@@ -18,17 +18,17 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
-from fleet.cli import node_agent
-from fleet.core import _test_hooks, staging
+from fleet.cli import node_agent, node_collect
+from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
     PASSING_TAIL,
     PROBED,
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
-    claim_replies,
+    held_answer,
+    launch,
     node_argv,
-    prebuilt_export,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, DEFAULT_SHA, FakeQueue, queue_job
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
@@ -36,47 +36,15 @@ from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
 
-def _launch(config_path: pathlib.Path) -> None:
-    """Run one tick that claims and launches, leaving a live ledger row.
-
-    Args:
-        config_path: The workspace document.
-    """
-    payload = prebuilt_export(config_path)
-    _test_hooks.run = FakeRun(claim_replies(staging.digest(payload), commit_present=True))
-    _test_hooks.http_post = FakeQueue(
-        [
-            dump_json_str({"jobs": []}),
-            dump_json_str({"claimed": queue_job(status="claimed", taskId=VERDICT_TASK)}),
-            dump_json_str({"job": queue_job(status="running", node="lavender")}),
-        ]
-    )
-    node_agent.main(node_argv(config_path))
-
-
-def _held(**overrides: str | None) -> str:
-    """The queue's answer listing the launched job as this runner's.
-
-    Args:
-        **overrides: Fields to vary on the row.
-
-    Returns:
-        The rendered ``dispatch_list`` answer.
-    """
-    return dump_json_str(
-        {"jobs": [queue_job(status="running", node="lavender", runId=DEMO_RUN_ID, **overrides)]}
-    )
-
-
 class TestCollecting:
     def test_a_finished_suite_posts_its_verdict_to_the_task_and_closes_both_sides(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _launch(sourced_config)
+        launch(sourced_config)
         _test_hooks.run = FakeRun([ok(""), ok("0 1757000060"), ok(""), ok(PASSING_TAIL), *PROBED])
         endpoint = FakeQueue(
             [
-                _held(taskId=VERDICT_TASK),
+                held_answer(taskId=VERDICT_TASK),
                 "posted",
                 dump_json_str({"job": queue_job(status="passed")}),
                 dump_json_str({"claimed": None}),
@@ -108,13 +76,13 @@ class TestCollecting:
     def test_a_job_with_no_task_is_addressed_to_the_submitter_in_the_fleet_room(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _launch(sourced_config)
+        launch(sourced_config)
         _test_hooks.run = FakeRun(
             [ok(""), ok("2 1757000060"), ok(""), ok("3 failed, 100 passed\n"), *PROBED]
         )
         endpoint = FakeQueue(
             [
-                _held(),
+                held_answer(),
                 "posted",
                 dump_json_str({"job": queue_job(status="failed")}),
                 dump_json_str({"claimed": None}),
@@ -136,11 +104,11 @@ class TestCollecting:
     def test_a_suite_still_running_has_its_lease_renewed(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _launch(sourced_config)
+        launch(sourced_config)
         _test_hooks.run = FakeRun([ok(""), ok(""), *PROBED])
         endpoint = FakeQueue(
             [
-                _held(),
+                held_answer(),
                 dump_json_str({"job": queue_job(status="running", node="lavender")}),
                 dump_json_str({"claimed": None}),
             ]
@@ -152,7 +120,7 @@ class TestCollecting:
         assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
         renewed = endpoint.arguments[1]
         assert renewed["action"] == "progress"
-        assert renewed["leaseSeconds"] == node_agent.CLAIM_LEASE_SECONDS
+        assert renewed["leaseSeconds"] == node_collect.CLAIM_LEASE_SECONDS
         assert renewed["note"] == f"still running on lavender as {DEMO_RUN_ID}"
 
     def test_a_job_whose_run_this_machine_never_had_is_left_alone(
@@ -194,9 +162,9 @@ class TestCollecting:
     def test_a_build_that_outlived_its_lease_stops_the_tick(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _launch(sourced_config)
+        launch(sourced_config)
         _test_hooks.run = FakeRun([ok(""), ok("0 1757003600")])
-        _test_hooks.http_post = FakeQueue([_held()])
+        _test_hooks.http_post = FakeQueue([held_answer()])
 
         with pytest.raises(AppError) as raised:
             node_agent.main(node_argv(sourced_config))
@@ -206,9 +174,9 @@ class TestCollecting:
     def test_a_held_running_row_without_a_sha_is_a_contract_fault(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _launch(sourced_config)
+        launch(sourced_config)
         _test_hooks.run = FakeRun([ok(""), ok("0 1757000060")])
-        _test_hooks.http_post = FakeQueue([_held(sha=None)])
+        _test_hooks.http_post = FakeQueue([held_answer(sha=None)])
 
         with pytest.raises(AppError) as raised:
             node_agent.main(node_argv(sourced_config))

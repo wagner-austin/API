@@ -32,8 +32,10 @@ from fleet.contracts.dispatch import (
     ClosingStatus,
     DispatchJob,
     DispatchLane,
+    ListingPage,
     decode_claim,
     decode_listing,
+    decode_listing_page,
     decode_reported,
 )
 from fleet.contracts.tags import NodeTag
@@ -50,6 +52,10 @@ URL_VARIABLE: Final = "FLEET_DISPATCH_URL"
 
 #: Where fleet-mcp is published on the host by default.
 DEFAULT_URL: Final = "http://127.0.0.1:8035/mcp"
+
+#: The page size a paged listing asks for: ``dispatch_list``'s own maximum,
+#: so a reader walking every page makes as few calls as the tool allows.
+LISTING_PAGE_LIMIT: Final = 100
 
 
 def load_credentials() -> McpCredentials:
@@ -301,6 +307,37 @@ def held_by(credentials: McpCredentials, *, agent: str) -> tuple[DispatchJob, ..
     )
 
 
+def cancelled_page(credentials: McpCredentials, *, agent: str, offset: int) -> ListingPage:
+    """List one page of the jobs cancelled while this runner held them.
+
+    A cancel keeps the row's ``claimed_by`` and ``run_id`` (MCPs
+    ``cancelDispatchJob`` sets only the status, detail, lease and close
+    time), so the runner that launched a build can still find it here after
+    :func:`held_by` has stopped returning it, and that is the only route a
+    cancel has to the node: the queue has no route to the tailnet.
+
+    Args:
+        credentials: Endpoint and headers.
+        agent: This runner's label.
+        offset: Where the page begins, ``0`` for the newest.
+
+    Returns:
+        The page, and where the next one begins.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    arguments: JSONObject = {
+        "claimedBy": agent,
+        "status": "cancelled",
+        "offset": offset,
+        "limit": LISTING_PAGE_LIMIT,
+    }
+    return decode_listing_page(
+        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
+    )
+
+
 def observe_sessions(
     credentials: McpCredentials,
     *,
@@ -421,11 +458,13 @@ def announce(
 __all__ = [
     "API_KEY_VARIABLE",
     "DEFAULT_URL",
+    "LISTING_PAGE_LIMIT",
     "RUNNER_HARNESS",
     "TENANT_ID_VARIABLE",
     "URL_VARIABLE",
     "VERDICT_ROOM",
     "announce",
+    "cancelled_page",
     "claim_next",
     "held_by",
     "identity_arguments",

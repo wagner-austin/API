@@ -367,12 +367,14 @@ class WindowsDialect:
             cache_root: The node's cache directory.
 
         Returns:
-            The script's text. Its last act writes the recipe's exit status
-            to the result file.
+            The script's text. Its first act records its own process id in
+            :data:`~fleet.core.names.PID_NAME`, for :meth:`stop_script`, and
+            its last writes the recipe's exit status to the result file.
         """
         log = names.log_path(target)
         result = f"{target}/{names.RESULT_NAME}"
         lines = [
+            f"$PID | Set-Content -LiteralPath '{target}/{names.PID_NAME}'",
             "$ErrorActionPreference = 'Continue'",
             f"$env:npm_config_cache = '{cache_root}/npm'",
             f"$env:POETRY_CACHE_DIR = '{cache_root}/pypoetry'",
@@ -496,21 +498,53 @@ class WindowsDialect:
             f"}}\n"
         )
 
-    def stop_script(self, run_id: str) -> str:
-        """Stop and unregister the task, never prompting.
+    def stop_script(self, *, target: str, run_id: str) -> str:
+        """End the build's process tree, then stop and unregister the task.
+
+        STOPPING THE TASK IS NOT STOPPING THE BUILD. ``Stop-ScheduledTask``
+        ends the process the task started and leaves its children running:
+        measured on sedona 2026-09-23, a probe task whose ``build.ps1`` ran a
+        native child read parent alive=False, child alive=True afterwards. So
+        the tree is ended first, by the process id the build recorded as its
+        first act, with ``taskkill /T /F``, which on the same probe ended the
+        parent, its child and its grandchild.
+
+        THE ID IS CHECKED BEFORE ANYTHING IS KILLED. A recorded id outlives
+        its process, and Windows reuses ids, so the kill happens only when
+        the process holding that id right now is running this dispatch's own
+        ``build.ps1``, read off its command line. A build that has finished
+        or died leaves an id that names nothing or names a stranger, and
+        either way nothing is killed. It kills by id and never by name or
+        pattern, which is the fleet's one rule about killing.
 
         ``-Confirm:$false`` because there is nobody at the node to answer, and
         an unanswered prompt would hang the cancel until its ssh timeout
         rather than stopping anything.
 
         Args:
+            target: Absolute remote directory holding the staged tree and the
+                build's recorded process id.
             run_id: The dispatch.
 
         Returns:
-            The script's text.
+            The script's text. ``taskkill`` exiting non-zero on a verified
+            process fails the script, so a stop that ended nothing is never
+            reported as one that did.
         """
         task = names.task_name(run_id)
+        pid_file = f"{target}/{names.PID_NAME}"
+        build = f"{target}/{names.BUILD_STEM}.ps1"
         return (
+            f"if (Test-Path -LiteralPath '{pid_file}') {{\n"
+            f"  $buildPid = [int](Get-Content -Raw -LiteralPath '{pid_file}').Trim()\n"
+            f'  $process = Get-CimInstance Win32_Process -Filter "ProcessId=$buildPid"\n'
+            f"  if ($null -ne $process -and $process.CommandLine -like '*{build}*') {{\n"
+            f"    & taskkill.exe /PID $buildPid /T /F\n"
+            f"    if ($LASTEXITCODE -gt 0) {{\n"
+            f'      throw "taskkill of $buildPid exited $LASTEXITCODE"\n'
+            f"    }}\n"
+            f"  }}\n"
+            f"}}\n"
             f"Stop-ScheduledTask -TaskName '{task}' -ErrorAction SilentlyContinue\n"
             f"Unregister-ScheduledTask -TaskName '{task}' -Confirm:$false "
             f"-ErrorAction SilentlyContinue\n"

@@ -425,6 +425,55 @@ def decode_listing(answer: str) -> tuple[DispatchJob, ...]:
     return tuple(decode_job(row, answer=answer) for row in jobs)
 
 
+class ListingPage(TypedDict):
+    """One page of a ``dispatch_list`` answer, with where the next begins.
+
+    Attributes:
+        jobs: The page's jobs, newest first as the tool returns them.
+        next_offset: The ``offset`` that asks for the following page, or
+            None on the last one.
+    """
+
+    jobs: tuple[DispatchJob, ...]
+    next_offset: int | None
+
+
+def decode_listing_page(answer: str) -> ListingPage:
+    """Decode a ``dispatch_list`` answer that may run past one page.
+
+    :func:`decode_listing` ignores the pagination block because what it
+    reads is bounded by what one runner holds. The jobs cancelled under a
+    runner are not bounded that way, they accumulate for as long as it
+    runs, so a reader of those needs the block, and a page boundary there is
+    ordinary rather than a sign the queue went wrong.
+
+    Args:
+        answer: The tool's text.
+
+    Returns:
+        The page.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` on a shape this cannot read,
+            including a ``nextOffset`` that is neither a whole number nor
+            null.
+    """
+    pagination = _envelope(answer, "pagination")
+    if not isinstance(pagination, dict):
+        raise _malformed(
+            f"'pagination' is {type(pagination).__name__}, not an object", answer=answer
+        )
+    next_offset = pagination.get("nextOffset", False)
+    if next_offset is None:
+        return ListingPage(jobs=decode_listing(answer), next_offset=None)
+    if isinstance(next_offset, bool) or not isinstance(next_offset, int):
+        raise _malformed(
+            f"'nextOffset' is {type(next_offset).__name__}, not a whole number or null",
+            answer=answer,
+        )
+    return ListingPage(jobs=decode_listing(answer), next_offset=next_offset)
+
+
 def encode_job_line(job: DispatchJob) -> str:
     """Render one job as the single line the agent logs.
 
@@ -460,9 +509,11 @@ __all__ = [
     "DispatchJob",
     "DispatchLane",
     "DispatchStatus",
+    "ListingPage",
     "decode_claim",
     "decode_job",
     "decode_listing",
+    "decode_listing_page",
     "decode_reported",
     "encode_job_line",
 ]

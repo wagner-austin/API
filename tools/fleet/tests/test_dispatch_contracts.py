@@ -19,6 +19,7 @@ from fleet.contracts.dispatch import (
     DispatchJob,
     decode_claim,
     decode_listing,
+    decode_listing_page,
     decode_reported,
     encode_job_line,
 )
@@ -240,6 +241,46 @@ class TestOtherEnvelopes:
             decode_listing(answer({"jobs": {"not": "an array"}}))
 
         assert "'jobs' is dict, not an array" in raised.value.message
+
+
+class TestListingPages:
+    def test_a_page_carries_its_jobs_and_where_the_next_begins(self) -> None:
+        page = decode_listing_page(
+            answer({"jobs": [queue_job()], "pagination": {"hasMore": True, "nextOffset": 100}})
+        )
+
+        assert [job["job_id"] for job in page["jobs"]] == ["aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"]
+        assert page["next_offset"] == 100
+
+    def test_the_last_page_says_so_with_null(self) -> None:
+        page = decode_listing_page(answer({"jobs": [], "pagination": {"nextOffset": None}}))
+
+        assert page == {"jobs": (), "next_offset": None}
+
+    @pytest.mark.parametrize(
+        ("pagination", "complaint"),
+        [
+            ({"nextOffset": "100"}, "'nextOffset' is str, not a whole number or null"),
+            ({"nextOffset": True}, "'nextOffset' is bool, not a whole number or null"),
+            ({"hasMore": False}, "'nextOffset' is bool, not a whole number or null"),
+        ],
+    )
+    def test_an_offset_that_is_not_a_whole_number_or_null_is_refused(
+        self, pagination: JSONObject, complaint: str
+    ) -> None:
+        """An absent member is refused as well, and not read as the last
+        page: a reader that stopped there would miss every later page."""
+        with pytest.raises(AppError) as raised:
+            decode_listing_page(answer({"jobs": [], "pagination": pagination}))
+
+        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
+        assert complaint in raised.value.message
+
+    def test_a_pagination_that_is_not_an_object_is_refused(self) -> None:
+        with pytest.raises(AppError) as raised:
+            decode_listing_page(answer({"jobs": [], "pagination": [100]}))
+
+        assert "'pagination' is list, not an object" in raised.value.message
 
 
 class TestRendering:

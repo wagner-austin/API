@@ -276,15 +276,18 @@ class Dialect(Protocol):
         """
         ...
 
-    def stop_script(self, run_id: str) -> str:
-        """The script that stops one dispatch's task or unit.
+    def stop_script(self, *, target: str, run_id: str) -> str:
+        """The script that stops one dispatch's build, its whole process tree.
 
         Args:
-            run_id: The dispatch.
+            target: Absolute remote directory holding the staged tree, where
+                a build that must be stopped by process id recorded it.
+            run_id: The dispatch, which names its own task or unit.
 
         Returns:
-            The script's text. It never prompts and it exits 0 whether or not
-            the task still existed.
+            The script's text. It never prompts, it ends every process the
+            build started and not only the one its task or unit launched, and
+            it exits 0 whether or not the build was still running.
         """
         ...
 

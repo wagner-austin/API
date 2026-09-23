@@ -35,7 +35,7 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
         assert names.RESULT_NAME in spoken.log_tail_script("/s/run", 5)
         assert names.task_name("r") in spoken.launch_script(target="/s/run", run_id="r")
         assert names.RESULT_NAME in spoken.result_script("/s/run")
-        assert names.task_name("r") in spoken.stop_script("r")
+        assert names.task_name("r") in spoken.stop_script(target="/s/run", run_id="r")
         assert "free_ram_gb" in spoken.capacity_probe_script()
         assert "poetry" in spoken.toolchain_probe_script()
         assert spoken.fleet_directory("austi") in {"C:/Users/austi/.fleet", "/home/austi/.fleet"}

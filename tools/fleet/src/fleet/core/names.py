@@ -23,6 +23,18 @@ from __future__ import annotations
 #: it as ``<RESULT_NAME>.log``.
 RESULT_NAME = "result.txt"
 
+#: Where a Windows build records its own process id, under its directory.
+#:
+#: THE STOP NEEDS THE BUILD'S PROCESS, NOT ONLY ITS TASK. Stopping the
+#: scheduled task ends the process the task started and nothing below it:
+#: measured on sedona 2026-09-23, a task whose ``build.ps1`` ran a native
+#: child read parent alive=False, child alive=True after
+#: ``Stop-ScheduledTask``, which is how a cancelled slime run's vitest held
+#: sedona for four hours. The build writes ``$PID`` here as its first act so
+#: the stop can end that tree by id. A Linux unit needs no such file: stopping
+#: it stops its whole control group.
+PID_NAME = "build.pid"
+
 #: The reassembled archive, under a dispatch's directory.
 ARCHIVE_NAME = "tree.tgz"
 
@@ -107,6 +119,19 @@ def cache_root(stage_root: str) -> str:
         ``<stage_root>/cache``.
     """
     return f"{stage_root}/{CACHE_DIRECTORY}"
+
+
+def dispatch_directory(stage_root: str, run_id: str) -> str:
+    """Where one dispatch's export, scripts and result live on its node.
+
+    Args:
+        stage_root: The node's declared stage root.
+        run_id: The dispatch.
+
+    Returns:
+        ``<stage_root>/<run_id>``.
+    """
+    return f"{stage_root}/{run_id}"
 
 
 def log_path(target: str) -> str:
@@ -264,6 +289,7 @@ __all__ = [
     "INSTALL_STEM",
     "LAUNCH_STEM",
     "LOG_TAIL_STEM",
+    "PID_NAME",
     "REASSEMBLE_STEM",
     "RESULT_NAME",
     "TOOLCHAIN_PROBE_STEM",
@@ -271,6 +297,7 @@ __all__ = [
     "companion_directory",
     "companion_stage_directory",
     "companion_stage_name",
+    "dispatch_directory",
     "log_path",
     "make_directory_stem",
     "recipe_directory",

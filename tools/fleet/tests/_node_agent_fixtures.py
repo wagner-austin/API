@@ -3,9 +3,10 @@ remote, the runner's argument list, the archive ``git archive`` would have
 produced, and the exact command sequence one claim tick issues.
 
 Support module, not a test module: ``test_node_agent.py`` (the claim tick and
-its refusals) and ``test_node_agent_collect.py`` (the collect tick, the
-announce and the entry points) both import from here, split at the file-size
-ceiling by which half of the tick they exercise.
+its refusals), ``test_node_agent_collect.py`` (the collect tick, the announce
+and the entry points) and ``test_node_collect_stop.py`` (the runs a tick
+stops) all import from here, split at the file-size ceiling by which part of
+the tick they exercise.
 """
 
 from __future__ import annotations
@@ -19,9 +20,17 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion, ProjectSource, encode_project_source
-from fleet.core import _test_hooks, queue
-from tests._queue_fakes import DEFAULT_SHA, FakeEnv
-from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, PROBE_OK, failed, ok, workspace_document
+from fleet.core import _test_hooks, queue, staging
+from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_job
+from tests.conftest import (
+    DEMO_PROJECT,
+    DEMO_RUN_ID,
+    PROBE_OK,
+    FakeRun,
+    failed,
+    ok,
+    workspace_document,
+)
 
 REMOTE = "https://github.com/wagner-austin/API.git"
 VERDICT_TASK = "fd5cabfa-a328-48f4-b5e9-3a02dd531ea5"
@@ -188,6 +197,42 @@ def claim_replies(digest: str, *, commit_present: bool) -> list[_test_hooks.Comm
     return replies
 
 
+def launch(config_path: pathlib.Path) -> None:
+    """Run one tick that claims and launches, leaving a live ledger row.
+
+    Lifted from ``test_node_agent_collect.py`` when the stop tests needed
+    the same starting point: a run lavender is building, which a later tick
+    collects, stops, or finds cancelled.
+
+    Args:
+        config_path: The workspace document.
+    """
+    payload = prebuilt_export(config_path)
+    _test_hooks.run = FakeRun(claim_replies(staging.digest(payload), commit_present=True))
+    _test_hooks.http_post = FakeQueue(
+        [
+            dump_json_str({"jobs": []}),
+            dump_json_str({"claimed": queue_job(status="claimed", taskId=VERDICT_TASK)}),
+            dump_json_str({"job": queue_job(status="running", node="lavender")}),
+        ]
+    )
+    node_agent.main(node_argv(config_path))
+
+
+def held_answer(**overrides: str | None) -> str:
+    """The queue's answer listing the launched job as this runner's.
+
+    Args:
+        **overrides: Fields to vary on the row.
+
+    Returns:
+        The rendered ``dispatch_list`` answer.
+    """
+    return dump_json_str(
+        {"jobs": [queue_job(status="running", node="lavender", runId=DEMO_RUN_ID, **overrides)]}
+    )
+
+
 __all__ = [
     "COMPANION_DIRECTORY",
     "COMPANION_REF",
@@ -198,6 +243,8 @@ __all__ = [
     "REMOTE",
     "VERDICT_TASK",
     "claim_replies",
+    "held_answer",
+    "launch",
     "node_argv",
     "prebuilt_companion",
     "prebuilt_export",

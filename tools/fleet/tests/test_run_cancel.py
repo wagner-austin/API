@@ -22,7 +22,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.cli import _config, cancel, run
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, dispatch, leases, records, staging
+from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, staging
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -290,14 +290,21 @@ class TestCancel:
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         self._dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped")])
+        runner = FakeRun([ok(""), ok("stopped")])
+        _test_hooks.run = runner
 
         assert (
             cancel.main([_config.CONFIG_FLAG, str(config_path), cancel.RUN_FLAG, DEMO_RUN_ID]) == 0
         )
 
+        node = loaded.workspace["nodes"][records.read_ledger(loaded.ledger)[0]["node"]]
+        stop_body = dialect.for_platform(node["platform"]).stop_script(
+            target=names.dispatch_directory(node["stage_root"], DEMO_RUN_ID), run_id=DEMO_RUN_ID
+        )
+        assert runner.stdin[0] == stop_body.encode("utf-8")
         rows = records.read_ledger(loaded.ledger)
         assert [row["outcome"] for row in rows] == ["running", "cancelled"]
+        assert rows[-1]["detail"] == "cancelled by fleet-cancel; was dispatched by opus-fleet-0904"
         assert records.read_feed(loaded.feed)[-1]["kind"] == "cancelled"
         assert leases.find_by_run(loaded.leases, run_id=DEMO_RUN_ID, now_unix=DEMO_NOW) is None
 

@@ -75,7 +75,7 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
             would otherwise make a finished run look like a running one
             forever, holding a node's budget against work that stopped.
     """
-    target = f"{node['stage_root']}/{run_id}"
+    target = names.dispatch_directory(node["stage_root"], run_id)
     spoken = dialect.for_platform(node["platform"])
     # A distinct script name from the build's own, so that reading a result
     # cannot overwrite the thing that produced it -- collection runs

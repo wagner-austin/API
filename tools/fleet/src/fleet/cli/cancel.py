@@ -3,17 +3,20 @@
 Usage:
     fleet-cancel --config fleet.json --run services-Model-Trainer-1757000000
 
-WHAT IT ACTUALLY DOES, in the order that matters. It stops the scheduled task
-(or, on a Linux node, the transient user unit) on the node, closes the ledger
-row as ``cancelled``, emits that on the feed,
-and releases the lease last -- so a failure part-way leaves the lease HELD,
-which expires on its own. Releasing first and failing after would free the
-environment while the record still said ``running``, and the next capacity
-check would count a dispatch that no longer exists.
+WHAT IT ACTUALLY DOES, in the order that matters. It ends the build on the
+node, its whole process tree and not only the scheduled task (or, on a Linux
+node, the transient user unit), closes the ledger row as ``cancelled``, emits
+that on the feed, and releases the lease last -- so a failure part-way leaves
+the lease HELD, which expires on its own. Releasing first and failing after
+would free the environment while the record still said ``running``, and the
+next capacity check would count a dispatch that no longer exists. The steps
+are :func:`fleet.core.stop.stop_and_finish`, which a node runner also takes
+when a queue job is cancelled under it.
 
-IT IS THE ONLY COMMAND THAT KILLS ANYTHING, and it kills exactly one dispatch
-by name. There is no sweep, no "cancel everything on this node", and no age
-heuristic. That is a direct response to what this fleet is for: the incident
+IT KILLS EXACTLY ONE DISPATCH, BY NAME. There is no sweep, no "cancel
+everything on this node", and no age heuristic; the node runner's own stops
+are as narrow, one run whose queue job was withdrawn or whose lease ran out
+(:mod:`fleet.cli.node_collect`). That is a direct response to what this fleet is for: the incident
 behind the package involved processes being destroyed by something that was
 not trying to destroy them, and a tool that could take out work it did not
 start would be the same hazard wearing a badge.
@@ -34,10 +37,9 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.logging import get_logger, setup_logging
 
 from fleet.cli import _config
-from fleet.contracts.feed import FeedEvent
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, is_live
 from fleet.contracts.workspace import require_node
-from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, remote
+from fleet.core import records, stop
 
 _log = get_logger(__name__)
 
@@ -103,54 +105,19 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     row = find_live_row(loaded, run_id=run_id)
     node = require_node(loaded.workspace, row["node"])
-    # The task or unit is named by names.task_name, the same function the
-    # dispatch launched it with; a second spelling here would be one rename
-    # away from a cancel that reports success having stopped nothing.
-    spoken = dialect.for_platform(node["platform"])
-    remote.run_script(
-        node["host"],
-        spoken.script_path(node["stage_root"], names.stop_stem(run_id)),
-        spoken.stop_script(run_id),
-        platform=node["platform"],
-    )
-
-    ended_unix = _test_hooks.now()
-    records.append_ledger(
+    stop.stop_and_finish(
+        loaded.leases,
         loaded.ledger,
-        dispatch.closed_row(
-            row,
-            outcome="cancelled",
-            exit_code=NO_EXIT_CODE,
-            ended_unix=ended_unix,
-            detail="cancelled by fleet-cancel",
-        ),
-    )
-    _emit_cancelled(loaded, row=row, ended_unix=ended_unix)
-    released = leases.release_if_held(loaded.leases, run_id=run_id, now_unix=ended_unix)
-
-    _log.info("cancelled %s on %s (%s)", run_id, row["node"], released)
-    return 0
-
-
-def _emit_cancelled(loaded: _config.LoadedWorkspace, *, row: LedgerEntry, ended_unix: int) -> None:
-    """Announce a cancellation on the feed.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        row: The row being closed.
-        ended_unix: When it was cancelled.
-    """
-    records.append_feed(
         loaded.feed,
-        FeedEvent(
-            at_unix=ended_unix,
-            run_id=row["run_id"],
-            node=row["node"],
-            project=row["project"],
-            kind="cancelled",
-            detail=f"cancelled by fleet-cancel; was dispatched by {row['agent']}",
-        ),
+        node=node,
+        row=row,
+        outcome="cancelled",
+        exit_code=NO_EXIT_CODE,
+        detail=f"cancelled by fleet-cancel; was dispatched by {row['agent']}",
     )
+
+    _log.info("cancelled %s on %s", run_id, row["node"])
+    return 0
 
 
 def entrypoint() -> None:

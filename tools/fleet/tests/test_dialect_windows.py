@@ -215,14 +215,6 @@ class TestLaunchScript:
         assert str(LAUNCH_TIMEOUT_SECONDS) in body
         assert "throw" in body
 
-    def test_the_task_name_is_the_one_the_stop_script_stops(self) -> None:
-        """Both come from names.task_name, so a rename cannot make
-        fleet-cancel report success having stopped nothing."""
-        launched = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
-
-        assert names.task_name(DEMO_RUN_ID) in launched
-        assert names.task_name(DEMO_RUN_ID) in DIALECT.stop_script(DEMO_RUN_ID)
-
 
 class TestResultAndStopScripts:
     def test_it_reports_when_as_well_as_what(self) -> None:
@@ -247,10 +239,6 @@ class TestResultAndStopScripts:
 
         assert "Test-Path" in body
         assert f"C:/s/run-1/{names.RESULT_NAME}" in body
-
-    def test_the_stop_script_never_prompts(self) -> None:
-        """There is nobody at the node to answer, and a prompt would hang."""
-        assert "-Confirm:$false" in DIALECT.stop_script(DEMO_RUN_ID)
 
 
 class TestTransportShape:

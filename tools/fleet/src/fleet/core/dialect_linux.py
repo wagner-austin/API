@@ -381,10 +381,16 @@ class LinuxDialect:
             f"fi\n"
         )
 
-    def stop_script(self, run_id: str) -> str:
+    def stop_script(self, *, target: str, run_id: str) -> str:
         """Stop the unit if it is still active, and say so either way.
 
+        Stopping a unit stops its control group, every process the build
+        started, so the unit's name is all this needs and ``target`` is not
+        read: the process id the Windows build records has no work to do here.
+
         Args:
+            target: Absolute remote directory holding the staged tree; unused
+                on this platform, for the reason above.
             run_id: The dispatch.
 
         Returns:

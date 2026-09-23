@@ -33,9 +33,11 @@ probe already taken, then takes the project's lease on this node, stages
 ``git archive`` of the commit through the same verified transport every
 dispatch uses, sends the build script with the project's install steps and
 the node's caches, launches it detached, and reports the run started. A
-later tick collects it: reads the result, reads the tail of the transcript,
-composes the verdict (:mod:`fleet.core.verdict`), posts it to the job's
-task thread or the submitter's feed, and closes the job on both sides.
+later tick collects it (:mod:`fleet.cli.node_collect`): reads the result,
+reads the tail of the transcript, composes the verdict
+(:mod:`fleet.core.verdict`), posts it to the job's task thread or the
+submitter's feed, and closes the job on both sides; or stops the build, when
+it runs past its lease or its queue job was cancelled under it.
 
 THE IDENTITY IS DERIVED, NOT CONFIGURED. The label is ``fleet-node-<alias>``
 and the session id is the version-5 UUID of that label, so every tick of one
@@ -67,10 +69,9 @@ from platform_core.mcp_client import McpCredentials
 from typing_extensions import TypedDict
 
 from fleet.cli import _config
-from fleet.cli import collect as collect_cli
 from fleet.cli import run as run_cli
+from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
-from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import ProjectSource
@@ -79,16 +80,11 @@ from fleet.contracts.workspace import require_node, require_project
 from fleet.core import (
     _test_hooks,
     capacity,
-    collect,
-    dialect,
     dispatch,
     export,
-    names,
     probe,
     queue,
     records,
-    remote,
-    verdict,
 )
 
 _log = get_logger(__name__)
@@ -97,12 +93,6 @@ NODE_FLAG = "--node"
 ANNOUNCE_FLAG = "--announce"
 
 _FLAGS = (_config.CONFIG_FLAG, NODE_FLAG)
-
-#: How long a claim survives without a report: the same hour the hub runner
-#: takes, covering the fetch, the staging and the wait until the next tick's
-#: collect renews it (:func:`collect_pass` renews every running job it holds,
-#: so the lease is never sized for the slowest suite in advance).
-CLAIM_LEASE_SECONDS = 3600
 
 #: The namespace the runner's session UUID is derived in.
 IDENTITY_NAMESPACE = uuid.NAMESPACE_URL
@@ -171,132 +161,6 @@ def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
         f"[{', '.join(job['required_tags'])}] but fleet.json declares "
         f"[{', '.join(declared)}] for {job['project']}; resubmit with the registry's tags"
     )
-
-
-def collect_one_job(
-    loaded: _config.LoadedWorkspace,
-    credentials: McpCredentials,
-    board: McpCredentials,
-    job: DispatchJob,
-    identity: JSONObject,
-) -> str:
-    """Close one running job out, on both sides, if its node has finished.
-
-    Lifted from ``fleet.cli.agent`` when the node lane took over the make
-    targets; the verdict post is what this lane adds to it.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers, for the verdict.
-        job: The queue job this runner holds.
-        identity: This runner's identity arguments.
-
-    Returns:
-        One line saying what happened, for the log.
-
-    Raises:
-        AppError: With a node or workspace code when the node cannot be
-            reached or its declaration has gone, ``LEASE_NOT_HELD`` when the
-            build was still writing after its lease lapsed, or
-            ``QUEUE_ANSWER_MALFORMED`` when a node-lane job carries no sha,
-            which the queue's pin makes impossible. Not caught: those mean
-            this machine's own records and the fleet disagree.
-    """
-    row: LedgerEntry | None = None
-    for candidate in collect_cli.live_rows(loaded, run_id=job["run_id"]):
-        row = candidate
-    if row is None:
-        return f"{encode_job_line(job)}: no live run on this machine, leaving it"
-    node = require_node(loaded.workspace, row["node"])
-    result = collect.poll_result(node, run_id=row["run_id"])
-    if result is None:
-        queue.report_progress(
-            credentials,
-            job_id=job["job_id"],
-            note=f"still running on {row['node']} as {row['run_id']}",
-            lease_seconds=CLAIM_LEASE_SECONDS,
-            identity=identity,
-        )
-        return f"{encode_job_line(job)}: still running, lease renewed"
-
-    plan = require_project(loaded.workspace, row["project"])
-    if collect.outlived_its_lease(row, plan, finished_unix=result["finished_unix"]):
-        raise collect_cli.lapsed_lease_refusal(row, plan, finished_unix=result["finished_unix"])
-
-    sha = require_sha(job)
-    exit_code = result["exit_code"]
-    detail = collect.describe(node, run_id=row["run_id"], exit_code=exit_code)
-    target = f"{node['stage_root']}/{row['run_id']}"
-    spoken = dialect.for_platform(node["platform"])
-    tail = remote.run_script(
-        node["host"],
-        spoken.script_path(target, names.LOG_TAIL_STEM),
-        spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
-        platform=node["platform"],
-    )
-    judged = verdict.judge(
-        job_id=job["job_id"],
-        project=row["project"],
-        sha=sha,
-        node=row["node"],
-        exit_code=exit_code,
-        tail=tail,
-        log_path=names.log_path(target),
-        run_id=row["run_id"],
-    )
-    line = verdict.render_verdict(judged)
-    queue.post_verdict(
-        board,
-        task_id=job["task_id"],
-        submitted_by=job["submitted_by"],
-        line=line,
-        identity=identity,
-    )
-    dispatch.finish(
-        loaded.leases,
-        loaded.ledger,
-        loaded.feed,
-        row=row,
-        outcome=collect.outcome_for(exit_code),
-        exit_code=exit_code,
-        detail=detail,
-    )
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status="passed" if exit_code == 0 else "failed",
-        exit_code=exit_code,
-        detail=line,
-        identity=identity,
-    )
-    return f"{encode_job_line(job)}: {line}"
-
-
-def collect_pass(
-    loaded: _config.LoadedWorkspace,
-    credentials: McpCredentials,
-    board: McpCredentials,
-    identity: JSONObject,
-    *,
-    agent: str,
-) -> None:
-    """Close out every finished job this runner is holding; renew the rest.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers.
-        identity: This runner's identity arguments.
-        agent: This runner's label.
-
-    Raises:
-        AppError: As :func:`collect_one_job` describes.
-    """
-    for job in queue.held_by(credentials, agent=agent):
-        if job["status"] != "running":
-            continue
-        _log.info("%s", collect_one_job(loaded, credentials, board, job, identity))
 
 
 def claim_pass(
@@ -417,29 +281,6 @@ class Prepared(TypedDict):
     workers: int
 
 
-def require_sha(job: DispatchJob) -> str:
-    """The commit a node-lane job names.
-
-    Args:
-        job: The claimed job.
-
-    Returns:
-        Its sha.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries none,
-            which the queue's pin (MCPs mig 532) makes impossible for a
-            node-lane row; a null here means the contract moved.
-    """
-    sha = job["sha"]
-    if sha is None:
-        raise AppError(
-            code=FleetErrorCode.QUEUE_ANSWER_MALFORMED,
-            message=f"node-lane job {job['job_id']} carries no sha; the queue's pin forbids it",
-        )
-    return sha
-
-
 def prepare(
     loaded: _config.LoadedWorkspace,
     job: DispatchJob,
@@ -534,7 +375,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     credentials = queue.load_credentials()
-    collect_pass(loaded, credentials, board, identity, agent=agent)
+    collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
     if claim_pass(loaded, credentials, identity, alias=alias, node=node) is None:
         _log.info("nothing in the node lane for %s", alias)
     return 0
@@ -564,18 +405,14 @@ if __name__ == "__main__":
 
 __all__ = [
     "ANNOUNCE_FLAG",
-    "CLAIM_LEASE_SECONDS",
     "IDENTITY_NAMESPACE",
     "NODE_FLAG",
     "Prepared",
     "claim_pass",
-    "collect_one_job",
-    "collect_pass",
     "entrypoint",
     "main",
     "node_identity",
     "prepare",
     "refuse",
-    "require_sha",
     "tags_refusal",
 ]

@@ -103,7 +103,7 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         DIALECT.log_tail_script(TARGET, 200),
         DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID),
         DIALECT.result_script(TARGET),
-        DIALECT.stop_script(DEMO_RUN_ID),
+        DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID),
         DIALECT.capacity_probe_script(),
         DIALECT.toolchain_probe_script(),
         DIALECT.observe_sessions_script(),
@@ -227,8 +227,10 @@ class TestLaunchScript:
         unit = names.task_name(DEMO_RUN_ID)
 
         assert unit in DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
-        assert f"systemctl --user is-active --quiet '{unit}'" in DIALECT.stop_script(DEMO_RUN_ID)
-        assert f"systemctl --user stop '{unit}'" in DIALECT.stop_script(DEMO_RUN_ID)
+        stopped = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
+
+        assert f"systemctl --user is-active --quiet '{unit}'" in stopped
+        assert f"systemctl --user stop '{unit}'" in stopped
 
 
 class TestResultAndStopScripts:
@@ -243,11 +245,18 @@ class TestResultAndStopScripts:
     def test_the_stop_script_is_guarded_and_always_reports(self) -> None:
         """systemctl stop of a collected unit exits 5; the cancel must still
         close the row, so the stop is guarded by is-active."""
-        body = DIALECT.stop_script(DEMO_RUN_ID)
+        body = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
         unit = names.task_name(DEMO_RUN_ID)
 
         assert body.count("systemctl --user stop") == 1
         assert body.rstrip().endswith(f"printf 'stopped {unit}\\n'")
+
+    def test_the_stop_reads_no_process_id(self) -> None:
+        """Stopping a unit stops its control group, the whole tree the build
+        started, so the id the Windows build records is neither written nor
+        read here, and the build script writes no such file."""
+        assert names.PID_NAME not in DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
+        assert names.PID_NAME not in _build(workers=4)
 
 
 class TestTransportShape:
