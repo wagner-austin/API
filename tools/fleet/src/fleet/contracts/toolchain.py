@@ -62,8 +62,9 @@ class RequiredTool(TypedDict):
         install: The command per package manager, keyed by the manager's own
             executable name. An EMPTY MAPPING means this package does not
             install that tool at all, which is a real state rather than a
-            gap: a node without a working Python 3.11 needs a decision, not a
-            package manager invocation.
+            gap: ``tar`` ships with the platform, and a manager that cannot
+            supply the version the fleet runs (Ubuntu's Node 18.19.1) is
+            left out rather than allowed to install the wrong one.
 
             A MAPPING RATHER THAN ONE COMMAND, and this was a defect before
             it was a design. The first version hardcoded ``choco install`` --
@@ -96,16 +97,78 @@ class ToolReport(TypedDict):
     version: str
 
 
+#: The exact Python a node is given when it has none.
+#:
+#: THE DECISION THIS PACKAGE ONCE REFUSED TO MAKE, made by the operator on
+#: 2026-09-23 after lavender took slime checks it could not run: the
+#: python.org build, at user scope, at the version every node already
+#: carried (sedona, lavender and the hub all answered ``Python 3.11.9`` from
+#: ``%LOCALAPPDATA%\\Programs\\Python\\Python311`` that day). User scope needs
+#: no elevation and lands at that same path, ahead of the Store alias on the
+#: user PATH. :data:`REQUIRED_PYTHON` is what a node is judged against; this
+#: is only what an install puts there, and a later 3.11 patch still passes.
+PINNED_PYTHON: Final = "3.11.9"
+
+#: Why a python install stops on a machine where this version is already registered.
+#:
+#: MEASURED ON LAVENDER, 2026-09-23. GitHub Actions' setup-python had put
+#: 3.11.9 in the runner's tool cache with the same python.org installer, and
+#: its component packages were registered machine-wide. The per-user winget
+#: install of the identical version was taken as a change to those same
+#: products and MOVED their files to ``Python311``: the tool cache kept only
+#: ``site-packages`` and ``Scripts``, and every Windows Python job on that
+#: runner failed at ``pip install poetry`` until the files were copied back.
+#: A registration without a usable python on the build PATH means an
+#: interpreter exists somewhere a second install would uproot, so the command
+#: stops with the reason instead, and the fix is to put that interpreter on
+#: the PATH. A node with python already on its PATH never reaches this, since
+#: it is not missing one.
+PYTHON_REGISTERED_MESSAGE: Final = (
+    f"Python {PINNED_PYTHON} is already registered on this machine (a setup-python tool "
+    "cache is one such copy); installing it again moves that copy's files, as it did on "
+    "lavender 2026-09-23. Put the registered interpreter on the build account's PATH instead."
+)
+
+#: The PowerShell that stops an install with :data:`PYTHON_REGISTERED_MESSAGE`.
+#:
+#: One plain line on stderr rather than ``Write-Error``, whose record wraps the
+#: text in a category and a position, so the node's transcript and the failed
+#: install's AppError carry the sentence and nothing else.
+PYTHON_REGISTERED_GUARD: Final = (
+    "if (Get-ItemProperty "
+    "'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',"
+    "'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' "
+    "-ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like "
+    f"'Python {PINNED_PYTHON} Core Interpreter*' }}) {{ [Console]::Error.WriteLine("
+    "'" + PYTHON_REGISTERED_MESSAGE.replace("'", "''") + "'); exit 1 }; "
+)
+
 #: Everything a node needs to run a project's ``make check``.
 #:
 #: ``tar`` is on the list even though every probed node had it, because the
 #: staging transport depends on it and a node acquired later may not. A
 #: requirement that is documented only by being satisfied is not documented.
+#:
+#: ``node`` joined on 2026-09-23 for the same reason: every node answered
+#: v24 that day, but nothing asked, and slime's check (tsc, eslint, vitest)
+#: cannot start without it. Presence is the requirement, like git and make.
+#: The winget and choco packages are each manager's current LTS, which was
+#: 24 on both when this was written (OpenJS.NodeJS.LTS 24.19.0, nodejs-lts
+#: 24.21.0).
 REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="python",
         reason="every project pins Python 3.11; poetry builds its venv from it",
-        install={},
+        install={
+            "winget": (
+                f"{PYTHON_REGISTERED_GUARD}winget install --id Python.Python.3.11 "
+                f"--version {PINNED_PYTHON} -e --scope user --source winget --silent "
+                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+            ),
+            "choco": (
+                f"{PYTHON_REGISTERED_GUARD}choco install python311 --version {PINNED_PYTHON} -y"
+            ),
+        },
     ),
     RequiredTool(
         name="poetry",
@@ -133,6 +196,17 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             ),
             "choco": "choco install make -y",
             "apt-get": "sudo apt-get install -y make",
+        },
+    ),
+    RequiredTool(
+        name="node",
+        reason="slime and the TypeScript packages run tsc, eslint and vitest under node",
+        install={
+            "winget": (
+                "winget install --id OpenJS.NodeJS.LTS -e --source winget --silent "
+                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco install nodejs-lts -y",
         },
     ),
     RequiredTool(
@@ -378,6 +452,9 @@ def decode_tool_report(value: JSONValue) -> ToolReport:
 
 __all__ = [
     "PACKAGE_MANAGERS",
+    "PINNED_PYTHON",
+    "PYTHON_REGISTERED_GUARD",
+    "PYTHON_REGISTERED_MESSAGE",
     "REQUIRED_PYTHON",
     "REQUIRED_TOOLS",
     "RequiredTool",
