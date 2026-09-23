@@ -49,7 +49,24 @@ TOOL="$REPO/tools/ci-wake"
 LEDGER="$TOOL/runs/pushes.jsonl"
 
 # git hands pre-push the remote's name and its location.
+REMOTE_NAME="${1-}"
 REMOTE_URL="${2-}"
+
+# A push to the wiki mirror (MCPs board task 3952274e) is not a
+# publication: the corvis wiki services on diphtheria read a clone of this
+# repository, kept at HEAD by a push from post-commit and from the end of
+# THIS hook, and that push runs this hook in turn. Nothing to enrol (no
+# Actions run will ever appear for it) and nothing to verify that the push
+# to origin did not, so it ends here, which is also what stops the mirror
+# push at the bottom from re-entering itself.
+MIRROR_REMOTE="$(git config --get wiki-mirror.remote 2>/dev/null || true)"
+if [ -n "$MIRROR_REMOTE" ] && [ "$REMOTE_NAME" = "$MIRROR_REMOTE" ]; then
+    exit 0
+fi
+
+# Read git's lines once: the enrolment loop and the mirror push at the end
+# both need them, and stdin can be read once.
+PUSH_INPUT="$(cat)"
 
 # The tool's own virtualenv, and NOTHING ELSE -- the interpreter its suite
 # ran against, so a green `make check` in that package is evidence about
@@ -98,7 +115,7 @@ ZERO="0000000000000000000000000000000000000000"
 # process inherits this loop's stdin and consumes the lines for the tips
 # after the first, so a push of three branches would enrol one -- and the
 # two it dropped would look exactly like pushes nobody made.
-while read -r local_ref local_sha _remote_ref _remote_sha; do
+printf '%s\n' "$PUSH_INPUT" | while read -r local_ref local_sha _remote_ref _remote_sha; do
     [ "$local_sha" = "$ZERO" ] && continue
     "$PYTHON" -m ci_wake.cli.enrol \
         --enrolment "$LEDGER" \
@@ -106,3 +123,16 @@ while read -r local_ref local_sha _remote_ref _remote_sha; do
         --sha "$local_sha" \
         --ref "$local_ref" < /dev/null
 done
+
+# The wiki mirror (MCPs board task 3952274e): every commit this push
+# publishes to main also goes to the bare mirror on diphtheria, fed the same
+# lines git gave this hook, so a commit published from a detached worktree
+# (which moved no local branch and fired no post-commit) reaches it too.
+# The script never fails the push; a host with no MCPs checkout beside this
+# one has no mirror role and says so.
+MIRROR="$REPO/../MCPs/scripts/ops/wiki-mirror-push.sh"
+if [ -f "$MIRROR" ]; then
+    printf '%s\n' "$PUSH_INPUT" | sh "$MIRROR" push "$REMOTE_NAME"
+else
+    echo "wiki-mirror: $MIRROR is not on this host; this push is not mirrored from here" >&2
+fi

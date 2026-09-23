@@ -1,0 +1,25 @@
+#!/bin/sh
+# Mirror the commit just made to diphtheria's bare copy of this repository,
+# where the corvis wiki services read a clone of it (MCPs board task
+# 3952274e). The four wikis under this repository (wiki/, clients/TankpitBot,
+# clients/NavProbe, clients/RustedWarfareBot, tools/hpc3) and the code-paths
+# audit's workspace mounts are served from that clone, so a page is
+# searchable and auditable once it is COMMITTED here, and this hook is what
+# makes "committed" mean "mirrored" without a separate step.
+#
+# THE LOGIC IS NOT IN THIS FILE, exactly as in pre-commit and pre-push: the
+# one script every mirrored repository runs is MCPs' scripts/ops/
+# wiki-mirror-push.sh, which reads this repository's wiki-mirror.* git config
+# keys (written by `make wiki-mirror-install` in MCPs) and never fails the
+# commit. A host with no MCPs checkout beside this one has no mirror role,
+# and says so in one line rather than pretending to have pushed.
+#
+# INSTALLED PER CLONE with the other hooks: `git config core.hooksPath
+# .githooks`, or `make install-hooks` from the repository root.
+
+MIRROR="$(git rev-parse --show-toplevel)/../MCPs/scripts/ops/wiki-mirror-push.sh"
+if [ -f "$MIRROR" ]; then
+    sh "$MIRROR" commit
+else
+    echo "wiki-mirror: $MIRROR is not on this host; this commit is not mirrored from here" >&2
+fi
