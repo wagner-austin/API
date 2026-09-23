@@ -139,7 +139,7 @@
     "slime": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,
-      "expected_minutes": 12,
+      "expected_minutes": 15,
       "required_tags": ["gpu", "windows"],
       "source": {
         "remote": "https://github.com/wagner-austin/slime.git",

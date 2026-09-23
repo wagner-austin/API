@@ -698,15 +698,45 @@ grows the same field. **Do not re-add it because the entry looks missing.**
 
 ## Cancelling
 
-`fleet-cancel` is the only command that kills anything, and it kills exactly
-one dispatch by name. There is no sweep, no "cancel everything on this node",
-and no age heuristic — a direct response to what this fleet is for, since the
-incident behind it was work destroyed by something that was not trying to
-destroy it.
+`fleet-cancel` kills exactly one dispatch by name. There is no sweep, no
+"cancel everything on this node", and no age heuristic — a direct response to
+what this fleet is for, since the incident behind it was work destroyed by
+something that was not trying to destroy it.
 
 It **will** cancel a run whose lease has already lapsed. That is precisely the
 wedge case, and refusing because the lease is gone would leave the only tool
 that can stop it unable to.
+
+**A stop ends the build's whole process tree, not only its task.** Stopping a
+scheduled task ends the process the task started and leaves its children
+running: measured on sedona 2026-09-23, a probe whose `build.ps1` ran a native
+child read parent alive=False, child alive=True after `Stop-ScheduledTask`.
+So a Windows build writes its own `$PID` to `build.pid` as its first act, and
+the stop runs `taskkill /PID <pid> /T /F` on it, but only when the process
+holding that id is still running this dispatch's own `build.ps1`, read off
+its command line, because ids are reused. A Linux unit needs none of this:
+stopping it stops its control group.
+
+**The node runner stops two kinds of run by itself**, through the same
+`fleet.core.stop` path (MCPs board task fd5cabfa):
+
+- **One whose queue job was cancelled under it.** `dispatch_cancel` marks the
+  queue row terminal and has no route to a node, and a cancelled job is not
+  live, so until this nothing looked at it again: slime-1790104328 was
+  cancelled at 2026-09-22 20:22Z and closed here only at 00:49Z, by hand. A
+  tick now lists the jobs cancelled while its runner held them (a cancel keeps
+  `claimedBy` and `runId`) whenever this machine's ledger has a live run on
+  the node that no held job names, and stops each one it finds, closing it
+  `cancelled`. A live run no cancelled job names, a `fleet-run` by hand, is
+  left alone.
+- **One still running past its lease.** A renewal used to have no deadline,
+  so a hung suite held its node for as long as it stayed hung. Past
+  `started + expected_minutes × 60 × 2` the environment is unprotected, so the
+  runner stops the build and closes the job `failed` with exit 124 and
+  `LEASE_NOT_HELD` in its verdict. A suite that legitimately needs longer
+  needs a larger `expected_minutes`; slime's went from 12 to 15 on
+  2026-09-23 because its measured runs took 1258 to 1446 s against a 1440 s
+  deadline.
 
 ## Why this is not `tools/hpc3`
 
