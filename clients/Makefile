@@ -13,3 +13,4 @@ test:
 
 check:
 	$(PYTHON) ../tools/maketools/scripts/run.py fan-out check .
+	@echo "=== ALL CHECKS PASSED ==="
