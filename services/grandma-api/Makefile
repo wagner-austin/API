@@ -24,6 +24,7 @@ test:
 	$(MAKE) -C web test
 
 check: lint test
+	@echo "=== ALL CHECKS PASSED ==="
 
 # The host-mode start/stop scripts and the log tail are PowerShell over a
 # Windows path and a Windows-only start (scripts/start.ps1 hard-codes the
