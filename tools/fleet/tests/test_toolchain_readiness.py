@@ -60,6 +60,18 @@ class TestAttemptToolchain:
         assert toolchain.read_reports("WARNING: banner\n") == ()
 
 
+class TestReadySummary:
+    def test_it_names_what_a_ready_node_was_judged_on(self) -> None:
+        assert (
+            toolchain.ready_summary(toolchain.read_reports(LAVENDER_2026_09_23))
+            == "python 3.11.9; poetry, git, make, node, tar present"
+        )
+        assert (
+            toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23))
+            == "python 3.11.15; poetry, git, make, node, tar present"
+        )
+
+
 class TestReadinessGap:
     def test_the_three_nodes_that_answered_ready_have_no_gap(self) -> None:
         for name, answer in (

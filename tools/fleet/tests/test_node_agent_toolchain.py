@@ -20,6 +20,7 @@ from fleet.cli import node_agent
 from fleet.contracts.toolchain import install_command
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
+    PROBED,
     _credentials_in_env,
     _sourced_config,
     node_argv,
@@ -55,6 +56,25 @@ def _tick(
     assert endpoint.tools == ["dispatch_list"]
     assert [call[0] for call in runner.calls] == ["ssh"] * 4
     return [record.getMessage() for record in caplog.records]
+
+
+class TestAToolchainThatCanBuild:
+    def test_a_ready_node_says_what_it_was_judged_on_and_asks_the_queue(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _test_hooks.run = FakeRun(PROBED)
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages[-2:] == [
+            "lavender toolchain ready: python 3.11.9; poetry, git, make, node, tar present",
+            "nothing in the node lane for lavender",
+        ]
 
 
 class TestAToolchainThatCannotBuild:
