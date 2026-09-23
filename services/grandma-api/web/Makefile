@@ -3,6 +3,7 @@ include ../../../scripts/make/shell.mk
 .PHONY: check lint typecheck test build serve dev
 
 check: lint typecheck test
+	@echo "=== ALL CHECKS PASSED ==="
 
 lint:
 	npm run lint
