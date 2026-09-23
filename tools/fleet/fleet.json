@@ -56,7 +56,7 @@
         "max_concurrent_runs": 2,
         "max_disk_gb": 40.0
       },
-      "enabled": true
+      "enabled": false
     },
     "diphtheria": {
       "host": "diphtheria",
