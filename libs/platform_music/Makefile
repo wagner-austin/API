@@ -29,3 +29,4 @@ test:
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
 check: lint | test
+	@echo "=== ALL CHECKS PASSED ==="
