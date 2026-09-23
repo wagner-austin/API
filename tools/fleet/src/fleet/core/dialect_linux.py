@@ -71,7 +71,11 @@ CAPACITY_PROBE_SCRIPT = (
 #: so that is what the probe asks for, and it reports the answer under the
 #: name the contract requires so :func:`fleet.contracts.toolchain.python_is_right`
 #: reads one report on every platform. The managers asked about are the two
-#: that exist here: ``apt-get`` for git and make, ``pipx`` for poetry.
+#: that exist here: ``apt-get`` for git and make, ``pipx`` for poetry. ``node``
+#: is asked and never installed here: Ubuntu 24.04's archive carries Node
+#: 18.19.1 where the fleet runs 24, and diphtheria's 24.21.0 came from the
+#: NodeSource repository (both read from ``apt-cache policy nodejs`` there,
+#: 2026-09-23), so a Linux node's Node is installed by hand.
 TOOLCHAIN_PROBE_SCRIPT = (
     PROLOGUE + "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -84,6 +88,7 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "report poetry poetry\n"
     "report git git\n"
     "report make make\n"
+    "report node node\n"
     "report tar tar\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"

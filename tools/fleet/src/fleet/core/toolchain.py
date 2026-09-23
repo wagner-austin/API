@@ -210,10 +210,10 @@ def installable(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
 
     Returns:
         The absent tools with a command for a manager this node has. A tool
-        is left out when the package knows no command for it -- python and
-        tar carry none, because which interpreter a machine should have is a
-        decision -- and also when the node lacks the manager that command
-        needs, which is a gap to report rather than a failure to raise.
+        is left out when the package knows no command for it on this node's
+        managers -- tar carries none, and python and node none for apt-get
+        -- and also when the node lacks the manager that command needs,
+        which is a gap to report rather than a failure to raise.
     """
     managers = available_managers(reports)
     return tuple(name for name in missing(reports) if install_command(name, managers))
