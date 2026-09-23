@@ -16,9 +16,13 @@ REPORTING IS THE DEFAULT AND INSTALLING IS NOT. These are other people's
 machines. A tool that installed software on one because a build wanted it
 would be doing the thing this package exists to stop -- acting on somebody
 else's computer without their knowing -- so ``--install`` has to be typed, and
-it only ever installs tools this package has a command for. Python and tar
-carry none deliberately: which interpreter a machine should have is a decision,
-not a package.
+it only ever installs tools this package has a command for. tar carries none,
+since it ships with the platform. Python carried none until 2026-09-23 on the
+grounds that which interpreter a machine should have is a decision; the
+operator made it that day (python.org 3.11.9 at user scope,
+:data:`fleet.contracts.toolchain.PINNED_PYTHON`), after lavender's runner
+met only the Store alias and every slime check it took died at its first
+python call.
 
 THE EXIT STATUS IS THE ANSWER. Zero when every node asked is ready, one when
 any is not, so this is usable as a gate in front of a dispatch rather than
