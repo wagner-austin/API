@@ -18,6 +18,7 @@ from platform_core.errors import AppError
 from maketools import _test_hooks, workspace
 from maketools.env_run import run_env
 from maketools.guard_run import run_guard
+from maketools.makefile_banner_rule import lint_banners
 from maketools.makefile_grammar import lint_grammar, render_violation
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
 from maketools.test_run import Runner, run_tests
@@ -143,17 +144,19 @@ def command_reap_stale(arguments: Sequence[str]) -> int:
 
 
 def command_lint_makefiles(arguments: Sequence[str]) -> int:
-    """``lint-makefiles``: the grammar over every tracked Makefile.
+    """``lint-makefiles``: the grammar and the banner rule over every tracked Makefile.
 
     Args:
         arguments: None expected.
 
     Returns:
-        1 when any Makefile is outside the grammar, else 0.
+        1 when any Makefile is outside the grammar or a ``check:`` target
+        does not print the pass banner last, else 0.
     """
     require_no_arguments("lint-makefiles", arguments)
     repo_root = repository_root()
-    examined, violations = lint_grammar(repo_root)
+    examined, grammar_violations = lint_grammar(repo_root)
+    violations = [*grammar_violations, *lint_banners(repo_root)]
     for violation in violations:
         _test_hooks.write_error(render_violation(violation, repo_root))
     if violations:
@@ -163,7 +166,7 @@ def command_lint_makefiles(arguments: Sequence[str]) -> int:
         return 1
     _test_hooks.write_line(
         f"lint-makefiles: {examined} tracked Makefile(s) in the portable grammar, "
-        "every one beginning with the shell prologue"
+        "every one beginning with the shell prologue and every check printing the pass banner"
     )
     return 0
 
