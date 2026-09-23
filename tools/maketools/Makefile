@@ -22,6 +22,7 @@ test:
 	$(PYTHON) scripts/run.py test
 
 check: lint | test
+	@echo "=== ALL CHECKS PASSED ==="
 
 lint-makefiles:
 	$(PYTHON) scripts/run.py lint-makefiles
