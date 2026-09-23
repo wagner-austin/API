@@ -22,6 +22,7 @@ from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion, ProjectSource, encode_project_source
 from fleet.core import _test_hooks, queue, staging
 from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_job
+from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import (
     DEMO_PROJECT,
     DEMO_RUN_ID,
@@ -42,9 +43,15 @@ COMPANION_REF = "main"
 COMPANION_DIRECTORY = "MCPs"
 COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
 
-#: The pre-claim probe every claiming tick pays: the script sent, then run,
-#: with lavender answering room for a dispatch.
-PROBED: tuple[_test_hooks.CommandResult, ...] = (ok(""), ok(PROBE_OK))
+#: The pre-claim probes every claiming tick pays, each script sent and then
+#: run: lavender answering room for a dispatch, then its toolchain as it
+#: answered on 2026-09-23, ready (MCPs board task bad56f65).
+PROBED: tuple[_test_hooks.CommandResult, ...] = (
+    ok(""),
+    ok(PROBE_OK),
+    ok(""),
+    ok(LAVENDER_2026_09_23),
+)
 
 #: A vitest transcript tail with the banner, as the collect pass reads it.
 PASSING_TAIL = (

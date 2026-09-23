@@ -38,6 +38,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
+from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -195,8 +196,10 @@ class TestCompanions:
         assert node_agent.main(node_argv(sourced)) == 0
 
         mirror = str(config_path.parent / "runs" / "mirrors" / "companion-wagner-austin-MCPs.git")
-        assert runner.calls[4] == ("git", "init", "--bare", "--quiet", mirror)
-        assert runner.calls[5] == (
+        # After the pre-claim probes and the project's two mirror commands.
+        base = len(PROBED) + 2
+        assert runner.calls[base] == ("git", "init", "--bare", "--quiet", mirror)
+        assert runner.calls[base + 1] == (
             "git",
             "-C",
             mirror,
@@ -207,9 +210,9 @@ class TestCompanions:
             COMPANION_REMOTE,
             f"+{COMPANION_REF}:refs/fleet/companion",
         )
-        assert runner.calls[6][3] == "rev-parse"
-        assert runner.calls[7][3] == "archive"
-        assert runner.calls[7][-1] == COMPANION_SHA
+        assert runner.calls[base + 2][3] == "rev-parse"
+        assert runner.calls[base + 3][3] == "archive"
+        assert runner.calls[base + 3][-1] == COMPANION_SHA
         sent = [body or b"" for body in runner.stdin]
         assert _companion_commit_script().encode() in sent
 
@@ -312,14 +315,15 @@ class TestClaiming:
         assert started["action"] == "start"
         assert started["node"] == "lavender"
         assert started["runId"] == "libs-demo-1757000000"
-        # The node's probe (two ssh calls) BEFORE the claim, then the mirror,
-        # the commit probe and the archive, then the fleet's own sequence:
-        # no tar of any working tree anywhere, and no second probe.
+        # The node's two probes, capacity then toolchain (two ssh calls each),
+        # BEFORE the claim, then the mirror, the commit probe and the archive,
+        # then the fleet's own sequence: no tar of any working tree anywhere,
+        # and no second probe.
         mirror = _mirror(sourced_config)
-        assert runner.calls[0][0] == "ssh"
-        assert runner.calls[1][0] == "ssh"
-        assert runner.calls[2] == ("git", "init", "--bare", "--quiet", mirror)
-        assert runner.calls[3] == (
+        probes = len(PROBED)
+        assert [call[0] for call in runner.calls[:probes]] == ["ssh"] * probes
+        assert runner.calls[probes] == ("git", "init", "--bare", "--quiet", mirror)
+        assert runner.calls[probes + 1] == (
             "git",
             "-C",
             mirror,
@@ -327,7 +331,7 @@ class TestClaiming:
             "-e",
             f"{DEFAULT_SHA}^{{commit}}",
         )
-        archive = runner.calls[4]
+        archive = runner.calls[probes + 2]
         assert archive[:6] == ("git", "-C", mirror, "archive", "--format=tar.gz", "-o")
         assert archive[7] == DEFAULT_SHA
         assert not any(call[0] == "tar" for call in runner.calls)
@@ -365,7 +369,7 @@ class TestClaiming:
         runner = _claim_and_start(sourced_config, commit_present=False)
 
         mirror = _mirror(sourced_config)
-        assert runner.calls[4] == (
+        assert runner.calls[len(PROBED) + 2] == (
             "git",
             "-C",
             mirror,
@@ -501,7 +505,7 @@ class TestRefusals:
             "PROJECT_TAGS_MISMATCH: the job requires [gpu] but fleet.json declares [] for "
             "libs/demo; resubmit with the registry's tags"
         )
-        assert [call[0] for call in runner.calls] == ["ssh", "ssh"]
+        assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED)
 
     def test_a_project_with_no_remote_is_refused_by_name(self, config_path: pathlib.Path) -> None:
         """The shared fixture's project declares ``source: null``."""
@@ -511,7 +515,7 @@ class TestRefusals:
         detail = self._refused_detail(config_path, queue_job(status="claimed"))
 
         assert detail.startswith("PROJECT_REMOTE_MISSING: project 'libs/demo' declares no source")
-        assert [call[0] for call in runner.calls] == ["ssh", "ssh"]
+        assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED)
 
     def test_a_sha_the_remote_lacks_is_refused_with_nothing_leased(
         self, sourced_config: pathlib.Path
@@ -556,7 +560,14 @@ class TestRefusals:
         something) and the claimed project, whose minimum is two workers,
         is refused after the claim with the engine's own code."""
         _test_hooks.run = FakeRun(
-            [ok(""), ok("free_ram_gb=6.0\nfree_disk_gb=860.0\n"), ok(""), ok("")]
+            [
+                ok(""),
+                ok("free_ram_gb=6.0\nfree_disk_gb=860.0\n"),
+                ok(""),
+                ok(LAVENDER_2026_09_23),
+                ok(""),
+                ok(""),
+            ]
         )
 
         detail = self._refused_detail(sourced_config, queue_job(status="claimed"))
