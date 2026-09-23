@@ -35,3 +35,4 @@ test: native-deps
 	$(MAKETOOLS) test
 
 check: lint | test
+	@echo "=== ALL CHECKS PASSED ==="
