@@ -22,7 +22,10 @@ has free first, and a node that does not answer or has room for nothing
 (:func:`fleet.core.capacity.room_for_any`) claims nothing, so the job stays
 in the lane for a node that can run it; the first tick of these runners
 (2026-09-21T10:00:02Z) had a sleeping node take the oldest job and refuse
-it while a live one found the lane empty.
+it while a live one found the lane empty. It then asks the node's build
+toolchain (:func:`fleet.core.toolchain.readiness_gap`, MCPs board task
+bad56f65), and a node missing a tool or on the wrong Python claims nothing
+either, naming the tool and the command that would install it there.
 
 WHAT A CLAIMED JOB BECOMES. The job names a project and a commit. The runner
 re-checks the job's tags against the registry's declaration for the project,
@@ -85,6 +88,7 @@ from fleet.core import (
     probe,
     queue,
     records,
+    toolchain,
 )
 
 _log = get_logger(__name__)
@@ -185,7 +189,13 @@ def claim_pass(
     live node beside it found nothing (:func:`fleet.core.capacity.room_for_any`
     carries the measurement), so a node that does not answer, or has room
     for nothing, claims nothing this tick and the job stays for one that
-    can run it.
+    can run it. The same holds for its TOOLCHAIN, asked second
+    (:func:`fleet.core.toolchain.attempt_toolchain`, over the ssh account
+    whose SID the build's scheduled task is registered for): lavender
+    claimed slime jobs d515d038 and 7235d4c4, staged a whole export and ran
+    npm ci before dying at the Makefile's first python call on the Store
+    alias stub (MCPs board task e62c8120), so a node missing a tool now logs
+    the code, the tool and this node's install command and claims nothing.
 
     Returns:
         The job that was claimed, whatever became of it, or None when this
@@ -207,6 +217,19 @@ def claim_pass(
     full = capacity.room_for_any(node, state)
     if full is not None:
         _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
+        return None
+    answered = toolchain.attempt_toolchain(node)
+    if not isinstance(answered, tuple):
+        _log.info(
+            "%s did not answer the toolchain probe; claiming nothing: %s: %s",
+            alias,
+            answered["code"],
+            answered["message"],
+        )
+        return None
+    gap = toolchain.readiness_gap(alias, node, answered)
+    if gap is not None:
+        _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
         return None
     job = queue.claim_next(
         credentials,
