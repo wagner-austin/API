@@ -40,3 +40,4 @@ test:
 	$(MAKETOOLS) test --serial
 
 check: lint | test
+	@echo "=== ALL CHECKS PASSED ==="
