@@ -88,6 +88,10 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
     # One post per tick at most, boundaries only, progress folded as
     # counts; the journal's 'agent' field (MCPs 66b85d32) supplies the
     # mention target. Standing task id: LOCK_WAKE_TASK_ID in runs/env.ps1.
+    # The check journal beside it (MCPs board task ea2ea29c) carries the
+    # check lock's finished make test runs, posted unaddressed in the same
+    # post; it is its own file because older readers of the fleet journal
+    # refuse a kind they do not declare.
     {
         "name": "lock-wake",
         "args": (
@@ -96,6 +100,8 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
             "lock-wake",
             "--journal",
             "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
+            "--check-journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.check-events.jsonl",
         ),
         "cwd": "..\\lock-wake",
     },
