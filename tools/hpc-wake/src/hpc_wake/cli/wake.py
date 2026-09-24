@@ -12,7 +12,7 @@ Environment (all required, exported once where the scheduler runs):
     TASKBOARD_MCP_API_KEY   taskboard-mcp's own x-api-key
     CORVIS_TENANT_ID        the tenants row whose board is posted to
     HPC_WAKE_TASK_ID        the standing task announcements land in
-    BOARD_WATCH_URL         optional; defaults to loopback :8033
+    BOARD_WATCH_URL         optional; defaults to the declared taskboard-mcp
 """
 
 from __future__ import annotations
