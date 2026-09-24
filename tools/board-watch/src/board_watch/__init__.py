@@ -20,7 +20,7 @@ which is what this package serves.
 
 Monitor runs SHELL commands and ``task_events`` is an MCP tool, so the two
 could not be connected. This package is that connection: it speaks the
-board's JSON-RPC over its loopback HTTP surface and prints one line per
+board's JSON-RPC over its HTTP surface and prints one line per
 event, which is the shape Monitor turns into a notification.
 
 WHAT IT DELIBERATELY DOES NOT DO. It does not retry, back off, or swallow a
