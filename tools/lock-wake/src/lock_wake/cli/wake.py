@@ -1,7 +1,7 @@
 """CLI: run one bridge cycle and exit.
 
 Usage:
-    lock-wake --journal /path/to/.fleet-events.jsonl
+    lock-wake --journal /path/to/.fleet-events.jsonl --check-journal /path/to/.check-events.jsonl
 
 One cycle, then exit. The interval belongs to the pump that calls this
 (``tools/hpc-wake/scripts/run_cycle.py``'s PUBLISHERS table), where it is
@@ -11,7 +11,9 @@ THE JOURNAL IS NAMED, NOT DISCOVERED: it lives in another repository's
 root, and a bridge that guessed at repo layout would break the day the
 layout moved while reading as a quiet fleet. The position file derives
 from the journal's path (:func:`lock_wake.position.position_path`), so
-the two cannot disagree.
+the two cannot disagree. Both journals are required: the check journal is
+the MCPs check lock's record of finished ``make test`` runs, beside the
+fleet journal in the same clone root (MCPs board task ea2ea29c).
 
 Environment (all required, exported once where the pump runs):
     TASKBOARD_MCP_API_KEY   taskboard-mcp's own x-api-key
@@ -32,11 +34,13 @@ from lock_wake.cycle import run_cycle
 
 JOURNAL_FLAG = "--journal"
 
-ALLOWED_FLAGS = (JOURNAL_FLAG,)
+CHECK_JOURNAL_FLAG = "--check-journal"
+
+ALLOWED_FLAGS = (JOURNAL_FLAG, CHECK_JOURNAL_FLAG)
 
 
 def main(argv: Sequence[str]) -> int:
-    """Run one cycle against the journal named on the command line.
+    """Run one cycle against the two journals named on the command line.
 
     Args:
         argv: Arguments excluding the program name.
@@ -50,12 +54,15 @@ def main(argv: Sequence[str]) -> int:
             :func:`lock_wake.cycle.run_cycle`.
         JSONTypeError: A journal line or position file that does not
             decode.
-        ValueError: A missing ``--journal`` flag, or a position past the
-            journal's end.
+        ValueError: A missing ``--journal`` or ``--check-journal`` flag, or
+            a position past a journal's end.
         OSError: A file that cannot be read or written.
     """
     parsed = cli_args.parse_single_flags(argv, ALLOWED_FLAGS)
-    run_cycle(pathlib.Path(cli_args.require_flag(parsed, JOURNAL_FLAG)))
+    run_cycle(
+        pathlib.Path(cli_args.require_flag(parsed, JOURNAL_FLAG)),
+        pathlib.Path(cli_args.require_flag(parsed, CHECK_JOURNAL_FLAG)),
+    )
     return 0
 
 
