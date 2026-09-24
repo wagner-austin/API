@@ -20,11 +20,17 @@ locked compose target. Since MCPs `66b85d32` each row carries `agent`, the
 session label behind the invocation when its shell exported
 `BOARD_AGENT_LABEL`; history rows without the key read as unlabelled.
 
-One kind is not a lock transition: `checked`, one finished `make test` run
-under the MCPs per-package check lock (`packages/maketools` `check_lock`),
-written here so check results and rebuilds share one stream (MCPs board
-task `ea2ea29c`). Its `label` is the package and its `detail` the outcome,
-exit code, seconds and HEAD.
+It also reads a second journal beside it, `.check-events.jsonl`: the MCPs
+per-package check lock's (`packages/maketools` `check_lock`) record of
+finished `make test` runs, one `checked` row each, in the same record
+shape, so check results and rebuilds share one stream (MCPs board task
+`ea2ea29c`). Its `label` is the package and its `detail` the outcome, exit
+code, seconds, HEAD and tree. The rows are their own file because every
+checkout's older reader of `.fleet-events.jsonl` refuses a kind it does not
+declare: for six minutes on 2026-09-24 they went into the fleet journal and
+the hub's `make fleet-status` died on them. A lock transition found in the
+check journal is refused, not announced. Each journal keeps its own cursor
+beside it, and both advance only after the tick's post.
 
 The position is a byte offset kept beside the journal
 (`.fleet-events.jsonl.lock-wake-offset.json`), per the journal's own
@@ -46,7 +52,7 @@ the post reaches only the sessions subscribed to the standing task.
 ## Running
 
 ```
-lock-wake --journal C:\Users\Test\PROJECTS\MCPs\.fleet-events.jsonl
+lock-wake --journal C:\Users\Test\PROJECTS\MCPs\.fleet-events.jsonl --check-journal C:\Users\Test\PROJECTS\MCPs\.check-events.jsonl
 ```
 
 One cycle, then exit. The interval belongs to the pump
