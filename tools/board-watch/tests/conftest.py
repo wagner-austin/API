@@ -34,9 +34,10 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.mcp_client import McpCredentials, McpHttpResponse, urllib_mcp_post
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from board_watch import _test_hooks
-from board_watch.config import API_KEY_VARIABLE, TENANT_ID_VARIABLE
+from board_watch.config import API_KEY_VARIABLE, TENANT_ID_VARIABLE, URL_VARIABLE
 from board_watch.contracts import EMPTY_FEED_SENTINEL
 
 #: A real ``task_events`` row carrying mentions and a truncated body.
@@ -73,7 +74,7 @@ LIVE_MULTILINE_ROW: Final = (
 
 #: The credentials every client test posts with.
 TEST_CREDENTIALS: Final = McpCredentials(
-    url="http://127.0.0.1:8033/mcp",
+    url=DECLARED_TASKBOARD_URL,
     api_key="test-key",
     tenant_id="2e137b5f-0000-4000-8000-000000000000",
 )
@@ -365,6 +366,10 @@ def refused(status: int, body: str) -> McpHttpResponse:
 def set_environment() -> FakeEnv:
     """Bind a complete environment and return it.
 
+    The url is the OVERRIDE, so a test that loads credentials never reads
+    the MCPs checkout's endpoint declaration; ``test_config`` removes it to
+    test that default against a declaration it supplies.
+
     Returns:
         The bound environment, so a test can mutate it further.
     """
@@ -372,6 +377,7 @@ def set_environment() -> FakeEnv:
         {
             API_KEY_VARIABLE: TEST_CREDENTIALS["api_key"],
             TENANT_ID_VARIABLE: TEST_CREDENTIALS["tenant_id"],
+            URL_VARIABLE: TEST_CREDENTIALS["url"],
         }
     )
     _test_hooks.env = environment
