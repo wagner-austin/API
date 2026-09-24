@@ -17,7 +17,11 @@ into every shell it spawns as ``CLAUDE_CODE_SESSION_ID`` (measured
 2026-09-16, MCPs board task d207df8a). The board binds one label to one
 session id on that session's first write and never releases it
 (``assertSessionLabel``, mig 415), and ``task_whereis(session=<id>)`` on
-the taskboard's loopback surface answers with that binding. It is called
+the taskboard answers with that binding. The taskboard is found where the
+MCPs repository declares it (``scripts/fleet/stack-endpoints.json``), not
+at a loopback port: the hub stopped forwarding those on 2026-09-24 (MCPs
+board task c6fc4882), and every push failed enrolment until this read the
+declaration. It is called
 through :func:`platform_core.mcp_client.call_mcp_tool` with the stack's
 ``MCP_INTERNAL_KEY`` and ``OPERATOR_TENANT_ID`` read from the MCPs
 repository's ``.env``, the same file and the same two keys the
@@ -47,6 +51,7 @@ from typing import Final, TypedDict
 from platform_core.error_codes_tooling import SessionLabelErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials, McpPostProtocol, call_mcp_tool
+from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH, TASKBOARD_SERVICE, declared_url
 
 #: Environment variable the harness exports carrying the acting session's id.
 SESSION_ID_VARIABLE: Final = "CLAUDE_CODE_SESSION_ID"
@@ -61,9 +66,6 @@ STACK_ENV_PATH: Final = pathlib.Path.home() / "PROJECTS" / "MCPs" / ".env"
 #: The two keys read from it.
 API_KEY_NAME: Final = "MCP_INTERNAL_KEY"
 TENANT_ID_NAME: Final = "OPERATOR_TENANT_ID"
-
-#: Where taskboard-mcp is published on the host.
-TASKBOARD_URL: Final = "http://127.0.0.1:8033/mcp"
 
 #: The tool that answers "which label is bound to this session id".
 WHEREIS_TOOL: Final = "task_whereis"
@@ -120,15 +122,17 @@ def require_session_id(value: str) -> str:
     return value
 
 
-def stack_credentials(env_text: str) -> McpCredentials:
+def stack_credentials(env_text: str, url: str) -> McpCredentials:
     """Read the taskboard's credentials out of the stack's ``.env`` text.
 
     Args:
         env_text: The whole file. ``NAME=value`` lines, values optionally
             quoted; everything else is ignored.
+        url: The taskboard's declared url
+            (:func:`platform_core.stack_endpoints.declared_url`).
 
     Returns:
-        The credentials, bound to :data:`TASKBOARD_URL`.
+        The credentials, bound to ``url``.
 
     Raises:
         AppError: ``CREDENTIALS_MISSING`` when either key is absent or
@@ -151,7 +155,7 @@ def stack_credentials(env_text: str) -> McpCredentials:
                     "who this session is"
                 ),
             )
-    return McpCredentials(url=TASKBOARD_URL, api_key=api_key, tenant_id=tenant_id)
+    return McpCredentials(url=url, api_key=api_key, tenant_id=tenant_id)
 
 
 def bound_label(whereis_text: str) -> str:
@@ -182,7 +186,8 @@ def read_identity(
         session_id: ``CLAUDE_CODE_SESSION_ID`` as the sanctioned reader
             returned it: None when unset or blank.
         exported: ``BOARD_AGENT_LABEL`` the same way.
-        read_text: The caller's file seam, for the stack's ``.env``.
+        read_text: The caller's file seam, for the stack's ``.env`` and its
+            endpoint declaration.
         post: The caller's HTTP seam.
 
     Returns:
@@ -191,17 +196,18 @@ def read_identity(
 
     Raises:
         AppError: ``SESSION_ID_MALFORMED`` or ``CREDENTIALS_MISSING`` from
-            the readers, and the :class:`McpClientErrorCode` failures of
-            the call: the board that cannot be asked is raised, never read
-            as unbound.
+            the readers, ``STACK_ENDPOINT_UNDECLARED`` from
+            :func:`platform_core.stack_endpoints.declared_url`, and the
+            :class:`McpClientErrorCode` failures of the call: the board
+            that cannot be asked is raised, never read as unbound.
     """
     declared = "" if exported is None else exported
     if session_id is None:
         return SessionIdentity(session_id="", exported=declared, bound="")
     session = require_session_id(session_id)
-    text = call_mcp_tool(
-        post, stack_credentials(read_text(STACK_ENV_PATH)), WHEREIS_TOOL, {"session": session}
-    )
+    url = declared_url(read_text(STACK_ENDPOINTS_PATH), TASKBOARD_SERVICE)
+    credentials = stack_credentials(read_text(STACK_ENV_PATH), url)
+    text = call_mcp_tool(post, credentials, WHEREIS_TOOL, {"session": session})
     return SessionIdentity(session_id=session, exported=declared, bound=bound_label(text))
 
 
@@ -297,7 +303,6 @@ __all__ = [
     "LABEL_VARIABLE",
     "SESSION_ID_VARIABLE",
     "STACK_ENV_PATH",
-    "TASKBOARD_URL",
     "TENANT_ID_NAME",
     "WHEREIS_TOOL",
     "SessionIdentity",

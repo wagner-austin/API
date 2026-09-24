@@ -505,6 +505,22 @@ class SessionLabelErrorCode(ErrorCodeBase):
     CREDENTIALS_MISSING = "SESSION_LABEL_CREDENTIALS_MISSING"
 
 
+class StackEndpointErrorCode(ErrorCodeBase):
+    """Reading where the MCPs stack's services are reached from this machine.
+
+    Shared by every tool here that calls the stack -- the session-label
+    resolution and the board pollers -- through
+    :mod:`platform_core.stack_endpoints`, the one reader of the MCPs
+    repository's ``scripts/fleet/stack-endpoints.json``.
+    """
+
+    # The declaration carries no non-empty url for the service asked about,
+    # so there is nowhere to call. The declaration is the one place the
+    # stack's addresses are written since the hub stopped forwarding loopback
+    # ports (MCPs board task c6fc4882), so no address is assumed instead.
+    UNDECLARED = "STACK_ENDPOINT_UNDECLARED"
+
+
 class MaketoolsErrorCode(ErrorCodeBase):
     """What the Makefile recipes' launcher (``tools/maketools``) refuses.
 

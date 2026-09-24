@@ -195,12 +195,40 @@ def notes_sent(poster: FakeHttpPost) -> list[JSONObject]:
     return [sent_arguments(body) for body in poster.bodies[1:]]
 
 
+#: The taskboard url :func:`stack_endpoints_text` declares by default:
+#: deliberately not any address the real stack uses, so an assertion that
+#: finds it proves the url came from the declaration the test supplied.
+DECLARED_TASKBOARD_URL = "http://taskboard.declared.test:8033/mcp"
+
+
+def stack_endpoints_text(taskboard_url: str = DECLARED_TASKBOARD_URL) -> str:
+    """The MCPs stack's endpoint declaration, declaring only the taskboard.
+
+    Shared rather than written into each suite because three packages
+    (``platform_core``, ``ci-wake``, ``hpc3``) answer the same file for
+    :mod:`platform_core.session_label`, and the declaration's shape is the
+    MCPs repository's ``scripts/fleet/stack-endpoints.json``, one place to
+    follow it when it changes.
+
+    Args:
+        taskboard_url: The url to declare for ``taskboard-mcp``.
+
+    Returns:
+        The file's text.
+    """
+    return dump_json_str(
+        {"services": {"taskboard-mcp": {"runsOn": "diphtheria", "url": taskboard_url}}}
+    )
+
+
 __all__ = [
+    "DECLARED_TASKBOARD_URL",
     "FakeHttpPost",
     "announcing_poster",
     "notes_sent",
     "posted_ok",
     "sent_arguments",
     "sse_body",
+    "stack_endpoints_text",
     "tool_text_body",
 ]
