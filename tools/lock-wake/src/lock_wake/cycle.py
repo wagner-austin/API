@@ -30,25 +30,34 @@ from platform_core.board import post_to_task, register_service_session
 from lock_wake import _test_hooks
 from lock_wake.announce import announcement
 from lock_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
-from lock_wake.journal import read_journal_slice
+from lock_wake.journal import read_journal_slice, require_check_rows
 from lock_wake.position import position_path, read_offset, write_offset
 
 
-def run_cycle(journal: pathlib.Path) -> None:
-    """Run one bridge cycle against one journal.
+def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
+    """Run one bridge cycle against the fleet journal and the check journal.
+
+    Both are read from their own positions, folded into at most one post,
+    and both positions advance only after that post, or after the decision
+    that there is nothing to post -- so the at-least-once order holds for
+    each file.
 
     Args:
         journal: Path to ``.fleet-events.jsonl``, the lock wrapper's
             append-only record.
+        check_journal: Path to ``.check-events.jsonl``, the MCPs check
+            lock's record of finished ``make test`` runs, kept apart from the
+            fleet journal because every checkout's older reader of that file
+            refuses a kind it does not declare (MCPs board task ea2ea29c).
 
     Raises:
         AppError: Configuration (missing credentials or task id) or the
             board refusing a post.
         JSONTypeError: A journal line or position file that does not
-            decode.
+            decode, or a check journal holding a lock transition.
         InvalidJsonError: A journal line or position file that is not
             JSON at all.
-        ValueError: A position pointing past the journal's end -- the
+        ValueError: A position pointing past a journal's end -- the
             journal was truncated or replaced, and the operator decides,
             not this reader.
         OSError: A journal or position file that cannot be read or
@@ -58,19 +67,21 @@ def run_cycle(journal: pathlib.Path) -> None:
     task_id = load_task_id()
 
     marks = position_path(journal)
-    offset = read_offset(marks)
-    journal_slice = read_journal_slice(journal, offset)
-    events = journal_slice["events"]
+    check_marks = position_path(check_journal)
+    journal_slice = read_journal_slice(journal, read_offset(marks))
+    check_slice = read_journal_slice(check_journal, read_offset(check_marks))
+    require_check_rows(check_slice["events"], check_journal)
+    events = journal_slice["events"] + check_slice["events"]
+    offsets = f"offsets {journal_slice['next_offset']} and {check_slice['next_offset']}"
     if events == ():
-        _test_hooks.emit(f"journal quiet; offset {offset}")
+        _test_hooks.emit(f"journals quiet; {offsets}")
         return
 
     post = announcement(events)
     if post is None:
         write_offset(marks, journal_slice["next_offset"])
-        _test_hooks.emit(
-            f"{len(events)} progress line(s), no boundary; offset {journal_slice['next_offset']}"
-        )
+        write_offset(check_marks, check_slice["next_offset"])
+        _test_hooks.emit(f"{len(events)} progress line(s), no boundary; {offsets}")
         return
 
     # THE LEDGER GATE COMES FIRST, and it is why all three bridges went
@@ -95,6 +106,7 @@ def run_cycle(journal: pathlib.Path) -> None:
         body=post["body"],
     )
     write_offset(marks, journal_slice["next_offset"])
+    write_offset(check_marks, check_slice["next_offset"])
     tagged = " ".join(f"@{agent}" for agent in post["agents"])
     _test_hooks.emit(
         f"posted {post['holds']} hold(s) and {post['checks']} check run(s) "

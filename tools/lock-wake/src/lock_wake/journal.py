@@ -287,10 +287,36 @@ def read_journal_slice(journal: pathlib.Path, offset: int) -> JournalSlice:
     return JournalSlice(events=tuple(events), next_offset=offset + last_newline + 1)
 
 
+def require_check_rows(events: tuple[LockEvent, ...], journal: pathlib.Path) -> None:
+    """Refuse a check journal slice holding anything but finished runs.
+
+    The check lock writes its rows to their own file (MCPs
+    ``packages/maketools`` ``check_lock``, ``.check-events.jsonl``) because
+    every checkout's older reader of the fleet journal refuses a kind it does
+    not declare. A lock transition in that file is a writer pointed at the
+    wrong journal, and announcing it as a check run would report something
+    that never happened.
+
+    Args:
+        events: The check journal slice's events.
+        journal: The check journal's path, for the refusal.
+
+    Raises:
+        JSONTypeError: When any event's kind is not ``checked``.
+    """
+    strays = sorted({event["kind"] for event in events if event["kind"] != "checked"})
+    if strays:
+        raise JSONTypeError(
+            f"{journal} holds {', '.join(strays)} rows; the check journal carries only "
+            f"checked rows, and a lock transition here means a writer chose the wrong file"
+        )
+
+
 __all__ = [
     "EVENT_KINDS",
     "JournalSlice",
     "LockEvent",
     "decode_lock_event",
     "read_journal_slice",
+    "require_check_rows",
 ]
