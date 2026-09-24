@@ -34,6 +34,7 @@ from typing import Final, Literal
 
 import pytest
 from platform_core.config import config_test_hooks
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from ci_wake import _test_hooks
 from ci_wake.announce import PushReport, RunReport, announcements
@@ -62,6 +63,9 @@ AGENT: Final = "opus-ci-wake-0909"
 
 #: The environment the configured tests run in, in full.
 CONFIGURED_ENV: Final[dict[str, str]] = {
+    # The override, so no test reads the MCPs checkout's endpoint declaration
+    # (board-watch's own suite tests that default).
+    "BOARD_WATCH_URL": DECLARED_TASKBOARD_URL,
     "TASKBOARD_MCP_API_KEY": "test-key",
     "CORVIS_TENANT_ID": "2e137b5f-0000-4000-8000-000000000000",
     TASK_ID_VARIABLE: TASK_ID,

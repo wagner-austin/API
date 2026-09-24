@@ -20,15 +20,21 @@ from platform_core.error_codes_tooling import (
 )
 from platform_core.errors import AppError
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
-from platform_core.mcp_testing import FakeHttpPost, sent_arguments, tool_text_body
+from platform_core.mcp_testing import (
+    DECLARED_TASKBOARD_URL,
+    FakeHttpPost,
+    sent_arguments,
+    stack_endpoints_text,
+    tool_text_body,
+)
 from platform_core.session_label import (
     API_KEY_NAME,
     LABEL_VARIABLE,
     SESSION_ID_VARIABLE,
     STACK_ENV_PATH,
-    TASKBOARD_URL,
     TENANT_ID_NAME,
 )
+from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 from ci_wake import _test_hooks
 from ci_wake.cli import enrol as enrol_cli
@@ -40,6 +46,15 @@ from tests.conftest import AGENT, CONFIGURED_ENV, FROZEN_NOW, REPO, SHA, FakeGh,
 SESSION = "4f8a2c1e-9b3d-4e7f-8a6b-1c2d3e4f5a6b"
 BOUND = "opus-rebuild-deadlock-0910"
 WRONG = "opus-dashboard-0911"
+
+#: The MCPs stack's two files the label resolution reads: its ``.env`` for
+#: the taskboard's credentials and its endpoint declaration for the url.
+STACK_FILES = {
+    STACK_ENV_PATH: (
+        f"{API_KEY_NAME}=internal-key\n{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-00000000aa\n"
+    ),
+    STACK_ENDPOINTS_PATH: stack_endpoints_text(),
+}
 
 
 def _whereis(label: str) -> McpHttpResponse:
@@ -65,15 +80,15 @@ def _in_session(label: str, exported: str | None) -> tuple[FakeHttpPost, list[pa
     )
     read: list[pathlib.Path] = []
     # The same seam reads the enrolment record back (``read_attempts``),
-    # so only the stack's ``.env`` is answered here and every other path
+    # so only the stack's two files are answered here and every other path
     # goes to the real file the enrolment wrote under ``tmp_path``.
     real_read_text = _test_hooks.read_text
 
     def _read_text(path: pathlib.Path) -> str:
-        if path != STACK_ENV_PATH:
+        if path not in STACK_FILES:
             return real_read_text(path)
         read.append(path)
-        return f"{API_KEY_NAME}=internal-key\n{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-00000000aa\n"
+        return STACK_FILES[path]
 
     _test_hooks.read_text = _read_text
     post = FakeHttpPost([_whereis(label)])
@@ -151,8 +166,8 @@ class TestEnrolMain:
 
         assert read_attempts(path)[0]["agent"] == BOUND
         assert emitted == [f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{BOUND}"]
-        assert read == [STACK_ENV_PATH]
-        assert post.urls == [TASKBOARD_URL]
+        assert read == [STACK_ENDPOINTS_PATH, STACK_ENV_PATH]
+        assert post.urls == [DECLARED_TASKBOARD_URL]
         assert post.headers[0]["x-api-key"] == "internal-key"
         assert sent_arguments(post.bodies[0]) == {"session": SESSION}
 
@@ -200,7 +215,7 @@ class TestEnrolMain:
         pin_env({SESSION_ID_VARIABLE: SESSION, LABEL_VARIABLE: BOUND})
 
         def _read_text(path: pathlib.Path) -> str:
-            return f"{API_KEY_NAME}=k\n{TENANT_ID_NAME}=t\n"
+            return STACK_FILES[path]
 
         _test_hooks.read_text = _read_text
         _test_hooks.http_post = FakeHttpPost(
