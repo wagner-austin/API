@@ -109,7 +109,7 @@ Two secrets and an optional endpoint, from the environment:
 ```bash
 export TASKBOARD_MCP_API_KEY=...   # taskboard-mcp's own x-api-key
 export CORVIS_TENANT_ID=...        # the tenants row whose board to read
-export BOARD_WATCH_URL=...         # optional; defaults to loopback :8033
+export BOARD_WATCH_URL=...         # optional; defaults to taskboard-mcp in MCPs scripts/fleet/stack-endpoints.json
 ```
 
 They are **required, not discovered.** An earlier prototype read them by
