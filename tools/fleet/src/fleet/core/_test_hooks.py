@@ -12,16 +12,13 @@ question about the current time. A test that could not control the clock could
 only assert that an unexpired lease is unexpired, which is the case that never
 breaks. Controlling it is how the expiry boundary gets tested at all.
 
-NOTHING HERE CATCHES, WITH ONE NAMED EXCEPTION. ``subprocess.run`` is called
-with ``check=False`` and the return code is inspected explicitly, so a
-remote failure becomes a typed :class:`~platform_core.errors.AppError` at
-the call site that knows what the command was for, rather than a
-``CalledProcessError`` caught and re-raised somewhere that does not. The
-exception is the deadline: ``subprocess`` reports an expired ``timeout``
-only by raising ``TimeoutExpired``, so :func:`_default_run` converts that
-one report into the result's own ``timed_out`` field at the boundary and
-returns it. Nothing is retried, softened or defaulted; the caller reads
-``timed_out`` exactly as it reads ``returncode``.
+NOTHING HERE CATCHES. The one named exception in this package is the
+deadline, and it now lives with the command runner in
+:mod:`fleet.core._command`, whose docstring states it: ``subprocess`` has
+no non-raising way to report an expired ``timeout``, so that one report is
+converted into the result's own ``timed_out`` field at the boundary.
+Nothing is retried, softened or defaulted; the caller reads ``timed_out``
+exactly as it reads ``returncode``.
 
 EVERY COMMAND CARRIES A DEADLINE, AND THE PARAMETER HAS NO DEFAULT. Measured
 2026-09-17 11:15Z (board tasks 35940277 and 41ac6ed2): one ssh whose peer
@@ -30,6 +27,13 @@ never exited, the scheduled task's IgnoreNew refused every later tick, and
 the dispatch queue drained nothing until the task's 72-hour execution limit
 ended the parent. A default would be the value a caller reaches for without
 deciding, which is how that ssh had none.
+
+AND A DEADLINE IS ONLY REAL IF THE CALL CANNOT BLOCK OUTSIDE IT, which is
+the half the rule above does not state and did not hold until 2026-09-24
+(board task 1e57ebe5). That reasoning, and the measurement behind it,
+belong with the code they govern: see :mod:`fleet.core._command`, which
+this module re-exports :class:`~fleet.core._command.CommandResult` and
+:data:`~fleet.core._command.TIMED_OUT_RETURNCODE` from.
 """
 
 from __future__ import annotations
@@ -44,7 +48,8 @@ from typing import Protocol
 
 from platform_core.config import _optional_env_str, config_test_hooks
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
-from typing_extensions import TypedDict
+
+from fleet.core._command import TIMED_OUT_RETURNCODE, CommandResult, _awaited
 
 
 class EnvProtocol(Protocol):
@@ -66,35 +71,6 @@ class EnvProtocol(Protocol):
             Its trimmed value, or None when unset or blank.
         """
         ...
-
-
-#: The ``returncode`` a result carries when the command was ended for
-#: outliving its deadline. Negative, so no caller reading ``returncode != 0``
-#: as failure can mistake it for success, and distinct from every status a
-#: process can exit with on its own; the fact itself is ``timed_out``.
-TIMED_OUT_RETURNCODE = -1
-
-
-class CommandResult(TypedDict):
-    """What running a command produced.
-
-    Attributes:
-        returncode: Process exit status, or :const:`TIMED_OUT_RETURNCODE`
-            when the command was ended at its deadline.
-        stdout: Standard output, decoded as UTF-8.
-        stderr: Standard error, decoded as UTF-8. Carried because ssh puts
-            the reason for a refusal here, and a failure that discards it
-            sends the reader to the node to rediscover what happened. For a
-            command ended at its deadline it ends with ``timed out after
-            <n> s``, so a caller that only prints stderr still says so.
-        timed_out: True when the command was ended for outliving its
-            ``timeout_seconds``; the streams then hold what it had produced.
-    """
-
-    returncode: int
-    stdout: str
-    stderr: str
-    timed_out: bool
 
 
 class RunProtocol(Protocol):
@@ -321,21 +297,6 @@ class WriteTextProtocol(Protocol):
         """
 
 
-def _decode_captured(captured: bytes | None) -> str:
-    """Decode one captured stream.
-
-    Args:
-        captured: The bytes, or None when the process was ended before the
-            stream was collected, which ``TimeoutExpired`` reports that way.
-
-    Returns:
-        The text, decoded as UTF-8 with undecodable bytes replaced -- a
-        mangled character in a diagnostic is better than losing the
-        diagnostic -- and empty for None.
-    """
-    return "" if captured is None else captured.decode("utf-8", errors="replace")
-
-
 def _default_run(
     argv: Sequence[str],
     *,
@@ -355,10 +316,8 @@ def _default_run(
             after the withheld names are removed.
 
     Returns:
-        The command's exit status and captured streams, decoded through
-        :func:`_decode_captured`; or, when the deadline passed first,
-        :const:`TIMED_OUT_RETURNCODE`, whatever the streams held, stderr
-        ending ``timed out after <n> s``, and ``timed_out`` set.
+        The command's exit status and captured streams, as
+        :func:`fleet.core._command._awaited` describes.
     """
     withheld = frozenset(unset_env)
     # The parent environment comes from the monorepo's one permitted reader
@@ -367,35 +326,24 @@ def _default_run(
     parent = config_test_hooks.get_environment()
     environment = {name: value for name, value in parent.items() if name not in withheld}
     environment.update(set_env)
-    # The one catch in this package, and it converts rather than recovers:
-    # subprocess has no non-raising way to report a deadline, so its report
-    # becomes the result's own field here, at the boundary, and propagates
-    # as a value the way every other outcome of a command does.
-    try:
-        completed = subprocess.run(
-            list(argv),
-            check=False,
-            input=stdin_bytes,
-            stdin=None if stdin_bytes is not None else subprocess.DEVNULL,
-            capture_output=True,
-            env=environment,
-            timeout=timeout_seconds,
+    if stdin_bytes is None:
+        return _awaited(
+            argv,
+            stdin_source=subprocess.DEVNULL,
+            environment=environment,
+            timeout_seconds=timeout_seconds,
         )
-    except subprocess.TimeoutExpired as expired:
-        partial = _decode_captured(expired.stderr).rstrip()
-        note = f"timed out after {timeout_seconds} s"
-        return CommandResult(
-            returncode=TIMED_OUT_RETURNCODE,
-            stdout=_decode_captured(expired.stdout),
-            stderr=note if not partial else f"{partial}\n{note}",
-            timed_out=True,
+    # A FILE THE CHILD READS, NOT BYTES THIS PROCESS WRITES, and the deadline
+    # depends on it: ``fleet.core._command`` carries the measurement and why.
+    with tempfile.TemporaryFile() as payload:
+        payload.write(stdin_bytes)
+        payload.seek(0)
+        return _awaited(
+            argv,
+            stdin_source=payload,
+            environment=environment,
+            timeout_seconds=timeout_seconds,
         )
-    return CommandResult(
-        returncode=completed.returncode,
-        stdout=_decode_captured(completed.stdout),
-        stderr=_decode_captured(completed.stderr),
-        timed_out=False,
-    )
 
 
 def _default_now() -> int:
@@ -552,6 +500,7 @@ hostname: HostnameProtocol = _default_hostname
 
 
 __all__ = [
+    "TIMED_OUT_RETURNCODE",
     "AppendTextProtocol",
     "CommandResult",
     "DirectoryExistsProtocol",
