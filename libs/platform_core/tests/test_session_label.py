@@ -9,15 +9,25 @@ from collections.abc import Callable
 
 import pytest
 
-from platform_core.error_codes_tooling import McpClientErrorCode, SessionLabelErrorCode
+from platform_core.error_codes_tooling import (
+    McpClientErrorCode,
+    SessionLabelErrorCode,
+    StackEndpointErrorCode,
+)
 from platform_core.errors import AppError
+from platform_core.json_utils import dump_json_str
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
-from platform_core.mcp_testing import FakeHttpPost, sent_arguments, tool_text_body
+from platform_core.mcp_testing import (
+    DECLARED_TASKBOARD_URL,
+    FakeHttpPost,
+    sent_arguments,
+    stack_endpoints_text,
+    tool_text_body,
+)
 from platform_core.session_label import (
     API_KEY_NAME,
     LABEL_VARIABLE,
     STACK_ENV_PATH,
-    TASKBOARD_URL,
     TENANT_ID_NAME,
     WHEREIS_TOOL,
     SessionIdentity,
@@ -30,6 +40,7 @@ from platform_core.session_label import (
     resolved_label,
     stack_credentials,
 )
+from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 SESSION = "4f8a2c1e-9b3d-4e7f-8a6b-1c2d3e4f5a6b"
 BOUND = "opus-rebuild-deadlock-0910"
@@ -41,6 +52,7 @@ ENV_TEXT = (
     "not a pair\n"
     f"{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-000000000000\n"
 )
+ENDPOINTS_TEXT = stack_endpoints_text()
 
 #: ``task_whereis`` for a session the board has written under a label, as
 #: taskboard-mcp renders it (the em dash and the double-space column).
@@ -70,13 +82,18 @@ def reply(text: str) -> McpHttpResponse:
     )
 
 
-def env_reader(text: str = ENV_TEXT) -> tuple[list[pathlib.Path], Callable[[pathlib.Path], str]]:
-    """A file seam answering ``text`` and recording what was asked for."""
+def env_reader(
+    text: str = ENV_TEXT, endpoints: str = ENDPOINTS_TEXT
+) -> tuple[list[pathlib.Path], Callable[[pathlib.Path], str]]:
+    """A file seam answering the stack's ``.env`` with ``text`` and its
+    endpoint declaration with ``endpoints``, recording what was asked for.
+    Any other path is a ``KeyError``: the resolution reads nothing else."""
     asked: list[pathlib.Path] = []
+    files = {STACK_ENV_PATH: text, STACK_ENDPOINTS_PATH: endpoints}
 
     def read_text(path: pathlib.Path) -> str:
         asked.append(path)
-        return text
+        return files[path]
 
     return asked, read_text
 
@@ -107,9 +124,9 @@ def test_a_session_id_the_harness_could_not_have_written_is_refused(value: str) 
 # ---------------------------------------------------------------------------
 
 
-def test_the_credentials_are_the_two_keys_unquoted_bound_to_the_loopback_url() -> None:
-    credentials = stack_credentials(ENV_TEXT)
-    assert credentials["url"] == TASKBOARD_URL
+def test_the_credentials_are_the_two_keys_unquoted_bound_to_the_given_url() -> None:
+    credentials = stack_credentials(ENV_TEXT, DECLARED_TASKBOARD_URL)
+    assert credentials["url"] == DECLARED_TASKBOARD_URL
     assert credentials["api_key"] == "internal-key"
     assert credentials["tenant_id"] == "2e137b5f-0000-4000-8000-000000000000"
 
@@ -125,7 +142,7 @@ def test_the_credentials_are_the_two_keys_unquoted_bound_to_the_loopback_url() -
 )
 def test_a_missing_or_empty_key_is_refused_naming_it_and_the_file(text: str, missing: str) -> None:
     with pytest.raises(AppError) as caught:
-        stack_credentials(text)
+        stack_credentials(text, DECLARED_TASKBOARD_URL)
     assert caught.value.code is SessionLabelErrorCode.CREDENTIALS_MISSING
     assert f"carries no {missing}" in caught.value.message
     assert str(STACK_ENV_PATH) in caught.value.message
@@ -169,8 +186,8 @@ def test_inside_a_session_the_board_is_asked_with_the_stacks_credentials() -> No
     assert read_identity(
         session_id=SESSION, exported=None, read_text=read_text, post=post
     ) == identity(SESSION, "", BOUND)
-    assert asked == [STACK_ENV_PATH]
-    assert post.urls == [TASKBOARD_URL]
+    assert asked == [STACK_ENDPOINTS_PATH, STACK_ENV_PATH]
+    assert post.urls == [DECLARED_TASKBOARD_URL]
     assert post.headers[0]["x-api-key"] == "internal-key"
     assert post.headers[0]["X-Tenant-Id"] == "2e137b5f-0000-4000-8000-000000000000"
     assert sent_arguments(post.bodies[0]) == {"session": SESSION}
@@ -184,6 +201,16 @@ def test_a_session_the_board_never_saw_reads_as_unbound() -> None:
     assert read_identity(
         session_id=SESSION, exported=WRONG, read_text=read_text, post=post
     ) == identity(SESSION, WRONG, "")
+
+
+def test_an_undeclared_taskboard_is_refused_before_anything_is_posted() -> None:
+    asked, read_text = env_reader(endpoints=dump_json_str({"services": {}}))
+    post = FakeHttpPost([])
+    with pytest.raises(AppError) as caught:
+        read_identity(session_id=SESSION, exported=None, read_text=read_text, post=post)
+    assert caught.value.code is StackEndpointErrorCode.UNDECLARED
+    assert asked == [STACK_ENDPOINTS_PATH]
+    assert post.urls == []
 
 
 def test_a_board_that_cannot_be_asked_raises_rather_than_reading_as_unbound() -> None:
