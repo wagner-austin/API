@@ -68,7 +68,7 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
-from fleet.core import _test_hooks, observe, queue, rebuild, registry, restart
+from fleet.core import _test_hooks, observe, published_tree, queue, rebuild, registry, restart
 
 _log = get_logger(__name__)
 
@@ -246,7 +246,15 @@ def restart_job(
         return _refuse_hub_job(credentials, job, identity, detail=refusal)
     # Narrowed by the refusal above: a None target was refused there.
     target = job["session_target"] if job["session_target"] is not None else ""
-    invocation = restart.session_invocation(mcps_root, job["command"], target, job["submitted_by"])
+    # The verb runs the session-audit published on origin/main, never the
+    # checkout's working tree (MCPs board task f4cd489f); a tree that cannot
+    # be extracted refuses the job with nothing run.
+    tree = published_tree.extract_published_tree(mcps_root)
+    if isinstance(tree, str):
+        return _refuse_hub_job(credentials, job, identity, detail=tree)
+    invocation = restart.session_invocation(
+        mcps_root, tree, job["command"], target, job["submitted_by"]
+    )
     # A revive types the submitter's label into its brief and a kill passes
     # it as an argument (MCPs migs 525 and 526), so the label is judged
     # before it can become an argv element, the same way the target is.
@@ -266,7 +274,7 @@ def restart_job(
     )
     _log.info("started %s on austinpc as %s (local %s)", job["job_id"], run_id, verb)
     result = restart.run_session_job(invocation)
-    detail = restart.describe_result(result, invocation["mode"])
+    detail = restart.describe_result(result, invocation)
     queue.report_close(
         credentials,
         job_id=job["job_id"],
