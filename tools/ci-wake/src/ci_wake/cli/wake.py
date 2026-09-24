@@ -17,7 +17,7 @@ Environment (all required, exported once where the scheduler runs):
     TASKBOARD_MCP_API_KEY   taskboard-mcp's own x-api-key
     CORVIS_TENANT_ID        the tenants row whose board is posted to
     CI_WAKE_TASK_ID         the standing task announcements land in
-    BOARD_WATCH_URL         optional; defaults to loopback :8033
+    BOARD_WATCH_URL         optional; defaults to the declared taskboard-mcp
 
 And on PATH: ``gh``, logged in. See :mod:`ci_wake._test_hooks` on why this
 bridge borrows the machine's GitHub identity rather than minting one.

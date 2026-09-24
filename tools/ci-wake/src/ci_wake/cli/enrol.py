@@ -25,7 +25,7 @@ Environment:
         submitter, so both bridges name the same session the same way.
 
 This command writes one line and exits. Inside a session it reaches the
-taskboard on loopback to ask who the session is, and nothing else; it does
+taskboard where the MCPs stack declares it to ask who the session is, and nothing else; it does
 not consult GitHub, and does not care whether the push it is recording will
 succeed -- see :mod:`ci_wake.enrolment` on why the record names an attempt.
 """
@@ -71,8 +71,9 @@ def main(argv: Sequence[str]) -> int:
         AppError: ``ENROLMENT_FIELD_MALFORMED`` when the repository, sha or
             resolved agent label cannot address anything;
             ``SESSION_LABEL_MISMATCH`` when the shell's label is not the one
-            the board bound to the acting session; ``SESSION_ID_MALFORMED``
-            or ``SESSION_LABEL_CREDENTIALS_MISSING`` when the board cannot
+            the board bound to the acting session; ``SESSION_ID_MALFORMED``,
+            ``STACK_ENDPOINT_UNDECLARED`` or
+            ``SESSION_LABEL_CREDENTIALS_MISSING`` when the board cannot
             be asked, and the :class:`McpClientErrorCode` failures when it
             does not answer.
         ValueError: A missing or repeated flag.
