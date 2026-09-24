@@ -40,7 +40,7 @@ loop it already runs.
 export TASKBOARD_MCP_API_KEY=...   # taskboard-mcp's own x-api-key
 export CORVIS_TENANT_ID=...        # the tenants row whose board is posted to
 export HPC_WAKE_TASK_ID=...        # the standing task announcements land in
-export BOARD_WATCH_URL=...         # optional; defaults to loopback :8033
+export BOARD_WATCH_URL=...         # optional; defaults to taskboard-mcp in MCPs scripts/fleet/stack-endpoints.json
 ```
 
 Credentials load through `board_watch.config.load_credentials` — same
