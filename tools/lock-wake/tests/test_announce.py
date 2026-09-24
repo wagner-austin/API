@@ -211,6 +211,74 @@ class TestAnnouncement:
         assert "(stale; a build-bases hold is in flight (pid 46312))" in post["body"]
         assert post["agents"] == ("opus-stick-rename-0911",)
 
+    def test_a_finished_check_run_is_a_line_that_names_but_never_mentions_its_runner(
+        self,
+    ) -> None:
+        # MCPs board task ea2ea29c: check results ride the rebuild stream for
+        # its subscribers; the runner already saw its output, so a mention
+        # would only buy it a wake per run.
+        events = (
+            _event(
+                ts="2026-09-24T05:00:00.0000000Z",
+                kind="checked",
+                holder_pid=7,
+                label="packages/claude-hooks",
+                op="check-lock",
+                detail="FAILED exit 2 in 41s at 42988420",
+                agent="opus-coordination-w2-0924",
+            ),
+        )
+
+        post = _required(events)
+        assert post["body"].splitlines() == [
+            "CHECKS: 1 make test run(s) finished",
+            "packages/claude-hooks 05:00:00Z: FAILED exit 2 in 41s at 42988420 "
+            "by opus-coordination-w2-0924",
+        ]
+        assert post["agents"] == ()
+        assert (post["holds"], post["checks"]) == (0, 1)
+
+    def test_an_unlabelled_check_run_names_nobody(self) -> None:
+        events = (
+            _event(
+                ts="2026-09-24T05:00:00.0000000Z",
+                kind="checked",
+                label="packages/db",
+                op="check-lock",
+                detail="PASSED exit 0 in 90s at abcdef12",
+                agent="",
+            ),
+        )
+
+        post = _required(events)
+        assert post["body"].splitlines()[-1] == (
+            "packages/db 05:00:00Z: PASSED exit 0 in 90s at abcdef12"
+        )
+
+    def test_checks_and_holds_share_one_post_and_only_holds_are_mentioned(self) -> None:
+        events = (
+            _event(ts="2026-09-09T19:28:00.0000000Z", kind="acquired", holder_pid=1),
+            _event(
+                ts="2026-09-09T19:28:02.0000000Z",
+                kind="checked",
+                holder_pid=1,
+                label="packages/maketools",
+                op="check-lock",
+                detail="PASSED exit 0 in 30s at 0123abcd",
+                agent="opus-other-0924",
+            ),
+            _event(ts="2026-09-09T19:28:05.0000000Z", kind="released", holder_pid=1),
+        )
+
+        post = _required(events)
+        lines = post["body"].splitlines()
+        assert lines[0] == "FLEET-LOCK: 1 hold(s) transitioned"
+        assert lines[2] == "CHECKS: 1 make test run(s) finished"
+        assert lines[-1] == "@opus-mosh-reboot-0909 your fleet-lock operation transitioned"
+        assert post["agents"] == ("opus-mosh-reboot-0909",)
+        assert (post["holds"], post["checks"]) == (1, 1)
+        assert "RELEASED after 5s" in lines[1]
+
     def test_an_unlabelled_acquire_refusal_is_an_unaddressed_boundary(self) -> None:
         # The lock wrapper declining an acquire with no BOARD_AGENT_LABEL
         # has, by construction, nobody to mention -- the empty agent is the

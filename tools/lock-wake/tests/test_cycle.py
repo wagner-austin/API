@@ -48,7 +48,9 @@ class TestRunCycle:
         assert "FLEET-LOCK: 1 hold(s) transitioned" in body
         assert "RELEASED after 165s" in body
         assert read_offset(position_path(journal)) == len(COMPLETED_HOLD.encode("utf-8"))
-        assert emitted == ["posted 1 hold(s) from 3 line(s): tagged @opus-mosh-reboot-0909"]
+        assert emitted == [
+            "posted 1 hold(s) and 0 check run(s) from 3 line(s): tagged @opus-mosh-reboot-0909"
+        ]
 
     def test_a_refused_post_leaves_the_offset_unmoved(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -132,7 +134,33 @@ class TestRunCycle:
 
         run_cycle(journal)
 
-        assert emitted == ["posted 1 hold(s) from 2 line(s): unaddressed, no agent recorded"]
+        assert emitted == ["posted 1 hold(s) and 0 check run(s) from 2 line(s): unaddressed"]
+
+    def test_a_finished_check_run_posts_unaddressed(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        pin_env(CONFIGURED_ENV)
+        content = journal_line(
+            ts="2026-09-24T05:00:00.000000Z",
+            kind="checked",
+            holder_pid=7,
+            label="packages/claude-hooks",
+            op="check-lock",
+            only="",
+            detail="PASSED exit 0 in 18s at 42988420",
+            agent="opus-coordination-w2-0924",
+        ).encode("utf-8")
+        journal = stage_journal(tmp_path, content)
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        run_cycle(journal)
+
+        body = require_str(notes_sent(poster)[0], "body")
+        assert "CHECKS: 1 make test run(s) finished" in body
+        assert "@" not in body
+        assert read_offset(position_path(journal)) == len(content)
+        assert emitted == ["posted 0 hold(s) and 1 check run(s) from 1 line(s): unaddressed"]
 
     def test_missing_credentials_refuse_before_any_read(
         self, tmp_path: pathlib.Path, emitted: list[str]
