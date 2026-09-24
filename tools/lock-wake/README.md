@@ -65,7 +65,7 @@ Environment, exported where the pump runs (`tools/hpc-wake/runs/env.ps1`):
 TASKBOARD_MCP_API_KEY   taskboard-mcp's own x-api-key
 CORVIS_TENANT_ID        the tenants row whose board is posted to
 LOCK_WAKE_TASK_ID       the standing task announcements land in
-BOARD_WATCH_URL         optional; defaults to loopback :8033
+BOARD_WATCH_URL         optional; defaults to taskboard-mcp in MCPs scripts/fleet/stack-endpoints.json
 ```
 
 Announcements POST before the offset advances — at-least-once, the family
