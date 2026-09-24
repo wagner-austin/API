@@ -107,6 +107,7 @@ class RunProtocol(Protocol):
         timeout_seconds: int,
         stdin_bytes: bytes | None = None,
         unset_env: Sequence[str] = (),
+        set_env: Sequence[tuple[str, str]] = (),
     ) -> CommandResult:
         """Run a command.
 
@@ -130,6 +131,11 @@ class RunProtocol(Protocol):
                 session-audit invocation inherited the fleet venv and could
                 not import ``session_audit``. There is no argv-level way to
                 drop a variable on Windows, so the seam carries it.
+            set_env: ``(name, value)`` pairs the child receives on top of
+                what it inherits, applied after ``unset_env``. There is no
+                argv-level way to set one on Windows either: a session verb
+                puts the committed extraction of session-audit first on
+                ``PYTHONPATH`` through this (:mod:`fleet.core.published_tree`).
 
         Returns:
             Exit status and captured streams. A non-zero status is returned
@@ -336,6 +342,7 @@ def _default_run(
     timeout_seconds: int,
     stdin_bytes: bytes | None = None,
     unset_env: Sequence[str] = (),
+    set_env: Sequence[tuple[str, str]] = (),
 ) -> CommandResult:
     """Run a command with the real subprocess module.
 
@@ -344,6 +351,8 @@ def _default_run(
         timeout_seconds: The deadline; the child is killed when it passes.
         stdin_bytes: Bytes for standard input, or None for a closed stdin.
         unset_env: Variable names withheld from the child's environment.
+        set_env: ``(name, value)`` pairs set in the child's environment
+            after the withheld names are removed.
 
     Returns:
         The command's exit status and captured streams, decoded through
@@ -357,6 +366,7 @@ def _default_run(
     # hands back is filtered here, never mutated.
     parent = config_test_hooks.get_environment()
     environment = {name: value for name, value in parent.items() if name not in withheld}
+    environment.update(set_env)
     # The one catch in this package, and it converts rather than recovers:
     # subprocess has no non-raising way to report a deadline, so its report
     # becomes the result's own field here, at the boundary, and propagates

@@ -39,6 +39,15 @@ through :func:`session_invocation`, so the runner has one job path for all
 of them and no verb can reach an invocation another verb owns. The hard
 kill is its own verb on the queue and its own ``--hard`` flag here: nothing
 in this module can turn a graceful kill into a hard one.
+
+EVERY VERB RUNS THE PUBLISHED SESSION-AUDIT (MCPs board task f4cd489f).
+The invocation runs in the MCPs checkout's session-audit environment, but
+the code it imports and the register it reads are the commit
+``refs/remotes/origin/main`` names, extracted by
+:mod:`fleet.core.published_tree` and put first on ``PYTHONPATH``; the
+checkout's working tree, which no worktree publish advances and which
+carries other sessions' uncommitted edits, is never what acts. The closing
+detail names that commit.
 """
 
 from __future__ import annotations
@@ -49,6 +58,7 @@ from typing import Final, TypedDict
 
 from fleet.core import _test_hooks
 from fleet.core._test_hooks import CommandResult
+from fleet.core.published_tree import PublishedTree
 from fleet.core.rebuild import DETAIL_TAIL_CHARS
 
 #: The UUID grammar the harness writes session ids in, and mig 507 pins.
@@ -131,18 +141,26 @@ def refusal_for(mcps_root: pathlib.Path, session_target: str | None) -> str | No
     return None
 
 
-def restart_argv(mcps_root: pathlib.Path, session_target: str) -> tuple[str, ...]:
-    """Compose the session-audit invocation for one restart job.
+def session_audit_argv(
+    mcps_root: pathlib.Path, registry_dir: str, *arguments: str
+) -> tuple[str, ...]:
+    """Compose one session-audit invocation against the published register.
 
     Args:
-        mcps_root: The MCPs checkout (already existence-checked).
-        session_target: The session UUID (already grammar-checked).
+        mcps_root: The MCPs checkout (already existence-checked), whose
+            session-audit environment the invocation runs in.
+        registry_dir: The extracted register
+            (:class:`~fleet.core.published_tree.PublishedTree`), so the
+            window a kill re-checks is the published one, not the working
+            tree's.
+        arguments: The mode and its arguments.
 
     Returns:
-        The argv: ``poetry -C <mcps>/packages/session-audit run session-audit
-        rollover --apply --session <uuid>``. Through poetry, the same way the
+        ``poetry -C <mcps>/packages/session-audit run session-audit
+        <arguments> --registry-dir <dir>``. Through poetry, the same way the
         manager runner invokes the package, so the invocation resolves the
-        package's own venv rather than this runner's.
+        package's own venv rather than this runner's; the CODE it imports is
+        the extraction on ``PYTHONPATH`` (:func:`run_session_job`).
     """
     return (
         "poetry",
@@ -150,32 +168,50 @@ def restart_argv(mcps_root: pathlib.Path, session_target: str) -> tuple[str, ...
         str(mcps_root / pathlib.Path(SESSION_AUDIT_DIR)),
         "run",
         "session-audit",
-        "rollover",
-        "--apply",
-        "--session",
-        session_target,
+        *arguments,
+        "--registry-dir",
+        registry_dir,
     )
 
 
-def revive_argv(mcps_root: pathlib.Path, session_target: str, requested_by: str) -> tuple[str, ...]:
+def restart_argv(
+    mcps_root: pathlib.Path, registry_dir: str, session_target: str
+) -> tuple[str, ...]:
+    """Compose the session-audit invocation for one restart job.
+
+    Args:
+        mcps_root: The MCPs checkout (already existence-checked).
+        registry_dir: The extracted register.
+        session_target: The session UUID (already grammar-checked).
+
+    Returns:
+        The argv: ``session-audit rollover --apply --session <uuid>``
+        through :func:`session_audit_argv`.
+    """
+    return session_audit_argv(
+        mcps_root, registry_dir, "rollover", "--apply", "--session", session_target
+    )
+
+
+def revive_argv(
+    mcps_root: pathlib.Path, registry_dir: str, session_target: str, requested_by: str
+) -> tuple[str, ...]:
     """Compose the session-audit invocation for one revive job.
 
     Args:
         mcps_root: The MCPs checkout (already existence-checked).
+        registry_dir: The extracted register.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the revive (already
             grammar-checked), named in the brief session-audit types.
 
     Returns:
-        The argv: ``poetry -C <mcps>/packages/session-audit run session-audit
-        revive --session <uuid> --requested-by <label>``.
+        The argv: ``session-audit revive --session <uuid> --requested-by
+        <label>`` through :func:`session_audit_argv`.
     """
-    return (
-        "poetry",
-        "-C",
-        str(mcps_root / pathlib.Path(SESSION_AUDIT_DIR)),
-        "run",
-        "session-audit",
+    return session_audit_argv(
+        mcps_root,
+        registry_dir,
         "revive",
         "--session",
         session_target,
@@ -185,35 +221,31 @@ def revive_argv(mcps_root: pathlib.Path, session_target: str, requested_by: str)
 
 
 def kill_argv(
-    mcps_root: pathlib.Path, session_target: str, requested_by: str, *, hard: bool
+    mcps_root: pathlib.Path,
+    registry_dir: str,
+    session_target: str,
+    requested_by: str,
+    *,
+    hard: bool,
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one kill job.
 
     Args:
         mcps_root: The MCPs checkout (already existence-checked).
+        registry_dir: The extracted register, which carries the idle window
+            the graceful kill re-checks its premise against.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the kill (already
             grammar-checked), printed with session-audit's outcome.
         hard: Whether the queue row is ``kill-session-hard``.
 
     Returns:
-        The argv: ``poetry -C <mcps>/packages/session-audit run session-audit
-        kill --session <uuid> --requested-by <label>``, with ``--hard`` last
-        for the hard verb and never otherwise.
+        The argv: ``session-audit kill --session <uuid> --requested-by
+        <label>`` through :func:`session_audit_argv`, with ``--hard`` after
+        the label for the hard verb and never otherwise.
     """
-    base = (
-        "poetry",
-        "-C",
-        str(mcps_root / pathlib.Path(SESSION_AUDIT_DIR)),
-        "run",
-        "session-audit",
-        "kill",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
-    )
-    return (*base, "--hard") if hard else base
+    base = ("kill", "--session", session_target, "--requested-by", requested_by)
+    return session_audit_argv(mcps_root, registry_dir, *base, *(("--hard",) if hard else ()))
 
 
 class SessionInvocation(TypedDict):
@@ -225,21 +257,33 @@ class SessionInvocation(TypedDict):
         argv: The one invocation.
         types_requester: Whether the submitter label becomes an argv
             element, and so must be judged before the run.
+        commit: The published commit whose session-audit runs, named in the
+            closing detail.
+        python_path: The ``PYTHONPATH`` that puts that commit's extraction
+            ahead of the checkout's editable install.
     """
 
     verb: str
     mode: str
     argv: tuple[str, ...]
     types_requester: bool
+    commit: str
+    python_path: str
 
 
 def session_invocation(
-    mcps_root: pathlib.Path, command: str, session_target: str, requested_by: str
+    mcps_root: pathlib.Path,
+    tree: PublishedTree,
+    command: str,
+    session_target: str,
+    requested_by: str,
 ) -> SessionInvocation:
     """Map one session verb to its one invocation.
 
     Args:
         mcps_root: The MCPs checkout (already existence-checked).
+        tree: The published session-audit the verb runs
+            (:func:`fleet.core.published_tree.extract_published_tree`).
         command: The queue row's command.
         session_target: The session UUID (already grammar-checked).
         requested_by: The queue row's ``submitted_by``.
@@ -252,28 +296,39 @@ def session_invocation(
             session verb. The caller routes only :data:`SESSION_COMMANDS`
             here, so this names a routing defect rather than guessing.
     """
+    registry_dir = tree["registry_dir"]
     if command == RESTART_COMMAND:
         return SessionInvocation(
             verb="restart",
             mode="rollover",
-            argv=restart_argv(mcps_root, session_target),
+            argv=restart_argv(mcps_root, registry_dir, session_target),
             types_requester=False,
+            commit=tree["commit"],
+            python_path=tree["python_path"],
         )
     if command == REVIVE_COMMAND:
         return SessionInvocation(
             verb="revive",
             mode="revive",
-            argv=revive_argv(mcps_root, session_target, requested_by),
+            argv=revive_argv(mcps_root, registry_dir, session_target, requested_by),
             types_requester=True,
+            commit=tree["commit"],
+            python_path=tree["python_path"],
         )
     if command in (KILL_COMMAND, KILL_HARD_COMMAND):
         return SessionInvocation(
             verb="kill",
             mode="kill",
             argv=kill_argv(
-                mcps_root, session_target, requested_by, hard=command == KILL_HARD_COMMAND
+                mcps_root,
+                registry_dir,
+                session_target,
+                requested_by,
+                hard=command == KILL_HARD_COMMAND,
             ),
             types_requester=True,
+            commit=tree["commit"],
+            python_path=tree["python_path"],
         )
     raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command!r} is not a session verb")
 
@@ -308,6 +363,11 @@ def requester_refusal(requested_by: str) -> str | None:
 #: ``.venv`` even with the fleet venv first on PATH (measured both ways).
 SESSION_ENVIRONMENT_EXCLUDED: Final[tuple[str, ...]] = ("VIRTUAL_ENV",)
 
+#: The variable a session verb's extracted source rides in on: first on
+#: Python's import path, ahead of the editable install that points at the
+#: MCPs main checkout's working tree (MCPs board task f4cd489f).
+PYTHONPATH_VARIABLE: Final = "PYTHONPATH"
+
 #: A session verb's deadline, in seconds.
 #:
 #: session-audit's own rails bound each verb (a revive waits 30 seconds for
@@ -335,27 +395,32 @@ def run_session_job(invocation: SessionInvocation) -> CommandResult:
         invocation["argv"],
         timeout_seconds=SESSION_JOB_TIMEOUT_SECONDS,
         unset_env=SESSION_ENVIRONMENT_EXCLUDED,
+        set_env=((PYTHONPATH_VARIABLE, invocation["python_path"]),),
     )
 
 
-def describe_result(result: CommandResult, mode: str) -> str:
+def describe_result(result: CommandResult, invocation: SessionInvocation) -> str:
     """Compose a closing detail from a finished session job.
 
     Args:
         result: The invocation's outcome.
-        mode: The session-audit mode that ran (``rollover``, ``revive`` or
-            ``kill``), named so the reader knows which outcome block the
-            tail carries.
+        invocation: What ran: its session-audit mode (``rollover``,
+            ``revive`` or ``kill``), named so the reader knows which outcome
+            block the tail carries, and the published commit it ran at, so
+            a closure can show its fix was the code that acted.
 
     Returns:
-        The exit code and the tail of the combined output -- the tail,
-        because session-audit prints its outcome block (``ROLLOVER
-        APPLIED`` with one line per session, ``REVIVE - <OUTCOME>``, or
-        ``KILL - <OUTCOME>``) last.
+        The mode, the commit, the exit code and the tail of the combined
+        output -- the tail, because session-audit prints its outcome block
+        (``ROLLOVER APPLIED`` with one line per session, ``REVIVE -
+        <OUTCOME>``, or ``KILL - <OUTCOME>``) last.
     """
     combined = (result["stdout"] + result["stderr"]).strip()
     tail = combined[-DETAIL_TAIL_CHARS:]
-    return f"session-audit {mode} exited {result['returncode']}: {tail}"
+    return (
+        f"session-audit {invocation['mode']} at {invocation['commit']} exited "
+        f"{result['returncode']}: {tail}"
+    )
 
 
 __all__ = [
@@ -363,6 +428,7 @@ __all__ = [
     "KILL_COMMAND",
     "KILL_HARD_COMMAND",
     "LABEL_PATTERN",
+    "PYTHONPATH_VARIABLE",
     "REQUESTER_INVALID_CODE",
     "RESTART_COMMAND",
     "REVIVE_COMMAND",
@@ -380,5 +446,6 @@ __all__ = [
     "restart_argv",
     "revive_argv",
     "run_session_job",
+    "session_audit_argv",
     "session_invocation",
 ]
