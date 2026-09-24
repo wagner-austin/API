@@ -49,7 +49,7 @@ visible — the same reason `fleet-watch` has no `--follow`.
 | `TASKBOARD_MCP_API_KEY` | taskboard-mcp's own `x-api-key` |
 | `CORVIS_TENANT_ID` | the `tenants` row whose board is posted to |
 | `FLEET_WAKE_TASK_ID` | the standing task announcements land in |
-| `BOARD_WATCH_URL` | optional; defaults to loopback `:8033` |
+| `BOARD_WATCH_URL` | optional; defaults to `taskboard-mcp` in MCPs `scripts/fleet/stack-endpoints.json` |
 
 The standing task is **configuration, never discovery**. Finding it by title
 search would make every cycle depend on a render grammar owned by another
