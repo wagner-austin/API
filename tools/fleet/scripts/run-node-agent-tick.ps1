@@ -17,10 +17,12 @@
       * FLEET_MCP_API_KEY -- the live ``mcp-fleet`` container's
         MCP_INTERNAL_KEY. Missing surfaces as the agent's named
         QUEUE_CREDENTIALS_MISSING refusal.
-      * TASKBOARD_MCP_API_KEY -- the live ``mcp-taskboard`` container's, for
-        the verdict the collect pass posts to the submitting task's thread
-        (A3) and for the ``--announce`` check-in. Missing surfaces as
-        board-watch's named API_KEY_MISSING.
+      * TASKBOARD_MCP_API_KEY -- from the same runs/env.ps1, for the
+        verdict the collect pass posts to the submitting task's thread (A3)
+        and for the ``--announce`` check-in. Not from a container: the
+        taskboard runs on diphtheria and the hub's ``mcp-taskboard``
+        forwarder is retired (MCPs board task c6fc4882). Missing surfaces
+        as board-watch's named API_KEY_MISSING.
 
     THE RUNNER'S IDENTITY IS DERIVED FROM THE NODE, NOT PASSED HERE:
     ``fleet-node-<alias>`` with a version-5 UUID of that name
@@ -68,14 +70,6 @@ $ErrorActionPreference = $prevEap
 $keyLine = @($containerEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
 if ($keyLine.Count -eq 1) {
     $env:FLEET_MCP_API_KEY = "$($keyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
-}
-
-$ErrorActionPreference = 'Continue'
-$boardEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-taskboard 2>$null
-$ErrorActionPreference = $prevEap
-$boardKeyLine = @($boardEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
-if ($boardKeyLine.Count -eq 1) {
-    $env:TASKBOARD_MCP_API_KEY = "$($boardKeyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
 }
 
 $fleetRoot = Join-Path $apiRoot 'tools\fleet'

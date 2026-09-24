@@ -17,11 +17,15 @@
         Nothing is written to disk; docker being down surfaces as the
         agent's named QUEUE_CREDENTIALS_MISSING refusal, not as a silent
         empty tick.
-      * TASKBOARD_MCP_API_KEY -- the same read against ``mcp-taskboard``,
-        for the tick's third pass: the session-ledger observer writes to
-        the BOARD (task_session_observe), not the queue, and the two
-        containers hold different keys. Missing surfaces as board-watch's
-        named API_KEY_MISSING, after the queue passes have run.
+      * TASKBOARD_MCP_API_KEY -- from the same runs/env.ps1, for the
+        tick's third pass: the session-ledger observer writes to the BOARD
+        (task_session_observe), not the queue, and the two services hold
+        different keys. Until 2026-09-24 this script also read it from an
+        ``mcp-taskboard`` container on this host; the taskboard runs on
+        diphtheria and the hub's forwarder of that name is retired (MCPs
+        board task c6fc4882), so that read found nothing and is gone.
+        Missing surfaces as board-watch's named API_KEY_MISSING, after the
+        queue passes have run.
       * --registry -- fleet-mcp/fleet-nodes.json in the MCPs checkout, the
         list of machines the observer walks. Without it the agent logs
         that observation was skipped, every tick, by design.
@@ -63,17 +67,6 @@ if ($keyLine.Count -eq 1) {
 # A missing line is NOT patched over: fleet-agent's own
 # QUEUE_CREDENTIALS_MISSING names the variable and where it comes from,
 # which is a better failure than anything this script could invent.
-
-# The board's key, the same way. A second block rather than a loop over the
-# two names, so a reader sees each container and each variable spelled out
-# beside the pass that needs it.
-$ErrorActionPreference = 'Continue'
-$boardEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-taskboard 2>$null
-$ErrorActionPreference = $prevEap
-$boardKeyLine = @($boardEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
-if ($boardKeyLine.Count -eq 1) {
-    $env:TASKBOARD_MCP_API_KEY = "$($boardKeyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
-}
 
 Set-Location (Join-Path $apiRoot 'tools\fleet')
 
