@@ -22,6 +22,7 @@ import pytest
 from hpc3.core import _test_hooks as hpc3_hooks
 from hpc3.core._test_hooks import CommandResult
 from platform_core.config import config_test_hooks
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from hpc_wake import _test_hooks
 from hpc_wake.identity import TASK_ID_VARIABLE
@@ -39,6 +40,9 @@ TASK_ID: Final = "50e693d6-c3aa-4464-b43b-adbc07149a67"
 
 #: The environment the configured tests run in, in full.
 CONFIGURED_ENV: Final[dict[str, str]] = {
+    # The override, so no test reads the MCPs checkout's endpoint declaration
+    # (board-watch's own suite tests that default).
+    "BOARD_WATCH_URL": DECLARED_TASKBOARD_URL,
     "TASKBOARD_MCP_API_KEY": "test-key",
     "CORVIS_TENANT_ID": "2e137b5f-0000-4000-8000-000000000000",
     TASK_ID_VARIABLE: TASK_ID,
