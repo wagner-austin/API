@@ -30,6 +30,7 @@ from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
 from fleet_wake import _test_hooks
 from fleet_wake.announce import MARKER
 from fleet_wake.cycle import load_workspace, run_cycle
+from fleet_wake.identity import TASK_ID_VARIABLE
 from fleet_wake.position import position_path, read_announced
 from tests.conftest import CONFIGURED_ENV, TASK_ID, pin_env, write_fleet_workspace
 
@@ -319,12 +320,7 @@ class TestFailuresEndTheCycle:
         """Configuration is checked before work: a bridge that read a ledger
         and then discovered it had nowhere to post would do the reading on
         every scheduled cycle forever."""
-        pin_env(
-            {
-                "TASKBOARD_MCP_API_KEY": "test-key",
-                "CORVIS_TENANT_ID": "2e137b5f-0000-4000-8000-000000000000",
-            }
-        )
+        pin_env({key: value for key, value in CONFIGURED_ENV.items() if key != TASK_ID_VARIABLE})
         _test_hooks.http_post = FakeHttpPost([])
 
         with pytest.raises(AppError) as caught:
