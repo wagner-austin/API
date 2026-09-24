@@ -97,8 +97,8 @@ def run_cycle(journal: pathlib.Path) -> None:
     write_offset(marks, journal_slice["next_offset"])
     tagged = " ".join(f"@{agent}" for agent in post["agents"])
     _test_hooks.emit(
-        f"posted {post['holds']} hold(s) from {len(events)} line(s)"
-        + (f": tagged {tagged}" if tagged != "" else ": unaddressed, no agent recorded")
+        f"posted {post['holds']} hold(s) and {post['checks']} check run(s) "
+        f"from {len(events)} line(s)" + (f": tagged {tagged}" if tagged != "" else ": unaddressed")
     )
 
 

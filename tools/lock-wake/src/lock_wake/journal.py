@@ -50,6 +50,14 @@ from lock_wake import _test_hooks
 #: 07fcc6af -- until 2026-09-11 both refusals left no record at all,
 #: so "how many sessions tried and were told no" was unanswerable
 #: from the fleet record).
+#:
+#: ``checked`` is not a lock transition at all: it is one finished
+#: ``make test`` run under the per-package check lock (MCPs
+#: ``packages/maketools`` ``check_lock``), written to this journal so check
+#: results ride the same stream as rebuilds (MCPs board task ea2ea29c, the
+#: operator's one channel "for make chdck for rwbuilds"). Its ``label`` is
+#: the package, its ``op`` is ``check-lock`` and its ``detail`` carries the
+#: exit code, the seconds, the HEAD and the tree.
 EVENT_KINDS: Final = (
     "gate-blocked",
     "refused",
@@ -60,6 +68,7 @@ EVENT_KINDS: Final = (
     "released",
     "failed",
     "timeout",
+    "checked",
 )
 
 
@@ -92,6 +101,7 @@ class LockEvent(TypedDict):
         "released",
         "failed",
         "timeout",
+        "checked",
     ]
     holder_pid: int
     label: str
@@ -99,6 +109,39 @@ class LockEvent(TypedDict):
     only: str
     detail: str
     agent: str
+
+
+#: Each declared kind's text to its narrowed value: the one table
+#: :func:`_decode_kind` reads, so a kind is narrowed by lookup rather than by
+#: an arm per kind, and a kind missing here is refused like an unknown one.
+_KIND_BY_NAME: Final[
+    dict[
+        str,
+        Literal[
+            "gate-blocked",
+            "refused",
+            "requested",
+            "waiting",
+            "acquired",
+            "step",
+            "released",
+            "failed",
+            "timeout",
+            "checked",
+        ],
+    ]
+] = {
+    "gate-blocked": "gate-blocked",
+    "refused": "refused",
+    "requested": "requested",
+    "waiting": "waiting",
+    "acquired": "acquired",
+    "step": "step",
+    "released": "released",
+    "failed": "failed",
+    "timeout": "timeout",
+    "checked": "checked",
+}
 
 
 class JournalSlice(TypedDict):
@@ -126,6 +169,7 @@ def _decode_kind(
     "released",
     "failed",
     "timeout",
+    "checked",
 ]:
     """Narrow a kind string to the declared set.
 
@@ -141,24 +185,9 @@ def _decode_kind(
             an unknown transition as if it were understood would report a
             cascade story that never happened.
     """
-    if value == "gate-blocked":
-        return "gate-blocked"
-    if value == "refused":
-        return "refused"
-    if value == "requested":
-        return "requested"
-    if value == "waiting":
-        return "waiting"
-    if value == "acquired":
-        return "acquired"
-    if value == "step":
-        return "step"
-    if value == "released":
-        return "released"
-    if value == "failed":
-        return "failed"
-    if value == "timeout":
-        return "timeout"
+    kind = _KIND_BY_NAME.get(value)
+    if kind is not None:
+        return kind
     raise JSONTypeError(
         f"journal line {line_number} has kind {value!r}, which this package does not "
         f"know; the declared kinds are {', '.join(EVENT_KINDS)} and an unknown one "

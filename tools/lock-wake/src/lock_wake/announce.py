@@ -18,6 +18,15 @@ several ticks; each boundary line reports the counts seen in ITS window
 ("+3 step(s) this window"), which is honest and cheap, where a
 cross-tick tally would need a second position record to say something
 nobody acts on.
+
+CHECK RUNS RIDE THE SAME POST, UNADDRESSED (MCPs board task ea2ea29c).
+A ``checked`` row is one finished ``make test`` run, and every such row in
+the slice becomes one line under a CHECKS heading in the same single post.
+Those lines name the runner in plain text and never ``@`` it: the runner
+already watched its own output, and a mention would buy it a wake or a
+turn-boundary continuation for every run it made. A session that wants
+check results subscribes to this bridge's standing task, and the
+subscription is what makes the post reach it.
 """
 
 from __future__ import annotations
@@ -48,13 +57,16 @@ class Announcement(TypedDict):
     Attributes:
         body: The full post text.
         agents: Distinct non-empty session labels behind the announced
-            holds, in first-seen order -- the @mention targets.
+            holds, in first-seen order -- the @mention targets. Check runs
+            add none.
         holds: How many holds the post covers, for the cycle's report line.
+        checks: How many finished check runs the post covers.
     """
 
     body: str
     agents: tuple[str, ...]
     holds: int
+    checks: int
 
 
 def parse_journal_ts(ts: str) -> datetime.datetime:
@@ -122,6 +134,19 @@ def _hold_line(events: tuple[LockEvent, ...]) -> str:
     return " ".join(parts)
 
 
+def _check_line(event: LockEvent) -> str:
+    """Compose one finished check run's line.
+
+    Args:
+        event: The ``checked`` row.
+
+    Returns:
+        The line, naming the runner without an ``@`` (module docstring).
+    """
+    runner = "" if event["agent"] == "" else f" by {event['agent']}"
+    return f"{event['label']} {event['ts'][11:19]}Z: {event['detail']}{runner}"
+
+
 def announcement(events: tuple[LockEvent, ...]) -> Announcement | None:
     """Fold one slice's events into one post, or nothing worth posting.
 
@@ -129,30 +154,40 @@ def announcement(events: tuple[LockEvent, ...]) -> Announcement | None:
         events: The slice's events, in file order.
 
     Returns:
-        The post, or None when no hold crossed a boundary -- progress-only
-        slices are consumed silently by design (module docstring).
+        The post, or None when no hold crossed a boundary and no check run
+        finished -- progress-only slices are consumed silently by design
+        (module docstring).
     """
+    checks = tuple(event for event in events if event["kind"] == "checked")
     holds: dict[int, list[LockEvent]] = {}
     for event in events:
-        holds.setdefault(event["holder_pid"], []).append(event)
+        if event["kind"] != "checked":
+            holds.setdefault(event["holder_pid"], []).append(event)
     announced = {
         holder: tuple(hold)
         for holder, hold in holds.items()
         if any(event["kind"] in BOUNDARY_KINDS for event in hold)
     }
-    if len(announced) == 0:
+    if len(announced) == 0 and len(checks) == 0:
         return None
-    lines = [f"FLEET-LOCK: {len(announced)} hold(s) transitioned"]
+    lines: list[str] = []
     agents: list[str] = []
-    for hold_events in announced.values():
-        lines.append(_hold_line(hold_events))
-        agent = hold_events[0]["agent"]
-        if agent != "" and agent not in agents:
-            agents.append(agent)
+    if len(announced) > 0:
+        lines.append(f"FLEET-LOCK: {len(announced)} hold(s) transitioned")
+        for hold_events in announced.values():
+            lines.append(_hold_line(hold_events))
+            agent = hold_events[0]["agent"]
+            if agent != "" and agent not in agents:
+                agents.append(agent)
+    if len(checks) > 0:
+        lines.append(f"CHECKS: {len(checks)} make test run(s) finished")
+        lines.extend(_check_line(event) for event in checks)
     if len(agents) > 0:
         mentions = " ".join(f"@{agent}" for agent in agents)
         lines.append(f"{mentions} your fleet-lock operation transitioned")
-    return Announcement(body="\n".join(lines), agents=tuple(agents), holds=len(announced))
+    return Announcement(
+        body="\n".join(lines), agents=tuple(agents), holds=len(announced), checks=len(checks)
+    )
 
 
 __all__ = ["BOUNDARY_KINDS", "Announcement", "announcement", "parse_journal_ts"]
