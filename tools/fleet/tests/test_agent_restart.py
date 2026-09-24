@@ -16,11 +16,24 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, queue, restart
+from fleet.core.published_tree import TREE_STEP_TIMEOUT_SECONDS
+from tests._published_tree_fixtures import (
+    COMMIT,
+    extraction_calls,
+    extraction_replies,
+    pin_scratch,
+    plant_extraction,
+)
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeEnv, FakeQueue, queue_job
-from tests.conftest import FakeRun, agent_argv
+from tests.conftest import FakeRun, agent_argv, failed
 from tests.test_agent_rebuild import rebuild_argv as hub_argv
 
 TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
+
+#: The environment each of the five commands of a session job receives: the
+#: four extraction steps inherit it untouched, and the verb withholds the
+#: agent's venv and gains the extraction on PYTHONPATH.
+EXTRACTION_UNSET: tuple[tuple[str, ...], ...] = ((), (), (), ())
 
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
@@ -29,6 +42,24 @@ def _credentials_in_env() -> None:
     _test_hooks.env = FakeEnv(
         {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
     )
+
+
+def checkout(tmp_path: pathlib.Path) -> pathlib.Path:
+    """Make the MCPs checkout directory and return it as the tick will see it.
+
+    The tick resolves ``--mcps-root``, which on Windows canonicalises the
+    case pytest's temporary root was spelled in, so the commands a test
+    expects must be composed from the resolved path.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The resolved checkout.
+    """
+    mcps = tmp_path / "mcps-checkout"
+    mcps.mkdir()
+    return mcps.resolve()
 
 
 def restart_row(**overrides: JSONValue) -> JSONObject:
@@ -58,10 +89,12 @@ class TestRestartLane:
     def test_a_claimed_restart_runs_session_audit_and_closes_with_its_verdict(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
+        scratch = tmp_path / "scratch"
+        tree = plant_extraction(scratch)
         runner = FakeRun(
             [
+                *extraction_replies(),
                 _test_hooks.CommandResult(
                     returncode=0,
                     stdout=(
@@ -72,7 +105,7 @@ class TestRestartLane:
                     ),
                     stderr="",
                     timed_out=False,
-                )
+                ),
             ]
         )
         _test_hooks.run = runner
@@ -92,13 +125,27 @@ class TestRestartLane:
         # out of a queue of checks (board task fd5cabfa, A5).
         assert endpoint.arguments[0]["lane"] == "hub"
         assert endpoint.arguments[0]["tags"] == []
-        assert runner.calls == [restart.restart_argv(mcps, TARGET)]
+        # The published tree is extracted first, then the verb runs against
+        # its register (MCPs board task f4cd489f).
+        assert runner.calls == [
+            *extraction_calls(mcps, scratch),
+            restart.restart_argv(mcps, tree["registry_dir"], TARGET),
+        ]
         # The child must not inherit this agent's own poetry venv, or the
-        # session-audit script resolves inside the wrong environment.
-        assert runner.unset_env == [("VIRTUAL_ENV",)]
+        # session-audit script resolves inside the wrong environment; and it
+        # imports the extraction, not the checkout's working tree.
+        assert runner.unset_env == [*EXTRACTION_UNSET, ("VIRTUAL_ENV",)]
+        assert runner.set_env[-1] == (("PYTHONPATH", tree["python_path"]),)
         # And it carries the lane's deadline, so a pane or hop that stops
         # answering closes the job failed instead of holding the tick.
-        assert runner.timeouts == [restart.SESSION_JOB_TIMEOUT_SECONDS] == [600]
+        assert (
+            runner.timeouts
+            == [
+                *[TREE_STEP_TIMEOUT_SECONDS] * 4,
+                restart.SESSION_JOB_TIMEOUT_SECONDS,
+            ]
+            == [120, 120, 120, 120, 600]
+        )
         started = endpoint.arguments[1]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
@@ -108,7 +155,9 @@ class TestRestartLane:
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
         detail = narrow_json_to_str(closed["detail"])
-        assert detail.startswith("session-audit rollover exited 0:")
+        # The detail names the commit that ran, so a closure can show its fix
+        # was the code that acted.
+        assert detail.startswith(f"session-audit rollover at {COMMIT} exited 0:")
         # The session-audit outcome line reaches the queue VERBATIM: it is
         # what the submitter reads, and it names the new pid.
         assert "RESTARTED  mcps-99" in detail
@@ -119,10 +168,12 @@ class TestRestartLane:
     ) -> None:
         """The second session verb (MCPs mig 525, board task 1fe89973) rides the
         same job path: one invocation, session-audit's own REVIVE line back."""
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
+        scratch = tmp_path / "scratch"
+        tree = plant_extraction(scratch)
         runner = FakeRun(
             [
+                *extraction_replies(),
                 _test_hooks.CommandResult(
                     returncode=0,
                     stdout=(
@@ -132,7 +183,7 @@ class TestRestartLane:
                     ),
                     stderr="",
                     timed_out=False,
-                )
+                ),
             ]
         )
         _test_hooks.run = runner
@@ -156,23 +207,27 @@ class TestRestartLane:
 
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
-        assert runner.calls == [restart.revive_argv(mcps, TARGET, "fable-dm-versionsplit-0912")]
-        assert runner.unset_env == [("VIRTUAL_ENV",)]
+        assert runner.calls == [
+            *extraction_calls(mcps, scratch),
+            restart.revive_argv(mcps, tree["registry_dir"], TARGET, "fable-dm-versionsplit-0912"),
+        ]
+        assert runner.unset_env == [*EXTRACTION_UNSET, ("VIRTUAL_ENV",)]
         started = endpoint.arguments[1]
         assert started["runId"] == f"revive-{DEFAULT_JOB_ID}"
         closed = endpoint.arguments[2]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
-        assert detail.startswith("session-audit revive exited 0:")
+        assert detail.startswith(f"session-audit revive at {COMMIT} exited 0:")
         assert "REVIVE - REVIVED" in detail
         assert "now pid 15280" in detail
 
     def test_a_revive_whose_submitter_is_not_a_label_is_refused_before_it_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
-        runner = FakeRun([])
+        mcps = checkout(tmp_path)
+        scratch = tmp_path / "scratch"
+        plant_extraction(scratch)
+        runner = FakeRun(extraction_replies())
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -186,7 +241,8 @@ class TestRestartLane:
 
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
-        assert runner.calls == []
+        # The extraction ran; session-audit never did.
+        assert runner.calls == extraction_calls(mcps, scratch)
         closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(closed["detail"])
@@ -209,11 +265,15 @@ class TestRestartLane:
     ) -> None:
         """The two kill verbs (MCPs mig 526, board task 660964d9) ride the same
         job path; the hard flag comes from the row's verb and nowhere else."""
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
+        scratch = tmp_path / "scratch"
+        tree = plant_extraction(scratch)
         line = f"KILL - {outcome.format(target=TARGET)}\n"
         runner = FakeRun(
-            [_test_hooks.CommandResult(returncode=0, stdout=line, stderr="", timed_out=False)]
+            [
+                *extraction_replies(),
+                _test_hooks.CommandResult(returncode=0, stdout=line, stderr="", timed_out=False),
+            ]
         )
         _test_hooks.run = runner
         endpoint = FakeQueue(
@@ -232,23 +292,30 @@ class TestRestartLane:
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == [
-            restart.kill_argv(mcps, TARGET, "fable-dm-versionsplit-0912", hard=hard)
+            *extraction_calls(mcps, scratch),
+            restart.kill_argv(
+                mcps, tree["registry_dir"], TARGET, "fable-dm-versionsplit-0912", hard=hard
+            ),
         ]
-        assert runner.unset_env == [("VIRTUAL_ENV",)]
+        assert runner.unset_env == [*EXTRACTION_UNSET, ("VIRTUAL_ENV",)]
+        assert runner.set_env[-1] == (("PYTHONPATH", tree["python_path"]),)
         assert endpoint.arguments[1]["runId"] == f"kill-{DEFAULT_JOB_ID}"
         closed = endpoint.arguments[2]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
-        assert detail == f"session-audit kill exited 0: {line.strip()}"
+        assert detail == f"session-audit kill at {COMMIT} exited 0: {line.strip()}"
 
     def test_a_kill_session_audit_did_not_carry_out_closes_failed(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
         refused = f"KILL - REFUSED session {TARGET} (graceful): nothing typed: busy right now\n"
+        plant_extraction(tmp_path / "scratch")
         _test_hooks.run = FakeRun(
-            [_test_hooks.CommandResult(returncode=1, stdout=refused, stderr="", timed_out=False)]
+            [
+                *extraction_replies(),
+                _test_hooks.CommandResult(returncode=1, stdout=refused, stderr="", timed_out=False),
+            ]
         )
         endpoint = FakeQueue(
             [
@@ -273,9 +340,10 @@ class TestRestartLane:
     def test_a_kill_whose_submitter_is_not_a_label_is_refused_before_it_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
-        runner = FakeRun([])
+        mcps = checkout(tmp_path)
+        scratch = tmp_path / "scratch"
+        plant_extraction(scratch)
+        runner = FakeRun(extraction_replies())
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -289,7 +357,7 @@ class TestRestartLane:
 
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
-        assert runner.calls == []
+        assert runner.calls == extraction_calls(mcps, scratch)
         assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(endpoint.arguments[1]["detail"])
 
     def test_a_skipped_or_failed_restart_closes_failed_with_session_audits_reason(
@@ -297,10 +365,11 @@ class TestRestartLane:
     ) -> None:
         """A2 on the board task: the busy session is SKIPPED by session-audit
         and this runner reports that, never a success it did not observe."""
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
+        plant_extraction(tmp_path / "scratch")
         _test_hooks.run = FakeRun(
             [
+                *extraction_replies(),
                 _test_hooks.CommandResult(
                     returncode=1,
                     stdout=(
@@ -311,7 +380,7 @@ class TestRestartLane:
                     ),
                     stderr="",
                     timed_out=False,
-                )
+                ),
             ]
         )
         endpoint = FakeQueue(
@@ -330,6 +399,33 @@ class TestRestartLane:
         assert closed["exitCode"] == 1
         assert "SKIPPED    mcps-6e" in narrow_json_to_str(closed["detail"])
         assert "untouched" in narrow_json_to_str(closed["detail"])
+
+    def test_a_published_tree_that_cannot_be_extracted_refuses_the_job_and_no_verb_runs(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs board task f4cd489f: no fallback to the working tree. A kill
+        whose published code cannot be read is refused by code, unrun."""
+        mcps = checkout(tmp_path)
+        pin_scratch(tmp_path / "scratch")
+        runner = FakeRun([failed(128, "fatal: Needed a single revision")])
+        _test_hooks.run = runner
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"claimed": restart_row(command="kill-session")}),
+                dump_json_str({"job": restart_row(command="kill-session", status="refused")}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(hub_argv(config_path, repo, mcps)) == 0
+
+        assert runner.calls == extraction_calls(mcps, tmp_path / "scratch")[:1]
+        assert endpoint.tools == ["dispatch_claim", "dispatch_report"]
+        closed = endpoint.arguments[1]
+        assert closed["status"] == "refused"
+        detail = narrow_json_to_str(closed["detail"])
+        assert detail.startswith("SESSION_TREE_REF_UNRESOLVED: refs/remotes/origin/main in ")
+        assert "fatal: Needed a single revision" in detail
 
     def test_without_the_mcps_root_flag_the_job_is_refused_and_nothing_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path
@@ -355,8 +451,7 @@ class TestRestartLane:
     def test_a_lawless_target_is_refused_before_session_audit_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
         runner = FakeRun([])
         _test_hooks.run = runner
         endpoint = FakeQueue(
@@ -376,8 +471,7 @@ class TestRestartLane:
     def test_a_row_with_no_target_is_refused_by_name(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        mcps = tmp_path / "mcps-checkout"
-        mcps.mkdir()
+        mcps = checkout(tmp_path)
         runner = FakeRun([])
         _test_hooks.run = runner
         endpoint = FakeQueue(

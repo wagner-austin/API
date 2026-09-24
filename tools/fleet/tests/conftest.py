@@ -46,6 +46,8 @@ class FakeRun:
             call, so a test asserting on argv does not have to mention bytes.
         unset_env: Every set of withheld variable names it was given, in
             order, empty for the calls that withheld nothing.
+        set_env: Every set of ``(name, value)`` pairs it was given, in
+            order, empty for the calls that set nothing.
         timeouts: Every deadline it was given, in order, one per call: the
             seam makes the deadline mandatory, and a test that asserts on
             the deadline a call site chose reads it here.
@@ -54,6 +56,7 @@ class FakeRun:
     calls: list[tuple[str, ...]]
     stdin: list[bytes | None]
     unset_env: list[tuple[str, ...]]
+    set_env: list[tuple[tuple[str, str], ...]]
     timeouts: list[int]
     _replies: list[_test_hooks.CommandResult]
 
@@ -68,6 +71,7 @@ class FakeRun:
         self.calls = []
         self.stdin = []
         self.unset_env = []
+        self.set_env = []
         self.timeouts = []
         self._replies = list(replies)
 
@@ -78,6 +82,7 @@ class FakeRun:
         timeout_seconds: int,
         stdin_bytes: bytes | None = None,
         unset_env: Sequence[str] = (),
+        set_env: Sequence[tuple[str, str]] = (),
     ) -> _test_hooks.CommandResult:
         """Record a call and answer with the next scripted result.
 
@@ -86,6 +91,7 @@ class FakeRun:
             timeout_seconds: The deadline the caller chose.
             stdin_bytes: Its standard input, or None.
             unset_env: The variables the caller withheld from the child.
+            set_env: The variables the caller set in the child.
 
         Returns:
             The next scripted result.
@@ -96,6 +102,7 @@ class FakeRun:
         self.calls.append(tuple(argv))
         self.stdin.append(stdin_bytes)
         self.unset_env.append(tuple(unset_env))
+        self.set_env.append(tuple(set_env))
         self.timeouts.append(timeout_seconds)
         assert self._replies, f"unscripted call: {list(argv)}"
         return self._replies.pop(0)

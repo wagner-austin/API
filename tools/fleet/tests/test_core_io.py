@@ -174,6 +174,29 @@ class TestDefaultHooks:
         assert withheld["stdout"].split() == ["False", "True"]
         assert inherited["stdout"].split() == ["True", "True"]
 
+    def test_run_sets_named_variables_after_withholding_and_keeps_the_rest(self) -> None:
+        """A real child reads back what it was given (MCPs board task f4cd489f).
+
+        A set name reaches the child with its value, a name both withheld and
+        set arrives with the set value because setting is applied second, and
+        PATH, neither withheld nor set, still arrives.
+        """
+        probe = [
+            sys.executable,
+            "-c",
+            "import os; print(os.environ['FLEET_PROBE'], os.environ['FLEET_BOTH'], "
+            "'PATH' in os.environ)",
+        ]
+        result = _test_hooks._default_run(
+            probe,
+            timeout_seconds=GENEROUS_SECONDS,
+            unset_env=("FLEET_BOTH",),
+            set_env=(("FLEET_PROBE", "published"), ("FLEET_BOTH", "second")),
+        )
+
+        assert result["returncode"] == 0, result["stderr"]
+        assert result["stdout"].split() == ["published", "second", "True"]
+
     def test_now_reads_whole_seconds_from_the_real_clock(self) -> None:
         """Whole rather than fractional, and moving forwards.
 
