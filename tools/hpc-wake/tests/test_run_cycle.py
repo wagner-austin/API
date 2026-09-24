@@ -247,6 +247,8 @@ class TestMain:
             "lock-wake",
             "--journal",
             "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
+            "--check-journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.check-events.jsonl",
         ]
         assert lock_cwd == (root / "..\\lock-wake").resolve()
         assert lock_env == env
@@ -368,6 +370,8 @@ class TestPublishers:
             "lock-wake",
             "--journal",
             "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
+            "--check-journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.check-events.jsonl",
         )
 
 
