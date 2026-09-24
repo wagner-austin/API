@@ -17,6 +17,7 @@ import pytest
 from board_watch import _test_hooks as board_watch_hooks
 from board_watch import config as board_config
 from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion, ProjectSource, encode_project_source
@@ -69,7 +70,11 @@ def _credentials_in_env() -> None:
         {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
     )
     board_watch_hooks.env = FakeEnv(
-        {board_config.API_KEY_VARIABLE: "board-key", board_config.TENANT_ID_VARIABLE: "tenant"}
+        {
+            board_config.API_KEY_VARIABLE: "board-key",
+            board_config.TENANT_ID_VARIABLE: "tenant",
+            board_config.URL_VARIABLE: DECLARED_TASKBOARD_URL,
+        }
     )
 
 

@@ -28,11 +28,20 @@ from board_watch import config as board_config
 from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import FakeEnv, FakeQueue
 from tests.conftest import FakeRun, agent_argv, failed, ok
+
+#: The board's variables for the observe pass, with the url overridden so
+#: no test reads the MCPs checkout's endpoint declaration.
+BOARD_ENV = {
+    board_config.API_KEY_VARIABLE: "board-key",
+    board_config.TENANT_ID_VARIABLE: "tenant",
+    board_config.URL_VARIABLE: DECLARED_TASKBOARD_URL,
+}
 
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
@@ -204,9 +213,7 @@ class TestObservingSessions:
         tmp_path: pathlib.Path,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        board_watch_hooks.env = FakeEnv(
-            {board_config.API_KEY_VARIABLE: "board-key", board_config.TENANT_ID_VARIABLE: "tenant"}
-        )
+        board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.run = FakeRun([failed(255, "ssh: serendipity is asleep")])
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
@@ -233,9 +240,7 @@ class TestObservingSessions:
     def test_a_worker_that_answers_is_recorded_on_the_board(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        board_watch_hooks.env = FakeEnv(
-            {board_config.API_KEY_VARIABLE: "board-key", board_config.TENANT_ID_VARIABLE: "tenant"}
-        )
+        board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.run = FakeRun(
             [
                 ok(""),
