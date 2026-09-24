@@ -20,6 +20,12 @@ locked compose target. Since MCPs `66b85d32` each row carries `agent`, the
 session label behind the invocation when its shell exported
 `BOARD_AGENT_LABEL`; history rows without the key read as unlabelled.
 
+One kind is not a lock transition: `checked`, one finished `make test` run
+under the MCPs per-package check lock (`packages/maketools` `check_lock`),
+written here so check results and rebuilds share one stream (MCPs board
+task `ea2ea29c`). Its `label` is the package and its `detail` the outcome,
+exit code, seconds and HEAD.
+
 The position is a byte offset kept beside the journal
 (`.fleet-events.jsonl.lock-wake-offset.json`), per the journal's own
 subscription contract. Torn tails from a mid-append writer are left for the
@@ -32,6 +38,10 @@ boundary — acquired, released, failed, timeout — with requested/waiting/step
 folded in as counts. Progress-only slices advance the offset silently: a
 30-minute deploy's step lines are not posts. Worst case is therefore one
 post per pump tick (3 minutes), and in practice one per cascade phase.
+
+Finished check runs join that same post under a `CHECKS` heading, one line
+each, naming the runner without an `@`: the runner saw its own output, so
+the post reaches only the sessions subscribed to the standing task.
 
 ## Running
 
