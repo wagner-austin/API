@@ -25,15 +25,21 @@ from platform_core.error_codes_tooling import SessionLabelErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
-from platform_core.mcp_testing import FakeHttpPost, sent_arguments, tool_text_body
+from platform_core.mcp_testing import (
+    DECLARED_TASKBOARD_URL,
+    FakeHttpPost,
+    sent_arguments,
+    stack_endpoints_text,
+    tool_text_body,
+)
 from platform_core.session_label import (
     API_KEY_NAME,
     LABEL_VARIABLE,
     SESSION_ID_VARIABLE,
     STACK_ENV_PATH,
-    TASKBOARD_URL,
     TENANT_ID_NAME,
 )
+from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.cli import submit as submit_cli
@@ -90,11 +96,13 @@ def _in_session(label: str, exported: str | None) -> tuple[FakeHttpPost, list[pa
     read: list[pathlib.Path] = []
     real_read_bytes = core_hooks.read_bytes
 
+    stack = {STACK_ENV_PATH: ENV_BYTES, STACK_ENDPOINTS_PATH: stack_endpoints_text().encode()}
+
     def _read_bytes(path: pathlib.Path) -> bytes:
-        if path != STACK_ENV_PATH:
+        if path not in stack:
             return real_read_bytes(path)
         read.append(path)
-        return ENV_BYTES
+        return stack[path]
 
     core_hooks.read_bytes = _read_bytes
     post = FakeHttpPost([_whereis(label)])
@@ -122,8 +130,8 @@ class TestSubmitterLabel:
     def test_inside_a_session_an_unset_label_is_filled_from_the_board(self) -> None:
         post, read = _in_session(BOUND, None)
         assert submitter_label() == BOUND
-        assert read == [STACK_ENV_PATH]
-        assert post.urls == [TASKBOARD_URL]
+        assert read == [STACK_ENDPOINTS_PATH, STACK_ENV_PATH]
+        assert post.urls == [DECLARED_TASKBOARD_URL]
         assert post.headers[0]["x-api-key"] == "internal-key"
         assert sent_arguments(post.bodies[0]) == {"session": SESSION}
 
