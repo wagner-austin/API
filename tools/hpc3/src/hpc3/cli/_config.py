@@ -94,8 +94,9 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
     return decode_workspace(value, config_dir=config_dir)
 
 
-def _stack_env_text(path: pathlib.Path) -> str:
-    """Read the stack's ``.env`` through the core's byte seam.
+def _stack_file_text(path: pathlib.Path) -> str:
+    """Read one of the stack's files (its ``.env`` or its endpoint
+    declaration) through the core's byte seam.
 
     Args:
         path: The file :mod:`platform_core.session_label` asks for.
@@ -133,15 +134,16 @@ def submitter_label() -> str:
 
     Raises:
         AppError: ``SESSION_LABEL_MISMATCH`` when the shell's label is not
-            the one the board bound to the session; ``SESSION_ID_MALFORMED``
-            or ``SESSION_LABEL_CREDENTIALS_MISSING`` when the board cannot be
+            the one the board bound to the session; ``SESSION_ID_MALFORMED``,
+            ``STACK_ENDPOINT_UNDECLARED`` or
+            ``SESSION_LABEL_CREDENTIALS_MISSING`` when the board cannot be
             asked, and the :class:`McpClientErrorCode` failures when it does
             not answer.
     """
     return resolve_label(
         session_id=_optional_env_str(SESSION_ID_VARIABLE),
         exported=_optional_env_str(LABEL_VARIABLE),
-        read_text=_stack_env_text,
+        read_text=_stack_file_text,
         post=cli_hooks.http_post,
     )
 
