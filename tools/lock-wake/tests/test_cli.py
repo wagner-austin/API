@@ -12,7 +12,13 @@ from platform_core.mcp_testing import FakeHttpPost, announcing_poster
 from lock_wake import _test_hooks
 from lock_wake.cli import wake
 from lock_wake.position import position_path, read_offset
-from tests.conftest import CONFIGURED_ENV, journal_line, pin_env, stage_journal
+from tests.conftest import (
+    CONFIGURED_ENV,
+    check_journal_path,
+    journal_line,
+    pin_env,
+    stage_journal,
+)
 
 
 class TestMain:
@@ -27,12 +33,17 @@ class TestMain:
         journal = stage_journal(tmp_path, content)
         _test_hooks.http_post = announcing_poster()
 
-        assert wake.main(["--journal", str(journal)]) == 0
+        checks = check_journal_path(tmp_path)
+        assert wake.main(["--journal", str(journal), "--check-journal", str(checks)]) == 0
         assert read_offset(position_path(journal)) == len(content)
 
-    def test_a_missing_flag_refuses(self) -> None:
+    def test_a_missing_journal_flag_refuses(self) -> None:
         with pytest.raises(ValueError, match="--journal"):
             wake.main([])
+
+    def test_a_missing_check_journal_flag_refuses(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="--check-journal"):
+            wake.main(["--journal", str(tmp_path / ".fleet-events.jsonl")])
 
 
 class TestInvocationForms:
@@ -43,14 +54,20 @@ class TestInvocationForms:
         journal = stage_journal(tmp_path, b"")
         _test_hooks.http_post = FakeHttpPost([])
         saved_argv = list(sys.argv)
-        sys.argv = ["lock-wake", "--journal", str(journal)]
+        sys.argv = [
+            "lock-wake",
+            "--journal",
+            str(journal),
+            "--check-journal",
+            str(check_journal_path(tmp_path)),
+        ]
         try:
             with pytest.raises(SystemExit) as caught:
                 wake.entrypoint()
         finally:
             sys.argv[:] = saved_argv
         assert caught.value.code == 0
-        assert emitted == ["journal quiet; offset 0"]
+        assert emitted == ["journals quiet; offsets 0 and 0"]
 
     def test_running_as_a_module_actually_runs(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -64,7 +81,13 @@ class TestInvocationForms:
         module_name = "lock_wake.cli.wake"
         saved_argv = list(sys.argv)
         saved_module = sys.modules.pop(module_name, None)
-        sys.argv = ["lock-wake", "--journal", str(journal)]
+        sys.argv = [
+            "lock-wake",
+            "--journal",
+            str(journal),
+            "--check-journal",
+            str(check_journal_path(tmp_path)),
+        ]
         try:
             with pytest.raises(SystemExit) as caught:
                 runpy.run_module(module_name, run_name="__main__", alter_sys=False)
@@ -73,4 +96,4 @@ class TestInvocationForms:
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
-        assert emitted == ["journal quiet; offset 0"]
+        assert emitted == ["journals quiet; offsets 0 and 0"]

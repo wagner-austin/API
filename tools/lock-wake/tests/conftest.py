@@ -92,6 +92,36 @@ def stage_journal(tmp_path: pathlib.Path, content: bytes) -> pathlib.Path:
     return journal
 
 
+def check_journal_path(tmp_path: pathlib.Path) -> pathlib.Path:
+    """Where the check journal lives for a test: beside the fleet journal.
+
+    Absent until :func:`stage_check_journal` writes it, which is the state
+    of a clone where no locked ``make test`` has finished yet.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The check journal's path.
+    """
+    return tmp_path / ".check-events.jsonl"
+
+
+def stage_check_journal(tmp_path: pathlib.Path, content: bytes) -> pathlib.Path:
+    """Write the check journal with exact bytes.
+
+    Args:
+        tmp_path: The test's temporary directory.
+        content: The journal's full contents.
+
+    Returns:
+        The check journal's path.
+    """
+    journal = check_journal_path(tmp_path)
+    journal.write_bytes(content)
+    return journal
+
+
 @pytest.fixture(autouse=True)
 def _reset_hooks() -> Generator[None, None, None]:
     """Rebind every touched seam to production before and after each test."""
