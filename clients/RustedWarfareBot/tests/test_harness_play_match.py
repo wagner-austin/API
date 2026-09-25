@@ -13,6 +13,7 @@ from rw_bot.harness.launch import LaunchConfig
 from rw_bot.harness.play_match import (
     EXIT_AGENT_BUILD_FAILED,
     EXIT_NO_CHANNEL,
+    PLANNER_WALL_SECONDS,
     TOOL_WALL_SECONDS,
     build_agent,
     clear_orphaned_engine,
@@ -273,7 +274,7 @@ class TestPlayingAMatch:
     def test_a_frozen_tree_reaches_the_planner_as_a_path(self) -> None:
         with _host() as host:
             play(_config(tree="runs/sweeps/demo/.tree"))
-            _, environment = host.inherited[0]
+            _, environment, _ = host.inherited[0]
             assert environment["PYTHONPATH"] == (
                 "/repo/runs/sweeps/demo/.tree:/repo/runs/sweeps/demo/.tree/src"
             )
@@ -282,14 +283,24 @@ class TestPlayingAMatch:
         """A blank PYTHONPATH is not an unset one."""
         with _host() as host:
             play(_config())
-            _, environment = host.inherited[0]
+            _, environment, _ = host.inherited[0]
             assert "PYTHONPATH" not in environment
 
     def test_the_planner_inherits_the_rest_of_the_environment(self) -> None:
         with _host() as host:
             play(_config(tree="t"))
-            _, environment = host.inherited[0]
+            _, environment, _ = host.inherited[0]
             assert environment["PATH"] == "/usr/bin"
+
+    def test_the_planner_is_launched_under_a_wall(self) -> None:
+        """The planner is the one child nothing captures, so nothing else
+        would notice it running forever: the 2026-09-09 wedge sat five hours.
+        Asserted as the constant rather than a number, so the bound and this
+        case cannot drift apart (board task 0d891468)."""
+        with _host() as host:
+            play(_config())
+            _, _, wall = host.inherited[0]
+            assert wall == PLANNER_WALL_SECONDS
 
     def test_a_compiled_jar_and_its_classes_are_removed(self) -> None:
         with _host() as host:

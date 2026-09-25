@@ -8,13 +8,22 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
 
 from platform_core.logging import get_logger
 
 logger = get_logger(__name__)
 
 DEFAULT_SAMPLE_RATE = 16000
+
+#: Wall-clock bound on one ffmpeg conversion. Ten minutes: this service
+#: converts a single uploaded clip to 16 kHz mono, which takes seconds, so
+#: the bound clears any honest conversion by orders of magnitude and is
+#: still FINITE. It runs inside a REQUEST, which is the reason it cannot be
+#: unbounded: an ffmpeg that never returns holds the worker handling that
+#: request forever, and the caller sees no answer and no error (board task
+#: 0d891468).
+FFMPEG_CONVERT_WALL_SECONDS: Final[int] = 600
 
 
 class AudioConverterProtocol(Protocol):
@@ -67,6 +76,7 @@ def _run_ffmpeg(input_path: str, output_path: str) -> subprocess.CompletedProces
         ],
         capture_output=True,
         check=True,
+        timeout=FFMPEG_CONVERT_WALL_SECONDS,
     )
 
 

@@ -17,7 +17,6 @@ Usage in tests:
 from __future__ import annotations
 
 import os
-import subprocess
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -26,6 +25,11 @@ from typing import BinaryIO, Literal, Protocol
 import numpy as np
 from numpy.typing import NDArray
 
+from ._subprocess_runner import (
+    SubprocessRunProtocol,
+    SubprocessRunResult,
+    _default_subprocess_run,
+)
 from .types import (
     AudioChunk,
     BinaryFileProtocol,
@@ -33,38 +37,6 @@ from .types import (
     VerboseResponse,
     WhisperTask,
 )
-
-# =============================================================================
-# Subprocess Protocol
-# =============================================================================
-
-
-class SubprocessRunResult(Protocol):
-    """Protocol for subprocess.run result."""
-
-    returncode: int
-    stdout: bytes | str | None
-    stderr: bytes | str | None
-
-
-class SubprocessRunProtocol(Protocol):
-    """Protocol for subprocess.run function."""
-
-    def __call__(
-        self,
-        args: list[str],
-        *,
-        capture_output: bool = False,
-        check: bool = False,
-        timeout: float | None = None,
-        text: bool = False,
-        input: bytes | str | None = None,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-    ) -> SubprocessRunResult:
-        """Run subprocess with given arguments."""
-        ...
-
 
 # =============================================================================
 # OpenAI Client Protocols
@@ -266,108 +238,6 @@ class WriteTextFileProtocol(Protocol):
 # =============================================================================
 # Default Implementations
 # =============================================================================
-
-
-class _SubprocessRunResultImpl:
-    """Concrete implementation of SubprocessRunResult from subprocess.run output."""
-
-    __slots__ = ("returncode", "stderr", "stdout")
-
-    def __init__(
-        self,
-        returncode: int,
-        stdout: bytes | str | None,
-        stderr: bytes | str | None,
-    ) -> None:
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
-
-
-def _run_subprocess_bytes(
-    args: list[str],
-    capture_output: bool,
-    check: bool,
-    timeout: float | None,
-    input_data: bytes | None,
-    cwd: str | None,
-    env: dict[str, str] | None,
-) -> _SubprocessRunResultImpl:
-    """Run subprocess and return bytes output."""
-    stdout_pipe = subprocess.PIPE if capture_output else None
-    stderr_pipe = subprocess.PIPE if capture_output else None
-    stdin_pipe = subprocess.PIPE if input_data is not None else None
-
-    proc: subprocess.Popen[bytes] = subprocess.Popen(
-        args,
-        stdout=stdout_pipe,
-        stderr=stderr_pipe,
-        stdin=stdin_pipe,
-        cwd=cwd,
-        env=env,
-    )
-    stdout_bytes, stderr_bytes = proc.communicate(input=input_data, timeout=timeout)
-    returncode: int = proc.returncode
-
-    if check and returncode != 0:
-        raise subprocess.CalledProcessError(returncode, args, stdout_bytes, stderr_bytes)
-
-    return _SubprocessRunResultImpl(returncode, stdout_bytes, stderr_bytes)
-
-
-def _run_subprocess_text(
-    args: list[str],
-    capture_output: bool,
-    check: bool,
-    timeout: float | None,
-    input_data: str | None,
-    cwd: str | None,
-    env: dict[str, str] | None,
-) -> _SubprocessRunResultImpl:
-    """Run subprocess and return text output."""
-    stdout_pipe = subprocess.PIPE if capture_output else None
-    stderr_pipe = subprocess.PIPE if capture_output else None
-    stdin_pipe = subprocess.PIPE if input_data is not None else None
-
-    proc: subprocess.Popen[str] = subprocess.Popen(
-        args,
-        stdout=stdout_pipe,
-        stderr=stderr_pipe,
-        stdin=stdin_pipe,
-        text=True,
-        cwd=cwd,
-        env=env,
-    )
-    stdout_str, stderr_str = proc.communicate(input=input_data, timeout=timeout)
-    returncode: int = proc.returncode
-
-    if check and returncode != 0:
-        raise subprocess.CalledProcessError(returncode, args, stdout_str, stderr_str)
-
-    return _SubprocessRunResultImpl(returncode, stdout_str, stderr_str)
-
-
-def _default_subprocess_run(
-    args: list[str],
-    *,
-    capture_output: bool = False,
-    check: bool = False,
-    timeout: float | None = None,
-    text: bool = False,
-    input: bytes | str | None = None,
-    cwd: str | None = None,
-    env: dict[str, str] | None = None,
-) -> SubprocessRunResult:
-    """Production implementation - uses typed Popen to avoid Any types."""
-    if text:
-        input_str: str | None = input if isinstance(input, str) else None
-        return _run_subprocess_text(args, capture_output, check, timeout, input_str, cwd, env)
-    input_bytes: bytes | None = None
-    if isinstance(input, str):
-        input_bytes = input.encode()
-    elif isinstance(input, bytes):
-        input_bytes = input
-    return _run_subprocess_bytes(args, capture_output, check, timeout, input_bytes, cwd, env)
 
 
 def _default_os_stat(path: str) -> os.stat_result:

@@ -17,13 +17,22 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
-from typing import Protocol
+from typing import IO, Final, Protocol
 
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
 _logger = get_logger("hpc3")
+
+#: Wall-clock bound on one cluster command. Ten minutes: every command this
+#: package runs is an ssh to HPC3 carrying an sbatch, squeue or scancel, all
+#: of which answer in seconds even on a slow link, so this clears any honest
+#: run by a wide margin and is still FINITE. An unbounded ssh to a machine
+#: that went away is the exact shape that drained the fleet's queue for three
+#: days in September 2026 (board tasks 41ac6ed2, 35940277 and 0d891468).
+CLUSTER_COMMAND_WALL_SECONDS: Final[int] = 600
 
 
 class CommandResult(TypedDict):
@@ -63,12 +72,14 @@ class RunProtocol(Protocol):
         ...
 
 
-def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> CommandResult:
-    """Real implementation running a command via subprocess.
+def _awaited(argv: Sequence[str], *, stdin_source: int | IO[bytes]) -> CommandResult:
+    """Run one command against an already-prepared standard input.
 
     Args:
         argv: Executable and arguments.
-        stdin_bytes: Bytes for standard input, or None.
+        stdin_source: What the child reads as standard input:
+            :data:`subprocess.DEVNULL` for a closed one, or a file already
+            positioned at the byte the child should read first.
 
     Returns:
         The command's exit status and captured streams, decoded as UTF-8 with
@@ -78,14 +89,48 @@ def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> Co
     completed = subprocess.run(
         list(argv),
         check=False,
-        input=stdin_bytes,
+        stdin=stdin_source,
         capture_output=True,
+        timeout=CLUSTER_COMMAND_WALL_SECONDS,
     )
     return CommandResult(
         returncode=completed.returncode,
         stdout=completed.stdout.decode("utf-8", errors="replace"),
         stderr=completed.stderr.decode("utf-8", errors="replace"),
     )
+
+
+def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> CommandResult:
+    """Real implementation running a command via subprocess.
+
+    THE PAYLOAD IS A FILE, NOT A PIPE, AND THE DEADLINE IS WHY. This used to
+    pass ``input=stdin_bytes``, which hands the payload over by WRITING IT
+    FROM THE CALLING THREAD before any ``timeout`` governs anything, so the
+    call reads as bounded and is not. Measured on Windows CPython 2026-09-24
+    against a child that never drains its pipe: 60 MB with ``timeout=5`` was
+    still blocked at 100 seconds (board task 1e57ebe5). Handing the child a
+    file it reads itself costs this thread nothing, so
+    :data:`CLUSTER_COMMAND_WALL_SECONDS` governs the whole call. Do not
+    reintroduce ``input=``: it restores the defect silently, and a suite whose
+    children all drain their pipes stays green through it.
+
+    A command with no payload gets a CLOSED stdin rather than this process's
+    own. Under a scheduled task an inherited stdin is a handle a remote shell
+    can wait on forever, which is the same stall by another route.
+
+    Args:
+        argv: Executable and arguments.
+        stdin_bytes: Bytes for standard input, or None.
+
+    Returns:
+        The command's exit status and captured streams.
+    """
+    if stdin_bytes is None:
+        return _awaited(argv, stdin_source=subprocess.DEVNULL)
+    with tempfile.TemporaryFile() as payload:
+        payload.write(stdin_bytes)
+        payload.seek(0)
+        return _awaited(argv, stdin_source=payload)
 
 
 class LogEventProtocol(Protocol):

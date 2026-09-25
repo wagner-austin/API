@@ -9,6 +9,18 @@ from pathlib import Path
 import pytest
 
 from platform_stt import _test_hooks
+
+# The subprocess runner moved out of _test_hooks when that module crossed the
+# 600-line ceiling (board task 0d891468). These cases test that runner, so
+# they import it from where it lives rather than through the seam that binds
+# it: importing it through _test_hooks would still resolve, and would hide
+# which module these assertions actually cover.
+from platform_stt._subprocess_runner import (
+    _default_subprocess_run,
+    _run_subprocess_bytes,
+    _run_subprocess_text,
+    _SubprocessRunResultImpl,
+)
 from platform_stt._test_hooks import (
     AudioChunkerProtocol,
     _default_audio_chunker_factory,
@@ -19,10 +31,6 @@ from platform_stt._test_hooks import (
     _default_os_path_getsize,
     _default_os_remove,
     _default_os_stat,
-    _default_subprocess_run,
-    _run_subprocess_bytes,
-    _run_subprocess_text,
-    _SubprocessRunResultImpl,
 )
 from platform_stt.testing import reset_hooks
 

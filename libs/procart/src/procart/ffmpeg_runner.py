@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import subprocess
-from typing import Protocol
+from typing import Final, Protocol
 
 from platform_core.logging import get_logger
 
 from .types import Fps
 
 _logger = get_logger(__name__)
+
+#: Wall-clock bound on one ffmpeg encode. Four hours, which is far longer than
+#: any render this package produces and is still FINITE. ffmpeg is the classic
+#: unbounded child: handed an unreadable input or a filter graph it cannot
+#: satisfy it can sit indefinitely, and with no deadline the encode call never
+#: returns and nothing says why (board task 0d891468). Raise it if a real
+#: render ever approaches it; do not remove it.
+FFMPEG_ENCODE_WALL_SECONDS: Final[int] = 14400
 
 
 class FfmpegRunner(Protocol):
@@ -77,7 +85,7 @@ class RealFfmpegRunner:
         _logger.info("Video encoding complete: %s", output_path)
 
     def _run(self, args: list[str]) -> None:
-        subprocess.run(args, check=True)
+        subprocess.run(args, check=True, timeout=FFMPEG_ENCODE_WALL_SECONDS)
 
 
 __all__ = ["FfmpegRunner", "RealFfmpegRunner", "build_ffmpeg_args"]

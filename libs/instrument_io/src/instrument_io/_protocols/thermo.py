@@ -14,6 +14,16 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Final
+
+#: Wall-clock bound on one ThermoRawFileParser conversion. Four hours: the
+#: largest raw files this package reads convert in minutes, so the bound
+#: clears any honest run by a wide margin and is still FINITE. The parser is
+#: a third-party CLI, on Linux and Mac run under Mono, and a converter that
+#: wedges on a malformed raw file would otherwise hold the reader open
+#: forever with nothing reported (board task 0d891468). Raise it if a real
+#: conversion ever approaches it; do not remove it.
+THERMO_CONVERSION_WALL_SECONDS: Final[int] = 14400
 
 
 def _get_bundled_exe_path() -> Path:
@@ -110,6 +120,7 @@ def _convert_raw_to_mzml(raw_path: Path, output_dir: Path) -> Path:
         capture_output=True,
         text=True,
         check=False,
+        timeout=THERMO_CONVERSION_WALL_SECONDS,
     )
 
     if result.returncode != 0:

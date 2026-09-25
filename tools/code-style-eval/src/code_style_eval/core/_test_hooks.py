@@ -9,7 +9,15 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
+
+#: Wall-clock bound on one checker run. An hour: mypy over a cold cache on a
+#: large tree is minutes, and an evaluation sweep runs many of them
+#: unattended, so the bound has to clear the slowest honest run by a wide
+#: margin. It is still FINITE, which is the property that matters -- a
+#: checker that wedges must end the run it is in rather than hold the sweep
+#: open forever with nothing reported (board task 0d891468).
+CHECKER_WALL_SECONDS: Final[int] = 3600
 
 
 class CompletedProcessProto(Protocol):
@@ -81,6 +89,7 @@ def _default_run_checker(
         encoding="utf-8",
         errors="replace",
         check=False,
+        timeout=CHECKER_WALL_SECONDS,
     )
 
 

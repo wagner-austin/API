@@ -18,7 +18,14 @@ from __future__ import annotations
 import pathlib
 import subprocess
 from collections.abc import Callable, Sequence
-from typing import Protocol
+from typing import Final, Protocol
+
+#: Wall-clock bound on one git subcommand. Ten minutes, which is far above
+#: anything this package asks git for and is still FINITE: a git that has not
+#: answered in ten minutes is wedged, and an unbounded wait inside a corpus
+#: build is a build that never ends and reports nothing (board task 0d891468,
+#: and the three-day fleet stall that row cites).
+GIT_WALL_SECONDS: Final[int] = 600
 
 
 class RunGitProtocol(Protocol):
@@ -60,6 +67,7 @@ def _default_run_git(repo_root: pathlib.Path, args: Sequence[str]) -> str:
         check=True,
         capture_output=True,
         text=True,
+        timeout=GIT_WALL_SECONDS,
     )
     return result.stdout
 

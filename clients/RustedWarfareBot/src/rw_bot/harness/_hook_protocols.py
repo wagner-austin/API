@@ -402,7 +402,7 @@ class MonotonicProto(Protocol):
 class RunInheritedProto(Protocol):
     """Run a child that writes to this process's own streams."""
 
-    def __call__(self, argv: Sequence[str], env: Mapping[str, str]) -> int:
+    def __call__(self, argv: Sequence[str], env: Mapping[str, str], timeout_seconds: float) -> int:
         """Run one command to completion without capturing it.
 
         The planner's scorecard is read by whoever captured THIS process, so
@@ -411,12 +411,25 @@ class RunInheritedProto(Protocol):
         Args:
             argv: Argument vector, program first.
             env: Environment for the child, complete rather than an overlay.
+            timeout_seconds: Wall-clock bound on the child. REQUIRED and
+                never defaulted, for the same reason
+                :class:`RunCaptureProto` requires one: the caller is the
+                only thing that knows what the child is for, and a default
+                is the value a new call site reaches for without deciding.
+                Not capturing a child is no reason to let it run forever --
+                the 2026-09-09 five-hour driver wedge was exactly an
+                uncaptured child nobody bounded (board task 0d891468).
 
         Returns:
             The child's exit status.
 
         Raises:
             OSError: When the program cannot be started.
+            subprocess.TimeoutExpired: When the child outlives the bound.
+                Raised rather than folded into the exit status, because an
+                uncaptured child has no output to return alongside a status
+                and a caller that read a number would not know the run was
+                cut short.
         """
         ...
 

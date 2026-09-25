@@ -98,7 +98,7 @@ class FakeHost:
         self.slept: list[float] = []
         self.removed: list[str] = []
         self.felled: list[int] = []
-        self.inherited: list[tuple[tuple[str, ...], dict[str, str]]] = []
+        self.inherited: list[tuple[tuple[str, ...], dict[str, str], float]] = []
         self.planner_status = 0
         #: Exit status and output keyed by the program a command names, so a
         #: test can make javac fail without also making jar fail.
@@ -413,17 +413,20 @@ class FakeHost:
         """
         return self.clock
 
-    def run_inherited(self, argv: Sequence[str], env: Mapping[str, str]) -> int:
-        """Record a planner run.
+    def run_inherited(
+        self, argv: Sequence[str], env: Mapping[str, str], timeout_seconds: float
+    ) -> int:
+        """Record a planner run and the wall it was bounded with.
 
         Args:
             argv: The planner command.
             env: The environment it was given.
+            timeout_seconds: Seconds allowed, recorded so a test can assert the bound.
 
         Returns:
             The stated planner status.
         """
-        self.inherited.append((tuple(argv), dict(env)))
+        self.inherited.append((tuple(argv), dict(env), timeout_seconds))
         return self.planner_status
 
     def sleep(self, seconds: float) -> None:

@@ -10,11 +10,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Final, Literal, Protocol
 
 from tankpit_bot.decoder import DecodedCommand, DecodedLobbyMessage
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+#: Wall-clock bound on the git query that resolves a path to its tree or blob
+#: id. Sixty seconds: rev-parse answers in milliseconds, so this is far above
+#: any honest run and is still FINITE. The function already treats a non-zero
+#: git as None; what it had no answer for was a git that never returns at all
+#: (board task 0d891468).
+GIT_REV_PARSE_WALL_SECONDS: Final[int] = 60
 
 
 class PathExistsProtocol(Protocol):
@@ -228,6 +235,7 @@ def _real_resolve_tree_hash(project_root: Path, repo_path: str) -> str | None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=GIT_REV_PARSE_WALL_SECONDS,
     )
     if completed.returncode != 0:
         return None

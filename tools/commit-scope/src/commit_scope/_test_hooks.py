@@ -14,20 +14,34 @@ question -- what is in the index -- and a general-purpose git wrapper here
 would be a second, thinner copy of something no caller needs. The seam is the
 answer, not the tool that produced it.
 
-There is deliberately no clock. A hook runs once and exits; nothing here is
-scheduled, retried, or timed out, because a check that retries a broken git is
-a check that reports success late instead of failing now.
+There is deliberately no RETRY clock. A hook runs once and exits; nothing here
+is scheduled or retried, because a check that retries a broken git is a check
+that reports success late instead of failing now.
+
+A DEADLINE IS NOT A RETRY, and the git call carries one. This package runs
+inside pre-commit, so a git that never answers does not fail the commit, it
+HANGS it, with no output and nothing to read; the same shape that stalled the
+fleet's queue for three days on one unbounded ssh (board tasks 41ac6ed2 and
+0d891468). :data:`GIT_INDEX_WALL_SECONDS` ends that wait and lets the refusal
+this module already raises be the thing the operator sees.
 """
 
 from __future__ import annotations
 
 import subprocess
 import sys
-from typing import Protocol
+from typing import Final, Protocol
 
 from platform_core.config import _optional_env_str
 from platform_core.error_codes_tooling import CommitScopeErrorCode
 from platform_core.errors import AppError
+
+#: Wall-clock bound on the one git question this package asks. Two minutes:
+#: reading the index of the largest repository here takes well under a second
+#: warm and seconds cold, so this is far above any honest answer and is still
+#: FINITE, which is the whole property. A git that has not answered in two
+#: minutes is wedged, and holding a commit open for it helps nobody.
+GIT_INDEX_WALL_SECONDS: Final[int] = 120
 
 
 class RunGitProtocol(Protocol):
@@ -110,6 +124,7 @@ def _default_run_git(arguments: tuple[str, ...]) -> str:
         capture_output=True,
         check=False,
         encoding="utf-8",
+        timeout=GIT_INDEX_WALL_SECONDS,
     )
     if completed.returncode == 0:
         return completed.stdout

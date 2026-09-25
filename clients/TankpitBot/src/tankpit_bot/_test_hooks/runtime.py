@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
-from typing import Protocol
+from typing import Final, Protocol
 
 import psutil
 from platform_core.environment_record import (
@@ -22,6 +22,14 @@ from platform_core.environment_record import (
     installed_version,
     stdlib_host_probe,
 )
+
+#: Wall-clock bound on the build-stamp git query. Sixty seconds: rev-parse
+#: answers in milliseconds, so this clears any honest run and is still
+#: FINITE. The function already answers "" for a tree that is not a
+#: repository, which is a fact about the environment; a git that never
+#: returns is not that, and without a bound it would hang startup rather
+#: than stamp it (board task 0d891468).
+GIT_HEAD_WALL_SECONDS: Final[int] = 60
 
 
 def _real_get_current_time_ms() -> int:
@@ -253,6 +261,7 @@ def _git_head_ref(cwd: str) -> str:
         cwd=cwd,
         capture_output=True,
         text=True,
+        timeout=GIT_HEAD_WALL_SECONDS,
     )
     if completed.returncode != 0:
         return ""

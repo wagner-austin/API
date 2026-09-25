@@ -211,6 +211,12 @@ class TestTheMonotonicClock:
 #: dictionary this process handed over.
 _REPORT_MARKER = "import os, sys; sys.exit(0 if os.environ.get('RW_MARK') == 'y' else 9)"
 
+#: Wall for the children these cases start, all of which exit immediately.
+#: Generous so a loaded box never fails a case that is not about timing; the
+#: case that IS about timing passes its own tiny wall rather than reusing
+#: this one.
+_TEST_WALL_SECONDS = 120.0
+
 
 class TestRunningAChild:
     def test_a_child_sees_the_environment_it_was_given(self) -> None:
@@ -220,6 +226,7 @@ class TestRunningAChild:
         status = _run_inherited_impl(
             [sys.executable, "-c", _REPORT_MARKER],
             {**_read_environment_impl(), "RW_MARK": "y"},
+            _TEST_WALL_SECONDS,
         )
         assert status == 0
 
@@ -227,7 +234,9 @@ class TestRunningAChild:
         """The negative half: without it the same child exits 9, so the test
         above is measuring the environment rather than always passing."""
         status = _run_inherited_impl(
-            [sys.executable, "-c", _REPORT_MARKER], dict(_read_environment_impl())
+            [sys.executable, "-c", _REPORT_MARKER],
+            dict(_read_environment_impl()),
+            _TEST_WALL_SECONDS,
         )
         assert status == 9
 
@@ -236,8 +245,28 @@ class TestRunningAChild:
         status = _run_inherited_impl(
             [sys.executable, "-c", "import sys; sys.exit(7)"],
             dict(_read_environment_impl()),
+            _TEST_WALL_SECONDS,
         )
         assert status == 7
+
+    def test_a_child_that_outlives_its_wall_is_felled_and_says_so(self) -> None:
+        """WATCH THE BOUND ACTUALLY BITE, on a real child that really sleeps.
+
+        Every other case here runs a child that exits immediately, so all of
+        them would pass with no deadline at all. This one sleeps past a
+        deliberately tiny wall, which is the only evidence that the bound is
+        wired to the call rather than merely present in the signature.
+
+        The bound RAISES rather than returning a status, because an
+        uncaptured child has no output to hand back alongside one, and a
+        caller reading a number would not know the run was cut short.
+        """
+        with pytest.raises(subprocess.TimeoutExpired):
+            _run_inherited_impl(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                dict(_read_environment_impl()),
+                0.5,
+            )
 
 
 class TestSpawningTheEngine:

@@ -84,6 +84,16 @@ ENGINE_STDERR_SUFFIX = ".err"
 #: check above it (the 2026-09-09 five-hour driver wedge).
 TOOL_WALL_SECONDS = 600.0
 
+#: Wall clock on the planner, which plays a whole match rather than running a
+#: tool. Four hours: a match is minutes and a batch of them runs unattended,
+#: so this is far past any honest run and is still FINITE. It is separate
+#: from :data:`TOOL_WALL_SECONDS` because ten minutes is right for javac and
+#: wrong for a match, and one constant covering both would be sized for the
+#: longer and stop bounding the shorter. The planner is NOT captured, so
+#: without this nothing bounds it at all -- which is the shape of the
+#: 2026-09-09 five-hour driver wedge (board task 0d891468).
+PLANNER_WALL_SECONDS = 14400.0
+
 
 def build_agent(config: LaunchConfig, jar_path: str, classes: str, platform: str) -> bool:
     """Compile and package the agent for a match that is not using a snapshot.
@@ -179,7 +189,7 @@ def run_planner(config: LaunchConfig, root: PurePath, platform: str) -> int:
     if config["tree"]:
         environment["PYTHONPATH"] = planner_pythonpath(root, config["tree"], platform)
     command = planner_command(_test_hooks.read_executable(), config)
-    return _test_hooks.run_inherited(command, environment)
+    return _test_hooks.run_inherited(command, environment, PLANNER_WALL_SECONDS)
 
 
 def _teardown_build(config: LaunchConfig, jar_path: str, classes: str) -> None:

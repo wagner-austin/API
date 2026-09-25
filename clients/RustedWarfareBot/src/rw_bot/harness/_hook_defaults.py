@@ -24,11 +24,22 @@ import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePath
 from socketserver import BaseServer
+from typing import Final
 
 from platform_core.config import config_test_hooks
 
 from rw_bot.harness._hook_protocols import CAPTURE_TIMEOUT_STATUS, SpawnedMatchProto
 from rw_bot.harness.process_tree import fell_command, spawn_isolation
+
+#: Wall-clock bound on a FELL command, the ``taskkill`` tree walk on Windows
+#: and the process-group signal on POSIX. Thirty seconds is far longer than
+#: either needs and still finite, which is the whole point: a kill is the
+#: last thing standing between a hung match and the next one, and a kill
+#: that hangs takes the recovery path down with the thing it was recovering
+#: from. One of the two call sites below runs INSIDE the handler for a child
+#: that already blew its own wall, so an unbounded kill there would convert
+#: a bounded hang into an unbounded one (board task 0d891468).
+FELL_WALL_SECONDS: Final[float] = 30.0
 
 
 def _run_capture_impl(argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
@@ -85,6 +96,7 @@ def _run_capture_impl(argv: Sequence[str], timeout_seconds: float) -> tuple[int,
             fell_command(child.pid, _read_platform_impl()),
             check=False,
             capture_output=True,
+            timeout=FELL_WALL_SECONDS,
         )
         output, _ = child.communicate()
         return CAPTURE_TIMEOUT_STATUS, tuple(output.splitlines())
@@ -246,6 +258,7 @@ def _kill_tree_impl(pid: int) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         check=False,
+        timeout=FELL_WALL_SECONDS,
     )
 
 
@@ -388,20 +401,24 @@ def _monotonic_impl() -> float:
     return time.monotonic()
 
 
-def _run_inherited_impl(argv: Sequence[str], env: Mapping[str, str]) -> int:
+def _run_inherited_impl(argv: Sequence[str], env: Mapping[str, str], timeout_seconds: float) -> int:
     """Production implementation of :class:`RunInheritedProto`.
 
     Args:
         argv: Argument vector, program first.
         env: Complete environment for the child.
+        timeout_seconds: Wall-clock bound on the child.
 
     Returns:
         The child's exit status.
 
     Raises:
         OSError: When the program cannot be started.
+        subprocess.TimeoutExpired: When the child outlives the bound.
     """
-    return subprocess.run(list(argv), env=dict(env), check=False).returncode
+    return subprocess.run(
+        list(argv), env=dict(env), check=False, timeout=timeout_seconds
+    ).returncode
 
 
 def _read_environment_impl() -> Mapping[str, str]:
