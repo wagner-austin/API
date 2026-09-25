@@ -8,6 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from platform_core.errors import AppError, ErrorCode
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONValue, load_json_bytes
 
 from ...dependencies import LoggerDep, QueueDep, RedisDep
@@ -66,7 +67,7 @@ def build_router() -> APIRouter:
             {
                 "job_id": job_id,
                 "user_id": parsed.user_id,
-                "status": "queued",
+                "status": JobStatus.QUEUED,
                 "progress": 0,
                 "message": "queued",
                 "url": parsed.url,
@@ -99,7 +100,7 @@ def build_router() -> APIRouter:
         response_content: dict[str, str | int] = {
             "job_id": job_id,
             "user_id": parsed.user_id,
-            "status": "queued",
+            "status": JobStatus.QUEUED.value,
             "url": parsed.url,
         }
         return JSONResponse(content=response_content, status_code=202)
@@ -116,7 +117,7 @@ def build_router() -> APIRouter:
         response: dict[str, str | int | None] = {
             "job_id": status["job_id"],
             "user_id": status["user_id"],
-            "status": status["status"],
+            "status": status["status"].value,
             "progress": status["progress"],
             "message": status["message"],
             "url": status["url"],
@@ -125,7 +126,7 @@ def build_router() -> APIRouter:
         }
 
         # Only include text if job is completed
-        if status["status"] == "completed" and status["text"] is not None:
+        if status["status"] is JobStatus.COMPLETED and status["text"] is not None:
             response["text"] = status["text"]
 
         return JSONResponse(content=response)

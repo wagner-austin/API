@@ -13,6 +13,7 @@ from platform_core.config import (
     _require_env_str,
 )
 from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
@@ -122,7 +123,7 @@ def process_stt_impl(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "processing",
+            "status": JobStatus.PROCESSING,
             "progress": 0,
             "message": "started",
             "url": canonical_url,
@@ -163,7 +164,7 @@ def process_stt_impl(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "processing",
+            "status": JobStatus.PROCESSING,
             "progress": 10,
             "message": "downloading audio",
             "url": canonical_url,
@@ -188,7 +189,7 @@ def process_stt_impl(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "completed",
+            "status": JobStatus.COMPLETED,
             "progress": 100,
             "message": "done",
             "url": canonical_url,

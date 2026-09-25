@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from platform_core.job_types import JobStatusLiteral, job_key
+from platform_core.job_types import JobStatus, job_key
 from platform_core.json_utils import JSONTypeError
 from platform_workers.job_store import (
     BaseJobStore,
@@ -28,7 +28,7 @@ class TranscriptJobStatus(TypedDict):
 
     job_id: str
     user_id: int
-    status: JobStatusLiteral
+    status: JobStatus
     progress: int
     message: str | None
     url: str
@@ -43,7 +43,7 @@ class _TranscriptJobEncoder(JobStoreEncoder[TranscriptJobStatus]):
     def encode(self, status: TranscriptJobStatus) -> dict[str, str]:
         return {
             "user_id": str(status["user_id"]),
-            "status": status["status"],
+            "status": status["status"].value,
             "progress": str(status["progress"]),
             "message": status["message"] or "",
             "url": status["url"],
@@ -92,7 +92,6 @@ class TranscriptJobStore:
 
 
 __all__ = [
-    "JobStatusLiteral",
     "TranscriptJobStatus",
     "TranscriptJobStore",
     "transcript_job_key",

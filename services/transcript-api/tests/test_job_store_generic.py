@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONTypeError
 from platform_workers.testing import FakeRedis
 
@@ -14,7 +15,7 @@ def _status(job_id: str) -> TranscriptJobStatus:
     return {
         "job_id": job_id,
         "user_id": 9,
-        "status": "processing",
+        "status": JobStatus.PROCESSING,
         "progress": 10,
         "message": None,
         "url": "https://youtu.be/abc",
@@ -40,7 +41,12 @@ def test_transcript_job_store_roundtrip() -> None:
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("status", "unknown", "invalid status in redis store"),
+        (
+            "status",
+            "unknown",
+            "Invalid status 'unknown': must be one of "
+            "'queued', 'processing', 'completed', 'failed'",
+        ),
         ("progress", "x", "invalid progress in redis store"),
         ("created_at", "", "missing created_at in redis store"),
     ],
