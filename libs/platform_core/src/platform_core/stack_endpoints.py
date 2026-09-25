@@ -32,6 +32,10 @@ STACK_ENDPOINTS_PATH: Final = (
 #: The declaration's name for the taskboard.
 TASKBOARD_SERVICE: Final = "taskboard-mcp"
 
+#: The declaration's name for fleet-mcp, whose dispatch queue the fleet
+#: agent's ticks claim from.
+FLEET_SERVICE: Final = "fleet-mcp"
+
 
 def declared_url(endpoints_text: str, service: str) -> str:
     """The url the stack's endpoint declaration gives a service.
@@ -63,6 +67,7 @@ def declared_url(endpoints_text: str, service: str) -> str:
 
 
 __all__ = [
+    "FLEET_SERVICE",
     "STACK_ENDPOINTS_PATH",
     "TASKBOARD_SERVICE",
     "declared_url",

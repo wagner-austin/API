@@ -200,28 +200,38 @@ def notes_sent(poster: FakeHttpPost) -> list[JSONObject]:
 #: finds it proves the url came from the declaration the test supplied.
 DECLARED_TASKBOARD_URL = "http://taskboard.declared.test:8033/mcp"
 
+#: The fleet-mcp url :func:`stack_endpoints_text` declares by default, chosen
+#: the same way as :data:`DECLARED_TASKBOARD_URL`.
+DECLARED_FLEET_URL = "http://fleet.declared.test:8035/mcp"
+
 
 def stack_endpoints_text(taskboard_url: str = DECLARED_TASKBOARD_URL) -> str:
-    """The MCPs stack's endpoint declaration, declaring only the taskboard.
+    """The MCPs stack's endpoint declaration, declaring the taskboard and fleet-mcp.
 
-    Shared rather than written into each suite because three packages
-    (``platform_core``, ``ci-wake``, ``hpc3``) answer the same file for
-    :mod:`platform_core.session_label`, and the declaration's shape is the
-    MCPs repository's ``scripts/fleet/stack-endpoints.json``, one place to
-    follow it when it changes.
+    Shared rather than written into each suite because several packages
+    (``platform_core``, ``ci-wake``, ``hpc3``, ``board-watch``, ``fleet``)
+    answer the same file, and the declaration's shape is the MCPs
+    repository's ``scripts/fleet/stack-endpoints.json``, one place to follow
+    it when it changes.
 
     Args:
         taskboard_url: The url to declare for ``taskboard-mcp``.
 
     Returns:
-        The file's text.
+        The file's text. fleet-mcp is declared at :data:`DECLARED_FLEET_URL`.
     """
     return dump_json_str(
-        {"services": {"taskboard-mcp": {"runsOn": "diphtheria", "url": taskboard_url}}}
+        {
+            "services": {
+                "taskboard-mcp": {"runsOn": "diphtheria", "url": taskboard_url},
+                "fleet-mcp": {"runsOn": "diphtheria", "url": DECLARED_FLEET_URL},
+            }
+        }
     )
 
 
 __all__ = [
+    "DECLARED_FLEET_URL",
     "DECLARED_TASKBOARD_URL",
     "FakeHttpPost",
     "announcing_poster",

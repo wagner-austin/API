@@ -8,12 +8,25 @@ import pytest
 from platform_core.error_codes_tooling import StackEndpointErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
-from platform_core.mcp_testing import DECLARED_TASKBOARD_URL, stack_endpoints_text
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH, TASKBOARD_SERVICE, declared_url
+from platform_core.mcp_testing import (
+    DECLARED_FLEET_URL,
+    DECLARED_TASKBOARD_URL,
+    stack_endpoints_text,
+)
+from platform_core.stack_endpoints import (
+    FLEET_SERVICE,
+    STACK_ENDPOINTS_PATH,
+    TASKBOARD_SERVICE,
+    declared_url,
+)
 
 
 def test_the_taskboard_url_is_the_one_the_declaration_names() -> None:
     assert declared_url(stack_endpoints_text(), TASKBOARD_SERVICE) == DECLARED_TASKBOARD_URL
+
+
+def test_the_fleet_url_is_the_one_the_declaration_names() -> None:
+    assert declared_url(stack_endpoints_text(), FLEET_SERVICE) == DECLARED_FLEET_URL
 
 
 def test_another_service_is_read_by_its_own_name() -> None:
@@ -21,11 +34,11 @@ def test_another_service_is_read_by_its_own_name() -> None:
         {
             "services": {
                 TASKBOARD_SERVICE: {"url": DECLARED_TASKBOARD_URL},
-                "fleet-mcp": {"url": "http://127.0.0.1:8035/mcp"},
+                FLEET_SERVICE: {"url": "http://elsewhere.test:8035/mcp"},
             }
         }
     )
-    assert declared_url(text, "fleet-mcp") == "http://127.0.0.1:8035/mcp"
+    assert declared_url(text, FLEET_SERVICE) == "http://elsewhere.test:8035/mcp"
 
 
 @pytest.mark.parametrize(
