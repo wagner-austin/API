@@ -25,7 +25,9 @@ from platform_core.json_utils import (
     narrow_json_to_str,
 )
 from platform_core.mcp_client import McpCredentials, McpHttpResponse
+from platform_core.mcp_testing import DECLARED_FLEET_URL
 
+from fleet.core import queue
 from tests.conftest import DEMO_PROJECT
 
 
@@ -254,3 +256,24 @@ class FakeEnv:
             return None
         trimmed = raw.strip()
         return trimmed if trimmed != "" else None
+
+
+def queue_env() -> FakeEnv:
+    """The environment every agent test runs under: both secrets, and the
+    endpoint named outright.
+
+    Naming the endpoint keeps an agent test off the real stack declaration,
+    which :func:`fleet.core.queue.load_credentials` reads when
+    ``FLEET_DISPATCH_URL`` is unset; that default has its own tests in
+    ``test_queue.py``.
+
+    Returns:
+        A fresh environment, so no test sees another's changes.
+    """
+    return FakeEnv(
+        {
+            queue.API_KEY_VARIABLE: "test-key",
+            queue.TENANT_ID_VARIABLE: "tenant",
+            queue.URL_VARIABLE: DECLARED_FLEET_URL,
+        }
+    )

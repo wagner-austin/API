@@ -15,7 +15,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, queue, restart
+from fleet.core import _test_hooks, restart
 from fleet.core.published_tree import TREE_STEP_TIMEOUT_SECONDS
 from tests._published_tree_fixtures import (
     COMMIT,
@@ -24,7 +24,7 @@ from tests._published_tree_fixtures import (
     pin_scratch,
     plant_extraction,
 )
-from tests._queue_fakes import DEFAULT_JOB_ID, FakeEnv, FakeQueue, queue_job
+from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests.conftest import FakeRun, agent_argv, failed
 from tests.test_agent_rebuild import rebuild_argv as hub_argv
 
@@ -39,9 +39,7 @@ EXTRACTION_UNSET: tuple[tuple[str, ...], ...] = ((), (), (), ())
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
     """Give every test the two variables the agent refuses to run without."""
-    _test_hooks.env = FakeEnv(
-        {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
-    )
+    _test_hooks.env = queue_env()
 
 
 def checkout(tmp_path: pathlib.Path) -> pathlib.Path:

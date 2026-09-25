@@ -15,17 +15,15 @@ import pytest
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, queue, rebuild
-from tests._queue_fakes import DEFAULT_JOB_ID, FakeEnv, FakeQueue, queue_job
+from fleet.core import _test_hooks, rebuild
+from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests.conftest import FakeRun, agent_argv
 
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
     """Give every test the two variables the agent refuses to run without."""
-    _test_hooks.env = FakeEnv(
-        {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
-    )
+    _test_hooks.env = queue_env()
 
 
 def rebuild_argv(config_path: pathlib.Path, repo: pathlib.Path, mcps: pathlib.Path) -> list[str]:

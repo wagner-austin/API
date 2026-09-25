@@ -7,9 +7,14 @@ actually read -- not a stubbed return value.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
+from platform_core.error_codes_tooling import StackEndpointErrorCode
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str
+from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoints_text
+from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import (
@@ -24,7 +29,31 @@ from tests._queue_fakes import (
 
 
 class TestCredentials:
-    def test_reads_both_secrets_and_defaults_the_endpoint(self) -> None:
+    def test_reads_both_secrets_and_the_endpoint_from_the_stack_declaration(self) -> None:
+        """The url must be the declaration's: a literal is what went stale
+        when fleet-mcp left the hub (board task 60df277e)."""
+        _test_hooks.env = FakeEnv(
+            {
+                queue.API_KEY_VARIABLE: "k",
+                queue.TENANT_ID_VARIABLE: "t",
+            }
+        )
+        read: list[pathlib.Path] = []
+
+        def declaration(path: pathlib.Path) -> str:
+            read.append(path)
+            return stack_endpoints_text()
+
+        _test_hooks.read_text = declaration
+
+        credentials = queue.load_credentials()
+
+        assert credentials["api_key"] == "k"
+        assert credentials["tenant_id"] == "t"
+        assert credentials["url"] == DECLARED_FLEET_URL
+        assert read == [STACK_ENDPOINTS_PATH]
+
+    def test_a_declaration_naming_no_fleet_url_is_refused(self) -> None:
         _test_hooks.env = FakeEnv(
             {
                 queue.API_KEY_VARIABLE: "k",
@@ -32,11 +61,15 @@ class TestCredentials:
             }
         )
 
-        credentials = queue.load_credentials()
+        def declaration(path: pathlib.Path) -> str:
+            return dump_json_str({"services": {}})
 
-        assert credentials["api_key"] == "k"
-        assert credentials["tenant_id"] == "t"
-        assert credentials["url"] == queue.DEFAULT_URL
+        _test_hooks.read_text = declaration
+
+        with pytest.raises(AppError) as raised:
+            queue.load_credentials()
+
+        assert raised.value.code is StackEndpointErrorCode.UNDECLARED
 
     def test_an_explicit_endpoint_overrides_the_default(self) -> None:
         _test_hooks.env = FakeEnv(
@@ -57,7 +90,7 @@ class TestCredentials:
             queue.load_credentials()
 
         assert raised.value.code is FleetErrorCode.QUEUE_CREDENTIALS_MISSING
-        assert "mcp-fleet container's" in raised.value.message
+        assert "hpc-wake runs/env.ps1" in raised.value.message
 
     def test_a_missing_tenant_id_names_where_its_value_comes_from(self) -> None:
         _test_hooks.env = FakeEnv({queue.API_KEY_VARIABLE: "k"})

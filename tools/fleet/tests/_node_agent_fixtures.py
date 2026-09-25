@@ -21,8 +21,8 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion, ProjectSource, encode_project_source
-from fleet.core import _test_hooks, queue, staging
-from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_job
+from fleet.core import _test_hooks, staging
+from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_env, queue_job
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import (
     DEMO_PROJECT,
@@ -66,9 +66,7 @@ PASSING_TAIL = (
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
     """Give every test the queue's and the board's variables."""
-    _test_hooks.env = FakeEnv(
-        {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
-    )
+    _test_hooks.env = queue_env()
     board_watch_hooks.env = FakeEnv(
         {
             board_config.API_KEY_VARIABLE: "board-key",

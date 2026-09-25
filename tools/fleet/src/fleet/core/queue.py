@@ -27,6 +27,7 @@ from platform_core.error_codes_tooling import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue
 from platform_core.mcp_client import McpCredentials, call_mcp_tool
+from platform_core.stack_endpoints import FLEET_SERVICE, STACK_ENDPOINTS_PATH, declared_url
 
 from fleet.contracts.dispatch import (
     ClosingStatus,
@@ -50,16 +51,23 @@ TENANT_ID_VARIABLE: Final = "CORVIS_TENANT_ID"
 #: Environment variable overriding the endpoint, for a non-default deployment.
 URL_VARIABLE: Final = "FLEET_DISPATCH_URL"
 
-#: Where fleet-mcp is published on the host by default.
-DEFAULT_URL: Final = "http://127.0.0.1:8035/mcp"
-
 #: The page size a paged listing asks for: ``dispatch_list``'s own maximum,
 #: so a reader walking every page makes as few calls as the tool allows.
 LISTING_PAGE_LIMIT: Final = 100
 
 
 def load_credentials() -> McpCredentials:
-    """Read the endpoint and both secrets from the environment.
+    """Read both secrets from the environment and the endpoint from the
+    stack's declaration, unless the environment overrides it.
+
+    The default endpoint is where the MCPs repository declares fleet-mcp
+    (:mod:`platform_core.stack_endpoints`), read after both secrets so a
+    shell missing one hears about that first. It was a literal
+    ``http://127.0.0.1:8035/mcp`` until 2026-09-25, when fleet-mcp moved to
+    diphtheria and the hub's landing for that port was retired (MCPs board
+    tasks 91ca67f4 and 60df277e): every fleet-agent tick failed from that
+    minute, the same break :mod:`board_watch.config` took for the taskboard
+    the day before.
 
     Returns:
         The credentials.
@@ -70,6 +78,9 @@ def load_credentials() -> McpCredentials:
             because both are fixed in the same place -- the shell that
             schedules the agent -- unlike ``board-watch``'s pair, whose two
             values live in a container's environment and a database row.
+            ``STACK_ENDPOINT_UNDECLARED`` when no override is set and the
+            declaration names no fleet-mcp url.
+        OSError: When no override is set and the declaration cannot be read.
     """
     api_key = _test_hooks.env(API_KEY_VARIABLE)
     if api_key is None:
@@ -77,8 +88,8 @@ def load_credentials() -> McpCredentials:
             code=FleetErrorCode.QUEUE_CREDENTIALS_MISSING,
             message=(
                 f"{API_KEY_VARIABLE} is unset; it is fleet-mcp's own "
-                "MCP_INTERNAL_KEY, read from the mcp-fleet container's "
-                "environment, and must be exported before the agent runs"
+                "MCP_INTERNAL_KEY, exported by the hpc-wake runs/env.ps1 the "
+                "tick scripts dot-source, and must be set before the agent runs"
             ),
         )
     tenant_id = _test_hooks.env(TENANT_ID_VARIABLE)
@@ -91,11 +102,9 @@ def load_credentials() -> McpCredentials:
             ),
         )
     url = _test_hooks.env(URL_VARIABLE)
-    return McpCredentials(
-        url=DEFAULT_URL if url is None else url,
-        api_key=api_key,
-        tenant_id=tenant_id,
-    )
+    if url is None:
+        url = declared_url(_test_hooks.read_text(STACK_ENDPOINTS_PATH), FLEET_SERVICE)
+    return McpCredentials(url=url, api_key=api_key, tenant_id=tenant_id)
 
 
 def identity_arguments(agent: str, session_id: str, cwd: str) -> JSONObject:
@@ -457,7 +466,6 @@ def announce(
 
 __all__ = [
     "API_KEY_VARIABLE",
-    "DEFAULT_URL",
     "LISTING_PAGE_LIMIT",
     "RUNNER_HARNESS",
     "TENANT_ID_VARIABLE",

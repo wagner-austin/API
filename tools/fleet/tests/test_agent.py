@@ -31,8 +31,8 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, queue
-from tests._queue_fakes import FakeEnv, FakeQueue
+from fleet.core import _test_hooks
+from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
 from tests.conftest import FakeRun, agent_argv, failed, ok
 
 #: The board's variables for the observe pass, with the url overridden so
@@ -47,9 +47,7 @@ BOARD_ENV = {
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
     """Give every test the two variables the agent refuses to run without."""
-    _test_hooks.env = FakeEnv(
-        {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
-    )
+    _test_hooks.env = queue_env()
 
 
 class TestAnEmptyHubLane:
