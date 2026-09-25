@@ -611,6 +611,15 @@ memory reading. The three MCPs packages declared beside it
 are the same shape: another repository's remote, the package's directory as
 `path`, and the install its checkout needs at the repository root.
 
+**`MCPs/packages/wiki-search` requires `linux`** (MCPs board task fd5cabfa,
+2026-09-25). Its install builds `hnswlib-node` from source with node-gyp,
+which needs a C++ toolchain, and no Windows node carries Visual Studio's:
+dispatch job dd0b2ab3 failed on sedona with node v24.20.0 at `gyp ERR!
+find VS`, and de32d61e on serendipity the same way under node 18. Its only
+passes, 6c81f413 among them, ran on diphtheria, whose linux toolchain builds
+it. The tag says so rather than letting a Windows node claim a check it
+cannot install.
+
 ## The staged tree is made a git repository, and that is not decoration
 
 Ruff honours `.gitignore` and applies it **only inside a git repository**. A

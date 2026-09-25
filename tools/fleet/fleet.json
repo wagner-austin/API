@@ -170,7 +170,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,
       "expected_minutes": 6,
-      "required_tags": [],
+      "required_tags": ["linux"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/wiki-search",
