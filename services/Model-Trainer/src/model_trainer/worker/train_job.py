@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from platform_core.determinism_record import DeterminismRecord
-from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.queues import TRAINER_QUEUE
@@ -43,7 +43,6 @@ from model_trainer.worker.train_job_lifecycle import (
 from model_trainer.worker.trainer_job_store import TrainerJobStore
 
 _log = get_logger(__name__)
-_TRAINER_DOMAIN: JobDomain = "trainer"
 
 
 def _execute_training(
@@ -263,7 +262,7 @@ def _execute_training(
             result["perplexity"],
             result["steps"],
         )
-        ctx.publish_failed("system", "Training cancelled")
+        ctx.publish_failed(ErrorKind.SYSTEM, "Training cancelled")
         return
     # Transition to saving phase
     _save_progress(
@@ -351,8 +350,8 @@ def process_train_job(payload_raw: JSONObject) -> None:
     )
     ctx: JobContext = make_job_context(
         redis=r,
-        domain=_TRAINER_DOMAIN,
-        events_channel=default_events_channel(_TRAINER_DOMAIN),
+        domain=JobDomain.TRAINER,
+        events_channel=default_events_channel(JobDomain.TRAINER),
         job_id=run_id,
         user_id=user_id,
         queue_name=TRAINER_QUEUE,

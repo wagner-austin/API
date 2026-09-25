@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
+from platform_core.job_events import ErrorKind
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
@@ -75,7 +76,7 @@ def _handle_train_error(
         },
     )
     get_logger(__name__).exception("Training job failed run_id=%s error=%s", run_id, error)
-    ctx.publish_failed("system", str(error))
+    ctx.publish_failed(ErrorKind.SYSTEM, str(error))
 
 
 def _upload_and_persist_pointer(
@@ -223,7 +224,7 @@ def _handle_post_save_or_cancel(
             result["perplexity"],
             result["steps"],
         )
-        ctx.publish_failed("system", "Training cancelled")
+        ctx.publish_failed(ErrorKind.SYSTEM, "Training cancelled")
         return
 
     # Transition to uploading phase

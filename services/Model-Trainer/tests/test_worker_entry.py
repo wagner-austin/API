@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import pytest
 from platform_core.config import _test_hooks as config_hooks
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.queues import TRAINER_QUEUE
 from platform_workers.rq_harness import WorkerConfig
 
@@ -53,7 +53,7 @@ def test_build_config_reads_env() -> None:
 
     assert cfg["redis_url"] == "redis://test-host:6379/0"
     assert cfg["queue_name"] == TRAINER_QUEUE
-    assert cfg["events_channel"] == default_events_channel("trainer")
+    assert cfg["events_channel"] == default_events_channel(JobDomain.TRAINER)
 
 
 def test_build_config_requires_redis_url() -> None:
@@ -69,7 +69,7 @@ def test_run_worker_logs_and_calls_runner() -> None:
     config: WorkerConfig = {
         "redis_url": "redis://test:6379/0",
         "queue_name": TRAINER_QUEUE,
-        "events_channel": default_events_channel("trainer"),
+        "events_channel": default_events_channel(JobDomain.TRAINER),
     }
     logger = _RecordingLogger()
     runner = _RecordingRunner()
@@ -81,7 +81,7 @@ def test_run_worker_logs_and_calls_runner() -> None:
     msg, extra = logger.messages[0]
     assert msg == "Starting RQ worker"
     assert extra["queue"] == TRAINER_QUEUE
-    assert extra["events_channel"] == default_events_channel("trainer")
+    assert extra["events_channel"] == default_events_channel(JobDomain.TRAINER)
 
     # Verify runner was called with config
     assert len(runner.configs) == 1
@@ -93,7 +93,7 @@ def test_main_with_injected_dependencies() -> None:
     config: WorkerConfig = {
         "redis_url": "redis://injected:6379/0",
         "queue_name": TRAINER_QUEUE,
-        "events_channel": default_events_channel("trainer"),
+        "events_channel": default_events_channel(JobDomain.TRAINER),
     }
     logger = _RecordingLogger()
     runner = _RecordingRunner()

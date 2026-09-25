@@ -15,7 +15,7 @@ from platform_core.determinism_record import (
     encode_determinism_record,
 )
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_keys import artifact_file_id_key
@@ -47,7 +47,7 @@ from model_trainer.worker.trainer_job_store import TrainerJobStore
 
 _log = get_logger(__name__)
 
-EVENTS_CHANNEL = default_events_channel("trainer")
+EVENTS_CHANNEL = default_events_channel(JobDomain.TRAINER)
 
 
 def redis_client(settings: Settings) -> RedisStrProto:
