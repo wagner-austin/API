@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Final
 
 from platform_core.data_bank_client import DataBankClientError
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TURKIC_QUEUE
@@ -116,8 +116,8 @@ def process_corpus_impl(
     store = TurkicJobStore(redis)
     ctx: JobContext = make_job_context(
         redis=redis,
-        domain="turkic",
-        events_channel=default_events_channel("turkic"),
+        domain=JobDomain.TURKIC,
+        events_channel=default_events_channel(JobDomain.TURKIC),
         job_id=job_id,
         user_id=user_id,
         queue_name=TURKIC_QUEUE,
@@ -316,7 +316,7 @@ def _fail_upload(
             "error": error,
         },
     )
-    ctx.publish_failed("system", error)
+    ctx.publish_failed(ErrorKind.SYSTEM, error)
 
 
 def _mark_completed(
