@@ -97,8 +97,11 @@ class TestDecodeErrors:
             "message": "Alert!",
             "timestamp": "2024-01-15T10:00:00Z"
         }"""
-        with pytest.raises(JSONTypeError, match="Invalid alert type"):
+        with pytest.raises(JSONTypeError) as excinfo:
             decode_covenant_metrics_event(payload)
+        assert str(excinfo.value) == (
+            "Invalid alert_type 'invalid': must be one of 'breach', 'high_risk'"
+        )
 
     def test_alert_invalid_severity_raises(self) -> None:
         from platform_core.json_utils import JSONTypeError
@@ -113,8 +116,11 @@ class TestDecodeErrors:
             "message": "Alert!",
             "timestamp": "2024-01-15T10:00:00Z"
         }"""
-        with pytest.raises(JSONTypeError, match="Invalid alert severity"):
+        with pytest.raises(JSONTypeError) as excinfo:
             decode_covenant_metrics_event(payload)
+        assert str(excinfo.value) == (
+            "Invalid severity 'invalid': must be one of 'warning', 'critical'"
+        )
 
     def test_retrain_invalid_trigger_type_raises(self) -> None:
         from platform_core.json_utils import JSONTypeError
@@ -128,5 +134,8 @@ class TestDecodeErrors:
             "samples_since_train": 5000,
             "timestamp": "2024-01-15T10:00:00Z"
         }"""
-        with pytest.raises(JSONTypeError, match="Invalid retrain trigger type"):
+        with pytest.raises(JSONTypeError) as excinfo:
             decode_covenant_metrics_event(payload)
+        assert str(excinfo.value) == (
+            "Invalid trigger_type 'invalid': must be one of 'drift', 'data_volume', 'scheduled'"
+        )

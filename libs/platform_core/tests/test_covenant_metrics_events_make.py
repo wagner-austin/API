@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from platform_core.covenant_metrics_events import (
+    AlertSeverity,
+    AlertType,
+    RetrainTriggerType,
     make_alert_triggered_event,
     make_evaluation_completed_event,
     make_measurement_received_event,
@@ -120,15 +123,15 @@ class TestMakeAlertTriggeredEvent:
         ev = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="breach",
-            severity="critical",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.95,
             message="Debt covenant breached",
             timestamp="2024-01-15T10:00:00Z",
         )
         assert ev["type"] == "covenant.metrics.alert.triggered.v1"
-        assert ev["alert_type"] == "breach"
-        assert ev["severity"] == "critical"
+        assert ev["alert_type"] is AlertType.BREACH
+        assert ev["severity"] is AlertSeverity.CRITICAL
         assert ev["risk_probability"] == 0.95
         assert ev["message"] == "Debt covenant breached"
 
@@ -136,28 +139,28 @@ class TestMakeAlertTriggeredEvent:
         ev = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="high_risk",
-            severity="warning",
+            alert_type=AlertType.HIGH_RISK,
+            severity=AlertSeverity.WARNING,
             risk_probability=0.85,
             message="Risk elevated",
             timestamp="2024-01-15T10:00:00Z",
         )
-        assert ev["alert_type"] == "high_risk"
-        assert ev["severity"] == "warning"
+        assert ev["alert_type"] is AlertType.HIGH_RISK
+        assert ev["severity"] is AlertSeverity.WARNING
 
 
 class TestMakeRetrainTriggeredEvent:
     def test_creates_event_drift(self) -> None:
         ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="drift",
+            trigger_type=RetrainTriggerType.DRIFT,
             current_auc=0.72,
             threshold_auc=0.75,
             samples_since_train=5000,
             timestamp="2024-01-15T10:00:00Z",
         )
         assert ev["type"] == "covenant.metrics.retrain.triggered.v1"
-        assert ev["trigger_type"] == "drift"
+        assert ev["trigger_type"] is RetrainTriggerType.DRIFT
         assert ev["current_auc"] == 0.72
         assert ev["threshold_auc"] == 0.75
         assert ev["samples_since_train"] == 5000
@@ -165,24 +168,24 @@ class TestMakeRetrainTriggeredEvent:
     def test_creates_event_data_volume(self) -> None:
         ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="data_volume",
+            trigger_type=RetrainTriggerType.DATA_VOLUME,
             current_auc=0.80,
             threshold_auc=0.75,
             samples_since_train=10000,
             timestamp="2024-01-15T10:00:00Z",
         )
-        assert ev["trigger_type"] == "data_volume"
+        assert ev["trigger_type"] is RetrainTriggerType.DATA_VOLUME
 
     def test_creates_event_scheduled(self) -> None:
         ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="scheduled",
+            trigger_type=RetrainTriggerType.SCHEDULED,
             current_auc=0.82,
             threshold_auc=0.75,
             samples_since_train=3000,
             timestamp="2024-01-15T10:00:00Z",
         )
-        assert ev["trigger_type"] == "scheduled"
+        assert ev["trigger_type"] is RetrainTriggerType.SCHEDULED
 
 
 class TestMakeStreamLagEvent:

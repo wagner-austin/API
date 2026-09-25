@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from platform_core.covenant_metrics_decode import (
-    CovenantEventV1,
     decode_covenant_event,
     is_covenant_alert_triggered,
     is_covenant_evaluation_completed,
@@ -18,6 +17,9 @@ from platform_core.covenant_metrics_decode import (
     is_covenant_stream_lag,
 )
 from platform_core.covenant_metrics_events import (
+    AlertSeverity,
+    AlertType,
+    RetrainTriggerType,
     encode_covenant_metrics_event,
     make_alert_triggered_event,
     make_evaluation_completed_event,
@@ -210,8 +212,7 @@ class TestCombinedTypeGuards:
             "user_id": 1,
             "queue": "q",
         }
-        ev: CovenantEventV1 = started
-        assert is_covenant_job_started(ev)
+        assert is_covenant_job_started(started)
 
     def test_is_covenant_job_completed(self) -> None:
         from platform_core.covenant_metrics_decode import (
@@ -226,8 +227,7 @@ class TestCombinedTypeGuards:
             "result_id": "r",
             "result_bytes": 1,
         }
-        ev: CovenantEventV1 = completed
-        assert is_covenant_job_completed(ev)
+        assert is_covenant_job_completed(completed)
 
     def test_is_covenant_job_failed(self) -> None:
         from platform_core.covenant_metrics_decode import (
@@ -242,11 +242,10 @@ class TestCombinedTypeGuards:
             "error_kind": "user",
             "message": "m",
         }
-        ev: CovenantEventV1 = failed
-        assert is_covenant_job_failed(ev)
+        assert is_covenant_job_failed(failed)
 
     def test_is_covenant_measurement_received(self) -> None:
-        ev: CovenantEventV1 = make_measurement_received_event(
+        ev = make_measurement_received_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",
@@ -258,7 +257,7 @@ class TestCombinedTypeGuards:
         assert is_covenant_measurement_received(ev)
 
     def test_is_covenant_evaluation_completed(self) -> None:
-        ev: CovenantEventV1 = make_evaluation_completed_event(
+        ev = make_evaluation_completed_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",
@@ -272,7 +271,7 @@ class TestCombinedTypeGuards:
         assert is_covenant_evaluation_completed(ev)
 
     def test_is_covenant_prediction_completed(self) -> None:
-        ev: CovenantEventV1 = make_prediction_completed_event(
+        ev = make_prediction_completed_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",
@@ -286,11 +285,11 @@ class TestCombinedTypeGuards:
         assert is_covenant_prediction_completed(ev)
 
     def test_is_covenant_alert_triggered(self) -> None:
-        ev: CovenantEventV1 = make_alert_triggered_event(
+        ev = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="breach",
-            severity="critical",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.95,
             message="Alert!",
             timestamp="2024-01-15T10:00:00Z",
@@ -298,9 +297,9 @@ class TestCombinedTypeGuards:
         assert is_covenant_alert_triggered(ev)
 
     def test_is_covenant_retrain_triggered(self) -> None:
-        ev: CovenantEventV1 = make_retrain_triggered_event(
+        ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="drift",
+            trigger_type=RetrainTriggerType.DRIFT,
             current_auc=0.72,
             threshold_auc=0.75,
             samples_since_train=5000,
@@ -309,7 +308,7 @@ class TestCombinedTypeGuards:
         assert is_covenant_retrain_triggered(ev)
 
     def test_is_covenant_stream_lag(self) -> None:
-        ev: CovenantEventV1 = make_stream_lag_event(
+        ev = make_stream_lag_event(
             event_id="e1",
             topic="covenant.measurements.v1",
             partition=0,
@@ -320,7 +319,7 @@ class TestCombinedTypeGuards:
         assert is_covenant_stream_lag(ev)
 
     def test_type_guards_return_false_for_non_matching(self) -> None:
-        ev: CovenantEventV1 = make_measurement_received_event(
+        ev = make_measurement_received_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",

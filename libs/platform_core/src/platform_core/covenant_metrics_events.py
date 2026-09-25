@@ -17,20 +17,12 @@ Event types:
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from .json_utils import (
     dump_json_str,
 )
-
-CovenantMetricsEventType = Literal[
-    "covenant.metrics.measurement.received.v1",
-    "covenant.metrics.evaluation.completed.v1",
-    "covenant.metrics.prediction.completed.v1",
-    "covenant.metrics.alert.triggered.v1",
-    "covenant.metrics.retrain.triggered.v1",
-    "covenant.metrics.stream.lag.v1",
-]
 
 
 class MeasurementReceivedV1(TypedDict):
@@ -76,8 +68,18 @@ class PredictionCompletedV1(TypedDict):
     timestamp: str
 
 
-AlertSeverity = Literal["warning", "critical"]
-AlertType = Literal["breach", "high_risk"]
+class AlertSeverity(StrEnum):
+    """How urgent a covenant alert is; the value is the word on the wire."""
+
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class AlertType(StrEnum):
+    """What raised a covenant alert; the value is the word on the wire."""
+
+    BREACH = "breach"
+    HIGH_RISK = "high_risk"
 
 
 class AlertTriggeredV1(TypedDict):
@@ -93,7 +95,12 @@ class AlertTriggeredV1(TypedDict):
     timestamp: str
 
 
-RetrainTriggerType = Literal["drift", "data_volume", "scheduled"]
+class RetrainTriggerType(StrEnum):
+    """Why a model retrain was triggered; the value is the word on the wire."""
+
+    DRIFT = "drift"
+    DATA_VOLUME = "data_volume"
+    SCHEDULED = "scheduled"
 
 
 class RetrainTriggeredV1(TypedDict):
@@ -120,17 +127,20 @@ class StreamLagV1(TypedDict):
     timestamp: str
 
 
-CovenantMetricsEventV1 = (
-    MeasurementReceivedV1
+# The six metrics events form a discriminated union on ``type``, written out
+# at each use rather than bound to a module-level name: an assignment of a
+# type expression is a type alias, which the operator's "no type alias"
+# covers (MCPs board task 1374feba).
+
+
+def encode_covenant_metrics_event(
+    event: MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
     | AlertTriggeredV1
     | RetrainTriggeredV1
-    | StreamLagV1
-)
-
-
-def encode_covenant_metrics_event(event: CovenantMetricsEventV1) -> str:
+    | StreamLagV1,
+) -> str:
     """Serialize a covenant metrics event to a compact JSON string."""
     return dump_json_str(event)
 
@@ -291,8 +301,6 @@ __all__ = [
     "AlertSeverity",
     "AlertTriggeredV1",
     "AlertType",
-    "CovenantMetricsEventType",
-    "CovenantMetricsEventV1",
     "EvaluationCompletedV1",
     "MeasurementReceivedV1",
     "PredictionCompletedV1",

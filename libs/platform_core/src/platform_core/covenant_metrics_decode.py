@@ -2,8 +2,13 @@
 
 The event shapes and their factory functions live in
 :mod:`platform_core.covenant_metrics_events`; this module owns the wire
-side the consumers use: payload decoding, the TypeGuard narrowers, and
-the combined covenant channel type.
+side the consumers use: payload decoding and the TypeGuard narrowers.
+
+The six metrics events, and the covenant channel's ten (the four job
+lifecycle events plus those six), are discriminated unions on ``type``,
+written out at each use rather than bound to a module-level name: an
+assignment of a type expression is a type alias, which the operator's
+"no type alias" covers (MCPs board task 1374feba).
 """
 
 from __future__ import annotations
@@ -15,7 +20,6 @@ from platform_core.covenant_metrics_events import (
     AlertSeverity,
     AlertTriggeredV1,
     AlertType,
-    CovenantMetricsEventV1,
     EvaluationCompletedV1,
     MeasurementReceivedV1,
     PredictionCompletedV1,
@@ -31,6 +35,7 @@ from platform_core.job_events import (
     JobStartedV1,
     default_events_channel,
 )
+from platform_core.members import require_member
 from platform_core.risk_tiers import require_risk_tier
 
 from .json_utils import (
@@ -118,31 +123,13 @@ def _decode_prediction_completed_event(
     }
 
 
-def _parse_alert_type(raw: str) -> AlertType:
-    if raw == "breach":
-        return "breach"
-    if raw == "high_risk":
-        return "high_risk"
-    raise JSONTypeError(f"Invalid alert type '{raw}'")
-
-
-def _parse_alert_severity(raw: str) -> AlertSeverity:
-    if raw == "warning":
-        return "warning"
-    if raw == "critical":
-        return "critical"
-    raise JSONTypeError(f"Invalid alert severity '{raw}'")
-
-
 def _decode_alert_triggered_event(
     decoded: JSONObject,
     event_id: str,
 ) -> AlertTriggeredV1:
     deal_id = require_str(decoded, "deal_id")
-    alert_type_raw = require_str(decoded, "alert_type")
-    alert_type = _parse_alert_type(alert_type_raw)
-    severity_raw = require_str(decoded, "severity")
-    severity = _parse_alert_severity(severity_raw)
+    alert_type = require_member(decoded, "alert_type", AlertType)
+    severity = require_member(decoded, "severity", AlertSeverity)
     risk_probability = require_float(decoded, "risk_probability")
     message = require_str(decoded, "message")
     timestamp = require_str(decoded, "timestamp")
@@ -158,22 +145,11 @@ def _decode_alert_triggered_event(
     }
 
 
-def _parse_retrain_trigger_type(raw: str) -> RetrainTriggerType:
-    if raw == "drift":
-        return "drift"
-    if raw == "data_volume":
-        return "data_volume"
-    if raw == "scheduled":
-        return "scheduled"
-    raise JSONTypeError(f"Invalid retrain trigger type '{raw}'")
-
-
 def _decode_retrain_triggered_event(
     decoded: JSONObject,
     event_id: str,
 ) -> RetrainTriggeredV1:
-    trigger_type_raw = require_str(decoded, "trigger_type")
-    trigger_type = _parse_retrain_trigger_type(trigger_type_raw)
+    trigger_type = require_member(decoded, "trigger_type", RetrainTriggerType)
     current_auc = require_float(decoded, "current_auc")
     threshold_auc = require_float(decoded, "threshold_auc")
     samples_since_train = require_int(decoded, "samples_since_train")
@@ -211,7 +187,15 @@ def _decode_stream_lag_event(
 
 _DECODERS: dict[
     str,
-    Callable[[JSONObject, str], CovenantMetricsEventV1],
+    Callable[
+        [JSONObject, str],
+        MeasurementReceivedV1
+        | EvaluationCompletedV1
+        | PredictionCompletedV1
+        | AlertTriggeredV1
+        | RetrainTriggeredV1
+        | StreamLagV1,
+    ],
 ] = {
     "covenant.metrics.measurement.received.v1": _decode_measurement_received_event,
     "covenant.metrics.evaluation.completed.v1": _decode_evaluation_completed_event,
@@ -222,7 +206,16 @@ _DECODERS: dict[
 }
 
 
-def decode_covenant_metrics_event(payload: str) -> CovenantMetricsEventV1:
+def decode_covenant_metrics_event(
+    payload: str,
+) -> (
+    MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1
+):
     """Parse and validate a serialized covenant metrics event.
 
     Raises:
@@ -244,42 +237,81 @@ def decode_covenant_metrics_event(payload: str) -> CovenantMetricsEventV1:
 # -----------------------------------------------------------------------------
 
 
-def is_measurement_received(ev: CovenantMetricsEventV1) -> TypeGuard[MeasurementReceivedV1]:
+def is_measurement_received(
+    ev: MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[MeasurementReceivedV1]:
     """Check if the event is a measurement received event."""
     return ev.get("type") == "covenant.metrics.measurement.received.v1"
 
 
-def is_evaluation_completed(ev: CovenantMetricsEventV1) -> TypeGuard[EvaluationCompletedV1]:
+def is_evaluation_completed(
+    ev: MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[EvaluationCompletedV1]:
     """Check if the event is an evaluation completed event."""
     return ev.get("type") == "covenant.metrics.evaluation.completed.v1"
 
 
-def is_prediction_completed(ev: CovenantMetricsEventV1) -> TypeGuard[PredictionCompletedV1]:
+def is_prediction_completed(
+    ev: MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[PredictionCompletedV1]:
     """Check if the event is a prediction completed event."""
     return ev.get("type") == "covenant.metrics.prediction.completed.v1"
 
 
-def is_alert_triggered(ev: CovenantMetricsEventV1) -> TypeGuard[AlertTriggeredV1]:
+def is_alert_triggered(
+    ev: MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[AlertTriggeredV1]:
     """Check if the event is an alert triggered event."""
     return ev.get("type") == "covenant.metrics.alert.triggered.v1"
 
 
-def is_retrain_triggered(ev: CovenantMetricsEventV1) -> TypeGuard[RetrainTriggeredV1]:
+def is_retrain_triggered(
+    ev: MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[RetrainTriggeredV1]:
     """Check if the event is a retrain triggered event."""
     return ev.get("type") == "covenant.metrics.retrain.triggered.v1"
 
 
-def is_stream_lag(ev: CovenantMetricsEventV1) -> TypeGuard[StreamLagV1]:
+def is_stream_lag(
+    ev: MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[StreamLagV1]:
     """Check if the event is a stream lag event."""
     return ev.get("type") == "covenant.metrics.stream.lag.v1"
 
 
 # -----------------------------------------------------------------------------
-# Combined event type for covenant channel (job lifecycle + domain metrics)
+# The covenant channel: job lifecycle + domain metrics
 # -----------------------------------------------------------------------------
-
-# Combined event type for covenant channel
-CovenantEventV1 = JobEventV1 | CovenantMetricsEventV1
 
 # Default channel for covenant events
 DEFAULT_COVENANT_EVENTS_CHANNEL: str = default_events_channel("covenant")
@@ -338,7 +370,17 @@ _JOB_DECODERS: dict[str, Callable[[JSONObject, str, int], JobEventV1]] = {
 }
 
 
-def decode_covenant_event(payload: str) -> CovenantEventV1:
+def decode_covenant_event(
+    payload: str,
+) -> (
+    JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1
+):
     """Parse and validate any event from the covenant channel.
 
     Handles both job lifecycle events (covenant.job.*.v1) and
@@ -374,58 +416,129 @@ def decode_covenant_event(payload: str) -> CovenantEventV1:
     raise JSONTypeError(f"Unknown covenant event type: '{type_raw}'")
 
 
-# TypeGuard helpers for combined event type narrowing
-def is_covenant_job_started(ev: CovenantEventV1) -> TypeGuard[JobStartedV1]:
-    """Check if a combined event is a job started event."""
+# TypeGuard helpers for narrowing an event from the covenant channel
+def is_covenant_job_started(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[JobStartedV1]:
+    """Check if a covenant channel event is a job started event."""
     type_val = ev.get("type")
     return isinstance(type_val, str) and type_val == "covenant.job.started.v1"
 
 
-def is_covenant_job_completed(ev: CovenantEventV1) -> TypeGuard[JobCompletedV1]:
-    """Check if a combined event is a job completed event."""
+def is_covenant_job_completed(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[JobCompletedV1]:
+    """Check if a covenant channel event is a job completed event."""
     type_val = ev.get("type")
     return isinstance(type_val, str) and type_val == "covenant.job.completed.v1"
 
 
-def is_covenant_job_failed(ev: CovenantEventV1) -> TypeGuard[JobFailedV1]:
-    """Check if a combined event is a job failed event."""
+def is_covenant_job_failed(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[JobFailedV1]:
+    """Check if a covenant channel event is a job failed event."""
     type_val = ev.get("type")
     return isinstance(type_val, str) and type_val == "covenant.job.failed.v1"
 
 
-def is_covenant_measurement_received(ev: CovenantEventV1) -> TypeGuard[MeasurementReceivedV1]:
-    """Check if a combined event is a measurement received event."""
+def is_covenant_measurement_received(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[MeasurementReceivedV1]:
+    """Check if a covenant channel event is a measurement received event."""
     return ev.get("type") == "covenant.metrics.measurement.received.v1"
 
 
-def is_covenant_evaluation_completed(ev: CovenantEventV1) -> TypeGuard[EvaluationCompletedV1]:
-    """Check if a combined event is an evaluation completed event."""
+def is_covenant_evaluation_completed(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[EvaluationCompletedV1]:
+    """Check if a covenant channel event is an evaluation completed event."""
     return ev.get("type") == "covenant.metrics.evaluation.completed.v1"
 
 
-def is_covenant_prediction_completed(ev: CovenantEventV1) -> TypeGuard[PredictionCompletedV1]:
-    """Check if a combined event is a prediction completed event."""
+def is_covenant_prediction_completed(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[PredictionCompletedV1]:
+    """Check if a covenant channel event is a prediction completed event."""
     return ev.get("type") == "covenant.metrics.prediction.completed.v1"
 
 
-def is_covenant_alert_triggered(ev: CovenantEventV1) -> TypeGuard[AlertTriggeredV1]:
-    """Check if a combined event is an alert triggered event."""
+def is_covenant_alert_triggered(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[AlertTriggeredV1]:
+    """Check if a covenant channel event is an alert triggered event."""
     return ev.get("type") == "covenant.metrics.alert.triggered.v1"
 
 
-def is_covenant_retrain_triggered(ev: CovenantEventV1) -> TypeGuard[RetrainTriggeredV1]:
-    """Check if a combined event is a retrain triggered event."""
+def is_covenant_retrain_triggered(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[RetrainTriggeredV1]:
+    """Check if a covenant channel event is a retrain triggered event."""
     return ev.get("type") == "covenant.metrics.retrain.triggered.v1"
 
 
-def is_covenant_stream_lag(ev: CovenantEventV1) -> TypeGuard[StreamLagV1]:
-    """Check if a combined event is a stream lag event."""
+def is_covenant_stream_lag(
+    ev: JobEventV1
+    | MeasurementReceivedV1
+    | EvaluationCompletedV1
+    | PredictionCompletedV1
+    | AlertTriggeredV1
+    | RetrainTriggeredV1
+    | StreamLagV1,
+) -> TypeGuard[StreamLagV1]:
+    """Check if a covenant channel event is a stream lag event."""
     return ev.get("type") == "covenant.metrics.stream.lag.v1"
 
 
 __all__ = [
     "DEFAULT_COVENANT_EVENTS_CHANNEL",
-    "CovenantEventV1",
     "JobCompletedV1",
     "JobFailedV1",
     "JobStartedV1",

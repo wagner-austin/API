@@ -12,11 +12,14 @@ from platform_core.covenant_metrics_decode import (
     is_stream_lag,
 )
 from platform_core.covenant_metrics_events import (
+    AlertSeverity,
     AlertTriggeredV1,
+    AlertType,
     EvaluationCompletedV1,
     MeasurementReceivedV1,
     PredictionCompletedV1,
     RetrainTriggeredV1,
+    RetrainTriggerType,
     StreamLagV1,
     encode_covenant_metrics_event,
     make_alert_triggered_event,
@@ -177,8 +180,8 @@ class TestEncodeDecodeRoundtrip:
         ev = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="breach",
-            severity="critical",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.95,
             message="Alert!",
             timestamp="2024-01-15T10:00:00Z",
@@ -187,14 +190,15 @@ class TestEncodeDecodeRoundtrip:
         decoded = decode_covenant_metrics_event(encoded)
         assert is_alert_triggered(decoded)
         alert_ev: AlertTriggeredV1 = decoded
-        assert alert_ev["severity"] == "critical"
+        assert alert_ev["severity"] is AlertSeverity.CRITICAL
+        assert alert_ev == ev
 
     def test_alert_high_risk_type_roundtrip(self) -> None:
         ev = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="high_risk",
-            severity="critical",
+            alert_type=AlertType.HIGH_RISK,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.88,
             message="High risk!",
             timestamp="2024-01-15T10:00:00Z",
@@ -203,14 +207,14 @@ class TestEncodeDecodeRoundtrip:
         decoded = decode_covenant_metrics_event(encoded)
         assert is_alert_triggered(decoded)
         alert_ev: AlertTriggeredV1 = decoded
-        assert alert_ev["alert_type"] == "high_risk"
+        assert alert_ev["alert_type"] is AlertType.HIGH_RISK
 
     def test_alert_warning_severity_roundtrip(self) -> None:
         ev = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="breach",
-            severity="warning",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.WARNING,
             risk_probability=0.75,
             message="Warning!",
             timestamp="2024-01-15T10:00:00Z",
@@ -219,12 +223,12 @@ class TestEncodeDecodeRoundtrip:
         decoded = decode_covenant_metrics_event(encoded)
         assert is_alert_triggered(decoded)
         alert_ev: AlertTriggeredV1 = decoded
-        assert alert_ev["severity"] == "warning"
+        assert alert_ev["severity"] is AlertSeverity.WARNING
 
     def test_retrain_triggered_roundtrip(self) -> None:
         ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="drift",
+            trigger_type=RetrainTriggerType.DRIFT,
             current_auc=0.72,
             threshold_auc=0.75,
             samples_since_train=5000,
@@ -234,12 +238,13 @@ class TestEncodeDecodeRoundtrip:
         decoded = decode_covenant_metrics_event(encoded)
         assert is_retrain_triggered(decoded)
         retrain_ev: RetrainTriggeredV1 = decoded
-        assert retrain_ev["trigger_type"] == "drift"
+        assert retrain_ev["trigger_type"] is RetrainTriggerType.DRIFT
+        assert '"trigger_type":"drift"' in encoded.replace(" ", "")
 
     def test_retrain_data_volume_trigger_roundtrip(self) -> None:
         ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="data_volume",
+            trigger_type=RetrainTriggerType.DATA_VOLUME,
             current_auc=0.80,
             threshold_auc=0.75,
             samples_since_train=10000,
@@ -249,12 +254,12 @@ class TestEncodeDecodeRoundtrip:
         decoded = decode_covenant_metrics_event(encoded)
         assert is_retrain_triggered(decoded)
         retrain_ev: RetrainTriggeredV1 = decoded
-        assert retrain_ev["trigger_type"] == "data_volume"
+        assert retrain_ev["trigger_type"] is RetrainTriggerType.DATA_VOLUME
 
     def test_retrain_scheduled_trigger_roundtrip(self) -> None:
         ev = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="scheduled",
+            trigger_type=RetrainTriggerType.SCHEDULED,
             current_auc=0.82,
             threshold_auc=0.75,
             samples_since_train=3000,
@@ -264,7 +269,7 @@ class TestEncodeDecodeRoundtrip:
         decoded = decode_covenant_metrics_event(encoded)
         assert is_retrain_triggered(decoded)
         retrain_ev: RetrainTriggeredV1 = decoded
-        assert retrain_ev["trigger_type"] == "scheduled"
+        assert retrain_ev["trigger_type"] is RetrainTriggerType.SCHEDULED
 
     def test_stream_lag_roundtrip(self) -> None:
         ev = make_stream_lag_event(

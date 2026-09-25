@@ -12,10 +12,15 @@ from platform_core.covenant_metrics_decode import (
     is_stream_lag,
 )
 from platform_core.covenant_metrics_events import (
+    AlertSeverity,
     AlertTriggeredV1,
-    CovenantMetricsEventV1,
+    AlertType,
+    EvaluationCompletedV1,
+    MeasurementReceivedV1,
     PredictionCompletedV1,
     RetrainTriggeredV1,
+    RetrainTriggerType,
+    StreamLagV1,
     make_alert_triggered_event,
     make_evaluation_completed_event,
     make_measurement_received_event,
@@ -27,7 +32,14 @@ from platform_core.covenant_metrics_events import (
 
 class TestTypeGuards:
     def test_is_measurement_received_true(self) -> None:
-        ev: CovenantMetricsEventV1 = make_measurement_received_event(
+        ev: (
+            MeasurementReceivedV1
+            | EvaluationCompletedV1
+            | PredictionCompletedV1
+            | AlertTriggeredV1
+            | RetrainTriggeredV1
+            | StreamLagV1
+        ) = make_measurement_received_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",
@@ -44,7 +56,14 @@ class TestTypeGuards:
         assert not is_stream_lag(ev)
 
     def test_is_evaluation_completed_true(self) -> None:
-        ev: CovenantMetricsEventV1 = make_evaluation_completed_event(
+        ev: (
+            MeasurementReceivedV1
+            | EvaluationCompletedV1
+            | PredictionCompletedV1
+            | AlertTriggeredV1
+            | RetrainTriggeredV1
+            | StreamLagV1
+        ) = make_evaluation_completed_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",
@@ -59,7 +78,14 @@ class TestTypeGuards:
         assert not is_measurement_received(ev)
 
     def test_is_prediction_completed_true(self) -> None:
-        ev: CovenantMetricsEventV1 = make_prediction_completed_event(
+        ev: (
+            MeasurementReceivedV1
+            | EvaluationCompletedV1
+            | PredictionCompletedV1
+            | AlertTriggeredV1
+            | RetrainTriggeredV1
+            | StreamLagV1
+        ) = make_prediction_completed_event(
             event_id="e1",
             deal_id="d1",
             period_start="2024-01-01",
@@ -74,11 +100,18 @@ class TestTypeGuards:
         assert not is_measurement_received(ev)
 
     def test_is_alert_triggered_true(self) -> None:
-        ev: CovenantMetricsEventV1 = make_alert_triggered_event(
+        ev: (
+            MeasurementReceivedV1
+            | EvaluationCompletedV1
+            | PredictionCompletedV1
+            | AlertTriggeredV1
+            | RetrainTriggeredV1
+            | StreamLagV1
+        ) = make_alert_triggered_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="breach",
-            severity="critical",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.95,
             message="Alert!",
             timestamp="2024-01-15T10:00:00Z",
@@ -87,9 +120,16 @@ class TestTypeGuards:
         assert not is_measurement_received(ev)
 
     def test_is_retrain_triggered_true(self) -> None:
-        ev: CovenantMetricsEventV1 = make_retrain_triggered_event(
+        ev: (
+            MeasurementReceivedV1
+            | EvaluationCompletedV1
+            | PredictionCompletedV1
+            | AlertTriggeredV1
+            | RetrainTriggeredV1
+            | StreamLagV1
+        ) = make_retrain_triggered_event(
             event_id="e1",
-            trigger_type="drift",
+            trigger_type=RetrainTriggerType.DRIFT,
             current_auc=0.72,
             threshold_auc=0.75,
             samples_since_train=5000,
@@ -99,7 +139,14 @@ class TestTypeGuards:
         assert not is_measurement_received(ev)
 
     def test_is_stream_lag_true(self) -> None:
-        ev: CovenantMetricsEventV1 = make_stream_lag_event(
+        ev: (
+            MeasurementReceivedV1
+            | EvaluationCompletedV1
+            | PredictionCompletedV1
+            | AlertTriggeredV1
+            | RetrainTriggeredV1
+            | StreamLagV1
+        ) = make_stream_lag_event(
             event_id="e1",
             topic="covenant.measurements.v1",
             partition=0,
