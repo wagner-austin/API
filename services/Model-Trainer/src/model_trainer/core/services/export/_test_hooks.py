@@ -8,7 +8,15 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Final, Literal, Protocol
+
+#: Wall-clock bound on one GGUF conversion. Four hours, which is far longer
+#: than a conversion of any adapter this service produces and is still
+#: FINITE: a converter that has not answered in four hours has wedged, and an
+#: unbounded wait would hold the export path open indefinitely with nothing
+#: reporting why (board task 0d891468, and the three-day fleet stall that row
+#: cites). Raise it if a real conversion ever approaches it; do not remove it.
+GGUF_CONVERSION_WALL_SECONDS: Final[int] = 14400
 
 
 class GgufConverterProto(Protocol):
@@ -130,7 +138,13 @@ def _real_gguf_converter(
         output_type,
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=GGUF_CONVERSION_WALL_SECONDS,
+    )
     if result.returncode != 0:
         raise RuntimeError(f"GGUF conversion failed: {result.stderr}")
 

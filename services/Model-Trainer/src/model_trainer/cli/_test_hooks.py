@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
 
 from platform_core.continuation_task import EvalPrompt
 from platform_core.determinism_record import DeterminismRecord
@@ -40,6 +40,10 @@ from model_trainer.core.services.model.cartridge_dense import (
     EmbedderFactoryProto,
     _default_embedder_factory,
 )
+
+#: Wall-clock bound on the cuBLASLt benchmark child; see the comment at its
+#: call site for why an hour, against a child that times several seconds.
+BENCHMARK_CHILD_WALL_SECONDS: Final[int] = 3600
 
 
 class LoadHubModelProto(Protocol):
@@ -237,7 +241,14 @@ def _default_run_benchmark_child(argv: list[str], variable: str, value: str, /) 
     import subprocess
 
     os.putenv(variable, value)
-    return subprocess.run(argv, check=False).returncode
+    # An hour, against a child this docstring describes as "several seconds of
+    # timing": three orders of magnitude of headroom, and FINITE, which is the
+    # whole point. The fleet agent's queue drained nothing for three days in
+    # September 2026 because one unbounded ssh never returned, and the rule
+    # that refuses a deadline-free subprocess exists for that (board task
+    # 0d891468). A benchmark child that has not answered in an hour is wedged,
+    # not slow. Raise it if a real run ever approaches it; do not remove it.
+    return subprocess.run(argv, check=False, timeout=BENCHMARK_CHILD_WALL_SECONDS).returncode
 
 
 def _default_load_continuation_arm(artifact_path: str, arm: ContinuationArm, /) -> PreparedLMModel:
