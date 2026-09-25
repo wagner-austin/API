@@ -12,11 +12,14 @@
         the machine's one home for that value (CI_WAKE_TASK_ID and the
         taskboard key already live there "beside the pump's other
         credentials"). A second copy would be the drift.
-      * FLEET_MCP_API_KEY -- read from the live ``mcp-fleet`` container's
-        MCP_INTERNAL_KEY, per queue.load_credentials' own documentation.
-        Nothing is written to disk; docker being down surfaces as the
-        agent's named QUEUE_CREDENTIALS_MISSING refusal, not as a silent
-        empty tick.
+      * FLEET_MCP_API_KEY -- fleet-mcp's MCP_INTERNAL_KEY, from the same
+        runs/env.ps1. Until 2026-09-25 this script read it from an
+        ``mcp-fleet`` container on this host; fleet-mcp runs on diphtheria
+        since then (MCPs board tasks 91ca67f4 and 60df277e), that read found
+        nothing, and every tick failed. Missing surfaces as the agent's
+        named QUEUE_CREDENTIALS_MISSING refusal, not as a silent empty tick.
+        The queue's address is not set here either: the agent reads it from
+        the MCPs stack's endpoint declaration.
       * TASKBOARD_MCP_API_KEY -- from the same runs/env.ps1, for the
         tick's third pass: the session-ledger observer writes to the BOARD
         (task_session_observe), not the queue, and the two services hold
@@ -49,24 +52,6 @@ $apiRoot = 'C:\Users\Test\PROJECTS\API'
 $mcpsRoot = 'C:\Users\Test\PROJECTS\MCPs'
 
 . (Join-Path $apiRoot 'tools\hpc-wake\runs\env.ps1')
-
-# Scoped preference around the native call: with docker down, `docker
-# inspect` writes stderr and exits non-zero, and under script-level 'Stop'
-# that raises a NativeCommandError HERE — before fleet-agent can issue the
-# named QUEUE_CREDENTIALS_MISSING refusal the comment below promises. Same
-# trap, same fix as register-agent-schedule.ps1's schtasks delete (audit
-# 83a7da44, standards arm).
-$prevEap = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-$containerEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-fleet 2>$null
-$ErrorActionPreference = $prevEap
-$keyLine = @($containerEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
-if ($keyLine.Count -eq 1) {
-    $env:FLEET_MCP_API_KEY = "$($keyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
-}
-# A missing line is NOT patched over: fleet-agent's own
-# QUEUE_CREDENTIALS_MISSING names the variable and where it comes from,
-# which is a better failure than anything this script could invent.
 
 Set-Location (Join-Path $apiRoot 'tools\fleet')
 

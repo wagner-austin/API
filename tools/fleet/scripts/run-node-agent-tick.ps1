@@ -14,9 +14,11 @@
     the same way and from the same places as run-agent-tick.ps1:
 
       * CORVIS_TENANT_ID  -- dot-sourced from the hpc-wake pump's runs/env.ps1.
-      * FLEET_MCP_API_KEY -- the live ``mcp-fleet`` container's
-        MCP_INTERNAL_KEY. Missing surfaces as the agent's named
-        QUEUE_CREDENTIALS_MISSING refusal.
+      * FLEET_MCP_API_KEY -- fleet-mcp's MCP_INTERNAL_KEY, from the same
+        runs/env.ps1. Not from a container: fleet-mcp runs on diphtheria
+        since 2026-09-25 and the hub has no ``mcp-fleet`` to inspect (MCPs
+        board tasks 91ca67f4 and 60df277e). Missing surfaces as the agent's
+        named QUEUE_CREDENTIALS_MISSING refusal.
       * TASKBOARD_MCP_API_KEY -- from the same runs/env.ps1, for the
         verdict the collect pass posts to the submitting task's thread (A3)
         and for the ``--announce`` check-in. Not from a container: the
@@ -57,20 +59,6 @@ $ErrorActionPreference = 'Stop'
 $apiRoot = 'C:\Users\Test\PROJECTS\API'
 
 . (Join-Path $apiRoot 'tools\hpc-wake\runs\env.ps1')
-
-# Scoped preference around each native call: with docker down, `docker
-# inspect` writes stderr and exits non-zero, and under script-level 'Stop'
-# that raises a NativeCommandError HERE, before the agent can issue its
-# named refusal (run-agent-tick.ps1 carries the same block for the same
-# reason).
-$prevEap = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-$containerEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-fleet 2>$null
-$ErrorActionPreference = $prevEap
-$keyLine = @($containerEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
-if ($keyLine.Count -eq 1) {
-    $env:FLEET_MCP_API_KEY = "$($keyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
-}
 
 $fleetRoot = Join-Path $apiRoot 'tools\fleet'
 Set-Location $fleetRoot
