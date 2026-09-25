@@ -12,8 +12,6 @@ from platform_workers.rq_harness import WorkerConfig
 
 from transcript_api import _test_hooks
 
-_TRANSCRIPT_DOMAIN: JobDomain = "transcript"
-
 
 class LoggerProtocol(Protocol):
     """Protocol for logger used in worker entry."""
@@ -33,7 +31,7 @@ def _build_config() -> WorkerConfig:
     return {
         "redis_url": redis_url,
         "queue_name": TRANSCRIPT_QUEUE,
-        "events_channel": default_events_channel(_TRANSCRIPT_DOMAIN),
+        "events_channel": default_events_channel(JobDomain.TRANSCRIPT),
     }
 
 

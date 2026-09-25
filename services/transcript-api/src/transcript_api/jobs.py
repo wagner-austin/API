@@ -12,7 +12,7 @@ from platform_core.config import (
     _parse_int,
     _require_env_str,
 )
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
@@ -110,8 +110,8 @@ def process_stt_impl(
     # Create job context for publishing events
     ctx: JobContext = make_job_context(
         redis=redis,
-        domain="transcript",
-        events_channel=default_events_channel("transcript"),
+        domain=JobDomain.TRANSCRIPT,
+        events_channel=default_events_channel(JobDomain.TRANSCRIPT),
         job_id=job_id,
         user_id=user_id,
         queue_name=TRANSCRIPT_QUEUE,
