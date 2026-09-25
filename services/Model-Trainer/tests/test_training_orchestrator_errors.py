@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.trainer_keys import eval_key
 from platform_workers.testing import FakeRedis
@@ -24,7 +24,7 @@ def test_trainer_job_store_initial_status() -> None:
     fake = FakeRedis()
     store = TrainerJobStore(fake)
     status = store.initial_status(
-        job_id="run-init", user_id=42, message="initializing", status="queued"
+        job_id="run-init", user_id=42, message="initializing", status=JobStatus.QUEUED
     )
     assert status["job_id"] == "run-init"
     assert status["user_id"] == 42
@@ -39,7 +39,7 @@ def test_trainer_job_store_initial_status() -> None:
 
 
 def _save_status(
-    fake: FakeRedis, run_id: str, status: JobStatusLiteral, message: str | None = None
+    fake: FakeRedis, run_id: str, status: JobStatus, message: str | None = None
 ) -> None:
     now = datetime.utcnow()
     TrainerJobStore(fake).save(
@@ -145,7 +145,7 @@ def test_orchestrator_eval_missing_run_returns_failed() -> None:
 
 def test_orchestrator_status_queued() -> None:
     fake = FakeRedis()
-    _save_status(fake, "run-q", "queued")
+    _save_status(fake, "run-q", JobStatus.QUEUED)
     orch = TrainingOrchestrator(
         settings=load_settings(),
         redis_client=fake,
@@ -159,7 +159,7 @@ def test_orchestrator_status_queued() -> None:
 
 def test_orchestrator_status_running() -> None:
     fake = FakeRedis()
-    _save_status(fake, "run-r", "processing")
+    _save_status(fake, "run-r", JobStatus.PROCESSING)
     orch = TrainingOrchestrator(
         settings=load_settings(),
         redis_client=fake,
@@ -173,7 +173,7 @@ def test_orchestrator_status_running() -> None:
 
 def test_orchestrator_status_completed() -> None:
     fake = FakeRedis()
-    _save_status(fake, "run-c", "completed")
+    _save_status(fake, "run-c", JobStatus.COMPLETED)
     orch = TrainingOrchestrator(
         settings=load_settings(),
         redis_client=fake,
@@ -187,7 +187,7 @@ def test_orchestrator_status_completed() -> None:
 
 def test_orchestrator_status_failed() -> None:
     fake = FakeRedis()
-    _save_status(fake, "run-f", "failed")
+    _save_status(fake, "run-f", JobStatus.FAILED)
     orch = TrainingOrchestrator(
         settings=load_settings(),
         redis_client=fake,
@@ -202,7 +202,7 @@ def test_orchestrator_status_failed() -> None:
 def test_orchestrator_eval_enqueues_and_sets_cache() -> None:
     fake = FakeRedis()
     # Mark run as present
-    _save_status(fake, "run-ok", "processing")
+    _save_status(fake, "run-ok", JobStatus.PROCESSING)
     orch = TrainingOrchestrator(
         settings=load_settings(),
         redis_client=fake,

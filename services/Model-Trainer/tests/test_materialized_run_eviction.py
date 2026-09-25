@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.core import _test_hooks
@@ -35,7 +35,7 @@ def _make_run_dir(models_root: Path, run_id: str, *, mtime: float) -> Path:
     return run_dir
 
 
-def _record_status(redis: RedisStrProto, run_id: str, status: JobStatusLiteral) -> None:
+def _record_status(redis: RedisStrProto, run_id: str, status: JobStatus) -> None:
     """Persist a job status for a run.
 
     Args:
@@ -70,7 +70,7 @@ def test_evicts_only_beyond_the_keep_window(
     for index in range(total):
         run_id = f"run-{index}"
         _make_run_dir(models_root, run_id, mtime=1_000_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     evicted = evict_materialized_runs(settings_with_paths, redis)
 
@@ -92,11 +92,11 @@ def test_never_evicts_a_non_terminal_run(
     models_root = models_dir(settings_with_paths)
     redis = fake_redis
     _make_run_dir(models_root, "training-now", mtime=1)
-    _record_status(redis, "training-now", "processing")
+    _record_status(redis, "training-now", JobStatus.PROCESSING)
     for index in range(MATERIALIZED_RUN_KEEP + 1):
         run_id = f"done-{index}"
         _make_run_dir(models_root, run_id, mtime=2_000_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     evicted = evict_materialized_runs(settings_with_paths, redis)
 
@@ -115,7 +115,7 @@ def test_never_evicts_a_run_with_no_recorded_status(
     for index in range(MATERIALIZED_RUN_KEEP + 1):
         run_id = f"done-{index}"
         _make_run_dir(models_root, run_id, mtime=2_000_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     evicted = evict_materialized_runs(settings_with_paths, redis)
 
@@ -131,11 +131,11 @@ def test_evicts_a_failed_run(
     models_root = models_dir(settings_with_paths)
     redis = fake_redis
     _make_run_dir(models_root, "broke", mtime=1)
-    _record_status(redis, "broke", "failed")
+    _record_status(redis, "broke", JobStatus.FAILED)
     for index in range(MATERIALIZED_RUN_KEEP):
         run_id = f"done-{index}"
         _make_run_dir(models_root, run_id, mtime=2_000_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     evicted = evict_materialized_runs(settings_with_paths, redis)
 
@@ -153,7 +153,7 @@ def test_evicts_nothing_when_within_the_window(
     for index in range(MATERIALIZED_RUN_KEEP):
         run_id = f"done-{index}"
         _make_run_dir(models_root, run_id, mtime=1_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     assert evict_materialized_runs(settings_with_paths, redis) == ()
 
@@ -180,7 +180,7 @@ def test_ignores_stray_files_beside_the_run_directories(
     for index in range(MATERIALIZED_RUN_KEEP + 1):
         run_id = f"done-{index}"
         _make_run_dir(models_root, run_id, mtime=1_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     evicted = evict_materialized_runs(settings_with_paths, redis)
 
@@ -200,11 +200,11 @@ def test_use_refreshes_recency_so_the_busy_run_is_not_evicted(
     models_root = models_dir(settings_with_paths)
     redis = fake_redis
     busy = _make_run_dir(models_root, "busy", mtime=1)
-    _record_status(redis, "busy", "completed")
+    _record_status(redis, "busy", JobStatus.COMPLETED)
     for index in range(MATERIALIZED_RUN_KEEP):
         run_id = f"done-{index}"
         _make_run_dir(models_root, run_id, mtime=2_000_000 + index)
-        _record_status(redis, run_id, "completed")
+        _record_status(redis, run_id, JobStatus.COMPLETED)
 
     _test_hooks.os_utime(busy)
     evicted = evict_materialized_runs(settings_with_paths, redis)

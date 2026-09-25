@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 from platform_core.trainer_keys import heartbeat_key
 from platform_workers.testing import FakeQueue, FakeRedis
 
@@ -83,10 +83,8 @@ class TestSecondsSinceLastSignOfLife:
 
 
 class TestWorkerHasDied:
-    @pytest.mark.parametrize("status", ["queued", "completed", "failed"])
-    def test_only_a_processing_run_is_judged_by_its_heartbeat(
-        self, status: JobStatusLiteral
-    ) -> None:
+    @pytest.mark.parametrize("status", [JobStatus.QUEUED, JobStatus.COMPLETED, JobStatus.FAILED])
+    def test_only_a_processing_run_is_judged_by_its_heartbeat(self, status: JobStatus) -> None:
         """A queued run has no worker yet and a terminal run needs none."""
         assert not worker_has_died(
             status=status,
@@ -99,7 +97,7 @@ class TestWorkerHasDied:
     def test_a_run_heartbeating_within_the_timeout_is_alive(self) -> None:
         """The end-of-run artifact upload is silent; the worst measured was 8 minutes."""
         assert not worker_has_died(
-            status="processing",
+            status=JobStatus.PROCESSING,
             last_heartbeat_ts=NOW_TS - 8.0 * 60.0,
             status_updated_at=NOW_DT,
             now_ts=NOW_TS,
@@ -109,7 +107,7 @@ class TestWorkerHasDied:
     def test_the_observed_zombie_is_detected(self) -> None:
         """297 minutes stale is the real incident this whole path exists for."""
         assert worker_has_died(
-            status="processing",
+            status=JobStatus.PROCESSING,
             last_heartbeat_ts=NOW_TS - 297.0 * 60.0,
             status_updated_at=NOW_DT - timedelta(minutes=300),
             now_ts=NOW_TS,
@@ -119,14 +117,14 @@ class TestWorkerHasDied:
     def test_the_boundary_is_exclusive_so_exactly_the_timeout_is_still_alive(self) -> None:
         """Asserted on both sides, because an off-by-one here kills healthy runs."""
         assert not worker_has_died(
-            status="processing",
+            status=JobStatus.PROCESSING,
             last_heartbeat_ts=NOW_TS - WORKER_HEARTBEAT_TIMEOUT_SECONDS,
             status_updated_at=NOW_DT,
             now_ts=NOW_TS,
             timeout_seconds=WORKER_HEARTBEAT_TIMEOUT_SECONDS,
         )
         assert worker_has_died(
-            status="processing",
+            status=JobStatus.PROCESSING,
             last_heartbeat_ts=NOW_TS - WORKER_HEARTBEAT_TIMEOUT_SECONDS - 0.001,
             status_updated_at=NOW_DT,
             now_ts=NOW_TS,
@@ -135,7 +133,7 @@ class TestWorkerHasDied:
 
     def test_a_run_killed_during_setup_is_detected_without_any_heartbeat(self) -> None:
         assert worker_has_died(
-            status="processing",
+            status=JobStatus.PROCESSING,
             last_heartbeat_ts=None,
             status_updated_at=NOW_DT - timedelta(hours=2),
             now_ts=NOW_TS,
@@ -169,7 +167,7 @@ def _seed_running_run(
         {
             "job_id": RUN_ID,
             "user_id": 42,
-            "status": "processing",
+            "status": JobStatus.PROCESSING,
             "progress": 50,
             "message": "training",
             "created_at": written_at,
@@ -248,7 +246,7 @@ class TestGetStatusReportsWorkerDeath:
             {
                 "job_id": RUN_ID,
                 "user_id": 42,
-                "status": "failed",
+                "status": JobStatus.FAILED,
                 "progress": 30,
                 "message": "training job failed",
                 "created_at": NOW_DT - timedelta(hours=9),

@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Final
 
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 
 WORKER_HEARTBEAT_TIMEOUT_SECONDS: Final[float] = 1800.0
 """How long a running job may go silent before its worker is presumed dead.
@@ -75,7 +75,7 @@ def seconds_since_last_sign_of_life(
 
 def worker_has_died(
     *,
-    status: JobStatusLiteral,
+    status: JobStatus,
     last_heartbeat_ts: float | None,
     status_updated_at: datetime,
     now_ts: float,
@@ -99,7 +99,7 @@ def worker_has_died(
         True when the run says it is processing but nothing has signalled life
         within the timeout.
     """
-    if status != "processing":
+    if status is not JobStatus.PROCESSING:
         return False
     age = seconds_since_last_sign_of_life(
         last_heartbeat_ts=last_heartbeat_ts,

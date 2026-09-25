@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, ModelTrainerErrorCode
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str, narrow_json_to_dict
 from platform_core.trainer_keys import cancel_key
 from platform_workers.redis import _RedisBytesClient
@@ -99,7 +99,7 @@ def _make_orchestrator(tmp_path: Path, redis: FakeRedis) -> tuple[TrainingOrches
     return orch, settings
 
 
-def _seed_status(redis: FakeRedis, run_id: str, status: JobStatusLiteral) -> None:
+def _seed_status(redis: FakeRedis, run_id: str, status: JobStatus) -> None:
     now = datetime.utcnow()
     TrainerJobStore(redis).save(
         {
@@ -138,8 +138,10 @@ class TestEnqueueResume:
         assert exc.code == ModelTrainerErrorCode.RUN_NOT_FOUND
         redis.assert_only_called({"hgetall"})
 
-    @pytest.mark.parametrize("status", ["queued", "processing", "completed"])
-    def test_non_failed_run_is_refused(self, tmp_path: Path, status: JobStatusLiteral) -> None:
+    @pytest.mark.parametrize(
+        "status", [JobStatus.QUEUED, JobStatus.PROCESSING, JobStatus.COMPLETED]
+    )
+    def test_non_failed_run_is_refused(self, tmp_path: Path, status: JobStatus) -> None:
         redis = FakeRedis()
         orch, _ = _make_orchestrator(tmp_path, redis)
         _seed_status(redis, RUN_ID, status)
@@ -147,7 +149,7 @@ class TestEnqueueResume:
             _ = orch.enqueue_resume(RUN_ID, _make_request())
         exc: AppError[ModelTrainerErrorCode] = excinfo.value
         assert exc.code == ModelTrainerErrorCode.RUN_NOT_RESUMABLE
-        assert status in str(exc)
+        assert status.value in str(exc)
         # The `get` is the heartbeat read: a non-failed run is only refused
         # once its worker has been confirmed alive.
         redis.assert_only_called({"hset", "hgetall", "get"})
@@ -155,7 +157,7 @@ class TestEnqueueResume:
     def test_failed_run_without_checkpoint_is_refused(self, tmp_path: Path) -> None:
         redis = FakeRedis()
         orch, _ = _make_orchestrator(tmp_path, redis)
-        _seed_status(redis, RUN_ID, "failed")
+        _seed_status(redis, RUN_ID, JobStatus.FAILED)
         with pytest.raises(AppError) as excinfo:
             _ = orch.enqueue_resume(RUN_ID, _make_request())
         exc: AppError[ModelTrainerErrorCode] = excinfo.value
@@ -167,7 +169,7 @@ class TestEnqueueResume:
         fake_queue = FakeQueue(job_id="job-resume-1")
         _install_fake_rq(fake_queue)
         orch, settings = _make_orchestrator(tmp_path, redis)
-        _seed_status(redis, RUN_ID, "failed")
+        _seed_status(redis, RUN_ID, JobStatus.FAILED)
         _touch_checkpoint(settings, RUN_ID)
 
         out = orch.enqueue_resume(RUN_ID, _make_request())
@@ -193,7 +195,7 @@ class TestEnqueueResume:
         fake_queue = FakeQueue(job_id="job-resume-2")
         _install_fake_rq(fake_queue)
         orch, settings = _make_orchestrator(tmp_path, redis)
-        _seed_status(redis, RUN_ID, "failed")
+        _seed_status(redis, RUN_ID, JobStatus.FAILED)
         _touch_checkpoint(settings, RUN_ID)
         redis.set(cancel_key(RUN_ID), "1")
 
@@ -247,7 +249,7 @@ class TestResumeRoute:
         fake_queue = FakeQueue(job_id="job-route-1")
         _install_fake_rq(fake_queue)
 
-        _seed_status(fake_redis, RUN_ID, "failed")
+        _seed_status(fake_redis, RUN_ID, JobStatus.FAILED)
         _touch_checkpoint(settings, RUN_ID)
 
         client = TestClient(app)

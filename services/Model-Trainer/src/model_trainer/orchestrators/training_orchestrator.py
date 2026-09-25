@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
+from platform_core.job_types import JobStatus
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import (
     artifact_file_id_key,
@@ -159,7 +160,7 @@ class TrainingOrchestrator:
             {
                 "job_id": run_id,
                 "user_id": int(req["user_id"]),
-                "status": "queued",
+                "status": JobStatus.QUEUED,
                 "progress": 0,
                 "message": "resume queued" if resume else "queued",
                 "created_at": now,
@@ -230,7 +231,7 @@ class TrainingOrchestrator:
                 model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_FOUND),
             )
         status_v = status_obj["status"]
-        if status_v != "failed":
+        if status_v is not JobStatus.FAILED:
             # A run whose worker was killed still reads `processing`, because
             # nothing ran to record otherwise. Those are precisely the runs
             # worth resuming -- interrupted rather than broken, and usually
@@ -294,7 +295,7 @@ class TrainingOrchestrator:
             {
                 "job_id": run_id,
                 "user_id": status_obj["user_id"] if status_obj is not None else 0,
-                "status": "failed",
+                "status": JobStatus.FAILED,
                 "progress": 0,
                 "message": "cancelled before training started",
                 "created_at": status_obj["created_at"] if status_obj is not None else now,
@@ -363,14 +364,14 @@ class TrainingOrchestrator:
             )
 
         status_literal: Literal["queued", "running", "completed", "failed"]
-        if status_v == "queued":
+        if status_v is JobStatus.QUEUED:
             status_literal = "queued"
-        elif status_v == "processing":
+        elif status_v is JobStatus.PROCESSING:
             status_literal = "running"
-        elif status_v == "completed":
+        elif status_v is JobStatus.COMPLETED:
             status_literal = "completed"
         else:
-            # status_v == "failed" is the only remaining case per JobStatusLiteral
+            # JobStatus.FAILED is the only member left
             status_literal = "failed"
         return RunStatusResponse(
             run_id=run_id,

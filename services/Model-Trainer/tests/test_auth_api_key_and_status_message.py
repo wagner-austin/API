@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from fastapi.testclient import TestClient
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_workers.redis import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
@@ -106,7 +107,7 @@ def test_api_key_unauthorized_and_authorized(
         {
             "job_id": run_id,
             "user_id": 123,
-            "status": "failed",
+            "status": JobStatus.FAILED,
             "progress": 100,
             "message": "boom",
             "created_at": now,

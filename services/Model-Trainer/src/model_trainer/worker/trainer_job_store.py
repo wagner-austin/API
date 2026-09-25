@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Final
 
-from platform_core.job_types import BaseJobStatus, JobStatusLiteral
+from platform_core.job_types import BaseJobStatus, JobStatus
 from platform_workers.job_store import (
     BaseJobStore,
     JobStoreEncoder,
@@ -72,7 +72,7 @@ class TrainerJobStore:
         job_id: str,
         user_id: int,
         message: str,
-        status: JobStatusLiteral,
+        status: JobStatus,
     ) -> TrainerJobStatus:
         now = datetime.utcnow()
         return {

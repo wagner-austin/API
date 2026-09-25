@@ -7,6 +7,7 @@ from typing import Literal, Protocol
 
 import pytest
 from platform_core.errors import AppError
+from platform_core.job_types import JobStatus
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
@@ -123,7 +124,7 @@ def test_get_progress_no_progress_but_job_exists(
         {
             "job_id": "run-no-progress",
             "user_id": 1,
-            "status": "queued",
+            "status": JobStatus.QUEUED,
             "progress": 0,
             "message": "queued",
             "created_at": datetime.utcnow(),

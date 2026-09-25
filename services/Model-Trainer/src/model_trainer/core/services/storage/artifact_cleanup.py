@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_workers.redis import RedisStrProto
@@ -103,8 +103,8 @@ class ArtifactCleanupService:
                 )
 
         status_store: TrainerJobStatus | None = TrainerJobStore(self.redis_client).load(run_id)
-        status: JobStatusLiteral | None = None if status_store is None else status_store["status"]
-        if status not in ("completed", "failed"):
+        status: JobStatus | None = None if status_store is None else status_store["status"]
+        if status is not JobStatus.COMPLETED and status is not JobStatus.FAILED:
             logger.info(
                 "Cleanup skipped: run not terminal",
                 extra={

@@ -16,6 +16,7 @@ from platform_core.determinism_record import (
 )
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.job_types import JobStatus
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_keys import artifact_file_id_key
@@ -123,7 +124,7 @@ def evict_materialized_runs(
         run_id = candidate.name
         status_record = store.load(run_id)
         status = None if status_record is None else status_record["status"]
-        if status not in ("completed", "failed"):
+        if status is not JobStatus.COMPLETED and status is not JobStatus.FAILED:
             _log.info(
                 "Materialized-run eviction skipped: run not terminal",
                 extra={

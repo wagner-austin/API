@@ -9,6 +9,7 @@ from pathlib import Path
 
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.queues import TRAINER_QUEUE
@@ -159,7 +160,7 @@ def _execute_training(
             {
                 "job_id": run_id,
                 "user_id": user_id,
-                "status": "processing",
+                "status": JobStatus.PROCESSING,
                 "progress": progress_pct,
                 "message": "training",
                 "created_at": created_at,
@@ -246,7 +247,7 @@ def _execute_training(
             {
                 "job_id": run_id,
                 "user_id": user_id,
-                "status": "failed",
+                "status": JobStatus.FAILED,
                 "progress": 100,
                 "message": "Training cancelled",
                 "created_at": created_at,
@@ -339,7 +340,7 @@ def process_train_job(payload_raw: JSONObject) -> None:
         {
             "job_id": run_id,
             "user_id": user_id,
-            "status": "processing",
+            "status": JobStatus.PROCESSING,
             "progress": 0,
             "message": "started",
             "created_at": created_at,

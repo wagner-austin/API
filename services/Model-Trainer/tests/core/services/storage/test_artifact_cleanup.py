@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Final
 
 import pytest
-from platform_core.job_types import JobStatusLiteral
+from platform_core.job_types import JobStatus
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
@@ -90,7 +90,7 @@ def _service(settings: Settings, redis_client: RedisStrProto) -> ArtifactCleanup
     return ArtifactCleanupService(settings=settings, redis_client=redis_client)
 
 
-def _save_status(redis_client: FakeRedis, run_id: str, status: JobStatusLiteral) -> None:
+def _save_status(redis_client: FakeRedis, run_id: str, status: JobStatus) -> None:
     now = datetime.utcnow()
     TrainerJobStore(redis_client).save(
         {
@@ -139,7 +139,7 @@ def test_cleanup_no_file_id_in_redis_skips_deletion(tmp_path: Path) -> None:
     settings = _settings_with_cleanup(enabled=True)
     r = FakeRedis()
     # status is terminal but no file_id
-    _save_status(r, "run-3", "completed")
+    _save_status(r, "run-3", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-3"
     artifact_dir.mkdir()
 
@@ -155,7 +155,7 @@ def test_cleanup_no_file_id_in_redis_skips_deletion(tmp_path: Path) -> None:
 def test_cleanup_verify_upload_disabled_skips_redis_check(tmp_path: Path) -> None:
     settings = _settings_with_cleanup(enabled=True, verify_upload=False)
     r = FakeRedis()
-    _save_status(r, "run-4", "completed")
+    _save_status(r, "run-4", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-4"
     artifact_dir.mkdir()
 
@@ -172,7 +172,7 @@ def test_cleanup_skips_when_run_not_terminal(tmp_path: Path) -> None:
     settings = _settings_with_cleanup(enabled=True)
     r = FakeRedis()
     r.set(artifact_file_id_key("run-5"), "fid-123")
-    _save_status(r, "run-5", "processing")
+    _save_status(r, "run-5", JobStatus.PROCESSING)
     artifact_dir = tmp_path / "run-5"
     artifact_dir.mkdir()
 
@@ -190,7 +190,7 @@ def test_cleanup_dry_run_does_not_delete(tmp_path: Path) -> None:
 
     r = FakeRedis()
     r.set(artifact_file_id_key("run-6"), "fid-456")
-    _save_status(r, "run-6", "completed")
+    _save_status(r, "run-6", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-6"
     artifact_dir.mkdir()
     (artifact_dir / "a.txt").write_text("x", encoding="utf-8")
@@ -208,7 +208,7 @@ def test_cleanup_success_deletes_directory(tmp_path: Path) -> None:
     settings = _settings_with_cleanup(enabled=True)
     r = FakeRedis()
     r.set(artifact_file_id_key("run-7"), "fid-789")
-    _save_status(r, "run-7", "completed")
+    _save_status(r, "run-7", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-7"
     artifact_dir.mkdir()
     f1 = artifact_dir / "a.txt"
@@ -234,7 +234,7 @@ def test_cleanup_deletion_failure_raises(tmp_path: Path) -> None:
     settings = _settings_with_cleanup(enabled=True)
     r = FakeRedis()
     r.set(artifact_file_id_key("run-8"), "fid-000")
-    _save_status(r, "run-8", "completed")
+    _save_status(r, "run-8", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-8"
     artifact_dir.mkdir()
 
@@ -273,7 +273,7 @@ def test_cleanup_grace_period_delays_before_delete(
         grace_period_seconds=1,
     )
     r = FakeRedis()
-    _save_status(r, "run-9", "completed")
+    _save_status(r, "run-9", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-9"
     artifact_dir.mkdir()
     (artifact_dir / "a.txt").write_text("x", encoding="utf-8")
@@ -291,7 +291,7 @@ def test_calculate_size_and_count_handle_errors(tmp_path: Path) -> None:
     settings = _settings_with_cleanup(enabled=True, verify_upload=False)
     r = FakeRedis()
     r.set(artifact_file_id_key("run-9"), "fid-999")
-    _save_status(r, "run-9", "completed")
+    _save_status(r, "run-9", JobStatus.COMPLETED)
     artifact_dir = tmp_path / "run-9"
     artifact_dir.mkdir()
     (artifact_dir / "a.txt").write_text("x", encoding="utf-8")

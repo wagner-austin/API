@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Literal
 
 from platform_core.job_events import ErrorKind
+from platform_core.job_types import JobStatus
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
@@ -66,7 +67,7 @@ def _handle_train_error(
         {
             "job_id": run_id,
             "user_id": user_id,
-            "status": "failed",
+            "status": JobStatus.FAILED,
             "progress": 100,
             "message": str(error),
             "created_at": created_at,
@@ -208,7 +209,7 @@ def _handle_post_save_or_cancel(
             {
                 "job_id": run_id,
                 "user_id": user_id,
-                "status": "failed",
+                "status": JobStatus.FAILED,
                 "progress": 100,
                 "message": "Training cancelled",
                 "created_at": created_at,
@@ -239,7 +240,7 @@ def _handle_post_save_or_cancel(
         {
             "job_id": run_id,
             "user_id": user_id,
-            "status": "completed",
+            "status": JobStatus.COMPLETED,
             "progress": 100,
             "message": "Training completed",
             "created_at": created_at,
