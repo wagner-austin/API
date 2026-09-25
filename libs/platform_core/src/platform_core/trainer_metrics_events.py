@@ -14,12 +14,6 @@ from .json_utils import (
     require_str,
 )
 
-TrainerMetricsEventType = Literal[
-    "trainer.metrics.config.v1",
-    "trainer.metrics.progress.v1",
-    "trainer.metrics.completed.v1",
-]
-
 
 class TrainerConfigV1(TypedDict):
     """Training configuration event published at job start."""
@@ -353,7 +347,6 @@ def is_completed_metrics(ev: TrainerMetricsEventV1) -> TypeGuard[TrainerComplete
 __all__ = [
     "TrainerCompletedMetricsV1",
     "TrainerConfigV1",
-    "TrainerMetricsEventType",
     "TrainerMetricsEventV1",
     "TrainerProgressMetricsV1",
     "decode_trainer_metrics_event",

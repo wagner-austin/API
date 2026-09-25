@@ -47,10 +47,13 @@ class FailedV1(TypedDict):
     message: str
 
 
-EventV1 = StartedV1 | ProgressV1 | CompletedV1 | FailedV1
+# The four job events form a discriminated union on ``type``, written out at
+# each use rather than bound to a module-level name: an assignment of a type
+# expression is a type alias, which the operator's "no type alias" covers
+# (MCPs board task 1374feba).
 
 
-def encode_event(event: EventV1) -> str:
+def encode_event(event: StartedV1 | ProgressV1 | CompletedV1 | FailedV1) -> str:
     return dump_json_str(event)
 
 
@@ -110,7 +113,10 @@ def _decode_failed(obj: JSONObject, job_id: str, user_id: int) -> FailedV1:
     }
 
 
-_DECODERS: dict[str, Callable[[JSONObject, str, int], EventV1]] = {
+_DECODERS: dict[
+    str,
+    Callable[[JSONObject, str, int], StartedV1 | ProgressV1 | CompletedV1 | FailedV1],
+] = {
     "data_bank.job.started.v1": _decode_started,
     "data_bank.job.progress.v1": _decode_progress,
     "data_bank.job.completed.v1": _decode_completed,
@@ -118,7 +124,7 @@ _DECODERS: dict[str, Callable[[JSONObject, str, int], EventV1]] = {
 }
 
 
-def decode_event(payload: str) -> EventV1:
+def decode_event(payload: str) -> StartedV1 | ProgressV1 | CompletedV1 | FailedV1:
     """Parse and validate a serialized data bank event.
 
     Raises:
@@ -136,26 +142,25 @@ def decode_event(payload: str) -> EventV1:
     return decoder(decoded, job_id, user_id)
 
 
-def is_started(ev: EventV1) -> TypeGuard[StartedV1]:
+def is_started(ev: StartedV1 | ProgressV1 | CompletedV1 | FailedV1) -> TypeGuard[StartedV1]:
     return ev["type"] == "data_bank.job.started.v1"
 
 
-def is_progress(ev: EventV1) -> TypeGuard[ProgressV1]:
+def is_progress(ev: StartedV1 | ProgressV1 | CompletedV1 | FailedV1) -> TypeGuard[ProgressV1]:
     return ev["type"] == "data_bank.job.progress.v1"
 
 
-def is_completed(ev: EventV1) -> TypeGuard[CompletedV1]:
+def is_completed(ev: StartedV1 | ProgressV1 | CompletedV1 | FailedV1) -> TypeGuard[CompletedV1]:
     return ev["type"] == "data_bank.job.completed.v1"
 
 
-def is_failed(ev: EventV1) -> TypeGuard[FailedV1]:
+def is_failed(ev: StartedV1 | ProgressV1 | CompletedV1 | FailedV1) -> TypeGuard[FailedV1]:
     return ev["type"] == "data_bank.job.failed.v1"
 
 
 __all__ = [
     "DEFAULT_DATA_BANK_EVENTS_CHANNEL",
     "CompletedV1",
-    "EventV1",
     "FailedV1",
     "ProgressV1",
     "StartedV1",

@@ -25,17 +25,6 @@ from .json_utils import (
     dump_json_str,
 )
 
-DigitsMetricsEventType = Literal[
-    "digits.metrics.config.v1",
-    "digits.metrics.batch.v1",
-    "digits.metrics.epoch.v1",
-    "digits.metrics.best.v1",
-    "digits.metrics.artifact.v1",
-    "digits.metrics.upload.v1",
-    "digits.metrics.prune.v1",
-    "digits.metrics.completed.v1",
-]
-
 
 class DigitsConfigV1(TypedDict):
     """Training configuration event published at job start."""
@@ -449,7 +438,6 @@ __all__ = [
     "DigitsCompletedMetricsV1",
     "DigitsConfigV1",
     "DigitsEpochMetricsV1",
-    "DigitsMetricsEventType",
     "DigitsMetricsEventV1",
     "DigitsPruneV1",
     "DigitsUploadV1",

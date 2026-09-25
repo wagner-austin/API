@@ -15,21 +15,6 @@ from platform_core.request_context import request_id_var
 LogFormat = Literal["json", "text"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-_LogRecordValue = (
-    JSONValue
-    | tuple[
-        type[BaseException] | BaseException | None,
-        BaseException | None,
-        TracebackType | None,
-    ]
-    | tuple[str | int | float | bool | None, ...]
-    | logging.LogRecord
-    | logging.Logger
-    | logging.Handler
-    | logging.Filter
-    | logging.Formatter
-)
-
 
 class _OsModule(Protocol):
     """Protocol for os module to avoid Any from __import__."""
@@ -42,7 +27,22 @@ class _LogRecordMapping(Protocol):
 
     def __contains__(self, key: str) -> bool: ...
 
-    def __getitem__(self, key: str) -> _LogRecordValue: ...
+    def __getitem__(
+        self, key: str
+    ) -> (
+        JSONValue
+        | tuple[
+            type[BaseException] | BaseException | None,
+            BaseException | None,
+            TracebackType | None,
+        ]
+        | tuple[str | int | float | bool | None, ...]
+        | logging.LogRecord
+        | logging.Logger
+        | logging.Handler
+        | logging.Filter
+        | logging.Formatter
+    ): ...
 
 
 class _MissingValue:
