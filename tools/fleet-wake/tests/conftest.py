@@ -103,6 +103,11 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             )
         },
         "not_dispatchable": {},
+        # Required by the workspace contract since board task 140e7042. Empty
+        # here because nothing this package does reads it: the field scopes a
+        # dispatch's ARCHIVE, and fleet-wake reads the workspace to find nodes
+        # and projects, never to export one.
+        "data_paths": {},
         "projects": {
             project: encode_project_config(
                 ProjectConfig(
