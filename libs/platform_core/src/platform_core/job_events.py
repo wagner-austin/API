@@ -1,7 +1,22 @@
+"""Generic job lifecycle events: started, progress, completed, failed.
+
+Three closed vocabularies live here as :class:`enum.StrEnum`, one definition
+each whose members are the same strings on the wire: :class:`JobDomain` (which
+service's queue emitted the event), :class:`EventSuffix` (which lifecycle
+step) and :class:`ErrorKind` (whose fault a failure was). They replaced
+module-level ``Literal`` aliases, which the operator's "no type alias" covers
+(MCPs board task 1374feba); an untrusted word narrows through
+:mod:`platform_core.members`.
+
+The four events form a discriminated union, written out at each use rather
+than bound to a module-level name for the same reason.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Final, Literal, NotRequired, TypedDict, TypeGuard
+from enum import StrEnum
+from typing import NotRequired, TypedDict, TypeGuard
 
 from platform_core.json_utils import (
     JSONObject,
@@ -13,31 +28,36 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import as_member, require_member
 
-JobDomain = Literal[
-    "covenant",
-    "databank",
-    "digits",
-    "music_wrapped",
-    "qr",
-    "trainer",
-    "transcript",
-    "turkic",
-]
-EventSuffix = Literal["started", "progress", "completed", "failed"]
-ErrorKind = Literal["user", "system"]
 
-_DOMAIN_VALUES: Final[tuple[JobDomain, ...]] = (
-    "covenant",
-    "databank",
-    "digits",
-    "music_wrapped",
-    "qr",
-    "trainer",
-    "transcript",
-    "turkic",
-)
-_SUFFIX_VALUES: Final[tuple[EventSuffix, ...]] = ("started", "progress", "completed", "failed")
+class JobDomain(StrEnum):
+    """The service whose job queue emitted an event."""
+
+    COVENANT = "covenant"
+    DATABANK = "databank"
+    DIGITS = "digits"
+    MUSIC_WRAPPED = "music_wrapped"
+    QR = "qr"
+    TRAINER = "trainer"
+    TRANSCRIPT = "transcript"
+    TURKIC = "turkic"
+
+
+class EventSuffix(StrEnum):
+    """The lifecycle step an event reports."""
+
+    STARTED = "started"
+    PROGRESS = "progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ErrorKind(StrEnum):
+    """Whose fault a failed job was: the caller's input or the system."""
+
+    USER = "user"
+    SYSTEM = "system"
 
 
 class JobStartedV1(TypedDict):
@@ -84,20 +104,17 @@ class JobFailedV1(TypedDict):
     message: str
 
 
-JobEventV1 = JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1
-
-
 def make_event_type(domain: JobDomain, suffix: EventSuffix) -> str:
     """Construct the canonical event type string."""
-    return f"{domain}.job.{suffix}.v1"
+    return f"{domain.value}.job.{suffix.value}.v1"
 
 
 def default_events_channel(domain: JobDomain) -> str:
     """Return the default Redis pub/sub channel for the domain."""
-    return f"{domain}:events"
+    return f"{domain.value}:events"
 
 
-def encode_job_event(event: JobEventV1) -> str:
+def encode_job_event(event: JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1) -> str:
     """Serialize a job event to a compact JSON string."""
     return dump_json_str(event)
 
@@ -105,7 +122,7 @@ def encode_job_event(event: JobEventV1) -> str:
 def make_started_event(*, domain: JobDomain, job_id: str, user_id: int, queue: str) -> JobStartedV1:
     """Create a started event."""
     return {
-        "type": make_event_type(domain, "started"),
+        "type": make_event_type(domain, EventSuffix.STARTED),
         "domain": domain,
         "job_id": job_id,
         "user_id": user_id,
@@ -124,7 +141,7 @@ def make_progress_event(
 ) -> JobProgressV1:
     """Create a progress event."""
     event: JobProgressV1 = {
-        "type": make_event_type(domain, "progress"),
+        "type": make_event_type(domain, EventSuffix.PROGRESS),
         "domain": domain,
         "job_id": job_id,
         "user_id": user_id,
@@ -147,7 +164,7 @@ def make_completed_event(
 ) -> JobCompletedV1:
     """Create a completed event."""
     return {
-        "type": make_event_type(domain, "completed"),
+        "type": make_event_type(domain, EventSuffix.COMPLETED),
         "domain": domain,
         "job_id": job_id,
         "user_id": user_id,
@@ -161,7 +178,7 @@ def make_failed_event(
 ) -> JobFailedV1:
     """Create a failed event."""
     return {
-        "type": make_event_type(domain, "failed"),
+        "type": make_event_type(domain, EventSuffix.FAILED),
         "domain": domain,
         "job_id": job_id,
         "user_id": user_id,
@@ -170,27 +187,12 @@ def make_failed_event(
     }
 
 
-def _parse_domain(raw: str) -> JobDomain:
-    for value in _DOMAIN_VALUES:
-        if raw == value:
-            return value
-    raise JSONTypeError(f"Invalid domain '{raw}' in job event")
-
-
-def _parse_suffix(raw: str) -> EventSuffix:
-    for value in _SUFFIX_VALUES:
-        if raw == value:
-            return value
-    raise JSONTypeError(f"Invalid event suffix '{raw}' in job event")
-
-
 def _parse_event_type(raw: str) -> tuple[JobDomain, EventSuffix]:
     segments = raw.split(".")
     if len(segments) != 4 or segments[1] != "job" or segments[3] != "v1":
         raise JSONTypeError(f"Invalid job event type format: '{raw}'")
-    domain_str, suffix_str = segments[0], segments[2]
-    domain = _parse_domain(domain_str)
-    suffix = _parse_suffix(suffix_str)
+    domain = as_member(segments[0], "domain", JobDomain)
+    suffix = as_member(segments[2], "event suffix", EventSuffix)
     return domain, suffix
 
 
@@ -244,14 +246,8 @@ def _decode_completed_event(
 def _decode_failed_event(
     type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: JSONObject
 ) -> JobFailedV1:
-    error_kind_raw = require_str(decoded, "error_kind")
+    kind = require_member(decoded, "error_kind", ErrorKind)
     message = require_str(decoded, "message")
-    if error_kind_raw == "user":
-        kind: ErrorKind = "user"
-    elif error_kind_raw == "system":
-        kind = "system"
-    else:
-        raise JSONTypeError(f"Invalid error_kind '{error_kind_raw}' in failed event")
     return {
         "type": type_raw,
         "domain": domain_value,
@@ -262,7 +258,21 @@ def _decode_failed_event(
     }
 
 
-def decode_job_event(payload: str) -> JobEventV1:
+_DECODERS: dict[
+    EventSuffix,
+    Callable[
+        [str, JobDomain, str, int, JSONObject],
+        JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+    ],
+] = {
+    EventSuffix.STARTED: _decode_started_event,
+    EventSuffix.PROGRESS: _decode_progress_event,
+    EventSuffix.COMPLETED: _decode_completed_event,
+    EventSuffix.FAILED: _decode_failed_event,
+}
+
+
+def decode_job_event(payload: str) -> JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1:
     """Parse and validate a serialized job event.
 
     Raises:
@@ -273,43 +283,43 @@ def decode_job_event(payload: str) -> JobEventV1:
     type_raw = require_str(decoded, "type")
     domain, suffix = _parse_event_type(type_raw)
 
-    domain_field = require_str(decoded, "domain")
-    domain_value = _parse_domain(domain_field)
-    if domain_value != domain:
+    domain_value = require_member(decoded, "domain", JobDomain)
+    if domain_value is not domain:
         raise JSONTypeError(
-            f"Job event domain mismatch: type says '{domain}', field says '{domain_value}'"
+            f"Job event domain mismatch: type says '{domain.value}', "
+            f"field says '{domain_value.value}'"
         )
 
     job_id = require_str(decoded, "job_id")
     user_id = require_int(decoded, "user_id")
 
-    decoder_type = Callable[[str, JobDomain, str, int, JSONObject], JobEventV1]
-    decoders: dict[EventSuffix, decoder_type] = {
-        "started": _decode_started_event,
-        "progress": _decode_progress_event,
-        "completed": _decode_completed_event,
-        "failed": _decode_failed_event,
-    }
-    decoder = decoders[suffix]
-    return decoder(type_raw, domain_value, job_id, user_id, decoded)
+    return _DECODERS[suffix](type_raw, domain_value, job_id, user_id, decoded)
 
 
-def is_started(ev: JobEventV1) -> TypeGuard[JobStartedV1]:
+def is_started(
+    ev: JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+) -> TypeGuard[JobStartedV1]:
     """Check if the event is a started event."""
     return ".job.started." in ev.get("type", "")
 
 
-def is_progress(ev: JobEventV1) -> TypeGuard[JobProgressV1]:
+def is_progress(
+    ev: JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+) -> TypeGuard[JobProgressV1]:
     """Check if the event is a progress event."""
     return ".job.progress." in ev.get("type", "")
 
 
-def is_completed(ev: JobEventV1) -> TypeGuard[JobCompletedV1]:
+def is_completed(
+    ev: JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+) -> TypeGuard[JobCompletedV1]:
     """Check if the event is a completed event."""
     return ".job.completed." in ev.get("type", "")
 
 
-def is_failed(ev: JobEventV1) -> TypeGuard[JobFailedV1]:
+def is_failed(
+    ev: JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+) -> TypeGuard[JobFailedV1]:
     """Check if the event is a failed event."""
     return ".job.failed." in ev.get("type", "")
 
@@ -319,7 +329,6 @@ __all__ = [
     "EventSuffix",
     "JobCompletedV1",
     "JobDomain",
-    "JobEventV1",
     "JobFailedV1",
     "JobProgressV1",
     "JobStartedV1",

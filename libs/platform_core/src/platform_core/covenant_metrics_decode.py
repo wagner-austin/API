@@ -14,7 +14,7 @@ assignment of a type expression is a type alias, which the operator's
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal, TypeGuard
+from typing import TypeGuard
 
 from platform_core.covenant_metrics_events import (
     AlertSeverity,
@@ -29,9 +29,11 @@ from platform_core.covenant_metrics_events import (
 )
 from platform_core.evaluation_statuses import require_evaluation_status
 from platform_core.job_events import (
+    ErrorKind,
     JobCompletedV1,
-    JobEventV1,
+    JobDomain,
     JobFailedV1,
+    JobProgressV1,
     JobStartedV1,
     default_events_channel,
 )
@@ -314,7 +316,7 @@ def is_stream_lag(
 # -----------------------------------------------------------------------------
 
 # Default channel for covenant events
-DEFAULT_COVENANT_EVENTS_CHANNEL: str = default_events_channel("covenant")
+DEFAULT_COVENANT_EVENTS_CHANNEL: str = default_events_channel(JobDomain.COVENANT)
 
 
 def _decode_job_started(decoded: JSONObject, job_id: str, user_id: int) -> JobStartedV1:
@@ -322,7 +324,7 @@ def _decode_job_started(decoded: JSONObject, job_id: str, user_id: int) -> JobSt
     queue = require_str(decoded, "queue")
     return {
         "type": "covenant.job.started.v1",
-        "domain": "covenant",
+        "domain": JobDomain.COVENANT,
         "job_id": job_id,
         "user_id": user_id,
         "queue": queue,
@@ -335,7 +337,7 @@ def _decode_job_completed(decoded: JSONObject, job_id: str, user_id: int) -> Job
     result_bytes = require_int(decoded, "result_bytes")
     return {
         "type": "covenant.job.completed.v1",
-        "domain": "covenant",
+        "domain": JobDomain.COVENANT,
         "job_id": job_id,
         "user_id": user_id,
         "result_id": result_id,
@@ -345,17 +347,11 @@ def _decode_job_completed(decoded: JSONObject, job_id: str, user_id: int) -> Job
 
 def _decode_job_failed(decoded: JSONObject, job_id: str, user_id: int) -> JobFailedV1:
     """Decode a failed event."""
-    error_kind_raw = require_str(decoded, "error_kind")
+    error_kind = require_member(decoded, "error_kind", ErrorKind)
     message = require_str(decoded, "message")
-    if error_kind_raw == "user":
-        error_kind: Literal["user", "system"] = "user"
-    elif error_kind_raw == "system":
-        error_kind = "system"
-    else:
-        raise JSONTypeError(f"Invalid error_kind '{error_kind_raw}' in failed event")
     return {
         "type": "covenant.job.failed.v1",
-        "domain": "covenant",
+        "domain": JobDomain.COVENANT,
         "job_id": job_id,
         "user_id": user_id,
         "error_kind": error_kind,
@@ -363,7 +359,13 @@ def _decode_job_failed(decoded: JSONObject, job_id: str, user_id: int) -> JobFai
     }
 
 
-_JOB_DECODERS: dict[str, Callable[[JSONObject, str, int], JobEventV1]] = {
+_JOB_DECODERS: dict[
+    str,
+    Callable[
+        [JSONObject, str, int],
+        JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+    ],
+] = {
     "covenant.job.started.v1": _decode_job_started,
     "covenant.job.completed.v1": _decode_job_completed,
     "covenant.job.failed.v1": _decode_job_failed,
@@ -373,7 +375,10 @@ _JOB_DECODERS: dict[str, Callable[[JSONObject, str, int], JobEventV1]] = {
 def decode_covenant_event(
     payload: str,
 ) -> (
-    JobEventV1
+    JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -418,7 +423,10 @@ def decode_covenant_event(
 
 # TypeGuard helpers for narrowing an event from the covenant channel
 def is_covenant_job_started(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -432,7 +440,10 @@ def is_covenant_job_started(
 
 
 def is_covenant_job_completed(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -446,7 +457,10 @@ def is_covenant_job_completed(
 
 
 def is_covenant_job_failed(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -460,7 +474,10 @@ def is_covenant_job_failed(
 
 
 def is_covenant_measurement_received(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -473,7 +490,10 @@ def is_covenant_measurement_received(
 
 
 def is_covenant_evaluation_completed(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -486,7 +506,10 @@ def is_covenant_evaluation_completed(
 
 
 def is_covenant_prediction_completed(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -499,7 +522,10 @@ def is_covenant_prediction_completed(
 
 
 def is_covenant_alert_triggered(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -512,7 +538,10 @@ def is_covenant_alert_triggered(
 
 
 def is_covenant_retrain_triggered(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1
@@ -525,7 +554,10 @@ def is_covenant_retrain_triggered(
 
 
 def is_covenant_stream_lag(
-    ev: JobEventV1
+    ev: JobStartedV1
+    | JobProgressV1
+    | JobCompletedV1
+    | JobFailedV1
     | MeasurementReceivedV1
     | EvaluationCompletedV1
     | PredictionCompletedV1

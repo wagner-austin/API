@@ -9,7 +9,7 @@ the combined digits channel type.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal, TypeGuard
+from typing import TypeGuard
 
 from platform_core.digits_metrics_events import (
     DigitsArtifactV1,
@@ -23,12 +23,15 @@ from platform_core.digits_metrics_events import (
     DigitsUploadV1,
 )
 from platform_core.job_events import (
+    ErrorKind,
     JobCompletedV1,
-    JobEventV1,
+    JobDomain,
     JobFailedV1,
+    JobProgressV1,
     JobStartedV1,
     default_events_channel,
 )
+from platform_core.members import require_member
 
 from .json_utils import (
     JSONObject,
@@ -352,10 +355,10 @@ def is_completed(ev: DigitsMetricsEventV1) -> TypeGuard[DigitsCompletedMetricsV1
 # -----------------------------------------------------------------------------
 
 # Combined event type for digits channel
-DigitsEventV1 = JobEventV1 | DigitsMetricsEventV1
+DigitsEventV1 = JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1 | DigitsMetricsEventV1
 
 # Default channel for digits events
-DEFAULT_DIGITS_EVENTS_CHANNEL: str = default_events_channel("digits")
+DEFAULT_DIGITS_EVENTS_CHANNEL: str = default_events_channel(JobDomain.DIGITS)
 
 
 def _decode_job_started(decoded: JSONObject, job_id: str, user_id: int) -> JobStartedV1:
@@ -363,7 +366,7 @@ def _decode_job_started(decoded: JSONObject, job_id: str, user_id: int) -> JobSt
     queue = require_str(decoded, "queue")
     return {
         "type": "digits.job.started.v1",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
         "job_id": job_id,
         "user_id": user_id,
         "queue": queue,
@@ -376,7 +379,7 @@ def _decode_job_completed(decoded: JSONObject, job_id: str, user_id: int) -> Job
     result_bytes = require_int(decoded, "result_bytes")
     return {
         "type": "digits.job.completed.v1",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
         "job_id": job_id,
         "user_id": user_id,
         "result_id": result_id,
@@ -386,17 +389,11 @@ def _decode_job_completed(decoded: JSONObject, job_id: str, user_id: int) -> Job
 
 def _decode_job_failed(decoded: JSONObject, job_id: str, user_id: int) -> JobFailedV1:
     """Decode a failed event."""
-    error_kind_raw = require_str(decoded, "error_kind")
+    error_kind = require_member(decoded, "error_kind", ErrorKind)
     message = require_str(decoded, "message")
-    if error_kind_raw == "user":
-        error_kind: Literal["user", "system"] = "user"
-    elif error_kind_raw == "system":
-        error_kind = "system"
-    else:
-        raise JSONTypeError(f"Invalid error_kind '{error_kind_raw}' in failed event")
     return {
         "type": "digits.job.failed.v1",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
         "job_id": job_id,
         "user_id": user_id,
         "error_kind": error_kind,
@@ -404,7 +401,13 @@ def _decode_job_failed(decoded: JSONObject, job_id: str, user_id: int) -> JobFai
     }
 
 
-_JOB_DECODERS: dict[str, Callable[[JSONObject, str, int], JobEventV1]] = {
+_JOB_DECODERS: dict[
+    str,
+    Callable[
+        [JSONObject, str, int],
+        JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1,
+    ],
+] = {
     "digits.job.started.v1": _decode_job_started,
     "digits.job.completed.v1": _decode_job_completed,
     "digits.job.failed.v1": _decode_job_failed,

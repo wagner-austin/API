@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Final, Literal, TypedDict, TypeGuard
 
+from .job_events import ErrorKind
 from .json_utils import (
     JSONObject,
     JSONTypeError,
@@ -12,6 +13,7 @@ from .json_utils import (
     require_int,
     require_str,
 )
+from .members import require_member
 
 DEFAULT_DATA_BANK_EVENTS_CHANNEL: Final[str] = "data_bank:events"
 
@@ -43,7 +45,7 @@ class FailedV1(TypedDict):
     type: Literal["data_bank.job.failed.v1"]
     job_id: str
     user_id: int
-    error_kind: Literal["user", "system"]
+    error_kind: ErrorKind
     message: str
 
 
@@ -96,20 +98,12 @@ def _decode_completed(obj: JSONObject, job_id: str, user_id: int) -> CompletedV1
 
 
 def _decode_failed(obj: JSONObject, job_id: str, user_id: int) -> FailedV1:
-    error_kind_raw = require_str(obj, "error_kind")
-    message = require_str(obj, "message")
-    if error_kind_raw == "user":
-        error_kind: Literal["user", "system"] = "user"
-    elif error_kind_raw == "system":
-        error_kind = "system"
-    else:
-        raise JSONTypeError(f"Invalid error_kind '{error_kind_raw}' in failed event")
     return {
         "type": "data_bank.job.failed.v1",
         "job_id": job_id,
         "user_id": user_id,
-        "error_kind": error_kind,
-        "message": message,
+        "error_kind": require_member(obj, "error_kind", ErrorKind),
+        "message": require_str(obj, "message"),
     }
 
 

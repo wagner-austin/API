@@ -15,6 +15,7 @@ from platform_core.data_bank_events import (
     is_progress,
     is_started,
 )
+from platform_core.job_events import ErrorKind
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 
@@ -82,12 +83,12 @@ def test_encode_decode_failed_system() -> None:
         "type": "data_bank.job.failed.v1",
         "job_id": "j1",
         "user_id": 42,
-        "error_kind": "system",
+        "error_kind": ErrorKind.SYSTEM,
         "message": "boom",
     }
     decoded = decode_event(encode_event(failed))
     assert is_failed(decoded)
-    assert decoded["error_kind"] == "system"
+    assert decoded["error_kind"] is ErrorKind.SYSTEM
     assert decoded["message"] == "boom"
 
 
@@ -96,12 +97,12 @@ def test_encode_decode_failed_user() -> None:
         "type": "data_bank.job.failed.v1",
         "job_id": "j2",
         "user_id": 42,
-        "error_kind": "user",
+        "error_kind": ErrorKind.USER,
         "message": "bad input",
     }
     decoded = decode_event(encode_event(failed_user))
     assert is_failed(decoded)
-    assert decoded["error_kind"] == "user"
+    assert decoded["error_kind"] is ErrorKind.USER
 
 
 def test_decode_raises_for_non_object() -> None:
@@ -173,8 +174,9 @@ def test_decode_raises_for_invalid_error_kind() -> None:
         "error_kind": "oops",
         "message": "m",
     }
-    with pytest.raises(JSONTypeError, match="Invalid error_kind 'oops'"):
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_event(dump_json_str(d_failed_bad))
+    assert str(excinfo.value) == "Invalid error_kind 'oops': must be one of 'user', 'system'"
 
 
 def test_decode_raises_for_unknown_event_type() -> None:

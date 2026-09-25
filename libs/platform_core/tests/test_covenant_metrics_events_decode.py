@@ -28,6 +28,7 @@ from platform_core.covenant_metrics_events import (
     make_retrain_triggered_event,
     make_stream_lag_event,
 )
+from platform_core.job_events import ErrorKind, JobDomain
 
 
 class TestDecodeCovenantEvent:
@@ -207,7 +208,7 @@ class TestCombinedTypeGuards:
 
         started: JobStartedV1 = {
             "type": "covenant.job.started.v1",
-            "domain": "covenant",
+            "domain": JobDomain.COVENANT,
             "job_id": "j",
             "user_id": 1,
             "queue": "q",
@@ -221,7 +222,7 @@ class TestCombinedTypeGuards:
 
         completed: JobCompletedV1 = {
             "type": "covenant.job.completed.v1",
-            "domain": "covenant",
+            "domain": JobDomain.COVENANT,
             "job_id": "j",
             "user_id": 1,
             "result_id": "r",
@@ -236,10 +237,10 @@ class TestCombinedTypeGuards:
 
         failed: JobFailedV1 = {
             "type": "covenant.job.failed.v1",
-            "domain": "covenant",
+            "domain": JobDomain.COVENANT,
             "job_id": "j",
             "user_id": 1,
-            "error_kind": "user",
+            "error_kind": ErrorKind.USER,
             "message": "m",
         }
         assert is_covenant_job_failed(failed)

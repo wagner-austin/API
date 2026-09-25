@@ -15,6 +15,7 @@ from platform_core.digits_metrics_events import (
     make_prune_event,
     make_upload_event,
 )
+from platform_core.job_events import ErrorKind, JobDomain
 
 
 class TestDecodeDigitsEvent:
@@ -219,7 +220,7 @@ class TestCombinedTypeGuards:
 
         started: JobStartedV1 = {
             "type": "digits.job.started.v1",
-            "domain": "digits",
+            "domain": JobDomain.DIGITS,
             "job_id": "j",
             "user_id": 1,
             "queue": "q",
@@ -236,7 +237,7 @@ class TestCombinedTypeGuards:
 
         completed: JobCompletedV1 = {
             "type": "digits.job.completed.v1",
-            "domain": "digits",
+            "domain": JobDomain.DIGITS,
             "job_id": "j",
             "user_id": 1,
             "result_id": "r",
@@ -254,10 +255,10 @@ class TestCombinedTypeGuards:
 
         failed: JobFailedV1 = {
             "type": "digits.job.failed.v1",
-            "domain": "digits",
+            "domain": JobDomain.DIGITS,
             "job_id": "j",
             "user_id": 1,
-            "error_kind": "user",
+            "error_kind": ErrorKind.USER,
             "message": "m",
         }
         ev: DigitsEventV1 = failed
