@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import get_logger, setup_logging
 from platform_core.queues import DATA_BANK_QUEUE
 from platform_workers.rq_harness import WorkerConfig
@@ -32,7 +32,7 @@ def _build_config() -> WorkerConfig:
     return {
         "redis_url": redis_url,
         "queue_name": DATA_BANK_QUEUE,
-        "events_channel": default_events_channel("databank"),
+        "events_channel": default_events_channel(JobDomain.DATABANK),
     }
 
 

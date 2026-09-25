@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Final, Protocol, TypedDict
 
 from platform_core.data_bank_client import DataBankClientError
-from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
 from platform_core.job_types import job_key
 from platform_core.queues import DATA_BANK_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
@@ -57,8 +57,7 @@ class LocalCorpusService:
                     break
 
 
-_DATABANK_DOMAIN: JobDomain = "databank"
-_EVENTS_CHANNEL = default_events_channel(_DATABANK_DOMAIN)
+_EVENTS_CHANNEL = default_events_channel(JobDomain.DATABANK)
 _DEFAULT_USER_ID = 0
 
 
@@ -81,7 +80,7 @@ def process_corpus_impl(
 
     ctx: JobContext = make_job_context(
         redis=redis,
-        domain=_DATABANK_DOMAIN,
+        domain=JobDomain.DATABANK,
         events_channel=_EVENTS_CHANNEL,
         job_id=job_id,
         user_id=user_id,
@@ -129,7 +128,7 @@ def process_corpus_impl(
         return {"status": "completed"}
     except Exception as exc:
         logger.error("data-bank upload failed", extra={"job_id": job_id})
-        ctx.publish_failed("system", str(exc))
+        ctx.publish_failed(ErrorKind.SYSTEM, str(exc))
         raise
 
 
