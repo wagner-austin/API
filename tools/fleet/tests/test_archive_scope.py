@@ -89,6 +89,46 @@ def _declared() -> tuple[str, ...]:
     return workspace["data_paths"][API]
 
 
+def _is_a_git_checkout() -> bool:
+    """Whether this tree has the history the measurements here read.
+
+    IT DOES NOT ON A FLEET NODE, and that is the point of asking. A dispatch
+    stages ``git archive`` of a commit: the node receives FILES and no
+    ``.git``, so ``git ls-tree HEAD`` there exits 128 with "Not a valid
+    object name HEAD". Found the honest way, by dispatching this suite to
+    serendipity at 3482c418 and reading the log: 3 failed, 8 errors, every
+    one of them this.
+
+    Returns:
+        True when ``HEAD`` resolves, which is a developer checkout and CI.
+    """
+    done = subprocess.run(
+        ("git", "-C", str(REPO_ROOT), "rev-parse", "--verify", "--quiet", "HEAD"),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=GIT_TIMEOUT_SECONDS,
+    )
+    return done.returncode == 0
+
+
+def _require_git() -> None:
+    """Skip a measurement that needs history, saying exactly what it needed.
+
+    Not a silent skip. A pass over zero rows must not read like a clean
+    result, so the reason names the tree it is standing in and what still
+    ran without it: on a node, :class:`TestTheStagedTreeItself` checks the
+    same property against the files that actually arrived, which is the
+    stronger evidence of the two.
+    """
+    if not _is_a_git_checkout():
+        pytest.skip(
+            f"not applicable: {REPO_ROOT} has no git history, so this is a staged export "
+            "rather than a checkout. The scope's effect on this tree is asserted directly "
+            "by TestTheStagedTreeItself, which reads the files the dispatch delivered."
+        )
+
+
 # ---------------------------------------------------------------------------
 # The rule
 # ---------------------------------------------------------------------------
@@ -176,6 +216,7 @@ def _tracked_sizes() -> dict[str, int]:
     Returns:
         Repo-relative posix path to size in bytes.
     """
+    _require_git()
     sizes: dict[str, int] = {}
     for line in _git("ls-tree", "-r", "--long", "HEAD").splitlines():
         fields = line.split(None, 4)
@@ -337,6 +378,7 @@ def scoped_tar(tmp_path_factory: pytest.TempPathFactory) -> pathlib.Path:
     Returns:
         Path to the written tarball.
     """
+    _require_git()
     spec = archive_pathspec({API: _declared()}, remote=API, project_path="libs/monorepo_guards")
     destination = tmp_path_factory.mktemp("scoped") / "scoped.tgz"
     _git("archive", "--format=tar.gz", "-o", str(destination), "HEAD", "--", *spec)
@@ -355,6 +397,66 @@ def names(scoped_tar: pathlib.Path) -> frozenset[str]:
     """
     with tarfile.open(scoped_tar, "r:gz") as archive:
         return frozenset(archive.getnames())
+
+
+class TestTheStagedTreeItself:
+    """The shape, read off the filesystem, wherever this suite is running.
+
+    THIS IS THE STRONGER EVIDENCE OF THE TWO AND IT ONLY EXISTS BECAUSE A
+    DISPATCH FAILED. The tar inspection below proves what the hub would
+    build; this proves what a node actually received, because on a node
+    this tree IS the scoped export, unpacked. Every assertion here holds in
+    a checkout too, so nothing is only ever checked in one place.
+    """
+
+    def test_the_tree_holds_every_package_s_manifest_and_guard_shim(self) -> None:
+        """``libs/monorepo_guards`` asserts at least forty package roots and
+        no unshimmed package, over the whole monorepo. If a scope ever stops
+        carrying the shape, that package fails on a node and this says why."""
+        manifests = list(REPO_ROOT.glob("*/*/pyproject.toml"))
+        shims = list(REPO_ROOT.glob("*/*/scripts/guard.py"))
+
+        assert len(manifests) >= 40
+        assert len(shims) >= 40
+
+    def test_the_tree_holds_the_workflows_that_package_parses(self) -> None:
+        workflows = sorted((REPO_ROOT / ".github" / "workflows").glob("*.y*ml"))
+
+        assert len(workflows) > 5
+
+    def test_the_tree_holds_the_build_files_every_makefile_reaches_for(self) -> None:
+        """Neither is a poetry path dependency, and every project's Makefile
+        dies at parse time without them. An include list would have dropped
+        both, which is the measured reason this scope excludes instead."""
+        assert (REPO_ROOT / "scripts" / "make" / "shell.mk").is_file()
+        assert (REPO_ROOT / "tools" / "maketools" / "scripts" / "run.py").is_file()
+
+    def test_the_tree_holds_the_root_files_a_check_reads(self) -> None:
+        assert (REPO_ROOT / "monorepo-guards.toml").is_file()
+        assert (REPO_ROOT / ".ruff.toml").is_file()
+        assert (REPO_ROOT / "Makefile").is_file()
+
+    def test_a_staged_export_carries_none_of_the_declared_data(self) -> None:
+        """ON A NODE THIS IS THE WHOLE CLAIM, MEASURED ON THE DELIVERED BYTES.
+
+        ``tools/fleet`` owns none of the eight declared directories, so a
+        dispatch of it must arrive with all eight absent. In a checkout they
+        are all present and correctly so, which is why this asserts only
+        where the tree is an export -- and says which of the two it saw
+        rather than passing quietly either way.
+        """
+        present = [path for path in _declared() if (REPO_ROOT / path).exists()]
+
+        if _is_a_git_checkout():
+            assert present == list(_declared()), (
+                "a checkout must still hold its own data directories; the scope removes them "
+                "from an ARCHIVE and must never touch the working tree"
+            )
+        else:
+            assert present == [], (
+                "this tree is a staged export of a project that owns none of the declared data "
+                f"directories, so all of them must be absent; these arrived anyway: {present}"
+            )
 
 
 class TestTheArchiveItKeeps:
