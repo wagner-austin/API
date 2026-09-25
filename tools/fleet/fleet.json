@@ -78,13 +78,28 @@
         "max_disk_gb": 40.0
       },
       "enabled": true
+    },
+    "serendipity": {
+      "host": "serendipity",
+      "platform": "windows",
+      "stage_root": "C:/fleet/stage",
+      "logical_cores": 8,
+      "ram_gb": 15.7,
+      "gpu": null,
+      "budget": {
+        "reserved_cores": 4,
+        "reserved_ram_gb": 4.0,
+        "worker_ram_gb": 1.1,
+        "max_concurrent_runs": 1,
+        "max_disk_gb": 40.0
+      },
+      "enabled": true
     }
   },
   "not_dispatchable": {
     "austinpc": "The hub, and the machine the dispatcher itself runs on. A dispatch here would run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database -- the three-way contention this whole package exists to escape. Enabled in the identity registry because it must answer for tunnels and DNS, which is a different question from whether work may be sent to it.",
     "lapis-lazuli": "An Android phone in Termux. A client of the fleet and never a target: it submits dispatches, it does not run them. Named here rather than left silent because that is a permanent decision, not a machine waiting to be onboarded.",
-    "serendipity": "The operator's own Yoga 9 laptop, enrolled 2026-09-12 and reachable from the hub. Held out of dispatch UNTIL the operator says it takes work: it is a machine he uses, and a measured budget (cores, RAM, whether it stays on AC) has not been taken. Move it to `nodes` with that budget when he decides; this line is the hold, not the verdict.",
-    "pendragon": "The operator's ASUS ROG Ally (Ryzen Z1 Extreme, Zen 4, AVX-512), re-provisioned 2026-09-15 and reachable from the hub. Held out of dispatch UNTIL the operator says it takes work, the same hold as serendipity and for the same reason: it is a machine he uses, and no budget (cores, RAM, sustained thermal headroom on a handheld) has been measured. Two things a future budget must account for that the other nodes do not have: ten ASUS services manage power and thermal profiles here and may override what the dispatcher assumes, and Armoury Crate holds the battery at 80%. Move it to `nodes` with a measured budget when he decides; this line is the hold, not the verdict.",
+    "pendragon": "The operator's ASUS ROG Ally (Ryzen Z1 Extreme, 8 physical / 16 logical), re-provisioned 2026-09-15 and reachable from the hub. The operator released this machine for dispatch on 2026-09-25 ('Yes, both, after I measure budgets'), and THE MEASUREMENT IS WHY IT IS STILL HELD: measured from the machine that day, it has 11.7 GB visible of 16 (the Radeon iGPU carves out the rest) and ONE GIGABYTE AVAILABLE, with 250 processes summing 7.72 GB of working set and 14.58 GB committed against 11.7 GB physical, so it is already paging at rest. There is no single hog to stop: the largest are ArmouryCrateSE.UserSessionHelper, explorer, MsMpEng, BingWallpaper, msedge, M365Copilot and two msedgewebview2, none above 260 MB, and 12 services match ASUS/Armoury/ROG (the ten this note used to predict, plus two). Enabling it now would hand the fleet a node that OOMs its first job. Thermal headroom was deliberately NOT measured: it is moot while the machine cannot hold a worker, and measuring it would answer the wrong question. Lift this hold when its idle available memory supports a worker budget, which means the operator deciding about his own applications on a machine he plays on, not infrastructure changing them for him. Board task ea6856eb carries the full measurement.",
     "lenovoold": "The operator's older Yoga 3 (i5-5200U Broadwell: AVX2, no AVX-512; 8 GB; Windows 10 22H2, end of support October 2025), enrolled 2026-09-12 and reachable from the hub. Not a CI dispatch target: 8 GB is under any project's worker budget once the OS and a runner are resident, and an EOL OS should not run CI. That hold is about THIS dispatcher; it never governed a manual measurement over ssh, and the operator explicitly authorised one on 2026-09-13 ('run the sweep on lenovoold'): the NavProbe CPU control sweep, board task 62fb6c7f, the AVX2-without-AVX-512 rung the fleet had never measured. Revisit dispatch only if it is reimaged to a supported OS and the operator asks."
   },
   "projects": {
