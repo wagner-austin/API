@@ -9,9 +9,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, NotRequired
 
+from platform_core import job_types
 from platform_core.errors import AppError
 from platform_core.errors import ErrorCode as PlatformErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
+from platform_core.members import as_member
 from typing_extensions import TypedDict
 
 from .types import JsonDict
@@ -47,7 +49,6 @@ def _hook_decode_optional_literal(
 
 
 # Type aliases for literals
-Status = Literal["queued", "processing", "completed", "failed"]
 Script = Literal["Latn", "Cyrl", "Arab"]
 Source = Literal["oscar", "wikipedia", "culturax"]
 Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"]
@@ -79,7 +80,7 @@ class JobResponse(TypedDict):
 
     job_id: str
     user_id: int
-    status: Status
+    status: job_types.JobStatus
     created_at: datetime
 
 
@@ -88,7 +89,7 @@ class JobStatus(TypedDict):
 
     job_id: str
     user_id: int
-    status: Status
+    status: job_types.JobStatus
     progress: int
     message: str | None
     result_url: str | None
@@ -291,17 +292,7 @@ def parse_job_response_json(s: str) -> JobResponse:
     if not isinstance(user_id_val, int):
         raise JSONTypeError("user_id must be an integer")
 
-    status_val = _decode_str(obj.get("status"), "status")
-    if status_val == "queued":
-        status: Status = "queued"
-    elif status_val == "processing":
-        status = "processing"
-    elif status_val == "completed":
-        status = "completed"
-    elif status_val == "failed":
-        status = "failed"
-    else:
-        raise JSONTypeError("Invalid job status")
+    status = as_member(_decode_str(obj.get("status"), "status"), "status", job_types.JobStatus)
 
     return {
         "job_id": _decode_str(obj.get("job_id"), "job_id"),
@@ -343,17 +334,7 @@ def parse_job_status_json(s: str) -> JobStatus:
     error_val = obj.get("error")
     error = _decode_str(error_val, "error") if error_val is not None else None
 
-    status_val = _decode_str(obj.get("status"), "status")
-    if status_val == "queued":
-        status: Status = "queued"
-    elif status_val == "processing":
-        status = "processing"
-    elif status_val == "completed":
-        status = "completed"
-    elif status_val == "failed":
-        status = "failed"
-    else:
-        raise JSONTypeError("Invalid job status")
+    status = as_member(_decode_str(obj.get("status"), "status"), "status", job_types.JobStatus)
 
     return {
         "job_id": _decode_str(obj.get("job_id"), "job_id"),
@@ -379,7 +360,6 @@ __all__ = [
     "Language",
     "Script",
     "Source",
-    "Status",
     "parse_job_create",
     "parse_job_response_json",
     "parse_job_status_json",

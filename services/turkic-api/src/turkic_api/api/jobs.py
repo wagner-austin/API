@@ -7,6 +7,7 @@ from typing import Final
 
 from platform_core.data_bank_client import DataBankClientError
 from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TURKIC_QUEUE
@@ -127,7 +128,7 @@ def process_corpus_impl(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "processing",
+            "status": JobStatus.PROCESSING,
             "progress": 0,
             "message": "started",
             "result_url": None,
@@ -187,7 +188,7 @@ def _result_stream(
                 {
                     "job_id": job_id,
                     "user_id": user_id,
-                    "status": "processing",
+                    "status": JobStatus.PROCESSING,
                     "progress": current_progress,
                     "message": "processing",
                     "result_url": None,
@@ -277,7 +278,7 @@ def _upload_and_record(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "processing",
+            "status": JobStatus.PROCESSING,
             "progress": 100,
             "message": "uploading",
             "result_url": None,
@@ -305,7 +306,7 @@ def _fail_upload(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "failed",
+            "status": JobStatus.FAILED,
             "progress": 100,
             "message": "upload_failed",
             "result_url": None,
@@ -334,7 +335,7 @@ def _mark_completed(
         {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "completed",
+            "status": JobStatus.COMPLETED,
             "progress": 100,
             "message": "done",
             "result_url": None,

@@ -9,6 +9,10 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 from turkic_api import _test_hooks
 from turkic_api.api import models
 
+_INVALID_STATUS_MESSAGE = (
+    "Invalid status 'invalid': must be one of 'queued', 'processing', 'completed', 'failed'"
+)
+
 
 def test_decode_source_literal_invalid_after_validation() -> None:
     # Test defensive error path in _decode_source_literal
@@ -151,11 +155,12 @@ def test_parse_job_response_json_not_dict() -> None:
 
 def test_parse_job_response_json_invalid_status() -> None:
     # Test invalid job status value
-    with pytest.raises(JSONTypeError, match="Invalid job status"):
+    with pytest.raises(JSONTypeError) as excinfo:
         models.parse_job_response_json(
             '{"status": "invalid", "job_id": "x", "user_id": 42, '
             '"created_at": "2024-01-01T00:00:00"}'
         )
+    assert str(excinfo.value) == _INVALID_STATUS_MESSAGE
 
 
 def test_parse_job_status_json_not_dict() -> None:
@@ -166,11 +171,12 @@ def test_parse_job_status_json_not_dict() -> None:
 
 def test_parse_job_status_json_invalid_status() -> None:
     # Test invalid job status value in result
-    with pytest.raises(JSONTypeError, match="Invalid job status"):
+    with pytest.raises(JSONTypeError) as excinfo:
         models.parse_job_status_json(
             '{"status": "invalid", "job_id": "x", "user_id": 42, "progress": 0, '
             '"created_at": "2024-01-01T00:00:00", "updated_at": "2024-01-01T00:00:00"}'
         )
+    assert str(excinfo.value) == _INVALID_STATUS_MESSAGE
 
 
 def test_decode_source_literal_all_values() -> None:

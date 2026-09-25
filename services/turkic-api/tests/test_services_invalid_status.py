@@ -40,6 +40,9 @@ def test_get_job_status_invalid_status_raises() -> None:
         "updated_at": now,
     }
     svc = JobService(redis=r, queue=_Queue(), logger=get_logger(__name__), data_dir="/tmp")
-    with pytest.raises(JSONTypeError, match="invalid status"):
+    with pytest.raises(JSONTypeError) as excinfo:
         svc.get_job_status("x")
+    assert str(excinfo.value) == (
+        "Invalid status 'weird': must be one of 'queued', 'processing', 'completed', 'failed'"
+    )
     r.assert_only_called({"hgetall"})

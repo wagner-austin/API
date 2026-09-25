@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONTypeError
 from platform_core.turkic_jobs import TurkicJobStatus, turkic_job_key
 from platform_workers.testing import FakeRedis
@@ -18,7 +19,7 @@ def test_job_store_roundtrip() -> None:
     status: TurkicJobStatus = {
         "job_id": "abc",
         "user_id": 42,
-        "status": "queued",
+        "status": JobStatus.QUEUED,
         "progress": 0,
         "message": None,
         "result_url": None,
@@ -54,8 +55,11 @@ def test_job_store_invalid_status_raises() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(JSONTypeError, match="invalid status"):
+    with pytest.raises(JSONTypeError) as excinfo:
         store.load("bad")
+    assert str(excinfo.value) == (
+        "Invalid status 'unknown': must be one of 'queued', 'processing', 'completed', 'failed'"
+    )
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 

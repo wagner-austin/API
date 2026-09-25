@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
+from platform_core import job_types
 from platform_core.turkic_jobs import TurkicJobStatus
 from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import QueueProtocol
@@ -40,7 +41,7 @@ class JobService:
         queued_status: TurkicJobStatus = {
             "job_id": job_id,
             "user_id": user_id,
-            "status": "queued",
+            "status": job_types.JobStatus.QUEUED,
             "progress": 0,
             "message": None,
             "result_url": None,
@@ -64,7 +65,12 @@ class JobService:
         }
         self._queue.enqueue("turkic_api.api.jobs.process_corpus", job_id, payload)
 
-        return {"job_id": job_id, "user_id": user_id, "status": "queued", "created_at": now}
+        return {
+            "job_id": job_id,
+            "user_id": user_id,
+            "status": job_types.JobStatus.QUEUED,
+            "created_at": now,
+        }
 
     def get_job_status(self, job_id: str) -> JobStatus | None:
         """Fetch job status from Redis and build a typed response; returns None if not found."""
@@ -83,7 +89,7 @@ class JobService:
         file_id = stored["file_id"]
         upload_status = stored["upload_status"]
         result_url: str | None = None
-        if status == "completed" and upload_status == "uploaded":
+        if status is job_types.JobStatus.COMPLETED and upload_status == "uploaded":
             result_url = f"/api/v1/jobs/{job_id}/result"
 
         return {
