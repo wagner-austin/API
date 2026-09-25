@@ -12,8 +12,6 @@ from platform_workers.rq_harness import WorkerConfig
 from qr_api import _test_hooks
 from qr_api._test_hooks import WorkerRunnerProtocol
 
-_QR_DOMAIN: JobDomain = "qr"
-
 
 class LoggerProtocol(Protocol):
     """Protocol for logger used in worker entry."""
@@ -29,7 +27,7 @@ def _build_config() -> WorkerConfig:
     return {
         "redis_url": redis_url,
         "queue_name": QR_QUEUE,
-        "events_channel": default_events_channel(_QR_DOMAIN),
+        "events_channel": default_events_channel(JobDomain.QR),
     }
 
 
