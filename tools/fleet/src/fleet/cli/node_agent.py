@@ -257,23 +257,32 @@ def claim_pass(
         )
         return dispatch.Payload(data=data, description=f"git archive of {sha}")
 
-    row = dispatch.start(
-        loaded.leases,
-        loaded.ledger,
-        loaded.feed,
-        node_name=alias,
-        node=node,
-        project=job["project"],
-        plan=prepared["plan"],
-        workers=prepared["workers"],
-        agent=job["submitted_by"],
-        session_id=job["session_id"],
-        build_payload=build,
-        companions=prepared["companions"],
-        recipe=dispatch.Recipe(
-            path=prepared["source"]["path"], install=prepared["source"]["install"]
-        ),
-    )
+    # GUARDED LIKE prepare ABOVE, because a fault here is otherwise reported
+    # NOWHERE: there is no failed feed row on this path, so an AppError out of
+    # staging ends the tick and leaves the queue row in status claimed until
+    # its lease runs out, an hour later, with no reason recorded anywhere a
+    # waiting session can read. Measured 2026-09-24 (board task 1e57ebe5):
+    # two jobs sat exactly that way for 32 and 14 minutes.
+    try:
+        row = dispatch.start(
+            loaded.leases,
+            loaded.ledger,
+            loaded.feed,
+            node_name=alias,
+            node=node,
+            project=job["project"],
+            plan=prepared["plan"],
+            workers=prepared["workers"],
+            agent=job["submitted_by"],
+            session_id=job["session_id"],
+            build_payload=build,
+            companions=prepared["companions"],
+            recipe=dispatch.Recipe(
+                path=prepared["source"]["path"], install=prepared["source"]["install"]
+            ),
+        )
+    except AppError as refusal:
+        return refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
     queue.report_start(
         credentials,
         job_id=job["job_id"],
