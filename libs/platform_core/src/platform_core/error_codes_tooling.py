@@ -213,6 +213,10 @@ class FleetErrorCode(ErrorCodeBase):
     # Measured 2026-09-04: `make` was present on one node of three.
     NODE_TOOL_MISSING = "NODE_TOOL_MISSING"
     NODE_PYTHON_MISMATCH = "NODE_PYTHON_MISMATCH"
+    # Node.js older than the projects' floor. Measured 2026-09-25: serendipity
+    # carried v18.13.0 and was dispatched to, because node was judged on
+    # presence alone.
+    NODE_NODEJS_MISMATCH = "NODE_NODEJS_MISMATCH"
 
     # Staging -- the bytes the node is entitled to run.
     STAGE_DIGEST_MISMATCH = "STAGE_DIGEST_MISMATCH"
