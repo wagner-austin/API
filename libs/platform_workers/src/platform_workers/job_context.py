@@ -5,7 +5,6 @@ from typing import Protocol
 from platform_core.job_events import (
     ErrorKind,
     JobDomain,
-    JobEventV1,
     encode_job_event,
     make_completed_event,
     make_failed_event,
@@ -44,7 +43,7 @@ def make_job_context(
 
     class _Ctx:
         def publish_started(self) -> None:
-            event: JobEventV1 = make_started_event(
+            event = make_started_event(
                 domain=domain,
                 job_id=job_id,
                 user_id=user_id,
@@ -55,7 +54,7 @@ def make_job_context(
         def publish_progress(
             self, progress: int, message: str | None = None, *, payload: JSONValue | None = None
         ) -> None:
-            event: JobEventV1 = make_progress_event(
+            event = make_progress_event(
                 domain=domain,
                 job_id=job_id,
                 user_id=user_id,
@@ -66,7 +65,7 @@ def make_job_context(
             redis.publish(events_channel, encode_job_event(event))
 
         def publish_completed(self, result_id: str, result_bytes: int) -> None:
-            event: JobEventV1 = make_completed_event(
+            event = make_completed_event(
                 domain=domain,
                 job_id=job_id,
                 user_id=user_id,
@@ -76,7 +75,7 @@ def make_job_context(
             redis.publish(events_channel, encode_job_event(event))
 
         def publish_failed(self, error_kind: ErrorKind, message: str) -> None:
-            event: JobEventV1 = make_failed_event(
+            event = make_failed_event(
                 domain=domain,
                 job_id=job_id,
                 user_id=user_id,
