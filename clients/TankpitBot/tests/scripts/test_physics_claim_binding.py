@@ -189,6 +189,47 @@ class TestTheTwoTreesDisagreeing:
         (package / "facts.py").write_text(body, encoding="utf-8")
         return root
 
+    def test_a_child_that_is_neither_a_package_nor_a_module_is_walked_past(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Build artefacts beside a module change nothing about the walk.
+
+        THIS BRANCH WAS COVERED BY ACCIDENT UNTIL 2026-09-25, which is worse
+        than not being covered, because the number said otherwise. The walk's
+        final ``continue`` runs only for a child that is neither a package
+        directory nor a ``.py`` file, and in a working tree the only such
+        children are build artefacts: ``src/tankpit_bot/*/__pycache__`` is a
+        directory with no ``__init__.py`` and no ``.py`` suffix, so a
+        developer's checkout takes that branch and reports 100 percent. A
+        PRISTINE checkout has no ``__pycache__``, nothing reaches the line,
+        and the review gate measured this file at 99.99 percent and refused
+        the package (board task 0d891468). Coverage that depends on leftover
+        bytecode is not coverage of anything.
+
+        Asserted as an equality between two runs rather than against a fixed
+        verdict: the point is not what the rules decide, it is that the
+        artefacts make no difference to what they decide.
+        """
+        source_root = self._tree(tmp_path / "src", '__all__ = ["X"]\nX = 1\n')
+        _write_page(
+            tmp_path,
+            "page.md",
+            _claims_page('{"claims": [{"id": "x", "code": "pkg.facts:X", "value": 1}]}'),
+        )
+        clean_count = run_physics_claim_rules(tmp_path, package_name="pkg", source_root=source_root)
+        clean_out = capsys.readouterr().out
+
+        cache = source_root / "pkg" / "__pycache__"
+        cache.mkdir()
+        (cache / "facts.cpython-311.pyc").write_bytes(b"\x00\x00\x00\x00")
+        (source_root / "pkg" / "notes.txt").write_text("not python\n", encoding="utf-8")
+
+        littered_count = run_physics_claim_rules(
+            tmp_path, package_name="pkg", source_root=source_root
+        )
+
+        assert (littered_count, capsys.readouterr().out) == (clean_count, clean_out)
+
     def test_a_module_this_tree_has_but_python_cannot_import_is_reported(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
