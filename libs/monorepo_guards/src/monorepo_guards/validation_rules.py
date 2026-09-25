@@ -11,14 +11,24 @@ class ValidationRule(Rule):
 
     _PLATFORM_VALIDATORS = "libs/platform_core/src/platform_core/validators.py"
     _REQUIRED_IMPORT = "from platform_core.validators import"
+    #: Validator helpers that belong to platform_core alone.
+    #:
+    #: EACH CARRIES ITS OPENING PARENTHESIS, and that is the whole point. The
+    #: match below is a substring one, so a bare ``def _decode_str`` also fires
+    #: on ``def _decode_stream``, ``def _decode_strict`` and every other name
+    #: that merely starts the same way. Measured 2026-09-20 20:38Z: tools/fleet
+    #: make lint refused a helper legitimately named ``_decode_stream``, and it
+    #: was worked around by renaming the helper to ``_decode_captured`` rather
+    #: than by fixing this tuple. A guard that makes a package rename a correct
+    #: symbol is teaching people to route around it.
     _DUPLICATE_DEFS = (
-        "def _load_json_dict",
-        "def _decode_optional_literal",
-        "def _decode_required_literal",
-        "def _decode_int_range",
-        "def _decode_float_range",
-        "def _decode_bool",
-        "def _decode_str",
+        "def _load_json_dict(",
+        "def _decode_optional_literal(",
+        "def _decode_required_literal(",
+        "def _decode_int_range(",
+        "def _decode_float_range(",
+        "def _decode_bool(",
+        "def _decode_str(",
     )
 
     def run(self, files: list[Path]) -> list[Violation]:

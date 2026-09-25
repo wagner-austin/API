@@ -97,7 +97,12 @@ class SubprocessTimeoutRule:
         name: The rule's name in the guard summary.
     """
 
-    name = "subprocess-timeout"
+    #: The rule's name in the guard summary, as board task 0d891468 named it.
+    #: Spelled REQUIRED rather than "subprocess-timeout" because the summary
+    #: line is read as a claim: "subprocess-timeout: 0 violations" reads like a
+    #: topic that was looked at, and "subprocess-timeout-required: 0
+    #: violations" reads like a rule that held.
+    name = "subprocess-timeout-required"
 
     #: Directories whose Python ships; a file outside both is not judged.
     _SCOPES: ClassVar[frozenset[str]] = frozenset({"src", "scripts"})

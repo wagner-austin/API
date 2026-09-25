@@ -24,6 +24,11 @@ from monorepo_guards.subprocess_timeout_rules import (
 )
 from tests._literal_set_support import write_declared_sets
 
+#: The monorepo root, from this file's own location: libs/monorepo_guards/tests.
+#: Derived rather than searched for, so a case that reads a real committed file
+#: fails loudly if the layout moves instead of quietly finding nothing.
+MONOREPO = Path(__file__).resolve().parents[3]
+
 
 def _module(tmp_path: Path, body: str, *, where: str = "src") -> Path:
     """Write one module into a scanned directory.
@@ -248,7 +253,30 @@ def test_a_file_outside_src_and_scripts_is_not_judged(tmp_path: Path) -> None:
 
 
 def test_the_rule_reports_its_name(tmp_path: Path) -> None:
-    assert SubprocessTimeoutRule().name == "subprocess-timeout"
+    assert SubprocessTimeoutRule().name == "subprocess-timeout-required"
+
+
+def test_the_rule_passes_on_the_fleet_seam_it_was_modelled_on() -> None:
+    """The prior art this rule generalises is clean under it.
+
+    tools/fleet solved this before the rule existed, by making the seam's own
+    type carry the deadline: ``RunProtocol`` takes a mandatory
+    ``timeout_seconds``, so mypy refuses a call without one. Board task
+    0d891468 asks that the rule be proved to PASS there as well as to fire
+    elsewhere, and the difference matters: a rule that fired on the one
+    package that had already done the right thing would be punishing the
+    pattern it exists to spread.
+
+    Run against the real committed file rather than a fixture, because a
+    fixture of my own writing would prove only that I can write a passing
+    fixture.
+    """
+    seam = MONOREPO / "tools" / "fleet" / "src" / "fleet" / "core" / "_command.py"
+    assert seam.is_file(), f"the fleet seam moved: {seam}"
+    source = seam.read_text(encoding="utf-8")
+    assert "subprocess.run(" in source, "the seam no longer calls subprocess.run; retarget this"
+    assert "timeout=timeout_seconds" in source, "the seam's deadline moved; retarget this"
+    assert SubprocessTimeoutRule().run([seam]) == []
 
 
 def test_several_files_are_judged_in_one_run(tmp_path: Path) -> None:
