@@ -35,12 +35,16 @@ class InheritingCall(TypedDict):
         cwd: Its directory.
         env: Its environment.
         new_session: Whether a new session was asked for.
+        timeout_seconds: The wall the caller bounded the child with,
+            recorded so a case can assert which bound a command got rather
+            than only that some bound exists.
     """
 
     argv: tuple[str, ...]
     cwd: Path
     env: dict[str, str]
     new_session: bool
+    timeout_seconds: int
 
 
 def ok(stdout: str) -> CommandResult:
@@ -208,10 +212,22 @@ class World:
         self.job = FakeJobApi()
 
     def run_inheriting(
-        self, argv: Sequence[str], *, cwd: Path, env: Mapping[str, str], new_session: bool
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str],
+        new_session: bool,
+        timeout_seconds: int,
     ) -> int:
         self.inheriting_calls.append(
-            InheritingCall(argv=tuple(argv), cwd=cwd, env=dict(env), new_session=new_session)
+            InheritingCall(
+                argv=tuple(argv),
+                cwd=cwd,
+                env=dict(env),
+                new_session=new_session,
+                timeout_seconds=timeout_seconds,
+            )
         )
         if self.inheriting_codes:
             return self.inheriting_codes.pop(0)

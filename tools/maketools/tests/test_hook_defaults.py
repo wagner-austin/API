@@ -17,6 +17,11 @@ from maketools.cli import COMMANDS, repository_root
 
 LAUNCHER = repository_root() / "tools" / "maketools" / "scripts" / "run.py"
 
+#: Wall for the children these cases start, every one of which exits at
+#: once. Generous so a loaded box never fails a case that is not about
+#: timing; the case that IS about timing passes its own tiny wall.
+PROBE_WALL_SECONDS = 120
+
 
 def test_run_inheriting_returns_the_childs_status(tmp_path: Path) -> None:
     code = _test_hooks.run_inheriting(
@@ -24,8 +29,31 @@ def test_run_inheriting_returns_the_childs_status(tmp_path: Path) -> None:
         cwd=tmp_path,
         env=_test_hooks.environ(),
         new_session=sys.platform != "win32",
+        timeout_seconds=PROBE_WALL_SECONDS,
     )
     assert code == 7
+
+
+def test_run_inheriting_fells_a_child_that_outlives_its_wall(tmp_path: Path) -> None:
+    """WATCH THE BOUND BITE, on a real child that really sleeps.
+
+    Every other case here runs a child that exits immediately, so all of them
+    would pass with no deadline at all. This one is the only evidence that
+    the wall is wired to the call rather than merely present in the
+    signature.
+
+    It RAISES rather than returning a status: an uncaptured child has no
+    output to hand back alongside a number, and a caller reading one would
+    not know the run had been cut short.
+    """
+    with pytest.raises(subprocess.TimeoutExpired):
+        _test_hooks.run_inheriting(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            cwd=tmp_path,
+            env=_test_hooks.environ(),
+            new_session=False,
+            timeout_seconds=1,
+        )
 
 
 def test_run_inheriting_passes_the_environment_and_cwd(tmp_path: Path) -> None:
@@ -42,6 +70,7 @@ def test_run_inheriting_passes_the_environment_and_cwd(tmp_path: Path) -> None:
         cwd=tmp_path,
         env=environment,
         new_session=False,
+        timeout_seconds=PROBE_WALL_SECONDS,
     )
     assert code == 0
     assert marker.read_text() == "yes"

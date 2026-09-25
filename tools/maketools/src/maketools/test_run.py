@@ -77,6 +77,15 @@ PARALLEL_ARGV: Final[Sequence[str]] = ("-n", "auto", "--max-worker-restart=0")
 #: Item 3 above, kept by name for the recipes' documentation.
 NO_WORKER_RESTART: Final[str] = PARALLEL_ARGV[2]
 
+#: Wall clock on a package's test suite. Four hours, and it is deliberately
+#: the largest bound in this package: the slowest suite measured here is
+#: TankpitBot at 350 s and covenant-radar-api at 154 s, so four hours is two
+#: orders of magnitude past any honest run. It exists for the run that is not
+#: honest. A suite that hangs on a socket or a lock is the shape that drained
+#: the fleet's queue for three days, and under a scheduled task there is
+#: nobody at the terminal to notice the silence (board task 0d891468).
+SUITE_WALL_SECONDS: Final[int] = 14400
+
 
 def pytest_argv(project: Path, runner: Runner) -> list[str]:
     """How pytest is reached for this project.
@@ -193,7 +202,11 @@ def run_tests(
     ]
     try:
         return _test_hooks.run_inheriting(
-            argv, cwd=project, env=environment, new_session=not windows
+            argv,
+            cwd=project,
+            env=environment,
+            new_session=not windows,
+            timeout_seconds=SUITE_WALL_SECONDS,
         )
     finally:
         remove_run_files(runs, token)

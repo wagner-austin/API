@@ -25,6 +25,12 @@ GUARD_SHIMS: Final[tuple[str, ...]] = ("scripts/guard.py", "scripts/guard/__main
 #: How the shim is invoked.
 GUARD_ARGV: Final[tuple[str, ...]] = ("poetry", "run", "python", "-m", "scripts.guard")
 
+#: Wall clock on the guard run. Twenty minutes: the slowest guard pass in
+#: this monorepo walks every package's python and finishes in tens of
+#: seconds, so this clears it by a wide margin and is still FINITE. A guard
+#: that has not answered in twenty minutes is wedged, not thorough.
+GUARD_WALL_SECONDS: Final[int] = 1200
+
 
 def run_guard(project: Path) -> int:
     """Run the guard shim, or say there is none.
@@ -45,7 +51,11 @@ def run_guard(project: Path) -> int:
         return 0
     _test_hooks.write_line(f"guard: running {present[0]}")
     return _test_hooks.run_inheriting(
-        GUARD_ARGV, cwd=project, env=_test_hooks.environ(), new_session=False
+        GUARD_ARGV,
+        cwd=project,
+        env=_test_hooks.environ(),
+        new_session=False,
+        timeout_seconds=GUARD_WALL_SECONDS,
     )
 
 

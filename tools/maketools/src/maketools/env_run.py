@@ -47,6 +47,14 @@ THEN_FLAG: Final[str] = "--then"
 #: Introduces a ``NAME=LOW-HIGH`` draw.
 DRAW_FLAG: Final[str] = "--draw"
 
+#: Wall clock on a command this runs on the operator's behalf. Four hours,
+#: matching the suite bound, because what arrives here is arbitrary: this
+#: command exists to run whatever a Makefile declares, which includes whole
+#: training runs and whole suites. Sized for the longest thing anyone has
+#: asked it to run and still FINITE, which is the property that matters
+#: under a scheduled task where nobody is watching (board task 0d891468).
+COMMAND_WALL_SECONDS: Final[int] = 14400
+
 
 class EnvRequest(TypedDict):
     """A parsed ``env`` invocation.
@@ -211,6 +219,7 @@ def run_env(arguments: Sequence[str], cwd: Path) -> int:
         cwd=cwd,
         env=environment,
         new_session=False,
+        timeout_seconds=COMMAND_WALL_SECONDS,
     )
     if request["then"]:
         then_code = _test_hooks.run_inheriting(
@@ -218,6 +227,7 @@ def run_env(arguments: Sequence[str], cwd: Path) -> int:
             cwd=cwd,
             env=environment,
             new_session=False,
+            timeout_seconds=COMMAND_WALL_SECONDS,
         )
         if code == 0:
             code = then_code

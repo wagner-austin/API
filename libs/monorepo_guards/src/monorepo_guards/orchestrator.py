@@ -48,6 +48,7 @@ from monorepo_guards.rust_rules import (
 from monorepo_guards.security_rules import SecurityRule
 from monorepo_guards.shim_rules import ShimRule
 from monorepo_guards.standardization_rules import StandardizationRule
+from monorepo_guards.subprocess_timeout_rules import SubprocessTimeoutRule
 from monorepo_guards.suppress_rules import SuppressRule
 from monorepo_guards.test_quality_rules import WeakAssertionRule
 from monorepo_guards.tests_rules import PolicyTestsRule
@@ -103,6 +104,7 @@ def _run_with_config(config: GuardConfig) -> int:
         RestrictedSymbolRule(),
         EscapingPathDependencyRule(config),
         WorkflowTimeoutRule(config),
+        SubprocessTimeoutRule(),
         RustTestRule(config),
         RustCargoLintRule(config),
         RustManualSerializeRule(config),

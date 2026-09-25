@@ -256,7 +256,12 @@ POSIX_KILL_SIGNAL: Final[int] = 9
 
 
 def _default_run_inheriting(
-    argv: Sequence[str], *, cwd: Path, env: Mapping[str, str], new_session: bool
+    argv: Sequence[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str],
+    new_session: bool,
+    timeout_seconds: int,
 ) -> int:
     """Run a child on this process's terminal.
 
@@ -265,12 +270,22 @@ def _default_run_inheriting(
         cwd: The working directory.
         env: The child's environment.
         new_session: Whether to ``setsid`` the child on POSIX.
+        timeout_seconds: Wall-clock bound, named by the caller for the
+            reason :class:`~maketools.commands.RunInheritingProtocol` gives.
 
     Returns:
         The exit status.
+
+    Raises:
+        subprocess.TimeoutExpired: When the child outlives the bound.
     """
     completed = subprocess.run(
-        list(argv), cwd=cwd, env=dict(env), check=False, start_new_session=new_session
+        list(argv),
+        cwd=cwd,
+        env=dict(env),
+        check=False,
+        start_new_session=new_session,
+        timeout=timeout_seconds,
     )
     return completed.returncode
 

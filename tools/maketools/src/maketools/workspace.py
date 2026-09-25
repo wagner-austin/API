@@ -25,6 +25,23 @@ COMPOSE_FILE: Final[str] = "docker-compose.yml"
 #: The one value ``core.hooksPath`` may hold here.
 HOOKS_PATH: Final[str] = ".githooks"
 
+#: Wall clock on one fanned-out make target. Four hours, because what this
+#: runs IS a package's whole lint or test, so it inherits the suite bound
+#: rather than inventing a smaller one; a fan-out over libs, services,
+#: clients and tools is the longest thing this package ever starts.
+FANOUT_WALL_SECONDS: Final[int] = 14400
+
+#: Wall clock on a docker image build. An hour: a cold build of the ML
+#: images pulls a CUDA base and compiles wheels, which is tens of minutes on
+#: this uplink, and a build still going after an hour is waiting on a
+#: registry that is not answering.
+COMPOSE_BUILD_WALL_SECONDS: Final[int] = 3600
+
+#: Wall clock on bringing containers up or down, and on a git config write.
+#: Ten minutes: these are local control-plane calls that take seconds, and
+#: the one that hangs is hanging on a wedged daemon rather than working.
+CONTROL_WALL_SECONDS: Final[int] = 600
+
 
 def makefile_directories(parents: Sequence[Path]) -> list[Path]:
     """Every immediate subdirectory of the parents that carries a Makefile.
@@ -68,7 +85,11 @@ def fan_out(target: str, parents: Sequence[Path], *, cwd: Path) -> int:
     for package in packages:
         _test_hooks.write_line(f"\n=== make {target} in {package.relative_to(cwd).as_posix()} ===")
         code = _test_hooks.run_inheriting(
-            ["make", target], cwd=package, env=_test_hooks.environ(), new_session=False
+            ["make", target],
+            cwd=package,
+            env=_test_hooks.environ(),
+            new_session=False,
+            timeout_seconds=FANOUT_WALL_SECONDS,
         )
         if code != 0:
             failed.append(package.relative_to(cwd).as_posix())
@@ -110,17 +131,23 @@ def compose_up(directory: Path, *, build_progress: str, git_commit: bool) -> int
             cwd=directory,
             env=environment,
             new_session=False,
+            timeout_seconds=COMPOSE_BUILD_WALL_SECONDS,
         )
         if code != 0:
             return code
         return _test_hooks.run_inheriting(
-            ["docker", "compose", "up", "-d"], cwd=directory, env=environment, new_session=False
+            ["docker", "compose", "up", "-d"],
+            cwd=directory,
+            env=environment,
+            new_session=False,
+            timeout_seconds=CONTROL_WALL_SECONDS,
         )
     return _test_hooks.run_inheriting(
         ["docker", "compose", "up", "-d", "--build"],
         cwd=directory,
         env=environment,
         new_session=False,
+        timeout_seconds=COMPOSE_BUILD_WALL_SECONDS,
     )
 
 
@@ -146,6 +173,7 @@ def compose_down(directories: Sequence[Path]) -> int:
             cwd=directory,
             env=_test_hooks.environ(),
             new_session=False,
+            timeout_seconds=CONTROL_WALL_SECONDS,
         )
         if code != 0:
             return code
@@ -166,6 +194,7 @@ def hooks_install(cwd: Path) -> int:
         cwd=cwd,
         env=_test_hooks.environ(),
         new_session=False,
+        timeout_seconds=CONTROL_WALL_SECONDS,
     )
     if code == 0:
         _test_hooks.write_line(f"core.hooksPath = {HOOKS_PATH}")

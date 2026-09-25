@@ -39,6 +39,20 @@ EXECUTABLE_DIRECTORIES: Final[tuple[str, ...]] = ("Scripts", "bin")
 #: What ``uv`` is told to install into a fresh venv.
 UV_INSTALL_ARGV: Final[tuple[str, ...]] = ("uv", "pip", "install", "-e", ".[dev]")
 
+#: Wall clock on a dependency install. An hour: a cold poetry or uv install
+#: of the heaviest project here (the ML services, with torch) is minutes on
+#: a warm cache and can be tens of minutes on a cold one over the operator's
+#: uplink, so an hour clears it and is still FINITE. An install that has not
+#: answered in an hour is waiting on an index that is not coming back.
+INSTALL_WALL_SECONDS: Final[int] = 3600
+
+#: Wall clock on creating an empty virtualenv or building one wheel. Ten
+#: minutes: both are local, disk-bound and take seconds. Kept separate from
+#: the install bound because an hour is a meaningless ceiling for a task
+#: that never legitimately exceeds a minute, and a bound that can never
+#: fire is decoration.
+BUILD_WALL_SECONDS: Final[int] = 600
+
 
 def venv_executable(project: Path, name: str) -> Path:
     """Locate an executable inside the project's venv.
@@ -85,6 +99,7 @@ def venv_exec(project: Path, argv: Sequence[str]) -> int:
         cwd=project,
         env=_test_hooks.environ(),
         new_session=False,
+        timeout_seconds=INSTALL_WALL_SECONDS,
     )
 
 
@@ -114,12 +129,20 @@ def uv_venv_check(project: Path) -> int:
         _test_hooks.write_line("uv-venv-check: no .venv yet; creating one")
     environment = _test_hooks.environ()
     code = _test_hooks.run_inheriting(
-        ["uv", "venv"], cwd=project, env=environment, new_session=False
+        ["uv", "venv"],
+        cwd=project,
+        env=environment,
+        new_session=False,
+        timeout_seconds=BUILD_WALL_SECONDS,
     )
     if code != 0:
         return code
     return _test_hooks.run_inheriting(
-        UV_INSTALL_ARGV, cwd=project, env=environment, new_session=False
+        UV_INSTALL_ARGV,
+        cwd=project,
+        env=environment,
+        new_session=False,
+        timeout_seconds=INSTALL_WALL_SECONDS,
     )
 
 
@@ -189,6 +212,7 @@ def native_wheel(project: Path, *, crate: Path, package: str) -> int:
         cwd=project,
         env=_test_hooks.environ(),
         new_session=False,
+        timeout_seconds=INSTALL_WALL_SECONDS,
     )
 
 
@@ -214,6 +238,7 @@ def poetry_build(project: Path, packages: Sequence[Path]) -> int:
             cwd=project / package,
             env=_test_hooks.environ(),
             new_session=False,
+            timeout_seconds=BUILD_WALL_SECONDS,
         )
         if code != 0:
             return code

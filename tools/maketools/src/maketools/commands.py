@@ -37,6 +37,7 @@ class RunInheritingProtocol(Protocol):
         cwd: Path,
         env: Mapping[str, str],
         new_session: bool,
+        timeout_seconds: int,
     ) -> int:
         """Run it to completion.
 
@@ -49,9 +50,32 @@ class RunInheritingProtocol(Protocol):
                 not reach the suite and the suite's group can be named for
                 the reaper. Accepted and ignored by the standard library on
                 Windows, where the job object does the same work.
+            timeout_seconds: Wall-clock bound on the child.
+
+                REQUIRED, AND NAMED BY THE CALLER RATHER THAN DEFAULTED,
+                because the children this runs are not alike: a ``git
+                config`` answers instantly and a fanned-out ``make check``
+                is hours, and one number covering both would be sized for
+                the longer and would stop bounding the shorter. A default
+                is the value a new call site reaches for without deciding,
+                which is how the unbounded ones got here.
+
+                SHARING A TERMINAL IS NOT A BOUND. It is tempting to think
+                an inherited child is bounded by the person watching it, and
+                that is false wherever it matters: these commands run
+                unattended under the fleet's scheduled tasks, where a wedged
+                child holds its lease to expiry and reports nothing (board
+                tasks 41ac6ed2, 35940277 and 0d891468).
 
         Returns:
             The exit status; a failure is the answer, not an exception.
+
+        Raises:
+            subprocess.TimeoutExpired: When the child outlives the bound.
+                Raised rather than folded into the exit status: an
+                uncaptured child has no output to return alongside a
+                number, and a caller reading one would not know the run
+                had been cut short.
         """
         ...
 
