@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from platform_core.errors import AppError, ErrorCode
-from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from platform_workers.job_context import JobContext, make_job_context
@@ -57,9 +57,6 @@ class WrappedJobPayload(TypedDict):
     user_id: int
     redis_url: str
     queue_name: str
-
-
-_MUSIC_DOMAIN: JobDomain = "music_wrapped"
 
 
 def _redis_client(url: str) -> RedisStrProto:
@@ -180,8 +177,8 @@ def process_wrapped_job(payload: WrappedJobPayload) -> str:
     redis = _redis_client(redis_url)
     ctx: JobContext = make_job_context(
         redis=redis,
-        domain=_MUSIC_DOMAIN,
-        events_channel=default_events_channel(_MUSIC_DOMAIN),
+        domain=JobDomain.MUSIC_WRAPPED,
+        events_channel=default_events_channel(JobDomain.MUSIC_WRAPPED),
         job_id=f"wrapped-{user_id}-{year}",
         user_id=user_id,
         queue_name=queue_name,
@@ -239,7 +236,7 @@ def process_wrapped_job(payload: WrappedJobPayload) -> str:
         return result_id
     except Exception as exc:
         # Classify error kind: AppError => user, else system
-        kind: Literal["user", "system"] = "user" if isinstance(exc, AppError) else "system"
+        kind = ErrorKind.USER if isinstance(exc, AppError) else ErrorKind.SYSTEM
         ctx.publish_failed(kind, str(exc))
         _log = get_logger(__name__)
         _log.exception("music_wrapped job failed: %s", exc)
@@ -282,8 +279,8 @@ def process_import_youtube_takeout(payload: ImportYouTubeTakeoutJobPayload) -> s
     redis = _redis_client(redis_url)
     ctx: JobContext = make_job_context(
         redis=redis,
-        domain=_MUSIC_DOMAIN,
-        events_channel=default_events_channel(_MUSIC_DOMAIN),
+        domain=JobDomain.MUSIC_WRAPPED,
+        events_channel=default_events_channel(JobDomain.MUSIC_WRAPPED),
         job_id=f"wrapped-takeout-{user_id}-{year}",
         user_id=user_id,
         queue_name=queue_name,
@@ -314,7 +311,7 @@ def process_import_youtube_takeout(payload: ImportYouTubeTakeoutJobPayload) -> s
         ctx.publish_completed(result_id, 0)
         return result_id
     except Exception as exc:
-        kind: Literal["user", "system"] = "user" if isinstance(exc, AppError) else "system"
+        kind = ErrorKind.USER if isinstance(exc, AppError) else ErrorKind.SYSTEM
         ctx.publish_failed(kind, str(exc))
         _log = get_logger(__name__)
         _log.exception("music_wrapped takeout job failed: %s", exc)
