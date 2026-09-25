@@ -207,6 +207,20 @@
       }
     }
   },
+  "data_paths": {
+    "https://github.com/wagner-austin/API.git": [
+      "services/covenant-radar-api/data/external",
+      "libs/instrument_io/tests/fixtures",
+      "libs/covenant_ml/tests/data",
+      "libs/covenant_nn/tests/data",
+      "tools/hpc3/artifacts",
+      "services/covenant-radar-api/mckinnon_sources",
+      "libs/instrument_io/tools/ThermoRawFileParser",
+      "services/covenant-radar-api/models"
+    ],
+    "https://github.com/wagner-austin/MCPs.git": [],
+    "https://github.com/wagner-austin/slime.git": []
+  },
   "ledger": "runs/ledger.jsonl",
   "feed": "runs/feed.jsonl",
   "leases": "runs/leases.json"

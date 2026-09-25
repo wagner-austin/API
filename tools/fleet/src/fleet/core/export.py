@@ -257,7 +257,9 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
     return resolved["stdout"].strip()
 
 
-def archive_commit(mirror: pathlib.Path, sha: str, destination: pathlib.Path) -> bytes:
+def archive_commit(
+    mirror: pathlib.Path, sha: str, destination: pathlib.Path, paths: tuple[str, ...]
+) -> bytes:
     """Write ``git archive --format=tar.gz <sha>`` and read the bytes back.
 
     Written to a file and read back rather than captured from git's
@@ -269,6 +271,19 @@ def archive_commit(mirror: pathlib.Path, sha: str, destination: pathlib.Path) ->
         mirror: The mirror's path, holding the commit.
         sha: The commit.
         destination: Where the archive is written; its directory is made.
+        paths: The pathspec, from
+            :func:`fleet.core.archive_scope.archive_pathspec`, scoping the
+            archive to what the project's check reads. Empty for the whole
+            commit, which is what a companion always is and what a project
+            whose repository declares no data directories still gets: an
+            empty tuple appends nothing, so the command run is the one this
+            function has always run.
+
+            REQUIRED AND NOT DEFAULTED, though every caller but one passes
+            the same thing. The unscoped archive was the defect (board task
+            140e7042, 216,826,747 bytes to check a 0.25 MB package), and a
+            default would be the value a new call site reaches for without
+            deciding -- which is exactly how the original had no pathspec.
 
     Returns:
         The archive's bytes, which are the payload
@@ -278,6 +293,7 @@ def archive_commit(mirror: pathlib.Path, sha: str, destination: pathlib.Path) ->
         AppError: ``EXPORT_FAILED`` when ``git archive`` exits non-zero.
     """
     _test_hooks.make_directory(destination.parent)
+    scope = ("--", *paths) if paths else ()
     archived = _test_hooks.run(
         (
             "git",
@@ -288,6 +304,7 @@ def archive_commit(mirror: pathlib.Path, sha: str, destination: pathlib.Path) ->
             "-o",
             str(destination),
             sha,
+            *scope,
         ),
         timeout_seconds=ARCHIVE_TIMEOUT_SECONDS,
     )
@@ -412,10 +429,19 @@ def export_companions(
             CompanionExport(
                 directory=companion["directory"],
                 sha=prepared["sha"],
+                # UNSCOPED, and that is a decision rather than an omission.
+                # A companion is a whole other repository staged beside the
+                # export because the project's check reads it (slime lints
+                # its lifted code against the committed MCPs workspace), and
+                # nothing here knows which parts of it that check opens. The
+                # data-path scope belongs to the project under check, whose
+                # registry line names its repository; a companion has no
+                # project line and no declaration to read.
                 data=archive_commit(
                     prepared["mirror"],
                     prepared["sha"],
                     archive_dir / f"{key}-{prepared['sha']}.tgz",
+                    (),
                 ),
             )
         )

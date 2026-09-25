@@ -34,6 +34,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodeConfig, decode_node_config, encode_node_config
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
+from fleet.contracts.source import decode_path, decode_remote
 
 
 class FleetWorkspace(TypedDict):
@@ -57,6 +58,36 @@ class FleetWorkspace(TypedDict):
             check can honour; absent from both, it is drift.
         projects: The work that may be dispatched, keyed by repo-relative
             path.
+        data_paths: Per repository, keyed by the remote its projects declare,
+            the directories holding DATA rather than code: corpora, binary
+            fixtures, vendored tool distributions, recorded artifacts. An
+            export of a project leaves out every one of them that does not
+            lie inside the project being checked
+            (:func:`~fleet.core.archive_scope.archive_pathspec`).
+
+            KEYED BY REMOTE BECAUSE THIS WORKSPACE SPANS THREE REPOSITORIES
+            and a repo-relative path means nothing outside its own. A flat
+            list would let ``tests/fixtures`` declared for one repository
+            silently strip a directory of that name from another.
+
+            MEASURED, 2026-09-25, at ``f560de52`` of the API monorepo (board
+            task 140e7042). The repository tracks 610,853,185 bytes and eight
+            directories hold 521 MB of it, so every check of every project
+            staged a 216,826,747-byte archive that took 43 seconds to build.
+            Declaring those eight brings it to 27,462,327 bytes and 2.7
+            seconds, 87.3% smaller, and the tar still holds all 51
+            ``pyproject.toml``, all 51 ``scripts/guard.py`` and all 7
+            workflow files.
+
+            WHICH IS THE POINT, AND THE REASON THIS IS NOT AN INCLUDE LIST.
+            ``libs/monorepo_guards`` audits the whole monorepo's SHAPE --
+            its suite asserts at least forty package roots and reads every
+            real workflow -- so an archive holding only that project and its
+            poetry closure would carry one package root and fail. Every
+            project's Makefile also reaches ``../../scripts/make/shell.mk``
+            and ``../../tools/maketools/scripts/run.py``, which no
+            dependency declaration names. The shape is cheap and the data is
+            not, so the data is what goes.
         ledger: Path to the append-only dispatch record. Relative paths
             resolve against the workspace document's own directory, so a
             workspace can be moved without editing it.
@@ -67,6 +98,7 @@ class FleetWorkspace(TypedDict):
     nodes: dict[str, NodeConfig]
     not_dispatchable: dict[str, str]
     projects: dict[str, ProjectConfig]
+    data_paths: dict[str, tuple[str, ...]]
     ledger: str
     feed: str
     leases: str
@@ -139,6 +171,7 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
         "projects": {
             path: encode_project_config(project) for path, project in workspace["projects"].items()
         },
+        "data_paths": {remote: list(paths) for remote, paths in workspace["data_paths"].items()},
         "ledger": workspace["ledger"],
         "feed": workspace["feed"],
         "leases": workspace["leases"],
@@ -215,6 +248,104 @@ def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) ->
     return excluded
 
 
+def _decode_data_paths(
+    value: JSONObject, projects: dict[str, ProjectConfig]
+) -> dict[str, tuple[str, ...]]:
+    """Read the per-repository data directories an export leaves behind.
+
+    Args:
+        value: The workspace object.
+        projects: The already-decoded projects, so a declaration that would
+            strip one of them is refused here rather than discovered as a
+            missing Makefile on a node.
+
+    Returns:
+        The declared paths, keyed by remote, in declaration order.
+
+    Raises:
+        JSONTypeError: If the field is missing, is not an object, a key is
+            not a remote in the source grammar, a value is not a list of
+            strings, a path is not a repo-relative directory in the path
+            grammar, a path is the repository root, or a path ENCLOSES a
+            project declared against that same remote.
+
+            The enclosing case is checked against the projects for the same
+            reason :func:`_decode_not_dispatchable` is checked against the
+            nodes: the workspace would be saying two opposite things about
+            one directory, that it is dispatchable work and that it is data
+            no export carries, and the export would win silently by staging
+            a tree with the project missing from it.
+
+            REQUIRED, and empty spelled out as ``{}``. An absent key would
+            read as "this fleet has no data directories" from a workspace
+            where nobody had considered the question, and the difference
+            between those two matters: the first stages 27 MB and the second
+            stages 217 MB while looking identical.
+
+            The root is refused because ``""`` names the whole repository,
+            so declaring it would exclude every file from the export and
+            produce an empty archive whose check fails on the node with a
+            message about a missing Makefile.
+    """
+    declared = require_dict(value, "data_paths")
+    paths: dict[str, tuple[str, ...]] = {}
+    for remote in sorted(declared):
+        entries = declared[remote]
+        if not isinstance(entries, list):
+            raise JSONTypeError(
+                f"data_paths[{remote!r}] must be a list of repo-relative directories, got "
+                f"{type(entries).__name__}"
+            )
+        decoded: list[str] = []
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, str):
+                raise JSONTypeError(
+                    f"data_paths[{remote!r}][{index}] must be a string, got {type(entry).__name__}"
+                )
+            if not entry:
+                raise JSONTypeError(
+                    f"data_paths[{remote!r}][{index}] is the repository root, which would "
+                    "exclude every file from the export and stage an empty archive"
+                )
+            decoded.append(decode_path(entry, field=f"data_paths[{remote!r}][{index}]"))
+        checked = decode_remote(remote, field="data_paths key")
+        for path in decoded:
+            enclosed = [
+                key
+                for key, project in projects.items()
+                if project["source"] is not None
+                and project["source"]["remote"] == checked
+                and _encloses(path, project["source"]["path"])
+            ]
+            if enclosed:
+                raise JSONTypeError(
+                    f"data_paths[{remote!r}] declares {path!r}, which contains the dispatchable "
+                    f"project(s) {', '.join(sorted(enclosed))}. Excluding it would stage a tree "
+                    "with the project itself missing, and the check would fail on the node with "
+                    "a message about a missing Makefile rather than about this line"
+                )
+        paths[checked] = tuple(decoded)
+    return paths
+
+
+def _encloses(data_path: str, project_path: str) -> bool:
+    """Whether a data directory contains a project's own tree.
+
+    Args:
+        data_path: The declared data directory, never the repository root.
+        project_path: The project's repo-relative path, ``""`` for a project
+            that is the whole repository.
+
+    Returns:
+        True when excluding ``data_path`` would remove part or all of the
+        project. A project that IS the repository is enclosed by every data
+        path, since every one of them lies inside it.
+    """
+    if not project_path:
+        return True
+    return project_path == data_path or project_path.startswith(f"{data_path}/")
+
+
 def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
     """Decode and validate a workspace.
 
@@ -241,6 +372,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         nodes=nodes,
         not_dispatchable=_decode_not_dispatchable(value, nodes),
         projects=projects,
+        data_paths=_decode_data_paths(value, projects),
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),
         leases=require_str(value, "leases"),

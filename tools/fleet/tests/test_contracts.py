@@ -122,6 +122,11 @@ def _workspace() -> FleetWorkspace:
         nodes={"lavender": _node(), "loki": _node(gpu=None)},
         not_dispatchable={},
         projects={"services/Model-Trainer": _project()},
+        data_paths={
+            "https://github.com/wagner-austin/API.git": (
+                "services/covenant-radar-api/data/external",
+            )
+        },
         ledger="ledger.jsonl",
         feed="feed.jsonl",
         leases="leases.json",

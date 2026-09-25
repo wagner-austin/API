@@ -162,7 +162,7 @@ class TestArchiveCommit:
         runner = FakeRun([ok("")])
         _test_hooks.run = runner
 
-        data = export.archive_commit(tmp_path / "slime.git", SHA, destination)
+        data = export.archive_commit(tmp_path / "slime.git", SHA, destination, ())
 
         assert data == payload
         assert runner.calls == [
@@ -180,11 +180,62 @@ class TestArchiveCommit:
         assert runner.timeouts == [export.ARCHIVE_TIMEOUT_SECONDS]
         assert destination.parent.is_dir()
 
+    def test_an_empty_scope_appends_no_separator_let_alone_a_pathspec(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The unscoped command must be the one this always ran, byte for byte.
+
+        Asserted on its own rather than left to the case above, because the
+        thing at stake is a NEGATIVE: that ``--`` does not appear. slime and
+        the three MCPs projects declare no data paths, so their payloads go
+        on being built by this exact argv, and a stray separator would be a
+        change to four projects nobody asked to change.
+        """
+        destination = tmp_path / "archives" / "run-2-loki.tgz"
+        destination.parent.mkdir()
+        destination.write_bytes(b"\x1f\x8b")
+        runner = FakeRun([ok("")])
+        _test_hooks.run = runner
+
+        export.archive_commit(tmp_path / "slime.git", SHA, destination, ())
+
+        assert "--" not in runner.calls[0]
+        assert runner.calls[0][-1] == SHA
+
+    def test_a_scope_reaches_git_after_a_separator_in_declaration_order(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A pathspec unseparated from the sha is how git reads a path as a ref."""
+        destination = tmp_path / "archives" / "run-3-sedona.tgz"
+        destination.parent.mkdir()
+        destination.write_bytes(b"\x1f\x8b")
+        runner = FakeRun([ok("")])
+        _test_hooks.run = runner
+
+        export.archive_commit(
+            tmp_path / "api.git",
+            SHA,
+            destination,
+            (
+                ".",
+                ":(exclude)services/covenant-radar-api/data/external",
+                ":(exclude)tools/hpc3/artifacts",
+            ),
+        )
+
+        assert runner.calls[0][-4:] == (
+            "--",
+            ".",
+            ":(exclude)services/covenant-radar-api/data/external",
+            ":(exclude)tools/hpc3/artifacts",
+        )
+        assert runner.calls[0][-5] == SHA
+
     def test_a_failing_archive_is_an_export_failure(self, tmp_path: pathlib.Path) -> None:
         _test_hooks.run = FakeRun([failed(128, f"fatal: not a valid object name: {SHA}")])
 
         with pytest.raises(AppError) as raised:
-            export.archive_commit(tmp_path / "slime.git", SHA, tmp_path / "out.tgz")
+            export.archive_commit(tmp_path / "slime.git", SHA, tmp_path / "out.tgz", ())
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message.startswith(f"git archive {SHA} from ")

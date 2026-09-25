@@ -303,6 +303,7 @@ def workspace_document() -> JSONObject:
             }
         },
         "not_dispatchable": {},
+        "data_paths": {},
         "projects": {
             DEMO_PROJECT: {
                 "worker_ram_gb": 1.1,

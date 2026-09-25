@@ -82,6 +82,7 @@ from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import (
     _test_hooks,
+    archive_scope,
     capacity,
     dispatch,
     export,
@@ -253,7 +254,7 @@ def claim_pass(
 
     def build(run_id: str) -> dispatch.Payload:
         data = export.archive_commit(
-            prepared["mirror"], sha, loaded.archives / f"{run_id}-{alias}.tgz"
+            prepared["mirror"], sha, loaded.archives / f"{run_id}-{alias}.tgz", prepared["scope"]
         )
         return dispatch.Payload(data=data, description=f"git archive of {sha}")
 
@@ -304,6 +305,10 @@ class Prepared(TypedDict):
         mirror: The mirror on the hub, holding the commit.
         companions: The archives of the repositories staged beside the
             export, each at the commit its declared ref names now.
+        scope: The pathspec the export's archive is built with, leaving out
+            the data directories this repository declares that this project
+            does not own (:func:`fleet.core.archive_scope.archive_pathspec`).
+            Empty for a repository that declares none.
         workers: Test workers the capacity check granted on this node.
     """
 
@@ -311,6 +316,7 @@ class Prepared(TypedDict):
     source: ProjectSource
     mirror: pathlib.Path
     companions: tuple[export.CompanionExport, ...]
+    scope: tuple[str, ...]
     workers: int
 
 
@@ -340,6 +346,12 @@ def prepare(
         state: What it reported when probed this tick.
         sha: The job's commit.
 
+    The archive's scope is resolved here too, with the rest of what the
+    dispatch needs and before the lease: it reads only the registry and the
+    project's own path, so a repository whose data declaration contradicts
+    its project list has already been refused by the workspace decoder and
+    never reaches a node.
+
     Returns:
         What the dispatch needs, or the ``PROJECT_TAGS_MISMATCH`` refusal
         as its ``CODE: message`` line.
@@ -363,7 +375,16 @@ def prepare(
     companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
     run_cli.require_resources_free(loaded, plan)
     workers = capacity.plan_dispatch(node, state, plan)
-    return Prepared(plan=plan, source=source, mirror=mirror, companions=companions, workers=workers)
+    return Prepared(
+        plan=plan,
+        source=source,
+        mirror=mirror,
+        companions=companions,
+        scope=archive_scope.archive_pathspec(
+            loaded.workspace["data_paths"], remote=source["remote"], project_path=source["path"]
+        ),
+        workers=workers,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
