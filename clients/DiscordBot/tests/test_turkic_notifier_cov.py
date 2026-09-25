@@ -4,7 +4,9 @@ import asyncio
 
 import pytest
 from platform_core.job_events import (
+    ErrorKind,
     JobCompletedV1,
+    JobDomain,
     JobFailedV1,
     JobProgressV1,
     JobStartedV1,
@@ -110,21 +112,21 @@ async def test_handle_event_branches_calls_notify() -> None:
     )
     started: JobStartedV1 = {
         "type": "turkic.job.started.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "j1",
         "user_id": 42,
         "queue": "q",
     }
     progress: JobProgressV1 = {
         "type": "turkic.job.progress.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "j1",
         "user_id": 42,
         "progress": 5,
     }
     completed: JobCompletedV1 = {
         "type": "turkic.job.completed.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "j1",
         "user_id": 42,
         "result_id": "f",
@@ -132,10 +134,10 @@ async def test_handle_event_branches_calls_notify() -> None:
     }
     failed: JobFailedV1 = {
         "type": "turkic.job.failed.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "j2",  # Different job_id for failed to trigger new DM
         "user_id": 42,
-        "error_kind": "user",
+        "error_kind": ErrorKind.USER,
         "message": "bad",
     }
 
@@ -158,7 +160,7 @@ async def test_handle_event_unknown_type_is_noop() -> None:
     # Use a valid payload from a different domain so it is ignored
     started: JobStartedV1 = {
         "type": "digits.job.started.v1",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
         "job_id": "j1",
         "user_id": 42,
         "queue": "q",
@@ -173,10 +175,10 @@ async def test_turkic_notifier_decode_filters_domain() -> None:
     decode = sub._decode
 
     turkic_payload = encode_job_event(
-        make_started_event(domain="turkic", job_id="j1", user_id=1, queue="q")
+        make_started_event(domain=JobDomain.TURKIC, job_id="j1", user_id=1, queue="q")
     )
     other_payload = encode_job_event(
-        make_started_event(domain="digits", job_id="j2", user_id=1, queue="q")
+        make_started_event(domain=JobDomain.DIGITS, job_id="j2", user_id=1, queue="q")
     )
 
     if decode(turkic_payload) is None:

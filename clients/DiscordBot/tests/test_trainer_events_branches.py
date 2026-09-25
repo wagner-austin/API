@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from platform_core.job_events import encode_job_event, make_failed_event
+from platform_core.job_events import ErrorKind, JobDomain, encode_job_event, make_failed_event
 from platform_core.trainer_metrics_events import (
     encode_trainer_metrics_event,
     make_completed_metrics_event,
@@ -69,17 +69,17 @@ def test_decode_completed_fields() -> None:
 
 def test_decode_failed_system_error() -> None:
     ev = make_failed_event(
-        domain="trainer",
+        domain=JobDomain.TRAINER,
         job_id="r",
         user_id=1,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="stop",
     )
     out = decode_trainer_event(encode_job_event(ev))
     if out is None:
         raise AssertionError("expected decoded event")
     assert is_job_failed(out)
-    assert out["error_kind"] == "system"
+    assert out["error_kind"] is ErrorKind.SYSTEM
 
 
 def test_decode_unknown_type_returns_none() -> None:

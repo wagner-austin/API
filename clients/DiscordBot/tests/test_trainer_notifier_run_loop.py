@@ -4,7 +4,7 @@ import asyncio
 from typing import ClassVar
 
 import pytest
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_discord.subscriber import MessageSource
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
@@ -51,5 +51,5 @@ async def test_run_constructs_and_runs_subscriber() -> None:
     assert _FakeSource.instances, "expected FakeSource to be constructed"
     inst = _FakeSource.instances[-1]
     assert inst.url == "redis://unit-test"
-    assert inst.subscribed == [default_events_channel("trainer")]
+    assert inst.subscribed == [default_events_channel(JobDomain.TRAINER)]
     assert inst.closed is True

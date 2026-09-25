@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from platform_core.digits_metrics_events import DigitsConfigV1 as _DigitsConfig
-from platform_core.job_events import make_completed_event
+from platform_core.job_events import JobDomain, make_completed_event
 from platform_core.json_utils import dump_json_str
 from platform_core.trainer_metrics_events import TrainerConfigV1
 
@@ -42,7 +42,7 @@ def test_registry_decode_functions_work_minimally() -> None:
 
     # transcript
     c = make_completed_event(
-        domain="transcript",
+        domain=JobDomain.TRANSCRIPT,
         job_id="r",
         user_id=1,
         result_id="https://x",
@@ -55,7 +55,7 @@ def test_registry_decode_functions_work_minimally() -> None:
 
 def test_transcript_decode_filters_other_domains() -> None:
     other = make_completed_event(
-        domain="turkic",
+        domain=JobDomain.TURKIC,
         job_id="r2",
         user_id=1,
         result_id="file",

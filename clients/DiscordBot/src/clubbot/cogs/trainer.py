@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 from platform_core.errors import AppError, ErrorCode
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import get_logger
 from platform_core.model_trainer_client import ModelTrainerAPIError
 from platform_discord.embed_helpers import add_field, create_embed, set_footer
@@ -36,7 +36,7 @@ class TrainerCog(BaseCog):
             if b is not None:
                 redis_url = (self.config["redis"]["redis_url"] or "").strip()
                 if redis_url:
-                    channel = default_events_channel("trainer")
+                    channel = default_events_channel(JobDomain.TRAINER)
                     self._subscriber = _test_hooks.trainer_event_subscriber_factory(
                         bot=b, redis_url=redis_url, events_channel=channel
                     )

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Final, Protocol
 
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_discord.bot_subscriber import BotEventSubscriber
 from platform_discord.protocols import BotProto
 from platform_discord.subscriber import MessageSource
@@ -62,7 +62,7 @@ class TurkicEventSubscriber(BotEventSubscriber[TurkicEventV1]):
         super().__init__(
             bot,
             redis_url=redis_url,
-            events_channel=events_channel or default_events_channel("turkic"),
+            events_channel=events_channel or default_events_channel(JobDomain.TURKIC),
             task_name=_EVENT_TASK_NAME,
             decode=decode_turkic_event,
             source_factory=source_factory,

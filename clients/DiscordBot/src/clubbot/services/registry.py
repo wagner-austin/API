@@ -19,8 +19,11 @@ from platform_core.digits_metrics_events import (
     DigitsUploadV1,
 )
 from platform_core.job_events import (
-    JobEventV1,
+    JobCompletedV1,
+    JobDomain,
     JobFailedV1,
+    JobProgressV1,
+    JobStartedV1,
     decode_job_event,
     default_events_channel,
 )
@@ -44,7 +47,7 @@ DigitsEvent = (
     | None
 )
 TrainerEvent = TrainerEventV1 | None
-TranscriptEvent = JobEventV1 | None
+TranscriptEvent = JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1 | None
 
 
 class ServiceDef(TypedDict):
@@ -53,9 +56,9 @@ class ServiceDef(TypedDict):
     decode_event: Callable[[str], DigitsEvent | TrainerEvent | TranscriptEvent]
 
 
-def _decode_transcript(payload: str) -> JobEventV1 | None:
+def _decode_transcript(payload: str) -> TranscriptEvent:
     ev = decode_job_event(payload)
-    return ev if ev["domain"] == "transcript" else None
+    return ev if ev["domain"] is JobDomain.TRANSCRIPT else None
 
 
 def _decode_trainer_safe(payload: str) -> TrainerEventV1 | None:
@@ -82,12 +85,12 @@ SERVICE_REGISTRY: dict[str, ServiceDef] = {
     },
     "trainer": {
         "id": "trainer",
-        "channel": default_events_channel("trainer"),
+        "channel": default_events_channel(JobDomain.TRAINER),
         "decode_event": _decode_trainer_safe,
     },
     "transcript": {
         "id": "transcript",
-        "channel": default_events_channel("transcript"),
+        "channel": default_events_channel(JobDomain.TRANSCRIPT),
         "decode_event": _decode_transcript,
     },
 }

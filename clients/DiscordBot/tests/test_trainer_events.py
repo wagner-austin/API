@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from platform_core.job_events import encode_job_event, make_failed_event
+from platform_core.job_events import ErrorKind, JobDomain, encode_job_event, make_failed_event
 from platform_core.trainer_metrics_events import (
     encode_trainer_metrics_event,
     make_completed_metrics_event,
@@ -73,17 +73,17 @@ def test_decode_completed_roundtrip() -> None:
 
 def test_decode_failed_roundtrip() -> None:
     ev = make_failed_event(
-        domain="trainer",
+        domain=JobDomain.TRAINER,
         job_id="r1",
         user_id=123,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="oom",
     )
     out = decode_trainer_event(encode_job_event(ev))
     if out is None:
         raise AssertionError("expected decoded event")
     assert is_job_failed(out)
-    assert out["error_kind"] == "system"
+    assert out["error_kind"] is ErrorKind.SYSTEM
 
 
 logger = logging.getLogger(__name__)

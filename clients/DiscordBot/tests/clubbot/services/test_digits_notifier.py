@@ -15,7 +15,7 @@ from typing import NoReturn
 import discord
 import pytest
 from platform_core.digits_metrics_events import DigitsCompletedMetricsV1, DigitsConfigV1
-from platform_core.job_events import JobFailedV1
+from platform_core.job_events import ErrorKind, JobDomain, JobFailedV1
 from platform_discord.embed_helpers import EmbedProto
 from platform_discord.handwriting import DigitsEventV1, DigitsRuntime, RequestAction
 from platform_discord.protocols import FileProto
@@ -221,9 +221,9 @@ async def test_notify_propagates_forbidden() -> None:
         "type": "digits.job.failed.v1",
         "job_id": "r_forbidden",
         "user_id": 999,
-        "error_kind": "system",
+        "error_kind": ErrorKind.SYSTEM,
         "message": "Test error",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
     }
     with pytest.raises(Forbidden):
         await sub._handle_event(event)

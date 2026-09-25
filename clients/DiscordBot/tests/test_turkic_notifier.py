@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 from platform_core.job_events import (
+    ErrorKind,
     JobCompletedV1,
+    JobDomain,
     JobFailedV1,
     JobProgressV1,
     JobStartedV1,
@@ -24,7 +26,7 @@ async def test_turkic_notifier_handles_events_from_user_id() -> None:
     await sub._handle_event(
         JobStartedV1(
             type="turkic.job.started.v1",
-            domain="turkic",
+            domain=JobDomain.TURKIC,
             job_id="j",
             user_id=42,
             queue="turkic",
@@ -33,7 +35,7 @@ async def test_turkic_notifier_handles_events_from_user_id() -> None:
     await sub._handle_event(
         JobProgressV1(
             type="turkic.job.progress.v1",
-            domain="turkic",
+            domain=JobDomain.TURKIC,
             job_id="j",
             user_id=42,
             progress=10,
@@ -42,7 +44,7 @@ async def test_turkic_notifier_handles_events_from_user_id() -> None:
     await sub._handle_event(
         JobCompletedV1(
             type="turkic.job.completed.v1",
-            domain="turkic",
+            domain=JobDomain.TURKIC,
             job_id="j",
             user_id=42,
             result_id="fid",
@@ -60,10 +62,10 @@ async def test_turkic_notifier_handles_failed_event() -> None:
     await sub._handle_event(
         JobFailedV1(
             type="turkic.job.failed.v1",
-            domain="turkic",
+            domain=JobDomain.TURKIC,
             job_id="j2",
             user_id=42,
-            error_kind="system",
+            error_kind=ErrorKind.SYSTEM,
             message="x",
         )
     )

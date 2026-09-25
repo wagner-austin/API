@@ -4,10 +4,10 @@ import asyncio
 from collections.abc import Awaitable, Callable
 
 import pytest
-from platform_core.job_events import JobEventV1
 from platform_discord.discord_types import EmbedProto as EmbedType
 from platform_discord.embed_helpers import EmbedData, EmbedFieldData
 from platform_discord.subscriber import MessageSource
+from platform_discord.turkic import TurkicEventV1
 
 from clubbot.services.jobs.turkic_notifier import TurkicEventSubscriber
 from tests.support.discord_fakes import FakeBot, FakeMessageSource
@@ -35,8 +35,8 @@ class _StubSubscriber:
         *,
         channel: str,
         source: MessageSource,
-        decode: Callable[[str], JobEventV1 | None],
-        handle: Callable[[JobEventV1], Awaitable[None]],
+        decode: Callable[[str], TurkicEventV1 | None],
+        handle: Callable[[TurkicEventV1], Awaitable[None]],
     ) -> None:
         _ = (channel, source, decode, handle)
         self.ran = False

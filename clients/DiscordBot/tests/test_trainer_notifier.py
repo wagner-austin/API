@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from platform_core.job_events import JobFailedV1, make_failed_event
+from platform_core.job_events import ErrorKind, JobDomain, JobFailedV1, make_failed_event
 from platform_core.trainer_metrics_events import (
     TrainerCompletedMetricsV1,
     TrainerConfigV1,
@@ -92,10 +92,10 @@ def _completed() -> TrainerCompletedMetricsV1:
 
 def _failed() -> JobFailedV1:
     return make_failed_event(
-        domain="trainer",
+        domain=JobDomain.TRAINER,
         job_id="r",
         user_id=1,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="boom",
     )
 

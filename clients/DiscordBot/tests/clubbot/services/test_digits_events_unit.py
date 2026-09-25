@@ -13,7 +13,7 @@ from platform_core.digits_metrics_events import (
     DigitsEpochMetricsV1,
     encode_digits_metrics_event,
 )
-from platform_core.job_events import JobFailedV1
+from platform_core.job_events import ErrorKind, JobDomain, JobFailedV1
 from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
 
 
@@ -72,9 +72,9 @@ def test_digits_events_encode_decode_roundtrip() -> None:
         "type": "digits.job.failed.v1",
         "job_id": "r1",
         "user_id": 1,
-        "error_kind": "system",
+        "error_kind": ErrorKind.SYSTEM,
         "message": "boom",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
     }
     from platform_core.job_events import decode_job_event, encode_job_event
 
