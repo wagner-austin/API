@@ -3,18 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, TypedDict
 
+from platform_core.job_types import JobStatus
+
 
 def turkic_job_key(job_id: str) -> str:
     return f"turkic:job:{job_id}"
 
 
-JobStatusLiteral = Literal["queued", "processing", "completed", "failed"]
-
-
 class TurkicJobStatus(TypedDict):
     job_id: str
     user_id: int
-    status: JobStatusLiteral
+    status: JobStatus
     progress: int
     message: str | None
     result_url: str | None
@@ -26,7 +25,6 @@ class TurkicJobStatus(TypedDict):
 
 
 __all__ = [
-    "JobStatusLiteral",
     "TurkicJobStatus",
     "turkic_job_key",
 ]
