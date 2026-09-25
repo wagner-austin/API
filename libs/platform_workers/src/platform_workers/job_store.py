@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Generic, Protocol, TypeVar
 
-from platform_core.job_types import BaseJobStatus, JobStatusLiteral, job_key
+from platform_core.job_types import BaseJobStatus, JobStatus, job_key
 from platform_core.json_utils import JSONTypeError
+from platform_core.members import as_member
 
 from platform_workers.redis import RedisStrProto
 
@@ -45,20 +46,16 @@ class BaseJobStore(Generic[TStatus]):
         return self._encoder.decode(job_id, raw)
 
 
-def parse_status(raw: dict[str, str]) -> JobStatusLiteral:
-    """Parse a status field from a Redis hash."""
+def parse_status(raw: dict[str, str]) -> JobStatus:
+    """Parse a status field from a Redis hash.
+
+    Raises:
+        JSONTypeError: if the field is absent or names no JobStatus member.
+    """
     status_raw = raw.get("status")
     if status_raw is None:
         raise JSONTypeError("missing status in redis store")
-    if status_raw == "queued":
-        return "queued"
-    if status_raw == "processing":
-        return "processing"
-    if status_raw == "completed":
-        return "completed"
-    if status_raw == "failed":
-        return "failed"
-    raise JSONTypeError("invalid status in redis store")
+    return as_member(status_raw, "status", JobStatus)
 
 
 def parse_int_field(raw: dict[str, str], key: str) -> int:

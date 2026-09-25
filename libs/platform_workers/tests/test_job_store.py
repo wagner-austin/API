@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 import pytest
-from platform_core.job_types import BaseJobStatus, JobStatusLiteral
+from platform_core.job_types import BaseJobStatus, JobStatus
 from platform_core.json_utils import JSONTypeError
 
 from platform_workers.job_store import (
@@ -60,7 +60,7 @@ def test_base_job_store_round_trip() -> None:
     status: _SampleStatus = {
         "job_id": "job-1",
         "user_id": 9,
-        "status": "processing",
+        "status": JobStatus.PROCESSING,
         "progress": 10,
         "message": "started",
         "created_at": now,
@@ -80,27 +80,31 @@ def test_base_job_store_round_trip() -> None:
 @pytest.mark.parametrize(
     ("raw", "message"),
     [
-        ({"status": "unknown"}, "invalid status in redis store"),
+        (
+            {"status": "unknown"},
+            "Invalid status 'unknown': must be one of "
+            "'queued', 'processing', 'completed', 'failed'",
+        ),
         ({}, "missing status in redis store"),
     ],
 )
 def test_parse_status_errors(raw: dict[str, str], message: str) -> None:
     with pytest.raises(JSONTypeError) as excinfo:
         parse_status(raw)
-    assert message in str(excinfo.value)
+    assert str(excinfo.value) == message
 
 
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        ("queued", "queued"),
-        ("processing", "processing"),
-        ("completed", "completed"),
-        ("failed", "failed"),
+        ("queued", JobStatus.QUEUED),
+        ("processing", JobStatus.PROCESSING),
+        ("completed", JobStatus.COMPLETED),
+        ("failed", JobStatus.FAILED),
     ],
 )
-def test_parse_status_success(value: str, expected: JobStatusLiteral) -> None:
-    assert parse_status({"status": value}) == expected
+def test_parse_status_success(value: str, expected: JobStatus) -> None:
+    assert parse_status({"status": value}) is expected
 
 
 def test_parse_int_field_validates() -> None:
