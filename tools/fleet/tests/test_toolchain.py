@@ -31,7 +31,15 @@ from fleet.contracts.toolchain import (
     version_number,
 )
 from fleet.core import _test_hooks, dialect_linux, dialect_windows, toolchain
-from tests._toolchain_fixtures import DIPHTHERIA, LAVENDER, LOKI, SEDONA, WRONG_PYTHON, node
+from tests._toolchain_fixtures import (
+    DIPHTHERIA,
+    LAVENDER,
+    LOKI,
+    SEDONA,
+    SEDONA_2026_09_23,
+    WRONG_PYTHON,
+    node,
+)
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -148,7 +156,9 @@ class TestParseProbe:
 
 
 class TestReadiness:
-    def test_loki_is_ready(self) -> None:
+    def test_loki_has_every_tool_it_was_asked_for_and_the_right_python(self) -> None:
+        """Not READY: its 2026-09-04 probe predates the node question, and an
+        unanswered floor is not a met one (test_toolchain_readiness)."""
         assert missing(toolchain.parse_probe(LOKI)) == ()
         assert python_is_right(toolchain.parse_probe(LOKI))
 
@@ -194,7 +204,7 @@ class TestVersionNumber:
 
 class TestDescribeGap:
     def test_a_ready_node_says_so(self) -> None:
-        assert describe_gap("loki", toolchain.parse_probe(LOKI)) == "loki: ready"
+        assert describe_gap("sedona", toolchain.parse_probe(SEDONA_2026_09_23)) == "sedona: ready"
 
     def test_it_names_the_install_command(self) -> None:
         """The reader's next question is always how to fix it."""
@@ -224,7 +234,7 @@ class TestDescribeGap:
 
 class TestRequireReady:
     def test_a_ready_node_passes(self) -> None:
-        toolchain.require_ready("loki", node("loki"), toolchain.parse_probe(LOKI))
+        toolchain.require_ready("sedona", node("sedona"), toolchain.parse_probe(SEDONA_2026_09_23))
 
     def test_a_missing_tool_names_every_one_and_why(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -309,18 +319,18 @@ class TestToolReportCodec:
 
 class TestBootstrapCommand:
     def test_a_ready_fleet_exits_zero(self, config_path: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun([ok(""), ok(LOKI), ok(""), ok(LOKI)])
+        _test_hooks.run = FakeRun([ok(""), ok(SEDONA_2026_09_23), ok(""), ok(SEDONA_2026_09_23)])
 
         assert bootstrap.main([_config.CONFIG_FLAG, str(config_path)]) == 0
 
     def test_an_unready_node_exits_one(self, config_path: pathlib.Path) -> None:
         """Usable as a gate in front of a dispatch, not something to read."""
-        _test_hooks.run = FakeRun([ok(""), ok(LAVENDER), ok(""), ok(LOKI)])
+        _test_hooks.run = FakeRun([ok(""), ok(LAVENDER), ok(""), ok(SEDONA_2026_09_23)])
 
         assert bootstrap.main([_config.CONFIG_FLAG, str(config_path)]) == 1
 
     def test_a_named_node_is_asked_alone(self, config_path: pathlib.Path) -> None:
-        runner = FakeRun([ok(""), ok(LOKI)])
+        runner = FakeRun([ok(""), ok(SEDONA_2026_09_23)])
         _test_hooks.run = runner
 
         assert (
@@ -354,7 +364,7 @@ class TestBootstrapCommand:
         """Re-probed rather than assumed: an install that ran is not an
         install that worked."""
         _test_hooks.run = FakeRun(
-            [ok(""), ok(SEDONA), ok(""), ok("installing make"), ok(""), ok(LOKI)]
+            [ok(""), ok(SEDONA), ok(""), ok("installing make"), ok(""), ok(SEDONA_2026_09_23)]
         )
 
         assert (

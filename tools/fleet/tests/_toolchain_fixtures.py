@@ -127,6 +127,24 @@ DIPHTHERIA_2026_09_23 = (
     "pipx=yes=1.4.3\n"
 )
 
+#: What serendipity answered, 2026-09-25 20:5xZ, verbatim: every tool present
+#: and Python 3.11, and Node.js v18.13.0, which the contract called ready
+#: until that day. It claimed MCPs/packages/wiki-search (dispatch job
+#: de32d61e) and failed rebuilding hnswlib-node before any test ran.
+SERENDIPITY_2026_09_25 = (
+    "python=yes=Python 3.11.1\n"
+    "poetry=yes=Poetry (version 2.5.1)\n"
+    "git=yes=git version 2.41.0.windows.1\n"
+    "make=yes=GNU Make 3.81\n"
+    "node=yes=v18.13.0\n"
+    "tar=yes=bsdtar 3.8.8 - libarchive 3.8.8 zlib/1.2.13.1-motley liblzma/5.8.3 "
+    "bz2lib/1.0.8 libzstd/1.5.7 cng/2.0 libb2/bundled\n"
+    "winget=yes=v1.29.380\n"
+    "choco=no=\n"
+    "pip=yes=pip 22.3.1 from C:\\Users\\austi\\AppData\\Local\\Programs\\Python\\Python311"
+    "\\Lib\\site-packages\\pip (python 3.11)\n"
+)
+
 #: A node carrying the wrong interpreter, which no probed Windows node did.
 WRONG_PYTHON = LOKI.replace("Python 3.11.9", "Python 3.12.4")
 
@@ -167,6 +185,7 @@ __all__ = [
     "LOKI",
     "SEDONA",
     "SEDONA_2026_09_23",
+    "SERENDIPITY_2026_09_25",
     "WRONG_PYTHON",
     "node",
 ]

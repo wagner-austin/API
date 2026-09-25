@@ -26,7 +26,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue
-from tests._toolchain_fixtures import LAVENDER_STORE_STUB, WRONG_PYTHON
+from tests._toolchain_fixtures import LAVENDER_STORE_STUB, SERENDIPITY_2026_09_25, WRONG_PYTHON
 from tests.conftest import PROBE_OK, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -72,7 +72,8 @@ class TestAToolchainThatCanBuild:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-2:] == [
-            "lavender toolchain ready: python 3.11.9; poetry, git, make, node, tar present",
+            "lavender toolchain ready: python 3.11.9; node v24.20.0; "
+            "poetry, git, make, tar present",
             "nothing in the node lane for lavender",
         ]
 
@@ -101,6 +102,21 @@ class TestAToolchainThatCannotBuild:
             m.startswith(
                 "lavender cannot build; claiming nothing: NODE_PYTHON_MISMATCH: "
                 "lavender (lavender) reports Python 'Python 3.12.4' where 3.11 is required"
+            )
+            for m in messages
+        )
+
+    def test_node_18_claims_nothing_with_its_own_code(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Serendipity's real answer on 2026-09-25, when it took an MCPs check
+        and failed at node-gyp: now the lane is left alone."""
+        messages = _tick(sourced_config, ok(SERENDIPITY_2026_09_25), caplog)
+
+        assert any(
+            m.startswith(
+                "lavender cannot build; claiming nothing: NODE_NODEJS_MISMATCH: "
+                "lavender (lavender) reports Node.js 'v18.13.0' where 24 or newer is required"
             )
             for m in messages
         )

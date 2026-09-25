@@ -25,13 +25,16 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
+    REQUIRED_NODE_MAJOR,
     REQUIRED_PYTHON,
     REQUIRED_TOOLS,
     ToolReport,
     available_managers,
     install_command,
     missing,
+    node_is_right,
     python_is_right,
+    reported_version,
     version_number,
 )
 from fleet.core import dialect, names, remote
@@ -177,9 +180,10 @@ def readiness_gap(
         raised: ``NODE_TOOL_MISSING`` naming every absent tool, why a build
         needs it and what would install it on THIS node, or
         ``NODE_PYTHON_MISMATCH`` when everything is present but the
-        interpreter is the wrong minor version. Two codes because the fixes
-        differ: one is a package manager, the other is a decision about which
-        Python that machine should carry.
+        interpreter is the wrong minor version, or ``NODE_NODEJS_MISMATCH``
+        when Node.js is older than :data:`REQUIRED_NODE_MAJOR`. Separate
+        codes because the fixes differ: one is a package manager, the others
+        are a decision about which runtime that machine should carry.
     """
     absent = missing(reports)
     if absent:
@@ -199,9 +203,17 @@ def readiness_gap(
         return AppError(
             FleetErrorCode.NODE_PYTHON_MISMATCH,
             f"{node_name} ({node['host']}) reports Python "
-            f"{_python_version(reports)!r} where {REQUIRED_PYTHON} is required; every project "
-            "resolves its lockfile against that minor version, so a build here would fail "
-            "resolving rather than testing",
+            f"{reported_version(reports, 'python')!r} where {REQUIRED_PYTHON} is required; "
+            "every project resolves its lockfile against that minor version, so a build here "
+            "would fail resolving rather than testing",
+        )
+    if not node_is_right(reports):
+        return AppError(
+            FleetErrorCode.NODE_NODEJS_MISMATCH,
+            f"{node_name} ({node['host']}) reports Node.js "
+            f"{reported_version(reports, 'node')!r} where {REQUIRED_NODE_MAJOR} or newer is "
+            "required; the TypeScript projects declare that engine, and native modules they "
+            "install fail to build under an older one",
         )
     return None
 
@@ -213,25 +225,30 @@ def ready_summary(reports: tuple[ToolReport, ...]) -> str:
     same for a node that reported six tools and for one whose probe named
     one, and only the first is a pass.
 
-    Only python's version is printed because only python's version is
-    judged; the trailing-token rule that reads it would call bsdtar's banner
-    ``libb2/bundled``, so the other tools are named, not versioned.
+    Only python's and node's versions are printed because only theirs are
+    judged; the trailing-token rule that reads them would call bsdtar's
+    banner ``libb2/bundled``, so the other tools are named, not versioned.
 
     Args:
         reports: What a node answered, already judged ready.
 
     Returns:
-        ``python <number>; <tool>, <tool> present``, the other required tools
-        in the contract's order, e.g. ``python 3.11.9; poetry, git, make,
-        node, tar present``.
+        ``python <number>; node <number>; <tool>, <tool> present``, the other
+        required tools in the contract's order, e.g. ``python 3.11.9; node
+        v24.20.0; poetry, git, make, tar present``.
     """
+    judged = {"python", "node"}
     present = [
         tool["name"]
         for tool in REQUIRED_TOOLS
-        if tool["name"] != "python"
+        if tool["name"] not in judged
         and any(report["name"] == tool["name"] and report["present"] for report in reports)
     ]
-    return f"python {version_number(_python_version(reports))}; {', '.join(present)} present"
+    return (
+        f"python {version_number(reported_version(reports, 'python'))}; "
+        f"node {version_number(reported_version(reports, 'node'))}; "
+        f"{', '.join(present)} present"
+    )
 
 
 def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, ...]) -> None:
@@ -250,21 +267,6 @@ def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, .
     gap = readiness_gap(node_name, node, reports)
     if gap is not None:
         raise gap
-
-
-def _python_version(reports: tuple[ToolReport, ...]) -> str:
-    """Read the node's reported Python version.
-
-    Args:
-        reports: What it answered.
-
-    Returns:
-        The version string, or ``unknown`` when it did not say.
-    """
-    for report in reports:
-        if report["name"] == "python":
-            return report["version"] or "unknown"
-    return "unknown"
 
 
 def install_script(

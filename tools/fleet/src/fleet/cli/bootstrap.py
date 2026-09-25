@@ -39,7 +39,7 @@ from platform_core.logging import get_logger, setup_logging
 
 from fleet.cli import _config
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.toolchain import ToolReport, describe_gap, missing, python_is_right
+from fleet.contracts.toolchain import describe_gap, is_ready
 from fleet.contracts.workspace import require_node
 from fleet.core import toolchain
 
@@ -49,21 +49,6 @@ NODE_FLAG = "--node"
 INSTALL_FLAG = "--install"
 
 _FLAGS = (_config.CONFIG_FLAG, NODE_FLAG)
-
-
-def is_ready(reports: tuple[ToolReport, ...]) -> bool:
-    """Whether a node can run a build as it stands.
-
-    Args:
-        reports: What it answered when probed.
-
-    Returns:
-        True when nothing is absent and the interpreter is the right minor
-        version. Both conditions, because a node with every tool present and
-        the wrong Python fails at lockfile resolution, which reads as a
-        broken project rather than a misconfigured node.
-    """
-    return not missing(reports) and python_is_right(reports)
 
 
 def bootstrap_node(name: str, node: NodeConfig, *, install: bool) -> tuple[str, bool]:
@@ -153,7 +138,7 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["bootstrap_node", "entrypoint", "is_ready", "main"]
+__all__ = ["bootstrap_node", "entrypoint", "main"]
 
 
 # Without this, `python -m fleet.cli.bootstrap` imports the module, runs

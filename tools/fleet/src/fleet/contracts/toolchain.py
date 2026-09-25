@@ -252,6 +252,17 @@ PACKAGE_MANAGERS: Final[tuple[str, ...]] = ("pip", "pipx", "winget", "choco", "a
 #: dependency set from the lockfile every project here pins.
 REQUIRED_PYTHON = "3.11"
 
+#: The oldest Node major a project's check is built against.
+#:
+#: A floor rather than a prefix like :data:`REQUIRED_PYTHON`, because the
+#: requirement is one: MCPs declares ``engines.node >=24`` and its CI runs 24,
+#: and a newer major only ever meets it. ``node`` was judged on presence
+#: alone until 2026-09-25, when serendipity answered ``v18.13.0`` (npm
+#: 8.19.3), was called ready, claimed MCPs/packages/wiki-search and failed
+#: rebuilding hnswlib-node under node-gyp before any test ran (dispatch job
+#: de32d61e, MCPs board task fd5cabfa).
+REQUIRED_NODE_MAJOR = 24
+
 
 def missing(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
     """Name the REQUIRED tools a node does not have.
@@ -322,6 +333,42 @@ def python_is_right(reports: tuple[ToolReport, ...]) -> bool:
     return False
 
 
+def node_is_right(reports: tuple[ToolReport, ...]) -> bool:
+    """Whether the node's Node.js is at least :data:`REQUIRED_NODE_MAJOR`.
+
+    Args:
+        reports: What the node answered.
+
+    Returns:
+        True when a ``node`` report is present and its version (``v24.20.0``,
+        the leading ``v`` optional) has a whole-number major at or above the
+        floor. False for a node that reported no Node, as
+        :func:`python_is_right` is for Python, and for a version whose major
+        is not a number, which no real ``node --version`` prints.
+    """
+    for report in reports:
+        if report["name"] == "node":
+            major = version_number(report["version"]).removeprefix("v").split(".")[0]
+            return report["present"] and major.isdigit() and int(major) >= REQUIRED_NODE_MAJOR
+    return False
+
+
+def is_ready(reports: tuple[ToolReport, ...]) -> bool:
+    """Whether a node can run a build as it stands.
+
+    Args:
+        reports: What it answered when probed.
+
+    Returns:
+        True when nothing is absent, the interpreter is the right minor
+        version and Node.js is at the floor. All three, because a node with
+        every tool present and the wrong runtime fails at lockfile resolution
+        or at a native build, which reads as a broken project rather than a
+        misconfigured node.
+    """
+    return not missing(reports) and python_is_right(reports) and node_is_right(reports)
+
+
 def available_managers(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
     """Name the package managers this node actually has, in preference order.
 
@@ -374,9 +421,9 @@ def describe_gap(node: str, reports: tuple[ToolReport, ...]) -> str:
         fleet does not share a package manager: the same missing ``make`` is
         a winget command on lavender and a choco one on loki.
     """
-    absent = missing(reports)
-    if not absent and python_is_right(reports):
+    if is_ready(reports):
         return f"{node}: ready"
+    absent = missing(reports)
     managers = available_managers(reports)
     wanted = {tool["name"] for tool in REQUIRED_TOOLS}
     parts = [
@@ -385,11 +432,13 @@ def describe_gap(node: str, reports: tuple[ToolReport, ...]) -> str:
         if name in wanted
     ]
     if not python_is_right(reports) and "python" not in absent:
-        parts.append(f"python {REQUIRED_PYTHON} (found {_version_of(reports, 'python')})")
+        parts.append(f"python {REQUIRED_PYTHON} (found {reported_version(reports, 'python')})")
+    if not node_is_right(reports) and "node" not in absent:
+        parts.append(f"node {REQUIRED_NODE_MAJOR}+ (found {reported_version(reports, 'node')})")
     return f"{node}: missing {', '.join(parts)}"
 
 
-def _version_of(reports: tuple[ToolReport, ...], name: str) -> str:
+def reported_version(reports: tuple[ToolReport, ...], name: str) -> str:
     """Read one tool's reported version.
 
     Args:
@@ -455,6 +504,7 @@ __all__ = [
     "PINNED_PYTHON",
     "PYTHON_REGISTERED_GUARD",
     "PYTHON_REGISTERED_MESSAGE",
+    "REQUIRED_NODE_MAJOR",
     "REQUIRED_PYTHON",
     "REQUIRED_TOOLS",
     "RequiredTool",
@@ -464,7 +514,10 @@ __all__ = [
     "describe_gap",
     "encode_tool_report",
     "install_command",
+    "is_ready",
     "missing",
+    "node_is_right",
     "python_is_right",
+    "reported_version",
     "version_number",
 ]
