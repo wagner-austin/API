@@ -16,7 +16,7 @@ from platform_core.digits_metrics_events import (
     make_epoch_metrics_event,
     make_upload_event,
 )
-from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import DIGITS_QUEUE as _DIGITS_QUEUE
@@ -36,8 +36,7 @@ from handwriting_ai.training.mnist_train import (
 )
 from handwriting_ai.training.progress import BatchProgressEmitter, BestEmitter, EpochEmitter
 
-_DIGITS_DOMAIN: JobDomain = "digits"
-DEFAULT_EVENTS_CHANNEL: Final[str] = default_events_channel(_DIGITS_DOMAIN)
+DEFAULT_EVENTS_CHANNEL: Final[str] = default_events_channel(JobDomain.DIGITS)
 
 
 class DigitsTrainJobV1(TypedDict):
@@ -283,8 +282,8 @@ def _decode_and_process_train_job(payload: dict[str, JSONValue]) -> None:
     try:
         job_ctx = _test_hooks.make_job_context(
             redis=redis_client,
-            domain=_DIGITS_DOMAIN,
-            events_channel=default_events_channel(_DIGITS_DOMAIN),
+            domain=JobDomain.DIGITS,
+            events_channel=DEFAULT_EVENTS_CHANNEL,
             job_id=p["request_id"],
             user_id=p["user_id"],
             queue_name=queue_name,
@@ -339,7 +338,7 @@ def _decode_and_process_train_job(payload: dict[str, JSONValue]) -> None:
             "training_failed error=%s", _summarize_training_exception(exc)
         )
         if job_ctx:
-            job_ctx.publish_failed("system", _summarize_training_exception(exc))
+            job_ctx.publish_failed(ErrorKind.SYSTEM, _summarize_training_exception(exc))
         raise
     finally:
         if training_progress_module is not None:

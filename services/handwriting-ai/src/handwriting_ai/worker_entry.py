@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from platform_core.config import _require_env_str
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import get_logger, setup_logging
 from platform_core.queues import DIGITS_QUEUE
 from platform_workers.rq_harness import WorkerConfig
@@ -31,7 +31,7 @@ def _build_config() -> WorkerConfig:
     return {
         "redis_url": redis_url,
         "queue_name": DIGITS_QUEUE,
-        "events_channel": default_events_channel("digits"),
+        "events_channel": default_events_channel(JobDomain.DIGITS),
     }
 
 

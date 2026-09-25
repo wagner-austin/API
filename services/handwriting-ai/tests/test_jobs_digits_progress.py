@@ -5,7 +5,7 @@ from typing import Protocol
 
 import pytest
 from PIL import Image
-from platform_core.job_events import JobEventV1, decode_job_event, is_progress
+from platform_core.job_events import decode_job_event, is_progress
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_workers.testing import FakeRedis, FakeRedisPublishError
 
@@ -114,9 +114,7 @@ def test_process_train_job_emits_progress(
 
     dj._decode_and_process_train_job(payload)
 
-    events: list[JobEventV1] = [
-        decode_job_event(record.payload) for record in digits_redis.published
-    ]
+    events = [decode_job_event(record.payload) for record in digits_redis.published]
     event_types = {ev["type"] for ev in events}
     assert "digits.job.started.v1" in event_types
     assert "digits.job.completed.v1" in event_types
