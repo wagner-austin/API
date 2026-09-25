@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Literal
 
 import pytest
 from platform_core.job_events import (
+    ErrorKind,
     JobCompletedV1,
+    JobDomain,
     JobFailedV1,
     JobProgressV1,
     JobStartedV1,
@@ -16,7 +17,6 @@ from platform_core.job_events import (
 
 from platform_discord.testing import fake_load_discord_module, hooks
 from platform_discord.turkic.handler import (
-    _narrow_turkic,
     decode_turkic_event,
     handle_turkic_event,
     is_completed,
@@ -37,7 +37,7 @@ def _use_fake_discord() -> Generator[None, None, None]:
 def _make_started_event(job_id: str, user_id: int, queue: str = "turkic") -> JobStartedV1:
     return {
         "type": "turkic.job.started.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": job_id,
         "user_id": user_id,
         "queue": queue,
@@ -49,7 +49,7 @@ def _make_progress_event(
 ) -> JobProgressV1:
     ev: JobProgressV1 = {
         "type": "turkic.job.progress.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": job_id,
         "user_id": user_id,
         "progress": progress,
@@ -64,7 +64,7 @@ def _make_completed_event(
 ) -> JobCompletedV1:
     return {
         "type": "turkic.job.completed.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": job_id,
         "user_id": user_id,
         "result_id": result_id,
@@ -73,11 +73,11 @@ def _make_completed_event(
 
 
 def _make_failed_event(
-    job_id: str, user_id: int, error_kind: Literal["user", "system"], message: str
+    job_id: str, user_id: int, error_kind: ErrorKind, message: str
 ) -> JobFailedV1:
     return {
         "type": "turkic.job.failed.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": job_id,
         "user_id": user_id,
         "error_kind": error_kind,
@@ -117,7 +117,7 @@ def test_decode_completed_event() -> None:
 
 def test_decode_failed_event() -> None:
     ev = _make_failed_event(
-        job_id="job-4", user_id=13, error_kind="system", message="error occurred"
+        job_id="job-4", user_id=13, error_kind=ErrorKind.SYSTEM, message="error occurred"
     )
     payload = encode_job_event(ev)
     decoded = decode_turkic_event(payload)
@@ -137,7 +137,7 @@ def test_decode_non_turkic_domain_returns_none() -> None:
     """Events from other domains should be ignored."""
     ev: JobStartedV1 = {
         "type": "digits.job.started.v1",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
         "job_id": "other-1",
         "user_id": 1,
         "queue": "digits",
@@ -191,7 +191,9 @@ def test_handle_completed_event() -> None:
 
 def test_handle_failed_event() -> None:
     rt = new_runtime()
-    ev = _make_failed_event(job_id="h-4", user_id=4, error_kind="user", message="job failed")
+    ev = _make_failed_event(
+        job_id="h-4", user_id=4, error_kind=ErrorKind.USER, message="job failed"
+    )
     result = handle_turkic_event(rt, ev)
     if result is None:
         pytest.fail("expected result")
@@ -205,7 +207,7 @@ def test_handle_null_user_id_returns_no_embed() -> None:
     # Create event with user_id that will be treated as None
     ev: JobStartedV1 = {
         "type": "turkic.job.started.v1",
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "null-user",
         "user_id": 0,  # Will be treated as invalid
         "queue": "turkic",
@@ -223,7 +225,7 @@ def test_type_guards() -> None:
     started: JobStartedV1 = _make_started_event("t1", 1)
     progress: JobProgressV1 = _make_progress_event("t2", 2, 50)
     completed: JobCompletedV1 = _make_completed_event("t3", 3, "r", 100)
-    failed: JobFailedV1 = _make_failed_event("t4", 4, "system", "err")
+    failed: JobFailedV1 = _make_failed_event("t4", 4, ErrorKind.SYSTEM, "err")
 
     assert is_started(started)
     assert not is_started(progress)
@@ -251,30 +253,13 @@ def test_decode_turkic_unknown_type_returns_none() -> None:
     # decode_job_event raises JSONTypeError for invalid suffixes like "queued"
     ev: JobStartedV1 = {
         "type": "turkic.job.queued.v1",  # Not a recognized suffix
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "unknown-1",
         "user_id": 1,
         "queue": "turkic",
     }
     payload = encode_job_event(ev)
     assert decode_turkic_event(payload) is None
-
-
-def test_narrow_turkic_returns_none_for_unrecognized_type() -> None:
-    """_narrow_turkic returns None when event type doesn't match any TypeGuard."""
-    from platform_core.job_events import JobEventV1
-
-    # Create a raw dict that satisfies JobEventV1 structurally but has unrecognized type
-    # This bypasses decode_job_event validation to test _narrow_turkic directly
-    ev: JobEventV1 = {
-        "type": "turkic.job.unknown.v1",  # Unrecognized suffix
-        "domain": "turkic",
-        "job_id": "test-narrow",
-        "user_id": 1,
-        "queue": "turkic",
-    }
-    result = _narrow_turkic(ev)
-    assert result is None
 
 
 def test_handle_unknown_event_type_returns_none() -> None:
@@ -284,7 +269,7 @@ def test_handle_unknown_event_type_returns_none() -> None:
     # We'll use JobStartedV1 but change the type field after
     ev: JobStartedV1 = {
         "type": "turkic.job.queued.v1",  # Unrecognized type
-        "domain": "turkic",
+        "domain": JobDomain.TURKIC,
         "job_id": "unknown-2",
         "user_id": 1,
         "queue": "turkic",

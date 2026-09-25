@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
-from platform_core.job_events import encode_job_event, make_failed_event
+from platform_core.job_events import ErrorKind, JobDomain, encode_job_event, make_failed_event
 from platform_core.trainer_metrics_events import (
     encode_trainer_metrics_event,
     make_completed_metrics_event,
@@ -81,10 +81,10 @@ def test_decode_completed_event() -> None:
 
 def test_decode_failed_job_event() -> None:
     ev = make_failed_event(
-        domain="trainer",
+        domain=JobDomain.TRAINER,
         job_id="run-4",
         user_id=13,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="training exploded",
     )
     payload = encode_job_event(ev)
@@ -105,7 +105,7 @@ def test_decode_non_failed_job_event_returns_none() -> None:
     from platform_core.job_events import encode_job_event, make_started_event
 
     # A started event for trainer domain should not be handled (only failed events)
-    ev = make_started_event(domain="trainer", job_id="s-1", user_id=1, queue="q")
+    ev = make_started_event(domain=JobDomain.TRAINER, job_id="s-1", user_id=1, queue="q")
     payload = encode_job_event(ev)
     assert decode_trainer_event(payload) is None
 
@@ -113,10 +113,10 @@ def test_decode_non_failed_job_event_returns_none() -> None:
 def test_decode_non_trainer_failed_event_returns_none() -> None:
     """Test that failed job events for non-trainer domains return None."""
     ev = make_failed_event(
-        domain="turkic",  # Not trainer domain
+        domain=JobDomain.TURKIC,  # Not trainer domain
         job_id="t-1",
         user_id=1,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="boom",
     )
     payload = encode_job_event(ev)
@@ -178,10 +178,10 @@ def test_handle_completed_event() -> None:
 def test_handle_failed_event() -> None:
     rt = new_runtime()
     ev = make_failed_event(
-        domain="trainer",
+        domain=JobDomain.TRAINER,
         job_id="h-4",
         user_id=4,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="boom",
     )
     result = handle_trainer_event(rt, ev)
@@ -199,10 +199,10 @@ def test_handle_unknown_event_type_returns_none() -> None:
     # The TypeGuard checks for ".job.failed." in type, so we use a different pattern
     event: JobFailedV1 = {
         "type": "trainer.unexpected.event.v1",  # No ".job.failed." pattern
-        "domain": "trainer",
+        "domain": JobDomain.TRAINER,
         "job_id": "fake",
         "user_id": 1,
-        "error_kind": "system",
+        "error_kind": ErrorKind.SYSTEM,
         "message": "test",
     }
     result = handle_trainer_event(rt, event)

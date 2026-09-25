@@ -16,7 +16,7 @@ from typing import TypeGuard
 
 from platform_core.job_events import (
     JobCompletedV1,
-    JobEventV1,
+    JobDomain,
     JobFailedV1,
     JobProgressV1,
     JobStartedV1,
@@ -39,50 +39,37 @@ TurkicEventV1 = JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1
 _logger = get_logger(__name__)
 
 
-def _narrow_turkic(ev: JobEventV1) -> TurkicEventV1 | None:
-    """Narrow JobEventV1 to TurkicEventV1 if type matches, else None."""
-    if is_started(ev):
-        return ev
-    if is_progress(ev):
-        return ev
-    if is_completed(ev):
-        return ev
-    if is_failed(ev):
-        return ev
-    return None
-
-
 def decode_turkic_event(payload: str) -> TurkicEventV1 | None:
     """Decode a turkic event from JSON payload.
 
     Returns None if the payload is not a recognized turkic event.
     """
     try:
-        ev: JobEventV1 = decode_job_event(payload)
+        ev: TurkicEventV1 = decode_job_event(payload)
     except (InvalidJsonError, JSONTypeError):
         _logger.debug("Payload is not a recognized turkic event")
         return None
-    if ev["domain"] != "turkic":
+    if ev["domain"] is not JobDomain.TURKIC:
         return None
-    return _narrow_turkic(ev)
+    return ev
 
 
-def is_started(event: JobEventV1) -> TypeGuard[JobStartedV1]:
+def is_started(event: TurkicEventV1) -> TypeGuard[JobStartedV1]:
     """Check if the event is a started event."""
     return event.get("type") == "turkic.job.started.v1"
 
 
-def is_progress(event: JobEventV1) -> TypeGuard[JobProgressV1]:
+def is_progress(event: TurkicEventV1) -> TypeGuard[JobProgressV1]:
     """Check if the event is a progress event."""
     return event.get("type") == "turkic.job.progress.v1"
 
 
-def is_completed(event: JobEventV1) -> TypeGuard[JobCompletedV1]:
+def is_completed(event: TurkicEventV1) -> TypeGuard[JobCompletedV1]:
     """Check if the event is a completed event."""
     return event.get("type") == "turkic.job.completed.v1"
 
 
-def is_failed(event: JobEventV1) -> TypeGuard[JobFailedV1]:
+def is_failed(event: TurkicEventV1) -> TypeGuard[JobFailedV1]:
     """Check if the event is a failed event."""
     return event.get("type") == "turkic.job.failed.v1"
 
@@ -137,7 +124,6 @@ def handle_turkic_event(
 
 __all__ = [
     "TurkicEventV1",
-    "_narrow_turkic",
     "decode_turkic_event",
     "handle_turkic_event",
     "is_completed",

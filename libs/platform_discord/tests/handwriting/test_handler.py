@@ -17,7 +17,7 @@ from platform_core.digits_metrics_events import (
     make_prune_event,
     make_upload_event,
 )
-from platform_core.job_events import encode_job_event, make_failed_event
+from platform_core.job_events import ErrorKind, JobDomain, encode_job_event, make_failed_event
 
 from platform_discord.handwriting.handler import (
     decode_digits_event_safe,
@@ -173,10 +173,10 @@ def test_decode_completed_event() -> None:
 
 def test_decode_failed_job_event() -> None:
     ev = make_failed_event(
-        domain="digits",
+        domain=JobDomain.DIGITS,
         job_id="run-9",
         user_id=31,
-        error_kind="system",
+        error_kind=ErrorKind.SYSTEM,
         message="training exploded",
     )
     payload = encode_job_event(ev)
@@ -357,10 +357,10 @@ def test_handle_completed_event() -> None:
 def test_handle_failed_event() -> None:
     rt = new_runtime()
     ev = make_failed_event(
-        domain="digits",
+        domain=JobDomain.DIGITS,
         job_id="h-9",
         user_id=9,
-        error_kind="user",
+        error_kind=ErrorKind.USER,
         message="training failed",
     )
     result = handle_digits_event(rt, ev)
@@ -378,7 +378,7 @@ def test_handle_unknown_event_type_returns_none() -> None:
     # JobStartedV1 is part of DigitsEventV1 but not handled by handle_digits_event
     event: JobStartedV1 = {
         "type": "digits.job.started.v1",
-        "domain": "digits",
+        "domain": JobDomain.DIGITS,
         "job_id": "fake",
         "user_id": 1,
         "queue": "digits",

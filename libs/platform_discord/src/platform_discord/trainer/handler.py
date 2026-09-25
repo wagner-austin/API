@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import TypeGuard
 
 from platform_core.job_events import (
-    JobEventV1,
+    JobDomain,
     JobFailedV1,
     decode_job_event,
     is_failed,
@@ -68,9 +68,9 @@ def _try_decode_metrics(payload: str) -> TrainerMetricsEventV1 | None:
 def _try_decode_job_failed(payload: str) -> JobFailedV1 | None:
     """Attempt to decode as failed job event, returning None on failure."""
     try:
-        ev: JobEventV1 = decode_job_event(payload)
+        ev = decode_job_event(payload)
         # Only handle failed events from job_events, and only for trainer domain
-        if is_failed(ev) and ev["domain"] == "trainer":
+        if is_failed(ev) and ev["domain"] is JobDomain.TRAINER:
             return ev
         return None
     except (InvalidJsonError, JSONTypeError):
