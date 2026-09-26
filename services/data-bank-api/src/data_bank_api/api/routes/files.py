@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from enum import StrEnum
+from typing import Annotated
 
 from fastapi import APIRouter, File, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -13,16 +14,22 @@ from platform_core.request_context import request_id_var
 from ..._test_hooks import StorageProtocol
 from ...config import Settings
 
-Permission = Literal["upload", "read", "delete"]
+
+class Permission(StrEnum):
+    """The access a route needs, each checked against its own key list."""
+
+    UPLOAD = "upload"
+    READ = "read"
+    DELETE = "delete"
 
 
 def _ensure_auth(cfg: Settings, perm: Permission, req: Request) -> None:
     """Validate API key for the given permission. Raises AppError on failure."""
     allowed = (
         cfg["api_upload_keys"]
-        if perm == "upload"
+        if perm is Permission.UPLOAD
         else cfg["api_read_keys"]
-        if perm == "read"
+        if perm is Permission.READ
         else cfg["api_delete_keys"]
     )
     # If no keys configured for this permission, auth is disabled.
@@ -114,7 +121,7 @@ def build_router(storage: StorageProtocol, cfg: Settings) -> APIRouter:
         file: Annotated[UploadFile, File(...)],
         request: Request,
     ) -> FileUploadResponse:
-        _ensure_auth(cfg, "upload", request)
+        _ensure_auth(cfg, Permission.UPLOAD, request)
         ct = file.content_type or "application/octet-stream"
         meta = storage.save_stream(file.file, ct)
         return {
@@ -126,7 +133,7 @@ def build_router(storage: StorageProtocol, cfg: Settings) -> APIRouter:
         }
 
     def _head(file_id: str, request: Request) -> Response:
-        _ensure_auth(cfg, "read", request)
+        _ensure_auth(cfg, Permission.READ, request)
         meta = storage.head(file_id)
         headers = {
             "Accept-Ranges": "bytes",
@@ -137,14 +144,14 @@ def build_router(storage: StorageProtocol, cfg: Settings) -> APIRouter:
         return Response(status_code=200, headers=headers)
 
     def _download(file_id: str, request: Request) -> StreamingResponse | JSONResponse:
-        _ensure_auth(cfg, "read", request)
+        _ensure_auth(cfg, Permission.READ, request)
         range_header = request.headers.get("Range")
         if range_header is None:
             return _download_full(storage, file_id)
         return _download_range(storage, file_id, range_header)
 
     def _info(file_id: str, request: Request) -> FileUploadResponse:
-        _ensure_auth(cfg, "read", request)
+        _ensure_auth(cfg, Permission.READ, request)
         meta = storage.head(file_id)
         return {
             "file_id": meta["file_id"],
@@ -155,7 +162,7 @@ def build_router(storage: StorageProtocol, cfg: Settings) -> APIRouter:
         }
 
     def _delete(file_id: str, request: Request) -> Response:
-        _ensure_auth(cfg, "delete", request)
+        _ensure_auth(cfg, Permission.DELETE, request)
         deleted = storage.delete(file_id)
         if not deleted and cfg["delete_strict_404"]:
             raise AppError(ErrorCode.NOT_FOUND, "file not found", 404)
