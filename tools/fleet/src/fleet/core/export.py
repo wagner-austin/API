@@ -29,7 +29,7 @@ import pathlib
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
-from fleet.contracts.source import ProjectCompanion, ProjectSource
+from fleet.contracts.source import PATH_PATTERN, ProjectCompanion, ProjectSource
 from fleet.core import _test_hooks
 
 #: The directory under the workspace's ``runs`` that holds one bare mirror
@@ -367,6 +367,66 @@ def prepare_mirror(
     return mirror
 
 
+def install_paths(step: tuple[str, ...]) -> tuple[str, ...]:
+    """The tokens of one install step that name a path in the repository.
+
+    A token names a path when it holds a slash, is not a flag, and is spelt
+    in the registry's path alphabet (:data:`PATH_PATTERN`): ``scripts/x.sh``
+    does, ``ci`` and ``--container`` do not, and neither does
+    ``--workspace=packages/db``, whose path the tool resolves itself.
+
+    Args:
+        step: One declared install step, argv form.
+
+    Returns:
+        The path tokens, in the step's order.
+    """
+    return tuple(
+        token
+        for token in step
+        if "/" in token and not token.startswith("-") and PATH_PATTERN.match(token) is not None
+    )
+
+
+def require_install_paths(
+    mirror: pathlib.Path, sha: str, install: tuple[tuple[str, ...], ...]
+) -> None:
+    """Refuse a commit that lacks a path its declared install steps name.
+
+    The steps come from today's registry and the tree from the commit, so a
+    step declared after the commit was made names a file that commit does
+    not carry. Run as it stood, the step exits 127 and the verdict reads as
+    a broken commit (MCPs board task 8454b6a9: packages/db at a 2026-09-21
+    commit, ``bash scripts/testdb-setup.sh``). Asked of the hub's mirror
+    before any lease, like :func:`fetch_commit`'s refusal.
+
+    Args:
+        mirror: The project's mirror, holding the commit.
+        sha: The commit.
+        install: The project's declared install steps.
+
+    Raises:
+        AppError: ``INSTALL_PATH_NOT_IN_COMMIT`` naming the first step and
+            path the commit lacks.
+    """
+    for step in install:
+        for path in install_paths(step):
+            probe = _test_hooks.run(
+                ("git", "-C", str(mirror), "cat-file", "-e", f"{sha}:{path}"),
+                timeout_seconds=INIT_TIMEOUT_SECONDS,
+            )
+            if probe["returncode"] != 0:
+                raise AppError(
+                    code=FleetErrorCode.INSTALL_PATH_NOT_IN_COMMIT,
+                    message=(
+                        f"the install step {' '.join(step)!r} names {path}, which commit {sha} "
+                        "does not contain: the step was declared in fleet.json after this "
+                        "commit, so today's registry cannot build it. Check a commit that "
+                        f"carries {path}, or run this one from a working tree with fleet-run"
+                    ),
+                )
+
+
 class PreparedCompanion(TypedDict):
     """A companion's mirror on the hub and the commit its ref names now.
 
@@ -487,8 +547,10 @@ __all__ = [
     "fetch_commit",
     "fetch_ref",
     "has_commit",
+    "install_paths",
     "mirror_path",
     "prepare_companion",
     "prepare_mirror",
+    "require_install_paths",
     "require_source",
 ]

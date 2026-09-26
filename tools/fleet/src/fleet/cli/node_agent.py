@@ -406,7 +406,8 @@ def prepare(
 
     Raises:
         AppError: ``WORKSPACE_PROJECT_UNKNOWN``, ``PROJECT_REMOTE_MISSING``,
-            ``SHA_NOT_ON_REMOTE``, ``COMPANION_REF_NOT_ON_REMOTE``,
+            ``SHA_NOT_ON_REMOTE``, ``INSTALL_PATH_NOT_IN_COMMIT``,
+            ``COMPANION_REF_NOT_ON_REMOTE``,
             ``EXPORT_FAILED``, ``RESOURCE_HELD`` from
             :func:`fleet.cli.run.require_resources_free`, or the capacity
             codes :func:`fleet.core.capacity.plan_dispatch` raises; every
@@ -420,6 +421,7 @@ def prepare(
     mirror = export.prepare_mirror(
         loaded.mirrors, project=job["project"], remote=source["remote"], sha=sha
     )
+    export.require_install_paths(mirror, sha, source["install"])
     companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
     run_cli.require_resources_free(loaded, plan)
     workers = capacity.plan_dispatch(node, state, plan)
