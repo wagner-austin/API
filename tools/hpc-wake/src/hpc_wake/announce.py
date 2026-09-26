@@ -18,6 +18,7 @@ from collections.abc import Mapping, Sequence
 
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
+from hpc3.contracts.status import JobState
 from platform_core.error_codes_tooling import HpcWakeErrorCode
 from platform_core.errors import AppError
 from typing_extensions import TypedDict
@@ -109,16 +110,16 @@ def _body(project: str, submitter: str, items: Sequence[tuple[Closure, LedgerEnt
     Returns:
         The post text.
     """
-    counts: dict[str, int] = {}
+    counts: dict[JobState, int] = {}
     for closure, _entry in items:
         counts[closure["state"]] = counts.get(closure["state"], 0) + 1
-    tally = ", ".join(f"{state} x{count}" for state, count in sorted(counts.items()))
+    tally = ", ".join(f"{state.value} x{count}" for state, count in sorted(counts.items()))
 
     lines = [f"{MARKER} {project}: {len(items)} job(s) ended ({tally})"]
     for closure, entry in items[:LINE_CAP]:
         elapsed = closure["elapsed_seconds"]
         duration = "elapsed unrecorded" if elapsed is None else f"{elapsed}s"
-        lines.append(f"{closure['job_id']} {entry['name']} {closure['state']} {duration}")
+        lines.append(f"{closure['job_id']} {entry['name']} {closure['state'].value} {duration}")
     if len(items) > LINE_CAP:
         lines.append(f"+{len(items) - LINE_CAP} more, all in the ledger's closure record")
     if submitter != "":
