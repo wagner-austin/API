@@ -7,7 +7,6 @@ from platform_core.request_context import install_request_id_middleware
 
 from ..core.config.settings import Settings, load_settings
 from ..core.logging.types import LOGGING_EXTRA_FIELDS
-from ..core.logging.utils import narrow_log_level
 from ..core.services.container import ServiceContainer
 from .middleware import api_key_dependency
 from .routes import health, runs, tokenizers
@@ -15,11 +14,9 @@ from .routes import health, runs, tokenizers
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     cfg = settings or load_settings()
-    level = narrow_log_level(cfg["logging"]["level"])
-    format_mode: LogFormat = "json"
     setup_logging(
-        level=level,
-        format_mode=format_mode,
+        level=cfg["logging"]["level"],
+        format_mode=LogFormat.JSON,
         service_name="model-trainer",
         instance_id=None,
         extra_fields=list(LOGGING_EXTRA_FIELDS),

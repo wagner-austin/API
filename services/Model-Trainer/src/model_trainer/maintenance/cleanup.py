@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, get_logger, setup_logging
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings, load_settings
 from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
-from model_trainer.core.logging.utils import narrow_log_level
 from model_trainer.core.services.data.corpus_cache_cleanup import (
     CorpusCacheCleanupResult,
 )
@@ -15,10 +14,9 @@ from model_trainer.core.services.tokenizer.tokenizer_cleanup import (
 
 
 def _init_logging(service_name: str, settings: Settings) -> None:
-    level = narrow_log_level(settings["logging"]["level"])
     setup_logging(
-        level=level,
-        format_mode="json",
+        level=settings["logging"]["level"],
+        format_mode=LogFormat.JSON,
         service_name=service_name,
         instance_id=None,
         extra_fields=list(LOGGING_EXTRA_FIELDS),

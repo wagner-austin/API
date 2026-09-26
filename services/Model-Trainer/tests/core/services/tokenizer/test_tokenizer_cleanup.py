@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import dump_json_str
+from platform_core.logging import LogLevel
 
 from model_trainer.core.config.settings import (
     AppConfig,
@@ -51,7 +52,7 @@ def _settings_with_tokenizer_cleanup(cfg: TokenizerCleanupConfig, artifacts_root
         "corpus_cache_cleanup": corpus_cache,
         "tokenizer_cleanup": cfg,
     }
-    logging_cfg: LoggingConfig = {"level": "INFO"}
+    logging_cfg: LoggingConfig = {"level": LogLevel.INFO}
     redis: RedisConfig = {"enabled": False, "url": ""}
     rq: RQConfig = {
         "queue_name": "test",

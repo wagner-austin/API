@@ -19,7 +19,6 @@ from platform_workers.testing import FakeRedis, FakeRedisNonRedisError
 from model_trainer.core.config.settings import Settings, load_settings
 from model_trainer.core.infra.paths import tokenizer_logs_path
 from model_trainer.core.infra.redis_utils import get_with_retry, set_with_retry
-from model_trainer.core.logging.utils import narrow_log_level
 from model_trainer.core.services.data.corpus import list_text_files
 
 # --- paths.py coverage: line 22 (tokenizer_logs_path) ---
@@ -32,41 +31,6 @@ def test_tokenizer_logs_path_returns_expected_path() -> None:
     result = tokenizer_logs_path(settings, tok_id)
     assert result.name == "logs.jsonl"
     assert tok_id in str(result)
-
-
-# --- logging/utils.py coverage: lines 16, 19-25 (narrow_log_level branches) ---
-
-
-def test_narrow_log_level_debug() -> None:
-    """Cover DEBUG branch."""
-    assert narrow_log_level("DEBUG") == "DEBUG"
-
-
-def test_narrow_log_level_info() -> None:
-    """Cover INFO branch."""
-    assert narrow_log_level("INFO") == "INFO"
-
-
-def test_narrow_log_level_warning() -> None:
-    """Cover WARNING branch (line 19)."""
-    assert narrow_log_level("WARNING") == "WARNING"
-
-
-def test_narrow_log_level_error() -> None:
-    """Cover ERROR branch (line 21)."""
-    assert narrow_log_level("ERROR") == "ERROR"
-
-
-def test_narrow_log_level_critical() -> None:
-    """Cover CRITICAL branch (line 23)."""
-    assert narrow_log_level("CRITICAL") == "CRITICAL"
-
-
-def test_narrow_log_level_unknown_defaults_to_info() -> None:
-    """Cover default branch (line 25)."""
-    assert narrow_log_level("UNKNOWN") == "INFO"
-    assert narrow_log_level("") == "INFO"
-    assert narrow_log_level("debug") == "INFO"  # Case sensitive
 
 
 # --- redis_utils.py coverage: lines 18, 35 (non-Redis error re-raises) ---

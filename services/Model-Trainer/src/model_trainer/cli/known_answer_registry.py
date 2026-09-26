@@ -49,7 +49,7 @@ from platform_core.known_answer_registry import (
     read_registry,
     write_registry,
 )
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.run_record import RunRecord, decode_run_record, run_record
 
 _log = get_logger(__name__)
@@ -359,8 +359,8 @@ def entrypoint() -> None:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="known-answer-registry",
         instance_id=None,
         extra_fields=None,

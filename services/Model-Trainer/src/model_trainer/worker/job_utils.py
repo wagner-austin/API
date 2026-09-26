@@ -17,7 +17,7 @@ from platform_core.determinism_record import (
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.job_types import JobStatus
-from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
+from platform_core.logging import LogFormat, get_logger, setup_logging
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_core.trainer_metrics_events import (
@@ -450,11 +450,9 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
 
 def setup_job_logging(settings: Settings) -> None:
     """Re-initialize logging in RQ subprocess."""
-    level: LogLevel = settings["logging"]["level"]
-    format_mode: LogFormat = "json"
     setup_logging(
-        level=level,
-        format_mode=format_mode,
+        level=settings["logging"]["level"],
+        format_mode=LogFormat.JSON,
         service_name="model-trainer-job",
         instance_id=None,
         extra_fields=list(LOGGING_EXTRA_FIELDS),

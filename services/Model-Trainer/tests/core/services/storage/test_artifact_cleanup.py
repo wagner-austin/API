@@ -6,6 +6,7 @@ from typing import Final
 
 import pytest
 from platform_core.job_types import JobStatus
+from platform_core.logging import LogLevel
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
@@ -63,7 +64,7 @@ def _settings_with_cleanup(
         "corpus_cache_cleanup": corpus_cache,
         "tokenizer_cleanup": tokenizer_cleanup,
     }
-    logging_cfg: LoggingConfig = {"level": "INFO"}
+    logging_cfg: LoggingConfig = {"level": LogLevel.INFO}
     redis: RedisConfig = {"enabled": False, "url": ""}
     rq: RQConfig = {
         "queue_name": "test",
