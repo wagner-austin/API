@@ -188,6 +188,13 @@
           "docker.io"
         ],
         "machine_path_entries": ["C:\\Program Files (x86)\\GnuWin32\\bin"],
+        "machine_environment": [
+          {
+            "name": "POETRY_CACHE_DIR",
+            "value": "C:\\fleet\\poetry",
+            "reason": "the runners run as SYSTEM, whose profile is under System32, where 32-bit make is redirected to SysWOW64 and cannot launch a venv's python (MCPs run 36264009927)"
+          }
+        ],
         "execution_policy": "RemoteSigned",
         "disk": {
           "ceiling_gb": 150,
