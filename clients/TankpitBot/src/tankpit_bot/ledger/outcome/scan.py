@@ -6,6 +6,7 @@ or the server rejected the command with a 0x52 Supervisor error.
 
 from __future__ import annotations
 
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
 from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
@@ -28,7 +29,7 @@ def emit_scan_radar_complete(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="scan",
+        action_kind=ActionKind.SCAN,
         outcome=ActionOutcome.RADAR_COMPLETE,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -53,7 +54,7 @@ def emit_scan_stall_timeout(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="scan",
+        action_kind=ActionKind.SCAN,
         outcome=ActionOutcome.STALL_TIMEOUT,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -79,7 +80,7 @@ def emit_scan_command_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="scan",
+        action_kind=ActionKind.SCAN,
         outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         target_x=target_x,

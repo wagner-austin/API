@@ -10,6 +10,7 @@ audit instance #3).
 
 from __future__ import annotations
 
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
 from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
@@ -40,7 +41,7 @@ def emit_collect_position_reached(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.POSITION_REACHED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -78,7 +79,7 @@ def emit_collect_container_consumed(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.CONTAINER_CONSUMED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -104,7 +105,7 @@ def emit_collect_movement_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.MOVEMENT_REJECTED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -134,7 +135,7 @@ def emit_collect_command_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -163,7 +164,7 @@ def emit_collect_pickup_empty(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.PICKUP_EMPTY,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -193,7 +194,7 @@ def emit_collect_clamped_transfer(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.CLAMPED_TRANSFER,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -221,7 +222,7 @@ def emit_collect_inventory_full(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.INVENTORY_FULL,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -246,7 +247,7 @@ def emit_collect_stall_timeout(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="collect",
+        action_kind=ActionKind.COLLECT,
         outcome=ActionOutcome.STALL_TIMEOUT,
         duration_ms=duration_ms,
         target_x=target_x,

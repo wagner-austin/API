@@ -8,6 +8,7 @@ line (rejection-loop audit instance #1's move-path sibling).
 
 from __future__ import annotations
 
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
 from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
@@ -38,7 +39,7 @@ def emit_move_position_reached(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="move",
+        action_kind=ActionKind.MOVE,
         outcome=ActionOutcome.POSITION_REACHED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -64,7 +65,7 @@ def emit_move_movement_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="move",
+        action_kind=ActionKind.MOVE,
         outcome=ActionOutcome.MOVEMENT_REJECTED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -89,7 +90,7 @@ def emit_move_command_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="move",
+        action_kind=ActionKind.MOVE,
         outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -115,7 +116,7 @@ def emit_move_stall_timeout(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="move",
+        action_kind=ActionKind.MOVE,
         outcome=ActionOutcome.STALL_TIMEOUT,
         duration_ms=duration_ms,
         target_x=target_x,

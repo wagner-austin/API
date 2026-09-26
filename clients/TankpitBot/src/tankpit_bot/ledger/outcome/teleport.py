@@ -18,6 +18,7 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.contracts.enforcement import enforce_contract, require
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
 from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import (
@@ -200,7 +201,7 @@ def emit_teleport_landed(
     exact = landed_x == target_x and landed_y == target_y
     return emit_action_outcome(
         ledger,
-        action_kind="teleport",
+        action_kind=ActionKind.TELEPORT,
         outcome=ActionOutcome.LANDED_EXACT if exact else ActionOutcome.LANDED_INEXACT,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -237,7 +238,7 @@ def emit_teleport_stall_timeout(
     sent_window, received_window = _consume_pending_windows(ledger, messages)
     return emit_action_outcome(
         ledger,
-        action_kind="teleport",
+        action_kind=ActionKind.TELEPORT,
         outcome=ActionOutcome.STALL_TIMEOUT,
         duration_ms=duration_ms,
         target_x=target_x,
@@ -273,7 +274,7 @@ def emit_teleport_command_rejected(
     sent_window, received_window = _consume_pending_windows(ledger, messages)
     return emit_action_outcome(
         ledger,
-        action_kind="teleport",
+        action_kind=ActionKind.TELEPORT,
         outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         target_x=target_x,

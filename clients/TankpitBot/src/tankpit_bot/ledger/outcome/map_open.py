@@ -7,6 +7,7 @@ sentinels).
 
 from __future__ import annotations
 
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
 from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
@@ -27,7 +28,7 @@ def emit_map_open_data_processed(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="map_open",
+        action_kind=ActionKind.MAP_OPEN,
         outcome=ActionOutcome.MAP_DATA_PROCESSED,
         duration_ms=duration_ms,
     )
@@ -48,7 +49,7 @@ def emit_map_open_stall_timeout(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="map_open",
+        action_kind=ActionKind.MAP_OPEN,
         outcome=ActionOutcome.STALL_TIMEOUT,
         duration_ms=duration_ms,
         timeout_ms=timeout_ms,
@@ -70,7 +71,7 @@ def emit_map_open_command_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="map_open",
+        action_kind=ActionKind.MAP_OPEN,
         outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         error_code=error_code,

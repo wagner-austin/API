@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
 from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
@@ -60,7 +61,7 @@ def emit_shoot_hit(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="shoot",
+        action_kind=ActionKind.SHOOT,
         outcome=ActionOutcome.HIT,
         duration_ms=duration_ms,
         target_id=target_id,
@@ -87,7 +88,7 @@ def emit_shoot_miss(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="shoot",
+        action_kind=ActionKind.SHOOT,
         outcome=ActionOutcome.MISS,
         duration_ms=duration_ms,
         target_id=target_id,
@@ -118,7 +119,7 @@ def emit_shoot_fired(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="shoot",
+        action_kind=ActionKind.SHOOT,
         outcome=ActionOutcome.FIRED,
         duration_ms=duration_ms,
         aim_x=aim_x,
@@ -143,7 +144,7 @@ def emit_shoot_command_rejected(
     """
     return emit_action_outcome(
         ledger,
-        action_kind="shoot",
+        action_kind=ActionKind.SHOOT,
         outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         target_id=target_id,
