@@ -16,6 +16,7 @@ from tankpit_bot.sniffer.world_state_radar import (
     update_world_state_from_radar_known_resources,
 )
 from tankpit_bot.state.types import WorldStateDict, coord_key, make_container_state
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 
 class TestUpdateWorldStateFromRadarCache:
@@ -43,8 +44,8 @@ class TestUpdateWorldStateFromRadarCache:
                         y=96,
                         is_fuel=True,
                         volume=400,
-                        source="viewport",
-                        refresh_kind="viewport_patch",
+                        source=EntitySource.VIEWPORT,
+                        refresh_kind=ContainerRefreshKind.VIEWPORT_PATCH,
                         timestamp_ms=50000,
                     ),
                 },
@@ -221,8 +222,8 @@ class TestHandleRadarAck:
                         y=96,
                         is_fuel=True,
                         volume=400,
-                        source="viewport",
-                        refresh_kind="viewport_patch",
+                        source=EntitySource.VIEWPORT,
+                        refresh_kind=ContainerRefreshKind.VIEWPORT_PATCH,
                         timestamp_ms=50000,
                     ),
                     equip_key: make_container_state(
@@ -230,8 +231,8 @@ class TestHandleRadarAck:
                         y=96,
                         is_fuel=False,
                         volume=0,
-                        source="viewport",
-                        refresh_kind="viewport_patch",
+                        source=EntitySource.VIEWPORT,
+                        refresh_kind=ContainerRefreshKind.VIEWPORT_PATCH,
                         timestamp_ms=50000,
                     ),
                 },
@@ -316,7 +317,7 @@ class TestReconcileRadarViewportResources:
 
         ws = self.ws
         svc = ws
-        visible = make_container_state(98, 98, True, 1042, source="viewport")
+        visible = make_container_state(98, 98, True, 1042, source=EntitySource.VIEWPORT)
         svc.world_state = WorldStateDict(
             **{
                 **svc.world_state,
@@ -336,8 +337,8 @@ class TestReconcileRadarViewportResources:
 
         ws = self.ws
         svc = ws
-        visible_mine = make_mine_state(97, 97, 0, -1, 3, source="viewport")
-        radar_mine = make_mine_state(98, 98, 0, -1, 3, source="radar")
+        visible_mine = make_mine_state(97, 97, 0, -1, 3, source=EntitySource.VIEWPORT)
+        radar_mine = make_mine_state(98, 98, 0, -1, 3, source=EntitySource.RADAR)
         svc.world_state = WorldStateDict(
             **{
                 **svc.world_state,

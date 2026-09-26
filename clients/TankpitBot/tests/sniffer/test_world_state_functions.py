@@ -9,6 +9,7 @@ from tankpit_bot.state.viewport_geometry import (
     viewport_radar_bounds,
     viewport_visible_bounds,
 )
+from tankpit_bot.types.constants import EntitySource
 
 
 class TestViewportGeometry:
@@ -301,7 +302,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=77,
             team=2,
-            source="radar",
+            source=EntitySource.RADAR,
         )
         ws.world_state["mines"]["150,150"] = make_mine_state(
             x=150,
@@ -309,7 +310,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=88,
             team=3,
-            source="radar",
+            source=EntitySource.RADAR,
         )
 
         update_world_state_from_radar(ws, [], [RadarMineDict(x=102, y=202, team=1)], [])
@@ -331,7 +332,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=77,
             team=2,
-            source="radar",
+            source=EntitySource.RADAR,
         )
         ws.world_state["mines"]["102,202"] = make_mine_state(
             x=102,
@@ -339,7 +340,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=88,
             team=3,
-            source="radar",
+            source=EntitySource.RADAR,
         )
 
         update_world_state_from_radar(ws, [], [], [])

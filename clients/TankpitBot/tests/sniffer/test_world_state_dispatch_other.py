@@ -7,6 +7,7 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
+from tankpit_bot.types.constants import EntitySource
 
 
 class TestDispatchOther:
@@ -219,7 +220,7 @@ class TestDispatchOther:
             name="Yuppler",
             is_bot=False,
             is_self=False,
-            source="viewport",
+            source=EntitySource.VIEWPORT,
             timestamp_ms=1000,
         )
         ws.world_state["tanks"] = new_tanks

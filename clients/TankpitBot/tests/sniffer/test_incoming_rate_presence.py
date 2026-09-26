@@ -30,7 +30,7 @@ def _shooter(
     tank_id: int,
     *,
     last_wire_seen_ms: int,
-    liveness: TankLiveness = "alive",
+    liveness: TankLiveness = TankLiveness.ALIVE,
 ) -> TankStateDict:
     """One registry row for a shooter.
 
@@ -131,7 +131,7 @@ def test_a_silent_pair_mate_leaves_the_rate_window() -> None:
 def test_a_deactivated_shooter_leaves_the_rate_window() -> None:
     """The 2026-07-31 arena-soak law survives the generalization."""
     ws = _service_with_hits(
-        {"700": _shooter(700, last_wire_seen_ms=_NOW - 1000, liveness="deactivated")},
+        {"700": _shooter(700, last_wire_seen_ms=_NOW - 1000, liveness=TankLiveness.DEACTIVATED)},
         [700],
     )
 

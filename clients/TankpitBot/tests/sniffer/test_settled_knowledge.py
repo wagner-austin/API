@@ -16,6 +16,7 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_tank_state,
 )
+from tankpit_bot.types.constants import TankLiveness
 
 _NOW = 10_000_000
 
@@ -42,7 +43,7 @@ def _tank(tank_id: int, name: str, timestamp_ms: int) -> TankStateDict:
         is_bot=False,
         is_self=False,
         timestamp_ms=timestamp_ms,
-        liveness="alive",
+        liveness=TankLiveness.ALIVE,
     )
 
 

@@ -20,7 +20,7 @@ class TestDispatchProtocolDeactivation:
     """Tests for protocol-path 0x41 Deactivation dispatch."""
 
     def test_dispatch_deactivation_marks_liveness_deactivated(self) -> None:
-        """Dispatch 0x41 marks the victim ``liveness="deactivated"`` and
+        """Dispatch 0x41 marks the victim ``liveness=TankLiveness.DEACTIVATED`` and
         preserves the death tile.
 
         Replaces the prior ``position-set-to-(0,0)`` sentinel with the
