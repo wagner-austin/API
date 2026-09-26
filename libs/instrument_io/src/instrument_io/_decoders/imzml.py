@@ -39,11 +39,11 @@ def _decode_imzml_polarity(polarity_str: str) -> Polarity:
         Polarity literal.
     """
     polarity_lower = polarity_str.lower()
-    if polarity_lower == "positive":
-        return "positive"
-    if polarity_lower == "negative":
-        return "negative"
-    return "unknown"
+    if polarity_lower == Polarity.POSITIVE:
+        return Polarity.POSITIVE
+    if polarity_lower == Polarity.NEGATIVE:
+        return Polarity.NEGATIVE
+    return Polarity.UNKNOWN
 
 
 def _decode_spectrum_mode(mode_str: str) -> SpectrumMode:
@@ -56,11 +56,11 @@ def _decode_spectrum_mode(mode_str: str) -> SpectrumMode:
         SpectrumMode literal.
     """
     mode_lower = mode_str.lower()
-    if mode_lower == "centroid":
-        return "centroid"
-    if mode_lower == "profile":
-        return "profile"
-    return "unknown"
+    if mode_lower == SpectrumMode.CENTROID:
+        return SpectrumMode.CENTROID
+    if mode_lower == SpectrumMode.PROFILE:
+        return SpectrumMode.PROFILE
+    return SpectrumMode.UNKNOWN
 
 
 def _compute_imzml_spectrum_stats(
@@ -140,12 +140,11 @@ def _make_imzml_spectrum_meta(
     Returns:
         ImagingSpectrumMeta TypedDict.
     """
-    ms_level: MSLevel = 1  # Imaging MS is typically MS1
     return ImagingSpectrumMeta(
         source_path=source_path,
         index=index,
         coordinate=coordinate,
-        ms_level=ms_level,
+        ms_level=MSLevel.MS1,  # Imaging MS is typically MS1
         polarity=polarity,
         total_ion_current=total_ion_current,
     )

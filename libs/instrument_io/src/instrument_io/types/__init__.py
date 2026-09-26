@@ -34,7 +34,6 @@ from instrument_io.types.common import (
 # Document types (for Word/PDF writers)
 from instrument_io.types.document import (
     PAGE_SIZES,
-    DocumentContent,
     DocumentSection,
     FigureContent,
     HeadingContent,
@@ -49,13 +48,6 @@ from instrument_io.types.document import (
     is_page_break,
     is_paragraph,
     is_table,
-)
-
-# Excel types
-from instrument_io.types.excel import (
-    ExcelRow,
-    ExcelRows,
-    ExcelSheets,
 )
 
 # Imaging types
@@ -114,14 +106,10 @@ __all__ = [
     "ChromatogramStats",
     "DADData",
     "DADSlice",
-    "DocumentContent",
     "DocumentSection",
     "EICData",
     "EICParams",
     "ErrorResult",
-    "ExcelRow",
-    "ExcelRows",
-    "ExcelSheets",
     "FigureContent",
     "FileInfo",
     "HeadingContent",

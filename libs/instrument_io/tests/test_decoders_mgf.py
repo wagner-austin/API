@@ -18,6 +18,7 @@ from instrument_io._decoders.mgf import (
     _make_mgf_spectrum_meta,
 )
 from instrument_io._exceptions import DecodingError
+from instrument_io.types.common import Polarity
 
 
 class TestDecodeMGFTitle:
@@ -339,7 +340,7 @@ class TestMakeMGFSpectrumMeta:
             source_path="/path/to/file.mgf",
             scan_number=123,
             retention_time=10.5,
-            polarity="positive",
+            polarity=Polarity.POSITIVE,
             total_ion_current=5000.0,
         )
         assert meta["source_path"] == "/path/to/file.mgf"

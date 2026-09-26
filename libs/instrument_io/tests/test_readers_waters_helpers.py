@@ -19,6 +19,7 @@ from instrument_io.readers.waters import (
     _find_uv_file,
     _is_waters_raw_directory,
 )
+from instrument_io.types.common import SignalType
 
 
 class TestIsWatersRawDirectory:
@@ -162,7 +163,7 @@ class TestBuildChromatogramMeta:
 
     def test_builds_meta_correctly(self) -> None:
         """Test building ChromatogramMeta."""
-        meta = _build_chromatogram_meta("/path/to/file", "TIC", "MS")
+        meta = _build_chromatogram_meta("/path/to/file", SignalType.TIC, "MS")
         assert meta["source_path"] == "/path/to/file"
         assert meta["signal_type"] == "TIC"
         assert meta["detector"] == "MS"

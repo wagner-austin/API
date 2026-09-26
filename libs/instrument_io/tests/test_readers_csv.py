@@ -9,6 +9,7 @@ from instrument_io.readers.csv import (
     _build_chromatogram_meta,
     _is_csv_file,
 )
+from instrument_io.types.common import SignalType
 
 
 # Test _is_csv_file
@@ -55,7 +56,7 @@ class TestBuildChromatogramMeta:
     """Tests for _build_chromatogram_meta function."""
 
     def test_builds_meta(self) -> None:
-        meta = _build_chromatogram_meta("/path/to/file.csv", "TIC", "CSV")
+        meta = _build_chromatogram_meta("/path/to/file.csv", SignalType.TIC, "CSV")
         assert meta["source_path"] == "/path/to/file.csv"
         assert meta["signal_type"] == "TIC"
         assert meta["detector"] == "CSV"

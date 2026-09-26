@@ -6,19 +6,38 @@ result wrappers, and re-exports from _json_bridge.
 
 from __future__ import annotations
 
+from enum import IntEnum, StrEnum
 from typing import Literal, TypedDict
 
 # Re-export from json bridge
 from instrument_io._json_bridge import CellValue, JSONValue
 
-# Signal types from analytical instruments
-SignalType = Literal["TIC", "EIC", "DAD", "UV", "FID", "MS"]
 
-# Polarity for mass spectrometry
-Polarity = Literal["positive", "negative", "unknown"]
+class SignalType(StrEnum):
+    """A signal an analytical instrument records a chromatogram from."""
 
-# MS level
-MSLevel = Literal[1, 2, 3]
+    TIC = "TIC"
+    EIC = "EIC"
+    DAD = "DAD"
+    UV = "UV"
+    FID = "FID"
+    MS = "MS"
+
+
+class Polarity(StrEnum):
+    """The ion polarity a mass spectrometer scanned in."""
+
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    UNKNOWN = "unknown"
+
+
+class MSLevel(IntEnum):
+    """How many stages of mass spectrometry produced a spectrum."""
+
+    MS1 = 1
+    MS2 = 2
+    MS3 = 3
 
 
 class SuccessResult(TypedDict):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from instrument_io.types.common import MSLevel, Polarity
 from instrument_io.types.spectrum import (
     MS2Spectrum,
     MS3Spectrum,
@@ -18,8 +19,8 @@ def test_spectrum_meta_construction() -> None:
         source_path="/data/sample.mzML",
         scan_number=100,
         retention_time=5.5,
-        ms_level=1,
-        polarity="positive",
+        ms_level=MSLevel.MS1,
+        polarity=Polarity.POSITIVE,
         total_ion_current=1000000.0,
     )
     assert meta["source_path"] == "/data/sample.mzML"
@@ -56,8 +57,8 @@ def test_ms_spectrum_construction() -> None:
         source_path="/test.mzML",
         scan_number=1,
         retention_time=1.0,
-        ms_level=1,
-        polarity="positive",
+        ms_level=MSLevel.MS1,
+        polarity=Polarity.POSITIVE,
         total_ion_current=500000.0,
     )
     data = SpectrumData(
@@ -104,8 +105,8 @@ def test_ms2_spectrum_construction() -> None:
         source_path="/test.mzML",
         scan_number=10,
         retention_time=2.5,
-        ms_level=2,
-        polarity="positive",
+        ms_level=MSLevel.MS2,
+        polarity=Polarity.POSITIVE,
         total_ion_current=100000.0,
     )
     precursor = PrecursorInfo(
@@ -136,8 +137,8 @@ def test_ms3_spectrum_construction() -> None:
         source_path="/test.mzML",
         scan_number=15,
         retention_time=3.0,
-        ms_level=3,
-        polarity="positive",
+        ms_level=MSLevel.MS3,
+        polarity=Polarity.POSITIVE,
         total_ion_current=50000.0,
     )
     # MS3 has a precursor chain: parent (MS1->MS2) -> child (MS2->MS3)

@@ -185,20 +185,20 @@ def _decode_signal_type(detector: str) -> SignalType:
     detector_lower = detector.lower()
 
     if "tic" in detector_lower or "total" in detector_lower:
-        return "TIC"
+        return SignalType.TIC
     if "eic" in detector_lower or "extracted" in detector_lower:
-        return "EIC"
+        return SignalType.EIC
     if "dad" in detector_lower or "diode" in detector_lower:
-        return "DAD"
+        return SignalType.DAD
     if "uv" in detector_lower:
-        return "UV"
+        return SignalType.UV
     if "fid" in detector_lower:
-        return "FID"
+        return SignalType.FID
     if "ms" in detector_lower:
-        return "MS"
+        return SignalType.MS
 
     # Default to MS for unknown detectors in MS data
-    return "MS"
+    return SignalType.MS
 
 
 def _compute_chromatogram_stats(

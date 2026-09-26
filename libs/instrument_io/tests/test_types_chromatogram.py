@@ -12,6 +12,7 @@ from instrument_io.types.chromatogram import (
     EICParams,
     TICData,
 )
+from instrument_io.types.common import SignalType
 
 
 def test_chromatogram_meta_construction() -> None:
@@ -21,7 +22,7 @@ def test_chromatogram_meta_construction() -> None:
         method_name="default.M",
         sample_name="Sample001",
         acquisition_date="2024-01-15",
-        signal_type="TIC",
+        signal_type=SignalType.TIC,
         detector="MS",
     )
     assert meta["source_path"] == "/data/sample.D"
@@ -64,7 +65,7 @@ def test_tic_data_construction() -> None:
         method_name="",
         sample_name="",
         acquisition_date="",
-        signal_type="TIC",
+        signal_type=SignalType.TIC,
         detector="MS",
     )
     data = ChromatogramData(
@@ -93,7 +94,7 @@ def test_eic_data_construction() -> None:
         method_name="",
         sample_name="",
         acquisition_date="",
-        signal_type="EIC",
+        signal_type=SignalType.EIC,
         detector="MS",
     )
     params = EICParams(target_mz=150.0, mz_tolerance=0.5)
@@ -123,7 +124,7 @@ def test_dad_slice_construction() -> None:
         method_name="",
         sample_name="",
         acquisition_date="",
-        signal_type="DAD",
+        signal_type=SignalType.DAD,
         detector="DAD",
     )
     data = ChromatogramData(
@@ -156,7 +157,7 @@ def test_dad_data_construction() -> None:
         method_name="",
         sample_name="",
         acquisition_date="",
-        signal_type="DAD",
+        signal_type=SignalType.DAD,
         detector="DAD",
     )
     dad = DADData(

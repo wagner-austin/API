@@ -10,6 +10,7 @@ from instrument_io._decoders.imzml import (
     _make_imzml_spectrum_data,
     _make_imzml_spectrum_meta,
 )
+from instrument_io.types.common import Polarity
 
 
 class TestDecodeCoordinate:
@@ -119,7 +120,7 @@ class TestMakeImzmlSpectrumMeta:
             source_path="/path/to/file.imzML",
             index=5,
             coordinate=coord,
-            polarity="positive",
+            polarity=Polarity.POSITIVE,
             total_ion_current=123456.0,
         )
         assert meta["source_path"] == "/path/to/file.imzML"

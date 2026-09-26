@@ -30,7 +30,6 @@ from instrument_io._protocols.reportlab_factories import (
 from instrument_io.types.common import CellValue
 from instrument_io.types.document import (
     PAGE_SIZES,
-    DocumentContent,
     DocumentSection,
     FigureContent,
     HeadingContent,
@@ -403,7 +402,7 @@ class PDFWriter:
     def __init__(
         self,
         *,
-        page_size: PageSize = "letter",
+        page_size: PageSize = PageSize.LETTER,
         margin_inches: float = 1.0,
     ) -> None:
         """Initialize PDF writer.
@@ -417,7 +416,7 @@ class PDFWriter:
 
     def write_document(
         self,
-        content: DocumentContent,
+        content: list[DocumentSection],
         out_path: Path,
     ) -> None:
         """Write document content to PDF file.

@@ -23,7 +23,6 @@ from instrument_io._decoders.mgf import (
 )
 from instrument_io._exceptions import MGFReadError
 from instrument_io._protocols.mgf import (
-    MGFParamsDict,
     MGFReaderProtocol,
     MGFSpectrumProtocol,
     _open_mgf,
@@ -57,7 +56,7 @@ def _get_spectrum_arrays(
 
 def _get_spectrum_params(
     spectrum: MGFSpectrumProtocol,
-) -> MGFParamsDict:
+) -> dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]:
     """Extract params dict from spectrum.
 
     Args:
@@ -66,7 +65,9 @@ def _get_spectrum_params(
     Returns:
         Params dict.
     """
-    params: MGFParamsDict = spectrum["params"]
+    params: dict[str, str | float | int | list[int] | tuple[float | None, ...] | None] = spectrum[
+        "params"
+    ]
     return params
 
 

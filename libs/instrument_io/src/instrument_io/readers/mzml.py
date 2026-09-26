@@ -30,6 +30,7 @@ from instrument_io.types.chromatogram import (
     EICParams,
     TICData,
 )
+from instrument_io.types.common import SignalType
 from instrument_io.types.spectrum import (
     MS2Spectrum,
     MSSpectrum,
@@ -207,7 +208,7 @@ class MzMLReader:
             method_name="",
             sample_name="",
             acquisition_date="",
-            signal_type="TIC",
+            signal_type=SignalType.TIC,
             detector="MS",
         )
         data = ChromatogramData(
@@ -273,7 +274,7 @@ class MzMLReader:
             method_name="",
             sample_name="",
             acquisition_date="",
-            signal_type="EIC",
+            signal_type=SignalType.EIC,
             detector="MS",
         )
         data = ChromatogramData(

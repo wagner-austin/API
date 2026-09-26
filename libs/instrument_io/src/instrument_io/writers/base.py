@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Protocol
 
 from instrument_io.types.common import CellValue
-from instrument_io.types.document import DocumentContent
+from instrument_io.types.document import DocumentSection
 
 
 class DocumentWriterProtocol(Protocol):
@@ -23,7 +23,7 @@ class DocumentWriterProtocol(Protocol):
 
     def write_document(
         self,
-        content: DocumentContent,
+        content: list[DocumentSection],
         out_path: Path,
     ) -> None:
         """Write content to a document file.

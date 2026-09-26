@@ -18,11 +18,10 @@ from instrument_io.writers.excel import (
 )
 
 # Type alias for row dictionaries
-RowDict = dict[str, CellValue]
 
 
 def test_collect_columns_basic() -> None:
-    rows: list[RowDict] = [
+    rows: list[dict[str, CellValue]] = [
         {"a": 1, "b": 2},
         {"a": 3, "c": 4},
     ]
@@ -31,7 +30,7 @@ def test_collect_columns_basic() -> None:
 
 
 def test_collect_columns_preserves_order() -> None:
-    rows: list[RowDict] = [
+    rows: list[dict[str, CellValue]] = [
         {"z": 1, "a": 2, "m": 3},
     ]
     result = _collect_columns(rows)
@@ -89,7 +88,7 @@ class TestExcelWriter:
 
     def test_write_sheet_creates_file(self, tmp_path: Path) -> None:
         writer = ExcelWriter()
-        rows: list[RowDict] = [
+        rows: list[dict[str, CellValue]] = [
             {"Name": "Item1", "Value": 100},
             {"Name": "Item2", "Value": 200},
         ]
@@ -99,7 +98,7 @@ class TestExcelWriter:
 
     def test_write_sheet_can_be_read_back(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=False)
-        rows: list[RowDict] = [
+        rows: list[dict[str, CellValue]] = [
             {"Name": "Item1", "Value": 100},
         ]
         out_path = tmp_path / "output.xlsx"
@@ -118,7 +117,7 @@ class TestExcelWriter:
 
     def test_write_sheets_multiple(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=False)
-        sheets: dict[str, list[RowDict]] = {
+        sheets: dict[str, list[dict[str, CellValue]]] = {
             "Sheet1": [{"A": 1}],
             "Sheet2": [{"B": 2}],
         }
@@ -132,7 +131,7 @@ class TestExcelWriter:
 
     def test_write_sheet_with_table(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=True)
-        rows: list[RowDict] = [
+        rows: list[dict[str, CellValue]] = [
             {"Name": "Item1", "Value": 100},
         ]
         out_path = tmp_path / "output.xlsx"
@@ -142,7 +141,7 @@ class TestExcelWriter:
 
     def test_write_sheet_auto_width(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_width=True, auto_table=False)
-        rows: list[RowDict] = [
+        rows: list[dict[str, CellValue]] = [
             {"ShortName": "A", "VeryLongColumnNameHere": "B"},
         ]
         out_path = tmp_path / "output.xlsx"
@@ -151,7 +150,7 @@ class TestExcelWriter:
 
     def test_write_sheet_no_auto_features(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=False, auto_width=False)
-        rows: list[RowDict] = [
+        rows: list[dict[str, CellValue]] = [
             {"Name": "Item1"},
         ]
         out_path = tmp_path / "output.xlsx"
@@ -160,14 +159,14 @@ class TestExcelWriter:
 
     def test_write_sheet_empty_rows(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=False)
-        rows: list[RowDict] = []
+        rows: list[dict[str, CellValue]] = []
         out_path = tmp_path / "output.xlsx"
         writer.write_sheets({"Empty": rows}, out_path)
         assert out_path.exists()
 
     def test_write_sheet_creates_parent_dirs(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=False)
-        rows: list[RowDict] = [{"A": 1}]
+        rows: list[dict[str, CellValue]] = [{"A": 1}]
         out_path = tmp_path / "subdir" / "nested" / "output.xlsx"
         writer.write_sheet(rows, out_path)
         assert out_path.exists()
@@ -176,7 +175,7 @@ class TestExcelWriter:
         writer = ExcelWriter(auto_table=False, auto_width=False)
         wb = _create_workbook()
 
-        rows: list[RowDict] = [{"A": 1, "B": 2}]
+        rows: list[dict[str, CellValue]] = [{"A": 1, "B": 2}]
         writer.write_rows_to_sheet(wb, "TestSheet", rows, 0)
 
         out_path = tmp_path / "output.xlsx"
@@ -191,7 +190,7 @@ class TestExcelWriter:
         writer = ExcelWriter(auto_table=False, auto_width=False)
         wb = _create_workbook()
 
-        empty_rows: list[RowDict] = []
+        empty_rows: list[dict[str, CellValue]] = []
         writer.write_rows_to_sheet(wb, "Empty", empty_rows, 0)
 
         out_path = tmp_path / "output.xlsx"
@@ -209,7 +208,7 @@ class TestExcelWriter:
         writer = ExcelWriter(auto_table=True, auto_width=True)
         wb = _create_workbook()
 
-        rows: list[RowDict] = [{"A": 1, "B": 2}, {"A": 3, "B": 4}]
+        rows: list[dict[str, CellValue]] = [{"A": 1, "B": 2}, {"A": 3, "B": 4}]
         writer.write_rows_to_sheet(wb, "AutoSheet", rows, 0)
 
         out_path = tmp_path / "output.xlsx"
@@ -227,7 +226,7 @@ class TestExcelWriter:
 
     def test_write_various_types(self, tmp_path: Path) -> None:
         writer = ExcelWriter(auto_table=False)
-        rows: list[RowDict] = [
+        rows: list[dict[str, CellValue]] = [
             {
                 "String": "hello",
                 "Int": 42,

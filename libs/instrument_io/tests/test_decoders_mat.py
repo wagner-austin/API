@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Final, TypeGuard
 
 from instrument_io._decoders.mat import _decode_mat_array, _decode_mat_dict, _is_metadata_key
-from instrument_io._protocols.scipy_io import MATDict, NdarrayProtocol, _load_mat
+from instrument_io._protocols.scipy_io import NdarrayProtocol, _load_mat
 
 
 def _is_ndarray_protocol(
@@ -59,7 +59,7 @@ def test_decode_mat_dict_converts_arrays_and_skips_metadata_from_fixture() -> No
 
 def test_decode_mat_dict_scalar_path() -> None:
     """_decode_mat_dict preserves plain scalars as-is for allowed types."""
-    mat_dict: MATDict = {
+    mat_dict: dict[str, NdarrayProtocol | str | int | float] = {
         "scalar_int": 7,
         "scalar_float": 2.5,
         "scalar_text": "ok",

@@ -38,6 +38,7 @@ from instrument_io.testing import (
     hooks,
     reset_hooks,
 )
+from instrument_io.types.common import MSLevel, Polarity
 from instrument_io.types.spectrum import MSSpectrum, SpectrumData, SpectrumMeta, SpectrumStats
 
 
@@ -299,7 +300,7 @@ class TestFakeImzMLParser:
         parser = FakeImzMLParser(
             [(1, 1, 1)],
             [([100.0, 200.0], [1000.0, 2000.0])],
-            polarity="positive",
+            polarity=Polarity.POSITIVE,
             spectrum_mode="centroid",
         )
         assert parser.coordinates == [(1, 1, 1)]
@@ -333,8 +334,8 @@ class TestFakeMzMLReader:
                 source_path="/test",
                 scan_number=1,
                 retention_time=1.0,
-                ms_level=1,
-                polarity="positive",
+                ms_level=MSLevel.MS1,
+                polarity=Polarity.POSITIVE,
                 total_ion_current=1000.0,
             ),
             data=SpectrumData(mz_values=[100.0], intensities=[1000.0]),
@@ -357,8 +358,8 @@ class TestFakeMzMLReader:
                 source_path="/test",
                 scan_number=5,
                 retention_time=1.0,
-                ms_level=1,
-                polarity="positive",
+                ms_level=MSLevel.MS1,
+                polarity=Polarity.POSITIVE,
                 total_ion_current=1000.0,
             ),
             data=SpectrumData(mz_values=[100.0], intensities=[1000.0]),
@@ -388,8 +389,8 @@ class TestFakeMzMLReader:
                 source_path="/test",
                 scan_number=1,
                 retention_time=1.0,
-                ms_level=1,
-                polarity="positive",
+                ms_level=MSLevel.MS1,
+                polarity=Polarity.POSITIVE,
                 total_ion_current=1000.0,
             ),
             data=SpectrumData(mz_values=[100.0], intensities=[1000.0]),

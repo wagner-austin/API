@@ -6,7 +6,6 @@ from pathlib import Path
 
 from instrument_io.types.document import (
     PAGE_SIZES,
-    DocumentContent,
     DocumentSection,
     FigureContent,
     HeadingContent,
@@ -117,32 +116,20 @@ def test_document_section_union() -> None:
     assert para["type"] == "paragraph"
 
 
-def test_document_content_list() -> None:
-    content: DocumentContent = [
-        {"type": "heading", "text": "Title", "level": 1},
-        {"type": "paragraph", "text": "Body text.", "bold": False, "italic": False},
-    ]
-    assert len(content) == 2
-    assert content[0]["type"] == "heading"
-    assert content[1]["type"] == "paragraph"
-
-
 def test_page_sizes_letter() -> None:
-    size: PageSize = "letter"
-    dims = PAGE_SIZES[size]
-    assert dims == (612.0, 792.0)
+    assert PAGE_SIZES[PageSize.LETTER] == (612.0, 792.0)
 
 
 def test_page_sizes_a4() -> None:
-    size: PageSize = "a4"
-    dims = PAGE_SIZES[size]
-    assert dims == (595.28, 841.89)
+    assert PAGE_SIZES[PageSize.A4] == (595.28, 841.89)
 
 
 def test_page_sizes_legal() -> None:
-    size: PageSize = "legal"
-    dims = PAGE_SIZES[size]
-    assert dims == (612.0, 1008.0)
+    assert PAGE_SIZES[PageSize.LEGAL] == (612.0, 1008.0)
+
+
+def test_every_page_size_has_dimensions() -> None:
+    assert set(PAGE_SIZES) == set(PageSize)
 
 
 def test_is_heading_true() -> None:

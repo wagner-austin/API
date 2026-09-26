@@ -5,7 +5,7 @@ Converts scipy.io.loadmat results to typed Python structures.
 
 from __future__ import annotations
 
-from instrument_io._protocols.scipy_io import MATDict, NdarrayProtocol, PythonValue
+from instrument_io._protocols.scipy_io import NdarrayProtocol, PythonValue
 
 
 def _is_metadata_key(key: str) -> bool:
@@ -32,7 +32,9 @@ def _decode_mat_array(arr: NdarrayProtocol) -> PythonValue:
     return arr.tolist()
 
 
-def _decode_mat_dict(mat_dict: MATDict) -> dict[str, PythonValue | str | int | float]:
+def _decode_mat_dict(
+    mat_dict: dict[str, NdarrayProtocol | str | int | float],
+) -> dict[str, PythonValue | str | int | float]:
     """Decode MATLAB dictionary, converting arrays to lists.
 
     Args:

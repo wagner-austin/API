@@ -45,38 +45,13 @@ def test_operation_result_error_type() -> None:
     assert result["status"] == "error"
 
 
-def test_signal_type_values() -> None:
-    # Verify SignalType literal values
-    tic: SignalType = "TIC"
-    eic: SignalType = "EIC"
-    dad: SignalType = "DAD"
-    uv: SignalType = "UV"
-    fid: SignalType = "FID"
-    ms: SignalType = "MS"
-
-    assert tic == "TIC"
-    assert eic == "EIC"
-    assert dad == "DAD"
-    assert uv == "UV"
-    assert fid == "FID"
-    assert ms == "MS"
+def test_signal_types_are_spelled_as_the_instruments_spell_them() -> None:
+    assert [signal.value for signal in SignalType] == ["TIC", "EIC", "DAD", "UV", "FID", "MS"]
 
 
 def test_polarity_values() -> None:
-    pos: Polarity = "positive"
-    neg: Polarity = "negative"
-    unk: Polarity = "unknown"
-
-    assert pos == "positive"
-    assert neg == "negative"
-    assert unk == "unknown"
+    assert [polarity.value for polarity in Polarity] == ["positive", "negative", "unknown"]
 
 
 def test_ms_level_values() -> None:
-    ms1: MSLevel = 1
-    ms2: MSLevel = 2
-    ms3: MSLevel = 3
-
-    assert ms1 == 1
-    assert ms2 == 2
-    assert ms3 == 3
+    assert [level.value for level in MSLevel] == [1, 2, 3]

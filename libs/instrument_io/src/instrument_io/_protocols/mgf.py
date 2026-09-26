@@ -13,9 +13,6 @@ from typing import Literal, Protocol, overload
 
 from instrument_io._protocols.numpy import NdArray1DProtocol
 
-# Type alias for MGF params dict
-MGFParamsDict = dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]
-
 
 class MGFSpectrumProtocol(Protocol):
     """Protocol for pyteomics MGF spectrum dictionary.
@@ -33,19 +30,37 @@ class MGFSpectrumProtocol(Protocol):
     @overload
     def __getitem__(self, key: Literal["intensity array"]) -> NdArray1DProtocol: ...
     @overload
-    def __getitem__(self, key: Literal["params"]) -> MGFParamsDict: ...
+    def __getitem__(
+        self, key: Literal["params"]
+    ) -> dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]: ...
     @overload
-    def __getitem__(self, key: str) -> NdArray1DProtocol | MGFParamsDict: ...
+    def __getitem__(
+        self, key: str
+    ) -> (
+        NdArray1DProtocol
+        | dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]
+    ): ...
 
-    def __getitem__(self, key: str) -> NdArray1DProtocol | MGFParamsDict:
+    def __getitem__(
+        self, key: str
+    ) -> (
+        NdArray1DProtocol
+        | dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]
+    ):
         """Get value by key."""
         ...
 
     def get(
         self,
         key: str,
-        default: NdArray1DProtocol | MGFParamsDict | None = None,
-    ) -> NdArray1DProtocol | MGFParamsDict | None:
+        default: NdArray1DProtocol
+        | dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]
+        | None = None,
+    ) -> (
+        NdArray1DProtocol
+        | dict[str, str | float | int | list[int] | tuple[float | None, ...] | None]
+        | None
+    ):
         """Get value by key with default."""
         ...
 
@@ -101,7 +116,6 @@ def _open_mgf(path: Path) -> MGFReaderProtocol:
 
 
 __all__ = [
-    "MGFParamsDict",
     "MGFReaderProtocol",
     "MGFSpectrumProtocol",
     "_open_mgf",

@@ -141,12 +141,12 @@ def _decode_mgf_polarity(
     # Reuse _decode_charge_value to get the numeric charge
     charge = _decode_charge_value(params.get("charge"))
     if charge is None:
-        return "unknown"
+        return Polarity.UNKNOWN
     if charge > 0:
-        return "positive"
+        return Polarity.POSITIVE
     if charge < 0:
-        return "negative"
-    return "unknown"
+        return Polarity.NEGATIVE
+    return Polarity.UNKNOWN
 
 
 def _decode_mgf_scan_number(
@@ -297,12 +297,11 @@ def _make_mgf_spectrum_meta(
     Returns:
         SpectrumMeta TypedDict.
     """
-    ms_level: MSLevel = 2  # MGF is always MS/MS data
     return SpectrumMeta(
         source_path=source_path,
         scan_number=scan_number,
         retention_time=retention_time,
-        ms_level=ms_level,
+        ms_level=MSLevel.MS2,  # MGF is always MS/MS data
         polarity=polarity,
         total_ion_current=total_ion_current,
     )

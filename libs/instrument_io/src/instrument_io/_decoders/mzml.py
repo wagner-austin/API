@@ -48,15 +48,15 @@ def _decode_polarity(scan_polarity: str | None) -> Polarity:
         Polarity literal ("positive", "negative", or "unknown").
     """
     if scan_polarity is None:
-        return "unknown"
+        return Polarity.UNKNOWN
 
     pol_lower = scan_polarity.lower()
-    if "positive" in pol_lower or "+" in pol_lower:
-        return "positive"
-    if "negative" in pol_lower or "-" in pol_lower:
-        return "negative"
+    if Polarity.POSITIVE in pol_lower or "+" in pol_lower:
+        return Polarity.POSITIVE
+    if Polarity.NEGATIVE in pol_lower or "-" in pol_lower:
+        return Polarity.NEGATIVE
 
-    return "unknown"
+    return Polarity.UNKNOWN
 
 
 def _decode_ms_level(level_raw: int | float | str | None) -> MSLevel:
@@ -72,17 +72,12 @@ def _decode_ms_level(level_raw: int | float | str | None) -> MSLevel:
         DecodingError: If level is not 1, 2, or 3.
     """
     if level_raw is None:
-        return 1
+        return MSLevel.MS1
 
     level_int = int(level_raw) if isinstance(level_raw, (str, float)) else level_raw
-
-    if level_int == 1:
-        return 1
-    if level_int == 2:
-        return 2
-    if level_int == 3:
-        return 3
-
+    for level in MSLevel:
+        if level_int == level:
+            return level
     raise DecodingError("ms_level", f"Invalid MS level: {level_int}")
 
 

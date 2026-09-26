@@ -151,7 +151,7 @@ class CSVChromatogramReader:
         time_column: str = "Time",
         intensity_column: str = "Intensity",
         delimiter: str | None = None,
-        signal_type: SignalType = "TIC",
+        signal_type: SignalType = SignalType.TIC,
     ) -> TICData:
         """Read chromatogram from CSV file.
 

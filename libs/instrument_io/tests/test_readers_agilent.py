@@ -15,6 +15,7 @@ from instrument_io.readers.agilent import (
     _find_ms_file,
     _is_agilent_d_directory,
 )
+from instrument_io.types.common import SignalType
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -42,17 +43,17 @@ class TestBuildChromatogramMeta:
     """Tests for _build_chromatogram_meta."""
 
     def test_creates_meta_tic(self) -> None:
-        meta = _build_chromatogram_meta("/path/test.D", "TIC", "TIC Detector")
+        meta = _build_chromatogram_meta("/path/test.D", SignalType.TIC, "TIC Detector")
         assert meta["source_path"] == "/path/test.D"
         assert meta["signal_type"] == "TIC"
         assert meta["detector"] == "TIC Detector"
 
     def test_creates_meta_eic(self) -> None:
-        meta = _build_chromatogram_meta("/path/test.D", "EIC", "MS")
+        meta = _build_chromatogram_meta("/path/test.D", SignalType.EIC, "MS")
         assert meta["signal_type"] == "EIC"
 
     def test_creates_meta_dad(self) -> None:
-        meta = _build_chromatogram_meta("/path/test.D", "DAD", "DAD Detector")
+        meta = _build_chromatogram_meta("/path/test.D", SignalType.DAD, "DAD Detector")
         assert meta["signal_type"] == "DAD"
 
 

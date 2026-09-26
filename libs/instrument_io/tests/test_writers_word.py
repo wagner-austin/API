@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from instrument_io._exceptions import WriterError
-from instrument_io.types.document import DocumentContent
+from instrument_io.types.document import DocumentSection
 from instrument_io.writers.word import WordWriter
 
 # Valid 1x1 pixel PNG (green pixel) - generated with correct CRC checksums
@@ -31,7 +31,7 @@ class TestWordWriter:
 
     def test_write_document_creates_file(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Test Document", "level": 1},
             {"type": "paragraph", "text": "This is a test.", "bold": False, "italic": False},
         ]
@@ -48,7 +48,7 @@ class TestWordWriter:
 
     def test_write_document_adds_extension(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Test", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "no_extension"
@@ -58,7 +58,7 @@ class TestWordWriter:
 
     def test_write_document_creates_parent_dirs(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Test", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "subdir" / "nested" / "output.docx"
@@ -67,7 +67,7 @@ class TestWordWriter:
 
     def test_write_document_with_heading_levels(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Heading 1", "level": 1},
             {"type": "heading", "text": "Heading 2", "level": 2},
             {"type": "heading", "text": "Heading 3", "level": 3},
@@ -81,7 +81,7 @@ class TestWordWriter:
 
     def test_write_document_with_bold_paragraph(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Bold text", "bold": True, "italic": False},
         ]
         out_path = tmp_path / "bold.docx"
@@ -90,7 +90,7 @@ class TestWordWriter:
 
     def test_write_document_with_italic_paragraph(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Italic text", "bold": False, "italic": True},
         ]
         out_path = tmp_path / "italic.docx"
@@ -99,7 +99,7 @@ class TestWordWriter:
 
     def test_write_document_with_bold_italic(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Bold and italic", "bold": True, "italic": True},
         ]
         out_path = tmp_path / "bold_italic.docx"
@@ -108,7 +108,7 @@ class TestWordWriter:
 
     def test_write_document_with_table(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": ["Name", "Value"],
@@ -125,7 +125,7 @@ class TestWordWriter:
 
     def test_write_document_with_table_no_caption(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": ["A", "B"],
@@ -139,7 +139,7 @@ class TestWordWriter:
 
     def test_write_document_with_empty_table(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": [],
@@ -153,7 +153,7 @@ class TestWordWriter:
 
     def test_write_document_with_ordered_list(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "list",
                 "items": ["First", "Second", "Third"],
@@ -166,7 +166,7 @@ class TestWordWriter:
 
     def test_write_document_with_unordered_list(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "list",
                 "items": ["Bullet 1", "Bullet 2", "Bullet 3"],
@@ -179,7 +179,7 @@ class TestWordWriter:
 
     def test_write_document_with_page_break(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Page 1", "bold": False, "italic": False},
             {"type": "page_break"},
             {"type": "paragraph", "text": "Page 2", "bold": False, "italic": False},
@@ -193,7 +193,7 @@ class TestWordWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": image_path,
@@ -210,7 +210,7 @@ class TestWordWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": image_path,
@@ -227,7 +227,7 @@ class TestWordWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": image_path,
@@ -241,7 +241,7 @@ class TestWordWriter:
 
     def test_write_document_figure_not_found_raises(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": tmp_path / "nonexistent.png",
@@ -258,7 +258,7 @@ class TestWordWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = WordWriter(title="Test Report", author="Test Author")
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Research Report", "level": 1},
             {
                 "type": "paragraph",
@@ -303,7 +303,7 @@ class TestWordWriter:
 
     def test_write_document_heading_level_clamped(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Level 0 clamped", "level": 0},
             {"type": "heading", "text": "Level 10 clamped", "level": 10},
         ]
@@ -313,7 +313,7 @@ class TestWordWriter:
 
     def test_write_document_table_with_none_values(self, tmp_path: Path) -> None:
         writer = WordWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": ["A", "B"],

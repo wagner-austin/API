@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from instrument_io._exceptions import WriterError
-from instrument_io.types.document import DocumentContent
+from instrument_io.types.document import DocumentSection, PageSize
 from instrument_io.writers.pdf import PDFWriter
 
 # Valid 1x1 pixel PNG (green pixel) - generated with correct CRC checksums
@@ -31,7 +31,7 @@ class TestPDFWriter:
 
     def test_write_document_creates_file(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Test Document", "level": 1},
             {"type": "paragraph", "text": "This is a test.", "bold": False, "italic": False},
         ]
@@ -48,7 +48,7 @@ class TestPDFWriter:
 
     def test_write_document_adds_extension(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Test", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "no_extension"
@@ -58,7 +58,7 @@ class TestPDFWriter:
 
     def test_write_document_creates_parent_dirs(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Test", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "subdir" / "nested" / "output.pdf"
@@ -66,8 +66,8 @@ class TestPDFWriter:
         assert out_path.exists()
 
     def test_write_document_page_size_letter(self, tmp_path: Path) -> None:
-        writer = PDFWriter(page_size="letter")
-        content: DocumentContent = [
+        writer = PDFWriter(page_size=PageSize.LETTER)
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Letter size", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "letter.pdf"
@@ -75,8 +75,8 @@ class TestPDFWriter:
         assert out_path.exists()
 
     def test_write_document_page_size_a4(self, tmp_path: Path) -> None:
-        writer = PDFWriter(page_size="a4")
-        content: DocumentContent = [
+        writer = PDFWriter(page_size=PageSize.A4)
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "A4 size", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "a4.pdf"
@@ -84,8 +84,8 @@ class TestPDFWriter:
         assert out_path.exists()
 
     def test_write_document_page_size_legal(self, tmp_path: Path) -> None:
-        writer = PDFWriter(page_size="legal")
-        content: DocumentContent = [
+        writer = PDFWriter(page_size=PageSize.LEGAL)
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Legal size", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "legal.pdf"
@@ -94,7 +94,7 @@ class TestPDFWriter:
 
     def test_write_document_custom_margins(self, tmp_path: Path) -> None:
         writer = PDFWriter(margin_inches=0.5)
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Custom margins", "bold": False, "italic": False},
         ]
         out_path = tmp_path / "margins.pdf"
@@ -103,7 +103,7 @@ class TestPDFWriter:
 
     def test_write_document_with_heading_levels(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Heading 1", "level": 1},
             {"type": "heading", "text": "Heading 2", "level": 2},
             {"type": "heading", "text": "Heading 3", "level": 3},
@@ -117,7 +117,7 @@ class TestPDFWriter:
 
     def test_write_document_with_bold_paragraph(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Bold text", "bold": True, "italic": False},
         ]
         out_path = tmp_path / "bold.pdf"
@@ -126,7 +126,7 @@ class TestPDFWriter:
 
     def test_write_document_with_italic_paragraph(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Italic text", "bold": False, "italic": True},
         ]
         out_path = tmp_path / "italic.pdf"
@@ -135,7 +135,7 @@ class TestPDFWriter:
 
     def test_write_document_with_bold_italic(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Bold and italic", "bold": True, "italic": True},
         ]
         out_path = tmp_path / "bold_italic.pdf"
@@ -144,7 +144,7 @@ class TestPDFWriter:
 
     def test_write_document_with_table(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": ["Name", "Value"],
@@ -161,7 +161,7 @@ class TestPDFWriter:
 
     def test_write_document_with_table_no_caption(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": ["A", "B"],
@@ -175,7 +175,7 @@ class TestPDFWriter:
 
     def test_write_document_with_empty_table(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": [],
@@ -189,7 +189,7 @@ class TestPDFWriter:
 
     def test_write_document_with_ordered_list(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "list",
                 "items": ["First", "Second", "Third"],
@@ -202,7 +202,7 @@ class TestPDFWriter:
 
     def test_write_document_with_unordered_list(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "list",
                 "items": ["Bullet 1", "Bullet 2", "Bullet 3"],
@@ -215,7 +215,7 @@ class TestPDFWriter:
 
     def test_write_document_with_page_break(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "paragraph", "text": "Page 1", "bold": False, "italic": False},
             {"type": "page_break"},
             {"type": "paragraph", "text": "Page 2", "bold": False, "italic": False},
@@ -229,7 +229,7 @@ class TestPDFWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": image_path,
@@ -246,7 +246,7 @@ class TestPDFWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": image_path,
@@ -263,7 +263,7 @@ class TestPDFWriter:
         image_path.write_bytes(VALID_PNG_BYTES)
 
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": image_path,
@@ -277,7 +277,7 @@ class TestPDFWriter:
 
     def test_write_document_figure_not_found_raises(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "figure",
                 "path": tmp_path / "nonexistent.png",
@@ -293,8 +293,8 @@ class TestPDFWriter:
         image_path = tmp_path / "chart.png"
         image_path.write_bytes(VALID_PNG_BYTES)
 
-        writer = PDFWriter(page_size="letter", margin_inches=1.0)
-        content: DocumentContent = [
+        writer = PDFWriter(page_size=PageSize.LETTER, margin_inches=1.0)
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Research Report", "level": 1},
             {
                 "type": "paragraph",
@@ -339,7 +339,7 @@ class TestPDFWriter:
 
     def test_write_document_heading_level_clamped(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Level 0 clamped", "level": 0},
             {"type": "heading", "text": "Level 10 clamped", "level": 10},
         ]
@@ -349,7 +349,7 @@ class TestPDFWriter:
 
     def test_write_document_table_with_none_values(self, tmp_path: Path) -> None:
         writer = PDFWriter()
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {
                 "type": "table",
                 "headers": ["A", "B"],
@@ -365,7 +365,7 @@ class TestPDFWriter:
         """Test level-1 heading that is not the first heading (not styled as title)."""
         writer = PDFWriter()
         # First heading is level 2, so level 1 heading later is not treated as title
-        content: DocumentContent = [
+        content: list[DocumentSection] = [
             {"type": "heading", "text": "Introduction", "level": 2},
             {"type": "paragraph", "text": "Some content.", "bold": False, "italic": False},
             {"type": "heading", "text": "Main Section", "level": 1},

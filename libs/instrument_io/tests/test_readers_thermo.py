@@ -14,6 +14,7 @@ from instrument_io.readers.thermo import (
     _is_raw_file,
 )
 from instrument_io.testing import hooks
+from instrument_io.types.common import MSLevel, Polarity
 from instrument_io.types.spectrum import MSSpectrum
 
 
@@ -154,8 +155,8 @@ def _make_spectrum(source_path: str, scan_number: int, rt: float, tic: float) ->
             "source_path": source_path,
             "scan_number": scan_number,
             "retention_time": rt,
-            "ms_level": 1,
-            "polarity": "positive",
+            "ms_level": MSLevel.MS1,
+            "polarity": Polarity.POSITIVE,
             "total_ion_current": tic,
         },
         data={"mz_values": [100.0, 200.0], "intensities": [500.0, 500.0]},
@@ -235,8 +236,8 @@ class TestThermoReaderWithFakes:
                 "source_path": str(mzml_output),
                 "scan_number": 1,
                 "retention_time": 1.0,
-                "ms_level": 1,
-                "polarity": "positive",
+                "ms_level": MSLevel.MS1,
+                "polarity": Polarity.POSITIVE,
                 "total_ion_current": 1000.0,
             },
             data={

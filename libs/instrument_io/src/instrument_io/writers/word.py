@@ -17,7 +17,6 @@ from instrument_io._protocols.python_docx import (
 )
 from instrument_io.types.common import CellValue
 from instrument_io.types.document import (
-    DocumentContent,
     DocumentSection,
     FigureContent,
     HeadingContent,
@@ -203,7 +202,7 @@ class WordWriter:
 
     def write_document(
         self,
-        content: DocumentContent,
+        content: list[DocumentSection],
         out_path: Path,
     ) -> None:
         """Write document content to Word file.

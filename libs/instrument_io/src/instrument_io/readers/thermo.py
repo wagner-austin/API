@@ -23,6 +23,7 @@ from instrument_io.types.chromatogram import (
     EICParams,
     TICData,
 )
+from instrument_io.types.common import SignalType
 from instrument_io.types.spectrum import MSSpectrum
 
 
@@ -143,7 +144,7 @@ class ThermoReader:
             method_name="",
             sample_name="",
             acquisition_date="",
-            signal_type="TIC",
+            signal_type=SignalType.TIC,
             detector="MS",
         )
         data = ChromatogramData(
@@ -220,7 +221,7 @@ class ThermoReader:
             method_name="",
             sample_name="",
             acquisition_date="",
-            signal_type="EIC",
+            signal_type=SignalType.EIC,
             detector="MS",
         )
         params = EICParams(target_mz=target_mz, mz_tolerance=mz_tolerance)

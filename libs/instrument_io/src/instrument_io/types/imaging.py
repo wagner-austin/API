@@ -6,7 +6,8 @@ with spatial coordinate information.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from instrument_io.types.common import MSLevel, Polarity
 from instrument_io.types.spectrum import SpectrumData, SpectrumStats
@@ -60,8 +61,12 @@ class ImagingSpectrum(TypedDict):
     stats: SpectrumStats
 
 
-# Spectrum mode for imzML data
-SpectrumMode = Literal["centroid", "profile", "unknown"]
+class SpectrumMode(StrEnum):
+    """How an imzML file stores its spectra."""
+
+    CENTROID = "centroid"
+    PROFILE = "profile"
+    UNKNOWN = "unknown"
 
 
 class ImzMLFileInfo(TypedDict):

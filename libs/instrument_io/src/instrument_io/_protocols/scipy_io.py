@@ -40,14 +40,13 @@ class NdarrayProtocol(Protocol):
         ...
 
 
-# scipy.io.loadmat returns dict with string keys and numpy arrays
-MATDict = dict[str, NdarrayProtocol | str | int | float]
-
-
 class _LoadMatFn(Protocol):
-    """Protocol for scipy.io.loadmat function."""
+    """Protocol for scipy.io.loadmat function.
 
-    def __call__(self, file_name: str | Path) -> MATDict:
+    loadmat returns a dict with string keys and numpy arrays or scalars.
+    """
+
+    def __call__(self, file_name: str | Path) -> dict[str, NdarrayProtocol | str | int | float]:
         """Load MATLAB .mat file.
 
         Args:
@@ -59,7 +58,7 @@ class _LoadMatFn(Protocol):
         ...
 
 
-def _load_mat(path: Path) -> MATDict:
+def _load_mat(path: Path) -> dict[str, NdarrayProtocol | str | int | float]:
     """Load MATLAB .mat file with proper typing via Protocol.
 
     Args:
@@ -75,7 +74,6 @@ def _load_mat(path: Path) -> MATDict:
 
 __all__ = [
     "DtypeProtocol",
-    "MATDict",
     "NdarrayProtocol",
     "PythonValue",
     "_load_mat",

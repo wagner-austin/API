@@ -86,7 +86,6 @@ from instrument_io.types.common import (
 
 # Types - Document
 from instrument_io.types.document import (
-    DocumentContent,
     DocumentSection,
     FigureContent,
     HeadingContent,
@@ -160,7 +159,6 @@ __all__ = [
     "DOCXReadError",
     "DOCXReader",
     "DecodingError",
-    "DocumentContent",
     "DocumentSection",
     "DocumentWriterProtocol",
     "EICData",

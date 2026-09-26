@@ -30,7 +30,7 @@ from instrument_io.types.chromatogram import (
     EICParams,
     TICData,
 )
-from instrument_io.types.common import SignalType
+from instrument_io.types.common import MSLevel, Polarity, SignalType
 from instrument_io.types.metadata import RunInfo
 from instrument_io.types.spectrum import (
     MSSpectrum,
@@ -228,7 +228,7 @@ class AgilentReader:
             intensities.append(total)
 
         # Build typed structures (signal type TIC, detector name from MS)
-        meta = _build_chromatogram_meta(str(path), "TIC", f"{ms_file.detector} (computed)")
+        meta = _build_chromatogram_meta(str(path), SignalType.TIC, f"{ms_file.detector} (computed)")
         data = _make_chromatogram_data(retention_times, intensities)
         stats = _compute_chromatogram_stats(retention_times, intensities)
 
@@ -276,7 +276,7 @@ class AgilentReader:
         )
 
         # Build typed structures
-        meta = _build_chromatogram_meta(str(path), "EIC", ms_file.detector)
+        meta = _build_chromatogram_meta(str(path), SignalType.EIC, ms_file.detector)
         params = EICParams(target_mz=target_mz, mz_tolerance=mz_tolerance)
         data = ChromatogramData(retention_times=retention_times, intensities=intensities)
         stats = _compute_chromatogram_stats(retention_times, intensities)
@@ -361,8 +361,8 @@ class AgilentReader:
                 source_path=str(path),
                 scan_number=scan_idx + 1,
                 retention_time=rt,
-                ms_level=1,
-                polarity="unknown",
+                ms_level=MSLevel.MS1,
+                polarity=Polarity.UNKNOWN,
                 total_ion_current=sum(intensity_values),
             )
 

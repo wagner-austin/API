@@ -8,6 +8,7 @@ All types are immutable TypedDicts with strict typing.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal, TypedDict, TypeGuard
 
@@ -110,19 +111,20 @@ DocumentSection = (
     | PageBreakContent
 )
 
-# A complete document is a sequence of sections
-DocumentContent = list[DocumentSection]
 
+class PageSize(StrEnum):
+    """A paper size the PDF writer lays pages out on."""
 
-# Page size type
-PageSize = Literal["letter", "a4", "legal"]
+    LETTER = "letter"
+    A4 = "a4"
+    LEGAL = "legal"
 
 
 # Page dimensions in points (72 points = 1 inch)
 PAGE_SIZES: dict[PageSize, tuple[float, float]] = {
-    "letter": (612.0, 792.0),  # 8.5 x 11 inches
-    "a4": (595.28, 841.89),  # 210 x 297 mm (precise conversion)
-    "legal": (612.0, 1008.0),  # 8.5 x 14 inches
+    PageSize.LETTER: (612.0, 792.0),  # 8.5 x 11 inches
+    PageSize.A4: (595.28, 841.89),  # 210 x 297 mm (precise conversion)
+    PageSize.LEGAL: (612.0, 1008.0),  # 8.5 x 14 inches
 }
 
 
@@ -200,7 +202,6 @@ def is_page_break(section: DocumentSection) -> TypeGuard[PageBreakContent]:
 
 __all__ = [
     "PAGE_SIZES",
-    "DocumentContent",
     "DocumentSection",
     "FigureContent",
     "HeadingContent",

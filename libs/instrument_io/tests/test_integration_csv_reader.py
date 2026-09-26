@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from instrument_io.readers.csv import CSVChromatogramReader
+from instrument_io.types.common import SignalType
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CHROMATOGRAM_CSV = FIXTURES_DIR / "chromatogram.csv"
@@ -76,6 +77,6 @@ class TestCSVReaderIntegration:
         """Test reading with custom signal type."""
         csv_file = _get_csv_file()
         reader = CSVChromatogramReader()
-        tic_data = reader.read_chromatogram(csv_file, signal_type="EIC")
+        tic_data = reader.read_chromatogram(csv_file, signal_type=SignalType.EIC)
 
         assert tic_data["meta"]["signal_type"] == "EIC"
