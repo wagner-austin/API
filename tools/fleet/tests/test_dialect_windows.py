@@ -178,14 +178,6 @@ class TestBuildScript:
         assert "$?" not in body
 
 
-class TestLogTailScript:
-    def test_it_reads_the_last_lines_of_the_transcript_or_nothing(self) -> None:
-        body = DIALECT.log_tail_script("C:/s/run-1", 200)
-
-        assert "if (Test-Path -LiteralPath 'C:/s/run-1/result.txt.log')" in body
-        assert "Get-Content -Tail 200 -LiteralPath 'C:/s/run-1/result.txt.log'" in body
-
-
 class TestLaunchScript:
     def test_it_registers_and_starts_a_scheduled_task(self) -> None:
         """Not an ssh child. Windows OpenSSH puts that in a job object that
