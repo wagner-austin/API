@@ -9,7 +9,8 @@ Provides functions to create derived features from raw financial ratios:
 from __future__ import annotations
 
 import math
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import Final, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -321,20 +322,33 @@ def engineer_features(
     }
 
 
-# Feature engineering presets for Optuna
-FeaturePreset = Literal["none", "log_only", "ratios_only", "full", "temporal"]
+class FeaturePreset(StrEnum):
+    """A named feature engineering configuration for Optuna runs."""
+
+    NONE = "none"
+    LOG_ONLY = "log_only"
+    RATIOS_ONLY = "ratios_only"
+    FULL = "full"
+    TEMPORAL = "temporal"
+
+
+#: Every preset except TEMPORAL: the set the regression API, the regression
+#: optimize results, the classifier optimize config and the optimize CLI admit.
+NON_TEMPORAL_FEATURE_PRESETS: Final[frozenset[FeaturePreset]] = frozenset(FeaturePreset) - {
+    FeaturePreset.TEMPORAL
+}
 
 
 def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringConfig:
     """Get feature engineering config for a named preset.
 
     Args:
-        preset: One of "none", "log_only", "ratios_only", "full", "temporal".
+        preset: The preset to expand.
 
     Returns:
         FeatureEngineeringConfig for the preset.
     """
-    if preset == "none":
+    if preset is FeaturePreset.NONE:
         return {
             "use_ratios": False,
             "use_products": False,
@@ -343,7 +357,7 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
-    if preset == "log_only":
+    if preset is FeaturePreset.LOG_ONLY:
         return {
             "use_ratios": False,
             "use_products": False,
@@ -352,7 +366,7 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
-    if preset == "ratios_only":
+    if preset is FeaturePreset.RATIOS_ONLY:
         return {
             "use_ratios": True,
             "use_products": False,
@@ -361,7 +375,7 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
             "max_ratio_features": 500,
             "max_product_features": 0,
         }
-    if preset == "temporal":
+    if preset is FeaturePreset.TEMPORAL:
         return {
             "use_ratios": False,
             "use_products": False,
@@ -370,7 +384,7 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
-    # "full"
+    # FULL
     return {
         "use_ratios": True,
         "use_products": True,

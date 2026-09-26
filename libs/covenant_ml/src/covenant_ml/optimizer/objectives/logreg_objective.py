@@ -136,7 +136,7 @@ class LogRegObjective:
             feature_preset: Feature engineering preset to apply.
         """
         # Apply feature engineering BEFORE splitting
-        if feature_preset != "none":
+        if feature_preset is not FeaturePreset.NONE:
             config = get_feature_config_for_preset(feature_preset)
             engineered = engineer_features(x_features, feature_names, config)
             x_engineered = engineered["x"]

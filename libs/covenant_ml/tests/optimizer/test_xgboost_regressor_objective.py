@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_ml import RequestedDevice
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.objectives.xgboost_regressor_objective import (
     XGBoostRegressorObjective,
     _cuda_available,
@@ -118,7 +119,7 @@ def test_init_stores_feature_count() -> None:
     """XGBoostRegressorObjective stores correct feature count."""
     x, y, names = _make_regression_data(n_samples=50, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
     assert objective.n_features == 5
 
@@ -128,7 +129,7 @@ def test_init_with_feature_engineering_log_only() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=5)
     x_positive = _make_positive_data(x, 1.0)
     objective = XGBoostRegressorObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.LOG_ONLY
     )
     assert objective.n_features > 5
 
@@ -138,7 +139,7 @@ def test_init_with_feature_engineering_full() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)
     objective = XGBoostRegressorObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.FULL
     )
     assert objective.n_features > 4
 
@@ -147,7 +148,7 @@ def test_init_with_auto_device() -> None:
     """Resolves 'auto' device based on CUDA availability."""
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.AUTO, feature_preset="none"
+        x, y, names, device=RequestedDevice.AUTO, feature_preset=FeaturePreset.NONE
     )
     assert objective.n_features == 4
 
@@ -156,7 +157,7 @@ def test_init_with_cpu_device() -> None:
     """Accepts 'cpu' device explicitly."""
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
     assert objective.n_features == 4
 
@@ -170,7 +171,7 @@ def test_call_returns_negative_rmse() -> None:
     """__call__ returns negative RMSE (for Optuna maximization)."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     result = objective(
@@ -196,7 +197,7 @@ def test_call_ignores_passed_data() -> None:
     """Uses pre-split data, not passed arguments."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5, seed=42)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     x_other, _, names_other = _make_regression_data(n_samples=50, n_features=3, seed=99)
@@ -222,7 +223,7 @@ def test_call_with_different_hyperparams() -> None:
     """Returns different results for different hyperparameters."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     int_params_shallow = SampledIntParams(max_depth=2, n_estimators=5)
@@ -265,7 +266,7 @@ def test_call_deterministic() -> None:
     """Multiple calls with same params return same result."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     int_params = _make_default_int_params()
@@ -308,7 +309,7 @@ def test_create_returns_objective() -> None:
     """create_xgboost_regressor_objective returns callable with n_features."""
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     objective = create_xgboost_regressor_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
     assert objective.n_features == 4
     assert callable(objective)
@@ -319,7 +320,7 @@ def test_create_with_feature_preset() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)
     objective = create_xgboost_regressor_objective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.FULL
     )
     assert objective.n_features > 4
 
@@ -328,7 +329,7 @@ def test_create_callable() -> None:
     """create_xgboost_regressor_objective returns callable objective."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = create_xgboost_regressor_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     result = objective(
@@ -356,7 +357,7 @@ def test_with_dart_booster() -> None:
     """Works with DART booster and rate_drop/skip_drop params."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     float_params = SampledFloatParams(
@@ -390,7 +391,7 @@ def test_with_dart_partial_params() -> None:
     """Works with DART and only rate_drop (no skip_drop)."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     float_params = SampledFloatParams(
@@ -423,7 +424,7 @@ def test_with_dart_skip_drop_only() -> None:
     """Works with DART and only skip_drop (no rate_drop)."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     float_params = SampledFloatParams(
@@ -461,7 +462,7 @@ def test_n_features_matches_original() -> None:
     """n_features matches input when no engineering applied."""
     x, y, names = _make_regression_data(n_samples=50, n_features=7)
     objective = XGBoostRegressorObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
     assert objective.n_features == 7
 
@@ -471,7 +472,7 @@ def test_n_features_reflects_engineering() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)
     objective = XGBoostRegressorObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.LOG_ONLY
     )
     assert objective.n_features > 4
 

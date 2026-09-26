@@ -56,6 +56,7 @@ from covenant_ml.types_regression import (
 )
 
 from .features import (
+    NON_TEMPORAL_FEATURE_PRESETS,
     EngineeredFeatures,
     FeatureEngineeringConfig,
     FeaturePreset,
@@ -69,6 +70,7 @@ from .features import (
 from .predictor import load_model, predict_probabilities
 
 __all__ = [
+    "NON_TEMPORAL_FEATURE_PRESETS",
     "DataSplits",
     "EngineeredFeatures",
     "EvalMetrics",

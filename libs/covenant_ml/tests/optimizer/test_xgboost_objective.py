@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_ml import RequestedDevice
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.objectives.xgboost_objective import (
     XGBoostObjective,
     _cuda_available,
@@ -111,7 +112,9 @@ def test_cuda_available_returns_bool() -> None:
 def test_xgboost_objective_init_stores_feature_count() -> None:
     """XGBoostObjective stores correct feature count after initialization."""
     x, y, names = _make_test_data(n_samples=50, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
     assert objective.n_features == 5
 
 
@@ -121,7 +124,7 @@ def test_xgboost_objective_init_with_feature_engineering_log_only() -> None:
     # Make all values positive for log transform
     x_positive = _make_positive_data(x, 1.0)
     objective = XGBoostObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.LOG_ONLY
     )
     # log_only adds log-transformed versions of original features
     assert objective.n_features > 5
@@ -133,7 +136,7 @@ def test_xgboost_objective_init_with_feature_engineering_ratios_only() -> None:
     # Make values positive and avoid zeros for ratio computation
     x_positive = _make_positive_data(x, 0.1)
     objective = XGBoostObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="ratios_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.RATIOS_ONLY
     )
     # ratios_only adds ratio features
     assert objective.n_features >= 4
@@ -145,7 +148,7 @@ def test_xgboost_objective_init_with_feature_engineering_full() -> None:
     # Make values positive for log and ratio transforms
     x_positive = _make_positive_data(x, 0.1)
     objective = XGBoostObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.FULL
     )
     # full adds ratios, products, and log transforms
     assert objective.n_features > 4
@@ -154,7 +157,9 @@ def test_xgboost_objective_init_with_feature_engineering_full() -> None:
 def test_xgboost_objective_init_with_auto_device() -> None:
     """XGBoostObjective resolves 'auto' device based on CUDA availability."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.AUTO, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.AUTO, feature_preset=FeaturePreset.NONE
+    )
     # Should not raise - device resolution happens at init
     assert objective.n_features == 4
 
@@ -162,7 +167,9 @@ def test_xgboost_objective_init_with_auto_device() -> None:
 def test_xgboost_objective_init_with_cpu_device() -> None:
     """XGBoostObjective accepts 'cpu' device explicitly."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
     assert objective.n_features == 4
 
 
@@ -174,7 +181,9 @@ def test_xgboost_objective_init_with_cpu_device() -> None:
 def test_xgboost_objective_call_returns_auc() -> None:
     """XGBoostObjective.__call__ returns validation AUC between 0 and 1."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
@@ -203,7 +212,9 @@ def test_xgboost_objective_call_ignores_passed_data() -> None:
     """XGBoostObjective uses pre-split data, not passed arguments."""
     # Create objective with specific data
     x, y, names = _make_test_data(n_samples=100, n_features=5, seed=42)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     # Pass different data (which should be ignored)
     x_other, y_other, names_other = _make_test_data(n_samples=50, n_features=3, seed=99)
@@ -232,7 +243,9 @@ def test_xgboost_objective_call_ignores_passed_data() -> None:
 def test_xgboost_objective_call_with_different_hyperparams() -> None:
     """XGBoostObjective returns different results for different hyperparameters."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params_shallow = SampledIntParams(max_depth=2, n_estimators=5)
     int_params_deep = SampledIntParams(max_depth=8, n_estimators=50)
@@ -273,7 +286,9 @@ def test_xgboost_objective_call_with_different_hyperparams() -> None:
 def test_xgboost_objective_multiple_calls_deterministic() -> None:
     """Multiple calls with same params return same AUC (deterministic)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
@@ -318,7 +333,7 @@ def test_create_xgboost_objective_returns_objective() -> None:
     """create_xgboost_objective returns callable with n_features property."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     objective = create_xgboost_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
     # Verify it has the n_features property
     assert objective.n_features == 4
@@ -331,7 +346,7 @@ def test_create_xgboost_objective_with_feature_preset() -> None:
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)  # Make positive for transformations
     objective = create_xgboost_objective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.FULL
     )
     assert objective.n_features > 4
 
@@ -340,7 +355,7 @@ def test_create_xgboost_objective_callable() -> None:
     """create_xgboost_objective returns callable objective."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
     objective = create_xgboost_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     int_params = _make_default_int_params()
@@ -371,7 +386,9 @@ def test_create_xgboost_objective_callable() -> None:
 def test_n_features_property_matches_original() -> None:
     """n_features matches input when no engineering applied."""
     x, y, names = _make_test_data(n_samples=50, n_features=7)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
     assert objective.n_features == 7
 
 
@@ -380,7 +397,7 @@ def test_n_features_property_reflects_engineering() -> None:
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)  # Make positive for log transform
     objective = XGBoostObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.LOG_ONLY
     )
     # log_only typically doubles features (original + log)
     assert objective.n_features > 4
@@ -394,7 +411,9 @@ def test_n_features_property_reflects_engineering() -> None:
 def test_xgboost_objective_with_dart_booster() -> None:
     """XGBoostObjective uses DART params when booster is 'dart'."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(
@@ -428,7 +447,9 @@ def test_xgboost_objective_with_dart_booster() -> None:
 def test_xgboost_objective_with_dart_partial_params() -> None:
     """XGBoostObjective handles partial DART params (only rate_drop, no skip_drop)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(
@@ -461,7 +482,9 @@ def test_xgboost_objective_with_dart_partial_params() -> None:
 def test_xgboost_objective_with_dart_skip_drop_only() -> None:
     """XGBoostObjective handles DART with only skip_drop (no rate_drop)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = XGBoostObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = XGBoostObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(

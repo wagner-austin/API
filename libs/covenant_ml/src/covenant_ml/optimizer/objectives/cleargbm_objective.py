@@ -163,7 +163,7 @@ class ClearGBMObjective:
             early_stopping_rounds: Stop if no improvement for this many rounds.
         """
         # Apply feature engineering BEFORE splitting
-        if feature_preset != "none":
+        if feature_preset is not FeaturePreset.NONE:
             config = get_feature_config_for_preset(feature_preset)
             engineered = engineer_features(x_features, feature_names, config)
             x_engineered = engineered["x"]

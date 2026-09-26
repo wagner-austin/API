@@ -7,6 +7,7 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.features import (
+    NON_TEMPORAL_FEATURE_PRESETS,
     FeatureEngineeringConfig,
     FeaturePreset,
     compute_log_transforms,
@@ -383,7 +384,7 @@ class TestGetFeatureConfigForPreset:
 
     def test_none_preset(self) -> None:
         """'none' preset disables all features."""
-        config = get_feature_config_for_preset("none")
+        config = get_feature_config_for_preset(FeaturePreset.NONE)
 
         assert config["use_ratios"] is False
         assert config["use_products"] is False
@@ -392,7 +393,7 @@ class TestGetFeatureConfigForPreset:
 
     def test_log_only_preset(self) -> None:
         """'log_only' preset enables only log transforms."""
-        config = get_feature_config_for_preset("log_only")
+        config = get_feature_config_for_preset(FeaturePreset.LOG_ONLY)
 
         assert config["use_ratios"] is False
         assert config["use_products"] is False
@@ -401,7 +402,7 @@ class TestGetFeatureConfigForPreset:
 
     def test_ratios_only_preset(self) -> None:
         """'ratios_only' preset enables only ratios."""
-        config = get_feature_config_for_preset("ratios_only")
+        config = get_feature_config_for_preset(FeaturePreset.RATIOS_ONLY)
 
         assert config["use_ratios"] is True
         assert config["use_products"] is False
@@ -411,7 +412,7 @@ class TestGetFeatureConfigForPreset:
 
     def test_full_preset(self) -> None:
         """'full' preset enables everything except temporal."""
-        config = get_feature_config_for_preset("full")
+        config = get_feature_config_for_preset(FeaturePreset.FULL)
 
         assert config["use_ratios"] is True
         assert config["use_products"] is True
@@ -420,17 +421,19 @@ class TestGetFeatureConfigForPreset:
         assert config["max_ratio_features"] == 500
         assert config["max_product_features"] == 200
 
+    def test_non_temporal_presets_are_every_preset_but_temporal(self) -> None:
+        """NON_TEMPORAL_FEATURE_PRESETS holds the four presets other than TEMPORAL."""
+        expected = {
+            FeaturePreset.NONE,
+            FeaturePreset.LOG_ONLY,
+            FeaturePreset.RATIOS_ONLY,
+            FeaturePreset.FULL,
+        }
+        assert expected == NON_TEMPORAL_FEATURE_PRESETS
+
     def test_all_presets_return_typed_config(self) -> None:
         """All presets return valid FeatureEngineeringConfig."""
-        presets: list[FeaturePreset] = [
-            "none",
-            "log_only",
-            "ratios_only",
-            "full",
-            "temporal",
-        ]
-
-        for preset in presets:
+        for preset in FeaturePreset:
             config = get_feature_config_for_preset(preset)
             # All required keys present
             assert "use_ratios" in config
@@ -558,7 +561,7 @@ class TestIntegration:
         x = _make_array(2, 4, (1e-10, 1e10, 0.0, -1e5, 1e10, 1e-10, 1.0, 1e5))
         names = ["tiny", "huge", "zero", "neg"]
 
-        config = get_feature_config_for_preset("full")
+        config = get_feature_config_for_preset(FeaturePreset.FULL)
         result = engineer_features(x, names, config)
 
         # All values should be finite

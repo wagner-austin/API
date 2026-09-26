@@ -9,6 +9,7 @@ import numpy as np
 from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.objectives.cleargbm_objective import (
     ClearGBMObjective,
     _build_trial_config,
@@ -141,7 +142,7 @@ class TestClearGBMObjectiveInit:
     def test_stores_feature_count(self) -> None:
         """ClearGBMObjective stores correct feature count after initialization."""
         x, y, names = _make_test_data(n_samples=50, n_features=5)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
         assert objective.n_features == 5
 
     def test_with_feature_engineering_log_only(self) -> None:
@@ -149,7 +150,7 @@ class TestClearGBMObjectiveInit:
         x, y, names = _make_test_data(n_samples=50, n_features=5)
         # Make all values positive for log transform
         x_positive = _make_positive_data(x, 1.0)
-        objective = ClearGBMObjective(x_positive, y, names, feature_preset="log_only")
+        objective = ClearGBMObjective(x_positive, y, names, feature_preset=FeaturePreset.LOG_ONLY)
         # log_only adds log-transformed versions of original features
         assert objective.n_features > 5
 
@@ -158,7 +159,9 @@ class TestClearGBMObjectiveInit:
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         # Make values positive and avoid zeros for ratio computation
         x_positive = _make_positive_data(x, 0.1)
-        objective = ClearGBMObjective(x_positive, y, names, feature_preset="ratios_only")
+        objective = ClearGBMObjective(
+            x_positive, y, names, feature_preset=FeaturePreset.RATIOS_ONLY
+        )
         # ratios_only adds ratio features
         assert objective.n_features >= 4
 
@@ -167,14 +170,16 @@ class TestClearGBMObjectiveInit:
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         # Make values positive for log and ratio transforms
         x_positive = _make_positive_data(x, 0.1)
-        objective = ClearGBMObjective(x_positive, y, names, feature_preset="full")
+        objective = ClearGBMObjective(x_positive, y, names, feature_preset=FeaturePreset.FULL)
         # full adds ratios, products, and log transforms
         assert objective.n_features > 4
 
     def test_with_custom_early_stopping_rounds(self) -> None:
         """ClearGBMObjective accepts custom early_stopping_rounds."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none", early_stopping_rounds=20)
+        objective = ClearGBMObjective(
+            x, y, names, feature_preset=FeaturePreset.NONE, early_stopping_rounds=20
+        )
         assert objective.n_features == 4
 
 
@@ -189,7 +194,7 @@ class TestClearGBMObjectiveCall:
     def test_returns_auc(self) -> None:
         """ClearGBMObjective.__call__ returns validation AUC between 0 and 1."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         int_params = _make_default_int_params()
         float_params = _make_default_float_params()
@@ -215,7 +220,7 @@ class TestClearGBMObjectiveCall:
         """ClearGBMObjective uses pre-split data, not passed arguments."""
         # Create objective with specific data
         x, y, names = _make_test_data(n_samples=100, n_features=5, seed=42)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         # Pass different data (which should be ignored)
         x_other, y_other, names_other = _make_test_data(n_samples=50, n_features=3, seed=99)
@@ -243,7 +248,7 @@ class TestClearGBMObjectiveCall:
     def test_with_different_hyperparams(self) -> None:
         """ClearGBMObjective returns different results for different hyperparameters."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         # Test with shallow model vs deeper model
         int_params_simple = SampledIntParams(
@@ -288,7 +293,7 @@ class TestClearGBMObjectiveCall:
     def test_multiple_calls_deterministic(self) -> None:
         """Multiple calls with same params return same AUC (deterministic)."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         int_params = _make_default_int_params()
         float_params = _make_default_float_params()
@@ -325,7 +330,7 @@ class TestClearGBMObjectiveCall:
     def test_with_subsample_less_than_one(self) -> None:
         """ClearGBMObjective handles subsample < 1.0 correctly."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         int_params = _make_default_int_params()
         float_params = SampledFloatParams(learning_rate=0.1, subsample=0.8)
@@ -358,7 +363,7 @@ class TestCreateClearGBMObjective:
     def test_returns_objective_with_n_features(self) -> None:
         """create_cleargbm_objective returns callable with n_features property."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
-        objective = create_cleargbm_objective(x, y, names, feature_preset="none")
+        objective = create_cleargbm_objective(x, y, names, feature_preset=FeaturePreset.NONE)
         # Verify it has the n_features property
         assert objective.n_features == 4
         # Verify it's callable
@@ -368,13 +373,15 @@ class TestCreateClearGBMObjective:
         """create_cleargbm_objective applies feature preset."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         x_positive = _make_positive_data(x, 0.1)  # Make positive for transformations
-        objective = create_cleargbm_objective(x_positive, y, names, feature_preset="full")
+        objective = create_cleargbm_objective(
+            x_positive, y, names, feature_preset=FeaturePreset.FULL
+        )
         assert objective.n_features > 4
 
     def test_callable(self) -> None:
         """create_cleargbm_objective returns callable objective."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = create_cleargbm_objective(x, y, names, feature_preset="none")
+        objective = create_cleargbm_objective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         int_params = _make_default_int_params()
         float_params = _make_default_float_params()
@@ -399,7 +406,7 @@ class TestCreateClearGBMObjective:
         """create_cleargbm_objective accepts early_stopping_rounds parameter."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
         objective = create_cleargbm_objective(
-            x, y, names, feature_preset="none", early_stopping_rounds=5
+            x, y, names, feature_preset=FeaturePreset.NONE, early_stopping_rounds=5
         )
 
         int_params = _make_default_int_params()
@@ -433,14 +440,14 @@ class TestNFeaturesProperty:
     def test_matches_original_when_no_engineering(self) -> None:
         """n_features matches input when no engineering applied."""
         x, y, names = _make_test_data(n_samples=50, n_features=7)
-        objective = ClearGBMObjective(x, y, names, feature_preset="none")
+        objective = ClearGBMObjective(x, y, names, feature_preset=FeaturePreset.NONE)
         assert objective.n_features == 7
 
     def test_reflects_engineering(self) -> None:
         """n_features reflects engineered count when preset applied."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         x_positive = _make_positive_data(x, 0.1)  # Make positive for log transform
-        objective = ClearGBMObjective(x_positive, y, names, feature_preset="log_only")
+        objective = ClearGBMObjective(x_positive, y, names, feature_preset=FeaturePreset.LOG_ONLY)
         # log_only typically doubles features (original + log)
         assert objective.n_features > 4
 

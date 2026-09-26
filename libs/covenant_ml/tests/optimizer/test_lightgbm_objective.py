@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from platform_ml import RequestedDevice
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.objectives.lightgbm_objective import (
     LightGBMObjective,
     _get_lgb_dataset_and_train,
@@ -61,7 +62,9 @@ def test_get_lgb_dataset_and_train_returns_valid_types() -> None:
 def test_lightgbm_objective_init_stores_feature_count() -> None:
     """LightGBMObjective stores correct feature count after initialization."""
     x, y, names = _make_test_data(n_samples=50, n_features=5)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
     assert objective.n_features == 5
 
 
@@ -71,7 +74,7 @@ def test_lightgbm_objective_init_with_feature_engineering_log_only() -> None:
     # Make all values positive for log transform
     x_positive = _make_positive_data(x, 1.0)
     objective = LightGBMObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.LOG_ONLY
     )
     # log_only adds log-transformed versions of original features
     assert objective.n_features > 5
@@ -83,7 +86,7 @@ def test_lightgbm_objective_init_with_feature_engineering_ratios_only() -> None:
     # Make values positive and avoid zeros for ratio computation
     x_positive = _make_positive_data(x, 0.1)
     objective = LightGBMObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="ratios_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.RATIOS_ONLY
     )
     # ratios_only adds ratio features
     assert objective.n_features >= 4
@@ -95,7 +98,7 @@ def test_lightgbm_objective_init_with_feature_engineering_full() -> None:
     # Make values positive for log and ratio transforms
     x_positive = _make_positive_data(x, 0.1)
     objective = LightGBMObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.FULL
     )
     # full adds ratios, products, and log transforms
     assert objective.n_features > 4
@@ -104,7 +107,9 @@ def test_lightgbm_objective_init_with_feature_engineering_full() -> None:
 def test_lightgbm_objective_init_with_auto_device() -> None:
     """LightGBMObjective resolves 'auto' device to cpu."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.AUTO, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.AUTO, feature_preset=FeaturePreset.NONE
+    )
     # Should not raise - device resolution happens at init
     assert objective.n_features == 4
 
@@ -112,7 +117,9 @@ def test_lightgbm_objective_init_with_auto_device() -> None:
 def test_lightgbm_objective_init_with_cpu_device() -> None:
     """LightGBMObjective accepts 'cpu' device explicitly."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
     assert objective.n_features == 4
 
 
@@ -120,7 +127,12 @@ def test_lightgbm_objective_init_with_early_stopping_rounds() -> None:
     """LightGBMObjective accepts custom early_stopping_rounds."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     objective = LightGBMObjective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none", early_stopping_rounds=20
+        x,
+        y,
+        names,
+        device=RequestedDevice.CPU,
+        feature_preset=FeaturePreset.NONE,
+        early_stopping_rounds=20,
     )
     assert objective.n_features == 4
 
@@ -128,7 +140,9 @@ def test_lightgbm_objective_init_with_early_stopping_rounds() -> None:
 def test_lightgbm_objective_call_returns_auc() -> None:
     """LightGBMObjective.__call__ returns validation AUC between 0 and 1."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
@@ -157,7 +171,9 @@ def test_lightgbm_objective_call_ignores_passed_data() -> None:
     """LightGBMObjective uses pre-split data, not passed arguments."""
     # Create objective with specific data
     x, y, names = _make_test_data(n_samples=100, n_features=5, seed=42)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     # Pass different data (which should be ignored)
     x_other, y_other, names_other = _make_test_data(n_samples=50, n_features=3, seed=99)
@@ -186,7 +202,9 @@ def test_lightgbm_objective_call_ignores_passed_data() -> None:
 def test_lightgbm_objective_call_with_different_hyperparams() -> None:
     """LightGBMObjective returns different results for different hyperparameters."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     # Test with few leaves (simpler model) vs many leaves (more complex model)
     int_params_simple = SampledIntParams(n_estimators=5, num_leaves=4)
@@ -228,7 +246,9 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
 def test_lightgbm_objective_multiple_calls_deterministic() -> None:
     """Multiple calls with same params return same AUC (deterministic)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
@@ -267,7 +287,7 @@ def test_create_lightgbm_objective_returns_objective() -> None:
     """create_lightgbm_objective returns callable with n_features property."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     objective = create_lightgbm_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
     # Verify it has the n_features property
     assert objective.n_features == 4
@@ -280,7 +300,7 @@ def test_create_lightgbm_objective_with_feature_preset() -> None:
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)  # Make positive for transformations
     objective = create_lightgbm_objective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.FULL
     )
     assert objective.n_features > 4
 
@@ -289,7 +309,7 @@ def test_create_lightgbm_objective_callable() -> None:
     """create_lightgbm_objective returns callable objective."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
     objective = create_lightgbm_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
     )
 
     int_params = _make_default_int_params()
@@ -316,7 +336,12 @@ def test_create_lightgbm_objective_with_early_stopping_rounds() -> None:
     """create_lightgbm_objective accepts early_stopping_rounds parameter."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
     objective = create_lightgbm_objective(
-        x, y, names, device=RequestedDevice.CPU, feature_preset="none", early_stopping_rounds=5
+        x,
+        y,
+        names,
+        device=RequestedDevice.CPU,
+        feature_preset=FeaturePreset.NONE,
+        early_stopping_rounds=5,
     )
 
     int_params = _make_default_int_params()
@@ -342,7 +367,9 @@ def test_create_lightgbm_objective_with_early_stopping_rounds() -> None:
 def test_n_features_property_matches_original() -> None:
     """n_features matches input when no engineering applied."""
     x, y, names = _make_test_data(n_samples=50, n_features=7)
-    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
+    objective = LightGBMObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.NONE
+    )
     assert objective.n_features == 7
 
 
@@ -351,7 +378,7 @@ def test_n_features_property_reflects_engineering() -> None:
     x, y, names = _make_test_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)  # Make positive for log transform
     objective = LightGBMObjective(
-        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset=FeaturePreset.LOG_ONLY
     )
     # log_only typically doubles features (original + log)
     assert objective.n_features > 4

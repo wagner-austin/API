@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 
 from covenant_ml.features import (
     FeatureEngineeringConfig,
+    FeaturePreset,
     engineer_features,
     get_feature_config_for_preset,
 )
@@ -35,7 +36,7 @@ class TestTemporalPreset:
 
     def test_temporal_preset_config(self) -> None:
         """'temporal' preset enables only temporal features."""
-        config = get_feature_config_for_preset("temporal")
+        config = get_feature_config_for_preset(FeaturePreset.TEMPORAL)
 
         assert config["use_ratios"] is False
         assert config["use_products"] is False
@@ -46,7 +47,7 @@ class TestTemporalPreset:
 
     def test_temporal_preset_has_all_keys(self) -> None:
         """'temporal' preset returns all required FeatureEngineeringConfig keys."""
-        config = get_feature_config_for_preset("temporal")
+        config = get_feature_config_for_preset(FeaturePreset.TEMPORAL)
 
         assert "use_ratios" in config
         assert "use_products" in config

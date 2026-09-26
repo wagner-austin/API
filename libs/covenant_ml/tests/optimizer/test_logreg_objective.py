@@ -8,6 +8,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.objectives.logreg_objective import (
     LogRegObjective,
     create_logreg_objective,
@@ -99,21 +100,21 @@ class TestLogRegObjectiveInit:
     def test_stores_feature_count(self) -> None:
         """LogRegObjective stores correct feature count after initialization."""
         x, y, names = _make_test_data(n_samples=50, n_features=5)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
         assert objective.n_features == 5
 
     def test_with_feature_engineering_log_only(self) -> None:
         """LogRegObjective applies log_only feature engineering correctly."""
         x, y, names = _make_test_data(n_samples=50, n_features=5)
         x_positive = _make_positive_data(x, 1.0)
-        objective = LogRegObjective(x_positive, y, names, feature_preset="log_only")
+        objective = LogRegObjective(x_positive, y, names, feature_preset=FeaturePreset.LOG_ONLY)
         assert objective.n_features > 5
 
     def test_with_feature_engineering_full(self) -> None:
         """LogRegObjective applies full feature engineering correctly."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         x_positive = _make_positive_data(x, 0.1)
-        objective = LogRegObjective(x_positive, y, names, feature_preset="full")
+        objective = LogRegObjective(x_positive, y, names, feature_preset=FeaturePreset.FULL)
         assert objective.n_features > 4
 
 
@@ -128,7 +129,7 @@ class TestLogRegObjectiveCall:
     def test_returns_auc(self) -> None:
         """LogRegObjective.__call__ returns validation AUC between 0 and 1."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         auc = objective(
             x_features=x,
@@ -148,7 +149,7 @@ class TestLogRegObjectiveCall:
     def test_ignores_passed_data(self) -> None:
         """LogRegObjective uses pre-split data, not passed arguments."""
         x, y, names = _make_test_data(n_samples=100, n_features=5, seed=42)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         x_other, y_other, names_other = _make_test_data(n_samples=50, n_features=3, seed=99)
 
@@ -170,7 +171,7 @@ class TestLogRegObjectiveCall:
     def test_with_l1_penalty(self) -> None:
         """LogRegObjective works with l1 penalty and saga solver."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         auc = objective(
             x_features=x,
@@ -190,7 +191,7 @@ class TestLogRegObjectiveCall:
     def test_multiple_calls_deterministic(self) -> None:
         """Multiple calls with same params return same AUC (deterministic)."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         int_params = _make_default_int_params()
         float_params = _make_default_float_params()
@@ -226,7 +227,7 @@ class TestLogRegObjectiveCall:
     def test_with_different_c_values(self) -> None:
         """LogRegObjective returns results for different C values."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         auc_low_c = objective(
             x_features=x,
@@ -269,7 +270,7 @@ class TestCreateLogRegObjective:
     def test_returns_objective_with_n_features(self) -> None:
         """create_logreg_objective returns callable with n_features property."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
-        objective = create_logreg_objective(x, y, names, feature_preset="none")
+        objective = create_logreg_objective(x, y, names, feature_preset=FeaturePreset.NONE)
         assert objective.n_features == 4
         assert callable(objective)
 
@@ -277,13 +278,13 @@ class TestCreateLogRegObjective:
         """create_logreg_objective applies feature preset."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         x_positive = _make_positive_data(x, 0.1)
-        objective = create_logreg_objective(x_positive, y, names, feature_preset="full")
+        objective = create_logreg_objective(x_positive, y, names, feature_preset=FeaturePreset.FULL)
         assert objective.n_features > 4
 
     def test_callable(self) -> None:
         """create_logreg_objective returns callable objective."""
         x, y, names = _make_test_data(n_samples=100, n_features=5)
-        objective = create_logreg_objective(x, y, names, feature_preset="none")
+        objective = create_logreg_objective(x, y, names, feature_preset=FeaturePreset.NONE)
 
         auc = objective(
             x_features=x,
@@ -312,12 +313,12 @@ class TestNFeaturesProperty:
     def test_matches_original_when_no_engineering(self) -> None:
         """n_features matches input when no engineering applied."""
         x, y, names = _make_test_data(n_samples=50, n_features=7)
-        objective = LogRegObjective(x, y, names, feature_preset="none")
+        objective = LogRegObjective(x, y, names, feature_preset=FeaturePreset.NONE)
         assert objective.n_features == 7
 
     def test_reflects_engineering(self) -> None:
         """n_features reflects engineered count when preset applied."""
         x, y, names = _make_test_data(n_samples=50, n_features=4)
         x_positive = _make_positive_data(x, 0.1)
-        objective = LogRegObjective(x_positive, y, names, feature_preset="log_only")
+        objective = LogRegObjective(x_positive, y, names, feature_preset=FeaturePreset.LOG_ONLY)
         assert objective.n_features > 4
