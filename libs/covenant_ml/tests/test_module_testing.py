@@ -5,7 +5,7 @@ Tests the public testing utility functions.
 
 from __future__ import annotations
 
-from platform_ml import RequestedDevice
+from platform_ml import OptimizerName, RequestedDevice
 
 from covenant_ml.testing import (
     make_lightgbm_regressor_config,
@@ -215,7 +215,7 @@ def test_make_mlp_regressor_config_defaults() -> None:
 
     assert config["device"] == "cpu"
     assert config["precision"] == "fp32"
-    assert config["optimizer"] == "adamw"
+    assert config["optimizer"] is OptimizerName.ADAMW
     assert config["hidden_sizes"] == (32, 16)
     assert config["learning_rate"] == 0.001
     assert config["batch_size"] == 256
@@ -228,7 +228,7 @@ def test_make_mlp_regressor_config_defaults() -> None:
 def test_make_mlp_regressor_config_custom() -> None:
     """make_mlp_regressor_config accepts custom values."""
     config = make_mlp_regressor_config(
-        optimizer="adam",
+        optimizer=OptimizerName.ADAM,
         hidden_sizes=(64, 32, 16),
         learning_rate=0.01,
         n_epochs=20,
@@ -236,7 +236,7 @@ def test_make_mlp_regressor_config_custom() -> None:
         random_state=99,
     )
 
-    assert config["optimizer"] == "adam"
+    assert config["optimizer"] is OptimizerName.ADAM
     assert config["hidden_sizes"] == (64, 32, 16)
     assert config["learning_rate"] == 0.01
     assert config["n_epochs"] == 20

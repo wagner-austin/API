@@ -23,6 +23,7 @@ from covenant_ml.explainers.adapters import try_extract_native_tree_model
 from covenant_ml.types import (
     ClassifierTrainConfig,
     MLPConfig,
+    OptimizerName,
     RandomForestConfig,
     TrainOutcome,
     TrainProgress,
@@ -169,7 +170,7 @@ def test_rf_backend_config_type_validation(tmp_path: Path) -> None:
     mlp_config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (32,),
         "learning_rate": 0.01,
         "batch_size": 32,

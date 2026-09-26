@@ -23,6 +23,7 @@ from covenant_ml.backends.cleargbm.config_resolution import (
 )
 from covenant_ml.types import (
     MLPConfig,
+    OptimizerName,
     TrainConfig,
 )
 from tests.backends.cleargbm._cleargbm_fixtures import (
@@ -63,7 +64,7 @@ def test_is_cleargbm_config_returns_false_for_mlp_config() -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (32,),
         "learning_rate": 0.01,
         "batch_size": 32,

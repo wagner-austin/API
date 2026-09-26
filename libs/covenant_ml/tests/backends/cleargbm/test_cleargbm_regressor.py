@@ -155,14 +155,14 @@ def test_cleargbm_regressor_train_with_progress_reports_summary() -> None:
 
 def test_cleargbm_regressor_train_rejects_non_cleargbm_config() -> None:
     """Backend raises RuntimeError for a non-ClearGBM config."""
-    from covenant_ml.types import MLPConfig
+    from covenant_ml.types import MLPConfig, OptimizerName
 
     backend = ClearGBMRegressorBackend()
     x, y = _make_regression_data(40, n_features=2)
     mlp_config = MLPConfig(
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        optimizer="adamw",
+        optimizer=OptimizerName.ADAMW,
         hidden_sizes=(32, 16),
         learning_rate=0.001,
         batch_size=16,

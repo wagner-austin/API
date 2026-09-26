@@ -23,6 +23,7 @@ from covenant_ml.types import (
     ClassifierTrainConfig,
     LogRegConfig,
     MLPConfig,
+    OptimizerName,
     TrainOutcome,
     TrainProgress,
 )
@@ -164,7 +165,7 @@ def test_logreg_backend_config_type_validation(tmp_path: Path) -> None:
     mlp_config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (32,),
         "learning_rate": 0.01,
         "batch_size": 32,

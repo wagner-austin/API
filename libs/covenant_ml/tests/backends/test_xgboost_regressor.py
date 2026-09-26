@@ -184,14 +184,14 @@ def test_xgboost_regressor_train_with_progress() -> None:
 
 def test_xgboost_regressor_train_rejects_non_train_config() -> None:
     """Backend raises RuntimeError for non-TrainConfig."""
-    from covenant_ml.types import MLPConfig
+    from covenant_ml.types import MLPConfig, OptimizerName
 
     backend = XGBoostRegressorBackend()
     x, y = _make_regression_data(40, n_features=2)
     mlp_config = MLPConfig(
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        optimizer="adamw",
+        optimizer=OptimizerName.ADAMW,
         hidden_sizes=(32, 16),
         learning_rate=0.001,
         batch_size=16,

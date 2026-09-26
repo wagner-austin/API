@@ -23,6 +23,7 @@ from covenant_ml.backends.regressor_registry import default_regressor_registry
 from covenant_ml.types import (
     LightGBMConfig,
     MLPConfig,
+    OptimizerName,
 )
 from covenant_ml.types_regression import (
     RegressionTrainOutcome,
@@ -267,7 +268,7 @@ def test_lightgbm_regressor_train_rejects_non_lightgbm_config(tmp_path: Path) ->
     mlp_config = MLPConfig(
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        optimizer="adamw",
+        optimizer=OptimizerName.ADAMW,
         hidden_sizes=(32, 16),
         learning_rate=0.001,
         batch_size=16,

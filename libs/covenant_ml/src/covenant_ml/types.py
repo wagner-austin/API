@@ -10,7 +10,7 @@ from typing import Literal, NotRequired, Protocol, TypedDict
 import numpy as np
 from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
-from platform_ml import RequestedDevice, RequestedPrecision, ResolvedDevice
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision, ResolvedDevice
 
 # Pluggable backend naming - all supported classifier backends
 BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm", "logreg", "random_forest"]
@@ -242,9 +242,6 @@ class DMatrixFactory(Protocol):
 # MLPConfig, LSTMConfig, LightGBMConfig: identical for classification and regression.
 
 
-MLPOptimizer = Literal["adamw", "adam", "sgd"]
-
-
 class MLPConfig(TypedDict, total=True):
     """Strict configuration for MLP backend training.
 
@@ -254,7 +251,7 @@ class MLPConfig(TypedDict, total=True):
 
     device: RequestedDevice
     precision: RequestedPrecision
-    optimizer: MLPOptimizer
+    optimizer: OptimizerName
     hidden_sizes: tuple[int, ...]
     learning_rate: float
     batch_size: int
@@ -545,7 +542,7 @@ __all__ = [
     "LogRegPenalty",
     "LogRegSolver",
     "MLPConfig",
-    "MLPOptimizer",
+    "OptimizerName",
     "PredictorProtocol",
     "Proba2DProtocol",
     "RandomForestConfig",
