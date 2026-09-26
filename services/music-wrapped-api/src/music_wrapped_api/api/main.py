@@ -6,7 +6,7 @@ from platform_core.fastapi import (
     register_json_error_handler,
 )
 from platform_core.json_utils import InvalidJsonError
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
 from .routes import health as routes_health
@@ -15,8 +15,8 @@ from .routes import wrapped as routes_wrapped
 
 def create_app() -> FastAPI:
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="music-wrapped-api",
         instance_id=None,
         extra_fields=["request_id"],
