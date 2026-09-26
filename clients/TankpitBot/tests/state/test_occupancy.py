@@ -20,7 +20,7 @@ def _tank(
     x: int = 10,
     y: int = 20,
     is_self: bool = False,
-    liveness: TankLiveness = "alive",
+    liveness: TankLiveness = TankLiveness.ALIVE,
     last_viewport_observation_ms: int = _NOW_MS,
     last_position_update_ms: int = 0,
 ) -> TankStateDict:
@@ -81,7 +81,7 @@ class TestIsTankBodyPresent:
         partial-walk ECHO, so an adjacent-standing bot's bare
         refusals were invisible to it.
         """
-        assert is_tank_body_present(_tank(liveness="deactivated"), _NOW_MS) is True
+        assert is_tank_body_present(_tank(liveness=TankLiveness.DEACTIVATED), _NOW_MS) is True
 
     def test_stale_viewport_observation_does_not_occupy(self) -> None:
         """Past the presence TTL the tank may have walked away."""

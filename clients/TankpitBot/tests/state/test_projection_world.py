@@ -63,7 +63,7 @@ def test_mine_default_fact_source_maps_every_entity_source(
 
 def test_mine_round_trip_and_legacy_decode() -> None:
     """Mine metadata survives round trip; legacy decode converges."""
-    mine = make_mine_state(10, 20, 2, 55, 1, source="radar", timestamp_ms=300)
+    mine = make_mine_state(10, 20, 2, 55, 1, source=EntitySource.RADAR, timestamp_ms=300)
     assert mine["provenance"] == make_provenance("wire_0x4F_radar_response", [])
     encoded = encode_mine_state(mine)
     assert decode_mine_state(encoded) == mine
@@ -83,7 +83,7 @@ def test_add_mine_records_placement_channel() -> None:
 
 def test_mine_fact_projection() -> None:
     """The mine Fact view exposes the value and flat metadata."""
-    mine = make_mine_state(10, 20, 2, 55, 1, source="viewport", timestamp_ms=300)
+    mine = make_mine_state(10, 20, 2, 55, 1, source=EntitySource.VIEWPORT, timestamp_ms=300)
     fact = mine_fact(mine)
     assert fact["value"]["team"] == 1
     assert fact["source"] == "wire_0x5A_viewport_patch"

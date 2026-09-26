@@ -52,7 +52,7 @@ def test_container_fact_source_maps_every_refresh_kind(
 
 def test_make_container_state_derives_provenance_from_refresh_kind() -> None:
     """The default provenance origin tracks the refresh kind."""
-    state = make_container_state(10, 20, True, 400, source="radar", timestamp_ms=500)
+    state = make_container_state(10, 20, True, 400, source=EntitySource.RADAR, timestamp_ms=500)
     assert state["confidence"] == 1.0
     assert state["provenance"] == make_provenance("wire_0x4F_radar_response", [])
 
@@ -70,7 +70,7 @@ def test_make_container_state_accepts_explicit_provenance() -> None:
 def test_container_round_trip_preserves_fact_metadata() -> None:
     """Encode/decode keeps confidence and provenance intact."""
     state = make_container_state(
-        10, 20, False, 0, source="viewport", timestamp_ms=900, confidence=0.8
+        10, 20, False, 0, source=EntitySource.VIEWPORT, timestamp_ms=900, confidence=0.8
     )
     assert decode_container_state(encode_container_state(state)) == state
 
@@ -93,8 +93,8 @@ def test_container_decode_without_new_keys_matches_derived_defaults() -> None:
         20,
         True,
         400,
-        source="radar",
-        refresh_kind="radar_cache_refresh",
+        source=EntitySource.RADAR,
+        refresh_kind=ContainerRefreshKind.RADAR_CACHE_REFRESH,
         timestamp_ms=500,
         failed_pickups=1,
     )
@@ -104,7 +104,7 @@ def test_container_decode_without_new_keys_matches_derived_defaults() -> None:
 def test_container_fact_projection() -> None:
     """The Fact view exposes the container value and flat metadata."""
     state = make_container_state(
-        10, 20, True, 400, source="viewport", timestamp_ms=900, confidence=0.9
+        10, 20, True, 400, source=EntitySource.VIEWPORT, timestamp_ms=900, confidence=0.9
     )
     fact = container_fact(state)
     assert fact["value"]["x"] == 10
@@ -141,7 +141,7 @@ def test_make_tank_state_derives_provenance_and_round_trips() -> None:
 
 def test_tank_decode_without_new_keys_matches_derived_defaults() -> None:
     """A pre-Phase-1c snapshot decodes to what a new encoder writes."""
-    tank = make_tank_state(7, 10, 20, 1, 3, 0, "enemy", False, False, source="radar")
+    tank = make_tank_state(7, 10, 20, 1, 3, 0, "enemy", False, False, source=EntitySource.RADAR)
     legacy = encode_tank_state(tank)
     del legacy["confidence"]
     del legacy["provenance"]
@@ -160,7 +160,7 @@ def test_tank_fact_projection() -> None:
         "enemy",
         False,
         False,
-        source="world_state",
+        source=EntitySource.WORLD_STATE,
         timestamp_ms=800,
         confidence=0.7,
     )
@@ -179,7 +179,7 @@ def test_tank_observation_carries_explicit_fact_source() -> None:
         7,
         100,
         True,
-        "viewport",
+        EntitySource.VIEWPORT,
         fact_source="wire_0x3D_movement",
         position=(10, 20),
     )
@@ -189,13 +189,15 @@ def test_tank_observation_carries_explicit_fact_source() -> None:
 
 def test_tank_observation_derives_default_fact_source() -> None:
     """Without an explicit channel, the coarse default applies."""
-    obs = make_tank_observation(7, 100, False, "world_state")
+    obs = make_tank_observation(7, 100, False, EntitySource.WORLD_STATE)
     assert obs["fact_source"] == "wire_0x4C_map_data"
 
 
 def test_tank_observation_decode_without_fact_source_derives_default() -> None:
     """A pre-Phase-1c encoded observation decodes with the coarse default."""
-    obs = make_tank_observation(7, 100, True, "viewport", fact_source="wire_0x47_movement")
+    obs = make_tank_observation(
+        7, 100, True, EntitySource.VIEWPORT, fact_source="wire_0x47_movement"
+    )
     legacy = encode_tank_observation(obs)
     del legacy["fact_source"]
     decoded = decode_tank_observation(legacy)
@@ -209,7 +211,7 @@ def test_apply_tank_observation_records_provenance_origin() -> None:
         7,
         100,
         True,
-        "viewport",
+        EntitySource.VIEWPORT,
         fact_source="wire_0x53_shoot_event",
         position=(10, 20),
     )
