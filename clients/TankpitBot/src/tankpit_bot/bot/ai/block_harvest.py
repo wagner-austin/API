@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.equipment import is_container_pursuable
 from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_within_bounds
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_scope_shift_command
@@ -328,11 +329,11 @@ def plan_block_harvest_leg(ctx: DecideCtx, base_state: AIStateDict) -> TickDecis
             )
             return make_decision(
                 make_scope_shift_command(direction),
-                "COLLECT",
+                BehaviorMode.COLLECT,
                 COLLECT_SCORE,
                 cx,
                 cy,
-                "harvest_frame_shift",
+                ReasonKind.HARVEST_FRAME_SHIFT,
                 locked,
                 ctx.equip,
                 reason_context={"direction": direction},
@@ -348,11 +349,11 @@ def plan_block_harvest_leg(ctx: DecideCtx, base_state: AIStateDict) -> TickDecis
         )
         return make_decision(
             command,
-            "COLLECT",
+            BehaviorMode.COLLECT,
             COLLECT_SCORE,
             cx,
             cy,
-            "harvest_leg_walk",
+            ReasonKind.HARVEST_LEG_WALK,
             locked,
             ctx.equip,
         )

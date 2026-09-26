@@ -26,6 +26,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
 from tankpit_bot.bot.ai.combat_target import has_clear_shot_line
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.mode_gates import weapon_reserves_below_break
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
@@ -205,11 +206,11 @@ def opportunity_fire(
         emit_ai("mid-combat pickup %s", secondary["cmd_type"])
     return make_decision(
         make_shoot_command(target["x"], target["y"], target["tank_id"]),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         target["x"],
         target["y"],
-        "opportunity_shot",
+        ReasonKind.OPPORTUNITY_SHOT,
         AIStateDict(
             **{
                 **ai_state,

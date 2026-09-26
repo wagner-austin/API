@@ -22,6 +22,7 @@ from tankpit_bot.bot.ai.mine_clearance import (
 )
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.movement import walk_or_teleport
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand, make_shoot_command
@@ -88,11 +89,11 @@ def select_and_pickup_equipment(
     emit_ai("collect equipment at (%d,%d)", target_x, target_y)
     return make_decision(
         command,
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         target_x,
         target_y,
-        "equipment_restock",
+        ReasonKind.EQUIPMENT_RESTOCK,
         set_resource_target(base_state, "equipment", target_x, target_y),
         ctx.equip,
     )
@@ -171,11 +172,11 @@ def mine_clearance_decision(
     )
     return make_decision(
         make_shoot_command(aim_x, aim_y),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         aim_x,
         aim_y,
-        "mine_clearance_shot",
+        ReasonKind.MINE_CLEARANCE_SHOT,
         AIStateDict(
             **{
                 **base_state,
@@ -343,11 +344,11 @@ def select_and_pickup_fuel(
     )
     return make_decision(
         command,
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         target_x,
         target_y,
-        "fuel_collect",
+        ReasonKind.FUEL_COLLECT,
         set_resource_target(base_state, "fuel", target_x, target_y),
         ctx.equip,
         reason_context={"volume": container["volume"]},

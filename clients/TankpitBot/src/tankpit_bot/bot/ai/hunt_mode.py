@@ -36,6 +36,7 @@ from tankpit_bot.bot.ai.hunt_lock import (
 from tankpit_bot.bot.ai.radar_economics import (
     radar_spend_worthwhile,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_radar_command
@@ -117,11 +118,11 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
             emit_ai("landed adjacent to %s, scanning viewport first", target["name"])
             return make_decision(
                 make_radar_command(),
-                "HUNT",
+                BehaviorMode.HUNT,
                 800,
                 target["x"],
                 target["y"],
-                "scan_on_landing",
+                ReasonKind.SCAN_ON_LANDING,
                 AIStateDict(
                     **{
                         **ctx.base,
@@ -179,7 +180,7 @@ def _enter_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:
     return search_for_enemies(
         ctx,
         ai_state=cleared,
-        map_reason="confirm_kill",
+        map_reason=ReasonKind.CONFIRM_KILL,
     )
 
 

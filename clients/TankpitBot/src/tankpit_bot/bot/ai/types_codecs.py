@@ -16,10 +16,9 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 
 from tankpit_bot.bot.ai.scoring_types import (
-    BEHAVIOR_MODES,
-    REASON_KINDS,
     BehaviorMode,
     BehaviorScoreDict,
     ReasonKind,
@@ -41,50 +40,9 @@ from tankpit_bot.types.modes import (
     require_ai_mode_state,
 )
 
-
-def _require_behavior_mode(data: JSONObject, key: str) -> BehaviorMode:
-    """Validate and extract a BehaviorMode from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated BehaviorMode value.
-
-    Raises:
-        ValueError: If value is not a valid BehaviorMode.
-    """
-    raw = require_str(data, key)
-    for mode in BEHAVIOR_MODES:
-        if raw == mode:
-            return mode
-    raise ValueError(f"{key} must be one of {BEHAVIOR_MODES}, got {raw!r}")
-
-
 # =========================================================================
 # BehaviorScoreDict codecs
 # =========================================================================
-
-
-def _require_reason_kind(data: JSONObject, key: str) -> ReasonKind:
-    """Validate and extract a reason kind from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated reason kind.
-
-    Raises:
-        JSONTypeError: If the value is not a supported reason kind.
-    """
-    raw = require_str(data, key)
-    for kind in REASON_KINDS:
-        if raw == kind:
-            return kind
-    raise JSONTypeError(f"{key} must be one of {REASON_KINDS}, got {raw!r}")
 
 
 def _require_reason_context(data: JSONObject, key: str) -> dict[str, str | int]:
@@ -119,12 +77,12 @@ def encode_behavior_score(score: BehaviorScoreDict) -> JSONObject:
         JSON-serializable dict representation.
     """
     return {
-        "mode": score["mode"],
+        "mode": score["mode"].value,
         "score": score["score"],
         "target_x": score["target_x"],
         "target_y": score["target_y"],
         "target_id": score["target_id"],
-        "reason_kind": score["reason_kind"],
+        "reason_kind": score["reason_kind"].value,
         "reason_context": dict(score["reason_context"]),
     }
 
@@ -139,16 +97,16 @@ def decode_behavior_score(data: JSONObject) -> BehaviorScoreDict:
         Validated BehaviorScoreDict.
 
     Raises:
-        ValueError: If mode is not a valid BehaviorMode.
-        JSONTypeError: If required fields are missing or invalid.
+        JSONTypeError: If a required field is missing or invalid, including a
+            mode outside ``BehaviorMode`` or a reason kind outside ``ReasonKind``.
     """
     return BehaviorScoreDict(
-        mode=_require_behavior_mode(data, "mode"),
+        mode=require_member(data, "mode", BehaviorMode),
         score=require_int(data, "score"),
         target_x=require_int(data, "target_x"),
         target_y=require_int(data, "target_y"),
         target_id=require_int(data, "target_id"),
-        reason_kind=_require_reason_kind(data, "reason_kind"),
+        reason_kind=require_member(data, "reason_kind", ReasonKind),
         reason_context=_require_reason_context(data, "reason_context"),
     )
 

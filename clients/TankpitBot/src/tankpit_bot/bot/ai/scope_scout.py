@@ -43,6 +43,7 @@ from tankpit_bot.bot.ai.ferry_landing import (
     find_ferry_boarding_tile,
     goal_water_pond,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_scope_shift_command
@@ -320,11 +321,11 @@ def scope_scout_for_ferry(
     )
     return make_decision(
         make_scope_shift_command(direction),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         goal_x,
         goal_y,
-        "ferry_scope_scout",
+        ReasonKind.FERRY_SCOPE_SCOUT,
         AIStateDict(
             **{
                 **base_state,

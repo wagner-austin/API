@@ -38,6 +38,7 @@ from tankpit_bot.bot.ai.radar_economics import (
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.threat_primitives import WIRE_PRESENCE_TTL_MS
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
@@ -123,11 +124,11 @@ def exhausted_collect_outcome(
             )
             return make_decision(
                 make_hold_command(),
-                "COLLECT",
+                BehaviorMode.COLLECT,
                 COLLECT_SCORE,
                 ctx.self_state["x"],
                 ctx.self_state["y"],
-                "gatherer_hold",
+                ReasonKind.GATHERER_HOLD,
                 base_state,
                 ctx.equip,
             )
@@ -182,11 +183,11 @@ def exhausted_collect_outcome(
         )
         return make_decision(
             make_hold_command(),
-            "COLLECT",
+            BehaviorMode.COLLECT,
             COLLECT_SCORE,
             ctx.self_state["x"],
             ctx.self_state["y"],
-            "await_map_answer",
+            ReasonKind.AWAIT_MAP_ANSWER,
             base_state,
             ctx.equip,
         )
@@ -302,9 +303,9 @@ def escape_under_fire_decision(
         return larder_under_fire
     escape_hop = make_resource_search_hop(
         ctx,
-        mode="COLLECT",
+        mode=BehaviorMode.COLLECT,
         score=COLLECT_SCORE,
-        reason="search_collect_local",
+        reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         ai_state=base_state,
     )
     if escape_hop is not None and _hop_escapes_attacker(base_state, escape_hop):
@@ -358,11 +359,11 @@ def desync_rescan_decision(
     )
     return make_decision(
         make_radar_command(),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         0,
         0,
-        "desync_rescan",
+        ReasonKind.DESYNC_RESCAN,
         base_state,
         ctx.equip,
     )
@@ -403,11 +404,11 @@ def mine_reveal_scan_decision(
     )
     return make_decision(
         make_radar_command(),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         0,
         0,
-        "mine_hit_reveal_scan",
+        ReasonKind.MINE_HIT_REVEAL_SCAN,
         base_state,
         ctx.equip,
     )
@@ -514,11 +515,11 @@ def scan_on_landing_decision(
         )
         displaced_scan = make_decision(
             make_radar_command(),
-            "COLLECT",
+            BehaviorMode.COLLECT,
             COLLECT_SCORE,
             0,
             0,
-            "scan_on_landing",
+            ReasonKind.SCAN_ON_LANDING,
             AIStateDict(
                 **{
                     **base_state,
@@ -555,11 +556,11 @@ def scan_on_landing_decision(
     )
     decision = make_decision(
         make_radar_command(),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         0,
         0,
-        "scan_on_landing",
+        ReasonKind.SCAN_ON_LANDING,
         AIStateDict(
             **{
                 **release_collect_plan(base_state, reason=PlanReleaseReason.LANDING_SCAN_RESET),

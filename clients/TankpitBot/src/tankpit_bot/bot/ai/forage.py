@@ -38,7 +38,7 @@ from tankpit_bot.bot.ai.movement import plan_viewport_walk
 from tankpit_bot.bot.ai.radar_economics import (
     radar_spend_worthwhile,
 )
-from tankpit_bot.bot.ai.scoring_types import BehaviorMode
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_radar_command, make_scope_shift_command
@@ -228,7 +228,7 @@ def _frontier_pan(
         score,
         beyond_x,
         beyond_y,
-        "forage_frontier_pan",
+        ReasonKind.FORAGE_FRONTIER_PAN,
         ai_state,
         ctx.equip,
         reason_context={"direction": direction},
@@ -395,7 +395,7 @@ def plan_forage_search(
             score,
             0,
             0,
-            "forage_radar",
+            ReasonKind.FORAGE_RADAR,
             ai_state,
             ctx.equip,
         )
@@ -452,7 +452,7 @@ def plan_forage_search(
             score,
             frontier_x,
             frontier_y,
-            "forage_frontier_walk",
+            ReasonKind.FORAGE_FRONTIER_WALK,
             ai_state,
             ctx.equip,
         )
@@ -472,7 +472,7 @@ def plan_forage_search(
         score,
         target_x,
         target_y,
-        "forage_sweep",
+        ReasonKind.FORAGE_SWEEP,
         ai_state,
         ctx.equip,
     )

@@ -20,7 +20,6 @@ from tankpit_bot.bot.ai.equipment_search import (
 )
 from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.bot.ai.scoring_types import (
-    BEHAVIOR_MODES,
     BehaviorMode,
     BehaviorScoreDict,
     make_behavior_score,
@@ -60,7 +59,6 @@ from tankpit_bot.bot.ai.world_types import (
 )
 
 __all__ = [
-    "BEHAVIOR_MODES",
     "AIConfigDict",
     "AIStateDict",
     "BehaviorMode",

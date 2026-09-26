@@ -37,6 +37,7 @@ from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
 from tankpit_bot.bot.ai.scope_scout import scope_scout_for_ferry
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.runtime_logging import emit_ai
@@ -171,16 +172,16 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
         ctx,
         base_state,
         score=COLLECT_SCORE,
-        behavior_mode="COLLECT",
+        behavior_mode=BehaviorMode.COLLECT,
     )
     if forage_decision is not None:
         return forage_decision
 
     search = make_resource_search_hop(
         ctx,
-        mode="COLLECT",
+        mode=BehaviorMode.COLLECT,
         score=COLLECT_SCORE,
-        reason="search_collect_local",
+        reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         ai_state=base_state,
     )
     if search is not None:

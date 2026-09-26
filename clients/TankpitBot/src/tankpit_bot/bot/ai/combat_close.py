@@ -35,6 +35,7 @@ from tankpit_bot.bot.ai.mine_clearance import (
     find_corridor_clearance_shot,
 )
 from tankpit_bot.bot.ai.reachability import is_move_reachable_in_viewport
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -113,11 +114,11 @@ def _walk_close_or_clear_corridor(
         )
         return make_decision(
             make_move_command(walk_x, walk_y),
-            "HUNT",
+            BehaviorMode.HUNT,
             800,
             walk_x,
             walk_y,
-            "walk_to_target",
+            ReasonKind.WALK_TO_TARGET,
             _set_combat_target(ctx.base, target),
             ctx.equip,
             reason_context={"target_name": target["name"]},
@@ -147,11 +148,11 @@ def _walk_close_or_clear_corridor(
     )
     return make_decision(
         make_shoot_command(mine_x, mine_y),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         mine_x,
         mine_y,
-        "mine_clearance_shot",
+        ReasonKind.MINE_CLEARANCE_SHOT,
         AIStateDict(
             **{
                 **_set_combat_target(ctx.base, target),
@@ -320,11 +321,11 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
     )
     return make_decision(
         make_teleport_command(landing_x, landing_y),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         landing_x,
         landing_y,
-        "teleport_target",
+        ReasonKind.TELEPORT_TARGET,
         _set_combat_target(ctx.base, target),
         ctx.equip,
         reason_context={"target_name": target["name"]},

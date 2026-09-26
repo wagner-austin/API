@@ -29,6 +29,7 @@ from tankpit_bot.bot.ai.reachability import (
     find_attainable_landing_tile,
     is_collection_reachable_in_viewport,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_teleport_command
@@ -293,11 +294,11 @@ def hop_toward_equipment(
     )
     return make_decision(
         make_teleport_command(best_landing_x, best_landing_y),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         best_landing_x,
         best_landing_y,
-        "equipment_hop",
+        ReasonKind.EQUIPMENT_HOP,
         # Larder semantics (2026-07-27): the hop holds an equipment
         # lock so the landing tick dispatches the pickup directly --
         # the landing tile IS the container when passable and the
@@ -409,11 +410,11 @@ def _hop_toward_fuel_larder(
     )
     return make_decision(
         make_teleport_command(selection["landing_x"], selection["landing_y"]),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         selection["landing_x"],
         selection["landing_y"],
-        "fuel_hop",
+        ReasonKind.FUEL_HOP,
         AIStateDict(
             **{
                 **set_resource_target(base_state, "fuel", container["x"], container["y"]),
@@ -503,11 +504,11 @@ def desperation_fuel_hop(
     )
     return make_decision(
         make_teleport_command(best_landing_x, best_landing_y),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         best_landing_x,
         best_landing_y,
-        "fuel_hop",
+        ReasonKind.FUEL_HOP,
         AIStateDict(
             **{
                 **set_resource_target(

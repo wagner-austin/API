@@ -34,6 +34,7 @@ from tankpit_bot.bot.ai.intent import (
 from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.inventory import inventory_counts
@@ -218,11 +219,11 @@ def _continue_or_release_equipment_lock(
     emit_ai("continue locked equipment target at (%d,%d)", target_x, target_y)
     decision = make_decision(
         locked_command,
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         target_x,
         target_y,
-        "equipment_locked",
+        ReasonKind.EQUIPMENT_LOCKED,
         set_resource_target(base_state, "equipment", target_x, target_y),
         ctx.equip,
     )
@@ -288,11 +289,11 @@ def continue_or_release_fuel_lock(
     )
     decision = make_decision(
         locked_command,
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         target_x,
         target_y,
-        "fuel_locked",
+        ReasonKind.FUEL_LOCKED,
         set_resource_target(base_state, "fuel", target_x, target_y),
         ctx.equip,
         reason_context={"volume": locked_target["volume"]},

@@ -20,6 +20,7 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
@@ -311,11 +312,11 @@ def block_combat_target_and_replan(
         )
         return make_decision(
             make_map_open_command(),
-            "HUNT",
+            BehaviorMode.HUNT,
             800,
             0,
             0,
-            "find_target",
+            ReasonKind.FIND_TARGET,
             AIStateDict(
                 **{
                     **_set_combat_target(base_with_block, next_target),
@@ -329,11 +330,11 @@ def block_combat_target_and_replan(
     emit_ai("blocked %s, no viable threats remaining", target["name"])
     return make_decision(
         make_map_open_command(),
-        "HUNT",
+        BehaviorMode.HUNT,
         0,
         0,
         0,
-        "find_enemies",
+        ReasonKind.FIND_ENEMIES,
         AIStateDict(**{**base_with_block, "last_map_open_ms": ctx.timestamp_ms}),
         ctx.equip,
     )

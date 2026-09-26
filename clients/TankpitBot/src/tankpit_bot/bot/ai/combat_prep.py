@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -125,11 +126,11 @@ def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecision
     emit_ai("open map to find %s", target["name"])
     return make_decision(
         make_map_open_command(),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         0,
         0,
-        "find_target",
+        ReasonKind.FIND_TARGET,
         AIStateDict(
             **{
                 **_set_combat_target(ctx.base, target),

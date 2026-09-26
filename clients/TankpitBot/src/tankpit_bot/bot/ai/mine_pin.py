@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.combat_target import _set_combat_target
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -90,11 +91,11 @@ def mine_pin_decision(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDi
     )
     return make_decision(
         make_mine_drop_command(),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         target["x"],
         target["y"],
-        "mine_pin",
+        ReasonKind.MINE_PIN,
         AIStateDict(
             **{
                 **_set_combat_target(ctx.base, target),

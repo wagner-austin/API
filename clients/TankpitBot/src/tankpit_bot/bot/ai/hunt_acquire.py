@@ -47,7 +47,7 @@ from tankpit_bot.bot.ai.hunt_relay import (
     relay_toward_unaffordable_enemy,
     stale_human_needs_map_refresh,
 )
-from tankpit_bot.bot.ai.scoring_types import ReasonKind
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.threat_acquisition import find_acquisition_target
 from tankpit_bot.bot.ai.threat_primitives import (
     human_combat_consented,
@@ -102,7 +102,7 @@ def search_for_enemies(
     emit_ai("opening map to search for enemies")
     return make_decision(
         make_map_open_command(),
-        "HUNT",
+        BehaviorMode.HUNT,
         0,
         0,
         0,
@@ -352,11 +352,11 @@ def _greeting_approach(
     )
     return make_decision(
         make_teleport_command(landing_x, landing_y),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         landing_x,
         landing_y,
-        "greet_approach",
+        ReasonKind.GREET_APPROACH,
         AIStateDict(
             **{
                 **ai_state,
@@ -457,7 +457,7 @@ def _decide_hunt_acquire_fresh(
     return search_for_enemies(
         ctx,
         ai_state=ai_state,
-        map_reason="find_enemies",
+        map_reason=ReasonKind.FIND_ENEMIES,
     )
 
 
@@ -506,7 +506,7 @@ def _acquire_map_target(
                 "known human is map-stale - refreshing map before settling for %s",
                 map_target["name"],
             )
-            return search_for_enemies(ctx, ai_state=ai_state, map_reason="find_target")
+            return search_for_enemies(ctx, ai_state=ai_state, map_reason=ReasonKind.FIND_TARGET)
     emit_ai(
         "map-known target %s (id=%d) at (%d,%d) - teleport-acquiring",
         map_target["name"],

@@ -446,7 +446,7 @@ def _open_map_for_dots(
         score,
         0,
         0,
-        "map_for_dots",
+        ReasonKind.MAP_FOR_DOTS,
         AIStateDict(
             **{
                 **base_state,

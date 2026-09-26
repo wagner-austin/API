@@ -30,6 +30,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
 )
 from tankpit_bot.bot.ai.mine_pin import mine_pin_decision
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -141,11 +142,11 @@ def frame_target_shift(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
     )
     return make_decision(
         make_scope_shift_command(direction),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         tx,
         ty,
-        "combat_frame_shift",
+        ReasonKind.COMBAT_FRAME_SHIFT,
         _set_combat_target(ctx.base, target),
         ctx.equip,
         reason_context={"target_name": target["name"], "direction": direction},
@@ -414,11 +415,11 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         emit_ai("mid-combat pickup %s", secondary["cmd_type"])
     return make_decision(
         make_shoot_command(aim_x, aim_y, target["tank_id"]),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         aim_x,
         aim_y,
-        "shoot_target",
+        ReasonKind.SHOOT_TARGET,
         AIStateDict(
             **{
                 **engaging_state,

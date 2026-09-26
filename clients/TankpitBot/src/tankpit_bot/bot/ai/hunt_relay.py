@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.threat_acquisition import (
     find_relay_travel_targets,
     stale_human_exists,
@@ -215,11 +216,11 @@ def _relay_leg_decision(
     )
     return make_decision(
         make_teleport_command(dot_x, dot_y),
-        "HUNT",
+        BehaviorMode.HUNT,
         800,
         dot_x,
         dot_y,
-        "dot_relay",
+        ReasonKind.DOT_RELAY,
         ai_state,
         ctx.equip,
     )
@@ -356,9 +357,9 @@ def _refuel_toward_engagement(
     )
     return make_resource_search_hop(
         ctx,
-        mode="HUNT",
+        mode=BehaviorMode.HUNT,
         score=800,
-        reason="hunt_refuel",
+        reason=ReasonKind.HUNT_REFUEL,
         ai_state=ai_state,
     )
 

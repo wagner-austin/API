@@ -7,111 +7,65 @@ renders into a human-readable line. Imports no other AI type module.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
-BehaviorMode = Literal[
-    "HUNT",
-    "COLLECT",
-]
+
+class BehaviorMode(StrEnum):
+    """The behaviour a scored decision belongs to."""
+
+    HUNT = "HUNT"
+    COLLECT = "COLLECT"
 
 
-BEHAVIOR_MODES: tuple[BehaviorMode, ...] = (
-    "HUNT",
-    "COLLECT",
-)
+class ReasonKind(StrEnum):
+    """Why the arbitrator chose a decision; each member is its wire and log word."""
 
-
-ReasonKind = Literal[
     # shared
-    "scan_on_landing",
+    SCAN_ON_LANDING = "scan_on_landing"
     # COLLECT
-    "equipment_locked",
-    "fuel_locked",
-    "equipment_restock",
-    "equipment_hop",
-    "forage_frontier_hop",
-    "fuel_hop",
-    "fuel_collect",
-    "mine_clearance_shot",
-    "mine_pin",
-    "forage_radar",
-    "forage_sweep",
-    "forage_frontier_walk",
-    "forage_frontier_pan",
-    "quad_sweep_shift",
-    "quad_sweep_radar",
-    "harvest_frame_shift",
-    "harvest_leg_walk",
-    "desync_rescan",
-    "mine_hit_reveal_scan",
-    "search_collect_local",
-    "claim_denied",
-    "walk_for_fuel",
-    "walk_for_fuel_pan",
-    "map_for_dots",
-    "await_map_answer",
-    "ferry_scope_scout",
-    "gatherer_hold",
+    EQUIPMENT_LOCKED = "equipment_locked"
+    FUEL_LOCKED = "fuel_locked"
+    EQUIPMENT_RESTOCK = "equipment_restock"
+    EQUIPMENT_HOP = "equipment_hop"
+    FORAGE_FRONTIER_HOP = "forage_frontier_hop"
+    FUEL_HOP = "fuel_hop"
+    FUEL_COLLECT = "fuel_collect"
+    MINE_CLEARANCE_SHOT = "mine_clearance_shot"
+    MINE_PIN = "mine_pin"
+    FORAGE_RADAR = "forage_radar"
+    FORAGE_SWEEP = "forage_sweep"
+    FORAGE_FRONTIER_WALK = "forage_frontier_walk"
+    FORAGE_FRONTIER_PAN = "forage_frontier_pan"
+    QUAD_SWEEP_SHIFT = "quad_sweep_shift"
+    QUAD_SWEEP_RADAR = "quad_sweep_radar"
+    HARVEST_FRAME_SHIFT = "harvest_frame_shift"
+    HARVEST_LEG_WALK = "harvest_leg_walk"
+    DESYNC_RESCAN = "desync_rescan"
+    MINE_HIT_REVEAL_SCAN = "mine_hit_reveal_scan"
+    SEARCH_COLLECT_LOCAL = "search_collect_local"
+    CLAIM_DENIED = "claim_denied"
+    WALK_FOR_FUEL = "walk_for_fuel"
+    WALK_FOR_FUEL_PAN = "walk_for_fuel_pan"
+    MAP_FOR_DOTS = "map_for_dots"
+    AWAIT_MAP_ANSWER = "await_map_answer"
+    FERRY_SCOPE_SCOUT = "ferry_scope_scout"
+    GATHERER_HOLD = "gatherer_hold"
     # HUNT
-    "find_target",
-    "find_enemies",
-    "teleport_target",
-    "greet_approach",
-    "walk_to_target",
-    "shoot_target",
-    "combat_frame_shift",
-    "opportunity_shot",
-    "dot_relay",
-    "hunt_refuel",
-    "confirm_kill",
+    FIND_TARGET = "find_target"
+    FIND_ENEMIES = "find_enemies"
+    TELEPORT_TARGET = "teleport_target"
+    GREET_APPROACH = "greet_approach"
+    WALK_TO_TARGET = "walk_to_target"
+    SHOOT_TARGET = "shoot_target"
+    COMBAT_FRAME_SHIFT = "combat_frame_shift"
+    OPPORTUNITY_SHOT = "opportunity_shot"
+    DOT_RELAY = "dot_relay"
+    HUNT_REFUEL = "hunt_refuel"
+    CONFIRM_KILL = "confirm_kill"
     # controller
-    "manual_hold",
-]
-
-
-REASON_KINDS: tuple[ReasonKind, ...] = (
-    "scan_on_landing",
-    "equipment_locked",
-    "fuel_locked",
-    "equipment_restock",
-    "equipment_hop",
-    "forage_frontier_hop",
-    "fuel_hop",
-    "fuel_collect",
-    "mine_clearance_shot",
-    "mine_pin",
-    "forage_radar",
-    "forage_sweep",
-    "forage_frontier_walk",
-    "forage_frontier_pan",
-    "quad_sweep_shift",
-    "quad_sweep_radar",
-    "harvest_frame_shift",
-    "harvest_leg_walk",
-    "desync_rescan",
-    "mine_hit_reveal_scan",
-    "search_collect_local",
-    "claim_denied",
-    "walk_for_fuel",
-    "walk_for_fuel_pan",
-    "map_for_dots",
-    "await_map_answer",
-    "ferry_scope_scout",
-    "gatherer_hold",
-    "find_target",
-    "find_enemies",
-    "teleport_target",
-    "greet_approach",
-    "walk_to_target",
-    "shoot_target",
-    "combat_frame_shift",
-    "opportunity_shot",
-    "dot_relay",
-    "confirm_kill",
-    "manual_hold",
-)
+    MANUAL_HOLD = "manual_hold"
 
 
 class BehaviorScoreDict(TypedDict):
@@ -186,15 +140,14 @@ def render_reason(behavior: BehaviorScoreDict) -> str:
         Compact reason label.
     """
     context = behavior["reason_context"]
+    kind = behavior["reason_kind"].value
     if not context:
-        return behavior["reason_kind"]
+        return kind
     rendered = ", ".join(f"{key}={value}" for key, value in sorted(context.items()))
-    return f"{behavior['reason_kind']}({rendered})"
+    return f"{kind}({rendered})"
 
 
 __all__ = [
-    "BEHAVIOR_MODES",
-    "REASON_KINDS",
     "BehaviorMode",
     "BehaviorScoreDict",
     "ReasonKind",

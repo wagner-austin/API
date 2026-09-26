@@ -38,6 +38,7 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.tactics import combat_radar_min
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -363,11 +364,11 @@ def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDec
     )
     return make_decision(
         command,
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         target_x,
         target_y,
-        "forage_frontier_hop",
+        ReasonKind.FORAGE_FRONTIER_HOP,
         # The held resource plan is NOT cleared: a plan whose
         # teleport is merely unaffordable this tick survives a
         # frontier leg (pinned by the locked-target cascade law);

@@ -8,7 +8,7 @@ the substate derivations. The entry/exit predicates it consults are
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.block_harvest import anchored_window_origin
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
@@ -290,11 +290,11 @@ def make_hold_decision(
     return make_tick_decision(
         command=make_hold_command(),
         behavior=make_behavior_score(
-            mode="HUNT",
+            mode=BehaviorMode.HUNT,
             score=0,
             target_x=0,
             target_y=0,
-            reason_kind="manual_hold",
+            reason_kind=ReasonKind.MANUAL_HOLD,
         ),
         updated_ai_state=AIStateDict(
             **{

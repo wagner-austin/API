@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.intent import PlanReleaseReason, release_collect_plan
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.scope_scout import SCOPE_REACH_TILES, pan_plan_toward
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_scope_shift_command
@@ -102,11 +103,11 @@ def _maroon_pan_toward(
     )
     return make_decision(
         make_scope_shift_command(direction),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         target_x,
         target_y,
-        "walk_for_fuel_pan",
+        ReasonKind.WALK_FOR_FUEL_PAN,
         AIStateDict(
             **{
                 **release_collect_plan(base_state, reason=PlanReleaseReason.WALK_FOR_FUEL_OVERRIDE),
@@ -207,11 +208,11 @@ def walk_for_fuel_last_resort(
         )
         return make_decision(
             command,
-            "COLLECT",
+            BehaviorMode.COLLECT,
             COLLECT_SCORE,
             leg_x,
             leg_y,
-            "walk_for_fuel",
+            ReasonKind.WALK_FOR_FUEL,
             release_collect_plan(base_state, reason=PlanReleaseReason.WALK_FOR_FUEL_OVERRIDE),
             ctx.equip,
         )

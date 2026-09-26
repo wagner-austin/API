@@ -37,6 +37,7 @@ from tankpit_bot.bot.ai.radar_economics import (
     RADAR_RESERVE_REVEAL_FLOOR_TILES,
     RADAR_SPEND_REVEAL_FLOOR_TILES,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -86,9 +87,6 @@ into it. Continuation is NOT gated by this floor: an in-progress
 sweep (tank still on its anchor tile) keeps going on the per-quadrant
 economics alone.
 """
-
-SweepReason = Literal["quad_sweep_radar", "quad_sweep_shift"]
-"""The two decision kinds a sweep tick can produce."""
 
 
 def quadrant_bounds(sx: int, sy: int, offset_x: int, offset_y: int) -> tuple[int, int, int, int]:
@@ -229,7 +227,9 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
             uncovered,
             extras,
         )
-        return _sweep_decision(ctx, base_state, sx, sy, "quad_sweep_radar", direction, uncovered)
+        return _sweep_decision(
+            ctx, base_state, sx, sy, ReasonKind.QUAD_SWEEP_RADAR, direction, uncovered
+        )
     # No pending quadrant is framed yet: steer toward the first one.
     # An earlier cut also radared the CURRENT window here whenever it
     # cleared the bare spend floor ("self-correcting"); measured live
@@ -245,7 +245,9 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
         bounds[1],
         uncovered,
     )
-    return _sweep_decision(ctx, base_state, sx, sy, "quad_sweep_shift", direction, uncovered)
+    return _sweep_decision(
+        ctx, base_state, sx, sy, ReasonKind.QUAD_SWEEP_SHIFT, direction, uncovered
+    )
 
 
 def _pending_quadrants(
@@ -286,7 +288,7 @@ def _sweep_decision(
     base_state: AIStateDict,
     sx: int,
     sy: int,
-    reason: SweepReason,
+    reason: Literal[ReasonKind.QUAD_SWEEP_RADAR, ReasonKind.QUAD_SWEEP_SHIFT],
     direction: int,
     uncovered: int,
 ) -> TickDecisionDict:
@@ -297,7 +299,7 @@ def _sweep_decision(
         base_state: Base AI state to rewrite.
         sx: Anchor X.
         sy: Anchor Y.
-        reason: The sweep reason kind.
+        reason: The sweep reason kind, one of the two a sweep tick produces.
         direction: Scope direction byte.
         uncovered: Uncovered tile count the spend is buying.
 
@@ -306,12 +308,12 @@ def _sweep_decision(
     """
     command: BotCommand = (
         make_radar_command()
-        if reason == "quad_sweep_radar"
+        if reason is ReasonKind.QUAD_SWEEP_RADAR
         else make_scope_shift_command(direction)
     )
     return make_decision(
         command,
-        "COLLECT",
+        BehaviorMode.COLLECT,
         COLLECT_SCORE,
         sx,
         sy,
