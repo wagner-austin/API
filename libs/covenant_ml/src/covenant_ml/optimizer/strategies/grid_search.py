@@ -42,7 +42,7 @@ from ..types import (
     XGBoostSearchSpace,
 )
 from . import _hooks
-from ._hooks import BuildGridProtocol, GridTuple
+from ._hooks import BuildGridProtocol
 
 _log = get_logger(__name__)
 
@@ -556,6 +556,5 @@ def create_grid_search_optimizer() -> GridSearchOptimizer:
 __all__ = [
     "BuildGridProtocol",
     "GridSearchOptimizer",
-    "GridTuple",
     "create_grid_search_optimizer",
 ]

@@ -11,7 +11,6 @@ Strategies:
 
 from .grid_search import (
     GridSearchOptimizer,
-    GridTuple,
     create_grid_search_optimizer,
 )
 from .optuna_tpe import (
@@ -25,7 +24,6 @@ from .random_search import (
 
 __all__ = [
     "GridSearchOptimizer",
-    "GridTuple",
     "OptunaTpeOptimizer",
     "RandomSearchOptimizer",
     "create_grid_search_optimizer",

@@ -13,12 +13,17 @@ Tests cover:
 
 from __future__ import annotations
 
-from covenant_ml.optimizer.strategies import (
-    GridSearchOptimizer,
-    GridTuple,
-)
+from covenant_ml.optimizer.strategies import GridSearchOptimizer
 from covenant_ml.optimizer.strategies import _hooks as strategy_hooks
-from covenant_ml.optimizer.types import OptimizationConfig, SearchSpace, TrialResult, TrialState
+from covenant_ml.optimizer.types import (
+    OptimizationConfig,
+    SampledFloatParams,
+    SampledIntParams,
+    SampledStringParams,
+    SearchSpace,
+    TrialResult,
+    TrialState,
+)
 from tests.optimizer._objective_fixtures import (
     dummy_objective,
     slow_objective,
@@ -232,7 +237,7 @@ class TestGridSearchEmptyGrid:
         def empty_grid_builder(
             search_space: SearchSpace,
             n_points: int,
-        ) -> list[GridTuple]:
+        ) -> list[tuple[SampledIntParams, SampledFloatParams, SampledStringParams]]:
             return []
 
         strategy_hooks.build_grid = empty_grid_builder
@@ -269,7 +274,7 @@ class TestGridSearchEmptyGrid:
         def empty_grid_builder(
             search_space: SearchSpace,
             n_points: int,
-        ) -> list[GridTuple]:
+        ) -> list[tuple[SampledIntParams, SampledFloatParams, SampledStringParams]]:
             return []
 
         strategy_hooks.build_grid = empty_grid_builder

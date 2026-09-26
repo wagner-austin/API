@@ -19,8 +19,6 @@ from typing import Protocol
 
 from ..types import SampledFloatParams, SampledIntParams, SampledStringParams, SearchSpace
 
-GridTuple = tuple[SampledIntParams, SampledFloatParams, SampledStringParams]
-
 
 class BuildGridProtocol(Protocol):
     """Protocol for grid building function."""
@@ -29,10 +27,12 @@ class BuildGridProtocol(Protocol):
         self,
         search_space: SearchSpace,
         n_points: int,
-    ) -> list[GridTuple]: ...
+    ) -> list[tuple[SampledIntParams, SampledFloatParams, SampledStringParams]]: ...
 
 
-def _real_build_grid(search_space: SearchSpace, n_points: int) -> list[GridTuple]:
+def _real_build_grid(
+    search_space: SearchSpace, n_points: int
+) -> list[tuple[SampledIntParams, SampledFloatParams, SampledStringParams]]:
     """Build the parameter grid the search space calls for.
 
     grid_search is imported on the call rather than on import, because that
@@ -197,7 +197,6 @@ optuna_factories: OptunaFactoriesProtocol = _real_optuna_factories
 
 __all__ = [
     "BuildGridProtocol",
-    "GridTuple",
     "OptunaCreateStudyProtocol",
     "OptunaFactoriesProtocol",
     "OptunaMedianPrunerProtocol",
