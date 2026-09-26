@@ -256,6 +256,8 @@ class TestStage:
             == (
                 f"{dialect_linux.PROLOGUE}git -C '{target}' init --quiet\n"
                 f"git -C '{target}' add --all\n"
+                f"git -C '{target}' -c user.name='fleet' -c user.email='fleet@corvis.invalid' "
+                f"commit --quiet --message 'fleet export {DEMO_RUN_ID}'\n"
             ).encode()
         )
         assert not any("powershell" in argument for call in runner.calls for argument in call)
@@ -301,7 +303,13 @@ class TestStage:
             spoken.checked_script(
                 dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)
             ).encode()
-        ) < (sent.index(spoken.checked_script(dialect.init_repository_commands(target)).encode()))
+        ) < (
+            sent.index(
+                spoken.checked_script(
+                    dialect.init_repository_commands(target, DEMO_RUN_ID)
+                ).encode()
+            )
+        )
 
     def test_the_extract_script_keeps_the_node_s_clock(self) -> None:
         """Without -m, a tree from a fast clock makes targets look fresh.

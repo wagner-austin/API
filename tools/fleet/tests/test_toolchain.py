@@ -64,6 +64,7 @@ def _workspace_document() -> JSONObject:
         "ram_gb": 32.0,
         "gpu": None,
         "enabled": True,
+        "test_database": False,
         "budget": budget,
     }
     return {

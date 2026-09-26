@@ -66,6 +66,7 @@ def _workspace_document() -> JSONObject:
             "driver_version": "591.86",
         },
         "enabled": True,
+        "test_database": False,
         "budget": budget,
     }
     return {

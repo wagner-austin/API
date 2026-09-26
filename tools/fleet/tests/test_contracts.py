@@ -87,6 +87,7 @@ def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
         ram_gb=32.0,
         gpu=gpu,
         enabled=True,
+        test_database=False,
         budget=_BUDGET,
     )
 
@@ -230,6 +231,25 @@ class TestNodeConfig:
 
         with pytest.raises(JSONTypeError, match="must declare 'enabled'"):
             decode_node_config(encoded)
+
+    def test_an_absent_test_database_key_is_refused(self) -> None:
+        """Neither default is safe here either (MCPs board task 6bbfd171).
+
+        False would hide a provisioned node from every Postgres-backed
+        package; true would hand those packages to a node whose global test
+        setup cannot reach a database.
+        """
+        encoded = encode_node_config(_node())
+        del encoded["test_database"]
+
+        with pytest.raises(JSONTypeError, match="must declare 'test_database'"):
+            decode_node_config(encoded)
+
+    def test_test_database_is_carried_both_ways(self) -> None:
+        encoded = encode_node_config(_node())
+        assert encoded["test_database"] is False
+
+        assert decode_node_config({**encoded, "test_database": True})["test_database"] is True
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):

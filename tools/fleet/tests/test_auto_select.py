@@ -67,6 +67,7 @@ def _node(host: str) -> NodeConfig:
         ram_gb=32.0,
         gpu=None,
         enabled=True,
+        test_database=False,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

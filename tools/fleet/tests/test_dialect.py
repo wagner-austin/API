@@ -48,12 +48,17 @@ def test_the_shared_commands_are_the_same_on_both_platforms() -> None:
     node has git; -m keeps a fast sender's clock from making targets look
     newer than their sources, git init is what makes ruff honour .gitignore
     on the node, and git add is what makes ``git ls-files`` answer as it
-    does in a checkout (the first fleet verdict, fd5cabfa)."""
+    does in a checkout (the first fleet verdict, fd5cabfa), and the commit is
+    what gives packages/db's migrator the HEAD its test admission reads
+    (MCPs board task 6bbfd171)."""
     archive = f"/s/run/{names.ARCHIVE_NAME}"
     assert dialect.extract_commands(archive, "/s/run") == (f"tar -xzmf '{archive}' -C '/s/run'",)
-    assert dialect.init_repository_commands("/s/run") == (
+    assert dialect.init_repository_commands("/s/run", "MCPs-packages-db-1790400000") == (
         "git -C '/s/run' init --quiet",
         "git -C '/s/run' add --all",
+        f"git -C '/s/run' -c user.name='{dialect.EXPORT_AUTHOR_NAME}' "
+        f"-c user.email='{dialect.EXPORT_AUTHOR_EMAIL}' commit --quiet "
+        "--message 'fleet export MCPs-packages-db-1790400000'",
     )
 
 
@@ -74,8 +79,8 @@ def test_a_companion_is_committed_so_the_check_reading_it_has_a_head() -> None:
     assert dialect.companion_repository_commands("/s/MCPs", "a" * 40) == (
         "git -C '/s/MCPs' init --quiet",
         "git -C '/s/MCPs' add --all --force",
-        f"git -C '/s/MCPs' -c user.name='{dialect.COMPANION_AUTHOR_NAME}' "
-        f"-c user.email='{dialect.COMPANION_AUTHOR_EMAIL}' commit --quiet "
+        f"git -C '/s/MCPs' -c user.name='{dialect.EXPORT_AUTHOR_NAME}' "
+        f"-c user.email='{dialect.EXPORT_AUTHOR_EMAIL}' commit --quiet "
         f"--message 'fleet companion export {'a' * 40}'",
     )
 

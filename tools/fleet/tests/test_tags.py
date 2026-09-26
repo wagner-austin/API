@@ -30,12 +30,18 @@ RTX_3070_TI = NodeGpu(
 )
 
 
-def _node(*, platform: NodePlatform = "windows", gpu: NodeGpu | None = None) -> NodeConfig:
-    """Build a node declaration with the two fields tags derive from.
+def _node(
+    *,
+    platform: NodePlatform = "windows",
+    gpu: NodeGpu | None = None,
+    test_database: bool = False,
+) -> NodeConfig:
+    """Build a node declaration with the three fields tags derive from.
 
     Args:
         platform: The node's dialect.
         gpu: Its CUDA device, or None for a CPU-only node.
+        test_database: Whether it runs the fleet test database.
 
     Returns:
         The node.
@@ -48,6 +54,7 @@ def _node(*, platform: NodePlatform = "windows", gpu: NodeGpu | None = None) -> 
         ram_gb=16.0,
         gpu=gpu,
         enabled=True,
+        test_database=test_database,
         budget=NodeBudget(
             reserved_cores=4,
             reserved_ram_gb=4.0,
@@ -65,8 +72,14 @@ class TestNodeTags:
     def test_a_linux_node_with_a_card_carries_both(self) -> None:
         assert node_tags(_node(platform="linux", gpu=RTX_3070_TI)) == frozenset({"linux", "gpu"})
 
-    def test_the_vocabulary_is_the_two_platforms_and_gpu(self) -> None:
-        assert NODE_TAGS == ("windows", "linux", "gpu")
+    def test_a_node_running_the_fleet_test_database_carries_testdb(self) -> None:
+        """diphtheria's shape once provisioned (MCPs board task 6bbfd171)."""
+        assert node_tags(_node(platform="linux", gpu=RTX_3070_TI, test_database=True)) == (
+            frozenset({"linux", "gpu", "testdb"})
+        )
+
+    def test_the_vocabulary_is_the_two_platforms_gpu_and_testdb(self) -> None:
+        assert NODE_TAGS == ("windows", "linux", "gpu", "testdb")
 
 
 class TestMissingTags:
@@ -76,6 +89,10 @@ class TestMissingTags:
     def test_the_missing_tags_come_back_in_the_project_s_order(self) -> None:
         assert missing_tags(_node(platform="linux"), ("windows", "gpu")) == ("windows", "gpu")
         assert missing_tags(_node(platform="linux"), ("gpu", "windows")) == ("gpu", "windows")
+
+    def test_a_database_suite_is_missing_testdb_on_a_node_without_one(self) -> None:
+        assert missing_tags(_node(platform="linux"), ("testdb",)) == ("testdb",)
+        assert missing_tags(_node(platform="linux", test_database=True), ("testdb",)) == ()
 
     def test_a_project_requiring_nothing_is_never_missing_anything(self) -> None:
         assert missing_tags(_node(platform="linux"), ()) == ()
@@ -88,7 +105,7 @@ class TestDecodeNodeTag:
 
     def test_a_word_outside_the_set_is_refused_with_the_set(self) -> None:
         with pytest.raises(
-            JSONTypeError, match="t must be one of windows, linux, gpu, got 'docker'"
+            JSONTypeError, match="t must be one of windows, linux, gpu, testdb, got 'docker'"
         ):
             decode_node_tag("docker", field="t")
 
@@ -116,7 +133,9 @@ class TestDecodeRequiredTags:
             decode_required_tags("gpu", field="p")
 
     def test_an_unknown_tag_is_refused_by_index(self) -> None:
-        with pytest.raises(JSONTypeError, match=r"p\[1\] must be one of windows, linux, gpu"):
+        with pytest.raises(
+            JSONTypeError, match=r"p\[1\] must be one of windows, linux, gpu, testdb"
+        ):
             decode_required_tags(["gpu", "cuda"], field="p")
 
     def test_a_repeated_tag_is_refused_by_index(self) -> None:
