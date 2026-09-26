@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.request_context import install_request_id_middleware
 
 from procart_api.app import create_app
@@ -8,8 +8,8 @@ from procart_api.app import create_app
 
 def _setup_logging() -> None:
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="procart-api",
         instance_id=None,
         extra_fields=None,
