@@ -33,7 +33,6 @@ from covenant_ml.datasets.loaders._polars_ranking import (
 from covenant_ml.datasets.loaders._polars_utils import (
     PolarsDataFrameProtocol,
     PolarsReadCSVProtocol,
-    convert_encoding,
     report_progress,
     sanitize_array_inplace,
 )
@@ -354,7 +353,7 @@ class TimeSeriesCSVLoader:
             ValueError: If no data rows found.
         """
         file_size = file_path.stat().st_size
-        polars_encoding = convert_encoding(encoding)
+        polars_encoding = encoding.polars_encoding
 
         report_progress(
             progress_callback,

@@ -12,6 +12,8 @@ from covenant_ml.datasets.registry import (
 )
 from covenant_ml.datasets.types import (
     DatasetConfig,
+    FileEncoding,
+    FileFormat,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -25,8 +27,8 @@ def _make_test_config(name: str) -> DatasetConfig:
         display_name=f"Test {name}",
         folder=f"{name}_folder",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
             label_type="binary_int",
@@ -150,7 +152,7 @@ class TestMakeDefaultRegistry:
         assert "taiwan" in registry
         config = registry.get("taiwan")
         assert config["display_name"] == "Taiwan Bankruptcy (Original)"
-        assert config["file_format"] == "csv"
+        assert config["file_format"] is FileFormat.CSV
 
     def test_default_registry_has_us(self) -> None:
         """Default registry includes US dataset."""
@@ -159,7 +161,7 @@ class TestMakeDefaultRegistry:
         assert "us" in registry
         config = registry.get("us")
         assert config["display_name"] == "US Bankruptcy (Original)"
-        assert config["encoding"] == "utf-8-sig"
+        assert config["encoding"] is FileEncoding.UTF_8_SIG
 
     def test_default_registry_has_rw_matches_as_a_grouped_dataset(self) -> None:
         """rw_matches groups by match and never leaks the verdict as a feature."""
@@ -187,7 +189,7 @@ class TestMakeDefaultRegistry:
         assert "polish" in registry
         config = registry.get("polish")
         assert config["display_name"] == "Polish Bankruptcy (Original)"
-        assert config["file_format"] == "arff"
+        assert config["file_format"] is FileFormat.ARFF
 
     def test_default_registry_configs_have_required_fields(self) -> None:
         """All configs in default registry have required fields."""
@@ -200,8 +202,10 @@ class TestMakeDefaultRegistry:
             assert len(config["display_name"]) >= 3, f"{name}: display_name too short"
             assert len(config["folder"]) >= 2, f"{name}: folder too short"
             assert len(config["file_name"]) >= 4, f"{name}: file_name too short"
-            assert config["file_format"] in ("csv", "arff", "excel")
-            assert config["encoding"] in ("utf-8", "utf-8-sig", "latin-1", "cp1252")
+            # Registry entries carry members, never bare wire words: a member
+            # is its own lookup, a bare string is not.
+            assert config["file_format"] is FileFormat(config["file_format"])
+            assert config["encoding"] is FileEncoding(config["encoding"])
             # A fixed dataset declares its sample census; a grouped dataset
             # that grows with every export (rw_matches) declares 0, meaning
             # "shape contract only, no census".
@@ -223,8 +227,8 @@ def _make_test_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
         display_name=f"Test {name}",
         folder=f"{name}_folder",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
             label_type="binary_int",

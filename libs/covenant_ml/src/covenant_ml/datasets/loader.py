@@ -24,6 +24,7 @@ from covenant_ml.datasets.loaders.timeseries_csv_loader import TimeSeriesCSVLoad
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
     DatasetConfig,
+    FileFormat,
     LoadedDataset,
     RegressionDatasetConfig,
     RegressionLoadedDataset,
@@ -77,9 +78,9 @@ class DatasetLoader:
         """
         file_format = config["file_format"]
 
-        if file_format == "csv":
+        if file_format is FileFormat.CSV:
             return self._csv_loader.load(config, external_dir, progress_callback)
-        if file_format == "arff":
+        if file_format is FileFormat.ARFF:
             return self._arff_loader.load(config, external_dir)
         # Excel format not yet implemented
         raise ValueError(f"Excel format not yet implemented for dataset '{config['name']}'")
@@ -134,7 +135,7 @@ class DatasetLoader:
         """
         file_format = config["file_format"]
 
-        if file_format == "csv":
+        if file_format is FileFormat.CSV:
             return self._regression_csv_loader.load(config, external_dir, progress_callback)
         raise ValueError(
             f"Regression loading not yet implemented for format '{file_format}'"

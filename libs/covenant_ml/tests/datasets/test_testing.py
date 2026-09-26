@@ -14,6 +14,8 @@ from covenant_ml.datasets.testing import (
 )
 from covenant_ml.datasets.types import (
     DatasetConfig,
+    FileEncoding,
+    FileFormat,
     RegressionDatasetConfig,
     RegressionTargetSpec,
     TargetColumnSpec,
@@ -27,8 +29,8 @@ def _make_test_config(name: str = "test") -> DatasetConfig:
         display_name=f"Test {name}",
         folder=f"{name}_folder",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
             label_type="binary_int",
@@ -207,8 +209,8 @@ def _make_regression_test_config(name: str = "test") -> RegressionDatasetConfig:
         display_name=f"Test {name}",
         folder=f"{name}_folder",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=RegressionTargetSpec(column_name="target"),
         exclude_columns=(),
         n_samples_expected=100,

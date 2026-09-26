@@ -20,6 +20,8 @@ from covenant_ml.datasets.loaders.csv_loader import CSVLoader
 from covenant_ml.datasets.loaders.timeseries_csv_loader import TimeSeriesCSVLoader
 from covenant_ml.datasets.types import (
     DatasetConfig,
+    FileEncoding,
+    FileFormat,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -52,8 +54,8 @@ def _grouped_config(group_column: str | None = "match") -> DatasetConfig:
         display_name="Grouped Test",
         folder="grouped",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
             label_type="binary_int",
@@ -110,7 +112,7 @@ def test_arff_loader_refuses_a_grouped_config(tmp_path: Path) -> None:
     (folder / "data.arff").write_text(arff, encoding="utf-8")
     config = _grouped_config()
     config["file_name"] = "data.arff"
-    config["file_format"] = "arff"
+    config["file_format"] = FileFormat.ARFF
     with pytest.raises(ValueError, match="only supported by the CSV loader"):
         ARFFLoader().load(config, tmp_path)
 
@@ -121,8 +123,8 @@ def test_timeseries_loader_refuses_a_grouped_config(tmp_path: Path) -> None:
         display_name="Grouped TS",
         folder="grouped",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
             label_type="binary_int",

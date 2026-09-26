@@ -13,6 +13,8 @@ from covenant_ml.datasets.registry import (
     make_default_regression_registry,
 )
 from covenant_ml.datasets.types import (
+    FileEncoding,
+    FileFormat,
     RegressionDatasetConfig,
     RegressionTargetSpec,
 )
@@ -32,8 +34,8 @@ def _make_test_config(name: str) -> RegressionDatasetConfig:
         display_name=f"Test {name}",
         folder=f"{name}_folder",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=RegressionTargetSpec(column_name="target"),
         exclude_columns=(),
         n_samples_expected=100,
@@ -119,8 +121,8 @@ class TestDefaultRegressionRegistry:
         assert config["display_name"] == "Financial Distress"
         assert config["folder"] == "kaggle_financial_distress"
         assert config["file_name"] == "Financial Distress.csv"
-        assert config["file_format"] == "csv"
-        assert config["encoding"] == "utf-8"
+        assert config["file_format"] is FileFormat.CSV
+        assert config["encoding"] is FileEncoding.UTF_8
         assert config["target"]["column_name"] == "Financial Distress"
         assert config["exclude_columns"] == ("Company", "Time")
         assert config["n_samples_expected"] == 3672

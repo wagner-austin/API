@@ -7,6 +7,8 @@ RegressionDatasetConfig, and RegressionDatasetMeta TypedDicts.
 from __future__ import annotations
 
 from covenant_ml.datasets.types import (
+    FileEncoding,
+    FileFormat,
     RegressionDatasetConfig,
     RegressionDatasetMeta,
     RegressionTargetSpec,
@@ -37,8 +39,8 @@ class TestRegressionDatasetConfig:
             display_name="Test Regression Dataset",
             folder="test_folder",
             file_name="data.csv",
-            file_format="csv",
-            encoding="utf-8",
+            file_format=FileFormat.CSV,
+            encoding=FileEncoding.UTF_8,
             target=RegressionTargetSpec(column_name="target"),
             exclude_columns=("id",),
             n_samples_expected=100,
@@ -50,8 +52,8 @@ class TestRegressionDatasetConfig:
         assert config["display_name"] == "Test Regression Dataset"
         assert config["folder"] == "test_folder"
         assert config["file_name"] == "data.csv"
-        assert config["file_format"] == "csv"
-        assert config["encoding"] == "utf-8"
+        assert config["file_format"] is FileFormat.CSV
+        assert config["encoding"] is FileEncoding.UTF_8
         assert config["target"]["column_name"] == "target"
         assert config["exclude_columns"] == ("id",)
         assert config["n_samples_expected"] == 100
@@ -65,8 +67,8 @@ class TestRegressionDatasetConfig:
             display_name="Minimal",
             folder="min",
             file_name="data.csv",
-            file_format="csv",
-            encoding="utf-8",
+            file_format=FileFormat.CSV,
+            encoding=FileEncoding.UTF_8,
             target=RegressionTargetSpec(column_name="y"),
             exclude_columns=(),
             n_samples_expected=10,

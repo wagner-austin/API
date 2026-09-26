@@ -6,13 +6,20 @@ All types are immutable (total=True) and strictly typed.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, NotRequired, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
-# File format literals
-FileFormat = Literal["csv", "arff", "excel"]
+
+class FileFormat(StrEnum):
+    """The on-disk format a dataset config declares."""
+
+    CSV = "csv"
+    ARFF = "arff"
+    EXCEL = "excel"
+
 
 # Loading phase literals for progress reporting
 LoadPhase = Literal[
@@ -50,8 +57,28 @@ class LoadProgress(TypedDict, total=True):
     message: str
 
 
-# Encoding literals
-FileEncoding = Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"]
+class FileEncoding(StrEnum):
+    """The text encoding a dataset file is declared to use."""
+
+    UTF_8 = "utf-8"
+    UTF_8_SIG = "utf-8-sig"
+    LATIN_1 = "latin-1"
+    CP1252 = "cp1252"
+
+    @property
+    def polars_encoding(self) -> str:
+        """The encoding name Polars' CSV reader takes for this encoding.
+
+        Polars strips a UTF-8 BOM itself and reads neither latin-1 nor
+        cp1252, so those two are read lossily as UTF-8.
+
+        Returns:
+            ``"utf8"`` for the UTF-8 encodings, ``"utf8-lossy"`` otherwise.
+        """
+        if self is FileEncoding.UTF_8 or self is FileEncoding.UTF_8_SIG:
+            return "utf8"
+        return "utf8-lossy"
+
 
 # Label type literals (how the target column encodes classes)
 LabelType = Literal["binary_int", "binary_str", "multiclass_int", "multiclass_str"]

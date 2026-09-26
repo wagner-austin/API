@@ -17,6 +17,7 @@ from covenant_ml.datasets.loaders.parquet_cache import (
 from covenant_ml.datasets.types import (
     DatasetConfig,
     FileEncoding,
+    FileFormat,
     LabelType,
     LoadedDataset,
     LoadProgress,
@@ -83,7 +84,7 @@ def _make_config(
     positive_values: tuple[str | int, ...] = (1,),
     negative_values: tuple[str | int, ...] = (0,),
     exclude_columns: tuple[str, ...] = (),
-    encoding: FileEncoding = "utf-8",
+    encoding: FileEncoding = FileEncoding.UTF_8,
     n_samples_expected: int = 5,
     n_features_expected: int = 3,
 ) -> DatasetConfig:
@@ -93,7 +94,7 @@ def _make_config(
         display_name=f"Test {name}",
         folder=folder,
         file_name=file_name,
-        file_format="csv",
+        file_format=FileFormat.CSV,
         encoding=encoding,
         target=TargetColumnSpec(
             column_name=target_column,

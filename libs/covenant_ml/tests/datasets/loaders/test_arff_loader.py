@@ -8,7 +8,13 @@ import numpy as np
 import pytest
 
 from covenant_ml.datasets.loaders.arff_loader import ARFFLoader, create_arff_loader
-from covenant_ml.datasets.types import DatasetConfig, LoadedDataset, TargetColumnSpec
+from covenant_ml.datasets.types import (
+    DatasetConfig,
+    FileEncoding,
+    FileFormat,
+    LoadedDataset,
+    TargetColumnSpec,
+)
 
 
 def _get_fixtures_dir() -> Path:
@@ -33,8 +39,8 @@ def _make_config(
         display_name=f"Test {name}",
         folder=folder,
         file_name=file_name,
-        file_format="arff",
-        encoding="utf-8",
+        file_format=FileFormat.ARFF,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name=target_column,
             label_type="binary_int",

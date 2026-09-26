@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from covenant_ml.datasets.loaders._parsing import MISSING_VALUES
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
-from covenant_ml.datasets.types import FileEncoding, LoadProgress
+from covenant_ml.datasets.types import LoadProgress
 
 
 class PolarsExprProtocol(Protocol):
@@ -253,24 +253,6 @@ class PolarsReadCSVProtocol(Protocol):
         ...
 
 
-def convert_encoding(encoding: FileEncoding) -> str:
-    """Convert FileEncoding literal to Polars encoding string.
-
-    Args:
-        encoding: FileEncoding literal value.
-
-    Returns:
-        Encoding string compatible with Polars.
-    """
-    encoding_map: dict[str, str] = {
-        "utf-8": "utf8",
-        "utf-8-sig": "utf8",
-        "latin-1": "utf8-lossy",
-        "cp1252": "utf8-lossy",
-    }
-    return encoding_map.get(encoding, "utf8")
-
-
 def report_progress(
     callback: ProgressCallbackProtocol | None,
     progress: LoadProgress,
@@ -406,7 +388,6 @@ __all__ = [
     "PolarsReadCSVProtocol",
     "PolarsSeriesProtocol",
     "PolarsWhenFnProtocol",
-    "convert_encoding",
     "extract_entity_ids",
     "extract_feature_array",
     "is_numeric_string",

@@ -156,25 +156,6 @@ def _report_progress(
         callback(progress)
 
 
-def _convert_encoding(encoding: FileEncoding) -> str:
-    """Convert FileEncoding literal to Polars encoding string.
-
-    Args:
-        encoding: FileEncoding literal value.
-
-    Returns:
-        Encoding string compatible with Polars.
-    """
-    # Polars uses standard encoding names
-    encoding_map: dict[str, str] = {
-        "utf-8": "utf8",
-        "utf-8-sig": "utf8",  # Polars handles BOM automatically
-        "latin-1": "utf8-lossy",  # Polars doesn't support latin-1 directly
-        "cp1252": "utf8-lossy",  # Use lossy fallback
-    }
-    return encoding_map.get(encoding, "utf8")
-
-
 def read_csv_with_progress(
     file_path: Path,
     encoding: FileEncoding,
@@ -202,7 +183,7 @@ def read_csv_with_progress(
         raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
     file_size = file_path.stat().st_size
-    polars_encoding = _convert_encoding(encoding)
+    polars_encoding = encoding.polars_encoding
 
     # Report initial progress for large files
     if file_size >= PROGRESS_THRESHOLD_BYTES:
@@ -313,7 +294,7 @@ def read_csv_to_dataframe(
         raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
     file_size = file_path.stat().st_size
-    polars_encoding = _convert_encoding(encoding)
+    polars_encoding = encoding.polars_encoding
 
     # Report initial progress
     _report_progress(

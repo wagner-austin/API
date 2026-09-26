@@ -7,6 +7,7 @@ from pathlib import Path
 from covenant_ml.datasets.types import (
     AggregationStrategy,
     FileEncoding,
+    FileFormat,
     LabelType,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
@@ -52,7 +53,7 @@ def _make_timeseries_config(
     positive_values: tuple[str | int, ...] = (1,),
     negative_values: tuple[str | int, ...] = (0,),
     exclude_columns: tuple[str, ...] = (),
-    encoding: FileEncoding = "utf-8",
+    encoding: FileEncoding = FileEncoding.UTF_8,
     n_samples_expected: int = 3,
     n_features_expected: int = 2,
     entity_column: str = "entity_id",
@@ -71,7 +72,7 @@ def _make_timeseries_config(
         display_name=f"Test {name}",
         folder=folder,
         file_name=file_name,
-        file_format="csv",
+        file_format=FileFormat.CSV,
         encoding=encoding,
         target=TargetColumnSpec(
             column_name=target_column,

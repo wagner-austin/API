@@ -14,7 +14,7 @@ from covenant_ml.datasets.loaders.chunked_csv_reader import (
     read_csv_to_dataframe,
     read_csv_with_progress,
 )
-from covenant_ml.datasets.types import LoadProgress
+from covenant_ml.datasets.types import FileEncoding, LoadProgress
 
 
 def _get_fixtures_dir() -> Path:
@@ -30,7 +30,7 @@ class TestReadCSVWithProgress:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        headers, rows = read_csv_with_progress(csv_path, "utf-8")
+        headers, rows = read_csv_with_progress(csv_path, FileEncoding.UTF_8)
 
         assert headers == ["feature_1", "feature_2", "feature_3", "target"]
         assert len(rows) == 5
@@ -40,7 +40,7 @@ class TestReadCSVWithProgress:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        _headers, rows = read_csv_with_progress(csv_path, "utf-8")
+        _headers, rows = read_csv_with_progress(csv_path, FileEncoding.UTF_8)
 
         # First data row: 1.0, 2.0, 3.0, 0
         assert rows[0] == ["1.0", "2.0", "3.0", "0"]
@@ -52,7 +52,7 @@ class TestReadCSVWithProgress:
         csv_path = Path("/nonexistent/path/data.csv")
 
         with pytest.raises(FileNotFoundError, match="Dataset file not found"):
-            read_csv_with_progress(csv_path, "utf-8")
+            read_csv_with_progress(csv_path, FileEncoding.UTF_8)
 
     def test_read_empty_csv_raises(self) -> None:
         """Read empty CSV raises ValueError."""
@@ -60,7 +60,7 @@ class TestReadCSVWithProgress:
         csv_path = fixtures_dir / "empty_csv" / "data.csv"
 
         with pytest.raises(ValueError, match="No data rows found"):
-            read_csv_with_progress(csv_path, "utf-8")
+            read_csv_with_progress(csv_path, FileEncoding.UTF_8)
 
     def test_read_csv_with_progress_callback(self) -> None:
         """Progress callback is called during reading."""
@@ -73,7 +73,7 @@ class TestReadCSVWithProgress:
             progress_updates.append(progress)
 
         _headers, _rows = read_csv_with_progress(
-            csv_path, "utf-8", progress_callback=capture_progress
+            csv_path, FileEncoding.UTF_8, progress_callback=capture_progress
         )
 
         # Small file skips reading phase, gets 2 parsing updates (start + end)
@@ -99,7 +99,7 @@ class TestReadCSVWithProgress:
         def capture_phase(progress: LoadProgress) -> None:
             phases_seen.add(progress["phase"])
 
-        read_csv_with_progress(csv_path, "utf-8", progress_callback=capture_phase)
+        read_csv_with_progress(csv_path, FileEncoding.UTF_8, progress_callback=capture_phase)
 
         # Should see parsing phase (small file skips some reading updates)
         assert "parsing" in phases_seen
@@ -115,7 +115,7 @@ class TestReadCSVWithProgress:
             last_progress.clear()
             last_progress.append(progress)
 
-        read_csv_with_progress(csv_path, "utf-8", progress_callback=capture_last)
+        read_csv_with_progress(csv_path, FileEncoding.UTF_8, progress_callback=capture_last)
 
         assert len(last_progress) == 1
         assert last_progress[0]["percent_complete"] == 100.0
@@ -126,7 +126,7 @@ class TestReadCSVWithProgress:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        headers, rows = read_csv_with_progress(csv_path, "utf-8", progress_callback=None)
+        headers, rows = read_csv_with_progress(csv_path, FileEncoding.UTF_8, progress_callback=None)
 
         assert len(headers) == 4
         assert len(rows) == 5
@@ -136,7 +136,7 @@ class TestReadCSVWithProgress:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        headers, rows = read_csv_with_progress(csv_path, "utf-8-sig")
+        headers, rows = read_csv_with_progress(csv_path, FileEncoding.UTF_8_SIG)
 
         assert len(headers) == 4
         assert len(rows) == 5
@@ -146,7 +146,7 @@ class TestReadCSVWithProgress:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        headers, rows = read_csv_with_progress(csv_path, "latin-1")
+        headers, rows = read_csv_with_progress(csv_path, FileEncoding.LATIN_1)
 
         assert len(headers) == 4
         assert len(rows) == 5
@@ -160,7 +160,7 @@ class TestReadCSVToDataframe:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        df = read_csv_to_dataframe(csv_path, "utf-8")
+        df = read_csv_to_dataframe(csv_path, FileEncoding.UTF_8)
 
         # Verify DataFrame has expected dimensions
         assert df.height == 5
@@ -172,7 +172,7 @@ class TestReadCSVToDataframe:
         fixtures_dir = _get_fixtures_dir()
         csv_path = fixtures_dir / "small_csv" / "data.csv"
 
-        df = read_csv_to_dataframe(csv_path, "utf-8")
+        df = read_csv_to_dataframe(csv_path, FileEncoding.UTF_8)
 
         assert df.columns == ["feature_1", "feature_2", "feature_3", "target"]
 
@@ -181,7 +181,7 @@ class TestReadCSVToDataframe:
         csv_path = Path("/nonexistent/path/data.csv")
 
         with pytest.raises(FileNotFoundError, match="Dataset file not found"):
-            read_csv_to_dataframe(csv_path, "utf-8")
+            read_csv_to_dataframe(csv_path, FileEncoding.UTF_8)
 
     def test_read_dataframe_empty_raises(self) -> None:
         """Read empty CSV raises ValueError."""
@@ -189,7 +189,7 @@ class TestReadCSVToDataframe:
         csv_path = fixtures_dir / "empty_csv" / "data.csv"
 
         with pytest.raises(ValueError, match="No data rows found"):
-            read_csv_to_dataframe(csv_path, "utf-8")
+            read_csv_to_dataframe(csv_path, FileEncoding.UTF_8)
 
     def test_read_dataframe_with_progress(self) -> None:
         """Progress callback is called when reading DataFrame."""
@@ -201,7 +201,7 @@ class TestReadCSVToDataframe:
         def count_progress(progress: LoadProgress) -> None:
             progress_count[0] += 1
 
-        df = read_csv_to_dataframe(csv_path, "utf-8", progress_callback=count_progress)
+        df = read_csv_to_dataframe(csv_path, FileEncoding.UTF_8, progress_callback=count_progress)
 
         assert df.height == 5
         assert progress_count[0] >= 2  # At least start and end
@@ -307,7 +307,9 @@ class TestLargeFileProgress:
             def capture(progress: LoadProgress) -> None:
                 progress_updates.append(progress)
 
-            _headers, _rows = read_csv_with_progress(csv_path, "utf-8", progress_callback=capture)
+            _headers, _rows = read_csv_with_progress(
+                csv_path, FileEncoding.UTF_8, progress_callback=capture
+            )
 
             # Should have reading phase progress reports for large files
             reading_updates = [p for p in progress_updates if p["phase"] == "reading"]
@@ -331,7 +333,9 @@ class TestLargeFileProgress:
             def capture(progress: LoadProgress) -> None:
                 progress_updates.append(progress)
 
-            _headers, _rows = read_csv_with_progress(csv_path, "utf-8", progress_callback=capture)
+            _headers, _rows = read_csv_with_progress(
+                csv_path, FileEncoding.UTF_8, progress_callback=capture
+            )
 
             # Should have parsing phase progress reports for periodic updates
             parsing_updates = [p for p in progress_updates if p["phase"] == "parsing"]
