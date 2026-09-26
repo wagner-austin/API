@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.bot.ai.scoring_types import BehaviorScoreDict
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, BehaviorScoreDict, ReasonKind
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -69,12 +69,12 @@ def _decision_with_command(
         command=primary,
         secondary_command=secondary,
         behavior=BehaviorScoreDict(
-            mode="HUNT",
+            mode=BehaviorMode.HUNT,
             score=100,
             target_x=0,
             target_y=0,
             target_id=-1,
-            reason_kind="manual_hold",
+            reason_kind=ReasonKind.MANUAL_HOLD,
             reason_context={},
         ),
         updated_ai_state=make_initial_ai_state(),
