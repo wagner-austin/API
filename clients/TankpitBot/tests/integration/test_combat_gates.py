@@ -28,6 +28,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
 )
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.protocol import MovementResponseDict, TankInfoDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
@@ -114,7 +115,7 @@ class TestCombatGates:
             make_inventory(),
             seed_ts,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -161,7 +162,7 @@ class TestCombatGates:
             make_inventory(),
             stale_now_ms,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -219,7 +220,7 @@ class TestCombatGates:
             make_inventory(),
             seed_ts,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
