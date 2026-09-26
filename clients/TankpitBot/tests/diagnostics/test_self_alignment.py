@@ -17,6 +17,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
 
+from tankpit_bot.bot.states import BotState
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.browser.page_client_snapshot_codecs import encode_client_field_map
 from tankpit_bot.diagnostics.event_stream import load_event_records
@@ -249,7 +250,7 @@ def test_tick_once_emits_sample_from_live_world_state(
     bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     bot._cdp = _SelfFieldsCDPSession()
     bot._state_data = bot._state_data.copy()
-    bot._state_data["state"] = "IDLE"
+    bot._state_data["state"] = BotState.IDLE
     bot._ai_state = AIStateDict(**{**bot._ai_state, "last_scan_ms": 1})
 
     _tick_once(bot)
