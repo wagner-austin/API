@@ -102,6 +102,69 @@ fields, so a ledger row and a board post can be matched by whoever reads both.
 A default would be one label shared by every session, which is the same as
 having none.
 
+## `fleet-runners`: a CI runner host is disposable
+
+The self-hosted GitHub Actions runners live on one roster, `runners.json`:
+which runners each host carries, which assets their jobs need, and, in each
+host's `base`, what a stock Windows install needs before any runner can
+register. `fleet-runners` holds the hosts to it:
+
+```bash
+fleet-runners --spec runners.json                                   # audit every host
+fleet-runners --spec runners.json --host lavender --render <dir>    # write provision.ps1/.sh
+fleet-runners --spec runners.json --host lavender --onboard owner/repo
+fleet-runners --spec runners.json --host lavender --rebuild yes     # rebuild the host
+```
+
+The operator, on 2026-09-26, while lavender was being recovered by hand from a
+full disk: "it justcis a github runner". A machine whose only job is running
+CI holds nothing that needs saving, so the answer to any fault on it is to
+wipe it and run the recipe again (board task 1aa6a021). `--rebuild yes` is
+that recipe. It starts from a machine that node setup has made reachable (the
+corvis-stick `fleet-node-setup` skill: OpenSSH, Tailscale, git, the fleet
+key), because nothing can reach a stock install before that, and it lays, in
+order:
+
+1. the **Windows base**: the optional features WSL needs, the pinned WSL
+   release (MSI, SHA-256 checked), the LocalMachine execution policy, the
+   machine PATH and `.wslconfig`; then the **reboot** Windows asks for,
+   waited out by comparing boot instants, never by a sleep;
+2. the **distro**, imported from the pinned image when it is not registered;
+3. **`/etc/wsl.conf`** (systemd as PID 1), restarting the distro when it
+   changed;
+4. the **Linux base**: the roster's apt packages, docker, the runner account;
+5. **registration tokens**, minted with `gh`, one per repository;
+6. the roster's own **`provision.ps1` and `provision.sh`**, carrying them;
+7. the **audit**, whose findings are the verdict and the exit code.
+
+Every stage is idempotent, so a rebuild cut short by anything is finished by
+running the same command again, and a rebuild over a healthy host changes
+nothing: an install whose `.runner` exists is not configured twice.
+
+**What a runner host holds, and why none of it needs saving:**
+
+| State | What happens to it on a rebuild |
+|---|---|
+| Registration tokens | Minted fresh by every run; they expire within the hour |
+| Each runner's `.runner`, `.credentials`, service | Written by config.sh; `--replace` takes back the old registration of the same name |
+| `_work` trees, poetry venvs, pip cache | Caches; the next job recreates them, and ci-clean prunes the orphans |
+| Docker images and volumes | The pull cache and nothing else: services mount tmpfs (MCPs `check.yml`), and ci-clean prunes daily |
+| Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
+| ci-clean script, service and timer | Rendered from `runner_render` and installed by provision.sh |
+| The distro itself | Imported from the pinned image |
+| Windows PATH, execution policy, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1 |
+| The licensed game tree (`manual` asset) | The one exception: no script may fetch it. The rebuild prints it as `PLACE BY HAND`, and the audit fails until it is placed |
+
+**The disk ceiling.** The audit fails a host whose distro root uses more than
+`base.disk.ceiling_gb`, and the row's id carries both numbers, so every line,
+passing or failing, says what is allowed and what normal was:
+`disk:/:ceiling-150gb:baseline-46gb@2026-09-26`. The baseline is lavender's
+idle rebuilt root, 46 GB on 2026-09-26, which still read 46 GB after about
+thirty real MCPs jobs. The ceiling leaves about 100 GB for the working set
+(the image pull cache, one set of venvs per runner, the checkouts) and trips
+long before the 536 GB of leaked volumes that filled lavender's disk on
+2026-09-25.
+
 ## `fleet-agent`: serving the corvis dispatch queue
 
 Everything above is driven from a shell on this machine. `fleet-agent` is how

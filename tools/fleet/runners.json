@@ -16,7 +16,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
           "workdir": "/home/gharunner/actions-runner-api-1/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/API",
@@ -24,7 +25,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-API.lavender-wsl-2.service",
           "workdir": "/home/gharunner/actions-runner-api-2/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/MCPs",
@@ -32,7 +34,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl.service",
           "workdir": "/home/gharunner/actions-runner/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/MCPs",
@@ -40,7 +43,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-2.service",
           "workdir": "/home/gharunner/actions-runner-2/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/MCPs",
@@ -48,7 +52,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-3.service",
           "workdir": "/home/gharunner/actions-runner-3/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/MCPs",
@@ -56,7 +61,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-4.service",
           "workdir": "/home/gharunner/actions-runner-4/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/MCPs",
@@ -64,7 +70,8 @@
           "side": "windows",
           "service": "actions.runner.wagner-austin-MCPs.lavender",
           "workdir": "C:/actions-runner/_work",
-          "labels": ["lavender"]
+          "labels": ["lavender"],
+          "python_toolcache": ["3.11.9"]
         },
         {
           "repo": "wagner-austin/corvis-stick",
@@ -72,7 +79,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-corvis-stick.lavender-wsl.service",
           "workdir": "/home/gharunner/actions-runner-corvis-stick-1/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/corvis-stick",
@@ -80,7 +88,8 @@
           "side": "windows",
           "service": "actions.runner.wagner-austin-corvis-stick.lavender",
           "workdir": "C:/actions-runner-corvis-stick/_work",
-          "labels": ["lavender"]
+          "labels": ["lavender"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/chat",
@@ -88,7 +97,8 @@
           "side": "windows",
           "service": "actions.runner.wagner-austin-chat.lavender",
           "workdir": "C:/actions-runner-chat/_work",
-          "labels": ["lavender"]
+          "labels": ["lavender"],
+          "python_toolcache": ["3.11.9"]
         },
         {
           "repo": "wagner-austin/tree-bot",
@@ -96,7 +106,8 @@
           "side": "wsl",
           "service": "actions.runner.wagner-austin-tree-bot.lavender-wsl.service",
           "workdir": "/home/gharunner/actions-runner-treebot-1/_work",
-          "labels": ["lavender-wsl"]
+          "labels": ["lavender-wsl"],
+          "python_toolcache": []
         },
         {
           "repo": "wagner-austin/tree-bot",
@@ -104,7 +115,8 @@
           "side": "windows",
           "service": "actions.runner.wagner-austin-tree-bot.lavender",
           "workdir": "C:/actions-runner-tree-bot/_work",
-          "labels": ["lavender"]
+          "labels": ["lavender"],
+          "python_toolcache": ["3.11.9", "3.12.10"]
         }
       ],
       "assets": [
@@ -131,8 +143,58 @@
           "reason": "Model-Trainer's APP__DATA_ROOT default; checkpoint tests write under it",
           "manual": false,
           "provision_command": null
+        },
+        {
+          "path": "/opt/google/chrome/chrome",
+          "sha256": null,
+          "writable": false,
+          "reason": "MCPs web-scraper launches channel 'chrome', the system Google Chrome, never bundled Chromium",
+          "manual": false,
+          "provision_command": "curl -fsSL -o /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y -qq /tmp/google-chrome-stable_current_amd64.deb && rm -f /tmp/google-chrome-stable_current_amd64.deb"
+        },
+        {
+          "path": "/opt/corvis/model-cache/Xenova/gte-small/onnx/model.onnx",
+          "sha256": null,
+          "writable": false,
+          "reason": "MCPs packages/embed and mcp-proxy load gte-small from this cache; absent, the 133 MB fetch times the embed suite out",
+          "manual": false,
+          "provision_command": "for f in config.json tokenizer.json tokenizer_config.json onnx/model.onnx; do curl -fsSL --create-dirs -o /opt/corvis/model-cache/Xenova/gte-small/$f https://huggingface.co/Xenova/gte-small/resolve/main/$f; done && chmod -R a+rX /opt/corvis/model-cache"
         }
-      ]
+      ],
+      "base": {
+        "windows_features": ["VirtualMachinePlatform", "Microsoft-Windows-Subsystem-Linux"],
+        "wsl_msi": {
+          "version": "2.7.14",
+          "url": "https://github.com/microsoft/WSL/releases/download/2.7.14/wsl.2.7.14.0.x64.msi",
+          "sha256": "db084e536279a59e90a26ec598d8aa8a4dff8309f41d078fd06242953ac1ebcd"
+        },
+        "rootfs": {
+          "version": "24.04-20240423",
+          "url": "https://cloud-images.ubuntu.com/wsl/releases/24.04/20240423/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz",
+          "sha256": "8251e27ffff381a4af5f41dcb94d867de3e0d9774a9241908ab34555d99315ea"
+        },
+        "distro_dir": "C:/wsl/Ubuntu",
+        "apt_packages": [
+          "build-essential",
+          "python3",
+          "pkg-config",
+          "postgresql-client",
+          "ffmpeg",
+          "curl",
+          "pipx",
+          "git",
+          "unzip",
+          "ca-certificates",
+          "docker.io"
+        ],
+        "machine_path_entries": ["C:\\Program Files (x86)\\GnuWin32\\bin"],
+        "execution_policy": "RemoteSigned",
+        "disk": {
+          "ceiling_gb": 150,
+          "baseline_gb": 46,
+          "baseline_measured": "2026-09-26"
+        }
+      }
     }
   ]
 }
