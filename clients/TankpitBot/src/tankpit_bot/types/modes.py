@@ -1,129 +1,56 @@
-"""Top-level AI mode literals and validation helpers.
+"""Top-level AI mode vocabulary and the mode/substate pairing rule.
 
 This module owns the durable HFSM mode vocabulary so it does not get mixed
-into the larger planner-state type module.
+into the larger planner-state type module. Decoders narrow the words with
+:func:`platform_core.members.require_member`.
 """
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
-from platform_core.json_utils import JSONObject, require_str
 
-AIMode = Literal[
-    "UNSET",
-    "HUNT",
-    "COLLECT",
-]
+class AIMode(StrEnum):
+    """The durable HFSM top-level mode."""
 
-AI_MODE_STATES: tuple[
-    Literal[
-        "",
-        "ACQUIRE",
-        "REFRESH",
-        "CLOSE",
-        "SCAN_ON_LANDING",
-        "ENGAGE",
-        "CONFIRM_KILL",
-        "SENSE",
-        "SEARCH",
-        "APPROACH",
-        "PICKUP",
-        "DONE",
-    ],
-    ...,
-] = (
-    "",
-    "ACQUIRE",
-    "REFRESH",
-    "CLOSE",
-    "SCAN_ON_LANDING",
-    "ENGAGE",
-    "CONFIRM_KILL",
-    "SENSE",
-    "SEARCH",
-    "APPROACH",
-    "PICKUP",
-    "DONE",
-)
+    UNSET = "UNSET"
+    HUNT = "HUNT"
+    COLLECT = "COLLECT"
 
-AIModeState = Literal[
-    "",
-    "ACQUIRE",
-    "REFRESH",
-    "CLOSE",
-    "SCAN_ON_LANDING",
-    "ENGAGE",
-    "CONFIRM_KILL",
-    "SENSE",
-    "SEARCH",
-    "APPROACH",
-    "PICKUP",
-    "DONE",
-]
 
-AI_MODES: tuple[AIMode, ...] = (
-    "UNSET",
-    "HUNT",
-    "COLLECT",
-)
+class AIModeState(StrEnum):
+    """The durable substate within an :class:`AIMode`; ``NONE`` belongs to UNSET."""
+
+    NONE = ""
+    ACQUIRE = "ACQUIRE"
+    REFRESH = "REFRESH"
+    CLOSE = "CLOSE"
+    SCAN_ON_LANDING = "SCAN_ON_LANDING"
+    ENGAGE = "ENGAGE"
+    CONFIRM_KILL = "CONFIRM_KILL"
+    SENSE = "SENSE"
+    SEARCH = "SEARCH"
+    APPROACH = "APPROACH"
+    PICKUP = "PICKUP"
+    DONE = "DONE"
+
 
 HUNT_MODE_STATES: tuple[AIModeState, ...] = (
-    "ACQUIRE",
-    "REFRESH",
-    "CLOSE",
-    "SCAN_ON_LANDING",
-    "ENGAGE",
-    "CONFIRM_KILL",
+    AIModeState.ACQUIRE,
+    AIModeState.REFRESH,
+    AIModeState.CLOSE,
+    AIModeState.SCAN_ON_LANDING,
+    AIModeState.ENGAGE,
+    AIModeState.CONFIRM_KILL,
 )
 
 COLLECT_MODE_STATES: tuple[AIModeState, ...] = (
-    "SENSE",
-    "SEARCH",
-    "APPROACH",
-    "PICKUP",
-    "DONE",
+    AIModeState.SENSE,
+    AIModeState.SEARCH,
+    AIModeState.APPROACH,
+    AIModeState.PICKUP,
+    AIModeState.DONE,
 )
-
-
-def require_ai_mode(data: JSONObject, key: str) -> AIMode:
-    """Validate and extract a durable AI mode from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated durable AI mode.
-
-    Raises:
-        ValueError: If the value is not a supported durable AI mode.
-    """
-    raw = require_str(data, key)
-    for mode in AI_MODES:
-        if raw == mode:
-            return mode
-    raise ValueError(f"{key} must be one of {AI_MODES}, got {raw!r}")
-
-
-def require_ai_mode_state(data: JSONObject, key: str) -> AIModeState:
-    """Validate and extract a durable AI substate from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated durable AI substate.
-
-    Raises:
-        ValueError: If the value is not a supported durable AI substate.
-    """
-    raw = require_str(data, key)
-    for state in AI_MODE_STATES:
-        if raw == state:
-            return state
-    raise ValueError(f"{key} must be one of {AI_MODE_STATES}, got {raw!r}")
 
 
 def is_valid_ai_mode_state(mode: AIMode, mode_state: AIModeState) -> bool:
@@ -136,21 +63,17 @@ def is_valid_ai_mode_state(mode: AIMode, mode_state: AIModeState) -> bool:
     Returns:
         True when the mode and substate are a valid pair.
     """
-    if mode == "UNSET":
-        return mode_state == ""
-    if mode == "HUNT":
+    if mode is AIMode.UNSET:
+        return mode_state is AIModeState.NONE
+    if mode is AIMode.HUNT:
         return mode_state in HUNT_MODE_STATES
     return mode_state in COLLECT_MODE_STATES
 
 
 __all__ = [
-    "AI_MODES",
-    "AI_MODE_STATES",
     "COLLECT_MODE_STATES",
     "HUNT_MODE_STATES",
     "AIMode",
     "AIModeState",
     "is_valid_ai_mode_state",
-    "require_ai_mode",
-    "require_ai_mode_state",
 ]
