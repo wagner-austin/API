@@ -18,6 +18,7 @@ from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -292,13 +293,15 @@ def decode_text_message(
     return f"[{tag}] ???: {preview}..."
 
 
-def decode_message(ws: WorldService, payload: str, direction: str, magic: str | None) -> str:
+def decode_message(
+    ws: WorldService, payload: str, direction: MessageDirection, magic: str | None
+) -> str:
     """Decode a WebSocket message payload for display.
 
     Args:
         ws: The session's world service; room beliefs land here.
         payload: Base64-encoded message payload.
-        direction: 'sent' or 'received'.
+        direction: Whether the frame was sent or received.
         magic: Captured XOR magic key.
 
     Returns:

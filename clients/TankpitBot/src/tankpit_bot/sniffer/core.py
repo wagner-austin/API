@@ -46,6 +46,7 @@ from tankpit_bot.types import (
     encode_capture_session,
     encode_session_summary,
 )
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -233,7 +234,7 @@ class WebSocketSniffer(BrowserSession):
         if not self._live_decode:
             return
 
-        if direction == "received":
+        if direction is MessageDirection.RECEIVED:
             # Use unified decoder for received messages. Frames that
             # arrive before the session's magic cannot be decoded at
             # all — live decode simply has nothing to print for them.
@@ -241,7 +242,7 @@ class WebSocketSniffer(BrowserSession):
                 process_received_message(self.world, payload, self.xor_table)
         else:
             # Use simple decoder for sent messages
-            mine_status = self._mine_tracker.process_message(payload, "sent")
+            mine_status = self._mine_tracker.process_message(payload, MessageDirection.SENT)
             if mine_status:
                 log.info(mine_status)
             decoded = decode_message(self.world, payload, direction, self._magic)
