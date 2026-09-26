@@ -5,11 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+import pytest
+from platform_core.json_utils import JSONTypeError
 from platform_core.logging import LogLevel
 from platform_workers.testing import FakeRedis
 
 from art_trainer.api.schemas.lora import LoraTrainRequest
 from art_trainer.core.config.settings import Settings
+from art_trainer.core.contracts.job_status import LoraJobStatus
+from art_trainer.core.contracts.progress import ArtTrainingPhase
 from art_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 from art_trainer.core.services.registries import BackendRegistry
 from art_trainer.core.services.training.backend_factory import create_kohya_backend
@@ -144,7 +148,7 @@ def test_get_status_queued(tmp_path: Path, fake_redis: FakeRedis) -> None:
     status_response = orchestrator.get_status(enqueue_response["job_id"])
 
     assert status_response["job_id"] == enqueue_response["job_id"]
-    assert status_response["status"] == "queued"
+    assert status_response["status"] is LoraJobStatus.QUEUED
     fake_redis.assert_only_called({"get", "set"})
 
 
@@ -156,7 +160,7 @@ def test_get_status_not_found(tmp_path: Path, fake_redis: FakeRedis) -> None:
     status_response = orchestrator.get_status("non-existent-job-id")
 
     assert status_response["job_id"] == "non-existent-job-id"
-    assert status_response["status"] == "failed"
+    assert status_response["status"] is LoraJobStatus.FAILED
     assert status_response["message"] == "Job not found"
     fake_redis.assert_only_called({"get", "set"})
 
@@ -187,7 +191,7 @@ def test_get_progress(tmp_path: Path, fake_redis: FakeRedis) -> None:
     progress = orchestrator.get_progress(enqueue_response["job_id"])
 
     assert progress["job_id"] == enqueue_response["job_id"]
-    assert progress["phase"] == "queued"
+    assert progress["phase"] is ArtTrainingPhase.QUEUED
     assert progress["total_steps"] == 3000
     fake_redis.assert_only_called({"get", "set"})
 
@@ -232,7 +236,7 @@ def test_get_status_running(tmp_path: Path, fake_redis: FakeRedis) -> None:
     status_response = orchestrator.get_status("running-job-id")
 
     assert status_response["job_id"] == "running-job-id"
-    assert status_response["status"] == "running"
+    assert status_response["status"] is LoraJobStatus.RUNNING
     fake_redis.assert_only_called({"get", "set"})
 
 
@@ -247,7 +251,7 @@ def test_get_status_completed(tmp_path: Path, fake_redis: FakeRedis) -> None:
     status_response = orchestrator.get_status("completed-job-id")
 
     assert status_response["job_id"] == "completed-job-id"
-    assert status_response["status"] == "completed"
+    assert status_response["status"] is LoraJobStatus.COMPLETED
     fake_redis.assert_only_called({"get", "set"})
 
 
@@ -262,22 +266,33 @@ def test_get_status_cancelled(tmp_path: Path, fake_redis: FakeRedis) -> None:
     status_response = orchestrator.get_status("cancelled-job-id")
 
     assert status_response["job_id"] == "cancelled-job-id"
-    assert status_response["status"] == "cancelled"
+    assert status_response["status"] is LoraJobStatus.CANCELLED
     fake_redis.assert_only_called({"get", "set"})
 
 
-def test_get_status_unknown_defaults_to_failed(tmp_path: Path, fake_redis: FakeRedis) -> None:
-    """Test get_status returns failed for unknown status values."""
+def test_get_status_failed(tmp_path: Path, fake_redis: FakeRedis) -> None:
+    """Test get_status reads the failed status the worker writes."""
     settings = _make_test_settings(tmp_path)
     orchestrator = _make_orchestrator(settings, fake_redis)
 
-    # Set unknown status directly
+    fake_redis.set("art:job:status:failed-job", "failed")
+
+    status_response = orchestrator.get_status("failed-job")
+
+    assert status_response["job_id"] == "failed-job"
+    assert status_response["status"] is LoraJobStatus.FAILED
+    fake_redis.assert_only_called({"get", "set"})
+
+
+def test_get_status_refuses_an_unknown_status(tmp_path: Path, fake_redis: FakeRedis) -> None:
+    """Test get_status names a status word no writer in this service produces."""
+    settings = _make_test_settings(tmp_path)
+    orchestrator = _make_orchestrator(settings, fake_redis)
+
     fake_redis.set("art:job:status:unknown-status-job", "some_random_status")
 
-    status_response = orchestrator.get_status("unknown-status-job")
-
-    assert status_response["job_id"] == "unknown-status-job"
-    assert status_response["status"] == "failed"
+    with pytest.raises(JSONTypeError, match="Invalid status 'some_random_status'"):
+        orchestrator.get_status("unknown-status-job")
     fake_redis.assert_only_called({"get", "set"})
 
 
@@ -289,7 +304,7 @@ def test_get_progress_not_found(tmp_path: Path, fake_redis: FakeRedis) -> None:
     progress = orchestrator.get_progress("non-existent-job-id")
 
     assert progress["job_id"] == "non-existent-job-id"
-    assert progress["phase"] == "failed"
+    assert progress["phase"] is ArtTrainingPhase.FAILED
     assert progress["step"] == 0
     assert progress["total_steps"] == 0
     fake_redis.assert_only_called({"get", "set"})
@@ -306,7 +321,7 @@ def test_get_progress_invalid_json(tmp_path: Path, fake_redis: FakeRedis) -> Non
     progress = orchestrator.get_progress("invalid-json-job")
 
     assert progress["job_id"] == "invalid-json-job"
-    assert progress["phase"] == "failed"
+    assert progress["phase"] is ArtTrainingPhase.FAILED
     assert progress["step"] == 0
     assert progress["total_steps"] == 0
     fake_redis.assert_only_called({"get", "set"})
@@ -333,7 +348,7 @@ def test_get_status_completed_with_result(tmp_path: Path, fake_redis: FakeRedis)
     status_response = orchestrator.get_status(job_id)
 
     assert status_response["job_id"] == job_id
-    assert status_response["status"] == "completed"
+    assert status_response["status"] is LoraJobStatus.COMPLETED
     assert status_response["lora_file_id"] == "file-lora-123"
     assert status_response["lora_name"] == "my_trained_lora"
     fake_redis.assert_only_called({"get", "set"})
@@ -352,7 +367,7 @@ def test_get_status_completed_without_result(tmp_path: Path, fake_redis: FakeRed
     status_response = orchestrator.get_status(job_id)
 
     assert status_response["job_id"] == job_id
-    assert status_response["status"] == "completed"
+    assert status_response["status"] is LoraJobStatus.COMPLETED
     assert status_response["lora_file_id"] is None
     assert status_response["lora_name"] is None
     fake_redis.assert_only_called({"get", "set"})
@@ -374,7 +389,7 @@ def test_get_status_completed_invalid_result_json(tmp_path: Path, fake_redis: Fa
     status_response = orchestrator.get_status(job_id)
 
     assert status_response["job_id"] == job_id
-    assert status_response["status"] == "completed"
+    assert status_response["status"] is LoraJobStatus.COMPLETED
     assert status_response["lora_file_id"] is None
     assert status_response["lora_name"] is None
     fake_redis.assert_only_called({"get", "set"})
@@ -404,7 +419,7 @@ def test_get_progress_completed_without_result(tmp_path: Path, fake_redis: FakeR
     progress = orchestrator.get_progress(job_id)
 
     assert progress["job_id"] == job_id
-    assert progress["phase"] == "completed"
+    assert progress["phase"] is ArtTrainingPhase.COMPLETED
     assert progress["step"] == 500
     assert progress["lora_file_id"] is None
     assert progress["lora_name"] is None
@@ -441,7 +456,7 @@ def test_get_progress_completed_with_result(tmp_path: Path, fake_redis: FakeRedi
     progress = orchestrator.get_progress(job_id)
 
     assert progress["job_id"] == job_id
-    assert progress["phase"] == "completed"
+    assert progress["phase"] is ArtTrainingPhase.COMPLETED
     assert progress["step"] == 1000
     assert progress["total_steps"] == 1000
     assert progress["lora_file_id"] == "file-progress-lora-456"

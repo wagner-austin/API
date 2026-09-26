@@ -7,10 +7,14 @@ Provides multiple captioning backends:
 
 Use the registry to get the appropriate backend:
 
-    from art_trainer.core.services.captioning import get_caption_registry, CaptionConfig
+    from art_trainer.core.services.captioning import (
+        CaptionBackendType,
+        CaptionConfig,
+        get_caption_registry,
+    )
 
     config: CaptionConfig = {
-        "backend": "blip",
+        "backend": CaptionBackendType.BLIP,
         "model_name": "Salesforce/blip-image-captioning-large",
         "api_key": "",
     }

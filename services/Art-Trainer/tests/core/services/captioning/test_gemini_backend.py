@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from art_trainer.core.services.captioning import _test_hooks
-from art_trainer.core.services.captioning.backends import CaptionBackendError
+from art_trainer.core.services.captioning.backends import CaptionBackendError, CaptionBackendType
 from art_trainer.core.services.captioning.gemini_backend import (
     DEFAULT_MODEL,
     SUPPORTED_FORMATS,
@@ -137,7 +137,7 @@ def test_gemini_captioner_backend_type() -> None:
     """Test GeminiCaptioner backend_type property."""
     captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
 
-    assert captioner.backend_type == "gemini"
+    assert captioner.backend_type is CaptionBackendType.GEMINI
 
 
 def test_gemini_captioner_caption_file_not_found(tmp_path: Path) -> None:

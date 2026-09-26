@@ -26,6 +26,7 @@ from art_trainer.api.validators.dataset import decode_dataset_caption_request
 from art_trainer.core.infra.paths import dataset_dir
 from art_trainer.core.services.captioning import caption_images
 from art_trainer.core.services.captioning.backends import (
+    CaptionBackendType,
     CaptionConfig,
     get_caption_registry,
 )
@@ -106,7 +107,7 @@ class _DatasetRoutes:
             # settings, which is the same place the /caption route's callers
             # take it from.
             blip_config: CaptionConfig = {
-                "backend": "blip",
+                "backend": CaptionBackendType.BLIP,
                 "model_name": settings["app"]["blip_model_name"],
                 "api_key": "",
             }
@@ -198,9 +199,9 @@ class _DatasetRoutes:
 
         # Get API key for the backend
         api_key = ""
-        if req["backend"] == "gemini":
+        if req["backend"] is CaptionBackendType.GEMINI:
             api_key = settings["app"]["gemini_api_key"]
-        elif req["backend"] == "openai":
+        elif req["backend"] is CaptionBackendType.OPENAI:
             api_key = settings["app"]["openai_api_key"]
 
         # Build caption config

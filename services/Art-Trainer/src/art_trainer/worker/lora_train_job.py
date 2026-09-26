@@ -13,6 +13,7 @@ from platform_workers.redis import RedisStrProto
 
 from art_trainer.core import _test_hooks
 from art_trainer.core.contracts.job_result import JobResult, encode_job_result
+from art_trainer.core.contracts.job_status import LoraJobStatus
 from art_trainer.core.contracts.lora import LoraTrainConfig
 from art_trainer.core.contracts.progress import (
     ArtTrainingPhase,
@@ -56,10 +57,10 @@ def run_lora_train(payload: JSONObject) -> None:
     redis: RedisStrProto = _test_hooks.kv_store_factory(settings["redis"]["url"])
 
     # Update status to running
-    redis.set(status_key(job_id), "running")
+    redis.set(status_key(job_id), LoraJobStatus.RUNNING.value)
 
     # Phase 1: Preparing - Download dataset from data-bank
-    _set_progress(redis, job_id, "preparing", 0, decoded["steps"])
+    _set_progress(redis, job_id, ArtTrainingPhase.PREPARING, 0, decoded["steps"])
     dataset_path = download_dataset(settings, dataset_file_id, job_id)
 
     # Build config
@@ -109,7 +110,9 @@ def run_lora_train(payload: JSONObject) -> None:
             lora_path = Path(lora_path_str)
 
             # Phase 3: Uploading - Upload LoRA to data-bank
-            _set_progress(redis, job_id, "uploading", config["steps"], config["steps"])
+            _set_progress(
+                redis, job_id, ArtTrainingPhase.UPLOADING, config["steps"], config["steps"]
+            )
             upload_result = upload_lora(settings, lora_path)
             lora_file_id = upload_result["file_id"]
 
@@ -125,14 +128,14 @@ def run_lora_train(payload: JSONObject) -> None:
         }
         redis.set(result_key(job_id), dump_json_str(encode_job_result(result)))
 
-        redis.set(status_key(job_id), "completed")
-        _set_progress(redis, job_id, "completed", config["steps"], config["steps"])
+        redis.set(status_key(job_id), LoraJobStatus.COMPLETED.value)
+        _set_progress(redis, job_id, ArtTrainingPhase.COMPLETED, config["steps"], config["steps"])
     elif outcome["error_message"] == "Training cancelled by user":
-        redis.set(status_key(job_id), "cancelled")
-        _set_progress(redis, job_id, "cancelled", 0, 0)
+        redis.set(status_key(job_id), LoraJobStatus.CANCELLED.value)
+        _set_progress(redis, job_id, ArtTrainingPhase.CANCELLED, 0, 0)
     else:
-        redis.set(status_key(job_id), "failed")
-        _set_progress(redis, job_id, "failed", 0, 0)
+        redis.set(status_key(job_id), LoraJobStatus.FAILED.value)
+        _set_progress(redis, job_id, ArtTrainingPhase.FAILED, 0, 0)
 
 
 def _set_progress(

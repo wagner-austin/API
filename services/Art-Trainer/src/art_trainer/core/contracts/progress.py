@@ -6,28 +6,30 @@ training state and provides encode/decode functions for serialization.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     optional_float,
     require_float,
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
-ArtTrainingPhase = Literal[
-    "queued",
-    "preparing",
-    "training",
-    "saving",
-    "uploading",
-    "completed",
-    "failed",
-    "cancelled",
-]
+
+class ArtTrainingPhase(StrEnum):
+    """Where an art training job is, as the progress record's phase field spells it."""
+
+    QUEUED = "queued"
+    PREPARING = "preparing"
+    TRAINING = "training"
+    SAVING = "saving"
+    UPLOADING = "uploading"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class ArtTrainingProgress(TypedDict, total=True):
@@ -52,37 +54,6 @@ class ArtTrainingProgress(TypedDict, total=True):
     updated_at: str
 
 
-def _narrow_phase(raw: str) -> ArtTrainingPhase:
-    """Narrow phase string to Literal type with validation.
-
-    Args:
-        raw: Raw phase string.
-
-    Returns:
-        Narrowed Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid phase.
-    """
-    if raw == "queued":
-        return "queued"
-    if raw == "preparing":
-        return "preparing"
-    if raw == "training":
-        return "training"
-    if raw == "saving":
-        return "saving"
-    if raw == "uploading":
-        return "uploading"
-    if raw == "completed":
-        return "completed"
-    if raw == "failed":
-        return "failed"
-    if raw == "cancelled":
-        return "cancelled"
-    raise JSONTypeError(f"Field 'phase' must be a valid training phase, got '{raw}'")
-
-
 def encode_art_training_progress(progress: ArtTrainingProgress) -> JSONObject:
     """Encode ArtTrainingProgress to JSONObject for serialization.
 
@@ -94,7 +65,7 @@ def encode_art_training_progress(progress: ArtTrainingProgress) -> JSONObject:
     """
     return {
         "job_id": progress["job_id"],
-        "phase": progress["phase"],
+        "phase": progress["phase"].value,
         "step": progress["step"],
         "total_steps": progress["total_steps"],
         "loss": progress["loss"],
@@ -116,7 +87,7 @@ def decode_art_training_progress(obj: JSONObject) -> ArtTrainingProgress:
         JSONTypeError: If required fields are missing or have wrong types.
     """
     job_id = require_str(obj, "job_id")
-    phase = _narrow_phase(require_str(obj, "phase"))
+    phase = require_member(obj, "phase", ArtTrainingPhase)
     step = require_int(obj, "step")
     total_steps = require_int(obj, "total_steps")
     loss = optional_float(obj, "loss")

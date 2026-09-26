@@ -8,6 +8,7 @@ from typing import Literal
 from platform_core.logging import LogLevel
 
 from art_trainer.core.config.settings import Settings
+from art_trainer.core.contracts.job_status import LoraJobStatus
 from art_trainer.core.services.container import ServiceContainer
 
 
@@ -68,7 +69,7 @@ def test_service_container_from_settings(tmp_path: Path) -> None:
     assert "kohya" in container.backend_registry.available_backends()
     # Verify orchestrator can get status for non-existent job
     status = container.lora_orchestrator.get_status("non-existent")
-    assert status["status"] == "failed"
+    assert status["status"] is LoraJobStatus.FAILED
 
 
 def test_service_container_backend_registry(tmp_path: Path) -> None:

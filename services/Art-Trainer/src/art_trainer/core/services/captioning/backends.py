@@ -8,12 +8,19 @@ Gemini, GPT-4V, etc.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 from typing_extensions import TypedDict
 
-CaptionBackendType = Literal["blip", "gemini", "openai"]
+
+class CaptionBackendType(StrEnum):
+    """A caption backend, as the caption request's backend field spells it."""
+
+    BLIP = "blip"
+    GEMINI = "gemini"
+    OPENAI = "openai"
 
 
 class CaptionBackend(Protocol):
@@ -141,9 +148,9 @@ class CaptionBackendRegistry:
         """Initialize with the real factory for every backend type."""
         self._backends = {}
         self._factories = {
-            "blip": _create_blip_backend,
-            "gemini": _create_gemini_backend,
-            "openai": _create_openai_backend,
+            CaptionBackendType.BLIP: _create_blip_backend,
+            CaptionBackendType.GEMINI: _create_gemini_backend,
+            CaptionBackendType.OPENAI: _create_openai_backend,
         }
 
     def register(
@@ -228,7 +235,7 @@ class _BlipBackendAdapter:
         Returns:
             Backend type string.
         """
-        return "blip"
+        return CaptionBackendType.BLIP
 
 
 # Singleton registry instance

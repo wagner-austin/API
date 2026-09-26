@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from art_trainer.core.services.captioning import _test_hooks
-from art_trainer.core.services.captioning.backends import CaptionBackendError
+from art_trainer.core.services.captioning.backends import CaptionBackendError, CaptionBackendType
 from art_trainer.core.services.captioning.openai_backend import (
     DEFAULT_MODEL,
     SUPPORTED_FORMATS,
@@ -159,7 +159,7 @@ def test_openai_captioner_backend_type() -> None:
     """Test OpenAICaptioner backend_type property."""
     captioner = OpenAICaptioner(model_name="gpt-4o", api_key="test-key")
 
-    assert captioner.backend_type == "openai"
+    assert captioner.backend_type is CaptionBackendType.OPENAI
 
 
 def test_openai_captioner_caption_file_not_found(tmp_path: Path) -> None:

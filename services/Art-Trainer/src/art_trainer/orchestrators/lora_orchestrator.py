@@ -7,16 +7,22 @@ status management, and progress tracking.
 from __future__ import annotations
 
 import uuid
-from typing import Literal
 
 from platform_core.json_utils import load_json_str
+from platform_core.members import as_member
 from platform_workers.redis import RedisStrProto
-from typing_extensions import TypedDict
 
-from art_trainer.api.schemas.lora import LoraTrainRequest
+from art_trainer.api.schemas.lora import (
+    LoraProgressResponse,
+    LoraStatusResponse,
+    LoraTrainRequest,
+    LoraTrainResponse,
+)
 from art_trainer.core.config.settings import Settings
 from art_trainer.core.contracts.job_result import JobResult, decode_job_result
+from art_trainer.core.contracts.job_status import LoraJobStatus
 from art_trainer.core.contracts.progress import (
+    ArtTrainingPhase,
     ArtTrainingProgress,
     decode_art_training_progress,
     encode_art_training_progress,
@@ -31,71 +37,6 @@ from art_trainer.core.infra.redis_keys import (
 )
 from art_trainer.core.services.queue.rq_adapter import RQEnqueuer
 from art_trainer.core.services.registries import BackendRegistry
-
-JobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
-
-
-class LoraTrainResponse(TypedDict, total=True):
-    """Response from enqueue_training.
-
-    Attributes:
-        job_id: Unique job identifier.
-    """
-
-    job_id: str
-
-
-class LoraStatusResponse(TypedDict, total=True):
-    """Response from get_status.
-
-    Attributes:
-        job_id: Unique job identifier.
-        status: Current job status.
-        message: Status message or None.
-        lora_file_id: File ID of the trained LoRA in data-bank.
-        lora_name: Name of the deployed LoRA in ComfyUI.
-    """
-
-    job_id: str
-    status: JobStatus
-    message: str | None
-    lora_file_id: str | None
-    lora_name: str | None
-
-
-class LoraProgressResponse(TypedDict, total=True):
-    """Response from get_progress with result data.
-
-    Attributes:
-        job_id: Unique job identifier.
-        phase: Current training phase.
-        step: Current step number.
-        total_steps: Total number of steps.
-        loss: Current loss value.
-        learning_rate: Current learning rate.
-        updated_at: ISO 8601 timestamp of last update.
-        lora_file_id: File ID of the trained LoRA in data-bank.
-        lora_name: Name of the deployed LoRA in ComfyUI.
-    """
-
-    job_id: str
-    phase: Literal[
-        "queued",
-        "preparing",
-        "training",
-        "saving",
-        "uploading",
-        "completed",
-        "failed",
-        "cancelled",
-    ]
-    step: int
-    total_steps: int
-    loss: float | None
-    learning_rate: float
-    updated_at: str
-    lora_file_id: str | None
-    lora_name: str | None
 
 
 class LoraOrchestrator:
@@ -159,12 +100,12 @@ class LoraOrchestrator:
         }
 
         # Set initial status
-        self._redis.set(status_key(job_id), "queued")
+        self._redis.set(status_key(job_id), LoraJobStatus.QUEUED.value)
 
         # Set initial progress
         initial_progress: ArtTrainingProgress = {
             "job_id": job_id,
-            "phase": "queued",
+            "phase": ArtTrainingPhase.QUEUED,
             "step": 0,
             "total_steps": request["steps"],
             "loss": None,
@@ -213,33 +154,28 @@ class LoraOrchestrator:
 
         Returns:
             Status response with lora_file_id and lora_name if completed.
+
+        Raises:
+            JSONTypeError: If the status key holds a word that is not a
+                LoraJobStatus value, which only a writer outside this service
+                can put there.
         """
         status_raw = self._redis.get(status_key(job_id))
         if status_raw is None:
             return {
                 "job_id": job_id,
-                "status": "failed",
+                "status": LoraJobStatus.FAILED,
                 "message": "Job not found",
                 "lora_file_id": None,
                 "lora_name": None,
             }
 
-        status: JobStatus
-        if status_raw == "queued":
-            status = "queued"
-        elif status_raw == "running":
-            status = "running"
-        elif status_raw == "completed":
-            status = "completed"
-        elif status_raw == "cancelled":
-            status = "cancelled"
-        else:
-            status = "failed"
+        status = as_member(status_raw, "status", LoraJobStatus)
 
         # Get result data if job is completed
         lora_file_id: str | None = None
         lora_name: str | None = None
-        if status == "completed":
+        if status is LoraJobStatus.COMPLETED:
             result = self._get_result(job_id)
             if result is not None:
                 lora_file_id = result["lora_file_id"]
@@ -266,7 +202,7 @@ class LoraOrchestrator:
         if progress_raw is None:
             return {
                 "job_id": job_id,
-                "phase": "failed",
+                "phase": ArtTrainingPhase.FAILED,
                 "step": 0,
                 "total_steps": 0,
                 "loss": None,
@@ -280,7 +216,7 @@ class LoraOrchestrator:
         if not isinstance(progress_obj, dict):
             return {
                 "job_id": job_id,
-                "phase": "failed",
+                "phase": ArtTrainingPhase.FAILED,
                 "step": 0,
                 "total_steps": 0,
                 "loss": None,
@@ -295,7 +231,7 @@ class LoraOrchestrator:
         # Get result data if job is completed
         lora_file_id: str | None = None
         lora_name: str | None = None
-        if progress["phase"] == "completed":
+        if progress["phase"] is ArtTrainingPhase.COMPLETED:
             result = self._get_result(job_id)
             if result is not None:
                 lora_file_id = result["lora_file_id"]
@@ -326,9 +262,4 @@ class LoraOrchestrator:
         return True
 
 
-__all__ = [
-    "LoraOrchestrator",
-    "LoraProgressResponse",
-    "LoraStatusResponse",
-    "LoraTrainResponse",
-]
+__all__ = ["LoraOrchestrator"]

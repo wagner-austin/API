@@ -6,6 +6,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from art_trainer.core.contracts.progress import (
+    ArtTrainingPhase,
     ArtTrainingProgress,
     decode_art_training_progress,
     encode_art_training_progress,
@@ -16,7 +17,7 @@ def test_encode_art_training_progress() -> None:
     """Test encoding ArtTrainingProgress to JSON."""
     progress: ArtTrainingProgress = {
         "job_id": "test-123",
-        "phase": "training",
+        "phase": ArtTrainingPhase.TRAINING,
         "step": 50,
         "total_steps": 100,
         "loss": 0.05,
@@ -46,7 +47,7 @@ def test_decode_art_training_progress() -> None:
     }
     decoded = decode_art_training_progress(obj)
     assert decoded["job_id"] == "test-456"
-    assert decoded["phase"] == "completed"
+    assert decoded["phase"] is ArtTrainingPhase.COMPLETED
     assert decoded["step"] == 100
     assert decoded["total_steps"] == 100
     assert decoded["loss"] == 0.03
@@ -88,7 +89,7 @@ def test_roundtrip_encode_decode() -> None:
     """Test that encoding then decoding preserves data."""
     original: ArtTrainingProgress = {
         "job_id": "roundtrip-test",
-        "phase": "training",
+        "phase": ArtTrainingPhase.TRAINING,
         "step": 75,
         "total_steps": 150,
         "loss": 0.042,
@@ -102,20 +103,10 @@ def test_roundtrip_encode_decode() -> None:
 
 def test_decode_all_valid_phases() -> None:
     """Test decoding with all valid phase values."""
-    phases = [
-        "queued",
-        "preparing",
-        "training",
-        "saving",
-        "uploading",
-        "completed",
-        "failed",
-        "cancelled",
-    ]
-    for phase in phases:
+    for phase in ArtTrainingPhase:
         obj: JSONObject = {
             "job_id": f"test-{phase}",
-            "phase": phase,
+            "phase": phase.value,
             "step": 0,
             "total_steps": 100,
             "loss": None,
@@ -123,4 +114,4 @@ def test_decode_all_valid_phases() -> None:
             "updated_at": "2024-01-15T10:00:00",
         }
         decoded = decode_art_training_progress(obj)
-        assert decoded["phase"] == phase
+        assert decoded["phase"] is phase

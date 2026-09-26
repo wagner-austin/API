@@ -13,8 +13,10 @@ from platform_core.json_utils import (
     require_bool,
     require_str,
 )
+from platform_core.members import require_member
 
 from art_trainer.api.schemas.dataset import DatasetCaptionRequest, DatasetUploadRequest
+from art_trainer.core.services.captioning.backends import CaptionBackendType
 
 
 def _narrow_training_type(raw: str) -> Literal["style", "character", "concept"]:
@@ -63,27 +65,6 @@ def decode_dataset_upload_request(obj: JSONObject) -> DatasetUploadRequest:
     }
 
 
-def _narrow_caption_backend(raw: str) -> Literal["blip", "gemini", "openai"]:
-    """Narrow backend string to Literal type with validation.
-
-    Args:
-        raw: Raw backend string.
-
-    Returns:
-        Narrowed Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid backend.
-    """
-    if raw == "blip":
-        return "blip"
-    if raw == "gemini":
-        return "gemini"
-    if raw == "openai":
-        return "openai"
-    raise JSONTypeError(f"Field 'backend' must be 'blip', 'gemini', or 'openai', got '{raw}'")
-
-
 def decode_dataset_caption_request(obj: JSONObject) -> DatasetCaptionRequest:
     """Decode and validate a dataset caption request.
 
@@ -97,7 +78,7 @@ def decode_dataset_caption_request(obj: JSONObject) -> DatasetCaptionRequest:
         JSONTypeError: If required fields are missing or have wrong types.
     """
     trigger_word = require_str(obj, "trigger_word")
-    backend = _narrow_caption_backend(require_str(obj, "backend"))
+    backend = require_member(obj, "backend", CaptionBackendType)
     model_name = require_str(obj, "model_name")
 
     return {

@@ -13,7 +13,6 @@ from platform_core.logging import LogLevel
 from art_trainer.api.main import create_app
 from art_trainer.core import _test_hooks
 from art_trainer.core.config.settings import Settings
-from art_trainer.core.services.captioning._test_hooks import CaptionConfigDict
 from art_trainer.core.services.captioning.backends import (
     CaptionBackend,
     CaptionBackendType,
@@ -75,7 +74,9 @@ class FakeCaptionBackend:
     _backend_type: CaptionBackendType
 
     def __init__(
-        self, caption: str = "test caption", backend_type: CaptionBackendType = "gemini"
+        self,
+        caption: str = "test caption",
+        backend_type: CaptionBackendType = CaptionBackendType.GEMINI,
     ) -> None:
         """Initialize fake caption backend.
 
@@ -121,7 +122,7 @@ def test_dataset_upload_with_auto_caption(tmp_path: Path) -> None:
 
     # Auto-caption goes through the registry now, like every other path
     reset_caption_registry()
-    fake_backend = FakeCaptionBackend("smiling", "blip")
+    fake_backend = FakeCaptionBackend("smiling", CaptionBackendType.BLIP)
 
     def fake_backend_factory(config: CaptionConfig) -> CaptionBackend:
         """Return the fake regardless of the config the route builds.
@@ -135,7 +136,7 @@ def test_dataset_upload_with_auto_caption(tmp_path: Path) -> None:
         del config
         return fake_backend
 
-    get_caption_registry().register("blip", fake_backend_factory)
+    get_caption_registry().register(CaptionBackendType.BLIP, fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -211,9 +212,9 @@ def test_dataset_caption_success_with_blip(tmp_path: Path) -> None:
     reset_caption_registry()
 
     # Set up fake caption backend factory
-    fake_backend = FakeCaptionBackend("detailed portrait", "blip")
+    fake_backend = FakeCaptionBackend("detailed portrait", CaptionBackendType.BLIP)
 
-    def fake_backend_factory(config: CaptionConfigDict) -> FakeCaptionBackend:
+    def fake_backend_factory(config: CaptionConfig) -> FakeCaptionBackend:
         """Create fake caption backend.
 
         Args:
@@ -225,7 +226,7 @@ def test_dataset_caption_success_with_blip(tmp_path: Path) -> None:
         del config  # Unused, return shared instance
         return fake_backend
 
-    get_caption_registry().register("blip", fake_backend_factory)
+    get_caption_registry().register(CaptionBackendType.BLIP, fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -289,9 +290,9 @@ def test_dataset_caption_skips_existing_captions(tmp_path: Path) -> None:
     reset_caption_registry()
 
     # Set up fake caption backend factory
-    fake_backend = FakeCaptionBackend("new caption", "blip")
+    fake_backend = FakeCaptionBackend("new caption", CaptionBackendType.BLIP)
 
-    def fake_backend_factory(config: CaptionConfigDict) -> FakeCaptionBackend:
+    def fake_backend_factory(config: CaptionConfig) -> FakeCaptionBackend:
         """Create fake caption backend.
 
         Args:
@@ -303,7 +304,7 @@ def test_dataset_caption_skips_existing_captions(tmp_path: Path) -> None:
         del config  # Unused, return shared instance
         return fake_backend
 
-    get_caption_registry().register("blip", fake_backend_factory)
+    get_caption_registry().register(CaptionBackendType.BLIP, fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -454,10 +455,10 @@ def test_dataset_caption_with_gemini_backend(tmp_path: Path) -> None:
     reset_caption_registry()
 
     # Set up fake caption backend factory
-    fake_backend = FakeCaptionBackend("gemini caption", "gemini")
-    received_configs: list[CaptionConfigDict] = []
+    fake_backend = FakeCaptionBackend("gemini caption", CaptionBackendType.GEMINI)
+    received_configs: list[CaptionConfig] = []
 
-    def fake_backend_factory(config: CaptionConfigDict) -> FakeCaptionBackend:
+    def fake_backend_factory(config: CaptionConfig) -> FakeCaptionBackend:
         """Create fake caption backend.
 
         Args:
@@ -469,7 +470,7 @@ def test_dataset_caption_with_gemini_backend(tmp_path: Path) -> None:
         received_configs.append(config)
         return fake_backend
 
-    get_caption_registry().register("gemini", fake_backend_factory)
+    get_caption_registry().register(CaptionBackendType.GEMINI, fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -506,7 +507,7 @@ def test_dataset_caption_with_gemini_backend(tmp_path: Path) -> None:
     # Verify the config received the API key
     assert len(received_configs) == 1
     assert received_configs[0]["api_key"] == "test-gemini-key"
-    assert received_configs[0]["backend"] == "gemini"
+    assert received_configs[0]["backend"] is CaptionBackendType.GEMINI
 
 
 def test_dataset_caption_with_openai_backend(tmp_path: Path) -> None:
@@ -523,10 +524,10 @@ def test_dataset_caption_with_openai_backend(tmp_path: Path) -> None:
     reset_caption_registry()
 
     # Set up fake caption backend factory
-    fake_backend = FakeCaptionBackend("openai caption", "openai")
-    received_configs: list[CaptionConfigDict] = []
+    fake_backend = FakeCaptionBackend("openai caption", CaptionBackendType.OPENAI)
+    received_configs: list[CaptionConfig] = []
 
-    def fake_backend_factory(config: CaptionConfigDict) -> FakeCaptionBackend:
+    def fake_backend_factory(config: CaptionConfig) -> FakeCaptionBackend:
         """Create fake caption backend.
 
         Args:
@@ -538,7 +539,7 @@ def test_dataset_caption_with_openai_backend(tmp_path: Path) -> None:
         received_configs.append(config)
         return fake_backend
 
-    get_caption_registry().register("openai", fake_backend_factory)
+    get_caption_registry().register(CaptionBackendType.OPENAI, fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -575,4 +576,4 @@ def test_dataset_caption_with_openai_backend(tmp_path: Path) -> None:
     # Verify the config received the API key
     assert len(received_configs) == 1
     assert received_configs[0]["api_key"] == "test-openai-key"
-    assert received_configs[0]["backend"] == "openai"
+    assert received_configs[0]["backend"] is CaptionBackendType.OPENAI

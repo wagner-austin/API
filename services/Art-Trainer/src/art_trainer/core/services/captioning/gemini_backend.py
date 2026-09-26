@@ -131,7 +131,7 @@ class GeminiCaptioner:
         Returns:
             Backend type string.
         """
-        return "gemini"
+        return CaptionBackendType.GEMINI
 
 
 def _get_mime_type(suffix: str) -> str:

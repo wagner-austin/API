@@ -9,6 +9,8 @@ from typing import Literal, TypedDict
 
 from platform_core.json_utils import JSONObject
 
+from art_trainer.core.services.captioning.backends import CaptionBackendType
+
 
 class DatasetUploadRequest(TypedDict, total=True):
     """Request to upload a dataset.
@@ -67,7 +69,7 @@ class DatasetCaptionRequest(TypedDict, total=True):
     """
 
     trigger_word: str
-    backend: Literal["blip", "gemini", "openai"]
+    backend: CaptionBackendType
     model_name: str
 
 
@@ -84,7 +86,7 @@ class DatasetCaptionResponse(TypedDict, total=True):
     dataset_id: str
     captioned_count: int
     skipped_count: int
-    backend: Literal["blip", "gemini", "openai"]
+    backend: CaptionBackendType
 
 
 def encode_dataset_caption_response(response: DatasetCaptionResponse) -> JSONObject:
@@ -100,7 +102,7 @@ def encode_dataset_caption_response(response: DatasetCaptionResponse) -> JSONObj
         "dataset_id": response["dataset_id"],
         "captioned_count": response["captioned_count"],
         "skipped_count": response["skipped_count"],
-        "backend": response["backend"],
+        "backend": response["backend"].value,
     }
 
 

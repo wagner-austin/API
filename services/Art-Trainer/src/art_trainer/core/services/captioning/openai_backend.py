@@ -148,7 +148,7 @@ class OpenAICaptioner:
         Returns:
             Backend type string.
         """
-        return "openai"
+        return CaptionBackendType.OPENAI
 
 
 def _get_mime_type(suffix: str) -> str:

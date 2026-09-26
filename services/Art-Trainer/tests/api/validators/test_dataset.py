@@ -9,6 +9,7 @@ from art_trainer.api.validators.dataset import (
     decode_dataset_caption_request,
     decode_dataset_upload_request,
 )
+from art_trainer.core.services.captioning.backends import CaptionBackendType
 
 
 def test_decode_dataset_upload_request_style() -> None:
@@ -114,7 +115,7 @@ def test_decode_dataset_caption_request_blip() -> None:
     result = decode_dataset_caption_request(obj)
 
     assert result["trigger_word"] == "sks person"
-    assert result["backend"] == "blip"
+    assert result["backend"] is CaptionBackendType.BLIP
     assert result["model_name"] == "Salesforce/blip-image-captioning-base"
 
 
@@ -129,7 +130,7 @@ def test_decode_dataset_caption_request_gemini() -> None:
     result = decode_dataset_caption_request(obj)
 
     assert result["trigger_word"] == "anime style"
-    assert result["backend"] == "gemini"
+    assert result["backend"] is CaptionBackendType.GEMINI
     assert result["model_name"] == "gemini-2.0-flash"
 
 
@@ -144,7 +145,7 @@ def test_decode_dataset_caption_request_openai() -> None:
     result = decode_dataset_caption_request(obj)
 
     assert result["trigger_word"] == "portrait"
-    assert result["backend"] == "openai"
+    assert result["backend"] is CaptionBackendType.OPENAI
     assert result["model_name"] == "gpt-4o"
 
 
@@ -159,7 +160,9 @@ def test_decode_dataset_caption_request_invalid_backend() -> None:
     with pytest.raises(JSONTypeError) as exc_info:
         decode_dataset_caption_request(obj)
 
-    assert "must be 'blip', 'gemini', or 'openai'" in str(exc_info.value)
+    assert str(exc_info.value) == (
+        "Invalid backend 'invalid': must be one of 'blip', 'gemini', 'openai'"
+    )
 
 
 def test_decode_dataset_caption_request_missing_trigger_word() -> None:

@@ -12,7 +12,7 @@ from pathlib import Path
 from art_trainer.core.config.settings import Settings
 from art_trainer.core.contracts.backend import CancelledCheck, ProgressCallback
 from art_trainer.core.contracts.lora import LoraTrainConfig, LoraTrainOutcome
-from art_trainer.core.contracts.progress import ArtTrainingProgress
+from art_trainer.core.contracts.progress import ArtTrainingPhase, ArtTrainingProgress
 
 from .config import build_kohya_config, write_kohya_config
 from .runner import run_subprocess
@@ -78,7 +78,9 @@ class KohyaBackend:
 
         # Report initial progress
         if progress_callback is not None:
-            progress_callback(_make_progress(config["job_id"], "preparing", 0, config["steps"]))
+            progress_callback(
+                _make_progress(config["job_id"], ArtTrainingPhase.PREPARING, 0, config["steps"])
+            )
 
         # Build and write config
         kohya_config = build_kohya_config(config)
@@ -91,7 +93,9 @@ class KohyaBackend:
 
         # Report training start
         if progress_callback is not None:
-            progress_callback(_make_progress(config["job_id"], "training", 0, config["steps"]))
+            progress_callback(
+                _make_progress(config["job_id"], ArtTrainingPhase.TRAINING, 0, config["steps"])
+            )
 
         # Run training
         kohya_path = Path(self._settings["app"]["kohya_ss_path"])
@@ -131,7 +135,7 @@ class KohyaBackend:
             progress_callback(
                 _make_progress(
                     config["job_id"],
-                    "completed",
+                    ArtTrainingPhase.COMPLETED,
                     config["steps"],
                     config["steps"],
                     loss=final_loss,
@@ -148,7 +152,7 @@ class KohyaBackend:
 
 def _make_progress(
     job_id: str,
-    phase: str,
+    phase: ArtTrainingPhase,
     step: int,
     total_steps: int,
     *,
@@ -166,32 +170,9 @@ def _make_progress(
     Returns:
         ArtTrainingProgress instance.
     """
-    from art_trainer.core.contracts.progress import ArtTrainingPhase
-
-    # Narrow the phase string
-    phase_typed: ArtTrainingPhase
-    if phase == "queued":
-        phase_typed = "queued"
-    elif phase == "preparing":
-        phase_typed = "preparing"
-    elif phase == "training":
-        phase_typed = "training"
-    elif phase == "saving":
-        phase_typed = "saving"
-    elif phase == "uploading":
-        phase_typed = "uploading"
-    elif phase == "completed":
-        phase_typed = "completed"
-    elif phase == "failed":
-        phase_typed = "failed"
-    elif phase == "cancelled":
-        phase_typed = "cancelled"
-    else:
-        phase_typed = "training"
-
     return {
         "job_id": job_id,
-        "phase": phase_typed,
+        "phase": phase,
         "step": step,
         "total_steps": total_steps,
         "loss": loss,

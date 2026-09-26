@@ -11,7 +11,7 @@ OpenAI and Gemini client interfaces.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 from typing_extensions import TypedDict
 
@@ -228,78 +228,6 @@ class GeminiModule(Protocol):
 
 
 # =============================================================================
-# Caption Backend Protocol (for registry hook)
-# =============================================================================
-
-
-CaptionBackendTypeStr = Literal["blip", "gemini", "openai"]
-
-
-class CaptionConfigDict(TypedDict, total=True):
-    """Configuration for caption generation.
-
-    Attributes:
-        backend: Which caption backend to use.
-        model_name: Model name/identifier for the backend.
-        api_key: API key for API-based backends (Gemini, OpenAI).
-            Empty string for local backends like BLIP.
-    """
-
-    backend: CaptionBackendTypeStr
-    model_name: str
-    api_key: str
-
-
-class CaptionBackend(Protocol):
-    """Protocol for caption backends.
-
-    All caption backends must implement this interface.
-    """
-
-    def caption(self, image_path: Path, trigger_word: str) -> str:
-        """Generate caption for an image.
-
-        Args:
-            image_path: Path to the image file.
-            trigger_word: Trigger word to prepend to caption.
-
-        Returns:
-            Generated caption with trigger word prefix.
-
-        Raises:
-            FileNotFoundError: If image_path does not exist.
-        """
-        ...
-
-    @property
-    def backend_type(self) -> CaptionBackendTypeStr:
-        """Get the backend type identifier.
-
-        Returns:
-            Backend type string.
-        """
-        ...
-
-
-class CaptionBackendFactory(Protocol):
-    """Protocol for caption backend factory.
-
-    Used by tests to inject fake backends into the registry.
-    """
-
-    def __call__(self, config: CaptionConfigDict) -> CaptionBackend:
-        """Create a caption backend.
-
-        Args:
-            config: Caption configuration.
-
-        Returns:
-            Caption backend instance.
-        """
-        ...
-
-
-# =============================================================================
 # Hooks Container
 # =============================================================================
 
@@ -391,10 +319,6 @@ def reset_hooks() -> None:
 
 
 __all__ = [
-    "CaptionBackend",
-    "CaptionBackendFactory",
-    "CaptionBackendTypeStr",
-    "CaptionConfigDict",
     "CaptionGenerator",
     "GeminiClient",
     "GeminiClientFactory",

@@ -9,6 +9,9 @@ from typing import Literal
 
 from typing_extensions import TypedDict
 
+from art_trainer.core.contracts.job_status import LoraJobStatus
+from art_trainer.core.contracts.progress import ArtTrainingPhase
+
 
 class LoraTrainRequest(TypedDict, total=True):
     """Request to start LoRA training.
@@ -70,7 +73,7 @@ class LoraStatusResponse(TypedDict, total=True):
     """
 
     job_id: str
-    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    status: LoraJobStatus
     message: str | None
     lora_file_id: str | None
     lora_name: str | None
@@ -94,16 +97,7 @@ class LoraProgressResponse(TypedDict, total=True):
     """
 
     job_id: str
-    phase: Literal[
-        "queued",
-        "preparing",
-        "training",
-        "saving",
-        "uploading",
-        "completed",
-        "failed",
-        "cancelled",
-    ]
+    phase: ArtTrainingPhase
     step: int
     total_steps: int
     loss: float | None

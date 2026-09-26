@@ -9,6 +9,7 @@ from PIL import Image
 
 from art_trainer.core.services.captioning.backends import (
     CaptionBackendRegistry,
+    CaptionBackendType,
     CaptionConfig,
     get_caption_registry,
     reset_caption_registry,
@@ -20,7 +21,7 @@ def test_registry_caches_backends() -> None:
     registry = CaptionBackendRegistry()
 
     config: CaptionConfig = {
-        "backend": "blip",
+        "backend": CaptionBackendType.BLIP,
         "model_name": "Salesforce/blip-image-captioning-base",
         "api_key": "",
     }
@@ -37,13 +38,13 @@ def test_registry_creates_different_backends_for_different_configs() -> None:
     registry = CaptionBackendRegistry()
 
     config1: CaptionConfig = {
-        "backend": "blip",
+        "backend": CaptionBackendType.BLIP,
         "model_name": "Salesforce/blip-image-captioning-base",
         "api_key": "",
     }
 
     config2: CaptionConfig = {
-        "backend": "blip",
+        "backend": CaptionBackendType.BLIP,
         "model_name": "Salesforce/blip-image-captioning-large",
         "api_key": "",
     }
@@ -60,14 +61,14 @@ def test_registry_creates_blip_backend() -> None:
     registry = CaptionBackendRegistry()
 
     config: CaptionConfig = {
-        "backend": "blip",
+        "backend": CaptionBackendType.BLIP,
         "model_name": "Salesforce/blip-image-captioning-base",
         "api_key": "",
     }
 
     backend = registry.get_backend(config)
 
-    assert backend.backend_type == "blip"
+    assert backend.backend_type is CaptionBackendType.BLIP
 
 
 def test_registry_creates_gemini_backend() -> None:
@@ -75,14 +76,14 @@ def test_registry_creates_gemini_backend() -> None:
     registry = CaptionBackendRegistry()
 
     config: CaptionConfig = {
-        "backend": "gemini",
+        "backend": CaptionBackendType.GEMINI,
         "model_name": "gemini-2.0-flash",
         "api_key": "test-api-key",
     }
 
     backend = registry.get_backend(config)
 
-    assert backend.backend_type == "gemini"
+    assert backend.backend_type is CaptionBackendType.GEMINI
 
 
 def test_registry_creates_openai_backend() -> None:
@@ -90,14 +91,14 @@ def test_registry_creates_openai_backend() -> None:
     registry = CaptionBackendRegistry()
 
     config: CaptionConfig = {
-        "backend": "openai",
+        "backend": CaptionBackendType.OPENAI,
         "model_name": "gpt-4o",
         "api_key": "test-api-key",
     }
 
     backend = registry.get_backend(config)
 
-    assert backend.backend_type == "openai"
+    assert backend.backend_type is CaptionBackendType.OPENAI
 
 
 def test_get_caption_registry_returns_singleton() -> None:
@@ -124,7 +125,7 @@ def test_blip_backend_adapter_caption(tmp_path: Path) -> None:
     registry = CaptionBackendRegistry()
 
     config: CaptionConfig = {
-        "backend": "blip",
+        "backend": CaptionBackendType.BLIP,
         "model_name": "Salesforce/blip-image-captioning-base",
         "api_key": "",
     }

@@ -45,9 +45,9 @@ class FakeCaptionBackend:
         """Identify which backend this stands in for.
 
         Returns:
-            Always "blip", since this adapter's caller asks for BLIP.
+            Always BLIP, since this adapter's caller asks for BLIP.
         """
-        return "blip"
+        return CaptionBackendType.BLIP
 
 
 def test_image_extensions() -> None:

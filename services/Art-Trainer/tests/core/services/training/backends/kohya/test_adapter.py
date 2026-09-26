@@ -9,7 +9,7 @@ from platform_core.logging import LogLevel
 
 from art_trainer.core.config.settings import Settings
 from art_trainer.core.contracts.lora import LoraTrainConfig
-from art_trainer.core.contracts.progress import ArtTrainingProgress
+from art_trainer.core.contracts.progress import ArtTrainingPhase, ArtTrainingProgress
 from art_trainer.core.services.training.backends.kohya import _test_hooks
 from art_trainer.core.services.training.backends.kohya.adapter import KohyaBackend
 
@@ -247,8 +247,8 @@ def test_kohya_backend_train_with_progress_callback(tmp_path: Path) -> None:
     assert final_loss == final_loss_expected
     assert final_loss < initial_loss  # Loss decreased during training
     # Check progress phases
-    assert progress_updates[0]["phase"] == "preparing"
-    assert progress_updates[-1]["phase"] == "completed"
+    assert progress_updates[0]["phase"] is ArtTrainingPhase.PREPARING
+    assert progress_updates[-1]["phase"] is ArtTrainingPhase.COMPLETED
 
 
 def test_kohya_backend_train_cancelled_after_config(tmp_path: Path) -> None:
@@ -383,32 +383,21 @@ def test_make_progress_all_phases() -> None:
     """Test _make_progress with all phase values."""
     from art_trainer.core.services.training.backends.kohya.adapter import _make_progress
 
-    phases = [
-        "queued",
-        "preparing",
-        "training",
-        "saving",
-        "uploading",
-        "completed",
-        "failed",
-        "cancelled",
-    ]
-
-    for phase in phases:
+    for phase in ArtTrainingPhase:
         progress = _make_progress("job-1", phase, 10, 100)
         assert progress["job_id"] == "job-1"
-        assert progress["phase"] == phase
+        assert progress["phase"] is phase
         assert progress["step"] == 10
         assert progress["total_steps"] == 100
 
 
-def test_make_progress_unknown_phase_defaults_to_training() -> None:
-    """Test _make_progress with unknown phase defaults to training."""
+def test_make_progress_carries_the_loss() -> None:
+    """Test _make_progress records the loss it is given."""
     from art_trainer.core.services.training.backends.kohya.adapter import _make_progress
 
-    progress = _make_progress("job-2", "unknown_phase", 5, 50, loss=0.25)
+    progress = _make_progress("job-2", ArtTrainingPhase.TRAINING, 5, 50, loss=0.25)
     assert progress["job_id"] == "job-2"
-    assert progress["phase"] == "training"
+    assert progress["phase"] is ArtTrainingPhase.TRAINING
     assert progress["step"] == 5
     assert progress["total_steps"] == 50
     assert progress["loss"] == 0.25
