@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import FastAPI
 from platform_core.errors import ErrorCode
 from platform_core.fastapi import install_exception_handlers_fastapi
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.request_context import install_request_id_middleware
 from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import QueueProtocol
@@ -42,8 +42,8 @@ def _to_json_simple(obj: Mapping[str, _SimpleValue]) -> dict[str, _SimpleValue]:
 # Initialize centralized logging (idempotent).
 def _init_logging() -> None:
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="turkic-api",
         instance_id=None,
         extra_fields=LOG_EXTRA_FIELDS,
