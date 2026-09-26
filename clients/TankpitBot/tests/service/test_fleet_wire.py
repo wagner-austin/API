@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONTypeError
 
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service.fleet_bot import FleetBotDict
 from tankpit_bot.service.fleet_wire import (
     FleetSnapshotDict,
@@ -28,7 +29,7 @@ def _bot(instance: str = "alpha", returncode: int | None = None) -> FleetBotDict
     return FleetBotDict(
         instance=instance,
         account="Artax",
-        role="gatherer",
+        role=FleetRole.GATHERER,
         room="World",
         troop="orange",
         doctrine="skirmish",
@@ -89,7 +90,7 @@ def test_decoding_refuses_a_role_that_is_not_a_fleet_role() -> None:
     data = encode_fleet_bot(_bot())
     data["role"] = "scout"
 
-    with pytest.raises(JSONTypeError, match="not a fleet role"):
+    with pytest.raises(JSONTypeError, match="Invalid role 'scout': must be one of 'fighter'"):
         decode_fleet_bot(data)
 
 

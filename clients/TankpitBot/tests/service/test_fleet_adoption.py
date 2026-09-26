@@ -8,6 +8,7 @@ import pytest
 from platform_core.json_utils import InvalidJsonError, JSONTypeError
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SpawnedProcessProtocol
 from tankpit_bot.service.fleet_adoption import adopt_recorded_bots
@@ -67,7 +68,7 @@ def _record(instance: str, pid: int, created_at: float) -> FleetProcessRecordDic
     return FleetProcessRecordDict(
         instance=instance,
         account="Artax",
-        role="fighter",
+        role=FleetRole.FIGHTER,
         room="World",
         troop="orange",
         doctrine="skirmish",

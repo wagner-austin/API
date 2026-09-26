@@ -11,7 +11,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.bus.session_status import (
-    WIRE_MODES,
+    WireMode,
     idle_session_status,
     make_live_stats,
     make_session_status,
@@ -28,18 +28,19 @@ from tankpit_bot.service.types_codecs import (
     encode_mode_command,
     encode_session_status,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 
 # =============================================================================
-# WIRE_MODES constant
+# WireMode vocabulary
 # =============================================================================
 
 
 class TestWireModes:
-    """Tests for :data:`WIRE_MODES`."""
+    """Tests for :class:`WireMode`."""
 
     def test_all_four_modes_present(self) -> None:
-        """All four wire modes are exposed in order."""
-        assert WIRE_MODES == ("UNSET", "HUNT", "COLLECT", "AUTO")
+        """All four wire modes are exposed in order, each its own word."""
+        assert [mode.value for mode in WireMode] == ["UNSET", "HUNT", "COLLECT", "AUTO"]
 
 
 # =============================================================================
@@ -52,21 +53,22 @@ class TestModeCommand:
 
     def test_make_mode_command(self) -> None:
         """Factory populates the manual_mode field."""
-        cmd = make_mode_command("HUNT")
-        assert cmd["manual_mode"] == "HUNT"
+        cmd = make_mode_command(WireMode.HUNT)
+        assert cmd["manual_mode"] is WireMode.HUNT
 
     def test_encode_decode_roundtrip_each_mode(self) -> None:
         """Every wire mode round-trips cleanly through the codec."""
-        for mode in WIRE_MODES:
+        for mode in WireMode:
             original = make_mode_command(mode)
             encoded = encode_mode_command(original)
+            assert encoded == {"manual_mode": mode.value}
             decoded = decode_mode_command(encoded)
-            assert decoded == original
+            assert decoded["manual_mode"] is mode
 
     def test_decode_invalid_mode_raises(self) -> None:
-        """Decode rejects a value outside :data:`WIRE_MODES`."""
+        """Decode rejects a value outside :class:`WireMode` by name."""
         data: JSONObject = {"manual_mode": "INVALID"}
-        with pytest.raises(ValueError, match="must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid manual_mode 'INVALID'"):
             decode_mode_command(data)
 
     def test_decode_missing_field_raises(self) -> None:
@@ -171,9 +173,9 @@ class TestSessionStatus:
         stats = make_live_stats(kills=1, hits=2, misses=3, radars_used=4, teleports=5)
         status = make_session_status(
             running=True,
-            manual_mode="HUNT",
-            active_mode="HUNT",
-            active_mode_state="ACQUIRE",
+            manual_mode=WireMode.HUNT,
+            active_mode=AIMode.HUNT,
+            active_mode_state=AIModeState.ACQUIRE,
             session_started_ms=1000,
             tick_timestamp_ms=1200,
             stats=stats,
@@ -202,9 +204,9 @@ class TestSessionStatus:
         stats = make_live_stats(kills=6, hits=18, misses=9, radars_used=3, teleports=7)
         original = make_session_status(
             running=True,
-            manual_mode="COLLECT",
-            active_mode="COLLECT",
-            active_mode_state="APPROACH",
+            manual_mode=WireMode.COLLECT,
+            active_mode=AIMode.COLLECT,
+            active_mode_state=AIModeState.APPROACH,
             session_started_ms=555,
             tick_timestamp_ms=999,
             stats=stats,
@@ -246,11 +248,11 @@ class TestSessionStatus:
             decode_session_status(encoded)
 
     def test_decode_invalid_manual_mode_raises(self) -> None:
-        """An invalid ``manual_mode`` surfaces as ValueError."""
+        """An invalid ``manual_mode`` surfaces as JSONTypeError naming it."""
         original = idle_session_status(tick_timestamp_ms=1)
         encoded = encode_session_status(original)
         encoded["manual_mode"] = "INVALID"
-        with pytest.raises(ValueError, match="must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid manual_mode 'INVALID'"):
             decode_session_status(encoded)
 
     def test_decode_missing_running_raises(self) -> None:
@@ -272,38 +274,27 @@ class TestWireModeTranslators:
 
     def test_wire_auto_becomes_none(self) -> None:
         """AUTO on the wire maps to auto-arbitration (None)."""
-        assert wire_mode_to_manual("AUTO") is None
+        assert wire_mode_to_manual(WireMode.AUTO) is None
 
-    def test_wire_unset_passes_through(self) -> None:
-        """UNSET on the wire maps to UNSET."""
-        assert wire_mode_to_manual("UNSET") == "UNSET"
-
-    def test_wire_hunt_passes_through(self) -> None:
-        """HUNT on the wire maps to HUNT."""
-        assert wire_mode_to_manual("HUNT") == "HUNT"
-
-    def test_wire_collect_passes_through(self) -> None:
-        """COLLECT on the wire maps to COLLECT."""
-        assert wire_mode_to_manual("COLLECT") == "COLLECT"
+    @pytest.mark.parametrize(
+        ("wire", "manual"),
+        [
+            (WireMode.UNSET, AIMode.UNSET),
+            (WireMode.HUNT, AIMode.HUNT),
+            (WireMode.COLLECT, AIMode.COLLECT),
+        ],
+    )
+    def test_wire_mode_pins_the_same_ai_mode(self, wire: WireMode, manual: AIMode) -> None:
+        """Each non-AUTO wire mode pins the AI mode carrying the same word."""
+        assert wire_mode_to_manual(wire) is manual
+        assert manual_to_wire_mode(manual) is wire
 
     def test_manual_none_becomes_auto(self) -> None:
         """None maps back to AUTO on the wire."""
-        assert manual_to_wire_mode(None) == "AUTO"
-
-    def test_manual_unset_passes_through(self) -> None:
-        """UNSET maps back to UNSET on the wire."""
-        assert manual_to_wire_mode("UNSET") == "UNSET"
-
-    def test_manual_hunt_passes_through(self) -> None:
-        """HUNT maps back to HUNT on the wire."""
-        assert manual_to_wire_mode("HUNT") == "HUNT"
-
-    def test_manual_collect_passes_through(self) -> None:
-        """COLLECT maps back to COLLECT on the wire."""
-        assert manual_to_wire_mode("COLLECT") == "COLLECT"
+        assert manual_to_wire_mode(None) is WireMode.AUTO
 
     def test_wire_manual_roundtrip(self) -> None:
         """Every WireMode round-trips through manual → wire."""
-        for wire in WIRE_MODES:
+        for wire in WireMode:
             manual = wire_mode_to_manual(wire)
-            assert manual_to_wire_mode(manual) == wire
+            assert manual_to_wire_mode(manual) is wire

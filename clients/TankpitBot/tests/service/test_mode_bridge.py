@@ -11,6 +11,7 @@ from __future__ import annotations
 import threading
 
 from tankpit_bot.bus.mode_bridge import ModeBridge
+from tankpit_bot.bus.session_status import WireMode
 
 
 class TestModeBridge:
@@ -29,41 +30,39 @@ class TestModeBridge:
     def test_submit_then_drain_returns_value(self) -> None:
         """A submitted value round-trips through drain."""
         bridge = ModeBridge()
-        bridge.submit("HUNT")
-        assert bridge.drain() == "HUNT"
+        bridge.submit(WireMode.HUNT)
+        assert bridge.drain() is WireMode.HUNT
 
     def test_drain_is_destructive(self) -> None:
         """The second drain after one submit returns ``None``."""
         bridge = ModeBridge()
-        bridge.submit("COLLECT")
-        assert bridge.drain() == "COLLECT"
+        bridge.submit(WireMode.COLLECT)
+        assert bridge.drain() is WireMode.COLLECT
         assert bridge.drain() is None
 
     def test_peek_is_non_destructive(self) -> None:
         """Peek leaves the pending value in place for a later drain."""
         bridge = ModeBridge()
-        bridge.submit("HUNT")
-        assert bridge.peek() == "HUNT"
-        assert bridge.peek() == "HUNT"
-        assert bridge.drain() == "HUNT"
+        bridge.submit(WireMode.HUNT)
+        assert bridge.peek() is WireMode.HUNT
+        assert bridge.peek() is WireMode.HUNT
+        assert bridge.drain() is WireMode.HUNT
         assert bridge.peek() is None
 
     def test_second_submit_replaces_first_latest_wins(self) -> None:
         """Two submits between drains yield only the second — latest wins."""
         bridge = ModeBridge()
-        bridge.submit("HUNT")
-        bridge.submit("COLLECT")
-        assert bridge.drain() == "COLLECT"
+        bridge.submit(WireMode.HUNT)
+        bridge.submit(WireMode.COLLECT)
+        assert bridge.drain() is WireMode.COLLECT
         assert bridge.drain() is None
 
     def test_every_wire_mode_round_trips(self) -> None:
-        """Every :data:`WIRE_MODES` value can round-trip through the bridge."""
-        from tankpit_bot.bus.session_status import WIRE_MODES
-
+        """Every :class:`WireMode` member can round-trip through the bridge."""
         bridge = ModeBridge()
-        for mode in WIRE_MODES:
+        for mode in WireMode:
             bridge.submit(mode)
-            assert bridge.drain() == mode
+            assert bridge.drain() is mode
 
 
 def test_mode_bridge_serialises_concurrent_submits() -> None:
@@ -77,23 +76,12 @@ def test_mode_bridge_serialises_concurrent_submits() -> None:
     corruption.
     """
     bridge = ModeBridge()
-    modes = ["UNSET", "HUNT", "COLLECT", "AUTO"]
+    modes = list(WireMode)
     threads: list[threading.Thread] = []
 
-    def writer(mode: str) -> None:
-        assert mode in modes
+    def writer(mode: WireMode) -> None:
         for _ in range(50):
-            # The Literal here is checked by the caller loop below —
-            # the writer signature keeps the concurrency scenario tight
-            # without pulling WireMode into the closure.
-            if mode == "UNSET":
-                bridge.submit("UNSET")
-            elif mode == "HUNT":
-                bridge.submit("HUNT")
-            elif mode == "COLLECT":
-                bridge.submit("COLLECT")
-            else:
-                bridge.submit("AUTO")
+            bridge.submit(mode)
 
     for mode in modes:
         for _ in range(3):

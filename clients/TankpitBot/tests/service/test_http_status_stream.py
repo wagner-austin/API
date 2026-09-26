@@ -26,6 +26,7 @@ from platform_core.json_utils import (
 from tankpit_bot.bus.mode_bridge import ModeBridge
 from tankpit_bot.bus.session_status import (
     SessionStatusDict,
+    WireMode,
     idle_session_status,
     make_live_stats,
     make_session_status,
@@ -36,6 +37,7 @@ from tankpit_bot.bus.status_bus import (
 )
 from tankpit_bot.service.http_server import make_app
 from tankpit_bot.service.types_codecs import decode_session_status
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.service._http_fixtures import (
     _noop_shutdown,
     _RecordingRunner,
@@ -282,9 +284,9 @@ class TestStatusRoute:
         stats = make_live_stats(kills=1, hits=2, misses=3, radars_used=4, teleports=5)
         frame: SessionStatusDict = make_session_status(
             running=True,
-            manual_mode="HUNT",
-            active_mode="HUNT",
-            active_mode_state="ACQUIRE",
+            manual_mode=WireMode.HUNT,
+            active_mode=AIMode.HUNT,
+            active_mode_state=AIModeState.ACQUIRE,
             session_started_ms=1000,
             tick_timestamp_ms=1200,
             stats=stats,
@@ -315,9 +317,9 @@ class TestStatusRoute:
         stats = make_live_stats(kills=9, hits=0, misses=0, radars_used=0, teleports=0)
         frame: SessionStatusDict = make_session_status(
             running=False,
-            manual_mode="AUTO",
-            active_mode="UNSET",
-            active_mode_state="",
+            manual_mode=WireMode.AUTO,
+            active_mode=AIMode.UNSET,
+            active_mode_state=AIModeState.NONE,
             session_started_ms=0,
             tick_timestamp_ms=17,
             stats=stats,

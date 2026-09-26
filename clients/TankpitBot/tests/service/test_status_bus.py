@@ -15,10 +15,12 @@ import time
 
 from tankpit_bot.bus.session_status import (
     SessionStatusDict,
+    WireMode,
     idle_session_status,
     make_live_stats,
 )
 from tankpit_bot.bus.status_bus import StatusBus, StatusSubscriber
+from tankpit_bot.types.modes import AIMode, AIModeState
 
 
 def _make_status(tick_timestamp_ms: int, kills: int = 0) -> SessionStatusDict:
@@ -35,9 +37,9 @@ def _make_status(tick_timestamp_ms: int, kills: int = 0) -> SessionStatusDict:
         return idle_session_status(tick_timestamp_ms=0)
     return SessionStatusDict(
         running=True,
-        manual_mode="HUNT",
-        active_mode="HUNT",
-        active_mode_state="ACQUIRE",
+        manual_mode=WireMode.HUNT,
+        active_mode=AIMode.HUNT,
+        active_mode_state=AIModeState.ACQUIRE,
         session_started_ms=1000,
         tick_timestamp_ms=tick_timestamp_ms,
         stats=make_live_stats(kills=kills, hits=0, misses=0, radars_used=0, teleports=0),

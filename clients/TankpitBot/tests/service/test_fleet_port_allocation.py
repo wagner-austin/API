@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service.constants import FLEET_CHILD_PORT_BASE, FLEET_CHILD_PORT_COUNT
 from tankpit_bot.service.fleet_bot import _ManagedBot
 from tankpit_bot.service.fleet_error import FleetError
@@ -38,7 +39,7 @@ def _managed(instance: str, port: int, *, alive: bool) -> _ManagedBot:
     return _ManagedBot(
         instance=instance,
         account=instance,
-        role="fighter",
+        role=FleetRole.FIGHTER,
         room="Practice",
         troop="orange",
         doctrine="skirmish",

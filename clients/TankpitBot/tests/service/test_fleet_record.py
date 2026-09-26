@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONTypeError, load_json_str, narrow_json_to_dict
 
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service.fleet_record import (
     FleetProcessRecordDict,
     decode_process_record,
@@ -33,7 +34,7 @@ def _record(instance: str = "alpha", pid: int = 4312) -> FleetProcessRecordDict:
     return FleetProcessRecordDict(
         instance=instance,
         account="Artax",
-        role="gatherer",
+        role=FleetRole.GATHERER,
         room="World",
         troop="orange",
         doctrine="skirmish",
@@ -140,7 +141,7 @@ def test_decoding_refuses_a_role_that_is_not_a_fleet_role() -> None:
     data = encode_process_record(_record())
     data["role"] = "scout"
 
-    with pytest.raises(JSONTypeError, match="not a fleet role"):
+    with pytest.raises(JSONTypeError, match="Invalid role 'scout': must be one of 'fighter'"):
         decode_process_record(data)
 
 
