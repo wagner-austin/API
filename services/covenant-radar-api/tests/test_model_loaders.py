@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.types import LogRegPenalty, LogRegSolver
 from numpy.typing import NDArray
 from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 
@@ -161,8 +162,8 @@ class TestDecodeLogregMeta:
 
         assert result["backend"] == "logreg"
         assert result["n_features"] == 25
-        assert result["penalty"] == "l2"
-        assert result["solver"] == "lbfgs"
+        assert result["penalty"] is LogRegPenalty.L2
+        assert result["solver"] is LogRegSolver.LBFGS
 
     def test_decode_logreg_meta_all_penalties(self) -> None:
         """Decode LogReg metadata with all valid penalties."""
@@ -209,10 +210,11 @@ class TestDecodeLogregMeta:
             "penalty": "invalid",
             "solver": "lbfgs",
         }
-        with pytest.raises(JSONTypeError) as exc_info:
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid penalty 'invalid': must be one of 'l1', 'l2', 'elasticnet', 'none'$",
+        ):
             _decode_logreg_meta(raw)
-
-        assert "Invalid penalty" in str(exc_info.value)
 
     def test_decode_logreg_meta_invalid_solver(self) -> None:
         """Raise error when solver is invalid."""
@@ -222,10 +224,14 @@ class TestDecodeLogregMeta:
             "penalty": "l2",
             "solver": "invalid",
         }
-        with pytest.raises(JSONTypeError) as exc_info:
+        with pytest.raises(
+            JSONTypeError,
+            match=(
+                r"^Invalid solver 'invalid': must be one of 'lbfgs', 'liblinear', "
+                r"'newton-cg', 'newton-cholesky', 'sag', 'saga'$"
+            ),
+        ):
             _decode_logreg_meta(raw)
-
-        assert "Invalid solver" in str(exc_info.value)
 
 
 class TestDecodeRandomForestMeta:

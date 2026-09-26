@@ -357,27 +357,18 @@ def _parse_logreg_solver(raw: JSONObject) -> LogRegSolver:
         raw: JSON object containing the solver field.
 
     Returns:
-        Validated LogRegSolver literal.
+        The LogRegSolver member the field names.
 
     Raises:
         JSONTypeError: If value is not a valid solver.
     """
     val = raw.get("solver")
-    if val == "lbfgs":
-        return "lbfgs"
-    if val == "liblinear":
-        return "liblinear"
-    if val == "newton-cg":
-        return "newton-cg"
-    if val == "newton-cholesky":
-        return "newton-cholesky"
-    if val == "sag":
-        return "sag"
-    if val == "saga":
-        return "saga"
-    raise JSONTypeError(
-        "solver must be one of: lbfgs, liblinear, newton-cg, newton-cholesky, sag, saga"
-    )
+    solver = find_member(val, LogRegSolver) if isinstance(val, str) else None
+    if solver is None:
+        raise JSONTypeError(
+            "solver must be one of: lbfgs, liblinear, newton-cg, newton-cholesky, sag, saga"
+        )
+    return solver
 
 
 def _parse_logreg_penalty(raw: JSONObject) -> LogRegPenalty:
@@ -387,21 +378,16 @@ def _parse_logreg_penalty(raw: JSONObject) -> LogRegPenalty:
         raw: JSON object containing the penalty field.
 
     Returns:
-        Validated LogRegPenalty literal.
+        The LogRegPenalty member the field names.
 
     Raises:
         JSONTypeError: If value is not a valid penalty.
     """
     val = raw.get("penalty")
-    if val == "l1":
-        return "l1"
-    if val == "l2":
-        return "l2"
-    if val == "elasticnet":
-        return "elasticnet"
-    if val == "none":
-        return "none"
-    raise JSONTypeError("penalty must be one of: l1, l2, elasticnet, none")
+    penalty = find_member(val, LogRegPenalty) if isinstance(val, str) else None
+    if penalty is None:
+        raise JSONTypeError("penalty must be one of: l1, l2, elasticnet, none")
+    return penalty
 
 
 def _parse_logreg_config(

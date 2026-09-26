@@ -27,6 +27,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
 
 def _decode_mlp_meta(raw: JSONObject) -> MLPModelMeta:
@@ -110,63 +111,6 @@ def _decode_lightgbm_meta(raw: JSONObject) -> LightGBMModelMeta:
     return {"backend": "lightgbm"}
 
 
-_LOGREG_PENALTIES: dict[str, LogRegPenalty] = {
-    "l1": "l1",
-    "l2": "l2",
-    "elasticnet": "elasticnet",
-    "none": "none",
-}
-
-
-def _parse_logreg_penalty(raw: str) -> LogRegPenalty:
-    """Parse and validate logistic regression penalty type.
-
-    Args:
-        raw: Penalty string from metadata.
-
-    Returns:
-        Validated LogRegPenalty literal.
-
-    Raises:
-        JSONTypeError: If penalty is not a valid option.
-    """
-    penalty = _LOGREG_PENALTIES.get(raw)
-    if penalty is not None:
-        return penalty
-    raise JSONTypeError(f"Invalid penalty '{raw}', expected one of: l1, l2, elasticnet, none")
-
-
-_LOGREG_SOLVERS: dict[str, LogRegSolver] = {
-    "lbfgs": "lbfgs",
-    "liblinear": "liblinear",
-    "newton-cg": "newton-cg",
-    "newton-cholesky": "newton-cholesky",
-    "sag": "sag",
-    "saga": "saga",
-}
-
-
-def _parse_logreg_solver(raw: str) -> LogRegSolver:
-    """Parse and validate logistic regression solver type.
-
-    Args:
-        raw: Solver string from metadata.
-
-    Returns:
-        Validated LogRegSolver literal.
-
-    Raises:
-        JSONTypeError: If solver is not a valid option.
-    """
-    solver = _LOGREG_SOLVERS.get(raw)
-    if solver is not None:
-        return solver
-    raise JSONTypeError(
-        f"Invalid solver '{raw}', expected one of: lbfgs, liblinear, newton-cg, "
-        "newton-cholesky, sag, saga"
-    )
-
-
 def _decode_logreg_meta(raw: JSONObject) -> LogRegModelMeta:
     """Decode and validate Logistic Regression model metadata from JSON object.
 
@@ -183,15 +127,11 @@ def _decode_logreg_meta(raw: JSONObject) -> LogRegModelMeta:
     if backend != "logreg":
         raise JSONTypeError(f"Expected backend 'logreg', got '{backend}'")
 
-    n_features = require_int(raw, "n_features")
-    penalty_raw = require_str(raw, "penalty")
-    solver_raw = require_str(raw, "solver")
-
     return {
         "backend": "logreg",
-        "n_features": n_features,
-        "penalty": _parse_logreg_penalty(penalty_raw),
-        "solver": _parse_logreg_solver(solver_raw),
+        "n_features": require_int(raw, "n_features"),
+        "penalty": require_member(raw, "penalty", LogRegPenalty),
+        "solver": require_member(raw, "solver", LogRegSolver),
     }
 
 

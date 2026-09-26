@@ -15,7 +15,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import GrowthStrategy, OptimizerName
+from covenant_ml.types import GrowthStrategy, LogRegPenalty, LogRegSolver, OptimizerName
 from scripts.optimize._config_builders import (
     _build_cleargbm_config,
     _build_lightgbm_config,
@@ -24,8 +24,6 @@ from scripts.optimize._config_builders import (
     _build_mlp_config,
     _build_random_forest_config,
     _build_xgboost_config,
-    _narrow_logreg_penalty,
-    _narrow_logreg_solver,
 )
 
 
@@ -171,56 +169,47 @@ class TestBuildLogRegConfig:
             SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.5),
             SampledStringParams(solver="saga", penalty="elasticnet"),
         )
-        assert config["solver"] == "saga"
-        assert config["penalty"] == "elasticnet"
+        assert config["solver"] is LogRegSolver.SAGA
+        assert config["penalty"] is LogRegPenalty.ELASTICNET
         assert config["C"] == 1.0
         assert config["tol"] == 0.0001
         assert config["l1_ratio"] == 0.5
         assert config["max_iter"] == 1000
         assert config["class_weight_balanced"] is True
 
-    def test_l2_lbfgs(self) -> None:
-        """LogReg config with l2 penalty and lbfgs solver."""
-        config = _build_logreg_config(
-            SampledFloatParams(C=0.5, tol=0.001, l1_ratio=0.0),
-            SampledStringParams(solver="lbfgs", penalty="l2"),
-        )
-        assert config["solver"] == "lbfgs"
-        assert config["penalty"] == "l2"
+    def test_every_solver_word_builds_its_member(self) -> None:
+        """Each sampled solver word becomes the member that carries it."""
+        for solver in LogRegSolver:
+            config = _build_logreg_config(
+                SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+                SampledStringParams(solver=solver.value, penalty="l2"),
+            )
+            assert config["solver"] is solver
 
-    def test_l1_liblinear(self) -> None:
-        """LogReg config with l1 penalty and liblinear solver."""
-        config = _build_logreg_config(
-            SampledFloatParams(C=10.0, tol=0.0001, l1_ratio=0.0),
-            SampledStringParams(solver="liblinear", penalty="l1"),
-        )
-        assert config["solver"] == "liblinear"
-        assert config["penalty"] == "l1"
+    def test_every_penalty_word_builds_its_member(self) -> None:
+        """Each sampled penalty word becomes the member that carries it."""
+        for penalty in LogRegPenalty:
+            config = _build_logreg_config(
+                SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+                SampledStringParams(solver="saga", penalty=penalty.value),
+            )
+            assert config["penalty"] is penalty
 
-    def test_none_penalty_newton_cg(self) -> None:
-        """LogReg config with none penalty and newton-cg solver."""
-        config = _build_logreg_config(
-            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
-            SampledStringParams(solver="newton-cg", penalty="none"),
-        )
-        assert config["solver"] == "newton-cg"
-        assert config["penalty"] == "none"
+    def test_unknown_solver_raises(self) -> None:
+        """A sampled solver that is no member's word is refused."""
+        with pytest.raises(ValueError, match=r"^'invalid_solver' is not a valid LogRegSolver$"):
+            _build_logreg_config(
+                SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+                SampledStringParams(solver="invalid_solver", penalty="l2"),
+            )
 
-    def test_newton_cholesky(self) -> None:
-        """LogReg config with newton-cholesky solver."""
-        config = _build_logreg_config(
-            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
-            SampledStringParams(solver="newton-cholesky", penalty="l2"),
-        )
-        assert config["solver"] == "newton-cholesky"
-
-    def test_sag(self) -> None:
-        """LogReg config with sag solver."""
-        config = _build_logreg_config(
-            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
-            SampledStringParams(solver="sag", penalty="l2"),
-        )
-        assert config["solver"] == "sag"
+    def test_unknown_penalty_raises(self) -> None:
+        """A sampled penalty that is no member's word is refused."""
+        with pytest.raises(ValueError, match=r"^'invalid_penalty' is not a valid LogRegPenalty$"):
+            _build_logreg_config(
+                SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+                SampledStringParams(solver="saga", penalty="invalid_penalty"),
+            )
 
 
 class TestBuildRandomForestConfig:
@@ -266,33 +255,3 @@ class TestBuildRandomForestConfig:
             SampledStringParams(),
         )
         assert config["max_features"] == "sqrt"
-
-
-class TestNarrowLogRegSolver:
-    """Tests for _narrow_logreg_solver."""
-
-    def test_all_valid_solvers(self) -> None:
-        """All valid solver names are narrowed correctly."""
-        solvers = ["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
-        for solver in solvers:
-            assert _narrow_logreg_solver(solver) == solver
-
-    def test_invalid_solver_raises(self) -> None:
-        """Invalid solver name raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid LogReg solver"):
-            _narrow_logreg_solver("invalid_solver")
-
-
-class TestNarrowLogRegPenalty:
-    """Tests for _narrow_logreg_penalty."""
-
-    def test_all_valid_penalties(self) -> None:
-        """All valid penalty names are narrowed correctly."""
-        penalties = ["l1", "l2", "elasticnet", "none"]
-        for penalty in penalties:
-            assert _narrow_logreg_penalty(penalty) == penalty
-
-    def test_invalid_penalty_raises(self) -> None:
-        """Invalid penalty name raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid LogReg penalty"):
-            _narrow_logreg_penalty("invalid_penalty")

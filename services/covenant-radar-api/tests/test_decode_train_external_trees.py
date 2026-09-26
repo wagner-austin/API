@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.types import LogRegPenalty, LogRegSolver
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode import (
@@ -152,8 +153,8 @@ class TestParseExternalTrainRequestTreeBackends:
         assert result["dataset"] == "taiwan"
         if result["backend"] != "logreg":
             raise AssertionError("Expected logreg backend")
-        assert result["config"]["solver"] == "saga"
-        assert result["config"]["penalty"] == "elasticnet"
+        assert result["config"]["solver"] is LogRegSolver.SAGA
+        assert result["config"]["penalty"] is LogRegPenalty.ELASTICNET
         assert result["config"]["C"] == 1.0
         assert result["config"]["max_iter"] == 1000
         assert result["config"]["tol"] == 0.0001

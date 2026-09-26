@@ -190,56 +190,6 @@ def _build_cleargbm_config(
     )
 
 
-def _narrow_logreg_solver(raw: str) -> LogRegSolver:
-    """Narrow string to LogRegSolver literal type.
-
-    Args:
-        raw: Solver name string.
-
-    Returns:
-        Validated LogRegSolver literal.
-
-    Raises:
-        ValueError: If solver name is not valid.
-    """
-    if raw == "lbfgs":
-        return "lbfgs"
-    if raw == "liblinear":
-        return "liblinear"
-    if raw == "newton-cg":
-        return "newton-cg"
-    if raw == "newton-cholesky":
-        return "newton-cholesky"
-    if raw == "sag":
-        return "sag"
-    if raw == "saga":
-        return "saga"
-    raise ValueError(f"Invalid LogReg solver: {raw}")
-
-
-def _narrow_logreg_penalty(raw: str) -> LogRegPenalty:
-    """Narrow string to LogRegPenalty literal type.
-
-    Args:
-        raw: Penalty name string.
-
-    Returns:
-        Validated LogRegPenalty literal.
-
-    Raises:
-        ValueError: If penalty name is not valid.
-    """
-    if raw == "l1":
-        return "l1"
-    if raw == "l2":
-        return "l2"
-    if raw == "elasticnet":
-        return "elasticnet"
-    if raw == "none":
-        return "none"
-    raise ValueError(f"Invalid LogReg penalty: {raw}")
-
-
 def _build_logreg_config(
     float_params: SampledFloatParams,
     string_params: SampledStringParams,
@@ -252,13 +202,13 @@ def _build_logreg_config(
 
     Returns:
         LogReg training configuration.
-    """
-    solver = _narrow_logreg_solver(string_params["solver"])
-    penalty = _narrow_logreg_penalty(string_params["penalty"])
 
+    Raises:
+        ValueError: If the sampled solver or penalty is not a member's word.
+    """
     return LogRegConfig(
-        solver=solver,
-        penalty=penalty,
+        solver=LogRegSolver(string_params["solver"]),
+        penalty=LogRegPenalty(string_params["penalty"]),
         C=float_params["C"],
         max_iter=1000,
         tol=float_params["tol"],
