@@ -75,6 +75,7 @@ from fleet.cli import _config
 from fleet.cli import run as run_cli
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
+from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import ProjectSource
@@ -89,6 +90,7 @@ from fleet.core import (
     probe,
     queue,
     records,
+    run_lease,
     toolchain,
 )
 
@@ -258,32 +260,9 @@ def claim_pass(
         )
         return dispatch.Payload(data=data, description=f"git archive of {sha}")
 
-    # GUARDED LIKE prepare ABOVE, because a fault here is otherwise reported
-    # NOWHERE: there is no failed feed row on this path, so an AppError out of
-    # staging ends the tick and leaves the queue row in status claimed until
-    # its lease runs out, an hour later, with no reason recorded anywhere a
-    # waiting session can read. Measured 2026-09-24 (board task 1e57ebe5):
-    # two jobs sat exactly that way for 32 and 14 minutes.
-    try:
-        row = dispatch.start(
-            loaded.leases,
-            loaded.ledger,
-            loaded.feed,
-            node_name=alias,
-            node=node,
-            project=job["project"],
-            plan=prepared["plan"],
-            workers=prepared["workers"],
-            agent=job["submitted_by"],
-            session_id=job["session_id"],
-            build_payload=build,
-            companions=prepared["companions"],
-            recipe=dispatch.Recipe(
-                path=prepared["source"]["path"], install=prepared["source"]["install"]
-            ),
-        )
-    except AppError as refusal:
-        return refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
+    row = launch_claimed(loaded, job, alias=alias, node=node, prepared=prepared, build=build)
+    if isinstance(row, str):
+        return refuse(credentials, job, identity, detail=row)
     queue.report_start(
         credentials,
         job_id=job["job_id"],
@@ -294,6 +273,75 @@ def claim_pass(
     )
     _log.info("started %s on %s as %s at %s", job["job_id"], alias, row["run_id"], sha)
     return job
+
+
+def launch_claimed(
+    loaded: _config.LoadedWorkspace,
+    job: DispatchJob,
+    *,
+    alias: str,
+    node: NodeConfig,
+    prepared: Prepared,
+    build: dispatch.PayloadBuilder,
+) -> LedgerEntry | str:
+    """Take the project's lease on this node and launch the job under it.
+
+    GUARDED LIKE ``prepare``, because a fault here is otherwise reported
+    NOWHERE: there is no failed feed row on this path, so an AppError out of
+    staging ended the tick and left the queue row in status claimed until its
+    lease ran out, an hour later, with no reason recorded anywhere a waiting
+    session could read. Measured 2026-09-24 (board task 1e57ebe5): two jobs
+    sat exactly that way for 32 and 14 minutes.
+
+    A FAILURE AFTER THE LEASE GIVES THE LEASE BACK before the refusal, or the
+    resubmission the refusal invites bounces off it: MCPs board task
+    e12affc5, where job 7143a25e was refused ``LEASE_HELD`` by the dead run
+    of job 4d8b28a9 with 793 s of its lease left. A ``LEASE_HELD`` out of the
+    lease itself gives nothing back, because that lease is another run's
+    (:mod:`fleet.core.run_lease`).
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        job: The claimed job.
+        alias: This node's workspace name.
+        node: Its declaration.
+        prepared: What :func:`prepare` resolved for the job.
+        build: Builds the job's export once the lease is held.
+
+    Returns:
+        The running ledger row, or the ``CODE: message`` refusal to report.
+    """
+    try:
+        lease = run_lease.take(
+            loaded.leases,
+            loaded.feed,
+            node_name=alias,
+            project=job["project"],
+            plan=prepared["plan"],
+            workers=prepared["workers"],
+            agent=job["submitted_by"],
+            session_id=job["session_id"],
+        )
+    except AppError as refusal:
+        return f"{refusal.code}: {refusal.message}"
+    try:
+        return dispatch.launch(
+            loaded.ledger,
+            loaded.feed,
+            lease=lease,
+            node=node,
+            workers=prepared["workers"],
+            build_payload=build,
+            companions=prepared["companions"],
+            recipe=dispatch.Recipe(
+                path=prepared["source"]["path"], install=prepared["source"]["install"]
+            ),
+        )
+    except AppError as refusal:
+        detail = f"{refusal.code}: {refusal.message}"
+        given_back = run_lease.abandon(loaded.leases, loaded.feed, lease=lease, detail=detail)
+        _log.info("%s never launched; %s", lease["run_id"], given_back)
+        return detail
 
 
 class Prepared(TypedDict):
