@@ -8,6 +8,7 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.facts.provenance import make_provenance
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state.mine_mutations import add_mine
 from tankpit_bot.state.projections.world import (
     mine_fact,
@@ -49,22 +50,22 @@ from tests.world_state.helpers import get_self_state
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
-        ("viewport", "wire_0x5A_viewport_patch"),
-        ("radar", "wire_0x4F_radar_response"),
-        ("world_state", "wire_0x4C_map_data"),
+        ("viewport", FactSource.WIRE_0X5A_VIEWPORT_PATCH),
+        ("radar", FactSource.WIRE_0X4F_RADAR_RESPONSE),
+        ("world_state", FactSource.WIRE_0X4C_MAP_DATA),
     ],
 )
 def test_mine_default_fact_source_maps_every_entity_source(
-    source: EntitySource, expected: str
+    source: EntitySource, expected: FactSource
 ) -> None:
     """Each coarse mine source resolves to its tile-observation channel."""
-    assert mine_default_fact_source(source) == expected
+    assert mine_default_fact_source(source) is expected
 
 
 def test_mine_round_trip_and_legacy_decode() -> None:
     """Mine metadata survives round trip; legacy decode converges."""
     mine = make_mine_state(10, 20, 2, 55, 1, source=EntitySource.RADAR, timestamp_ms=300)
-    assert mine["provenance"] == make_provenance("wire_0x4F_radar_response", [])
+    assert mine["provenance"] == make_provenance(FactSource.WIRE_0X4F_RADAR_RESPONSE, [])
     encoded = encode_mine_state(mine)
     assert decode_mine_state(encoded) == mine
     legacy = dict(encoded)
@@ -78,7 +79,7 @@ def test_add_mine_records_placement_channel() -> None:
     world = make_empty_world_state()
     updated = add_mine(world, 10, 20, 2, 55, 1, 500)
     mine = updated["mines"]["10,20"]
-    assert mine["provenance"] == make_provenance("wire_0x4B_mine_placement", [])
+    assert mine["provenance"] == make_provenance(FactSource.WIRE_0X4B_MINE_PLACEMENT, [])
 
 
 def test_mine_fact_projection() -> None:
@@ -86,7 +87,7 @@ def test_mine_fact_projection() -> None:
     mine = make_mine_state(10, 20, 2, 55, 1, source=EntitySource.VIEWPORT, timestamp_ms=300)
     fact = mine_fact(mine)
     assert fact["value"]["team"] == 1
-    assert fact["source"] == "wire_0x5A_viewport_patch"
+    assert fact["source"] is FactSource.WIRE_0X5A_VIEWPORT_PATCH
     assert fact["observed_ms"] == 300
 
 
@@ -105,22 +106,22 @@ def test_self_state_round_trip_and_legacy_decode() -> None:
 def test_update_self_position_records_channel() -> None:
     """The position mutator stamps observed_ms and the given channel."""
     world = make_empty_world_state()
-    updated = update_self_position(world, 50, 60, 900, "wire_0x47_movement")
+    updated = update_self_position(world, 50, 60, 900, FactSource.WIRE_0X47_MOVEMENT)
     self_state = get_self_state(updated)
     assert self_state["observed_ms"] == 900
-    assert self_state["provenance"] == make_provenance("wire_0x47_movement", [])
+    assert self_state["provenance"] == make_provenance(FactSource.WIRE_0X47_MOVEMENT, [])
 
 
 def test_set_self_fuel_and_rank_record_channels() -> None:
     """Fuel and rank mutators stamp their message channels."""
     world = update_self_position(make_empty_world_state(), 50, 60, 100)
-    fueled = set_self_fuel(world, 500, 200, "wire_0x64_fuel_total")
+    fueled = set_self_fuel(world, 500, 200, FactSource.WIRE_0X64_FUEL_TOTAL)
     fueled_self = get_self_state(fueled)
-    assert fueled_self["provenance"] == make_provenance("wire_0x64_fuel_total", [])
+    assert fueled_self["provenance"] == make_provenance(FactSource.WIRE_0X64_FUEL_TOTAL, [])
     assert fueled_self["observed_ms"] == 200
     ranked = set_self_rank(fueled, 3, 300)
     ranked_self = get_self_state(ranked)
-    assert ranked_self["provenance"] == make_provenance("wire_0x2B_promotion", [])
+    assert ranked_self["provenance"] == make_provenance(FactSource.WIRE_0X2B_PROMOTION, [])
 
 
 def test_self_fact_projection() -> None:
@@ -128,7 +129,7 @@ def test_self_fact_projection() -> None:
     state = make_self_state(1, 100, 100, 0, 4, 800, 5, observed_ms=700)
     fact = self_fact(state)
     assert fact["value"]["fuel"] == 800
-    assert fact["source"] == "wire_0x3D_movement"
+    assert fact["source"] is FactSource.WIRE_0X3D_MOVEMENT
     assert fact["observed_ms"] == 700
 
 
@@ -151,17 +152,17 @@ def test_terrain_explicit_provenance_for_terrain_update() -> None:
         20,
         1,
         observed_ms=400,
-        provenance=make_provenance("wire_0x4A_terrain_update", []),
+        provenance=make_provenance(FactSource.WIRE_0X4A_TERRAIN_UPDATE, []),
     )
     fact = terrain_tile_fact(tile)
-    assert fact["source"] == "wire_0x4A_terrain_update"
+    assert fact["source"] is FactSource.WIRE_0X4A_TERRAIN_UPDATE
     assert fact["value"]["terrain_type"] == 1
 
 
 def test_viewport_round_trip_and_legacy_decode() -> None:
     """Viewport metadata survives round trip; legacy decode converges."""
     state = make_viewport_state(100, 50, 16, 16, observed_ms=600)
-    assert state["provenance"] == make_provenance("wire_0x5A_viewport_patch", [])
+    assert state["provenance"] == make_provenance(FactSource.WIRE_0X5A_VIEWPORT_PATCH, [])
     encoded = encode_viewport_state(state)
     assert decode_viewport_state(encoded) == state
     legacy: JSONObject = {"left": 100, "top": 50, "width": 16, "height": 16}
@@ -173,5 +174,5 @@ def test_viewport_fact_projection() -> None:
     state = make_viewport_state(100, 50, 16, 16, observed_ms=600)
     fact = viewport_fact(state)
     assert fact["value"]["left"] == 100
-    assert fact["source"] == "wire_0x5A_viewport_patch"
+    assert fact["source"] is FactSource.WIRE_0X5A_VIEWPORT_PATCH
     assert fact["observed_ms"] == 600

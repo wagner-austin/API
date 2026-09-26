@@ -9,6 +9,7 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.facts.provenance import make_provenance, make_source_ref
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state.projections.container import container_fact
 from tankpit_bot.state.projections.tank import tank_fact
 from tankpit_bot.state.tank_mutations import apply_tank_observation
@@ -36,31 +37,32 @@ from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 @pytest.mark.parametrize(
     ("refresh_kind", "expected"),
     [
-        ("radar_response", "wire_0x4F_radar_response"),
-        ("radar_cache_refresh", "wire_0x43_cache_update"),
-        ("radar_known_resources", "wire_0x4F_radar_response"),
-        ("viewport_patch", "wire_0x5A_viewport_patch"),
-        ("world_state", "wire_0x4C_map_data"),
+        ("radar_response", FactSource.WIRE_0X4F_RADAR_RESPONSE),
+        ("radar_cache_refresh", FactSource.WIRE_0X43_CACHE_UPDATE),
+        ("radar_known_resources", FactSource.WIRE_0X4F_RADAR_RESPONSE),
+        ("viewport_patch", FactSource.WIRE_0X5A_VIEWPORT_PATCH),
+        ("world_state", FactSource.WIRE_0X4C_MAP_DATA),
     ],
 )
 def test_container_fact_source_maps_every_refresh_kind(
-    refresh_kind: ContainerRefreshKind, expected: str
+    refresh_kind: ContainerRefreshKind, expected: FactSource
 ) -> None:
     """Each refresh kind resolves to its wire channel."""
-    assert container_fact_source(refresh_kind) == expected
+    assert container_fact_source(refresh_kind) is expected
 
 
 def test_make_container_state_derives_provenance_from_refresh_kind() -> None:
     """The default provenance origin tracks the refresh kind."""
     state = make_container_state(10, 20, True, 400, source=EntitySource.RADAR, timestamp_ms=500)
     assert state["confidence"] == 1.0
-    assert state["provenance"] == make_provenance("wire_0x4F_radar_response", [])
+    assert state["provenance"] == make_provenance(FactSource.WIRE_0X4F_RADAR_RESPONSE, [])
 
 
 def test_make_container_state_accepts_explicit_provenance() -> None:
     """An explicit provenance chain is stored unchanged."""
     chain = make_provenance(
-        "client_side_inference", [make_source_ref("wire_0x4F_radar_response", 100)]
+        FactSource.CLIENT_SIDE_INFERENCE,
+        [make_source_ref(FactSource.WIRE_0X4F_RADAR_RESPONSE, 100)],
     )
     state = make_container_state(10, 20, True, 400, confidence=0.6, provenance=chain)
     assert state["confidence"] == 0.6
@@ -98,7 +100,7 @@ def test_container_decode_without_new_keys_matches_derived_defaults() -> None:
         timestamp_ms=500,
         failed_pickups=1,
     )
-    assert decoded["provenance"]["origin"] == "wire_0x43_cache_update"
+    assert decoded["provenance"]["origin"] is FactSource.WIRE_0X43_CACHE_UPDATE
 
 
 def test_container_fact_projection() -> None:
@@ -110,7 +112,7 @@ def test_container_fact_projection() -> None:
     assert fact["value"]["x"] == 10
     assert fact["value"]["volume"] == 400
     assert fact["value"]["refresh_kind"] == "viewport_patch"
-    assert fact["source"] == "wire_0x5A_viewport_patch"
+    assert fact["source"] is FactSource.WIRE_0X5A_VIEWPORT_PATCH
     assert fact["observed_ms"] == 900
     assert fact["confidence"] == 0.9
     assert fact["provenance"] == state["provenance"]
@@ -119,23 +121,23 @@ def test_container_fact_projection() -> None:
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
-        ("viewport", "wire_0x28_tank_entry"),
-        ("radar", "wire_0x48_enemy_detect"),
-        ("world_state", "wire_0x4C_map_data"),
+        ("viewport", FactSource.WIRE_0X28_TANK_ENTRY),
+        ("radar", FactSource.WIRE_0X48_ENEMY_DETECT),
+        ("world_state", FactSource.WIRE_0X4C_MAP_DATA),
     ],
 )
 def test_tank_default_fact_source_maps_every_entity_source(
-    source: EntitySource, expected: str
+    source: EntitySource, expected: FactSource
 ) -> None:
     """Each coarse entity source resolves to its canonical channel."""
-    assert tank_default_fact_source(source) == expected
+    assert tank_default_fact_source(source) is expected
 
 
 def test_make_tank_state_derives_provenance_and_round_trips() -> None:
     """Default provenance tracks the coarse source; encode/decode holds."""
     tank = make_tank_state(7, 10, 20, 1, 3, 0, "enemy", False, False, timestamp_ms=100)
     assert tank["confidence"] == 1.0
-    assert tank["provenance"] == make_provenance("wire_0x28_tank_entry", [])
+    assert tank["provenance"] == make_provenance(FactSource.WIRE_0X28_TANK_ENTRY, [])
     assert decode_tank_state(encode_tank_state(tank)) == tank
 
 
@@ -168,7 +170,7 @@ def test_tank_fact_projection() -> None:
     assert fact["value"]["tank_id"] == 7
     assert fact["value"]["damage_state"] == 2
     assert fact["value"]["liveness"] == "alive"
-    assert fact["source"] == "wire_0x4C_map_data"
+    assert fact["source"] is FactSource.WIRE_0X4C_MAP_DATA
     assert fact["observed_ms"] == 800
     assert fact["confidence"] == 0.7
 
@@ -180,28 +182,28 @@ def test_tank_observation_carries_explicit_fact_source() -> None:
         100,
         True,
         EntitySource.VIEWPORT,
-        fact_source="wire_0x3D_movement",
+        fact_source=FactSource.WIRE_0X3D_MOVEMENT,
         position=(10, 20),
     )
-    assert obs["fact_source"] == "wire_0x3D_movement"
+    assert obs["fact_source"] is FactSource.WIRE_0X3D_MOVEMENT
     assert decode_tank_observation(encode_tank_observation(obs)) == obs
 
 
 def test_tank_observation_derives_default_fact_source() -> None:
     """Without an explicit channel, the coarse default applies."""
     obs = make_tank_observation(7, 100, False, EntitySource.WORLD_STATE)
-    assert obs["fact_source"] == "wire_0x4C_map_data"
+    assert obs["fact_source"] is FactSource.WIRE_0X4C_MAP_DATA
 
 
 def test_tank_observation_decode_without_fact_source_derives_default() -> None:
     """A pre-Phase-1c encoded observation decodes with the coarse default."""
     obs = make_tank_observation(
-        7, 100, True, EntitySource.VIEWPORT, fact_source="wire_0x47_movement"
+        7, 100, True, EntitySource.VIEWPORT, fact_source=FactSource.WIRE_0X47_MOVEMENT
     )
     legacy = encode_tank_observation(obs)
     del legacy["fact_source"]
     decoded = decode_tank_observation(legacy)
-    assert decoded["fact_source"] == "wire_0x28_tank_entry"
+    assert decoded["fact_source"] is FactSource.WIRE_0X28_TANK_ENTRY
 
 
 def test_apply_tank_observation_records_provenance_origin() -> None:
@@ -212,10 +214,10 @@ def test_apply_tank_observation_records_provenance_origin() -> None:
         100,
         True,
         EntitySource.VIEWPORT,
-        fact_source="wire_0x53_shoot_event",
+        fact_source=FactSource.WIRE_0X53_SHOOT_EVENT,
         position=(10, 20),
     )
     updated = apply_tank_observation(world, obs)
     tank = updated["tanks"]["7"]
-    assert tank["provenance"] == make_provenance("wire_0x53_shoot_event", [])
+    assert tank["provenance"] == make_provenance(FactSource.WIRE_0X53_SHOOT_EVENT, [])
     assert tank["confidence"] == 1.0
