@@ -37,19 +37,35 @@ is to name neither.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from enum import StrEnum
+from typing import Final
 
 from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_core.members import find_member
 
-from fleet.contracts.node import NodeConfig
+from fleet.contracts.node import NodeConfig, NodePlatform
 
-#: A capability a project may require of a node.
-NodeTag = Literal["windows", "linux", "gpu", "testdb"]
 
-#: Every tag, for the decoder's refusal and the reader's reference. The
-#: dispatch queue's vocabulary CHECK (MCPs migrations 532 and 563) is the
-#: same four words.
-NODE_TAGS: Final[tuple[NodeTag, ...]] = ("windows", "linux", "gpu", "testdb")
+class NodeTag(StrEnum):
+    """A capability a project may require of a node.
+
+    The dispatch queue's vocabulary CHECK (MCPs migrations 532 and 563) is
+    the same four words as these members' values, in this order.
+    """
+
+    WINDOWS = "windows"
+    LINUX = "linux"
+    GPU = "gpu"
+    TESTDB = "testdb"
+
+
+#: The tag each platform carries. A table rather than a lookup by word, so
+#: the two vocabularies stay separate types; test_tags pins that every
+#: platform has a row, which is what a third platform would need first.
+_PLATFORM_TAG: Final[dict[NodePlatform, NodeTag]] = {
+    NodePlatform.WINDOWS: NodeTag.WINDOWS,
+    NodePlatform.LINUX: NodeTag.LINUX,
+}
 
 
 def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
@@ -62,11 +78,11 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
         Its platform, plus ``gpu`` when the node declares a CUDA device and
         ``testdb`` when it declares the fleet test database.
     """
-    tags: set[NodeTag] = {node["platform"]}
+    tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
-        tags.add("gpu")
+        tags.add(NodeTag.GPU)
     if node["test_database"]:
-        tags.add("testdb")
+        tags.add(NodeTag.TESTDB)
     return frozenset(tags)
 
 
@@ -81,15 +97,16 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         The tag.
 
     Raises:
-        JSONTypeError: If it is not a string naming one of :data:`NODE_TAGS`.
+        JSONTypeError: If it is not a string naming one of :class:`NodeTag`'s
+            words.
     """
     if not isinstance(value, str):
         raise JSONTypeError(f"{field} must be a string, got {type(value).__name__}")
-    for tag in NODE_TAGS:
-        if value == tag:
-            return tag
+    tag = find_member(value, NodeTag)
+    if tag is not None:
+        return tag
     raise JSONTypeError(
-        f"{field} must be one of {', '.join(NODE_TAGS)}, got {value!r}; a tag names a fact "
+        f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, or the "
         "fleet test database), and one it does not carry could never be satisfied"
     )
@@ -115,7 +132,7 @@ def decode_required_tags(value: JSONValue, *, field: str) -> tuple[NodeTag, ...]
     if value is None:
         raise JSONTypeError(
             f"{field} is required: [] for a suite any node may run, else the tags it needs "
-            f"from {', '.join(NODE_TAGS)}"
+            f"from {', '.join(NodeTag)}"
         )
     if not isinstance(value, list):
         raise JSONTypeError(f"{field} must be a list of tags, got {type(value).__name__}")
@@ -123,9 +140,9 @@ def decode_required_tags(value: JSONValue, *, field: str) -> tuple[NodeTag, ...]
     for index, entry in enumerate(value):
         tag = decode_node_tag(entry, field=f"{field}[{index}]")
         if tag in tags:
-            raise JSONTypeError(f"{field}[{index}] repeats {tag!r}")
+            raise JSONTypeError(f"{field}[{index}] repeats {tag.value!r}")
         tags.append(tag)
-    if "windows" in tags and "linux" in tags:
+    if NodeTag.WINDOWS in tags and NodeTag.LINUX in tags:
         raise JSONTypeError(
             f"{field} names both windows and linux; no node is both, so nothing could satisfy "
             "it. Name neither to run on either platform"
@@ -142,7 +159,7 @@ def encode_tags(tags: tuple[NodeTag, ...]) -> list[JSONValue]:
     Returns:
         The tags as a JSON list, in order.
     """
-    return list(tags)
+    return [tag.value for tag in tags]
 
 
 def missing_tags(node: NodeConfig, required: tuple[NodeTag, ...]) -> tuple[NodeTag, ...]:
@@ -161,7 +178,6 @@ def missing_tags(node: NodeConfig, required: tuple[NodeTag, ...]) -> tuple[NodeT
 
 
 __all__ = [
-    "NODE_TAGS",
     "NodeTag",
     "decode_node_tag",
     "decode_required_tags",

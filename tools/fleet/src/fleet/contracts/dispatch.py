@@ -23,82 +23,77 @@ carry ``None`` into a state machine.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from enum import StrEnum
 
 from platform_core.error_codes_tooling import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.members import find_member
 from typing_extensions import TypedDict
 
-from fleet.contracts.tags import NODE_TAGS, NodeTag
+from fleet.contracts.tags import NodeTag
 
-#: Every status a queue job can be in (MCPs migration 486's CHECK).
-DISPATCH_STATUSES: Final = (
-    "queued",
-    "claimed",
-    "running",
-    "passed",
-    "failed",
-    "refused",
-    "cancelled",
-)
 
-#: Narrow type for a queue job's status.
-DispatchStatus = Literal["queued", "claimed", "running", "passed", "failed", "refused", "cancelled"]
+class DispatchStatus(StrEnum):
+    """Every status a queue job can be in (MCPs migration 486's CHECK)."""
 
-#: The commands a job may ask for. There is no free-command field.
-#: ``build-bases`` (MCPs mig 497, board 3c9033ff) runs on the hub itself
-#: rather than on a node -- the R6 rebuild lane; its execution lives in
-#: :mod:`fleet.core.rebuild`. ``restart-session`` (MCPs mig 507, board
-#: ccec3417) is the second hub-local verb, the only one that carries a
-#: target; :mod:`fleet.core.restart` maps it to one session-audit
-#: invocation.
-DISPATCH_COMMANDS: Final = (
-    "check",
-    "lint",
-    "test",
-    "build-bases",
-    "restart-session",
+    QUEUED = "queued"
+    CLAIMED = "claimed"
+    RUNNING = "running"
+    PASSED = "passed"
+    FAILED = "failed"
+    REFUSED = "refused"
+    CANCELLED = "cancelled"
+
+
+class DispatchCommand(StrEnum):
+    """The commands a job may ask for. There is no free-command field.
+
+    ``build-bases`` (MCPs mig 497, board 3c9033ff) runs on the hub itself
+    rather than on a node -- the R6 rebuild lane; its execution lives in
+    :mod:`fleet.core.rebuild`. ``restart-session`` (MCPs mig 507, board
+    ccec3417) is the second hub-local verb, the only one that carries a
+    target; :mod:`fleet.core.restart` maps it to one session-audit
+    invocation.
+    """
+
+    CHECK = "check"
+    LINT = "lint"
+    TEST = "test"
+    BUILD_BASES = "build-bases"
+    RESTART_SESSION = "restart-session"
     # MCPs mig 525, board task 1fe89973: the twin of restart-session for a
     # session with no pane; the same hub pins and the same session target.
-    "revive-session",
+    REVIVE_SESSION = "revive-session"
     # MCPs mig 526, board task 660964d9: ending a live session on purpose,
     # the graceful verb and its explicit hard successor.
-    "kill-session",
-    "kill-session-hard",
+    KILL_SESSION = "kill-session"
+    KILL_SESSION_HARD = "kill-session-hard"
     # MCPs mig 564, board task 01f31e4a: compacting a working session that
     # got too big; the same hub pins, target and reason as a kill.
-    "compact-session",
-)
+    COMPACT_SESSION = "compact-session"
 
-#: Narrow type for a queue job's command.
-DispatchCommand = Literal[
-    "check",
-    "lint",
-    "test",
-    "build-bases",
-    "restart-session",
-    "revive-session",
-    "kill-session",
-    "kill-session-hard",
-    "compact-session",
-]
 
-#: The two lanes a runner claims from (MCPs mig 532, board task fd5cabfa
-#: A5). ``hub`` is the rebuild and the five session verbs, run on the hub
-#: by ``fleet-agent``; ``node`` is the make targets a fleet node runs on a
-#: checked-out commit, claimed by ``fleet-node-agent``. The queue partitions
-#: its claims by lane, which is what stops a revive queueing behind a check.
-DISPATCH_LANES: Final = ("hub", "node")
+class DispatchLane(StrEnum):
+    """The two lanes a runner claims from (MCPs mig 532, board task fd5cabfa A5).
 
-#: Narrow type for a runner's lane.
-DispatchLane = Literal["hub", "node"]
+    ``hub`` is the rebuild and the five session verbs, run on the hub by
+    ``fleet-agent``; ``node`` is the make targets a fleet node runs on a
+    checked-out commit, claimed by ``fleet-node-agent``. The queue
+    partitions its claims by lane, which is what stops a revive queueing
+    behind a check.
+    """
 
-#: The terminal statuses a runner may report.
-CLOSING_STATUSES: Final = ("passed", "failed", "refused")
+    HUB = "hub"
+    NODE = "node"
 
-#: Narrow type for what a runner closes a job with.
-ClosingStatus = Literal["passed", "failed", "refused"]
+
+class ClosingStatus(StrEnum):
+    """The terminal statuses a runner may report a job closed with."""
+
+    PASSED = "passed"
+    FAILED = "failed"
+    REFUSED = "refused"
 
 
 class DispatchJob(TypedDict):
@@ -134,7 +129,7 @@ class DispatchJob(TypedDict):
             lowercase hex, and None on the hub verbs. The export runner
             fetches exactly this and a closure cites it.
         required_tags: The node capabilities the job requires, from
-            :data:`~fleet.contracts.tags.NODE_TAGS`; the queue only hands a
+            :class:`~fleet.contracts.tags.NodeTag`; the queue only hands a
             node-lane runner a job whose tags its node carries, and the
             runner re-checks the value against the registry's declaration
             for the project before it exports.
@@ -245,12 +240,10 @@ def _require_status(row: dict[str, JSONValue], *, answer: str) -> DispatchStatus
         AppError: ``QUEUE_ANSWER_MALFORMED`` when it is not one of them.
     """
     value = _require_str(row, "status", answer=answer)
-    for status in DISPATCH_STATUSES:
-        if value == status:
-            return status
-    raise _malformed(
-        f"status {value!r} is not one of {', '.join(DISPATCH_STATUSES)}", answer=answer
-    )
+    status = find_member(value, DispatchStatus)
+    if status is not None:
+        return status
+    raise _malformed(f"status {value!r} is not one of {', '.join(DispatchStatus)}", answer=answer)
 
 
 def _require_command(row: dict[str, JSONValue], *, answer: str) -> DispatchCommand:
@@ -267,12 +260,10 @@ def _require_command(row: dict[str, JSONValue], *, answer: str) -> DispatchComma
         AppError: ``QUEUE_ANSWER_MALFORMED`` when it is not one of them.
     """
     value = _require_str(row, "command", answer=answer)
-    for command in DISPATCH_COMMANDS:
-        if value == command:
-            return command
-    raise _malformed(
-        f"command {value!r} is not one of {', '.join(DISPATCH_COMMANDS)}", answer=answer
-    )
+    command = find_member(value, DispatchCommand)
+    if command is not None:
+        return command
+    raise _malformed(f"command {value!r} is not one of {', '.join(DispatchCommand)}", answer=answer)
 
 
 def _require_tags(row: dict[str, JSONValue], *, answer: str) -> tuple[NodeTag, ...]:
@@ -298,13 +289,10 @@ def _require_tags(row: dict[str, JSONValue], *, answer: str) -> tuple[NodeTag, .
         )
     tags: list[NodeTag] = []
     for index, entry in enumerate(value):
-        matched: NodeTag | None = None
-        for tag in NODE_TAGS:
-            if entry == tag:
-                matched = tag
+        matched = find_member(entry, NodeTag) if isinstance(entry, str) else None
         if matched is None:
             raise _malformed(
-                f"requiredTags[{index}] {entry!r} is not one of {', '.join(NODE_TAGS)}",
+                f"requiredTags[{index}] {entry!r} is not one of {', '.join(NodeTag)}",
                 answer=answer,
             )
         tags.append(matched)
@@ -504,10 +492,6 @@ def encode_job_line(job: DispatchJob) -> str:
 
 
 __all__ = [
-    "CLOSING_STATUSES",
-    "DISPATCH_COMMANDS",
-    "DISPATCH_LANES",
-    "DISPATCH_STATUSES",
     "ClosingStatus",
     "DispatchCommand",
     "DispatchJob",

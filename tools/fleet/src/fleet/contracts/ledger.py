@@ -20,7 +20,8 @@ to know the convention.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from enum import StrEnum
+from typing import Final
 
 from platform_core.json_utils import (
     JSONObject,
@@ -29,37 +30,29 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import find_member
 from typing_extensions import TypedDict
 
-LedgerOutcome = Literal["refused", "passed", "failed", "cancelled", "lost", "running"]
-"""How a dispatch ended, or that it has not.
 
-``running`` is the only non-terminal value and exists because the row is
-written when the dispatch STARTS. A ledger that only recorded finished work
-could not answer "what is live on this node right now", which is exactly what
-a capacity check needs -- and a capacity check that could not see running work
-would admit a second dispatch onto a node the first had already filled.
-"""
+class LedgerOutcome(StrEnum):
+    """How a dispatch ended, or that it has not; each value is a row's word.
 
-OUTCOME_BY_NAME: Final[dict[str, LedgerOutcome]] = {
-    "refused": "refused",
-    "passed": "passed",
-    "failed": "failed",
-    "cancelled": "cancelled",
-    "lost": "lost",
-    "running": "running",
-}
-"""Every outcome, keyed by the string a row spells it with.
+    ``running`` is the only non-terminal value, the one outcome that means a
+    dispatch still holds resources, and exists because the row is written
+    when the dispatch STARTS. A ledger that only recorded finished work could
+    not answer "what is live on this node right now", which is exactly what a
+    capacity check needs -- and a capacity check that could not see running
+    work would admit a second dispatch onto a node the first had already
+    filled.
+    """
 
-Same shape as :data:`~fleet.contracts.feed.KIND_BY_NAME` and for the same
-reason: the key set IS the membership test and the value IS the narrowed
-literal, so an outcome absent here does not exist in either sense. Typed
-``dict[str, LedgerOutcome]``, so mypy checks each value against the Literal
-once, at definition, which is what makes the narrowing sound without a cast.
-"""
+    REFUSED = "refused"
+    PASSED = "passed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    LOST = "lost"
+    RUNNING = "running"
 
-#: The one outcome that means a dispatch still holds resources.
-RUNNING: Final[str] = "running"
 
 #: Recorded in ``exit_code`` when a dispatch produced no exit status at all.
 #:
@@ -120,7 +113,7 @@ def is_live(entry: LedgerEntry) -> bool:
     Returns:
         True while the outcome is ``running``.
     """
-    return entry["outcome"] == RUNNING
+    return entry["outcome"] is LedgerOutcome.RUNNING
 
 
 def encode_ledger_entry(entry: LedgerEntry) -> JSONObject:
@@ -141,7 +134,7 @@ def encode_ledger_entry(entry: LedgerEntry) -> JSONObject:
         "session_id": entry["session_id"],
         "started_unix": entry["started_unix"],
         "ended_unix": entry["ended_unix"],
-        "outcome": entry["outcome"],
+        "outcome": entry["outcome"].value,
         "exit_code": entry["exit_code"],
         "workers": entry["workers"],
         "detail": entry["detail"],
@@ -169,11 +162,11 @@ def decode_ledger_entry(value: JSONValue) -> LedgerEntry:
     if not isinstance(value, dict):
         raise JSONTypeError(f"ledger entry must be a JSON object, got {type(value).__name__}")
     spelling = require_str(value, "outcome")
-    outcome = OUTCOME_BY_NAME.get(spelling)
+    outcome = find_member(spelling, LedgerOutcome)
     if outcome is None:
         raise JSONTypeError(
             f"ledger outcome {spelling!r} is not one of "
-            f"{', '.join(sorted(OUTCOME_BY_NAME))}; an unrecognised outcome would be read as "
+            f"{', '.join(sorted(LedgerOutcome))}; an unrecognised outcome would be read as "
             "finished and let a second dispatch onto a node the first still holds"
         )
     started_unix = require_int(value, "started_unix")
@@ -207,8 +200,6 @@ def decode_ledger_entry(value: JSONValue) -> LedgerEntry:
 
 __all__ = [
     "NO_EXIT_CODE",
-    "OUTCOME_BY_NAME",
-    "RUNNING",
     "LedgerEntry",
     "LedgerOutcome",
     "decode_ledger_entry",

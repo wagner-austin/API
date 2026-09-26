@@ -20,7 +20,8 @@ outside exactly like work in progress.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from enum import StrEnum
+from typing import Final
 
 from platform_core.json_utils import (
     JSONObject,
@@ -29,64 +30,47 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import find_member
 from typing_extensions import TypedDict
 
-FeedKind = Literal[
-    "refused",
-    "leased",
-    "staged",
-    "started",
-    "phase",
-    "heartbeat",
-    "passed",
-    "failed",
-    "cancelled",
-    "lost",
-]
-"""What a feed line can say.
 
-``lost`` is the one that does not correspond to anything the run does. It is
-emitted by a watcher that finds a dispatch whose lease has expired with no
-terminal event, which is the observable signature of a wedge -- the run cannot
-report its own death, so something else has to.
+class FeedKind(StrEnum):
+    """What a feed line can say; each value is the word a record spells it with.
 
-``refused`` is terminal too, and deliberately on the same feed as the rest: a
-dispatch that never started because the node had no room is an outcome a
-subscriber is waiting for, and putting refusals on a separate channel is how a
-caller ends up waiting forever for a run that was never going to exist.
-"""
+    ``lost`` is the one that does not correspond to anything the run does. It
+    is emitted by a watcher that finds a dispatch whose lease has expired with
+    no terminal event, which is the observable signature of a wedge -- the run
+    cannot report its own death, so something else has to.
 
-KIND_BY_NAME: Final[dict[str, FeedKind]] = {
-    "refused": "refused",
-    "leased": "leased",
-    "staged": "staged",
-    "started": "started",
-    "phase": "phase",
-    "heartbeat": "heartbeat",
-    "passed": "passed",
-    "failed": "failed",
-    "cancelled": "cancelled",
-    "lost": "lost",
-}
-"""Every kind, keyed by the string a record spells it with.
+    ``refused`` is terminal too, and deliberately on the same feed as the
+    rest: a dispatch that never started because the node had no room is an
+    outcome a subscriber is waiting for, and putting refusals on a separate
+    channel is how a caller ends up waiting forever for a run that was never
+    going to exist.
 
-A mapping rather than a membership set plus a narrowing function, and that is
-not only brevity. Two structures would be two places to add a kind, and the
-one that gets forgotten decides whether a decode accepts a value it cannot
-type. Here the key set IS the membership test and the value IS the narrowed
-literal, so a kind that is not in this dict does not exist in either sense.
+    The enum is the one place a kind is added: its members are both the
+    membership test a decode applies and the narrowed value it returns, so a
+    kind that is not a member does not exist in either sense.
+    """
 
-Typed ``dict[str, FeedKind]``, so mypy checks every value against the Literal
-at definition. That is what makes the narrowing sound without a cast: the
-check happens once, here, rather than at each decode.
-"""
+    REFUSED = "refused"
+    LEASED = "leased"
+    STAGED = "staged"
+    STARTED = "started"
+    PHASE = "phase"
+    HEARTBEAT = "heartbeat"
+    PASSED = "passed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    LOST = "lost"
+
 
 TERMINAL_KINDS: Final[frozenset[FeedKind]] = frozenset(
-    {"refused", "passed", "failed", "cancelled", "lost"}
+    {FeedKind.REFUSED, FeedKind.PASSED, FeedKind.FAILED, FeedKind.CANCELLED, FeedKind.LOST}
 )
 """Kinds after which no further event will arrive for a run.
 
-Spelled out rather than derived from :data:`KIND_BY_NAME`, because terminality
+Spelled out rather than derived from :class:`FeedKind`, because terminality
 is not a property of being a kind -- it is a claim about each one, and the
 five here are a deliberate subset of the ten. A derivation would have to
 encode the same judgement somewhere else.
@@ -167,7 +151,7 @@ def encode_feed_event(event: FeedEvent) -> JSONObject:
         "run_id": event["run_id"],
         "node": event["node"],
         "project": event["project"],
-        "kind": event["kind"],
+        "kind": event["kind"].value,
         "detail": event["detail"],
     }
 
@@ -192,11 +176,11 @@ def decode_feed_event(value: JSONValue) -> FeedEvent:
     if not isinstance(value, dict):
         raise JSONTypeError(f"feed event must be a JSON object, got {type(value).__name__}")
     spelling = require_str(value, "kind")
-    kind = KIND_BY_NAME.get(spelling)
+    kind = find_member(spelling, FeedKind)
     if kind is None:
         raise JSONTypeError(
             f"feed event kind {spelling!r} is not one of "
-            f"{', '.join(sorted(KIND_BY_NAME))}; an unrecognised kind would be read as "
+            f"{', '.join(sorted(FeedKind))}; an unrecognised kind would be read as "
             "non-terminal and leave a subscriber waiting on a run that has already ended"
         )
     return FeedEvent(
@@ -210,7 +194,6 @@ def decode_feed_event(value: JSONValue) -> FeedEvent:
 
 
 __all__ = [
-    "KIND_BY_NAME",
     "TERMINAL_KINDS",
     "FeedEvent",
     "FeedKind",

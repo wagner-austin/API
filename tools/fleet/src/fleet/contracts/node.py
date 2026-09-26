@@ -15,7 +15,7 @@ measurement is about to be pinned to a card.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
@@ -27,9 +27,11 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import find_member
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
+
 
 #: The operating-system family a node runs, which decides every script a
 #: dispatch sends it: how a file is written over ssh, how a script is run by
@@ -40,11 +42,13 @@ from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_b
 #: dialect in :mod:`fleet.core.dialect`, and a third value would need a third
 #: one before it could dispatch anything. The identity registry
 #: (``fleet-mcp/fleet-nodes.json``) declares the same field under the same
-#: name, and ``fleet-nodes --registry`` reports the two disagreeing.
-NodePlatform = Literal["windows", "linux"]
+#: name, and ``fleet-nodes --registry`` reports the two disagreeing. Each
+#: member's value is the word the workspace and the registry spell it with.
+class NodePlatform(StrEnum):
+    """The operating-system family a node runs."""
 
-#: Every platform, for the decoder's refusal and the reconciler's reading.
-NODE_PLATFORMS: Final[tuple[NodePlatform, ...]] = ("windows", "linux")
+    WINDOWS = "windows"
+    LINUX = "linux"
 
 
 class NodeGpu(TypedDict):
@@ -226,7 +230,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
     gpu = node["gpu"]
     return {
         "host": node["host"],
-        "platform": node["platform"],
+        "platform": node["platform"].value,
         "stage_root": node["stage_root"],
         "logical_cores": node["logical_cores"],
         "ram_gb": node["ram_gb"],
@@ -249,7 +253,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, ``gpu`` is absent rather than explicitly null,
-            ``platform`` is not one of :data:`NODE_PLATFORMS`, or the
+            ``platform`` is not one of :class:`NodePlatform`'s words, or the
             machine's own numbers are not positive.
     """
     if not isinstance(value, dict):
@@ -304,16 +308,16 @@ def decode_node_platform(value: str) -> NodePlatform:
         The platform.
 
     Raises:
-        JSONTypeError: If it is not one of :data:`NODE_PLATFORMS`. A value
-            outside the set has no dialect, so nothing could be sent to the
-            node; refusing here is what keeps that from surfacing as a
-            script the far side cannot parse.
+        JSONTypeError: If it is not one of :class:`NodePlatform`'s words. A
+            value outside the set has no dialect, so nothing could be sent
+            to the node; refusing here is what keeps that from surfacing as
+            a script the far side cannot parse.
     """
-    for platform in NODE_PLATFORMS:
-        if value == platform:
-            return platform
+    platform = find_member(value, NodePlatform)
+    if platform is not None:
+        return platform
     raise JSONTypeError(
-        f"platform must be one of {', '.join(NODE_PLATFORMS)}, got {value!r}; each names the "
+        f"platform must be one of {', '.join(NodePlatform)}, got {value!r}; each names the "
         "script dialect every remote act uses, and a value outside the set has none"
     )
 
@@ -357,7 +361,6 @@ def describe_node(node: NodeConfig, state: NodeState) -> str:
 
 
 __all__ = [
-    "NODE_PLATFORMS",
     "NodeConfig",
     "NodeGpu",
     "NodePlatform",

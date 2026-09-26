@@ -79,7 +79,7 @@ class ProjectConfig(TypedDict):
             rather than solved: the drift surfaces as a loud remote failure
             naming the missing file, which is how this field was found.
         required_tags: What a node must carry for this suite to run on it,
-            from :data:`~fleet.contracts.tags.NODE_TAGS`; empty for a suite
+            from :class:`~fleet.contracts.tags.NodeTag`; empty for a suite
             any reachable node may run, which is every poetry project here.
             REQUIRED, never defaulted: ``slime`` (MCPs board task 41f45bd7)
             drives a real scene through Chromium on the machine's GPU with a
