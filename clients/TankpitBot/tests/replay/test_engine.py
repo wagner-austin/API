@@ -58,7 +58,7 @@ def _make_session(
 def _make_text_message(
     timestamp_ms: int,
     text: str,
-    direction: MessageDirection = "received",
+    direction: MessageDirection = MessageDirection.RECEIVED,
 ) -> CapturedMessage:
     """Create a base64-encoded text message for testing.
 
@@ -134,7 +134,9 @@ class TestReplaySessionValidation:
         """replay_session skips sent messages and returns zero ticks."""
         session = _make_session(
             [
-                _make_text_message(1000, "+1|Room|5|1,1,1,0,1,0,0|3|n|field42.gif|2026", "sent"),
+                _make_text_message(
+                    1000, "+1|Room|5|1,1,1,0,1,0,0|3|n|field42.gif|2026", MessageDirection.SENT
+                ),
             ]
         )
         result = replay_session(session)

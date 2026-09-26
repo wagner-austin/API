@@ -13,6 +13,7 @@ from tankpit_bot.replay.types import ReplayTickTraceDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types import CaptureSession, encode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 
 
@@ -329,7 +330,7 @@ class TestMainCLI:
 
         msg = CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             # A well-formed 4-byte text frame. This read "BQBUZXN0"
             # until 2026-08-06 — a length prefix claiming FIVE bytes
             # over a four-byte body, i.e. a torn frame the old inline
