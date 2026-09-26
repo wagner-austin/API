@@ -35,6 +35,7 @@ from fleet.core.runner_account import (
     render_service_running_lines,
 )
 from fleet.core.runner_keepalive import render_keepalive_lines
+from fleet.core.runner_recovery import render_windows_recovery_lines, render_wsl_recovery_lines
 
 #: The GitHub Actions runner release the rendered provision installs.
 #:
@@ -242,6 +243,7 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         f"{install['runner_name']} exited ' + $LASTEXITCODE }}",
         "}",
         *render_service_account_lines(install),
+        *render_windows_recovery_lines(install),
         *render_service_running_lines(install),
     ]
 
@@ -475,6 +477,7 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
             for entry in RUNNER_PATH_ENTRIES
         ),
         f"[ -f {directory}/.service ] || (cd {directory} && ./svc.sh install gharunner)",
+        *render_wsl_recovery_lines(install),
         f"(cd {directory} && ./svc.sh start)",
     ]
 
