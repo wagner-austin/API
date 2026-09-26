@@ -198,7 +198,13 @@ class TestLinuxScript:
         """The .path lines are executed, twice, by a real bash against a real
         file shaped as config.sh writes it: one colon-joined line. Both
         entries land once and in order, and the second run leaves the file
-        unchanged, because the provision is re-run after any roster change."""
+        unchanged, because the provision is re-run after any roster change.
+
+        The lines run from a script file, as runner_onboard delivers them
+        (``bash <file>``), never through ``bash -c``: on a host whose PATH
+        resolves bash to System32's WSL launcher, that launcher re-expands
+        its argument and turns ``s#$#`` into ``s#0#``, which the 2026-09-26
+        review re-run hit and production never can."""
         bash = shutil.which("bash")
         if bash is None:
             raise AssertionError("bash is required to execute the rendered provision lines")
@@ -217,9 +223,10 @@ class TestLinuxScript:
         runner_dir = tmp_path / "rt"
         runner_dir.mkdir()
         (runner_dir / ".path").write_bytes(b"/usr/local/bin:/usr/bin:/bin\n")
+        (tmp_path / "append-path.sh").write_bytes(("\n".join(appends) + "\n").encode())
         for _ in range(2):
             ran = subprocess.run(
-                [bash, "-c", "\n".join(appends)],
+                [bash, "append-path.sh"],
                 cwd=tmp_path,
                 capture_output=True,
                 text=True,
