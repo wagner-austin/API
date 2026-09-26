@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from typing import Final, Literal, TypedDict
+from enum import StrEnum
+from typing import Final, TypedDict
 
-ServiceName = Literal["lastfm", "spotify", "apple_music", "youtube_music"]
+
+class ServiceName(StrEnum):
+    """The music service a play, a track or a Wrapped result came from, as the wire spells it."""
+
+    LASTFM = "lastfm"
+    SPOTIFY = "spotify"
+    APPLE_MUSIC = "apple_music"
+    YOUTUBE_MUSIC = "youtube_music"
 
 
 class Track(TypedDict):

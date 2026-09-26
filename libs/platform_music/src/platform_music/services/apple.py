@@ -6,7 +6,7 @@ from typing import Protocol, runtime_checkable
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue, load_json_str
 
-from platform_music.models import PlayRecord, Track
+from platform_music.models import PlayRecord, ServiceName, Track
 from platform_music.services.protocol import MusicServiceProto
 
 
@@ -89,9 +89,9 @@ def _decode_apple_item(raw: JSONValue) -> PlayRecord:
         "title": title,
         "artist_name": artist,
         "duration_ms": int(dur),
-        "service": "apple_music",
+        "service": ServiceName.APPLE_MUSIC,
     }
-    return {"track": track, "played_at": played, "service": "apple_music"}
+    return {"track": track, "played_at": played, "service": ServiceName.APPLE_MUSIC}
 
 
 @runtime_checkable

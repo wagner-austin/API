@@ -7,6 +7,7 @@ from platform_core.job_events import decode_job_event, is_failed
 from platform_workers.testing import FakeRedis
 
 from platform_music.jobs import WrappedJobPayload, process_wrapped_job
+from platform_music.models import ServiceName
 from platform_music.services.lastfm import LastFmProto
 from platform_music.testing import hooks, make_fake_redis_client
 
@@ -33,7 +34,7 @@ def test_process_wrapped_job_system_error() -> None:
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
         "credentials": {"api_key": "x", "api_secret": "y", "session_key": "z"},
         "user_id": 7,
         "redis_url": "redis://ignored",

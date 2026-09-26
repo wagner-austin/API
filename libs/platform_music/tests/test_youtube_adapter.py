@@ -3,6 +3,7 @@ from __future__ import annotations
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 
+from platform_music.models import ServiceName
 from platform_music.services import youtube as yt
 from platform_music.testing import hooks, make_fake_youtube_http_post
 
@@ -26,7 +27,7 @@ def test_youtube_adapter_fetch_history() -> None:
     out = cli.get_listening_history(
         start_date="2024-01-01T00:00:00Z", end_date="2024-12-31T23:59:59Z"
     )
-    assert len(out) == 1 and out[0]["track"]["service"] == "youtube_music"
+    assert len(out) == 1 and out[0]["track"]["service"] is ServiceName.YOUTUBE_MUSIC
 
 
 def test_youtube_adapter_invalid() -> None:

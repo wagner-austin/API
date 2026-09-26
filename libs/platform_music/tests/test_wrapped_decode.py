@@ -4,6 +4,8 @@ import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
 
+from platform_music.error_codes import MusicWrappedErrorCode
+from platform_music.models import ServiceName
 from platform_music.wrapped import decode_wrapped_result
 
 
@@ -19,13 +21,13 @@ def test_decode_wrapped_result_success() -> None:
     }
     out = decode_wrapped_result(doc)
     assert out["year"] == 2024
-    assert out["service"] == "lastfm"
+    assert out["service"] is ServiceName.LASTFM
 
 
 def test_decode_wrapped_result_other_services() -> None:
-    for svc in ("spotify", "apple_music", "youtube_music"):
+    for svc in (ServiceName.SPOTIFY, ServiceName.APPLE_MUSIC, ServiceName.YOUTUBE_MUSIC):
         doc: JSONValue = {
-            "service": svc,
+            "service": svc.value,
             "year": 2024,
             "generated_at": "2024-12-31T00:00:00Z",
             "total_scrobbles": 1,
@@ -34,7 +36,7 @@ def test_decode_wrapped_result_other_services() -> None:
             "top_by_month": [],
         }
         out = decode_wrapped_result(doc)
-        assert out["service"] == svc
+        assert out["service"] is svc
 
 
 def test_decode_wrapped_result_invalid() -> None:
@@ -71,8 +73,13 @@ def test_decode_wrapped_invalid_service() -> None:
     raw = _valid_doc()
     doc: dict[str, JSONValue] = dict(raw)
     doc["service"] = "unknown"
-    with pytest.raises(AppError):
+    with pytest.raises(AppError) as exc_info:
         decode_wrapped_result(doc)
+    assert exc_info.value.code is MusicWrappedErrorCode.INVALID_SERVICE
+    assert exc_info.value.message == (
+        "service must be one of: apple_music, lastfm, spotify, youtube_music"
+    )
+    assert exc_info.value.http_status == 400
 
 
 def test_decode_wrapped_missing_generated_at() -> None:

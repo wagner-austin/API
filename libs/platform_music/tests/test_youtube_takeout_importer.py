@@ -8,6 +8,7 @@ from platform_music.importers.youtube_takeout import (
     parse_takeout_bytes,
     static_service_from_plays,
 )
+from platform_music.models import ServiceName
 
 
 def _sample_takeout_items() -> list[dict[str, JSONValue]]:
@@ -39,7 +40,7 @@ def test_decode_takeout_json_success() -> None:
     doc = _sample_takeout_items()
     plays = decode_takeout_json(doc)
     assert len(plays) == 2
-    assert plays[0]["service"] == "youtube_music"
+    assert plays[0]["service"] is ServiceName.YOUTUBE_MUSIC
     assert plays[0]["track"]["id"] == "vidA"
     assert plays[1]["track"]["id"] == "vidB"
 
@@ -73,4 +74,6 @@ def test_static_service_filtering_and_decode_stored() -> None:
         start_date="2024-02-01T00:00:00Z", end_date="2024-12-31T23:59:59Z", limit=None
     )
     assert len(res) == 1
+    assert plays2[0]["service"] is ServiceName.YOUTUBE_MUSIC
+    assert plays2[0]["track"]["service"] is ServiceName.YOUTUBE_MUSIC
     assert res[0]["track"]["title"] == "Song B"

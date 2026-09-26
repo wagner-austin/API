@@ -7,6 +7,7 @@ from platform_core.errors import AppError
 
 from platform_music import FakeLastFm, WrappedGenerator
 from platform_music.error_codes import MusicWrappedErrorCode
+from platform_music.models import ServiceName
 
 
 def _add_many(fake: FakeLastFm, *, year: int, count: int) -> None:
@@ -26,7 +27,7 @@ def test_generate_wrapped_success() -> None:
 
     result = gen.generate_wrapped(year=2024)
 
-    assert result["service"] == "lastfm"
+    assert result["service"] is ServiceName.LASTFM
     assert result["year"] == 2024
     assert bool(re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", result["generated_at"]))
     assert result["total_scrobbles"] == 15

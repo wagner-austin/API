@@ -4,6 +4,7 @@ import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 
+from platform_music.models import ServiceName
 from platform_music.services import apple as ap
 from platform_music.testing import hooks, make_fake_apple_http_get
 
@@ -37,7 +38,7 @@ def test_apple_adapter_fetch_history() -> None:
     out = cli.get_listening_history(
         start_date="2024-01-01T00:00:00Z", end_date="2024-12-31T23:59:59Z", limit=1
     )
-    assert len(out) == 1 and out[0]["track"]["service"] == "apple_music"
+    assert len(out) == 1 and out[0]["track"]["service"] is ServiceName.APPLE_MUSIC
 
 
 def test_apple_adapter_fetch_history_limit_above_size() -> None:

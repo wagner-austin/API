@@ -34,9 +34,9 @@ class FakeLastFm(LastFmProto):
             "title": title,
             "artist_name": artist_name,
             "duration_ms": 0,
-            "service": "lastfm",
+            "service": ServiceName.LASTFM,
         }
-        self._plays.append({"track": track, "played_at": played_at, "service": "lastfm"})
+        self._plays.append({"track": track, "played_at": played_at, "service": ServiceName.LASTFM})
 
     def get_listening_history(
         self,
@@ -72,9 +72,9 @@ class FakeSpotify(SpotifyProto):
             "title": title,
             "artist_name": artist_name,
             "duration_ms": duration_ms,
-            "service": "spotify",
+            "service": ServiceName.SPOTIFY,
         }
-        self._plays.append({"track": track, "played_at": played_at, "service": "spotify"})
+        self._plays.append({"track": track, "played_at": played_at, "service": ServiceName.SPOTIFY})
 
     def get_listening_history(
         self,
@@ -109,9 +109,11 @@ class FakeAppleMusic(AppleMusicProto):
             "title": title,
             "artist_name": artist_name,
             "duration_ms": duration_ms,
-            "service": "apple_music",
+            "service": ServiceName.APPLE_MUSIC,
         }
-        self._plays.append({"track": track, "played_at": played_at, "service": "apple_music"})
+        self._plays.append(
+            {"track": track, "played_at": played_at, "service": ServiceName.APPLE_MUSIC}
+        )
 
     def get_listening_history(
         self,
@@ -146,9 +148,11 @@ class FakeYouTubeMusic(YouTubeMusicProto):
             "title": title,
             "artist_name": artist_name,
             "duration_ms": duration_ms,
-            "service": "youtube_music",
+            "service": ServiceName.YOUTUBE_MUSIC,
         }
-        self._plays.append({"track": track, "played_at": played_at, "service": "youtube_music"})
+        self._plays.append(
+            {"track": track, "played_at": played_at, "service": ServiceName.YOUTUBE_MUSIC}
+        )
 
     def get_listening_history(
         self,

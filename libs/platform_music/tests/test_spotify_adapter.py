@@ -3,6 +3,7 @@ from __future__ import annotations
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 
+from platform_music.models import ServiceName
 from platform_music.services import spotify as sp
 from platform_music.testing import (
     hooks,
@@ -40,7 +41,7 @@ def test_spotify_adapter_fetch_history() -> None:
         start_date="2024-01-01T00:00:00Z", end_date="2024-12-31T23:59:59Z"
     )
 
-    assert len(out) == 1 and out[0]["track"]["service"] == "spotify"
+    assert len(out) == 1 and out[0]["track"]["service"] is ServiceName.SPOTIFY
 
 
 def test_spotify_adapter_invalid_json() -> None:

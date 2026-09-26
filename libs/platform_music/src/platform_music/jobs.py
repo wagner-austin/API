@@ -14,6 +14,7 @@ from platform_music.importers.youtube_takeout import (
     decode_stored_plays,
     static_service_from_plays,
 )
+from platform_music.models import ServiceName
 from platform_music.services.apple import AppleMusicProto
 from platform_music.services.lastfm import LastFmProto
 from platform_music.services.protocol import MusicServiceProto
@@ -52,7 +53,7 @@ ServiceCredentials = (
 class WrappedJobPayload(TypedDict):
     type: Literal["music_wrapped.generate.v1"]
     year: int
-    service: Literal["lastfm", "spotify", "apple_music", "youtube_music"]
+    service: ServiceName
     credentials: ServiceCredentials
     user_id: int
     redis_url: str
@@ -217,10 +218,10 @@ def process_wrapped_job(payload: WrappedJobPayload) -> str:
             return _get_youtube_client(sapisid=c["sapisid"], cookies=c["cookies"])
 
         builders = {
-            "lastfm": _build_lastfm,
-            "spotify": _build_spotify,
-            "apple_music": _build_apple,
-            "youtube_music": _build_youtube,
+            ServiceName.LASTFM: _build_lastfm,
+            ServiceName.SPOTIFY: _build_spotify,
+            ServiceName.APPLE_MUSIC: _build_apple,
+            ServiceName.YOUTUBE_MUSIC: _build_youtube,
         }
         client = builders[service](payload["credentials"])
 

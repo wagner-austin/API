@@ -7,6 +7,7 @@ from platform_workers.testing import FakeRedis
 
 from platform_music import FakeLastFm, process_wrapped_job
 from platform_music.jobs import AppleMusicCredentials, SpotifyCredentials, WrappedJobPayload
+from platform_music.models import ServiceName
 from platform_music.testing import hooks, make_fake_lastfm_client, make_fake_redis_client
 
 
@@ -29,7 +30,7 @@ def test_process_wrapped_job_success() -> None:
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
         "credentials": {"api_key": "x", "api_secret": "y", "session_key": "z"},
         "user_id": 99,
         "redis_url": "redis://ignored",
@@ -77,7 +78,7 @@ def test_process_wrapped_job_unsupported_service() -> None:
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "spotify",
+        "service": ServiceName.SPOTIFY,
         "credentials": {"api_key": "x", "api_secret": "y", "session_key": "z"},
         "user_id": 5,
         "redis_url": "redis://ignored",
@@ -107,7 +108,7 @@ def test_process_wrapped_job_invalid_lastfm_credentials() -> None:
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
         # Wrong credential type on purpose
         "credentials": bad_creds,
         "user_id": 5,
@@ -138,7 +139,7 @@ def test_process_wrapped_job_invalid_apple_credentials() -> None:
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "apple_music",
+        "service": ServiceName.APPLE_MUSIC,
         # Supply Spotify credentials to Apple to force validation error
         "credentials": bad_creds_sp,
         "user_id": 5,
@@ -168,7 +169,7 @@ def test_process_wrapped_job_invalid_youtube_credentials() -> None:
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "youtube_music",
+        "service": ServiceName.YOUTUBE_MUSIC,
         # Supply Apple credentials to YouTube to force validation error
         "credentials": bad_creds_ap,
         "user_id": 5,

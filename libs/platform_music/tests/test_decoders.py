@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from platform_music.models import ServiceName
 from platform_music.services.decoders import (
     _decode_lastfm_scrobble,
     _decode_spotify_play,
@@ -16,7 +17,7 @@ def test_decode_lastfm_scrobble_success_str_uts() -> None:
         "date": {"uts": "1704067200"},  # 2024-01-01T00:00:00Z
     }
     rec = _decode_lastfm_scrobble(raw)
-    assert rec["service"] == "lastfm"
+    assert rec["service"] is ServiceName.LASTFM
     assert rec["track"]["artist_name"] == "Artist"
     assert rec["track"]["title"] == "Song"
     assert rec["played_at"].endswith("Z")
@@ -29,7 +30,7 @@ def test_decode_lastfm_scrobble_success_int_uts() -> None:
         "date": {"uts": 1704067200},
     }
     rec = _decode_lastfm_scrobble(raw)
-    assert rec["service"] == "lastfm"
+    assert rec["service"] is ServiceName.LASTFM
 
 
 _ERR_ARTIST_TEXT = "artist.#text must be a non-empty string"
@@ -69,7 +70,7 @@ def test_decode_spotify_play_success() -> None:
         "played_at": "2024-01-01T00:00:00Z",
     }
     rec = _decode_spotify_play(raw)
-    assert rec["service"] == "spotify"
+    assert rec["service"] is ServiceName.SPOTIFY
     assert rec["track"]["id"] == "t1"
     assert rec["track"]["duration_ms"] == 120000
 

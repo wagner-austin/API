@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 from platform_core.validators import (
     load_json_dict,
     validate_int_range,
-    validate_required_literal,
     validate_str,
 )
 
@@ -26,14 +26,6 @@ from platform_music.models import (
     WrappedResult,
 )
 from platform_music.services.protocol import MusicServiceProto
-
-_SERVICE_VALUES = frozenset({"lastfm", "spotify", "apple_music", "youtube_music"})
-_SERVICE_MAP: dict[str, ServiceName] = {
-    "lastfm": "lastfm",
-    "spotify": "spotify",
-    "apple_music": "apple_music",
-    "youtube_music": "youtube_music",
-}
 
 
 def _iso_utc_now() -> str:
@@ -117,14 +109,19 @@ def decode_wrapped_result(doc: JSONValue) -> WrappedResult:
         http_status=400,
     )
 
-    service_val = validate_required_literal(
+    service_word = validate_str(
         d.get("service"),
         "service",
-        _SERVICE_VALUES,
         error_code=MusicWrappedErrorCode.INVALID_SERVICE,
         http_status=400,
     )
-    service_name = _SERVICE_MAP[service_val]
+    service_name = find_member(service_word, ServiceName)
+    if service_name is None:
+        raise AppError(
+            code=MusicWrappedErrorCode.INVALID_SERVICE,
+            message=f"service must be one of: {', '.join(sorted(ServiceName))}",
+            http_status=400,
+        )
 
     year = validate_int_range(
         d.get("year"),

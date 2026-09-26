@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from platform_music.models import ServiceName
 from platform_music.testing import (
     FakeAppleMusic,
     FakeSpotify,
@@ -60,8 +61,8 @@ def test_fake_youtube_music_limit_and_range() -> None:
 
 
 def test_make_plays_utility() -> None:
-    plays = make_plays("spotify", count=5)
+    plays = make_plays(ServiceName.SPOTIFY, count=5)
     assert len(plays) == 5
     for p in plays:
-        assert p["service"] == "spotify"
-        assert p["track"]["service"] == "spotify"
+        assert p["service"] is ServiceName.SPOTIFY
+        assert p["track"]["service"] is ServiceName.SPOTIFY

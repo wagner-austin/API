@@ -12,6 +12,7 @@ from platform_music.importers.youtube_takeout import (
     decode_takeout_json,
     parse_takeout_bytes,
 )
+from platform_music.models import ServiceName
 
 
 def test_parse_takeout_bytes_invalid_root_json() -> None:
@@ -165,3 +166,38 @@ def test_decode_stored_plays_invalid_shapes() -> None:
     }
     with pytest.raises(AppError):
         decode_stored_plays([bad_item])
+
+
+def _stored_play(play_service: str, track_service: str) -> JSONValue:
+    return {
+        "track": {
+            "id": "v1",
+            "title": "t",
+            "artist_name": "a",
+            "duration_ms": 0,
+            "service": track_service,
+        },
+        "played_at": "2024-01-01T00:00:00Z",
+        "service": play_service,
+    }
+
+
+def test_decode_stored_plays_keeps_the_stored_service() -> None:
+    plays = decode_stored_plays([_stored_play("spotify", "spotify")])
+    assert plays[0]["service"] is ServiceName.SPOTIFY
+    assert plays[0]["track"]["service"] is ServiceName.SPOTIFY
+
+
+@pytest.mark.parametrize(
+    ("play_service", "track_service"),
+    [("tidal", "youtube_music"), ("youtube_music", "tidal")],
+)
+def test_decode_stored_plays_refuses_an_unknown_service(
+    play_service: str, track_service: str
+) -> None:
+    with pytest.raises(AppError) as exc_info:
+        decode_stored_plays([_stored_play(play_service, track_service)])
+    assert exc_info.value.message == (
+        "play 0 names a service outside apple_music, lastfm, spotify, youtube_music"
+    )
+    assert exc_info.value.http_status == 400

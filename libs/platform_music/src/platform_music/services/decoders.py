@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from platform_core.json_utils import JSONTypeError, JSONValue
 
-from platform_music.models import PlayRecord, Track
+from platform_music.models import PlayRecord, ServiceName, Track
 
 
 def _iso_from_uts(uts: str | int) -> str:
@@ -57,9 +57,9 @@ def _decode_lastfm_scrobble(raw: JSONValue) -> PlayRecord:
         "title": title,
         "artist_name": artist_name,
         "duration_ms": 0,
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
     }
-    record: PlayRecord = {"track": track, "played_at": played_at, "service": "lastfm"}
+    record: PlayRecord = {"track": track, "played_at": played_at, "service": ServiceName.LASTFM}
     return record
 
 
@@ -115,9 +115,13 @@ def _decode_spotify_play(raw: JSONValue) -> PlayRecord:
         "title": name_val,
         "artist_name": artist_name_val,
         "duration_ms": dur_val,
-        "service": "spotify",
+        "service": ServiceName.SPOTIFY,
     }
-    record: PlayRecord = {"track": track, "played_at": played_at_val, "service": "spotify"}
+    record: PlayRecord = {
+        "track": track,
+        "played_at": played_at_val,
+        "service": ServiceName.SPOTIFY,
+    }
     return record
 
 

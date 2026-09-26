@@ -35,7 +35,7 @@ def _populate_fake(
 def test_process_wrapped_job_spotify_success() -> None:
     fake_redis = FakeRedis()
     fake_spotify = FakeSpotify()
-    _populate_fake(fake_spotify, "spotify")
+    _populate_fake(fake_spotify, ServiceName.SPOTIFY)
 
     hooks.redis_client = make_fake_redis_client(fake_redis)
     hooks.spotify_client = make_fake_spotify_client(fake_spotify)
@@ -43,7 +43,7 @@ def test_process_wrapped_job_spotify_success() -> None:
     p_sp: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "spotify",
+        "service": ServiceName.SPOTIFY,
         "credentials": {"access_token": "at", "refresh_token": "rt", "expires_in": 3600},
         "user_id": 1,
         "redis_url": "redis://ignored",
@@ -63,7 +63,7 @@ def test_process_wrapped_job_spotify_success() -> None:
 def test_process_wrapped_job_apple_success() -> None:
     fake_redis = FakeRedis()
     fake_apple = FakeAppleMusic()
-    _populate_fake(fake_apple, "apple_music")
+    _populate_fake(fake_apple, ServiceName.APPLE_MUSIC)
 
     hooks.redis_client = make_fake_redis_client(fake_redis)
     hooks.apple_client = make_fake_apple_client(fake_apple)
@@ -71,7 +71,7 @@ def test_process_wrapped_job_apple_success() -> None:
     p_ap: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "apple_music",
+        "service": ServiceName.APPLE_MUSIC,
         "credentials": {"developer_token": "d", "music_user_token": "u"},
         "user_id": 2,
         "redis_url": "redis://ignored",
@@ -91,7 +91,7 @@ def test_process_wrapped_job_apple_success() -> None:
 def test_process_wrapped_job_youtube_success() -> None:
     fake_redis = FakeRedis()
     fake_youtube = FakeYouTubeMusic()
-    _populate_fake(fake_youtube, "youtube_music")
+    _populate_fake(fake_youtube, ServiceName.YOUTUBE_MUSIC)
 
     hooks.redis_client = make_fake_redis_client(fake_redis)
     hooks.youtube_client = make_fake_youtube_client(fake_youtube)
@@ -99,7 +99,7 @@ def test_process_wrapped_job_youtube_success() -> None:
     p_yt: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
-        "service": "youtube_music",
+        "service": ServiceName.YOUTUBE_MUSIC,
         "credentials": {"sapisid": "sid", "cookies": "a=b"},
         "user_id": 3,
         "redis_url": "redis://ignored",

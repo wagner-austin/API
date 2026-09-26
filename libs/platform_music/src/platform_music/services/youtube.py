@@ -8,7 +8,7 @@ from typing import Protocol, runtime_checkable
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue, load_json_str
 
-from platform_music.models import PlayRecord, Track
+from platform_music.models import PlayRecord, ServiceName, Track
 from platform_music.services.protocol import MusicServiceProto
 
 
@@ -117,9 +117,9 @@ def _decode_yt_item(raw: JSONValue) -> PlayRecord:
         "title": title,
         "artist_name": artist,
         "duration_ms": int(dur) * 1000,
-        "service": "youtube_music",
+        "service": ServiceName.YOUTUBE_MUSIC,
     }
-    return {"track": track, "played_at": played, "service": "youtube_music"}
+    return {"track": track, "played_at": played, "service": ServiceName.YOUTUBE_MUSIC}
 
 
 @runtime_checkable

@@ -5,8 +5,9 @@ from typing import Protocol
 
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue, load_json_bytes, load_json_str
+from platform_core.members import find_member
 
-from platform_music.models import PlayRecord, Track
+from platform_music.models import PlayRecord, ServiceName, Track
 from platform_music.services.protocol import MusicServiceProto
 
 
@@ -67,9 +68,9 @@ def _decode_takeout_entry(raw: JSONValue) -> PlayRecord | None:
         "artist_name": artist_name,
         # Duration is not available in Takeout; default to 0
         "duration_ms": 0,
-        "service": "youtube_music",
+        "service": ServiceName.YOUTUBE_MUSIC,
     }
-    return {"track": track, "played_at": played_at, "service": "youtube_music"}
+    return {"track": track, "played_at": played_at, "service": ServiceName.YOUTUBE_MUSIC}
 
 
 def _expect_list(doc: JSONValue) -> list[JSONValue]:
@@ -210,14 +211,22 @@ def decode_stored_plays(doc: JSONValue) -> list[PlayRecord]:
             and isinstance(svc2, str)
         ):
             raise AppError(ErrorCode.INVALID_INPUT, f"play {i} has invalid fields", 400)
+        play_service = find_member(service, ServiceName)
+        track_service = find_member(svc2, ServiceName)
+        if play_service is None or track_service is None:
+            raise AppError(
+                ErrorCode.INVALID_INPUT,
+                f"play {i} names a service outside {', '.join(sorted(ServiceName))}",
+                400,
+            )
         track: Track = {
             "id": tid,
             "title": ttl,
             "artist_name": art,
             "duration_ms": int(dur),
-            "service": "youtube_music",
+            "service": track_service,
         }
-        out.append({"track": track, "played_at": played_at, "service": "youtube_music"})
+        out.append({"track": track, "played_at": played_at, "service": play_service})
     return out
 
 
