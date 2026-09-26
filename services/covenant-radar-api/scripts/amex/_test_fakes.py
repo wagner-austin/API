@@ -199,7 +199,7 @@ class FakeBackend:
         Returns:
             Backend name as BackendName literal.
         """
-        return "lightgbm"
+        return BackendName.LIGHTGBM
 
     def capabilities(self) -> BackendCapabilities:
         """Get backend capabilities.

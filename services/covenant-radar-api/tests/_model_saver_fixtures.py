@@ -73,7 +73,7 @@ class FakeClassifierBackend:
 
     def __init__(
         self,
-        backend_name_val: BackendName = "xgboost",
+        backend_name_val: BackendName = BackendName.XGBOOST,
         output_filename_override: str | None = None,
     ) -> None:
         """Initialize with configurable backend name and output filename.
@@ -384,7 +384,7 @@ def _make_fake_optimization_result(
         UnifiedOptimizationResult with specified values.
     """
     return UnifiedOptimizationResult(
-        backend="xgboost",
+        backend=BackendName.XGBOOST,
         status="complete",
         dataset=dataset,
         n_samples=1000,

@@ -158,11 +158,15 @@ def _config_for(
         this protocol does not cover.
     """
     if backend == "cleargbm":
-        return "cleargbm", _cleargbm_config(seed, GrowthStrategy.DEPTH_WISE, min_data_in_bin)
+        return BackendName.CLEARGBM, _cleargbm_config(
+            seed, GrowthStrategy.DEPTH_WISE, min_data_in_bin
+        )
     if backend == "cleargbm-leafwise":
-        return "cleargbm", _cleargbm_config(seed, GrowthStrategy.LEAF_WISE, min_data_in_bin)
+        return BackendName.CLEARGBM, _cleargbm_config(
+            seed, GrowthStrategy.LEAF_WISE, min_data_in_bin
+        )
     if backend == "lightgbm":
-        return "lightgbm", _lightgbm_config(seed)
+        return BackendName.LIGHTGBM, _lightgbm_config(seed)
     return None
 
 

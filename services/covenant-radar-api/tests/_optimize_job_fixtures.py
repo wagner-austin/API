@@ -301,7 +301,7 @@ class _FakeBackend:
     Other protocol methods raise NotImplementedError.
     """
 
-    def __init__(self, name: BackendName = "xgboost") -> None:
+    def __init__(self, name: BackendName = BackendName.XGBOOST) -> None:
         """Initialize fake backend.
 
         Args:
@@ -405,16 +405,7 @@ def _make_fake_backend_registry(backend: _FakeBackend) -> ClassifierRegistry:
         ClassifierRegistry with the fake backend registered for all 7 names.
     """
     reg = ClassifierRegistry()
-    backends: tuple[BackendName, ...] = (
-        "xgboost",
-        "mlp",
-        "lstm",
-        "lightgbm",
-        "cleargbm",
-        "logreg",
-        "random_forest",
-    )
-    for name in backends:
+    for name in BackendName:
 
         def _factory(b: _FakeBackend = backend) -> _FakeBackend:
             return b

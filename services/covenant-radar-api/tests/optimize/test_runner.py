@@ -10,6 +10,7 @@ from pathlib import Path
 
 import scripts._test_hooks as _hooks
 from covenant_ml.features import FeaturePreset
+from covenant_ml.types import BackendName
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
     PhaseProgressCallbackProtocol,
@@ -85,7 +86,9 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("xgboost", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend(
+                BackendName.XGBOOST, DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+            )
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -98,13 +101,15 @@ class TestRunBackend:
 
     def test_runs_mlp_with_hook(self) -> None:
         """Test run_backend for mlp uses optimization_runner hook."""
-        fake_result = make_fake_result(backend="mlp")
+        fake_result = make_fake_result(backend=BackendName.MLP)
         call_args: list[tuple[str, Path, Path]] = []
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("mlp", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend(
+                BackendName.MLP, DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+            )
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -114,14 +119,14 @@ class TestRunBackend:
 
     def test_runs_lightgbm_with_hook(self) -> None:
         """Test run_backend for lightgbm uses optimization_runner hook."""
-        fake_result = make_fake_result(backend="lightgbm")
+        fake_result = make_fake_result(backend=BackendName.LIGHTGBM)
         call_args: list[tuple[str, Path, Path]] = []
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
             result = run_backend(
-                "lightgbm", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+                BackendName.LIGHTGBM, DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
             )
             assert result == fake_result
             assert len(call_args) == 1
@@ -132,13 +137,15 @@ class TestRunBackend:
 
     def test_runs_lstm_with_hook(self) -> None:
         """Test run_backend for lstm uses optimization_runner hook."""
-        fake_result = make_fake_result(backend="lstm")
+        fake_result = make_fake_result(backend=BackendName.LSTM)
         call_args: list[tuple[str, Path, Path]] = []
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("lstm", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend(
+                BackendName.LSTM, DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+            )
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -148,14 +155,14 @@ class TestRunBackend:
 
     def test_runs_cleargbm_with_hook(self) -> None:
         """Test run_backend for cleargbm uses optimization_runner hook."""
-        fake_result = make_fake_result(backend="cleargbm")
+        fake_result = make_fake_result(backend=BackendName.CLEARGBM)
         call_args: list[tuple[str, Path, Path]] = []
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
             result = run_backend(
-                "cleargbm", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+                BackendName.CLEARGBM, DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
             )
             assert result == fake_result
             assert len(call_args) == 1
@@ -172,7 +179,7 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            run_backend("xgboost", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", 60)
+            run_backend(BackendName.XGBOOST, DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", 60)
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
             assert "timeout_seconds" in config_json

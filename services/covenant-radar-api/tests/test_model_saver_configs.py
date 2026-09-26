@@ -58,7 +58,7 @@ def fake_backend() -> FakeClassifierBackend:
     Returns:
         FakeClassifierBackend instance.
     """
-    return FakeClassifierBackend("xgboost")
+    return FakeClassifierBackend(BackendName.XGBOOST)
 
 
 @pytest.fixture()
@@ -76,7 +76,7 @@ def fake_backend_registry(fake_backend: FakeClassifierBackend) -> ClassifierRegi
     def factory() -> FakeClassifierBackend:
         return fake_backend
 
-    registry.register("xgboost", BackendRegistration(factory))
+    registry.register(BackendName.XGBOOST, BackendRegistration(factory))
     return registry
 
 
@@ -184,7 +184,7 @@ class TestBuildTrainConfigDispatch:
             tuple[BackendName, SampledIntParams, SampledFloatParams, SampledStringParams]
         ] = [
             (
-                "xgboost",
+                BackendName.XGBOOST,
                 SampledIntParams(max_depth=6, n_estimators=100),
                 SampledFloatParams(
                     learning_rate=0.1,
@@ -196,19 +196,19 @@ class TestBuildTrainConfigDispatch:
                 SampledStringParams(),
             ),
             (
-                "mlp",
+                BackendName.MLP,
                 SampledIntParams(n_layers=3, hidden_size=128, batch_size=64),
                 SampledFloatParams(learning_rate=0.001, dropout=0.2),
                 SampledStringParams(),
             ),
             (
-                "lstm",
+                BackendName.LSTM,
                 SampledIntParams(hidden_size=64, num_layers=2, batch_size=32),
                 SampledFloatParams(learning_rate=0.001, dropout=0.3),
                 SampledStringParams(),
             ),
             (
-                "lightgbm",
+                BackendName.LIGHTGBM,
                 SampledIntParams(
                     max_depth=-1,
                     n_estimators=100,
@@ -225,7 +225,7 @@ class TestBuildTrainConfigDispatch:
                 SampledStringParams(),
             ),
             (
-                "cleargbm",
+                BackendName.CLEARGBM,
                 SampledIntParams(
                     max_depth=5,
                     n_estimators=100,
@@ -242,13 +242,13 @@ class TestBuildTrainConfigDispatch:
                 SampledStringParams(),
             ),
             (
-                "logreg",
+                BackendName.LOGREG,
                 SampledIntParams(),
                 SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.5),
                 SampledStringParams(solver="saga", penalty="elasticnet"),
             ),
             (
-                "random_forest",
+                BackendName.RANDOM_FOREST,
                 SampledIntParams(n_estimators=200, min_samples_split=5, min_samples_leaf=2),
                 SampledFloatParams(),
                 SampledStringParams(max_features="sqrt"),
@@ -266,7 +266,7 @@ class TestBuildTrainConfigDispatch:
     def test_unknown_backend_raises(self) -> None:
         """Unknown backend raises ValueError."""
         result = _make_result_for_backend(
-            "xgboost",
+            BackendName.XGBOOST,
             SampledIntParams(max_depth=6, n_estimators=100),
             SampledFloatParams(
                 learning_rate=0.1,

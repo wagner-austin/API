@@ -31,6 +31,10 @@ from platform_core.members import require_member
 from platform_ml.explainers.types import FeatureImportanceScore
 
 from covenant_radar_api.core.model_paths import resolve_model_path
+from covenant_radar_api.worker._optimize_regression_common import (
+    SERVED_REGRESSOR_BACKENDS,
+    find_served_regressor_backend,
+)
 from covenant_radar_api.worker._regression_hooks import (
     regression_dataset_loader,
     regression_explainer_registry_factory,
@@ -98,22 +102,17 @@ def _parse_regressor_backend(raw: JSONValue) -> RegressorBackendName:
         raw: Raw JSON value.
 
     Returns:
-        Validated RegressorBackendName literal.
+        The served RegressorBackendName member.
 
     Raises:
         JSONTypeError: If value is not a valid regressor backend name.
     """
     if not isinstance(raw, str):
         raise JSONTypeError("backend must be a string")
-    if raw == "xgboost_reg":
-        return "xgboost_reg"
-    if raw == "lightgbm_reg":
-        return "lightgbm_reg"
-    if raw == "mlp_reg":
-        return "mlp_reg"
-    if raw == "lstm_reg":
-        return "lstm_reg"
-    raise JSONTypeError("backend must be one of: xgboost_reg, lightgbm_reg, mlp_reg, lstm_reg")
+    backend = find_served_regressor_backend(raw)
+    if backend is None:
+        raise JSONTypeError(f"backend must be one of: {', '.join(SERVED_REGRESSOR_BACKENDS)}")
+    return backend
 
 
 def _parse_regression_explain_config(

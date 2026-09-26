@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import OptimizerName
+from covenant_ml.types import BackendName, OptimizerName
 from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
 
 from covenant_radar_api.worker._train_external_parsers import (
@@ -28,7 +28,7 @@ class TestXGBoostConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "xgboost":
+        if result["backend"] is not BackendName.XGBOOST:
             raise AssertionError("Expected xgboost backend")
 
         assert result["dataset"] == "taiwan"
@@ -82,7 +82,7 @@ class TestXGBoostConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        assert result["backend"] == "xgboost"
+        assert result["backend"] is BackendName.XGBOOST
         assert result["config"].get("scale_pos_weight") == 2.5
 
     def test_with_custom_ratios(self) -> None:
@@ -102,7 +102,7 @@ class TestXGBoostConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "xgboost":
+        if result["backend"] is not BackendName.XGBOOST:
             raise AssertionError("Expected xgboost backend")
         assert result["config"]["train_ratio"] == 0.8
         assert result["config"]["val_ratio"] == 0.1
@@ -130,7 +130,7 @@ class TestMLPConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "mlp":
+        if result["backend"] is not BackendName.MLP:
             raise AssertionError("Expected mlp backend")
         assert result["dataset"] == "taiwan"
         assert result["config"]["learning_rate"] == 0.001
@@ -154,7 +154,7 @@ class TestMLPConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "mlp":
+        if result["backend"] is not BackendName.MLP:
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "fp16"
         assert result["config"]["optimizer"] is OptimizerName.ADAM
@@ -177,7 +177,7 @@ class TestMLPConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "mlp":
+        if result["backend"] is not BackendName.MLP:
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "bf16"
         assert result["config"]["optimizer"] is OptimizerName.SGD
@@ -200,7 +200,7 @@ class TestMLPConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "mlp":
+        if result["backend"] is not BackendName.MLP:
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "auto"
 
@@ -308,7 +308,7 @@ class TestLSTMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["dataset"] == "taiwan"
         assert result["config"]["learning_rate"] == 0.001
@@ -337,7 +337,7 @@ class TestLSTMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["precision"] == "fp16"
         assert result["config"]["bidirectional"] is False
@@ -362,7 +362,7 @@ class TestLSTMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["precision"] == "bf16"
 
@@ -386,7 +386,7 @@ class TestLSTMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["precision"] == "auto"
 

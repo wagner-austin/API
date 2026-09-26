@@ -14,6 +14,7 @@ from covenant_ml.backends.registry import ClassifierRegistry
 from covenant_ml.base_trainer import BaseTabularTrainer
 from covenant_ml.datasets import LoadedDataset
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     ClearGBMConfig,
     EvalMetrics,
@@ -213,37 +214,37 @@ def _dispatch_backend(
     Returns:
         Tuple of (config_log, train_config, metadata_builder_or_none).
     """
-    if parse_result["backend"] == "xgboost":
+    if parse_result["backend"] is BackendName.XGBOOST:
         return (
             _build_xgboost_log(parse_result["config"]),
             parse_result["config"],
             None,
         )
-    if parse_result["backend"] == "mlp":
+    if parse_result["backend"] is BackendName.MLP:
         return (
             _build_mlp_log(parse_result["config"]),
             parse_result["config"],
             _MlpMetadataBuilder(parse_result["config"]),
         )
-    if parse_result["backend"] == "lstm":
+    if parse_result["backend"] is BackendName.LSTM:
         return (
             _build_lstm_log(parse_result["config"]),
             parse_result["config"],
             _LstmMetadataBuilder(parse_result["config"]),
         )
-    if parse_result["backend"] == "lightgbm":
+    if parse_result["backend"] is BackendName.LIGHTGBM:
         return (
             _build_lightgbm_log(parse_result["config"]),
             parse_result["config"],
             _LightgbmMetadataBuilder(),
         )
-    if parse_result["backend"] == "cleargbm":
+    if parse_result["backend"] is BackendName.CLEARGBM:
         return (
             _build_cleargbm_log(parse_result["config"]),
             parse_result["config"],
             None,
         )
-    if parse_result["backend"] == "logreg":
+    if parse_result["backend"] is BackendName.LOGREG:
         return (
             _build_logreg_log(parse_result["config"]),
             parse_result["config"],

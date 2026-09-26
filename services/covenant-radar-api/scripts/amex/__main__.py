@@ -20,7 +20,7 @@ from platform_core.rich_logging import setup_rich_logging
 
 from scripts.amex._hooks import get_console, get_project_root
 from scripts.amex.pipeline import run_pipeline
-from scripts.amex.types import AMEXPipelineConfig
+from scripts.amex.types import AMEX_BACKENDS, AMEXPipelineConfig
 
 # =============================================================================
 # Types
@@ -80,7 +80,7 @@ class _ArgState:
 
     def __init__(self, project_root: Path) -> None:
         """Initialize with defaults."""
-        self.backends = ("lightgbm", "xgboost")
+        self.backends = AMEX_BACKENDS
         self.n_folds = 5
         self.n_estimators = 1000
         self.learning_rate = 0.05
@@ -133,14 +133,12 @@ def _parse_backends(val: str) -> tuple[BackendName, ...]:
     result: list[BackendName] = []
     for name in val.split(","):
         name = name.strip()
-        if name == "lightgbm":
-            result.append("lightgbm")
-        elif name == "xgboost":
-            result.append("xgboost")
-        else:
+        backend = find_member(name, BackendName)
+        if backend is None or backend not in AMEX_BACKENDS:
             console = get_console()
             console.write(f"Invalid backend: {name}. Must be lightgbm, xgboost.")
             raise SystemExit(1)
+        result.append(backend)
     return tuple(result)
 
 

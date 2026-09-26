@@ -16,6 +16,7 @@ from covenant_ml.datasets import (
     RegressionDatasetRegistry,
 )
 from covenant_ml.datasets.types import RegressionTargetSpec
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from covenant_radar_api.worker import _regression_hooks as regression_hooks
@@ -114,7 +115,7 @@ class TestParseXGBoostRegConfig:
         )
         result = parse_external_regression_train_config(config_json)
 
-        assert result["backend"] == "xgboost_reg"
+        assert result["backend"] is RegressorBackendName.XGBOOST_REG
         assert result["dataset"] == "financial_distress"
         assert result["config"]["learning_rate"] == 0.1
         assert result["config"]["max_depth"] == 3
@@ -135,7 +136,7 @@ class TestParseXGBoostRegConfig:
             }
         )
         result = parse_external_regression_train_config(config_json)
-        assert result["backend"] == "xgboost_reg"
+        assert result["backend"] is RegressorBackendName.XGBOOST_REG
 
     def test_xgboost_reg_custom_split_ratios(self) -> None:
         """Custom split ratios are parsed."""
@@ -212,7 +213,7 @@ class TestParseLightGBMRegConfig:
         )
         result = parse_external_regression_train_config(config_json)
 
-        assert result["backend"] == "lightgbm_reg"
+        assert result["backend"] is RegressorBackendName.LIGHTGBM_REG
         assert result["dataset"] == "financial_distress"
         assert result["config"]["num_leaves"] == 31
         assert result["config"]["min_child_samples"] == 20

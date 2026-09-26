@@ -13,6 +13,7 @@ from pathlib import Path
 from covenant_ml.backends.regressor_registry import (
     RegressorRegistry,
 )
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     dump_json_str,
     narrow_json_to_dict,
@@ -47,7 +48,9 @@ class TestRunExternalRegressionTraining:
         reg_hooks.regression_registry_factory = _make_fake_regression_registry
         reg_hooks.regression_dataset_loader = _make_fake_regression_loader
 
-        registry, self._fake_backend = _make_fake_regressor_registry("xgboost_reg")
+        registry, self._fake_backend = _make_fake_regressor_registry(
+            RegressorBackendName.XGBOOST_REG
+        )
 
         def _reg_factory() -> RegressorRegistry:
             return registry
@@ -113,7 +116,9 @@ class TestRunExternalRegressionTraining:
     def test_lightgbm_reg_produces_result(self, tmp_path: Path) -> None:
         """LightGBM regression training produces metadata file."""
         # Set up lightgbm_reg backend
-        lgbm_registry, _lgbm_backend = _make_fake_regressor_registry("lightgbm_reg")
+        lgbm_registry, _lgbm_backend = _make_fake_regressor_registry(
+            RegressorBackendName.LIGHTGBM_REG
+        )
 
         def _lgbm_factory() -> RegressorRegistry:
             return lgbm_registry
@@ -199,7 +204,9 @@ class TestProcessExternalRegressionTrainJob:
         reg_hooks.regression_registry_factory = _make_fake_regression_registry
         reg_hooks.regression_dataset_loader = _make_fake_regression_loader
 
-        registry, self._fake_backend = _make_fake_regressor_registry("xgboost_reg")
+        registry, self._fake_backend = _make_fake_regressor_registry(
+            RegressorBackendName.XGBOOST_REG
+        )
 
         def _reg_factory() -> RegressorRegistry:
             return registry

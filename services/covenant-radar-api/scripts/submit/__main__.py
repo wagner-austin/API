@@ -20,6 +20,14 @@ from platform_core.rich_logging import setup_rich_logging
 from scripts.submit._hooks import get_console, get_project_root
 from scripts.submit.pipeline import SubmitConfig, run_pipeline
 
+#: The backends a submission can be trained with.
+_SUBMIT_BACKENDS: tuple[BackendName, ...] = (
+    BackendName.LIGHTGBM,
+    BackendName.XGBOOST,
+    BackendName.MLP,
+    BackendName.LSTM,
+)
+
 # =============================================================================
 # Types
 # =============================================================================
@@ -72,7 +80,7 @@ class _ArgState:
 
     def __init__(self, project_root: Path) -> None:
         """Initialize with defaults."""
-        self.backend = "lightgbm"
+        self.backend = BackendName.LIGHTGBM
         self.n_estimators = 1000
         self.learning_rate = 0.05
         self.num_leaves = 31
@@ -113,19 +121,14 @@ def _parse_backend(val: str) -> BackendName:
         val: Backend name string from CLI.
 
     Returns:
-        Validated backend name literal.
+        The BackendName member, one of the submittable backends.
 
     Raises:
         SystemExit: If backend name is invalid.
     """
-    if val == "lightgbm":
-        return "lightgbm"
-    if val == "xgboost":
-        return "xgboost"
-    if val == "mlp":
-        return "mlp"
-    if val == "lstm":
-        return "lstm"
+    backend = find_member(val, BackendName)
+    if backend is not None and backend in _SUBMIT_BACKENDS:
+        return backend
     console = get_console()
     console.write(f"Invalid backend: {val}. Must be lightgbm, xgboost, mlp, lstm.")
     raise SystemExit(1)

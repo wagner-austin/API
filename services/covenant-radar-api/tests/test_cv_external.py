@@ -188,7 +188,7 @@ class _FakeCVBackend:
         return _FakePrepared()
 
     def backend_name(self) -> BackendName:
-        return "cleargbm"
+        return BackendName.CLEARGBM
 
     def capabilities(self) -> BackendCapabilities:
         raise NotImplementedError("the CV runner does not query backend capabilities")
@@ -256,8 +256,8 @@ def cv_hooks() -> Generator[_FakeCVBackend, None, None]:
         return backend
 
     classifier_registry = ClassifierRegistry()
-    classifier_registry.register("cleargbm", BackendRegistration(backend_factory))
-    classifier_registry.register("lightgbm", BackendRegistration(backend_factory))
+    classifier_registry.register(BackendName.CLEARGBM, BackendRegistration(backend_factory))
+    classifier_registry.register(BackendName.LIGHTGBM, BackendRegistration(backend_factory))
 
     def fake_classifier_registry() -> ClassifierRegistry:
         return classifier_registry

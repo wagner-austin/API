@@ -66,7 +66,7 @@ class Fake2DBackend:
 
     def backend_name(self) -> BackendName:
         """Get backend name."""
-        return "lightgbm"
+        return BackendName.LIGHTGBM
 
     def capabilities(self) -> BackendCapabilities:
         """Get capabilities."""

@@ -27,10 +27,10 @@ from covenant_radar_api.dataset_names import DatasetName
 
 # Model extensions for each backend
 MODEL_EXTENSIONS: dict[BackendName, str] = {
-    "xgboost": "ubj",
-    "mlp": "pt",
-    "lightgbm": "txt",
-    "lstm": "pt",
+    BackendName.XGBOOST: "ubj",
+    BackendName.MLP: "pt",
+    BackendName.LIGHTGBM: "txt",
+    BackendName.LSTM: "pt",
 }
 
 

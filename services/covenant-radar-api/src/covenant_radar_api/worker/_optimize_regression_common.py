@@ -14,6 +14,29 @@ from covenant_ml.datasets import RegressionLoadedDataset
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_core.members import find_member
+
+#: The regressor backends this service accepts, in the order its refusals name
+#: them. cleargbm_reg is registered in covenant_ml but is not served here.
+SERVED_REGRESSOR_BACKENDS: tuple[RegressorBackendName, ...] = (
+    RegressorBackendName.XGBOOST_REG,
+    RegressorBackendName.LIGHTGBM_REG,
+    RegressorBackendName.MLP_REG,
+    RegressorBackendName.LSTM_REG,
+)
+
+
+def find_served_regressor_backend(raw: str) -> RegressorBackendName | None:
+    """Return the served regressor backend named by ``raw``, if any.
+
+    Args:
+        raw: The candidate backend word.
+
+    Returns:
+        The member when it names a served backend, else None.
+    """
+    backend = find_member(raw, RegressorBackendName)
+    return backend if backend in SERVED_REGRESSOR_BACKENDS else None
 
 
 def parse_regressor_backend_name(raw: JSONValue | None) -> RegressorBackendName:
@@ -23,25 +46,20 @@ def parse_regressor_backend_name(raw: JSONValue | None) -> RegressorBackendName:
         raw: Raw JSON value.
 
     Returns:
-        RegressorBackendName literal.
+        The RegressorBackendName member.
 
     Raises:
         JSONTypeError: If value is not a string.
-        ValueError: If value is not a valid regressor backend.
+        ValueError: If value is not a served regressor backend.
     """
     if raw is None:
-        return "xgboost_reg"
+        return RegressorBackendName.XGBOOST_REG
     if not isinstance(raw, str):
         raise JSONTypeError("backend must be a string")
-    if raw == "xgboost_reg":
-        return "xgboost_reg"
-    if raw == "lightgbm_reg":
-        return "lightgbm_reg"
-    if raw == "mlp_reg":
-        return "mlp_reg"
-    if raw == "lstm_reg":
-        return "lstm_reg"
-    raise ValueError("backend must be one of: xgboost_reg, lightgbm_reg, mlp_reg, lstm_reg")
+    backend = find_served_regressor_backend(raw)
+    if backend is None:
+        raise ValueError(f"backend must be one of: {', '.join(SERVED_REGRESSOR_BACKENDS)}")
+    return backend
 
 
 def parse_regression_dataset_name(dataset: str) -> str:
@@ -94,6 +112,8 @@ def load_regression_dataset(
 
 
 __all__ = [
+    "SERVED_REGRESSOR_BACKENDS",
+    "find_served_regressor_backend",
     "load_regression_dataset",
     "parse_regression_dataset_name",
     "parse_regressor_backend_name",

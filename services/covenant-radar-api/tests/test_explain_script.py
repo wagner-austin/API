@@ -178,22 +178,22 @@ class TestValidateExplainerBackend:
 
     def test_valid_combinations(self) -> None:
         """Valid explainer/backend combinations are accepted."""
-        validate_explainer_backend(ExplainerName.PERMUTATION, "xgboost")
-        validate_explainer_backend(ExplainerName.SHAP_TREE, "xgboost")
-        validate_explainer_backend(ExplainerName.PERMUTATION, "mlp")
-        validate_explainer_backend(ExplainerName.GRADIENT, "mlp")
-        validate_explainer_backend(ExplainerName.INTEGRATED_GRADIENTS, "lstm")
+        validate_explainer_backend(ExplainerName.PERMUTATION, BackendName.XGBOOST)
+        validate_explainer_backend(ExplainerName.SHAP_TREE, BackendName.XGBOOST)
+        validate_explainer_backend(ExplainerName.PERMUTATION, BackendName.MLP)
+        validate_explainer_backend(ExplainerName.GRADIENT, BackendName.MLP)
+        validate_explainer_backend(ExplainerName.INTEGRATED_GRADIENTS, BackendName.LSTM)
 
     def test_invalid_gradient_on_xgboost_exits(self) -> None:
         """Gradient explainer on xgboost raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
-            validate_explainer_backend(ExplainerName.GRADIENT, "xgboost")
+            validate_explainer_backend(ExplainerName.GRADIENT, BackendName.XGBOOST)
         assert exc_info.value.code == 1
 
     def test_invalid_shap_tree_on_mlp_exits(self) -> None:
         """SHAP tree on MLP raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
-            validate_explainer_backend(ExplainerName.SHAP_TREE, "mlp")
+            validate_explainer_backend(ExplainerName.SHAP_TREE, BackendName.MLP)
         assert exc_info.value.code == 1
 
 
@@ -245,7 +245,12 @@ class TestDisplayBackendNames:
 
     def test_all_backends_have_display_names(self) -> None:
         """All backends should have display names."""
-        backends: list[BackendName] = ["xgboost", "mlp", "lightgbm", "lstm"]
+        backends: list[BackendName] = [
+            BackendName.XGBOOST,
+            BackendName.MLP,
+            BackendName.LIGHTGBM,
+            BackendName.LSTM,
+        ]
         for backend in backends:
             assert backend in BACKEND_DISPLAY_NAMES
 
@@ -306,11 +311,13 @@ class TestPrintConfig:
 
     def test_print_config_executes(self) -> None:
         """print_config executes without error."""
-        print_config("xgboost", DatasetName.TAIWAN, ExplainerName.PERMUTATION, 1000, None)
+        print_config(BackendName.XGBOOST, DatasetName.TAIWAN, ExplainerName.PERMUTATION, 1000, None)
 
     def test_print_config_with_model_path(self) -> None:
         """print_config with custom model path executes."""
-        print_config("mlp", DatasetName.US, ExplainerName.GRADIENT, 500, "/custom/path.pt")
+        print_config(
+            BackendName.MLP, DatasetName.US, ExplainerName.GRADIENT, 500, "/custom/path.pt"
+        )
 
 
 class TestPrintResult:
@@ -337,7 +344,12 @@ class TestModelExtensions:
 
     def test_all_backends_have_extensions(self) -> None:
         """All backends have model file extensions."""
-        backends: list[BackendName] = ["xgboost", "mlp", "lightgbm", "lstm"]
+        backends: list[BackendName] = [
+            BackendName.XGBOOST,
+            BackendName.MLP,
+            BackendName.LIGHTGBM,
+            BackendName.LSTM,
+        ]
         for backend in backends:
             assert backend in MODEL_EXTENSIONS
 
@@ -347,17 +359,17 @@ class TestGetDefaultModelPath:
 
     def test_xgboost_path(self) -> None:
         """XGBoost model path has .ubj extension."""
-        path = _get_default_model_path("xgboost", DatasetName.TAIWAN)
+        path = _get_default_model_path(BackendName.XGBOOST, DatasetName.TAIWAN)
         assert path.name == "taiwan_xgboost_best.ubj"
 
     def test_mlp_path(self) -> None:
         """MLP model path has .pt extension."""
-        path = _get_default_model_path("mlp", DatasetName.US)
+        path = _get_default_model_path(BackendName.MLP, DatasetName.US)
         assert path.name == "us_mlp_best.pt"
 
     def test_lightgbm_path(self) -> None:
         """LightGBM model path has .txt extension."""
-        path = _get_default_model_path("lightgbm", DatasetName.POLISH)
+        path = _get_default_model_path(BackendName.LIGHTGBM, DatasetName.POLISH)
         assert path.name == "polish_lightgbm_best.txt"
 
 
@@ -420,7 +432,12 @@ class TestBackendExplainers:
 
     def test_all_backends_have_explainer_lists(self) -> None:
         """All backends have explainer compatibility lists."""
-        backends: list[BackendName] = ["xgboost", "mlp", "lightgbm", "lstm"]
+        backends: list[BackendName] = [
+            BackendName.XGBOOST,
+            BackendName.MLP,
+            BackendName.LIGHTGBM,
+            BackendName.LSTM,
+        ]
         for backend in backends:
             assert backend in BACKEND_EXPLAINERS
             # Each backend has at least 2 compatible explainers (permutation + one other)

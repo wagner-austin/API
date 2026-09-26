@@ -24,6 +24,10 @@ from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_int_params,
     encode_sampled_string_params,
 )
+from covenant_radar_api.worker._optimize_regression_common import (
+    SERVED_REGRESSOR_BACKENDS,
+    find_served_regressor_backend,
+)
 from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_field_decoders import (
     _require_float,
@@ -49,16 +53,12 @@ def _require_regressor_backend_name(raw: JSONObject) -> RegressorBackendName:
         raise JSONTypeError("Missing required field 'backend'")
     if not isinstance(val, str):
         raise JSONTypeError("Field 'backend' must be a string")
-    valid: tuple[str, ...] = ("xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_reg")
-    if val not in valid:
-        raise JSONTypeError(f"Field 'backend' must be one of: {', '.join(valid)} (got {val})")
-    if val == "xgboost_reg":
-        return "xgboost_reg"
-    if val == "lightgbm_reg":
-        return "lightgbm_reg"
-    if val == "mlp_reg":
-        return "mlp_reg"
-    return "lstm_reg"
+    backend = find_served_regressor_backend(val)
+    if backend is None:
+        raise JSONTypeError(
+            f"Field 'backend' must be one of: {', '.join(SERVED_REGRESSOR_BACKENDS)} (got {val})"
+        )
+    return backend
 
 
 def _require_json_object(raw: JSONObject, key: str) -> JSONObject:

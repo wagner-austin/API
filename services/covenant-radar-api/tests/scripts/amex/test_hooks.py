@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from covenant_ml.datasets import AggregationStrategy, FileEncoding, FileFormat, LabelType
+from covenant_ml.types import BackendName
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
 )
@@ -74,7 +75,7 @@ class TestRegistryHook:
         registry = get_registry()
 
         # Should be able to get a backend
-        backend = registry.get("lightgbm")
+        backend = registry.get(BackendName.LIGHTGBM)
 
         # Verify backend methods work
         n_features = 10
@@ -302,7 +303,7 @@ class TestRealImplementations:
         registry = _default_registry_factory()
 
         # Verify get method works by calling it
-        backend = registry.get("lightgbm")
+        backend = registry.get(BackendName.LIGHTGBM)
         # Should return a backend with prepare method
         assert callable(backend.prepare)
 

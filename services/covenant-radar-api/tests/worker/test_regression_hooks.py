@@ -133,7 +133,7 @@ class TestRegressorObjectiveFactoryHook:
 
     def _make_config(
         self,
-        backend: RegressorBackendName = "xgboost_reg",
+        backend: RegressorBackendName = RegressorBackendName.XGBOOST_REG,
     ) -> UnifiedRegressionOptimizeParseResult:
         """Create minimal config for regression objective factory tests.
 
@@ -183,28 +183,34 @@ class TestRegressorObjectiveFactoryHook:
         """_real_regressor_objective_factory creates XGBoost regressor objective."""
         x, y, names = self._make_regression_data()
         config = self._make_config()
-        obj = _real_regressor_objective_factory("xgboost_reg", x, y, names, config)
+        obj = _real_regressor_objective_factory(
+            RegressorBackendName.XGBOOST_REG, x, y, names, config
+        )
         assert obj.n_features == 5
 
     def test_lightgbm_reg_objective(self) -> None:
         """_real_regressor_objective_factory creates LightGBM regressor objective."""
         x, y, names = self._make_regression_data()
         config = self._make_config()
-        obj = _real_regressor_objective_factory("lightgbm_reg", x, y, names, config)
+        obj = _real_regressor_objective_factory(
+            RegressorBackendName.LIGHTGBM_REG, x, y, names, config
+        )
         assert obj.n_features == 5
 
     def test_mlp_reg_objective(self) -> None:
         """_real_regressor_objective_factory creates MLP regressor objective."""
         x, y, names = self._make_regression_data()
-        config = self._make_config(backend="mlp_reg")
-        obj = _real_regressor_objective_factory("mlp_reg", x, y, names, config)
+        config = self._make_config(backend=RegressorBackendName.MLP_REG)
+        obj = _real_regressor_objective_factory(RegressorBackendName.MLP_REG, x, y, names, config)
         assert obj.n_features == 5
 
     def test_lstm_reg_objective(self) -> None:
         """_real_regressor_objective_factory creates LSTM regressor objective."""
         x, y, names = self._make_regression_data()
-        config = self._make_config(backend="lstm_reg")
-        objective = _real_regressor_objective_factory("lstm_reg", x, y, names, config)
+        config = self._make_config(backend=RegressorBackendName.LSTM_REG)
+        objective = _real_regressor_objective_factory(
+            RegressorBackendName.LSTM_REG, x, y, names, config
+        )
         assert objective.n_features == 5
 
 
@@ -232,7 +238,7 @@ class TestRegressionExplainerRegistryHook:
     def test_xgboost_reg_compatible(self) -> None:
         """xgboost_reg is compatible with permutation and shap_tree."""
         registry = _real_regression_explainer_registry()
-        compatible = registry.list_compatible_explainers("xgboost_reg")
+        compatible = registry.list_compatible_explainers(RegressorBackendName.XGBOOST_REG)
         assert "permutation" in compatible
         assert "shap_tree" in compatible
         assert "gradient" not in compatible
@@ -240,7 +246,7 @@ class TestRegressionExplainerRegistryHook:
     def test_mlp_reg_compatible(self) -> None:
         """mlp_reg is compatible with gradient, IG, and permutation."""
         registry = _real_regression_explainer_registry()
-        compatible = registry.list_compatible_explainers("mlp_reg")
+        compatible = registry.list_compatible_explainers(RegressorBackendName.MLP_REG)
         assert "gradient" in compatible
         assert "integrated_gradients" in compatible
         assert "permutation" in compatible

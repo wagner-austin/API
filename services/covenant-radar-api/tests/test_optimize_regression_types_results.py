@@ -13,6 +13,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from covenant_radar_api.worker.optimize_regression_results import (
@@ -38,7 +39,7 @@ class TestRegressionOptimizationResultEncode:
 
     def test_round_trip_lightgbm_reg(self) -> None:
         """Round-trip works for lightgbm_reg backend."""
-        original = _make_regression_optimization_result(backend="lightgbm_reg")
+        original = _make_regression_optimization_result(backend=RegressorBackendName.LIGHTGBM_REG)
         encoded = encode_unified_regression_optimization_result(original)
         decoded = decode_unified_regression_optimization_result(encoded)
         assert decoded == original
@@ -69,7 +70,7 @@ class TestRegressionOptimizationResultEncode:
     def test_round_trip_with_dart_string_params(self) -> None:
         """Round-trip works with DART boosting string params."""
         result = UnifiedRegressionOptimizationResult(
-            backend="lightgbm_reg",
+            backend=RegressorBackendName.LIGHTGBM_REG,
             status="complete",
             dataset="us_bankruptcy",
             n_samples=500,
@@ -99,7 +100,7 @@ class TestRegressionOptimizationResultEncode:
     def test_round_trip_with_xgb_booster_params(self) -> None:
         """Round-trip works with XGBoost DART booster string params."""
         result = UnifiedRegressionOptimizationResult(
-            backend="xgboost_reg",
+            backend=RegressorBackendName.XGBOOST_REG,
             status="complete",
             dataset="us_bankruptcy",
             n_samples=500,
@@ -130,7 +131,7 @@ class TestRegressionOptimizationResultEncode:
     def test_round_trip_with_all_int_params(self) -> None:
         """Round-trip works with all regression-relevant int params."""
         result = UnifiedRegressionOptimizationResult(
-            backend="lightgbm_reg",
+            backend=RegressorBackendName.LIGHTGBM_REG,
             status="complete",
             dataset="us_bankruptcy",
             n_samples=500,
@@ -160,7 +161,7 @@ class TestRegressionOptimizationResultEncode:
     def test_round_trip_with_all_float_params(self) -> None:
         """Round-trip works with all regression-relevant float params."""
         result = UnifiedRegressionOptimizationResult(
-            backend="xgboost_reg",
+            backend=RegressorBackendName.XGBOOST_REG,
             status="complete",
             dataset="us_bankruptcy",
             n_samples=500,
@@ -193,7 +194,7 @@ class TestRegressionOptimizationResultEncode:
     def test_round_trip_empty_sampled_params(self) -> None:
         """Round-trip works with empty sampled params dicts."""
         result = UnifiedRegressionOptimizationResult(
-            backend="xgboost_reg",
+            backend=RegressorBackendName.XGBOOST_REG,
             status="complete",
             dataset="us_bankruptcy",
             n_samples=100,

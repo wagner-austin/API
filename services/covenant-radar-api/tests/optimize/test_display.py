@@ -12,6 +12,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
+from covenant_ml.types import BackendName
 from scripts.optimize.display import (
     _format_delta,
     create_history_comparison_table,
@@ -39,7 +40,7 @@ class TestCreateResultTable:
     def test_creates_table_with_data(self) -> None:
         """Test table is created with result data."""
         result = make_fake_result()
-        table = create_result_table("xgboost", result, 15.5)
+        table = create_result_table(BackendName.XGBOOST, result, 15.5)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
@@ -50,42 +51,42 @@ class TestCreateHyperparamsTable:
     def test_creates_xgboost_table(self) -> None:
         """Test table is created for XGBoost hyperparameters."""
         result = make_fake_result()
-        table = create_hyperparams_table("xgboost", result)
+        table = create_hyperparams_table(BackendName.XGBOOST, result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
     def test_creates_mlp_table(self) -> None:
         """Test table is created for MLP hyperparameters."""
         result = make_fake_mlp_result()
-        table = create_hyperparams_table("mlp", result)
+        table = create_hyperparams_table(BackendName.MLP, result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
     def test_creates_lightgbm_table(self) -> None:
         """Test table is created for LightGBM hyperparameters."""
         result = make_fake_lightgbm_result()
-        table = create_hyperparams_table("lightgbm", result)
+        table = create_hyperparams_table(BackendName.LIGHTGBM, result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
     def test_creates_lstm_table(self) -> None:
         """Test table is created for LSTM hyperparameters."""
         result = make_fake_lstm_result()
-        table = create_hyperparams_table("lstm", result)
+        table = create_hyperparams_table(BackendName.LSTM, result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
     def test_creates_cleargbm_table(self) -> None:
         """Test table is created for ClearGBM hyperparameters."""
         result = make_fake_cleargbm_result()
-        table = create_hyperparams_table("cleargbm", result)
+        table = create_hyperparams_table(BackendName.CLEARGBM, result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
     def test_creates_logreg_table_with_string_params(self) -> None:
         """Test table is created for LogReg with string params."""
         result = make_fake_result(
-            backend="logreg",
+            backend=BackendName.LOGREG,
             best_int_params=SampledIntParams(),
             best_float_params=SampledFloatParams(
                 C=1.0,
@@ -97,7 +98,7 @@ class TestCreateHyperparamsTable:
                 penalty="elasticnet",
             ),
         )
-        table = create_hyperparams_table("logreg", result)
+        table = create_hyperparams_table(BackendName.LOGREG, result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
@@ -107,7 +108,7 @@ class TestPrintConfig:
 
     def test_prints_without_error(self) -> None:
         """Test print_config runs without error."""
-        print_config("xgboost", DatasetName.TAIWAN, 50, FeaturePreset.FULL, "cuda")
+        print_config(BackendName.XGBOOST, DatasetName.TAIWAN, 50, FeaturePreset.FULL, "cuda")
 
 
 class TestPrintResult:
@@ -116,7 +117,7 @@ class TestPrintResult:
     def test_prints_without_error(self) -> None:
         """Test print_result runs without error."""
         result = make_fake_result()
-        print_result("xgboost", result, 10.5)
+        print_result(BackendName.XGBOOST, result, 10.5)
 
 
 class TestPrintResultNotNewBest:
@@ -140,7 +141,7 @@ class TestPrintResultNotNewBest:
             fingerprint=None,
         )
 
-        print_result("xgboost", result, 10.5, all_time_best=all_time_best)
+        print_result(BackendName.XGBOOST, result, 10.5, all_time_best=all_time_best)
 
 
 class TestCreateHistoryComparisonTable:

@@ -159,7 +159,7 @@ class FakeBackend:
 
     def backend_name(self) -> BackendName:
         """Return backend name."""
-        return "lightgbm"
+        return BackendName.LIGHTGBM
 
     def capabilities(self) -> BackendCapabilities:
         """Return backend capabilities."""
@@ -329,7 +329,7 @@ def create_fake_registry() -> ClassifierRegistry:
     """Create a ClassifierRegistry with fake backend registered."""
     registry = ClassifierRegistry()
     registration = BackendRegistration(create_fake_backend)
-    registry.register("lightgbm", registration)
+    registry.register(BackendName.LIGHTGBM, registration)
     return registry
 
 

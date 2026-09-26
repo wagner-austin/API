@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.types import BackendName
 from covenant_nn.backends.lstm.backend import FC_STATE_PREFIX, LSTM_STATE_PREFIX
 from covenant_nn.backends.lstm.sequences import compute_features_per_step
 from numpy.typing import NDArray
@@ -34,7 +35,7 @@ class TestLoadModelForBackendLSTM:
         model_path = tmp_path / "model.pt"
         lstm_config = _create_lstm_model(model_path)
 
-        model = load_model_for_backend("lstm", str(model_path), lstm_config=lstm_config)
+        model = load_model_for_backend(BackendName.LSTM, str(model_path), lstm_config=lstm_config)
 
         # Verify model can predict
         rng = np.random.default_rng(42)
@@ -99,7 +100,7 @@ class TestLoadModelForBackendLSTM:
         _create_lstm_model(model_path)
 
         with pytest.raises(ValueError, match="lstm_config is required for LSTM backend"):
-            load_model_for_backend("lstm", str(model_path))
+            load_model_for_backend(BackendName.LSTM, str(model_path))
 
     def test_lstm_ignores_extra_state_dict_keys(self, tmp_path: Path) -> None:
         """LSTM model ignores keys that don't start with 'lstm.' or 'fc.'."""
@@ -155,7 +156,7 @@ class TestLoadModelForBackendLSTM:
         )
 
         # Should load successfully, ignoring the extra key
-        loaded = load_model_for_backend("lstm", str(model_path), lstm_config=config)
+        loaded = load_model_for_backend(BackendName.LSTM, str(model_path), lstm_config=config)
 
         rng = np.random.default_rng(42)
         x: NDArray[np.float64] = rng.random((3, n_features))
@@ -215,7 +216,7 @@ class TestLoadModelForBackendLSTM:
             sequence_length=sequence_length,
         )
 
-        loaded = load_model_for_backend("lstm", str(model_path), lstm_config=config)
+        loaded = load_model_for_backend(BackendName.LSTM, str(model_path), lstm_config=config)
 
         rng = np.random.default_rng(42)
         x: NDArray[np.float64] = rng.random((3, n_features))
@@ -274,7 +275,7 @@ class TestLoadModelForBackendLSTM:
             sequence_length=sequence_length,
         )
 
-        loaded = load_model_for_backend("lstm", str(model_path), lstm_config=config)
+        loaded = load_model_for_backend(BackendName.LSTM, str(model_path), lstm_config=config)
 
         rng = np.random.default_rng(42)
         x: NDArray[np.float64] = rng.random((3, n_features))

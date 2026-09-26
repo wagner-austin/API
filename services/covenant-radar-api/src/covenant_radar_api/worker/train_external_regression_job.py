@@ -146,9 +146,9 @@ def _get_regression_active_filename(
     Raises:
         ValueError: If backend_name is not recognized.
     """
-    if backend_name == "xgboost_reg":
+    if backend_name is RegressorBackendName.XGBOOST_REG:
         return "active_xgb_reg.ubj"
-    if backend_name == "lightgbm_reg":
+    if backend_name is RegressorBackendName.LIGHTGBM_REG:
         return "active_lgbm_reg.txt"
     raise ValueError(f"Unknown regressor backend: {backend_name}")
 
@@ -165,7 +165,7 @@ def _get_regression_meta_filename(
         Filename for the metadata JSON file, or empty string if
         the backend's format is self-describing.
     """
-    if backend_name == "lightgbm_reg":
+    if backend_name is RegressorBackendName.LIGHTGBM_REG:
         return "active_lgbm_reg_meta.json"
     # xgboost_reg uses self-describing .ubj format
     return ""
@@ -222,7 +222,7 @@ def _dispatch_regression_backend(
     Returns:
         Config log dict for structured logging.
     """
-    if parse_result["backend"] == "xgboost_reg":
+    if parse_result["backend"] is RegressorBackendName.XGBOOST_REG:
         return _build_xgboost_reg_log(parse_result["config"])
     # lightgbm_reg
     return _build_lightgbm_reg_log(parse_result["config"])

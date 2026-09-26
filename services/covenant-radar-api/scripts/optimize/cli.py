@@ -21,7 +21,13 @@ from platform_core.rich_logging import get_rich_console
 from covenant_radar_api.dataset_names import DatasetName
 
 # All backend names for "all" option
-ALL_BACKENDS: tuple[BackendName, ...] = ("xgboost", "lightgbm", "mlp", "lstm", "cleargbm")
+ALL_BACKENDS: tuple[BackendName, ...] = (
+    BackendName.XGBOOST,
+    BackendName.LIGHTGBM,
+    BackendName.MLP,
+    BackendName.LSTM,
+    BackendName.CLEARGBM,
+)
 
 
 # Feature preset descriptions
@@ -34,11 +40,11 @@ PRESET_DESCRIPTIONS: dict[FeaturePreset, str] = {
 
 # Backend descriptions for help text
 BACKEND_DESCRIPTIONS: dict[BackendName, str] = {
-    "xgboost": "Gradient boosted trees (XGBoost DMatrix API)",
-    "mlp": "Multi-layer perceptron (PyTorch)",
-    "lightgbm": "Gradient boosted trees (LightGBM)",
-    "lstm": "Long short-term memory network (PyTorch)",
-    "cleargbm": "Pure Python gradient boosting (ClearGBM, zero dependencies)",
+    BackendName.XGBOOST: "Gradient boosted trees (XGBoost DMatrix API)",
+    BackendName.MLP: "Multi-layer perceptron (PyTorch)",
+    BackendName.LIGHTGBM: "Gradient boosted trees (LightGBM)",
+    BackendName.LSTM: "Long short-term memory network (PyTorch)",
+    BackendName.CLEARGBM: "Pure Python gradient boosting (ClearGBM, zero dependencies)",
 }
 
 
@@ -71,7 +77,7 @@ class OptimizeArgs:
 
     def __init__(self) -> None:
         """Initialize with defaults."""
-        self.backends = ("xgboost",)
+        self.backends = (BackendName.XGBOOST,)
         self.dataset = DatasetName.TAIWAN
         self.n_trials = 300
         self.feature_preset = FeaturePreset.FULL
@@ -135,22 +141,15 @@ def _parse_single_backend(val: str) -> BackendName:
         val: Backend name string.
 
     Returns:
-        Validated backend name literal.
+        The BackendName member, one of ALL_BACKENDS.
 
     Raises:
         SystemExit: If backend name is invalid.
     """
+    backend = find_member(val, BackendName)
+    if backend is not None and backend in ALL_BACKENDS:
+        return backend
     console = get_rich_console()
-    if val == "xgboost":
-        return "xgboost"
-    if val == "mlp":
-        return "mlp"
-    if val == "lightgbm":
-        return "lightgbm"
-    if val == "lstm":
-        return "lstm"
-    if val == "cleargbm":
-        return "cleargbm"
     console.print(f"[red]Invalid backend: {val}.[/red]")
     console.print("[red]Must be xgboost, mlp, lightgbm, lstm, cleargbm, or all.[/red]")
     raise SystemExit(1)

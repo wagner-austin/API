@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import LogRegPenalty, LogRegSolver
+from covenant_ml.types import BackendName, LogRegPenalty, LogRegSolver
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from covenant_radar_api.worker._train_external_parsers import (
@@ -31,7 +31,7 @@ class TestLogRegConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "logreg":
+        if result["backend"] is not BackendName.LOGREG:
             raise AssertionError("Expected logreg backend")
         assert result["dataset"] == "taiwan"
         assert result["config"]["solver"] is LogRegSolver.SAGA
@@ -61,7 +61,7 @@ class TestLogRegConfig:
                 }
             )
             result = _parse_external_train_config(config_json)
-            if result["backend"] != "logreg":
+            if result["backend"] is not BackendName.LOGREG:
                 raise AssertionError("Expected logreg backend")
             assert result["config"]["solver"] == solver
 
@@ -83,7 +83,7 @@ class TestLogRegConfig:
                 }
             )
             result = _parse_external_train_config(config_json)
-            if result["backend"] != "logreg":
+            if result["backend"] is not BackendName.LOGREG:
                 raise AssertionError("Expected logreg backend")
             assert result["config"]["penalty"] == penalty
 
@@ -103,7 +103,7 @@ class TestLogRegConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "logreg":
+        if result["backend"] is not BackendName.LOGREG:
             raise AssertionError("Expected logreg backend")
         assert result["config"]["l1_ratio"] == 0.0
 
@@ -181,7 +181,7 @@ class TestRandomForestConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["dataset"] == "taiwan"
         assert result["config"]["n_estimators"] == 100
@@ -212,7 +212,7 @@ class TestRandomForestConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["max_depth"] is None
         assert result["config"]["max_features"] == "log2"
@@ -234,7 +234,7 @@ class TestRandomForestConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["max_features"] == 0.7
         assert result["config"]["bootstrap"] is False
@@ -256,7 +256,7 @@ class TestRandomForestConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["max_features"] == 10
 
@@ -277,7 +277,7 @@ class TestRandomForestConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["max_features"] is None
 
@@ -299,7 +299,7 @@ class TestRandomForestConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["oob_score"] is True
 

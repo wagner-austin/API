@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from covenant_ml.types import (
+    BackendName,
     ClearGBMConfig,
     LightGBMConfig,
     LogRegConfig,
@@ -283,7 +284,7 @@ def _parse_lstm_config(
 class XGBoostParseResult(TypedDict, total=True):
     """Result of parsing XGBoost config."""
 
-    backend: Literal["xgboost"]
+    backend: Literal[BackendName.XGBOOST]
     config: TrainConfig
     dataset: str
 
@@ -291,7 +292,7 @@ class XGBoostParseResult(TypedDict, total=True):
 class MLPParseResult(TypedDict, total=True):
     """Result of parsing MLP config."""
 
-    backend: Literal["mlp"]
+    backend: Literal[BackendName.MLP]
     config: MLPConfig
     dataset: str
 
@@ -299,7 +300,7 @@ class MLPParseResult(TypedDict, total=True):
 class LSTMParseResult(TypedDict, total=True):
     """Result of parsing LSTM config."""
 
-    backend: Literal["lstm"]
+    backend: Literal[BackendName.LSTM]
     config: LSTMConfig
     dataset: str
 
@@ -307,7 +308,7 @@ class LSTMParseResult(TypedDict, total=True):
 class LightGBMParseResult(TypedDict, total=True):
     """Result of parsing LightGBM config."""
 
-    backend: Literal["lightgbm"]
+    backend: Literal[BackendName.LIGHTGBM]
     config: LightGBMConfig
     dataset: str
 
@@ -315,7 +316,7 @@ class LightGBMParseResult(TypedDict, total=True):
 class ClearGBMParseResult(TypedDict, total=True):
     """Result of parsing ClearGBM config."""
 
-    backend: Literal["cleargbm"]
+    backend: Literal[BackendName.CLEARGBM]
     config: ClearGBMConfig
     dataset: str
 
@@ -323,7 +324,7 @@ class ClearGBMParseResult(TypedDict, total=True):
 class LogRegParseResult(TypedDict, total=True):
     """Result of parsing LogReg config."""
 
-    backend: Literal["logreg"]
+    backend: Literal[BackendName.LOGREG]
     config: LogRegConfig
     dataset: str
 
@@ -331,7 +332,7 @@ class LogRegParseResult(TypedDict, total=True):
 class RandomForestParseResult(TypedDict, total=True):
     """Result of parsing RandomForest config."""
 
-    backend: Literal["random_forest"]
+    backend: Literal[BackendName.RANDOM_FOREST]
     config: RandomForestConfig
     dataset: str
 
@@ -402,48 +403,48 @@ def parse_external_train_config(config_json: str) -> ParseResult:
     backend_val = raw.get("backend")
     if backend_val == "mlp":
         mlp_result: MLPParseResult = {
-            "backend": "mlp",
+            "backend": BackendName.MLP,
             "config": _parse_mlp_config(raw, device, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
         return mlp_result
     if backend_val == "lstm":
         lstm_result: LSTMParseResult = {
-            "backend": "lstm",
+            "backend": BackendName.LSTM,
             "config": _parse_lstm_config(raw, device, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
         return lstm_result
     if backend_val == "lightgbm":
         lgbm_result: LightGBMParseResult = {
-            "backend": "lightgbm",
+            "backend": BackendName.LIGHTGBM,
             "config": _parse_lightgbm_config(raw, device, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
         return lgbm_result
     if backend_val == "cleargbm":
         cgbm_result: ClearGBMParseResult = {
-            "backend": "cleargbm",
+            "backend": BackendName.CLEARGBM,
             "config": _parse_cleargbm_config(raw, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
         return cgbm_result
     if backend_val == "logreg":
         lr_result: LogRegParseResult = {
-            "backend": "logreg",
+            "backend": BackendName.LOGREG,
             "config": _parse_logreg_config(raw, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
         return lr_result
     if backend_val == "random_forest":
         rf_result: RandomForestParseResult = {
-            "backend": "random_forest",
+            "backend": BackendName.RANDOM_FOREST,
             "config": _parse_random_forest_config(raw, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
         return rf_result
     xgb_result: XGBoostParseResult = {
-        "backend": "xgboost",
+        "backend": BackendName.XGBOOST,
         "config": _parse_xgboost_config(raw, device, train_ratio, val_ratio, test_ratio),
         "dataset": dataset_name,
     }

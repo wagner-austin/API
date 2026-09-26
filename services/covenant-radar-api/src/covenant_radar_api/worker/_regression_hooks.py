@@ -166,8 +166,8 @@ def _real_regressor_registry() -> RegressorRegistry:
     )
     create_mlp_reg: RegressorBackendFactory = nn_mod.create_mlp_regressor_backend
     create_lstm_reg: RegressorBackendFactory = nn_mod.create_lstm_regressor_backend
-    reg.register("mlp_reg", RegressorBackendRegistration(create_mlp_reg))
-    reg.register("lstm_reg", RegressorBackendRegistration(create_lstm_reg))
+    reg.register(RegressorBackendName.MLP_REG, RegressorBackendRegistration(create_mlp_reg))
+    reg.register(RegressorBackendName.LSTM_REG, RegressorBackendRegistration(create_lstm_reg))
     return reg
 
 

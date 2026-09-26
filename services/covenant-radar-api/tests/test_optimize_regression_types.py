@@ -35,7 +35,7 @@ class TestRegressionParseResultEncode:
 
     def test_round_trip_lightgbm_reg(self) -> None:
         """Round-trip works for lightgbm_reg backend."""
-        original = _make_regression_parse_result(backend="lightgbm_reg")
+        original = _make_regression_parse_result(backend=RegressorBackendName.LIGHTGBM_REG)
         encoded = encode_unified_regression_optimize_parse_result(original)
         decoded = decode_unified_regression_optimize_parse_result(encoded)
         assert decoded == original
@@ -91,10 +91,10 @@ class TestRegressionParseResultEncode:
     def test_round_trip_all_backends(self) -> None:
         """Round-trip works for all regressor backends."""
         backends: list[RegressorBackendName] = [
-            "xgboost_reg",
-            "lightgbm_reg",
-            "mlp_reg",
-            "lstm_reg",
+            RegressorBackendName.XGBOOST_REG,
+            RegressorBackendName.LIGHTGBM_REG,
+            RegressorBackendName.MLP_REG,
+            RegressorBackendName.LSTM_REG,
         ]
         for backend in backends:
             original = _make_regression_parse_result(backend=backend)
@@ -130,7 +130,7 @@ class TestRegressionParseResultEncode:
     def test_round_trip_cuda_device(self) -> None:
         """Round-trip works with cuda device."""
         original = UnifiedRegressionOptimizeParseResult(
-            backend="xgboost_reg",
+            backend=RegressorBackendName.XGBOOST_REG,
             dataset="us_bankruptcy",
             n_trials=50,
             timeout_seconds=None,
@@ -154,7 +154,7 @@ class TestRegressionParseResultEncode:
     def test_round_trip_auto_device(self) -> None:
         """Round-trip works with auto device."""
         original = UnifiedRegressionOptimizeParseResult(
-            backend="xgboost_reg",
+            backend=RegressorBackendName.XGBOOST_REG,
             dataset="us_bankruptcy",
             n_trials=50,
             timeout_seconds=None,

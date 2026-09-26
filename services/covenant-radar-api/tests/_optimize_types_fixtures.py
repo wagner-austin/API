@@ -17,7 +17,7 @@ from covenant_radar_api.worker.optimize_types import (
 
 
 def _make_parse_result(
-    backend: BackendName = "xgboost",
+    backend: BackendName = BackendName.XGBOOST,
     dataset: str = "taiwan",
 ) -> UnifiedOptimizeParseResult:
     """Create a valid UnifiedOptimizeParseResult for testing.
@@ -49,7 +49,7 @@ def _make_parse_result(
 
 
 def _make_optimization_result(
-    backend: BackendName = "xgboost",
+    backend: BackendName = BackendName.XGBOOST,
 ) -> UnifiedOptimizationResult:
     """Create a valid UnifiedOptimizationResult for testing.
 

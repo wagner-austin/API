@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import EvalMetrics
+from covenant_ml.types import BackendName, EvalMetrics
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.worker._train_external_parsers import (
@@ -151,31 +151,31 @@ class TestGetMetaFilename:
 
     def test_mlp(self) -> None:
         """Returns correct filename for MLP."""
-        assert _get_meta_filename("mlp") == "active_mlp_meta.json"
+        assert _get_meta_filename(BackendName.MLP) == "active_mlp_meta.json"
 
     def test_lstm(self) -> None:
         """Returns correct filename for LSTM."""
-        assert _get_meta_filename("lstm") == "active_lstm_meta.json"
+        assert _get_meta_filename(BackendName.LSTM) == "active_lstm_meta.json"
 
     def test_lightgbm(self) -> None:
         """Returns correct filename for LightGBM."""
-        assert _get_meta_filename("lightgbm") == "active_lgbm_meta.json"
+        assert _get_meta_filename(BackendName.LIGHTGBM) == "active_lgbm_meta.json"
 
     def test_logreg(self) -> None:
         """Returns correct filename for LogReg."""
-        assert _get_meta_filename("logreg") == "active_logreg_meta.json"
+        assert _get_meta_filename(BackendName.LOGREG) == "active_logreg_meta.json"
 
     def test_random_forest(self) -> None:
         """Returns correct filename for RandomForest."""
-        assert _get_meta_filename("random_forest") == "active_rf_meta.json"
+        assert _get_meta_filename(BackendName.RANDOM_FOREST) == "active_rf_meta.json"
 
     def test_xgboost(self) -> None:
         """Returns empty string for XGBoost (self-describing format)."""
-        assert _get_meta_filename("xgboost") == ""
+        assert _get_meta_filename(BackendName.XGBOOST) == ""
 
     def test_cleargbm(self) -> None:
         """Returns empty string for ClearGBM (self-describing format)."""
-        assert _get_meta_filename("cleargbm") == ""
+        assert _get_meta_filename(BackendName.CLEARGBM) == ""
 
 
 class TestGetActiveFilename:

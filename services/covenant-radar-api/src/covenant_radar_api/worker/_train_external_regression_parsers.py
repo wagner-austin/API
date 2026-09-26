@@ -13,12 +13,14 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from covenant_ml.types import LightGBMConfig, TrainConfig
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     load_json_str,
     require_str,
 )
+from platform_core.members import find_member
 
 from covenant_radar_api.worker._optimize_regression_common import (
     parse_regression_dataset_name,
@@ -46,7 +48,7 @@ class XGBoostRegParseResult(TypedDict, total=True):
         dataset: Regression dataset name.
     """
 
-    backend: Literal["xgboost_reg"]
+    backend: Literal[RegressorBackendName.XGBOOST_REG]
     config: TrainConfig
     dataset: str
 
@@ -60,7 +62,7 @@ class LightGBMRegParseResult(TypedDict, total=True):
         dataset: Regression dataset name.
     """
 
-    backend: Literal["lightgbm_reg"]
+    backend: Literal[RegressorBackendName.LIGHTGBM_REG]
     config: LightGBMConfig
     dataset: str
 
@@ -73,9 +75,15 @@ RegressionParseResult = XGBoostRegParseResult | LightGBMRegParseResult
 # =============================================================================
 
 
-def _parse_regression_train_backend(
-    raw: JSONValue | None,
-) -> Literal["xgboost_reg", "lightgbm_reg"]:
+#: The regressor backends train-external can train, in the order its refusal
+#: names them.
+_TRAINABLE_REGRESSOR_BACKENDS: tuple[RegressorBackendName, ...] = (
+    RegressorBackendName.XGBOOST_REG,
+    RegressorBackendName.LIGHTGBM_REG,
+)
+
+
+def _parse_regression_train_backend(raw: JSONValue | None) -> RegressorBackendName:
     """Parse regression train-external backend name.
 
     Only xgboost_reg and lightgbm_reg are supported for training.
@@ -84,21 +92,20 @@ def _parse_regression_train_backend(
         raw: Raw JSON value for backend field.
 
     Returns:
-        Validated regressor backend name.
+        The trainable RegressorBackendName member.
 
     Raises:
         JSONTypeError: If value is not a string.
         ValueError: If value is not a supported training backend.
     """
     if raw is None:
-        return "xgboost_reg"
+        return RegressorBackendName.XGBOOST_REG
     if not isinstance(raw, str):
         raise JSONTypeError("backend must be a string")
-    if raw == "xgboost_reg":
-        return "xgboost_reg"
-    if raw == "lightgbm_reg":
-        return "lightgbm_reg"
-    raise ValueError("backend must be one of: xgboost_reg, lightgbm_reg")
+    backend = find_member(raw, RegressorBackendName)
+    if backend is None or backend not in _TRAINABLE_REGRESSOR_BACKENDS:
+        raise ValueError(f"backend must be one of: {', '.join(_TRAINABLE_REGRESSOR_BACKENDS)}")
+    return backend
 
 
 # =============================================================================
@@ -151,9 +158,9 @@ def parse_external_regression_train_config(
     # Backend selection
     backend_name = _parse_regression_train_backend(raw.get("backend"))
 
-    if backend_name == "lightgbm_reg":
+    if backend_name is RegressorBackendName.LIGHTGBM_REG:
         lgbm_result: LightGBMRegParseResult = {
-            "backend": "lightgbm_reg",
+            "backend": RegressorBackendName.LIGHTGBM_REG,
             "config": _parse_lightgbm_config(raw, device, train_ratio, val_ratio, test_ratio),
             "dataset": dataset_name,
         }
@@ -161,7 +168,7 @@ def parse_external_regression_train_config(
 
     # xgboost_reg (default)
     xgb_result: XGBoostRegParseResult = {
-        "backend": "xgboost_reg",
+        "backend": RegressorBackendName.XGBOOST_REG,
         "config": _parse_xgboost_config(raw, device, train_ratio, val_ratio, test_ratio),
         "dataset": dataset_name,
     }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import LogRegPenalty, LogRegSolver
+from covenant_ml.types import BackendName, LogRegPenalty, LogRegSolver
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode import (
@@ -30,9 +30,9 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "lightgbm"
+        assert result["backend"] is BackendName.LIGHTGBM
         assert result["dataset"] == "taiwan"
-        if result["backend"] != "lightgbm":
+        if result["backend"] is not BackendName.LIGHTGBM:
             raise AssertionError("Expected lightgbm backend")
         assert result["config"]["learning_rate"] == 0.1
         assert result["config"]["max_depth"] == 6
@@ -67,7 +67,7 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "lightgbm":
+        if result["backend"] is not BackendName.LIGHTGBM:
             raise AssertionError("Expected lightgbm backend")
         assert result["config"]["device"] == "cuda"
         assert result["config"]["early_stopping_rounds"] == 20
@@ -90,9 +90,9 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "cleargbm"
+        assert result["backend"] is BackendName.CLEARGBM
         assert result["dataset"] == "taiwan"
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["n_estimators"] == 100
         assert result["config"]["max_depth"] == 6
@@ -125,7 +125,7 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["max_features"] is None
         assert result["config"]["monotonic_constraints"] == {
@@ -149,9 +149,9 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "logreg"
+        assert result["backend"] is BackendName.LOGREG
         assert result["dataset"] == "taiwan"
-        if result["backend"] != "logreg":
+        if result["backend"] is not BackendName.LOGREG:
             raise AssertionError("Expected logreg backend")
         assert result["config"]["solver"] is LogRegSolver.SAGA
         assert result["config"]["penalty"] is LogRegPenalty.ELASTICNET
@@ -210,9 +210,9 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "random_forest"
+        assert result["backend"] is BackendName.RANDOM_FOREST
         assert result["dataset"] == "polish"
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["n_estimators"] == 100
         assert result["config"]["max_depth"] == 10
@@ -239,7 +239,7 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["max_depth"] is None
         assert result["config"]["max_features"] == "log2"
@@ -260,7 +260,7 @@ class TestParseExternalTrainRequestTreeBackends:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "random_forest":
+        if result["backend"] is not BackendName.RANDOM_FOREST:
             raise AssertionError("Expected random_forest backend")
         assert result["config"]["max_features"] == 0.7
 

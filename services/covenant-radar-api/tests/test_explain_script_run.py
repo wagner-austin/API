@@ -141,7 +141,7 @@ class TestRunExplanation:
 
         with pytest.raises(FileNotFoundError):
             run_explanation(
-                backend="xgboost",
+                backend=BackendName.XGBOOST,
                 dataset=DatasetName.TAIWAN,
                 explainer=ExplainerName.PERMUTATION,
                 model_path="/nonexistent/model.ubj",
@@ -171,7 +171,7 @@ class TestRunExplanation:
                     return FakeExplainer()
 
                 # Only permutation is compatible with xgboost
-                backends: frozenset[BackendName] = frozenset(["mlp", "lstm"])
+                backends: frozenset[BackendName] = frozenset([BackendName.MLP, BackendName.LSTM])
                 registration = ExplainerRegistration(
                     factory=make_fake,
                     compatible_backends=backends,
@@ -184,7 +184,7 @@ class TestRunExplanation:
 
             with pytest.raises(ValueError) as exc_info:
                 run_explanation(
-                    backend="xgboost",
+                    backend=BackendName.XGBOOST,
                     dataset=DatasetName.TAIWAN,
                     explainer=ExplainerName.GRADIENT,
                     model_path=temp_path,
@@ -239,7 +239,7 @@ class TestRunExplanation:
 
             try:
                 result = run_explanation(
-                    backend="xgboost",
+                    backend=BackendName.XGBOOST,
                     dataset=DatasetName.TAIWAN,
                     explainer=ExplainerName.PERMUTATION,
                     model_path=temp_path,
@@ -273,7 +273,7 @@ class TestRunExplanation:
         # Use lstm+polish which is unlikely to have a trained model
         with pytest.raises(FileNotFoundError) as exc_info:
             run_explanation(
-                backend="lstm",
+                backend=BackendName.LSTM,
                 dataset=DatasetName.POLISH,
                 explainer=ExplainerName.PERMUTATION,
                 model_path=None,  # Use default
@@ -329,7 +329,7 @@ class TestMainValueErrorHandler:
 
                 # Register permutation with ONLY neural network backends
                 # (not xgboost), so is_compatible("permutation", "xgboost") = False
-                backends: frozenset[BackendName] = frozenset(["mlp", "lstm"])
+                backends: frozenset[BackendName] = frozenset([BackendName.MLP, BackendName.LSTM])
                 registration = ExplainerRegistration(
                     factory=make_fake,
                     compatible_backends=backends,

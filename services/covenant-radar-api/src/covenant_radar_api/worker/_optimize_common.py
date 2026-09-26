@@ -209,33 +209,20 @@ def parse_backend_name(raw: JSONValue | None) -> BackendName:
         raw: Raw JSON value.
 
     Returns:
-        BackendName literal.
+        The BackendName member.
 
     Raises:
         JSONTypeError: If value is not a string.
         ValueError: If value is not a valid backend.
     """
     if raw is None:
-        return "xgboost"
+        return BackendName.XGBOOST
     if not isinstance(raw, str):
         raise JSONTypeError("backend must be a string")
-    if raw == "xgboost":
-        return "xgboost"
-    if raw == "mlp":
-        return "mlp"
-    if raw == "lstm":
-        return "lstm"
-    if raw == "lightgbm":
-        return "lightgbm"
-    if raw == "cleargbm":
-        return "cleargbm"
-    if raw == "logreg":
-        return "logreg"
-    if raw == "random_forest":
-        return "random_forest"
-    raise ValueError(
-        "backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm, logreg, random_forest"
-    )
+    backend = find_member(raw, BackendName)
+    if backend is None:
+        raise ValueError(f"backend must be one of: {', '.join(BackendName)}")
+    return backend
 
 
 def load_dataset(

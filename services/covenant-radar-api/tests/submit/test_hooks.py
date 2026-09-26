@@ -6,6 +6,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from covenant_ml.types import BackendName
 from scripts.submit._hooks import (
     _default_console_factory,
     _default_project_root,
@@ -101,7 +102,7 @@ class TestRegistryHook:
         get_method = registry.get
         assert callable(get_method)
         # Verify it can retrieve a backend
-        backend = registry.get("lightgbm")
+        backend = registry.get(BackendName.LIGHTGBM)
         assert backend.backend_name() == "lightgbm"
 
     def test_default_registry_factory_returns_registry_with_backends(self) -> None:
@@ -111,5 +112,5 @@ class TestRegistryHook:
         get_method = registry.get
         assert callable(get_method)
         # Default registry should have backends like lightgbm
-        backend = registry.get("lightgbm")
+        backend = registry.get(BackendName.LIGHTGBM)
         assert backend.backend_name() == "lightgbm"

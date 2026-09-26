@@ -66,13 +66,13 @@ class SaveModelResult(TypedDict, total=True):
 # =============================================================================
 
 MODEL_EXTENSIONS: dict[BackendName, str] = {
-    "xgboost": "ubj",
-    "mlp": "pt",
-    "lightgbm": "txt",
-    "lstm": "pt",
-    "cleargbm": "json",
-    "logreg": "joblib",
-    "random_forest": "joblib",
+    BackendName.XGBOOST: "ubj",
+    BackendName.MLP: "pt",
+    BackendName.LIGHTGBM: "txt",
+    BackendName.LSTM: "pt",
+    BackendName.CLEARGBM: "json",
+    BackendName.LOGREG: "joblib",
+    BackendName.RANDOM_FOREST: "joblib",
 }
 
 

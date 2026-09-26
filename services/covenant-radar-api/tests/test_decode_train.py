@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode import (
@@ -361,7 +362,7 @@ class TestParseExternalRegressionTrainRequest:
         }"""
         result = parse_external_regression_train_request(body)
 
-        assert result["backend"] == "xgboost_reg"
+        assert result["backend"] is RegressorBackendName.XGBOOST_REG
         assert result["dataset"] == "financial_distress"
         assert result["config"]["learning_rate"] == 0.1
         assert result["config"]["max_depth"] == 3
@@ -385,7 +386,7 @@ class TestParseExternalRegressionTrainRequest:
         }"""
         result = parse_external_regression_train_request(body)
 
-        assert result["backend"] == "lightgbm_reg"
+        assert result["backend"] is RegressorBackendName.LIGHTGBM_REG
         assert result["config"]["num_leaves"] == 31
 
     def test_invalid_dataset_raises_value_error(self) -> None:

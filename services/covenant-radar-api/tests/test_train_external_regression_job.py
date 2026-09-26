@@ -15,6 +15,7 @@ from covenant_ml.types import (
     FeatureImportance,
     RequestedDevice,
 )
+from covenant_ml.types_regression import RegressorBackendName
 
 from covenant_radar_api.worker.train_external_regression_job import (
     _build_lightgbm_reg_log,
@@ -132,16 +133,22 @@ class TestGetRegressionActiveFilename:
 
     def test_xgboost_reg(self) -> None:
         """XGBoost regressor returns .ubj filename."""
-        assert _get_regression_active_filename("xgboost_reg") == "active_xgb_reg.ubj"
+        assert (
+            _get_regression_active_filename(RegressorBackendName.XGBOOST_REG)
+            == "active_xgb_reg.ubj"
+        )
 
     def test_lightgbm_reg(self) -> None:
         """LightGBM regressor returns .txt filename."""
-        assert _get_regression_active_filename("lightgbm_reg") == "active_lgbm_reg.txt"
+        assert (
+            _get_regression_active_filename(RegressorBackendName.LIGHTGBM_REG)
+            == "active_lgbm_reg.txt"
+        )
 
     def test_unknown_raises_value_error(self) -> None:
         """Unknown backend raises ValueError."""
         with pytest.raises(ValueError, match="Unknown regressor backend"):
-            _get_regression_active_filename("mlp_reg")
+            _get_regression_active_filename(RegressorBackendName.MLP_REG)
 
 
 class TestGetRegressionMetaFilename:
@@ -149,11 +156,14 @@ class TestGetRegressionMetaFilename:
 
     def test_xgboost_reg_empty(self) -> None:
         """XGBoost regressor has no metadata (self-describing)."""
-        assert _get_regression_meta_filename("xgboost_reg") == ""
+        assert _get_regression_meta_filename(RegressorBackendName.XGBOOST_REG) == ""
 
     def test_lightgbm_reg(self) -> None:
         """LightGBM regressor has metadata."""
-        assert _get_regression_meta_filename("lightgbm_reg") == "active_lgbm_reg_meta.json"
+        assert (
+            _get_regression_meta_filename(RegressorBackendName.LIGHTGBM_REG)
+            == "active_lgbm_reg_meta.json"
+        )
 
 
 class TestWriteRegressionModelMetadata:
@@ -161,12 +171,12 @@ class TestWriteRegressionModelMetadata:
 
     def test_xgboost_reg_returns_none(self, tmp_path: Path) -> None:
         """XGBoost regressor returns None (no metadata needed)."""
-        result = _write_regression_model_metadata("xgboost_reg", tmp_path)
+        result = _write_regression_model_metadata(RegressorBackendName.XGBOOST_REG, tmp_path)
         assert result is None
 
     def test_lightgbm_reg_writes_metadata(self, tmp_path: Path) -> None:
         """LightGBM regressor writes metadata file."""
-        result = _write_regression_model_metadata("lightgbm_reg", tmp_path)
+        result = _write_regression_model_metadata(RegressorBackendName.LIGHTGBM_REG, tmp_path)
         expected_path = tmp_path / "active_lgbm_reg_meta.json"
         assert result == expected_path
         assert expected_path.exists()
@@ -202,7 +212,7 @@ class TestDispatchRegressionBackend:
             "reg_lambda": 1.0,
         }
         parse_result: XGBoostRegParseResult = {
-            "backend": "xgboost_reg",
+            "backend": RegressorBackendName.XGBOOST_REG,
             "config": config,
             "dataset": "financial_distress",
         }
@@ -235,7 +245,7 @@ class TestDispatchRegressionBackend:
             "early_stopping_rounds": 10,
         }
         parse_result: LightGBMRegParseResult = {
-            "backend": "lightgbm_reg",
+            "backend": RegressorBackendName.LIGHTGBM_REG,
             "config": config,
             "dataset": "financial_distress",
         }

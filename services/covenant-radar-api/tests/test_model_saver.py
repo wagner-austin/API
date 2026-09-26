@@ -57,7 +57,7 @@ def fake_backend() -> FakeClassifierBackend:
     Returns:
         FakeClassifierBackend instance.
     """
-    return FakeClassifierBackend("xgboost")
+    return FakeClassifierBackend(BackendName.XGBOOST)
 
 
 @pytest.fixture()
@@ -75,7 +75,7 @@ def fake_backend_registry(fake_backend: FakeClassifierBackend) -> ClassifierRegi
     def factory() -> FakeClassifierBackend:
         return fake_backend
 
-    registry.register("xgboost", BackendRegistration(factory))
+    registry.register(BackendName.XGBOOST, BackendRegistration(factory))
     return registry
 
 
@@ -166,7 +166,7 @@ class TestLoadExistingAuc:
 
     def test_returns_none_when_no_file(self, tmp_path: Path) -> None:
         """Test returns None when metadata file doesn't exist."""
-        result = load_existing_auc(tmp_path, "taiwan", "xgboost")
+        result = load_existing_auc(tmp_path, "taiwan", BackendName.XGBOOST)
         assert result is None
 
     def test_loads_auc_from_valid_metadata(self, tmp_path: Path) -> None:
@@ -180,12 +180,17 @@ class TestLoadExistingAuc:
         }
         meta_path.write_text(dump_json_str(meta_content), encoding="utf-8")
 
-        result = load_existing_auc(tmp_path, "taiwan", "xgboost")
+        result = load_existing_auc(tmp_path, "taiwan", BackendName.XGBOOST)
         assert result == 0.8765
 
     def test_loads_for_different_backends(self, tmp_path: Path) -> None:
         """Test loads correct file for each backend type."""
-        backends: list[BackendName] = ["xgboost", "mlp", "lightgbm", "lstm"]
+        backends: list[BackendName] = [
+            BackendName.XGBOOST,
+            BackendName.MLP,
+            BackendName.LIGHTGBM,
+            BackendName.LSTM,
+        ]
         expected_aucs = [0.80, 0.82, 0.84, 0.86]
 
         for backend, auc in zip(backends, expected_aucs, strict=True):
@@ -208,7 +213,7 @@ class TestLoadExistingAuc:
             meta_path.write_text(dump_json_str(meta_content), encoding="utf-8")
 
         for dataset, expected_auc in zip(datasets, expected_aucs, strict=True):
-            result = load_existing_auc(tmp_path, dataset, "xgboost")
+            result = load_existing_auc(tmp_path, dataset, BackendName.XGBOOST)
             assert result == expected_auc
 
 
@@ -217,44 +222,35 @@ class TestModelExtensions:
 
     def test_xgboost_extension(self) -> None:
         """Test XGBoost uses .ubj extension."""
-        assert MODEL_EXTENSIONS["xgboost"] == "ubj"
+        assert MODEL_EXTENSIONS[BackendName.XGBOOST] == "ubj"
 
     def test_mlp_extension(self) -> None:
         """Test MLP uses .pt extension."""
-        assert MODEL_EXTENSIONS["mlp"] == "pt"
+        assert MODEL_EXTENSIONS[BackendName.MLP] == "pt"
 
     def test_lightgbm_extension(self) -> None:
         """Test LightGBM uses .txt extension."""
-        assert MODEL_EXTENSIONS["lightgbm"] == "txt"
+        assert MODEL_EXTENSIONS[BackendName.LIGHTGBM] == "txt"
 
     def test_lstm_extension(self) -> None:
         """Test LSTM uses .pt extension."""
-        assert MODEL_EXTENSIONS["lstm"] == "pt"
+        assert MODEL_EXTENSIONS[BackendName.LSTM] == "pt"
 
     def test_cleargbm_extension(self) -> None:
         """Test ClearGBM uses .json extension."""
-        assert MODEL_EXTENSIONS["cleargbm"] == "json"
+        assert MODEL_EXTENSIONS[BackendName.CLEARGBM] == "json"
 
     def test_logreg_extension(self) -> None:
         """Test LogReg uses .joblib extension."""
-        assert MODEL_EXTENSIONS["logreg"] == "joblib"
+        assert MODEL_EXTENSIONS[BackendName.LOGREG] == "joblib"
 
     def test_random_forest_extension(self) -> None:
         """Test RandomForest uses .joblib extension."""
-        assert MODEL_EXTENSIONS["random_forest"] == "joblib"
+        assert MODEL_EXTENSIONS[BackendName.RANDOM_FOREST] == "joblib"
 
     def test_all_backends_covered(self) -> None:
         """Test all backend names have extensions defined."""
-        backends: list[BackendName] = [
-            "xgboost",
-            "mlp",
-            "lightgbm",
-            "lstm",
-            "cleargbm",
-            "logreg",
-            "random_forest",
-        ]
-        for backend in backends:
+        for backend in BackendName:
             assert backend in MODEL_EXTENSIONS
 
 
@@ -457,7 +453,7 @@ class TestSaveBestModel:
         """
         best_filename = "taiwan_xgboost_best.ubj"
         custom_backend = FakeClassifierBackend(
-            backend_name_val="xgboost",
+            backend_name_val=BackendName.XGBOOST,
             output_filename_override=best_filename,
         )
 
@@ -466,7 +462,7 @@ class TestSaveBestModel:
         def factory() -> FakeClassifierBackend:
             return custom_backend
 
-        custom_registry.register("xgboost", BackendRegistration(factory))
+        custom_registry.register(BackendName.XGBOOST, BackendRegistration(factory))
 
         original_backend_factory = _hooks.backend_registry_factory
         original_dataset_registry = _hooks.dataset_registry_factory

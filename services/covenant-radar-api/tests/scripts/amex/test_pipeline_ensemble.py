@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from covenant_ml.datasets import AggregationStrategy
+from covenant_ml.types import BackendName
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
 )
@@ -81,7 +82,7 @@ class TestGenerateEnsemblePredictions:
         )
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm", "xgboost"),
+            backends=(BackendName.LIGHTGBM, BackendName.XGBOOST),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
@@ -138,7 +139,7 @@ class TestRunPipeline:
         test_dir.mkdir(parents=True, exist_ok=True)
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm",),
+            backends=(BackendName.LIGHTGBM,),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
@@ -223,7 +224,7 @@ class TestGenerateEnsemblePredictionsMissingModel:
         )
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm",),
+            backends=(BackendName.LIGHTGBM,),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
@@ -308,7 +309,7 @@ class TestGenerateEnsemblePredictions2D:
         )
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm",),
+            backends=(BackendName.LIGHTGBM,),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from covenant_ml.datasets import AggregationStrategy
+from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
@@ -111,7 +112,7 @@ class TestLoadTrainingData:
         from scripts.amex.pipeline import load_training_data
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm",),
+            backends=(BackendName.LIGHTGBM,),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
@@ -248,7 +249,7 @@ class TestLoadTestData:
         )
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm",),
+            backends=(BackendName.LIGHTGBM,),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
@@ -303,7 +304,7 @@ class TestTrainSingleModel:
             x=x,
             y=y,
             feature_names=feature_names,
-            backend_name="lightgbm",
+            backend_name=BackendName.LIGHTGBM,
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
@@ -352,7 +353,7 @@ class TestTrainAllModels:
         feature_names = tuple(f"f{i}" for i in range(10))
 
         config = AMEXPipelineConfig(
-            backends=("lightgbm", "xgboost"),
+            backends=(BackendName.LIGHTGBM, BackendName.XGBOOST),
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,

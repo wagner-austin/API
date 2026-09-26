@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
+from covenant_ml.types import BackendName
 from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts._test_hooks import UnifiedOptimizationResult
@@ -33,7 +34,7 @@ def _make_optimization_result(
 ) -> UnifiedOptimizationResult:
     """Create a test UnifiedOptimizationResult."""
     return UnifiedOptimizationResult(
-        backend="xgboost",
+        backend=BackendName.XGBOOST,
         status="complete",
         dataset=dataset,
         n_samples=n_samples,
@@ -65,7 +66,7 @@ def _make_history_entry(
     """Create a test UnifiedHistoryEntry."""
     return UnifiedHistoryEntry(
         timestamp="2024-01-01T00:00:00Z",
-        backend="xgboost",
+        backend=BackendName.XGBOOST,
         dataset=dataset,
         feature_preset=feature_preset,
         n_trials=50,
@@ -85,7 +86,7 @@ class TestPrintMultiDatasetSummary:
         """Test function executes when all_time_best is None (NEW path)."""
         result = _make_optimization_result(dataset=DatasetName.TAIWAN, best_value=0.85)
         run_result: RunResult = RunResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             result=result,
             elapsed=60.0,
             previous_best=None,
@@ -104,7 +105,7 @@ class TestPrintMultiDatasetSummary:
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             result=result,
             elapsed=60.0,
             previous_best=None,
@@ -123,7 +124,7 @@ class TestPrintMultiDatasetSummary:
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             result=result,
             elapsed=60.0,
             previous_best=None,
@@ -142,7 +143,7 @@ class TestPrintMultiDatasetSummary:
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             result=result,
             elapsed=60.0,
             previous_best=None,
@@ -165,7 +166,7 @@ class TestPrintMultiDatasetSummary:
             (
                 DatasetName.TAIWAN,
                 RunResult(
-                    backend="xgboost",
+                    backend=BackendName.XGBOOST,
                     result=result_taiwan,
                     elapsed=60.0,
                     previous_best=None,
@@ -176,7 +177,7 @@ class TestPrintMultiDatasetSummary:
             (
                 DatasetName.US,
                 RunResult(
-                    backend="xgboost",
+                    backend=BackendName.XGBOOST,
                     result=result_us,
                     elapsed=70.0,
                     previous_best=None,
@@ -187,7 +188,7 @@ class TestPrintMultiDatasetSummary:
             (
                 DatasetName.POLISH,
                 RunResult(
-                    backend="xgboost",
+                    backend=BackendName.XGBOOST,
                     result=result_polish,
                     elapsed=80.0,
                     previous_best=None,

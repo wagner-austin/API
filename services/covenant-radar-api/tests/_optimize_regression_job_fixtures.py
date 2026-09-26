@@ -249,7 +249,7 @@ class _FakeRegressorBackend:
     Only get_default_search_space is exercised.
     """
 
-    def __init__(self, name: RegressorBackendName = "xgboost_reg") -> None:
+    def __init__(self, name: RegressorBackendName = RegressorBackendName.XGBOOST_REG) -> None:
         """Initialize fake regressor backend.
 
         Args:
@@ -420,7 +420,12 @@ def _make_fake_regressor_registry(backend: _FakeRegressorBackend) -> RegressorRe
         RegressorRegistry with the fake backend for xgboost_reg and lightgbm_reg.
     """
     reg = RegressorRegistry()
-    names: tuple[RegressorBackendName, ...] = ("xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_reg")
+    names: tuple[RegressorBackendName, ...] = (
+        RegressorBackendName.XGBOOST_REG,
+        RegressorBackendName.LIGHTGBM_REG,
+        RegressorBackendName.MLP_REG,
+        RegressorBackendName.LSTM_REG,
+    )
     for name in names:
         _b = backend
 

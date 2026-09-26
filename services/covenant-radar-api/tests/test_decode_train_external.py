@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import OptimizerName
+from covenant_ml.types import BackendName, OptimizerName
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode import (
@@ -27,7 +27,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "xgboost"
+        assert result["backend"] is BackendName.XGBOOST
         assert result["dataset"] == "taiwan"
         assert result["config"]["learning_rate"] == 0.1
         assert result["config"]["max_depth"] == 6
@@ -56,7 +56,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "xgboost"
+        assert result["backend"] is BackendName.XGBOOST
         assert result["dataset"] == "us"
         assert result["config"]["device"] == "cpu"
         assert result["config"]["scale_pos_weight"] == 2.5
@@ -78,7 +78,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "mlp"
+        assert result["backend"] is BackendName.MLP
         assert result["dataset"] == "polish"
         assert result["config"]["learning_rate"] == 0.001
         assert result["config"]["batch_size"] == 32
@@ -110,7 +110,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "mlp"
+        assert result["backend"] is BackendName.MLP
         assert result["config"]["device"] == "cuda"
         assert result["config"]["precision"] == "fp16"
         assert result["config"]["optimizer"] is OptimizerName.ADAM
@@ -134,7 +134,7 @@ class TestParseExternalTrainRequest:
         result = parse_external_train_request(body)
 
         # Use if for type narrowing (discriminated union)
-        if result["backend"] != "mlp":
+        if result["backend"] is not BackendName.MLP:
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "bf16"
         assert result["config"]["optimizer"] is OptimizerName.SGD
@@ -157,7 +157,7 @@ class TestParseExternalTrainRequest:
         result = parse_external_train_request(body)
 
         # Use if for type narrowing (discriminated union)
-        if result["backend"] != "mlp":
+        if result["backend"] is not BackendName.MLP:
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "auto"
 
@@ -200,10 +200,10 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        assert result["backend"] == "lstm"
+        assert result["backend"] is BackendName.LSTM
         assert result["dataset"] == "taiwan"
         # Use if for type narrowing (discriminated union)
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["learning_rate"] == 0.001
         assert result["config"]["batch_size"] == 32
@@ -238,7 +238,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["device"] == "cuda"
         assert result["config"]["precision"] == "fp16"
@@ -263,7 +263,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["precision"] == "bf16"
 
@@ -286,7 +286,7 @@ class TestParseExternalTrainRequest:
         }"""
         result = parse_external_train_request(body)
 
-        if result["backend"] != "lstm":
+        if result["backend"] is not BackendName.LSTM:
             raise AssertionError("Expected lstm backend")
         assert result["config"]["precision"] == "auto"
 

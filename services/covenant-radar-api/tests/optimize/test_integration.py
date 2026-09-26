@@ -35,7 +35,7 @@ def _make_trial_info(
     best_value: float = 0.80,
     best_trial: int = 1,
     is_best: bool = True,
-    backend: BackendName = "xgboost",
+    backend: BackendName = BackendName.XGBOOST,
 ) -> TrialProgressInfo:
     """Create a unified TrialProgressInfo for testing.
 

@@ -54,16 +54,7 @@ class TestUnifiedOptimizeParseResultEncodeDecode:
 
     def test_encode_all_backends(self) -> None:
         """All 7 backends encode and decode correctly."""
-        backends: tuple[BackendName, ...] = (
-            "xgboost",
-            "mlp",
-            "lstm",
-            "lightgbm",
-            "cleargbm",
-            "logreg",
-            "random_forest",
-        )
-        for backend in backends:
+        for backend in BackendName:
             original = _make_parse_result(backend=backend)
             encoded = encode_unified_optimize_parse_result(original)
             decoded = decode_unified_optimize_parse_result(encoded)
@@ -229,7 +220,7 @@ class TestUnifiedOptimizationResultEncodeDecode:
     def test_encode_decode_empty_params(self) -> None:
         """Round-trip with empty sampled params works."""
         original = UnifiedOptimizationResult(
-            backend="mlp",
+            backend=BackendName.MLP,
             status="complete",
             dataset="us",
             n_samples=1000,
@@ -251,15 +242,7 @@ class TestUnifiedOptimizationResultEncodeDecode:
 
     def test_encode_decode_all_backends(self) -> None:
         """All 7 backends round-trip correctly."""
-        backends: tuple[BackendName, ...] = (
-            "xgboost",
-            "mlp",
-            "lstm",
-            "lightgbm",
-            "cleargbm",
-            "logreg",
-            "random_forest",
-        )
+        backends: tuple[BackendName, ...] = tuple(BackendName)
         for backend in backends:
             original = _make_optimization_result(backend=backend)
             encoded = encode_unified_optimization_result(original)

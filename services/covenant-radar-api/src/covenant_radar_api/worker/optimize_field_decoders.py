@@ -29,31 +29,10 @@ def _require_backend_name(raw: JSONObject) -> BackendName:
         raise JSONTypeError("Missing required field 'backend'")
     if not isinstance(val, str):
         raise JSONTypeError("Field 'backend' must be a string")
-    valid: tuple[str, ...] = (
-        "xgboost",
-        "mlp",
-        "lstm",
-        "lightgbm",
-        "cleargbm",
-        "logreg",
-        "random_forest",
-    )
-    if val not in valid:
-        raise JSONTypeError(f"Field 'backend' must be one of: {', '.join(valid)} (got {val})")
-    # Narrow to BackendName via explicit matching
-    if val == "xgboost":
-        return "xgboost"
-    if val == "mlp":
-        return "mlp"
-    if val == "lstm":
-        return "lstm"
-    if val == "lightgbm":
-        return "lightgbm"
-    if val == "cleargbm":
-        return "cleargbm"
-    if val == "logreg":
-        return "logreg"
-    return "random_forest"
+    backend = find_member(val, BackendName)
+    if backend is None:
+        raise JSONTypeError(f"Field 'backend' must be one of: {', '.join(BackendName)} (got {val})")
+    return backend
 
 
 def _require_device(raw: JSONObject) -> RequestedDevice:

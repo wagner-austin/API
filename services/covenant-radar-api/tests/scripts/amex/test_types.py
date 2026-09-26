@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from covenant_ml.datasets import AggregationStrategy
+from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from scripts.amex.types import (
     AMEXPipelineConfig,
@@ -44,7 +45,7 @@ class TestAMEXPipelineConfig:
     def test_create_config(self) -> None:
         """AMEXPipelineConfig can be created with all fields."""
         config = AMEXPipelineConfig(
-            backends=("lightgbm", "xgboost"),
+            backends=(BackendName.LIGHTGBM, BackendName.XGBOOST),
             n_folds=5,
             n_estimators=1000,
             learning_rate=0.05,

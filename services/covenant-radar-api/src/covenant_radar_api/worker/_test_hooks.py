@@ -23,7 +23,7 @@ from covenant_ml.datasets import (
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.explainers.registry import ExplainerRegistry
-from covenant_ml.types import PredictorProtocol
+from covenant_ml.types import BackendName, PredictorProtocol
 
 from covenant_radar_api.worker._hook_defaults import (
     _real_data_bank_uploader,
@@ -70,8 +70,8 @@ def _full_registry() -> ClassifierRegistry:
     nn_mod = __import__("covenant_nn", fromlist=["create_mlp_backend", "create_lstm_backend"])
     create_mlp: BackendFactory = nn_mod.create_mlp_backend
     create_lstm: BackendFactory = nn_mod.create_lstm_backend
-    reg.register("mlp", BackendRegistration(create_mlp))
-    reg.register("lstm", BackendRegistration(create_lstm))
+    reg.register(BackendName.MLP, BackendRegistration(create_mlp))
+    reg.register(BackendName.LSTM, BackendRegistration(create_lstm))
     return reg
 
 

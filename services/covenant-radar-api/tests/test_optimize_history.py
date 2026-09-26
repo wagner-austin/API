@@ -168,7 +168,7 @@ class TestResultToEntry:
     def test_converts_xgboost_result(self) -> None:
         """Test converting unified XGBoost result to history entry."""
         result: UnifiedOptimizationResult = UnifiedOptimizationResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             status="complete",
             dataset="us",
             n_samples=2000,
@@ -205,7 +205,7 @@ class TestResultToEntry:
     def test_converts_mlp_result(self) -> None:
         """Test converting unified MLP result to history entry."""
         result: UnifiedOptimizationResult = UnifiedOptimizationResult(
-            backend="mlp",
+            backend=BackendName.MLP,
             status="complete",
             dataset="taiwan",
             n_samples=1000,
@@ -324,7 +324,7 @@ class TestOptimizationHistoryGetPreviousBest:
         history_file.write_text(content, encoding="utf-8")
 
         history = OptimizationHistory.for_output_dir(tmp_path)
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         result: UnifiedHistoryEntry | None = history.get_previous_best(backend, dataset, preset)
@@ -334,7 +334,7 @@ class TestOptimizationHistoryGetPreviousBest:
     def test_returns_none_when_no_match(self, tmp_path: Path) -> None:
         """Test get_previous_best returns None when no matching entries."""
         history = OptimizationHistory.for_output_dir(tmp_path)
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         result = history.get_previous_best(backend, dataset, preset)
@@ -344,7 +344,7 @@ class TestOptimizationHistoryGetPreviousBest:
         """Test get_previous_best calls load if not yet loaded."""
         history = OptimizationHistory.for_output_dir(tmp_path)
         assert history._loaded is False
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         history.get_previous_best(backend, dataset, preset)
@@ -370,7 +370,7 @@ class TestOptimizationHistoryGetAllTimeBest:
         history_file.write_text(content, encoding="utf-8")
 
         history = OptimizationHistory.for_output_dir(tmp_path)
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         result: UnifiedHistoryEntry | None = history.get_all_time_best(backend, dataset, preset)
@@ -380,7 +380,7 @@ class TestOptimizationHistoryGetAllTimeBest:
     def test_returns_none_when_no_match(self, tmp_path: Path) -> None:
         """Test get_all_time_best returns None when no matching entries."""
         history = OptimizationHistory.for_output_dir(tmp_path)
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         result = history.get_all_time_best(backend, dataset, preset)
@@ -390,7 +390,7 @@ class TestOptimizationHistoryGetAllTimeBest:
         """Test get_all_time_best calls load if not yet loaded."""
         history = OptimizationHistory.for_output_dir(tmp_path)
         assert history._loaded is False
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         history.get_all_time_best(backend, dataset, preset)
@@ -429,8 +429,8 @@ class TestOptimizationHistoryGetEntriesForBackend:
         history.append(_make_history_entry(backend="xgboost"))
         history.append(_make_history_entry(backend="mlp"))
 
-        xgboost_entries = history.get_entries_for_backend("xgboost")
-        mlp_entries = history.get_entries_for_backend("mlp")
+        xgboost_entries = history.get_entries_for_backend(BackendName.XGBOOST)
+        mlp_entries = history.get_entries_for_backend(BackendName.MLP)
 
         assert len(xgboost_entries) == 1
         assert len(mlp_entries) == 1
@@ -441,7 +441,7 @@ class TestOptimizationHistoryGetEntriesForBackend:
         """Test get_entries_for_backend calls load if not yet loaded."""
         history = OptimizationHistory.for_output_dir(tmp_path)
         assert history._loaded is False
-        history.get_entries_for_backend("xgboost")
+        history.get_entries_for_backend(BackendName.XGBOOST)
         assert history._loaded is True
 
 
@@ -485,7 +485,7 @@ class TestOptimizationHistoryGetProgression:
             _make_history_entry(dataset=DatasetName.US, feature_preset=FeaturePreset.FULL)
         )
 
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         progression = history.get_progression(backend, dataset, preset)
@@ -498,7 +498,7 @@ class TestOptimizationHistoryGetProgression:
         """Test get_progression calls load if not yet loaded."""
         history = OptimizationHistory.for_output_dir(tmp_path)
         assert history._loaded is False
-        backend: BackendName = "xgboost"
+        backend: BackendName = BackendName.XGBOOST
         dataset: DatasetName = DatasetName.TAIWAN
         preset = FeaturePreset.FULL
         history.get_progression(backend, dataset, preset)

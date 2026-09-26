@@ -26,10 +26,10 @@ from scripts.explain.runner import ExplainRunResult
 # =============================================================================
 
 BACKEND_DISPLAY_NAMES: dict[BackendName, str] = {
-    "xgboost": "XGBoost",
-    "mlp": "MLP",
-    "lightgbm": "LightGBM",
-    "lstm": "LSTM",
+    BackendName.XGBOOST: "XGBoost",
+    BackendName.MLP: "MLP",
+    BackendName.LIGHTGBM: "LightGBM",
+    BackendName.LSTM: "LSTM",
 }
 
 

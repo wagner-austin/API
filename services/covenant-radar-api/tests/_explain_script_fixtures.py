@@ -39,7 +39,7 @@ def _make_fake_feature_importances(n_features: int = 10) -> list[FeatureImportan
 
 
 def _make_fake_explain_result(
-    backend: BackendName = "xgboost",
+    backend: BackendName = BackendName.XGBOOST,
     explainer: ExplainerName = ExplainerName.PERMUTATION,
     n_samples: int = 100,
     n_features: int = 10,
@@ -58,7 +58,7 @@ def _make_fake_explain_result(
 
 
 def _make_fake_run_result(
-    backend: BackendName = "xgboost",
+    backend: BackendName = BackendName.XGBOOST,
     dataset: DatasetName = DatasetName.TAIWAN,
     explainer: ExplainerName = ExplainerName.PERMUTATION,
 ) -> ExplainRunResult:
@@ -178,7 +178,9 @@ def _make_fake_explainer_registry() -> ExplainerRegistry:
         return FakeExplainer()
 
     # Register with proper ExplainerRegistration
-    backends: frozenset[BackendName] = frozenset(["xgboost", "lightgbm", "mlp", "lstm"])
+    backends: frozenset[BackendName] = frozenset(
+        [BackendName.XGBOOST, BackendName.LIGHTGBM, BackendName.MLP, BackendName.LSTM]
+    )
     registration = ExplainerRegistration(
         factory=make_fake,
         compatible_backends=backends,

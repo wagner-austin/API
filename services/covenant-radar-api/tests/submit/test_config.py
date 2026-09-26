@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from covenant_ml.datasets import AggregationStrategy
+from covenant_ml.types import BackendName
 from scripts.submit.pipeline import (
     SubmitConfig,
     _build_lightgbm_config,
@@ -75,7 +76,7 @@ class TestBuildLightGBMConfig:
     def test_build_lightgbm_config(self) -> None:
         """Test building LightGBM config."""
         submit_config = SubmitConfig(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             n_estimators=100,
             learning_rate=0.1,
             num_leaves=31,
@@ -98,7 +99,7 @@ class TestBuildXGBoostConfig:
     def test_build_xgboost_config(self) -> None:
         """Test building XGBoost config."""
         submit_config = SubmitConfig(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             n_estimators=100,
             learning_rate=0.1,
             num_leaves=31,
@@ -119,7 +120,7 @@ class TestBuildMLPConfig:
     def test_build_mlp_config(self) -> None:
         """Test building MLP config."""
         submit_config = SubmitConfig(
-            backend="mlp",
+            backend=BackendName.MLP,
             n_estimators=50,
             learning_rate=0.01,
             num_leaves=31,
@@ -140,7 +141,7 @@ class TestBuildLSTMConfig:
     def test_build_lstm_config(self) -> None:
         """Test building LSTM config."""
         submit_config = SubmitConfig(
-            backend="lstm",
+            backend=BackendName.LSTM,
             n_estimators=30,
             learning_rate=0.001,
             num_leaves=31,
@@ -161,7 +162,7 @@ class TestGetTrainConfig:
     def test_dispatcher_lightgbm(self) -> None:
         """Test dispatcher returns LightGBM config for lightgbm backend."""
         submit_config = SubmitConfig(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             n_estimators=100,
             learning_rate=0.1,
             num_leaves=31,
@@ -177,7 +178,7 @@ class TestGetTrainConfig:
     def test_dispatcher_xgboost(self) -> None:
         """Test dispatcher returns XGBoost config for xgboost backend."""
         submit_config = SubmitConfig(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             n_estimators=200,
             learning_rate=0.05,
             num_leaves=31,
@@ -193,7 +194,7 @@ class TestGetTrainConfig:
     def test_dispatcher_mlp(self) -> None:
         """Test dispatcher returns MLP config for mlp backend."""
         submit_config = SubmitConfig(
-            backend="mlp",
+            backend=BackendName.MLP,
             n_estimators=50,
             learning_rate=0.01,
             num_leaves=31,
@@ -209,7 +210,7 @@ class TestGetTrainConfig:
     def test_dispatcher_lstm(self) -> None:
         """Test dispatcher returns LSTM config for lstm backend."""
         submit_config = SubmitConfig(
-            backend="lstm",
+            backend=BackendName.LSTM,
             n_estimators=30,
             learning_rate=0.001,
             num_leaves=31,

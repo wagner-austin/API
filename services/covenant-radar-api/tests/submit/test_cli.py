@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 from covenant_ml.datasets import AggregationStrategy
+from covenant_ml.types import BackendName
 from scripts.submit.__main__ import (
     _ArgState,
     _handle_flag_arg,
@@ -81,7 +82,7 @@ class TestArgState:
     def test_argstate_to_parsed_args(self, tmp_path: Path) -> None:
         """Test _ArgState.to_parsed_args returns correct TypedDict."""
         state = _ArgState(tmp_path)
-        state.backend = "xgboost"
+        state.backend = BackendName.XGBOOST
         state.n_estimators = 500
 
         result = state.to_parsed_args()

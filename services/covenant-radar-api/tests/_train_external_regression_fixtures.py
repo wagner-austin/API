@@ -168,7 +168,7 @@ class _FakeRegressorBackend:
 
     def __init__(
         self,
-        name: RegressorBackendName = "xgboost_reg",
+        name: RegressorBackendName = RegressorBackendName.XGBOOST_REG,
     ) -> None:
         self._name = name
         self.train_calls: list[RegressorTrainConfig] = []
@@ -321,7 +321,7 @@ class _FakeRegressorBackend:
 
 
 def _make_fake_regressor_registry(
-    backend_name: RegressorBackendName = "xgboost_reg",
+    backend_name: RegressorBackendName = RegressorBackendName.XGBOOST_REG,
 ) -> tuple[RegressorRegistry, _FakeRegressorBackend]:
     """Create fake regressor registry with one backend.
 

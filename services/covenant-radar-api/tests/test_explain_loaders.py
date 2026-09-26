@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from covenant_ml.backends.registry import default_registry
+from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._explain_loaders import (
@@ -39,7 +40,7 @@ class TestLoadModelForBackendXGBoost:
         n_features = 10
         _create_xgboost_model(model_path, n_features)
 
-        model = load_model_for_backend("xgboost", str(model_path))
+        model = load_model_for_backend(BackendName.XGBOOST, str(model_path))
 
         # Verify model can predict
         rng = np.random.default_rng(42)
@@ -55,7 +56,7 @@ class TestLoadModelForBackendXGBoost:
         model_path = tmp_path / "nonexistent.ubj"
 
         with pytest.raises(FileNotFoundError, match="Model file not found"):
-            load_model_for_backend("xgboost", str(model_path))
+            load_model_for_backend(BackendName.XGBOOST, str(model_path))
 
 
 class TestLoadModelForBackendRegistryDelegation:
@@ -78,7 +79,7 @@ class TestLoadModelForBackendRegistryDelegation:
     def test_missing_file_is_reported_before_dispatch(self, tmp_path: Path) -> None:
         """A path with no model names the file, not the backend."""
         with pytest.raises(FileNotFoundError, match="Model file not found"):
-            load_model_for_backend("logreg", str(tmp_path / "absent.joblib"))
+            load_model_for_backend(BackendName.LOGREG, str(tmp_path / "absent.joblib"))
 
 
 class TestLoadModelForBackendLightGBM:
@@ -90,7 +91,7 @@ class TestLoadModelForBackendLightGBM:
         n_features = 10
         _create_lightgbm_model(model_path, n_features)
 
-        model = load_model_for_backend("lightgbm", str(model_path))
+        model = load_model_for_backend(BackendName.LIGHTGBM, str(model_path))
 
         # Verify model can predict
         rng = np.random.default_rng(42)
@@ -107,7 +108,7 @@ class TestLoadModelForBackendLightGBM:
         n_features = 10
         _create_lightgbm_model(model_path, n_features)
 
-        model = load_model_for_backend("lightgbm", str(model_path))
+        model = load_model_for_backend(BackendName.LIGHTGBM, str(model_path))
 
         rng = np.random.default_rng(42)
         x: NDArray[np.float64] = rng.random((10, n_features))
@@ -131,7 +132,7 @@ class TestLoadModelForBackendMLP:
         model_path = tmp_path / "model.pt"
         mlp_config = _create_mlp_model(model_path)
 
-        model = load_model_for_backend("mlp", str(model_path), mlp_config=mlp_config)
+        model = load_model_for_backend(BackendName.MLP, str(model_path), mlp_config=mlp_config)
 
         # Verify model can predict
         rng = np.random.default_rng(42)
@@ -162,7 +163,7 @@ class TestLoadModelForBackendMLP:
         _create_mlp_model(model_path)
 
         with pytest.raises(ValueError, match="mlp_config is required for MLP backend"):
-            load_model_for_backend("mlp", str(model_path))
+            load_model_for_backend(BackendName.MLP, str(model_path))
 
     def test_mlp_model_no_dropout(self, tmp_path: Path) -> None:
         """MLP model works with dropout=0."""
@@ -201,7 +202,7 @@ class TestLoadModelForBackendMLP:
             dropout=dropout_rate,
         )
 
-        loaded = load_model_for_backend("mlp", str(model_path), mlp_config=config)
+        loaded = load_model_for_backend(BackendName.MLP, str(model_path), mlp_config=config)
 
         rng = np.random.default_rng(42)
         x: NDArray[np.float64] = rng.random((3, n_features))

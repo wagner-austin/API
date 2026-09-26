@@ -19,6 +19,7 @@ from platform_core.json_utils import (
 )
 from platform_core.members import find_member, require_member
 
+from covenant_radar_api.worker._optimize_regression_common import parse_regressor_backend_name
 from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 
 
@@ -79,34 +80,6 @@ class RegressionOptimizeApiParseResult(TypedDict, total=True):
     random_state: int
 
 
-def _parse_regressor_backend(raw: JSONValue | None) -> RegressorBackendName:
-    """Parse regressor backend name, defaulting to 'xgboost_reg'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        RegressorBackendName literal.
-
-    Raises:
-        JSONTypeError: If value is not a string.
-        ValueError: If value is not a valid regressor backend.
-    """
-    if raw is None:
-        return "xgboost_reg"
-    if not isinstance(raw, str):
-        raise JSONTypeError("backend must be a string")
-    if raw == "xgboost_reg":
-        return "xgboost_reg"
-    if raw == "lightgbm_reg":
-        return "lightgbm_reg"
-    if raw == "mlp_reg":
-        return "mlp_reg"
-    if raw == "lstm_reg":
-        return "lstm_reg"
-    raise ValueError("backend must be one of: xgboost_reg, lightgbm_reg, mlp_reg, lstm_reg")
-
-
 def _parse_regression_dataset_name(raw: JSONObject) -> str:
     """Parse and validate regression dataset name.
 
@@ -157,7 +130,7 @@ def parse_regression_optimize_request(body: bytes) -> RegressionOptimizeApiParse
     """
     raw = _parse_body_as_dict(body)
 
-    backend = _parse_regressor_backend(raw.get("backend"))
+    backend = parse_regressor_backend_name(raw.get("backend"))
     dataset_name = _parse_regression_dataset_name(raw)
     n_trials = require_int(raw, "n_trials")
 
@@ -233,7 +206,7 @@ def parse_regression_predict_request(body: bytes) -> RegressionPredictRequest:
     """
     data = _parse_body_as_dict(body)
 
-    backend = _parse_regressor_backend(data.get("backend"))
+    backend = parse_regressor_backend_name(data.get("backend"))
     model_path = require_str(data, "model_path")
 
     features_raw = require_list(data, "features")
@@ -338,7 +311,7 @@ def parse_regression_explain_request(body: bytes) -> RegressionExplainParseResul
     backend_raw = raw.get("backend")
     if backend_raw is None:
         raise JSONTypeError("Missing required field 'backend'")
-    backend = _parse_regressor_backend(backend_raw)
+    backend = parse_regressor_backend_name(backend_raw)
 
     model_path = require_str(raw, "model_path")
 

@@ -91,7 +91,7 @@ def _isolate_project_root(tmp_path: Path) -> Generator[None, None, None]:
 
 
 def make_fake_result(
-    backend: BackendName = "xgboost",
+    backend: BackendName = BackendName.XGBOOST,
     dataset: str = "taiwan",
     feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
@@ -163,7 +163,7 @@ def make_fake_xgboost_result(
         UnifiedOptimizationResult for xgboost backend.
     """
     return make_fake_result(
-        backend="xgboost",
+        backend=BackendName.XGBOOST,
         dataset=dataset,
         feature_preset=feature_preset,
         best_value=best_value,
@@ -194,7 +194,7 @@ def make_fake_mlp_result(
         UnifiedOptimizationResult for mlp backend.
     """
     return make_fake_result(
-        backend="mlp",
+        backend=BackendName.MLP,
         dataset=dataset,
         feature_preset=feature_preset,
         best_value=best_value,
@@ -219,7 +219,7 @@ def make_fake_lightgbm_result(
         UnifiedOptimizationResult for lightgbm backend.
     """
     return make_fake_result(
-        backend="lightgbm",
+        backend=BackendName.LIGHTGBM,
         dataset=dataset,
         feature_preset=feature_preset,
         best_value=best_value,
@@ -252,7 +252,7 @@ def make_fake_lstm_result(
         UnifiedOptimizationResult for lstm backend.
     """
     return make_fake_result(
-        backend="lstm",
+        backend=BackendName.LSTM,
         dataset=dataset,
         feature_preset=feature_preset,
         best_value=best_value,
@@ -277,7 +277,7 @@ def make_fake_cleargbm_result(
         UnifiedOptimizationResult for cleargbm backend.
     """
     return make_fake_result(
-        backend="cleargbm",
+        backend=BackendName.CLEARGBM,
         dataset=dataset,
         feature_preset=feature_preset,
         best_value=best_value,
@@ -312,7 +312,7 @@ class FakeSaveModelBackend:
 
     def backend_name(self) -> BackendName:
         """Return xgboost as backend name."""
-        return "xgboost"
+        return BackendName.XGBOOST
 
     def capabilities(self) -> BackendCapabilities:
         """Return fake capabilities."""

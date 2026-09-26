@@ -14,6 +14,7 @@ from types import ModuleType
 import numpy as np
 import pytest
 from covenant_ml.datasets import AggregationStrategy
+from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from scripts.submit import _hooks as submit_hooks
 from scripts.submit.__main__ import main
@@ -73,7 +74,7 @@ class TestTrainModel:
         feature_names: tuple[str, ...] = ("f1", "f2", "f3")
 
         config = SubmitConfig(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             n_estimators=100,
             learning_rate=0.1,
             num_leaves=31,
@@ -135,7 +136,7 @@ class TestRunPipeline:
         model_output_dir.mkdir()
 
         config = SubmitConfig(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             n_estimators=100,
             learning_rate=0.1,
             num_leaves=31,
@@ -181,7 +182,7 @@ class TestRunPipeline:
         output_path = tmp_path / "output" / "submission.csv"
 
         config = SubmitConfig(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             n_estimators=100,
             learning_rate=0.1,
             num_leaves=31,

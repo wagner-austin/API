@@ -12,6 +12,9 @@ from covenant_ml.datasets import AggregationStrategy
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 
+#: The backends the AMEX pipeline trains and ensembles, and its default set.
+AMEX_BACKENDS: tuple[BackendName, ...] = (BackendName.LIGHTGBM, BackendName.XGBOOST)
+
 
 class AMEXPipelineConfig(TypedDict, total=True):
     """Configuration for AMEX competition pipeline.
@@ -104,7 +107,7 @@ def make_default_config() -> AMEXPipelineConfig:
         Default configuration matching 1st place solution approach.
     """
     return AMEXPipelineConfig(
-        backends=("lightgbm", "xgboost"),
+        backends=AMEX_BACKENDS,
         n_folds=5,
         n_estimators=1000,
         learning_rate=0.05,
@@ -118,6 +121,7 @@ def make_default_config() -> AMEXPipelineConfig:
 
 
 __all__ = [
+    "AMEX_BACKENDS",
     "AMEXPipelineConfig",
     "EnsembleResult",
     "ModelOOFResult",

@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from covenant_ml.features import FeaturePreset
 from covenant_ml.types import OptimizerName
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONTypeError,
     dump_json_str,
@@ -203,7 +204,7 @@ class TestReportRegressionPhase:
         _report_regression_phase(
             _callback,
             OptimizePhase.LOADING_DATA,
-            "xgboost_reg",
+            RegressorBackendName.XGBOOST_REG,
             "financial_distress",
             100,
             10,
@@ -219,7 +220,9 @@ class TestReportRegressionPhase:
 
     def test_none_callback_is_safe(self) -> None:
         """None callback does not raise."""
-        _report_regression_phase(None, OptimizePhase.OPTIMIZING, "xgboost_reg", "test", 50, 5)
+        _report_regression_phase(
+            None, OptimizePhase.OPTIMIZING, RegressorBackendName.XGBOOST_REG, "test", 50, 5
+        )
 
     def test_all_phases(self) -> None:
         """All four phases can be reported."""
@@ -229,7 +232,9 @@ class TestReportRegressionPhase:
             received.append(info)
 
         for phase in OptimizePhase:
-            _report_regression_phase(_callback, phase, "lightgbm_reg", "test", 0, 0)
+            _report_regression_phase(
+                _callback, phase, RegressorBackendName.LIGHTGBM_REG, "test", 0, 0
+            )
 
         assert [r["phase"] for r in received] == list(OptimizePhase)
 
@@ -244,7 +249,7 @@ class TestMakeRegressionTrialCallback:
         def _progress(info: RegressionTrialProgressInfo) -> None:
             received.append(info)
 
-        callback = _make_regression_trial_callback("xgboost_reg", 5, _progress)
+        callback = _make_regression_trial_callback(RegressorBackendName.XGBOOST_REG, 5, _progress)
 
         # First trial is always best
         callback(_make_trial_result(trial_number=0, value=-0.5))
@@ -266,7 +271,7 @@ class TestMakeRegressionTrialCallback:
 
     def test_none_callback_is_safe(self) -> None:
         """None progress callback does not raise."""
-        callback = _make_regression_trial_callback("xgboost_reg", 5, None)
+        callback = _make_regression_trial_callback(RegressorBackendName.XGBOOST_REG, 5, None)
         callback(_make_trial_result(trial_number=0, value=-0.5))
 
     def test_backend_name_propagated(self) -> None:
@@ -276,7 +281,7 @@ class TestMakeRegressionTrialCallback:
         def _progress(info: RegressionTrialProgressInfo) -> None:
             received.append(info)
 
-        callback = _make_regression_trial_callback("lightgbm_reg", 10, _progress)
+        callback = _make_regression_trial_callback(RegressorBackendName.LIGHTGBM_REG, 10, _progress)
         callback(_make_trial_result(trial_number=0, value=-0.5))
 
         assert received[0]["backend"] == "lightgbm_reg"
@@ -289,7 +294,7 @@ class TestMakeRegressionTrialCallback:
         def _progress(info: RegressionTrialProgressInfo) -> None:
             received.append(info)
 
-        callback = _make_regression_trial_callback("xgboost_reg", 3, _progress)
+        callback = _make_regression_trial_callback(RegressorBackendName.XGBOOST_REG, 3, _progress)
         callback(_make_trial_result(trial_number=0, value=-0.5))
         callback(_make_trial_result(trial_number=1, value=-0.9))
 

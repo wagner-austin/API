@@ -33,13 +33,13 @@ from scripts.optimize.history import UnifiedHistoryEntry
 # =============================================================================
 
 BACKEND_DISPLAY_NAMES: dict[BackendName, str] = {
-    "xgboost": "XGBoost",
-    "mlp": "MLP",
-    "lightgbm": "LightGBM",
-    "lstm": "LSTM",
-    "cleargbm": "ClearGBM",
-    "logreg": "Logistic Regression",
-    "random_forest": "Random Forest",
+    BackendName.XGBOOST: "XGBoost",
+    BackendName.MLP: "MLP",
+    BackendName.LIGHTGBM: "LightGBM",
+    BackendName.LSTM: "LSTM",
+    BackendName.CLEARGBM: "ClearGBM",
+    BackendName.LOGREG: "Logistic Regression",
+    BackendName.RANDOM_FOREST: "Random Forest",
 }
 
 

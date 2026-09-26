@@ -124,17 +124,23 @@ class TestRunSingleWithProgress:
             nonlocal call_count
             call_count += 1
             if phase_callback is not None:
-                for info in _make_phase_infos("xgboost"):
+                for info in _make_phase_infos(BackendName.XGBOOST):
                     phase_callback(info)
             if progress_callback is not None:
-                progress_callback(_make_trial_info("xgboost"))
+                progress_callback(_make_trial_info(BackendName.XGBOOST))
             return make_fake_result()
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "xgboost", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                BackendName.XGBOOST,
+                DatasetName.TAIWAN,
+                5,
+                FeaturePreset.FULL,
+                "cpu",
+                None,
+                save_model=False,
             )
             assert call_count == 1
             assert result["backend"] == "xgboost"
@@ -157,17 +163,23 @@ class TestRunSingleWithProgress:
             nonlocal call_count
             call_count += 1
             if phase_callback is not None:
-                for info in _make_phase_infos("mlp"):
+                for info in _make_phase_infos(BackendName.MLP):
                     phase_callback(info)
             if progress_callback is not None:
-                progress_callback(_make_trial_info("mlp"))
+                progress_callback(_make_trial_info(BackendName.MLP))
             return make_fake_mlp_result()
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "mlp", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                BackendName.MLP,
+                DatasetName.TAIWAN,
+                5,
+                FeaturePreset.FULL,
+                "cpu",
+                None,
+                save_model=False,
             )
             assert call_count == 1
             assert result["backend"] == "mlp"
@@ -191,18 +203,24 @@ class TestRunSingleWithProgress:
             nonlocal call_count
             call_count += 1
             if phase_callback is not None:
-                for info in _make_phase_infos("lightgbm"):
+                for info in _make_phase_infos(BackendName.LIGHTGBM):
                     phase_callback(info)
                 phase_calls.append("called")
             if progress_callback is not None:
-                progress_callback(_make_trial_info("lightgbm"))
+                progress_callback(_make_trial_info(BackendName.LIGHTGBM))
             return make_fake_lightgbm_result()
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lightgbm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                BackendName.LIGHTGBM,
+                DatasetName.TAIWAN,
+                5,
+                FeaturePreset.FULL,
+                "cpu",
+                None,
+                save_model=False,
             )
             assert call_count == 1
             assert result["backend"] == "lightgbm"
@@ -226,17 +244,23 @@ class TestRunSingleWithProgress:
             nonlocal call_count
             call_count += 1
             if phase_callback is not None:
-                for info in _make_phase_infos("lstm"):
+                for info in _make_phase_infos(BackendName.LSTM):
                     phase_callback(info)
             if progress_callback is not None:
-                progress_callback(_make_trial_info("lstm"))
+                progress_callback(_make_trial_info(BackendName.LSTM))
             return make_fake_lstm_result()
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lstm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                BackendName.LSTM,
+                DatasetName.TAIWAN,
+                5,
+                FeaturePreset.FULL,
+                "cpu",
+                None,
+                save_model=False,
             )
             assert call_count == 1
             assert result["backend"] == "lstm"
@@ -259,10 +283,10 @@ class TestRunSingleWithProgress:
             nonlocal call_count
             call_count += 1
             if phase_callback is not None:
-                for info in _make_phase_infos("cleargbm"):
+                for info in _make_phase_infos(BackendName.CLEARGBM):
                     phase_callback(info)
             if progress_callback is not None:
-                progress_callback(_make_trial_info("cleargbm"))
+                progress_callback(_make_trial_info(BackendName.CLEARGBM))
             if loading_progress_callback is not None:
                 loading_info: LoadingProgressInfo = {
                     "dataset": "taiwan",
@@ -279,7 +303,13 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "cleargbm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                BackendName.CLEARGBM,
+                DatasetName.TAIWAN,
+                5,
+                FeaturePreset.FULL,
+                "cpu",
+                None,
+                save_model=False,
             )
             assert call_count == 1
             assert result["backend"] == "cleargbm"
@@ -294,7 +324,7 @@ class TestRunSingleWithProgress:
         """
         fake_backend = FakeSaveModelBackend()
         fake_registry = ClassifierRegistry()
-        fake_registry.register("xgboost", BackendRegistration(lambda: fake_backend))
+        fake_registry.register(BackendName.XGBOOST, BackendRegistration(lambda: fake_backend))
         fake_dataset_reg = DatasetRegistry((make_fake_dataset_config("taiwan"),))
 
         orig_runner = _hooks.optimization_runner
@@ -324,7 +354,7 @@ class TestRunSingleWithProgress:
             (tmp_path / "models").mkdir(parents=True, exist_ok=True)
 
             result = run_single_with_progress(
-                "xgboost",
+                BackendName.XGBOOST,
                 DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,

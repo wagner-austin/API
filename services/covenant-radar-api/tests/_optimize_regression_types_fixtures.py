@@ -20,7 +20,7 @@ from covenant_radar_api.worker.optimize_regression_types import (
 
 
 def _make_regression_parse_result(
-    backend: RegressorBackendName = "xgboost_reg",
+    backend: RegressorBackendName = RegressorBackendName.XGBOOST_REG,
     dataset: str = "us_bankruptcy",
 ) -> UnifiedRegressionOptimizeParseResult:
     """Create a valid UnifiedRegressionOptimizeParseResult for testing.
@@ -52,7 +52,7 @@ def _make_regression_parse_result(
 
 
 def _make_regression_optimization_result(
-    backend: RegressorBackendName = "xgboost_reg",
+    backend: RegressorBackendName = RegressorBackendName.XGBOOST_REG,
 ) -> UnifiedRegressionOptimizationResult:
     """Create a valid UnifiedRegressionOptimizationResult for testing.
 

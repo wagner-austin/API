@@ -99,9 +99,9 @@ class TestComparePresets:
             nonlocal callback_calls
             _ = phase_callback
             if progress_callback is not None:
-                progress_callback(_make_trial_info("xgboost"))
+                progress_callback(_make_trial_info(BackendName.XGBOOST))
                 callback_calls += 1
-                progress_callback(_make_non_best_trial_info("xgboost"))
+                progress_callback(_make_non_best_trial_info(BackendName.XGBOOST))
                 callback_calls += 1
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
@@ -126,7 +126,9 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("xgboost",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
+            compare_presets(
+                (BackendName.XGBOOST,), DatasetName.TAIWAN, 10, "cpu", None, save_model=False
+            )
             assert len(presets_called) == 4
             assert "none" in presets_called
             assert "log_only" in presets_called
@@ -149,7 +151,7 @@ class TestComparePresets:
             loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
         ) -> UnifiedOptimizationResult:
             if progress_callback is not None:
-                progress_callback(_make_trial_info("mlp"))
+                progress_callback(_make_trial_info(BackendName.MLP))
             _ = phase_callback
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
@@ -164,7 +166,9 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("mlp",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
+            compare_presets(
+                (BackendName.MLP,), DatasetName.TAIWAN, 10, "cpu", None, save_model=False
+            )
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -182,7 +186,7 @@ class TestComparePresets:
             loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
         ) -> UnifiedOptimizationResult:
             if progress_callback is not None:
-                progress_callback(_make_trial_info("lightgbm"))
+                progress_callback(_make_trial_info(BackendName.LIGHTGBM))
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
             elif "log_only" in config_json:
@@ -196,7 +200,9 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("lightgbm",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
+            compare_presets(
+                (BackendName.LIGHTGBM,), DatasetName.TAIWAN, 10, "cpu", None, save_model=False
+            )
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -214,7 +220,7 @@ class TestComparePresets:
             loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
         ) -> UnifiedOptimizationResult:
             if progress_callback is not None:
-                progress_callback(_make_trial_info("lstm"))
+                progress_callback(_make_trial_info(BackendName.LSTM))
             _ = phase_callback
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
@@ -229,7 +235,9 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("lstm",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
+            compare_presets(
+                (BackendName.LSTM,), DatasetName.TAIWAN, 10, "cpu", None, save_model=False
+            )
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -247,7 +255,7 @@ class TestComparePresets:
             loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
         ) -> UnifiedOptimizationResult:
             if progress_callback is not None:
-                progress_callback(_make_trial_info("cleargbm"))
+                progress_callback(_make_trial_info(BackendName.CLEARGBM))
             _ = phase_callback
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
@@ -262,7 +270,9 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("cleargbm",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
+            compare_presets(
+                (BackendName.CLEARGBM,), DatasetName.TAIWAN, 10, "cpu", None, save_model=False
+            )
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -274,7 +284,7 @@ class TestComparePresets:
         """
         fake_backend = FakeSaveModelBackend()
         fake_registry = ClassifierRegistry()
-        fake_registry.register("xgboost", BackendRegistration(lambda: fake_backend))
+        fake_registry.register(BackendName.XGBOOST, BackendRegistration(lambda: fake_backend))
         fake_dataset_reg = DatasetRegistry((make_fake_dataset_config("taiwan"),))
 
         orig_runner = _hooks.optimization_runner
@@ -324,7 +334,7 @@ class TestComparePresets:
             (tmp_path / "models").mkdir(parents=True, exist_ok=True)
 
             compare_presets(
-                ("xgboost",),
+                (BackendName.XGBOOST,),
                 DatasetName.TAIWAN,
                 5,
                 "cpu",
@@ -366,9 +376,9 @@ class TestRunAllDatasets:
         ) -> UnifiedOptimizationResult:
             nonlocal callback_calls
             if progress_callback is not None:
-                progress_callback(_make_trial_info("xgboost"))
+                progress_callback(_make_trial_info(BackendName.XGBOOST))
                 callback_calls += 1
-                progress_callback(_make_non_best_trial_info("xgboost"))
+                progress_callback(_make_non_best_trial_info(BackendName.XGBOOST))
                 callback_calls += 1
             if "taiwan" in config_json:
                 datasets_called.append("taiwan")
@@ -382,7 +392,9 @@ class TestRunAllDatasets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            run_all_datasets("xgboost", 10, FeaturePreset.FULL, "cpu", None, save_model=False)
+            run_all_datasets(
+                BackendName.XGBOOST, 10, FeaturePreset.FULL, "cpu", None, save_model=False
+            )
             assert len(datasets_called) == 3
             assert "taiwan" in datasets_called
             assert "us" in datasets_called
@@ -410,18 +422,18 @@ class TestRunMultipleBackends:
             if '"xgboost"' in config_json:
                 backends_called.append("xgboost")
                 if progress_callback is not None:
-                    progress_callback(_make_trial_info("xgboost"))
+                    progress_callback(_make_trial_info(BackendName.XGBOOST))
                 return make_fake_result(dataset="taiwan", best_value=0.85)
             backends_called.append("lightgbm")
             if progress_callback is not None:
-                progress_callback(_make_trial_info("lightgbm"))
+                progress_callback(_make_trial_info(BackendName.LIGHTGBM))
             return make_fake_lightgbm_result(dataset="taiwan", best_value=0.90)
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
             run_multiple_backends(
-                ("lightgbm", "xgboost"),
+                (BackendName.LIGHTGBM, BackendName.XGBOOST),
                 DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
@@ -449,14 +461,14 @@ class TestRunMultipleBackends:
         ) -> UnifiedOptimizationResult:
             backends_called.append("xgboost")
             if progress_callback is not None:
-                progress_callback(_make_trial_info("xgboost"))
+                progress_callback(_make_trial_info(BackendName.XGBOOST))
             return make_fake_result(dataset="taiwan", best_value=0.85)
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
             run_multiple_backends(
-                ("xgboost",),
+                (BackendName.XGBOOST,),
                 DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
@@ -496,7 +508,7 @@ class TestRunMultipleBackends:
         _hooks.optimization_runner = fake_runner
         try:
             run_multiple_backends(
-                ("xgboost", "lightgbm", "mlp", "lstm"),
+                (BackendName.XGBOOST, BackendName.LIGHTGBM, BackendName.MLP, BackendName.LSTM),
                 DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
@@ -534,7 +546,7 @@ class TestRunMultipleBackends:
         _hooks.optimization_runner = fake_runner
         try:
             run_multiple_backends(
-                ("xgboost",),
+                (BackendName.XGBOOST,),
                 DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,

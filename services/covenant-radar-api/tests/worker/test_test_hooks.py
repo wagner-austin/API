@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
-from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
+from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._hook_defaults import (
@@ -192,7 +192,7 @@ class TestRealObjectiveFactory:
             UnifiedOptimizeParseResult with default values.
         """
         return UnifiedOptimizeParseResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             dataset="taiwan",
             n_trials=1,
             timeout_seconds=None,
@@ -229,7 +229,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("xgboost", x, y, names, config)
+        obj = _real_objective_factory(BackendName.XGBOOST, x, y, names, config)
         assert obj.n_features == 5
 
     def test_lightgbm_objective(self) -> None:
@@ -238,7 +238,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("lightgbm", x, y, names, config)
+        obj = _real_objective_factory(BackendName.LIGHTGBM, x, y, names, config)
         assert obj.n_features == 5
 
     def test_cleargbm_objective(self) -> None:
@@ -247,7 +247,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("cleargbm", x, y, names, config)
+        obj = _real_objective_factory(BackendName.CLEARGBM, x, y, names, config)
         assert obj.n_features == 5
 
     def test_logreg_objective(self) -> None:
@@ -256,7 +256,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("logreg", x, y, names, config)
+        obj = _real_objective_factory(BackendName.LOGREG, x, y, names, config)
         assert obj.n_features == 5
 
     def test_random_forest_objective(self) -> None:
@@ -265,7 +265,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("random_forest", x, y, names, config)
+        obj = _real_objective_factory(BackendName.RANDOM_FOREST, x, y, names, config)
         assert obj.n_features == 5
 
     def test_mlp_objective(self) -> None:
@@ -274,7 +274,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("mlp", x, y, names, config)
+        obj = _real_objective_factory(BackendName.MLP, x, y, names, config)
         assert obj.n_features == 5
 
     def test_lstm_objective(self) -> None:
@@ -283,7 +283,7 @@ class TestRealObjectiveFactory:
 
         x, y, names = self._make_data()
         config = self._make_config()
-        obj = _real_objective_factory("lstm", x, y, names, config)
+        obj = _real_objective_factory(BackendName.LSTM, x, y, names, config)
         assert obj.n_features == 5
 
 

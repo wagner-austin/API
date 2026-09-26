@@ -25,6 +25,7 @@ from covenant_radar_api.api.decode_regression import (
     _parse_device,
 )
 from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
+from covenant_radar_api.worker._optimize_common import parse_backend_name
 from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 
 
@@ -114,42 +115,6 @@ class UnifiedOptimizeApiParseResult(TypedDict, total=True):
     random_state: int
 
 
-def _parse_optimize_backend(raw: JSONValue | None) -> BackendName:
-    """Parse optimize backend name, defaulting to 'xgboost'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        BackendName literal.
-
-    Raises:
-        JSONTypeError: If value is not a string.
-        ValueError: If value is not a valid backend.
-    """
-    if raw is None:
-        return "xgboost"
-    if not isinstance(raw, str):
-        raise JSONTypeError("backend must be a string")
-    if raw == "xgboost":
-        return "xgboost"
-    if raw == "mlp":
-        return "mlp"
-    if raw == "lstm":
-        return "lstm"
-    if raw == "lightgbm":
-        return "lightgbm"
-    if raw == "cleargbm":
-        return "cleargbm"
-    if raw == "logreg":
-        return "logreg"
-    if raw == "random_forest":
-        return "random_forest"
-    raise ValueError(
-        "backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm, logreg, random_forest"
-    )
-
-
 def parse_optimize_request(body: bytes) -> UnifiedOptimizeApiParseResult:
     """Parse request body for hyperparameter optimization.
 
@@ -186,7 +151,7 @@ def parse_optimize_request(body: bytes) -> UnifiedOptimizeApiParseResult:
     """
     raw = _parse_body_as_dict(body)
 
-    backend = _parse_optimize_backend(raw.get("backend"))
+    backend = parse_backend_name(raw.get("backend"))
     dataset_name = _parse_dataset_name(raw)
     n_trials = require_int(raw, "n_trials")
 
@@ -273,30 +238,17 @@ def _parse_backend_name(raw: JSONValue) -> BackendName:
         raw: Raw JSON value.
 
     Returns:
-        Validated BackendName literal.
+        The BackendName member.
 
     Raises:
         JSONTypeError: If value is not a valid backend name.
     """
     if not isinstance(raw, str):
         raise JSONTypeError("backend must be a string")
-    if raw == "xgboost":
-        return "xgboost"
-    if raw == "mlp":
-        return "mlp"
-    if raw == "lstm":
-        return "lstm"
-    if raw == "lightgbm":
-        return "lightgbm"
-    if raw == "cleargbm":
-        return "cleargbm"
-    if raw == "logreg":
-        return "logreg"
-    if raw == "random_forest":
-        return "random_forest"
-    raise JSONTypeError(
-        "backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm, logreg, random_forest"
-    )
+    backend = find_member(raw, BackendName)
+    if backend is None:
+        raise JSONTypeError(f"backend must be one of: {', '.join(BackendName)}")
+    return backend
 
 
 def parse_explain_request(body: bytes) -> ExplainParseResult:

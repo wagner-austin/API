@@ -27,10 +27,18 @@ EXPLAINER_DESCRIPTIONS: dict[ExplainerName, str] = {
 
 # Backend to compatible explainers mapping
 BACKEND_EXPLAINERS: dict[BackendName, list[ExplainerName]] = {
-    "xgboost": [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE],
-    "lightgbm": [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE],
-    "mlp": [ExplainerName.PERMUTATION, ExplainerName.GRADIENT, ExplainerName.INTEGRATED_GRADIENTS],
-    "lstm": [ExplainerName.PERMUTATION, ExplainerName.GRADIENT, ExplainerName.INTEGRATED_GRADIENTS],
+    BackendName.XGBOOST: [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE],
+    BackendName.LIGHTGBM: [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE],
+    BackendName.MLP: [
+        ExplainerName.PERMUTATION,
+        ExplainerName.GRADIENT,
+        ExplainerName.INTEGRATED_GRADIENTS,
+    ],
+    BackendName.LSTM: [
+        ExplainerName.PERMUTATION,
+        ExplainerName.GRADIENT,
+        ExplainerName.INTEGRATED_GRADIENTS,
+    ],
 }
 
 
@@ -59,7 +67,7 @@ class ExplainArgs:
 
     def __init__(self) -> None:
         """Initialize with defaults."""
-        self.backend = "xgboost"
+        self.backend = BackendName.XGBOOST
         self.dataset = DatasetName.TAIWAN
         self.explainer = ExplainerName.PERMUTATION
         self.model_path = None
@@ -108,20 +116,15 @@ def _parse_backend(val: str) -> BackendName:
         val: Backend name string from CLI.
 
     Returns:
-        Validated backend name literal.
+        The BackendName member, one of the explainable backends.
 
     Raises:
         SystemExit: If backend name is invalid.
     """
+    backend = find_member(val, BackendName)
+    if backend is not None and backend in BACKEND_EXPLAINERS:
+        return backend
     console = get_rich_console()
-    if val == "xgboost":
-        return "xgboost"
-    if val == "mlp":
-        return "mlp"
-    if val == "lightgbm":
-        return "lightgbm"
-    if val == "lstm":
-        return "lstm"
     console.print(f"[red]Invalid backend: {val}. Must be xgboost, mlp, lightgbm, or lstm.[/red]")
     raise SystemExit(1)
 

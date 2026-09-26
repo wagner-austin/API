@@ -14,6 +14,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
+from covenant_ml.types import BackendName
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from covenant_radar_api.worker.job_phases import OptimizePhase
@@ -43,7 +44,7 @@ class TestPhaseProgressInfoEncodeDecode:
         """Encoding then decoding produces identical result."""
         original = PhaseProgressInfo(
             phase=OptimizePhase.LOADING_DATA,
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             dataset="taiwan",
             n_samples=0,
             n_features=0,
@@ -57,7 +58,7 @@ class TestPhaseProgressInfoEncodeDecode:
         for phase in OptimizePhase:
             original = PhaseProgressInfo(
                 phase=phase,
-                backend="mlp",
+                backend=BackendName.MLP,
                 dataset="us",
                 n_samples=100,
                 n_features=50,
@@ -174,7 +175,7 @@ class TestTrialProgressInfoEncodeDecode:
     def test_encode_decode_round_trip(self) -> None:
         """Encoding then decoding produces identical result."""
         original = TrialProgressInfo(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             trial_number=5,
             n_trials_total=50,
             current_value=0.82,
@@ -189,7 +190,7 @@ class TestTrialProgressInfoEncodeDecode:
     def test_is_best_true_round_trip(self) -> None:
         """is_best=True round-trips correctly."""
         original = TrialProgressInfo(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             trial_number=10,
             n_trials_total=100,
             current_value=0.90,
@@ -238,7 +239,7 @@ class TestSampledParamsBranchCoverage:
     def test_lightgbm_int_params_round_trip(self) -> None:
         """LightGBM int params (num_leaves, min_child_samples) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="lightgbm",
+            backend=BackendName.LIGHTGBM,
             status="complete",
             dataset="taiwan",
             n_samples=1000,
@@ -274,7 +275,7 @@ class TestSampledParamsBranchCoverage:
     def test_mlp_int_params_round_trip(self) -> None:
         """MLP int params (n_layers, hidden_size, batch_size) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="mlp",
+            backend=BackendName.MLP,
             status="complete",
             dataset="us",
             n_samples=500,
@@ -301,7 +302,7 @@ class TestSampledParamsBranchCoverage:
     def test_lstm_int_params_round_trip(self) -> None:
         """LSTM int params (num_layers, hidden_size, batch_size) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="lstm",
+            backend=BackendName.LSTM,
             status="complete",
             dataset="polish",
             n_samples=7000,
@@ -325,7 +326,7 @@ class TestSampledParamsBranchCoverage:
     def test_cleargbm_int_params_round_trip(self) -> None:
         """ClearGBM int params (min_samples_split, min_samples_leaf, max_bins) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="cleargbm",
+            backend=BackendName.CLEARGBM,
             status="complete",
             dataset="taiwan",
             n_samples=6819,
@@ -359,7 +360,7 @@ class TestSampledParamsBranchCoverage:
     def test_logreg_params_round_trip(self) -> None:
         """LogReg params (max_iter, C, tol, l1_ratio, penalty, solver) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="logreg",
+            backend=BackendName.LOGREG,
             status="complete",
             dataset="us",
             n_samples=78682,
@@ -388,7 +389,7 @@ class TestSampledParamsBranchCoverage:
     def test_random_forest_params_round_trip(self) -> None:
         """RandomForest params (min_samples_split/leaf, max_features) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="random_forest",
+            backend=BackendName.RANDOM_FOREST,
             status="complete",
             dataset="polish",
             n_samples=7027,
@@ -417,7 +418,7 @@ class TestSampledParamsBranchCoverage:
     def test_xgboost_dart_params_round_trip(self) -> None:
         """XGBoost DART params (drop_rate, skip_drop, rate_drop) round-trip."""
         original = UnifiedOptimizationResult(
-            backend="xgboost",
+            backend=BackendName.XGBOOST,
             status="complete",
             dataset="taiwan",
             n_samples=6819,

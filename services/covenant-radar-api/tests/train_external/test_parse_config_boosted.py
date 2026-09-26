@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import GrowthStrategy
+from covenant_ml.types import BackendName, GrowthStrategy
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from covenant_radar_api.worker._train_external_parsers import (
@@ -31,7 +31,7 @@ class TestLightGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "lightgbm":
+        if result["backend"] is not BackendName.LIGHTGBM:
             raise AssertionError("Expected lightgbm backend")
         assert result["dataset"] == "taiwan"
         assert result["config"]["learning_rate"] == 0.1
@@ -62,7 +62,7 @@ class TestLightGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "lightgbm":
+        if result["backend"] is not BackendName.LIGHTGBM:
             raise AssertionError("Expected lightgbm backend")
         assert result["config"]["device"] == "cuda"
         assert result["config"]["early_stopping_rounds"] == 20
@@ -90,7 +90,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["dataset"] == "taiwan"
         assert result["config"]["n_estimators"] == 100
@@ -126,7 +126,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["monotonic_constraints"] == {
             "feature_a": 1,
@@ -151,7 +151,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["max_features"] is None
 
@@ -173,7 +173,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["monotonic_constraints"] is None
 
@@ -199,7 +199,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["max_bins"] == 128
         assert result["config"]["reg_alpha"] == 0.5
@@ -226,7 +226,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["growth_strategy"] is GrowthStrategy.LEAF_WISE
         assert result["config"]["num_leaves"] == 31
@@ -249,7 +249,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["growth_strategy"] is GrowthStrategy.DEPTH_WISE
         assert result["config"]["num_leaves"] is None
@@ -360,7 +360,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert "track_contributions" not in result["config"]
 
@@ -382,7 +382,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["colsample_bytree"] == 0.5
 
@@ -424,7 +424,7 @@ class TestClearGBMConfig:
             }
         )
         result = _parse_external_train_config(config_json)
-        if result["backend"] != "cleargbm":
+        if result["backend"] is not BackendName.CLEARGBM:
             raise AssertionError("Expected cleargbm backend")
         assert result["config"]["categorical_features"] == ["industry", "region"]
 

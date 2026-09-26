@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from covenant_ml.datasets import AggregationStrategy, FileEncoding, FileFormat, LabelType
-from covenant_ml.types import RequestedDevice
+from covenant_ml.types import BackendName, RequestedDevice
 from numpy.typing import NDArray
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
@@ -179,7 +179,7 @@ class TestFakeRegistry:
         """FakeRegistry.get returns a backend that can train and load."""
         registry = FakeRegistry(tmp_path)
 
-        backend = registry.get("lightgbm")
+        backend = registry.get(BackendName.LIGHTGBM)
 
         # Verify backend can prepare a classifier
         classifier = backend.prepare(

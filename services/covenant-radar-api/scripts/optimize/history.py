@@ -32,6 +32,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import find_member
 
 from covenant_radar_api.dataset_names import DatasetName
 from scripts._test_hooks import UnifiedOptimizationResult
@@ -85,22 +86,11 @@ def _decode_backend(obj: JSONObject) -> BackendName:
     Raises:
         ValueError: If backend field contains invalid value.
     """
-    backend = require_str(obj, "backend")
-    if backend == "xgboost":
-        return "xgboost"
-    if backend == "mlp":
-        return "mlp"
-    if backend == "lightgbm":
-        return "lightgbm"
-    if backend == "lstm":
-        return "lstm"
-    if backend == "cleargbm":
-        return "cleargbm"
-    if backend == "logreg":
-        return "logreg"
-    if backend == "random_forest":
-        return "random_forest"
-    raise ValueError(f"Invalid backend: {backend}")
+    raw = require_str(obj, "backend")
+    backend = find_member(raw, BackendName)
+    if backend is None:
+        raise ValueError(f"Invalid backend: {raw}")
+    return backend
 
 
 def _decode_history_entry(obj: JSONObject) -> UnifiedHistoryEntry:
