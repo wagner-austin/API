@@ -30,6 +30,7 @@ from tankpit_bot.state import (
     make_empty_world_state,
     make_tank_state,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.bot._executor_support import (
     _make_bot,
     _make_snapshot,
@@ -213,7 +214,7 @@ class TestExecute:
         so ``source`` no longer affects dispatch.
         """
         bot, fake_cdp = _make_bot(fake_env)
-        _store_tank(bot.world, 10, x=105, y=103, source="world_state")
+        _store_tank(bot.world, 10, x=105, y=103, source=EntitySource.WORLD_STATE)
         behavior = make_behavior_score("HUNT", 800, 105, 103, "shoot_target", target_id=10)
         decision = make_tick_decision(
             command=make_shoot_command(105, 103, 10),
@@ -246,7 +247,7 @@ class TestSecondaryCommandDispatch:
                     name="Enemy",
                     is_bot=False,
                     is_self=False,
-                    source="viewport",
+                    source=EntitySource.VIEWPORT,
                     timestamp_ms=1000,
                     last_wire_seen_ms=1000,
                     last_position_update_ms=1000,

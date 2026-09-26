@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
@@ -14,6 +12,7 @@ from tankpit_bot.state import (
     make_self_state,
     make_tank_state,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.conftest import FakeEnv
 from tests.fakes import FakeCDPSession
 
@@ -64,7 +63,7 @@ def _store_tank(
     *,
     x: int,
     y: int,
-    source: Literal["viewport", "radar", "world_state"],
+    source: EntitySource,
 ) -> None:
     """Store a tracked tank into ``ws``'s world state for executor tests."""
 

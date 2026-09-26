@@ -15,6 +15,7 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_viewport_state,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.bot._cdp_harness import _make_snapshot
 from tests.conftest import FakeEnv
 
@@ -254,7 +255,7 @@ class TestBotAIIntegration:
                 tank_id=10,
                 timestamp_ms=get_current_time_ms(),
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(110, 100),
                 team=1,
                 rank=0,

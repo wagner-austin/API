@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
@@ -14,6 +15,7 @@ from tankpit_bot.sniffer.world_state_inventory import (
 from tankpit_bot.sniffer.world_state_radar import (
     update_world_state_from_radar as _update_radar,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.bot._cdp_harness import _sba
 from tests.conftest import FakeEnv
 
@@ -237,7 +239,7 @@ class TestBotTickOnce:
             inventory: InventoryState,
             timestamp_ms: int,
             terrain: TerrainMapProtocol | None,
-            combat_feedback: CombatFeedback = "",
+            combat_feedback: CombatFeedback = CombatFeedback.NONE,
             *,
             ws: WorldService,
         ) -> TickDecisionDict:
@@ -331,7 +333,7 @@ class TestBotTickOnce:
             inventory: InventoryState,
             timestamp_ms: int,
             terrain: TerrainMapProtocol | None,
-            combat_feedback: CombatFeedback = "",
+            combat_feedback: CombatFeedback = CombatFeedback.NONE,
             *,
             ws: WorldService,
         ) -> TickDecisionDict:
@@ -426,7 +428,7 @@ class TestBotTickOnce:
                 tank_id=10,
                 timestamp_ms=get_current_time_ms(),
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(106, 100),
                 team=1,
                 rank=0,
