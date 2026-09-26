@@ -21,7 +21,7 @@ to strangers.
 The rebuild's first recipe dropped the ``--windowslogonaccount`` argument,
 and the reinstalled lavender came up as NETWORK SERVICE. That is why the
 account is both rendered into ``config.cmd`` and CONVERGED: a service
-already installed under another account is rebound in place.
+already installed under another account is rebound in place and audited.
 """
 
 from __future__ import annotations
@@ -34,6 +34,53 @@ WINDOWS_SERVICE_ACCOUNT = "NT AUTHORITY\\SYSTEM"
 
 #: The same account as ``Win32_Service.StartName`` and ``sc.exe obj=`` name it.
 WINDOWS_SERVICE_START_NAME = "LocalSystem"
+
+#: Why the audit row exists, printed beside a drift line.
+SERVICE_ACCOUNT_REASON = (
+    "setup-python's registry writes, node-gyp's toolchain and scheduled-task "
+    "registration all need more than NETWORK SERVICE; the repos are private"
+)
+
+
+def service_account_check_id(install: RunnerInstall) -> str:
+    """The audit row holding one Windows-side service to its account.
+
+    Args:
+        install: A windows-side install.
+
+    Returns:
+        ``account:windows:<service>:LocalSystem``.
+    """
+    return f"account:windows:{install['service']}:{WINDOWS_SERVICE_START_NAME}"
+
+
+def render_service_account_check_lines(install: RunnerInstall) -> list[str]:
+    """The audit driver's lines for one service's account row.
+
+    The StartName is JOINED from the pipeline, never cast: for a service
+    that is absent the pipeline emits nothing, and the row must still be
+    emitted, drifted, rather than the Emit statement dying and the
+    transcript coming up one line short.
+
+    Args:
+        install: A windows-side install.
+
+    Returns:
+        Lines calling the driver's ``Emit`` once, with the StartName the
+        host reports as the drift detail.
+
+    Raises:
+        ValueError: When the service name cannot be embedded verbatim; see
+            :func:`fleet.core.script_values.scriptable`.
+    """
+    service = scriptable(install["service"], label="service")
+    return [
+        "$Account = (@(Get-CimInstance Win32_Service "
+        f"-Filter \"Name='{service}'\" | ForEach-Object {{ $_.StartName }}) -join '')",
+        f"Emit '{service_account_check_id(install)}' "
+        f"($Account -eq '{WINDOWS_SERVICE_START_NAME}') "
+        "('Win32_Service StartName: ' + $Account)",
+    ]
 
 
 def render_service_account_lines(install: RunnerInstall) -> list[str]:
@@ -80,7 +127,10 @@ def render_service_account_lines(install: RunnerInstall) -> list[str]:
 
 
 __all__ = [
+    "SERVICE_ACCOUNT_REASON",
     "WINDOWS_SERVICE_ACCOUNT",
     "WINDOWS_SERVICE_START_NAME",
+    "render_service_account_check_lines",
     "render_service_account_lines",
+    "service_account_check_id",
 ]

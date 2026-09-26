@@ -28,6 +28,11 @@ from typing_extensions import TypedDict
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
+from fleet.core.runner_account import (
+    SERVICE_ACCOUNT_REASON,
+    render_service_account_check_lines,
+    service_account_check_id,
+)
 from fleet.core.runner_base_render import LONG_PATHS_KEY
 from fleet.core.script_values import scriptable
 
@@ -168,6 +173,12 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
                 reason="the install's _work tree, which its venvs are path-bound to",
             )
         )
+        if install["side"] == "windows":
+            checks.append(
+                ExpectedCheck(
+                    check_id=service_account_check_id(install), reason=SERVICE_ACCOUNT_REASON
+                )
+            )
     for asset in spec["assets"]:
         checks.append(ExpectedCheck(check_id=f"asset:{asset['path']}", reason=asset["reason"]))
         if asset["sha256"] is not None:
@@ -384,6 +395,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
                 f"Emit 'workdir:{repo}:windows:{runner_name}' "
                 f"(Test-Path -LiteralPath '{workdir}') "
                 f"('Test-Path {workdir}')",
+                *render_service_account_check_lines(install),
             ]
     for asset in spec["assets"]:
         path = scriptable(asset["path"], label="asset path")
