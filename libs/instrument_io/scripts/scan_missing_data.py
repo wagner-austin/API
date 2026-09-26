@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -120,8 +120,8 @@ def scan_for_missing_data(base_path: Path | None = None) -> int:
 def main() -> int:
     """Entry point for script."""
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="scan-missing-data",
         instance_id=None,
         extra_fields=None,

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import polars as pl
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from instrument_io._json_bridge import _df_json_to_row_dicts, _get_json_str_value
 from instrument_io._protocols.openpyxl import (
@@ -316,8 +316,8 @@ def create_audit_excel(
 def main() -> int:
     """Entry point for script."""
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="create-audit-excel",
         instance_id=None,
         extra_fields=None,

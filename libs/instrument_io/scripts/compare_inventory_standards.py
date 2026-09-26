@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import polars as pl
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from instrument_io._json_bridge import _json_col_to_opt_str_list
 
@@ -163,8 +163,8 @@ def compare_inventory_and_standards(
 def main() -> int:
     """Entry point for script."""
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="compare-inventory-standards",
         instance_id=None,
         extra_fields=None,

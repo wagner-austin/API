@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from instrument_io._protocols.openpyxl import _load_workbook
 
@@ -71,8 +71,8 @@ def verify_all_sheets(base_path: Path | None = None) -> int:
 def main() -> int:
     """Entry point for script."""
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="verify-sheets",
         instance_id=None,
         extra_fields=None,

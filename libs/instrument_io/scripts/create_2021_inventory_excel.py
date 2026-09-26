@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from instrument_io._json_bridge import CellValue, _df_json_to_row_dicts, _json_value_to_cell
 from instrument_io._protocols.openpyxl import (
@@ -254,8 +254,8 @@ def create_2021_inventory_report(
 def main() -> int:
     """Entry point for script."""
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="create-2021-inventory",
         instance_id=None,
         extra_fields=None,

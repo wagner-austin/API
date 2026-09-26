@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from instrument_io._json_bridge import (
     _df_json_to_row_dicts,
@@ -277,8 +277,8 @@ def create_formatted_ghost_excel(
 def main() -> int:
     """Entry point for script."""
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="create-ghost-excel",
         instance_id=None,
         extra_fields=None,
