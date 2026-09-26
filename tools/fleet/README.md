@@ -161,10 +161,19 @@ its code and message verbatim, where the submitter reads it. Exiting non-zero
 would stop the loop on exactly the condition the loop exists to keep
 reporting.
 
+**A job refused after its lease was taken gives the lease back first**
+(`fleet.core.run_lease.abandon`, MCPs board task e12affc5). A staging or
+launch failure used to close the queue row and leave the lease standing for
+the project's whole window, so the resubmission the refusal invites was
+refused `LEASE_HELD` by the run that had just died: job 7143a25e, 793 s after
+job 4d8b28a9 failed to send its payload to serendipity. The feed gets the run's
+terminal `refused` line with the same reason. A `LEASE_HELD` refusal gives
+nothing back, because that lease belongs to another run.
+
 **The ledger row names the submitter, not the runner.** A row stamped with
 `fleet-runner-austinpc` would record only that the runner ran something; the
 queue job carries the enqueueing session's label and UUID, and those are what
-`dispatch.start` is given.
+`run_lease.take` is given.
 
 **What a runner holds is asked of the queue, never remembered locally.** A
 runner that crashed between launching a suite and writing itself a note would
