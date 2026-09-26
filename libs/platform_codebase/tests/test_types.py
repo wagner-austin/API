@@ -8,6 +8,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from platform_codebase.types import (
+    CapabilityStrength,
     CodebaseCapability,
     CodebaseProfile,
     LibInfo,
@@ -18,8 +19,6 @@ from platform_codebase.types import (
     encode_lib_info,
     encode_profile,
     encode_service_info,
-    require_recommendation,
-    require_strength,
 )
 
 
@@ -30,13 +29,13 @@ class TestCodebaseCapability:
         """Test CodebaseCapability initialization."""
         cap = CodebaseCapability(
             name="test_cap",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("tag1", "tag2"),
             description="Test description",
         )
 
         assert cap.name == "test_cap"
-        assert cap.strength == "strong"
+        assert cap.strength is CapabilityStrength.STRONG
         assert cap.tags == ("tag1", "tag2")
         assert cap.description == "Test description"
 
@@ -44,7 +43,7 @@ class TestCodebaseCapability:
         """Test encode/decode roundtrip for CodebaseCapability."""
         cap = CodebaseCapability(
             name="ml_cap",
-            strength="moderate",
+            strength=CapabilityStrength.MODERATE,
             tags=("ml", "tabular"),
             description="ML capability",
         )
@@ -53,7 +52,7 @@ class TestCodebaseCapability:
         decoded = decode_capability(encoded)
 
         assert decoded.name == cap.name
-        assert decoded.strength == cap.strength
+        assert decoded.strength is cap.strength
         assert decoded.tags == cap.tags
         assert decoded.description == cap.description
 
@@ -76,7 +75,7 @@ class TestCodebaseProfile:
         """Test CodebaseProfile with all args."""
         cap = CodebaseCapability(
             name="cap1",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("tag1",),
             description="Cap 1",
         )
@@ -100,7 +99,7 @@ class TestCodebaseProfile:
         """Test encode/decode roundtrip for CodebaseProfile."""
         cap = CodebaseCapability(
             name="cap1",
-            strength="basic",
+            strength=CapabilityStrength.BASIC,
             tags=("t1", "t2"),
             description="Description",
         )
@@ -189,68 +188,28 @@ class TestServiceInfo:
         assert encoded["has_rules_files"] is True
 
 
-class TestRequireStrength:
-    """Tests for require_strength validation helper."""
+class TestDecodeCapabilityStrength:
+    """decode_capability narrows strength to a CapabilityStrength member."""
 
-    def test_strong(self) -> None:
-        """Test require_strength with 'strong' value."""
-        obj: JSONObject = {"strength": "strong"}
-        result = require_strength(obj, "strength")
-        assert result == "strong"
+    def test_every_strength_decodes_to_its_member(self) -> None:
+        """Each CapabilityStrength's wire word decodes to that member."""
+        for strength in CapabilityStrength:
+            obj: JSONObject = {
+                "name": "cap",
+                "strength": strength.value,
+                "tags": [],
+                "description": "d",
+            }
+            assert decode_capability(obj).strength is strength
 
-    def test_moderate(self) -> None:
-        """Test require_strength with 'moderate' value."""
-        obj: JSONObject = {"strength": "moderate"}
-        result = require_strength(obj, "strength")
-        assert result == "moderate"
-
-    def test_basic(self) -> None:
-        """Test require_strength with 'basic' value."""
-        obj: JSONObject = {"strength": "basic"}
-        result = require_strength(obj, "strength")
-        assert result == "basic"
-
-    def test_invalid_value(self) -> None:
-        """Test require_strength with invalid value."""
-        obj: JSONObject = {"strength": "invalid"}
-        with pytest.raises(JSONTypeError) as exc_info:
-            require_strength(obj, "strength")
-        assert "strong/moderate/basic" in str(exc_info.value)
-
-
-class TestRequireRecommendation:
-    """Tests for require_recommendation validation helper."""
-
-    def test_strong_fit(self) -> None:
-        """Test require_recommendation with 'strong_fit' value."""
-        obj: JSONObject = {"rec": "strong_fit"}
-        result = require_recommendation(obj, "rec")
-        assert result == "strong_fit"
-
-    def test_good_fit(self) -> None:
-        """Test require_recommendation with 'good_fit' value."""
-        obj: JSONObject = {"rec": "good_fit"}
-        result = require_recommendation(obj, "rec")
-        assert result == "good_fit"
-
-    def test_stretch(self) -> None:
-        """Test require_recommendation with 'stretch' value."""
-        obj: JSONObject = {"rec": "stretch"}
-        result = require_recommendation(obj, "rec")
-        assert result == "stretch"
-
-    def test_new_territory(self) -> None:
-        """Test require_recommendation with 'new_territory' value."""
-        obj: JSONObject = {"rec": "new_territory"}
-        result = require_recommendation(obj, "rec")
-        assert result == "new_territory"
-
-    def test_invalid_value(self) -> None:
-        """Test require_recommendation with invalid value."""
-        obj: JSONObject = {"rec": "invalid"}
-        with pytest.raises(JSONTypeError) as exc_info:
-            require_recommendation(obj, "rec")
-        assert "valid recommendation" in str(exc_info.value)
+    def test_unknown_strength_is_refused(self) -> None:
+        """An unknown strength is refused naming the word and every admitted one."""
+        obj: JSONObject = {"name": "cap", "strength": "invalid", "tags": [], "description": "d"}
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid strength 'invalid': must be one of 'strong', 'moderate', 'basic'$",
+        ):
+            decode_capability(obj)
 
 
 class TestDecodeCapabilityErrors:

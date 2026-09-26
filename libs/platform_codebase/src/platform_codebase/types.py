@@ -6,8 +6,8 @@ to detect capabilities, technologies, and frameworks.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
 from platform_core.json_utils import (
     JSONObject,
@@ -17,13 +17,28 @@ from platform_core.json_utils import (
     require_str,
     require_str_list,
 )
+from platform_core.members import require_member
 
 # -----------------------------------------------------------------------------
-# Literal Types
+# Vocabularies
 # -----------------------------------------------------------------------------
 
-CapabilityStrength = Literal["strong", "moderate", "basic"]
-MatchRecommendation = Literal["strong_fit", "good_fit", "stretch", "new_territory"]
+
+class CapabilityStrength(StrEnum):
+    """How deeply the codebase exercises a capability."""
+
+    STRONG = "strong"
+    MODERATE = "moderate"
+    BASIC = "basic"
+
+
+class MatchRecommendation(StrEnum):
+    """How well an opportunity fits the codebase, from its match score."""
+
+    STRONG_FIT = "strong_fit"
+    GOOD_FIT = "good_fit"
+    STRETCH = "stretch"
+    NEW_TERRITORY = "new_territory"
 
 
 # -----------------------------------------------------------------------------
@@ -47,54 +62,6 @@ def _require_dict_value(value: JSONValue, context: str) -> JSONObject:
     if not isinstance(value, dict):
         raise JSONTypeError(f"{context} must be an object, got {type(value).__name__}")
     return value
-
-
-def require_strength(obj: JSONObject, key: str) -> CapabilityStrength:
-    """Extract and validate CapabilityStrength from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Field key.
-
-    Returns:
-        Validated CapabilityStrength.
-
-    Raises:
-        JSONTypeError: If field is missing or not a valid strength.
-    """
-    value = require_str(obj, key)
-    if value == "strong":
-        return "strong"
-    if value == "moderate":
-        return "moderate"
-    if value == "basic":
-        return "basic"
-    raise JSONTypeError(f"Field '{key}' must be strong/moderate/basic, got '{value}'")
-
-
-def require_recommendation(obj: JSONObject, key: str) -> MatchRecommendation:
-    """Extract and validate MatchRecommendation from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Field key.
-
-    Returns:
-        Validated MatchRecommendation.
-
-    Raises:
-        JSONTypeError: If field is missing or not a valid recommendation.
-    """
-    value = require_str(obj, key)
-    if value == "strong_fit":
-        return "strong_fit"
-    if value == "good_fit":
-        return "good_fit"
-    if value == "stretch":
-        return "stretch"
-    if value == "new_territory":
-        return "new_territory"
-    raise JSONTypeError(f"Field '{key}' must be a valid recommendation, got '{value}'")
 
 
 # -----------------------------------------------------------------------------
@@ -168,7 +135,7 @@ def decode_capability(data: JSONObject) -> CodebaseCapability:
     """
     return CodebaseCapability(
         name=require_str(data, "name"),
-        strength=require_strength(data, "strength"),
+        strength=require_member(data, "strength", CapabilityStrength),
         tags=tuple(require_str_list(data, "tags")),
         description=require_str(data, "description"),
     )

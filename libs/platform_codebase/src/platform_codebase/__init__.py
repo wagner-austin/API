@@ -46,8 +46,6 @@ from platform_codebase.types import (
     encode_lib_info,
     encode_profile,
     encode_service_info,
-    require_recommendation,
-    require_strength,
 )
 
 __all__ = [
@@ -78,8 +76,6 @@ __all__ = [
     "make_fake_service_info",
     "parse_github_repo",
     "parse_pyproject",
-    "require_recommendation",
-    "require_strength",
     "scan_libs",
     "scan_libs_from_github",
     "scan_services",

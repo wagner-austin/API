@@ -244,7 +244,7 @@ _fake_http_client_check: HttpxClient = FakeHttpxClient()
 def make_fake_capability(
     *,
     name: str = "test_capability",
-    strength: CapabilityStrength = "moderate",
+    strength: CapabilityStrength = CapabilityStrength.MODERATE,
     tags: tuple[str, ...] = ("test",),
     description: str = "Test capability",
 ) -> CodebaseCapability:

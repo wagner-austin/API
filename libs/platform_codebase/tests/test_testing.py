@@ -10,6 +10,7 @@ from platform_codebase.testing import (
     make_fake_profile,
     make_fake_service_info,
 )
+from platform_codebase.types import CapabilityStrength
 
 
 class TestMakeFakeCapability:
@@ -20,7 +21,7 @@ class TestMakeFakeCapability:
         cap = make_fake_capability()
 
         assert cap.name == "test_capability"
-        assert cap.strength == "moderate"
+        assert cap.strength is CapabilityStrength.MODERATE
         assert cap.tags == ("test",)
         assert cap.description == "Test capability"
 
@@ -28,13 +29,13 @@ class TestMakeFakeCapability:
         """Test with custom values."""
         cap = make_fake_capability(
             name="custom_cap",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("ml", "tabular"),
             description="Custom description",
         )
 
         assert cap.name == "custom_cap"
-        assert cap.strength == "strong"
+        assert cap.strength is CapabilityStrength.STRONG
         assert cap.tags == ("ml", "tabular")
         assert cap.description == "Custom description"
 
