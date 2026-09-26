@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.config.covenant_radar import Settings, load_settings
+from platform_core.config.covenant_radar import DatadogEnv, MLBackend, Settings, load_settings
 from platform_core.testing import make_fake_env
 
 
@@ -23,7 +23,7 @@ def test_load_covenant_radar_settings_success() -> None:
     assert settings["app"]["models_root"] == "/data/models"
     assert settings["app"]["logs_root"] == "/data/logs"
     assert settings["app"]["data_root"] == "/data"
-    assert settings["app"]["ml_backend"] == "xgboost"
+    assert settings["app"]["ml_backend"] is MLBackend.XGBOOST
     assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
     assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
     assert settings["rq"]["queue_name"] == "covenant"
@@ -182,7 +182,7 @@ def test_load_covenant_radar_settings_mlp_backend() -> None:
 
     settings = load_settings()
 
-    assert settings["app"]["ml_backend"] == "mlp"
+    assert settings["app"]["ml_backend"] is MLBackend.MLP
     assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
     assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
 
@@ -196,7 +196,7 @@ def test_load_covenant_radar_settings_lstm_backend() -> None:
 
     settings = load_settings()
 
-    assert settings["app"]["ml_backend"] == "lstm"
+    assert settings["app"]["ml_backend"] is MLBackend.LSTM
 
 
 def test_load_covenant_radar_settings_lightgbm_backend() -> None:
@@ -208,7 +208,7 @@ def test_load_covenant_radar_settings_lightgbm_backend() -> None:
 
     settings = load_settings()
 
-    assert settings["app"]["ml_backend"] == "lightgbm"
+    assert settings["app"]["ml_backend"] is MLBackend.LIGHTGBM
 
 
 def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
@@ -220,7 +220,11 @@ def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP__ML_BACKEND", "invalid_backend")
 
-    with pytest.raises(ValueError, match="must be 'xgboost', 'mlp', 'lstm', or 'lightgbm'"):
+    with pytest.raises(
+        ValueError,
+        match="APP__ML_BACKEND must be one of 'xgboost', 'mlp', 'lstm', 'lightgbm', "
+        "got 'invalid_backend'",
+    ):
         load_settings()
 
 
@@ -233,7 +237,7 @@ def test_load_covenant_radar_settings_datadog_defaults() -> None:
 
     assert settings["datadog"]["enabled"] is False
     assert settings["datadog"]["service"] == "covenant-radar-api"
-    assert settings["datadog"]["env"] == "dev"
+    assert settings["datadog"]["env"] is DatadogEnv.DEV
     assert settings["datadog"]["version"] == "0.0.0"
     assert settings["datadog"]["agent_host"] == "localhost"
     assert settings["datadog"]["dogstatsd_port"] == 8125
@@ -256,7 +260,7 @@ def test_load_covenant_radar_settings_datadog_custom() -> None:
 
     assert settings["datadog"]["enabled"] is True
     assert settings["datadog"]["service"] == "my-service"
-    assert settings["datadog"]["env"] == "production"
+    assert settings["datadog"]["env"] is DatadogEnv.PRODUCTION
     assert settings["datadog"]["version"] == "2.0.0"
     assert settings["datadog"]["agent_host"] == "datadog-agent"
     assert settings["datadog"]["dogstatsd_port"] == 9125
@@ -271,7 +275,7 @@ def test_load_covenant_radar_settings_datadog_staging_env() -> None:
 
     settings = load_settings()
 
-    assert settings["datadog"]["env"] == "staging"
+    assert settings["datadog"]["env"] is DatadogEnv.STAGING
 
 
 def test_load_covenant_radar_settings_datadog_invalid_env_raises() -> None:
@@ -281,5 +285,8 @@ def test_load_covenant_radar_settings_datadog_invalid_env_raises() -> None:
     env = make_fake_env()
     env.set("DATADOG__ENV", "invalid_env")
 
-    with pytest.raises(ValueError, match="must be 'dev', 'staging', or 'production'"):
+    with pytest.raises(
+        ValueError,
+        match="DATADOG__ENV must be one of 'dev', 'staging', 'production', got 'invalid_env'",
+    ):
         load_settings()

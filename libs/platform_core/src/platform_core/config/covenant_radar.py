@@ -1,13 +1,28 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from platform_core.logging import LogLevel
 
-from ._utils import _parse_bool, _parse_int, _parse_str, _require_env_str
+from ._utils import _parse_bool, _parse_int, _parse_member, _parse_str, _require_env_str
 
-# ML backend type - matches covenant_ml.types.BackendName
-MLBackend = Literal["xgboost", "mlp", "lstm", "lightgbm"]
+
+class MLBackend(StrEnum):
+    """The inference backend covenant-radar-api serves, a subset of covenant_ml's BackendName."""
+
+    XGBOOST = "xgboost"
+    MLP = "mlp"
+    LSTM = "lstm"
+    LIGHTGBM = "lightgbm"
+
+
+class DatadogEnv(StrEnum):
+    """The environment name Datadog files traces and metrics under."""
+
+    DEV = "dev"
+    STAGING = "staging"
+    PRODUCTION = "production"
 
 
 class LoggingConfig(TypedDict, total=True):
@@ -47,7 +62,7 @@ class DatadogConfig(TypedDict, total=True):
 
     enabled: bool
     service: str
-    env: Literal["dev", "staging", "production"]
+    env: DatadogEnv
     version: str
     agent_host: str
     dogstatsd_port: int
@@ -78,35 +93,6 @@ class Settings(TypedDict, total=True):
     app: AppConfig
     datadog: DatadogConfig
     database_url: str
-
-
-def _parse_ml_backend(env_var: str, default: MLBackend) -> MLBackend:
-    """Parse ML backend from environment variable."""
-    value = _parse_str(env_var, default)
-    if value == "xgboost":
-        return "xgboost"
-    if value == "mlp":
-        return "mlp"
-    if value == "lstm":
-        return "lstm"
-    if value == "lightgbm":
-        return "lightgbm"
-    raise ValueError(f"{env_var} must be 'xgboost', 'mlp', 'lstm', or 'lightgbm', got '{value}'")
-
-
-DatadogEnv = Literal["dev", "staging", "production"]
-
-
-def _parse_datadog_env(env_var: str, default: DatadogEnv) -> DatadogEnv:
-    """Parse Datadog environment from environment variable."""
-    value = _parse_str(env_var, default)
-    if value == "dev":
-        return "dev"
-    if value == "staging":
-        return "staging"
-    if value == "production":
-        return "production"
-    raise ValueError(f"{env_var} must be 'dev', 'staging', or 'production', got '{value}'")
 
 
 def load_settings() -> Settings:
@@ -169,7 +155,7 @@ def load_settings() -> Settings:
     }
 
     # Parse ML backend and backend-specific active model paths
-    ml_backend = _parse_ml_backend("APP__ML_BACKEND", "xgboost")
+    ml_backend = _parse_member("APP__ML_BACKEND", MLBackend.XGBOOST, MLBackend)
     active_model_path_xgb = _parse_str("APP__ACTIVE_MODEL_PATH_XGB", "/data/models/active_xgb.ubj")
     active_model_path_mlp = _parse_str("APP__ACTIVE_MODEL_PATH_MLP", "/data/models/active_mlp.pt")
 
@@ -188,7 +174,7 @@ def load_settings() -> Settings:
     datadog_cfg: DatadogConfig = {
         "enabled": _parse_bool("DATADOG__ENABLED", False),
         "service": _parse_str("DATADOG__SERVICE", "covenant-radar-api"),
-        "env": _parse_datadog_env("DATADOG__ENV", "dev"),
+        "env": _parse_member("DATADOG__ENV", DatadogEnv.DEV, DatadogEnv),
         "version": _parse_str("DATADOG__VERSION", "0.0.0"),
         "agent_host": _parse_str("DATADOG__AGENT_HOST", "localhost"),
         "dogstatsd_port": _parse_int("DATADOG__DOGSTATSD_PORT", 8125),
@@ -217,6 +203,7 @@ def load_settings() -> Settings:
 __all__ = [
     "AppConfig",
     "DatadogConfig",
+    "DatadogEnv",
     "LoggingConfig",
     "MLBackend",
     "RQConfig",

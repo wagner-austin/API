@@ -4,6 +4,7 @@ from pathlib import Path
 
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import LogFormat, LogLevel
+from platform_core.members import MemberT, find_member
 
 from . import _test_hooks
 
@@ -73,6 +74,34 @@ def _parse_bool(key: str, default: bool) -> bool:
     if normalized in {"0", "false", "no", "n", "off"}:
         return False
     raise ValueError(f"Invalid boolean value for {key}: {val!r}")
+
+
+def _parse_member(key: str, default: MemberT, members: type[MemberT]) -> MemberT:
+    """Read an environment variable as a member of a StrEnum vocabulary.
+
+    The one parser for every closed set of words a service reads from its
+    environment, so each vocabulary is one StrEnum and no config module keeps
+    its own ``if value == "a": return "a"`` ladder (MCPs board task 1374feba).
+
+    Args:
+        key: The environment variable.
+        default: The member used when the variable is unset or blank.
+        members: The vocabulary.
+
+    Returns:
+        The member whose value is the variable's trimmed text, or ``default``.
+
+    Raises:
+        ValueError: When the variable is set to a word no member carries; the
+            message names the variable, every admitted word in declaration
+            order, and the word it got.
+    """
+    value = _parse_str(key, default)
+    member = find_member(value, members)
+    if member is None:
+        admitted = ", ".join(f"'{declared.value}'" for declared in members)
+        raise ValueError(f"{key} must be one of {admitted}, got '{value}'")
+    return member
 
 
 def _validate_log_level(value: str) -> LogLevel:
@@ -166,6 +195,7 @@ __all__ = [
     "_parse_int",
     "_parse_log_format",
     "_parse_log_level",
+    "_parse_member",
     "_parse_str",
     "_require_env_csv",
     "_require_env_str",

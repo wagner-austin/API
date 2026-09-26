@@ -8,45 +8,26 @@ All TypedDicts use immutable semantics with proper validation on decode.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     optional_str,
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 
 # =============================================================================
-# Literal Types
-# =============================================================================
-
-TokenType = Literal["Bearer"]
-
-
-# =============================================================================
-# Validation Helpers
+# Vocabularies
 # =============================================================================
 
 
-def _require_token_type(obj: JSONObject, key: str) -> TokenType:
-    """Extract and validate TokenType from JSON object.
+class TokenType(StrEnum):
+    """The token types a stored OAuth token may carry; only Bearer is issued."""
 
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated TokenType literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid TokenType.
-    """
-    value = require_str(obj, key)
-    if value == "Bearer":
-        return "Bearer"
-    raise JSONTypeError(f"Field '{key}' must be Bearer, got '{value}'")
+    BEARER = "Bearer"
 
 
 # =============================================================================
@@ -159,7 +140,7 @@ def decode_oauth_tokens(data: JSONObject) -> OAuthTokens:
         access_token=require_str(data, "access_token"),
         refresh_token=require_str(data, "refresh_token"),
         expires_at=require_int(data, "expires_at"),
-        token_type=_require_token_type(data, "token_type"),
+        token_type=require_member(data, "token_type", TokenType),
     )
 
 

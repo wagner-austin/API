@@ -12,7 +12,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from platform_core.json_utils import dump_json_str
-from platform_core.oauth_types import OAuthCredentials, OAuthTokenResponse, OAuthTokens
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokenResponse,
+    OAuthTokens,
+    TokenType,
+)
 
 # =============================================================================
 # HTTP Hook Fakes
@@ -240,7 +245,7 @@ def make_test_tokens(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_at=actual_expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 

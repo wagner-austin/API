@@ -9,6 +9,7 @@ from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokenResponse,
     OAuthTokens,
+    TokenType,
     decode_oauth_credentials,
     decode_oauth_token_response,
     decode_oauth_tokens,
@@ -100,7 +101,7 @@ class TestOAuthTokensEncodeDecode:
             access_token="access_123",
             refresh_token="refresh_456",
             expires_at=1735200000,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
         result = encode_oauth_tokens(tokens)
 
@@ -121,7 +122,7 @@ class TestOAuthTokensEncodeDecode:
         assert result["access_token"] == "access_123"
         assert result["refresh_token"] == "refresh_456"
         assert result["expires_at"] == 1735200000
-        assert result["token_type"] == "Bearer"
+        assert result["token_type"] is TokenType.BEARER
 
     def test_decode_tokens_missing_access_token(self) -> None:
         data: JSONObject = {
@@ -172,8 +173,7 @@ class TestOAuthTokensEncodeDecode:
         }
         with pytest.raises(JSONTypeError) as exc_info:
             decode_oauth_tokens(data)
-        assert "token_type" in str(exc_info.value)
-        assert "Bearer" in str(exc_info.value)
+        assert str(exc_info.value) == "Invalid token_type 'Basic': must be one of 'Bearer'"
 
     def test_decode_tokens_expires_at_wrong_type(self) -> None:
         data: JSONObject = {
@@ -191,7 +191,7 @@ class TestOAuthTokensEncodeDecode:
             access_token="roundtrip_access",
             refresh_token="roundtrip_refresh",
             expires_at=1735300000,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
         encoded = encode_oauth_tokens(original)
         decoded = decode_oauth_tokens(encoded)
