@@ -34,7 +34,7 @@ class FakeTranscribeFn:
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         language: str | None = None,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         timeout: float | None = None,
     ) -> VerboseResponse:
         """Record call and return next response."""
@@ -67,7 +67,7 @@ class FailingThenSuccessFn:
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         language: str | None = None,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         timeout: float | None = None,
     ) -> VerboseResponse:
         """Fail first call, succeed after."""
@@ -93,7 +93,7 @@ class AlwaysFailsFn:
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         language: str | None = None,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         timeout: float | None = None,
     ) -> VerboseResponse:
         """Always raise TimeoutError."""
@@ -111,7 +111,7 @@ class TestParallelTranscriber:
         assert transcriber._max_retries == 2
         assert transcriber._timeout == 900.0
         assert transcriber._language is None
-        assert transcriber._task == "transcribe"
+        assert transcriber._task is WhisperTask.TRANSCRIBE
 
     def test_init_custom_values(self) -> None:
         """Initialize with custom values."""
@@ -122,13 +122,13 @@ class TestParallelTranscriber:
             max_retries=3,
             timeout_seconds=600.0,
             language="vi",
-            task="translate",
+            task=WhisperTask.TRANSLATE,
         )
         assert transcriber._max_concurrent == 5
         assert transcriber._max_retries == 3
         assert transcriber._timeout == 600.0
         assert transcriber._language == "vi"
-        assert transcriber._task == "translate"
+        assert transcriber._task is WhisperTask.TRANSLATE
 
     def test_init_clamps_negative_values(self) -> None:
         """Clamp negative concurrent and retry values to minimums."""
@@ -252,7 +252,7 @@ class TestParallelTranscriber:
         fake_fn = FakeTranscribeFn()
         transcriber = ParallelTranscriber(
             transcribe=fake_fn,
-            task="translate",
+            task=WhisperTask.TRANSLATE,
         )
 
         chunks = [
@@ -265,7 +265,7 @@ class TestParallelTranscriber:
         ]
         transcriber.transcribe_chunks(chunks)
 
-        assert fake_fn._calls[0]["task"] == "translate"
+        assert fake_fn._calls[0]["task"] is WhisperTask.TRANSLATE
 
     def test_transcribe_chunks_retries_on_failure(self, tmp_path: Path) -> None:
         """Verify retry logic on transient errors."""

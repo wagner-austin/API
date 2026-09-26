@@ -98,12 +98,12 @@ class FakeSTTClient:
         self,
         *,
         file: BinaryIO,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         language: str | None = None,
         timeout: float | None = None,
     ) -> VerboseResponse:
         """Fake process."""
-        if task == "translate":
+        if task is WhisperTask.TRANSLATE:
             return self.translate(file=file, timeout=timeout)
         return self.transcribe(file=file, language=language, timeout=timeout)
 

@@ -22,7 +22,7 @@ from platform_stt.testing import (
     reset_hooks,
     set_production_hooks,
 )
-from platform_stt.types import AudioChunk, VerboseResponse, VerboseSegment
+from platform_stt.types import AudioChunk, VerboseResponse, VerboseSegment, WhisperTask
 
 
 class TestFakeSTTClient:
@@ -95,7 +95,7 @@ class TestFakeSTTClient:
         """Process with transcribe task."""
         client = FakeSTTClient()
         file_obj: BinaryIO = io.BytesIO(b"fake")
-        result = client.process(file=file_obj, task="transcribe", language="en")
+        result = client.process(file=file_obj, task=WhisperTask.TRANSCRIBE, language="en")
         assert result["text"] == "Test transcription"
 
     def test_process_translate(self) -> None:
@@ -107,7 +107,7 @@ class TestFakeSTTClient:
         )
         client = FakeSTTClient(translate_response=translate_response)
         file_obj: BinaryIO = io.BytesIO(b"fake")
-        result = client.process(file=file_obj, task="translate")
+        result = client.process(file=file_obj, task=WhisperTask.TRANSLATE)
         assert result["text"] == "Translated"
 
 

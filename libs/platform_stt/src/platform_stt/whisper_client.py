@@ -120,7 +120,7 @@ class OpenAISttClient:
         self,
         *,
         file: BinaryIO,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         language: str | None = None,
         timeout: float | None = None,
     ) -> VerboseResponse:
@@ -137,7 +137,7 @@ class OpenAISttClient:
         Returns:
             VerboseResponse with processed text and segments.
         """
-        if task == "translate":
+        if task is WhisperTask.TRANSLATE:
             return self.translate(file=file, timeout=timeout)
         return self.transcribe(file=file, language=language, timeout=timeout)
 
