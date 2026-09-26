@@ -203,8 +203,11 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         takes back a registration of the same name, which is what a
         rebuilt host must do: its old runners are still registered,
         offline, under exactly the names the roster gives the new ones
-        (board task 1aa6a021). Duplicate installs are the roster's to
-        prevent, and ``--onboard`` refuses a repo the roster already
+        (board task 1aa6a021). An install whose ``.runner`` file exists is
+        already configured and is left alone, because config.cmd refuses a
+        second configuration and ``--rebuild`` re-runs every stage over a
+        host that may be half built. Duplicate installs are the roster's
+        to prevent, and ``--onboard`` refuses a repo the roster already
         carries on the host.
     """
     token_var = token_variable(install["repo"])
@@ -222,15 +225,17 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         f"    Expand-Archive -LiteralPath $zip -DestinationPath '{directory}' -Force",
         "    Remove-Item $zip",
         "}",
-        f"& '{directory}\\config.cmd' --unattended "
+        f"if (-not (Test-Path '{directory}\\.runner')) {{",
+        f"    & '{directory}\\config.cmd' --unattended "
         f"--url https://github.com/{install['repo']} --token $env:{token_var} "
         f"--name {install['runner_name']} --labels {labels} --runasservice --replace",
+        f"    if ($LASTEXITCODE -ne 0) {{ throw 'config.cmd for {install['repo']} "
+        f"{install['runner_name']} exited ' + $LASTEXITCODE }}",
+        "}",
     ]
 
 
-def render_windows_python_toolcache_lines(
-    install: RunnerInstall, python_versions: tuple[str, ...]
-) -> list[str]:
+def render_windows_python_toolcache_lines(install: RunnerInstall) -> list[str]:
     """PowerShell lines that seed a Windows runner's Python tool cache.
 
     On self-hosted Windows, ``actions/setup-python`` INSTALLS when the tool
@@ -244,21 +249,23 @@ def render_windows_python_toolcache_lines(
     ``Python/<ver>/x64/python.exe`` plus an ``x64.complete`` marker.
 
     Args:
-        install: The windows-side install whose tool cache to seed.
-        python_versions: Exact versions to seed, e.g. ``("3.11.9",)``.
-            Exact on purpose: NuGet carries only versions python.org built
-            for Windows, and a floating spec here would re-create the
-            drift this module exists to prevent.
+        install: The windows-side install whose tool cache to seed, with the
+            exact versions in its ``python_toolcache``. Exact on purpose:
+            NuGet carries only versions python.org built for Windows, and a
+            floating spec here would re-create the drift this module exists
+            to prevent.
 
     Returns:
-        The PowerShell lines. Idempotent: an already-seeded version is
-        left alone.
+        The PowerShell lines, none for an install that seeds nothing.
+        Idempotent: an already-seeded version is left alone.
     """
+    if not install["python_toolcache"]:
+        return []
     root = _install_root_for(install)
     lines: list[str] = [
         f"$ToolDir = '{root}\\_work\\_tool'",
     ]
-    for version in python_versions:
+    for version in install["python_toolcache"]:
         lines += [
             f"$Target = Join-Path $ToolDir 'Python\\{version}\\x64'",
             "if (-not (Test-Path (Join-Path $Target 'python.exe'))) {",
@@ -298,6 +305,33 @@ def _install_root_for(install: RunnerInstall) -> str:
     return root
 
 
+def render_wslconfig_lines(spec: HostRunnerSpec) -> list[str]:
+    """PowerShell lines that write ``.wslconfig`` for a declared memory floor.
+
+    Shared by ``provision.ps1`` and the rebuild's Windows base stage, which
+    writes it BEFORE the distro is first started so the VM boots into the
+    floor rather than needing a restart to take it.
+
+    Args:
+        spec: The host's roster entry.
+
+    Returns:
+        The lines, none when the roster declares no floor.
+    """
+    floor = spec["wslconfig_min_memory_gb"]
+    if floor is None:
+        return []
+    return [
+        "$WslConfig = @(",
+        "  '[wsl2]',",
+        f"  'memory={floor}GB',",
+        "  'swap=8GB'",
+        ")",
+        'Set-Content -LiteralPath "$env:USERPROFILE\\.wslconfig" -Value $WslConfig -Encoding ascii',
+        "Write-Output 'wrote .wslconfig; the ceiling applies when the VM next starts'",
+    ]
+
+
 def _render_windows_script(spec: HostRunnerSpec) -> str:
     """The Windows-side provision for one host.
 
@@ -314,22 +348,11 @@ def _render_windows_script(spec: HostRunnerSpec) -> str:
     lines: list[str] = [
         "# provision.ps1 -- Windows side. Rendered by fleet-runners; run as the",
         "# machine's interactive user. Re-run after any change: every step is",
-        "# idempotent except runner registration, which config.cmd refuses to",
-        "# repeat -- loudly, which is the correct answer to running it twice.",
+        "# idempotent, and an install already configured is left alone.",
         "$ErrorActionPreference = 'Stop'",
     ]
     floor = spec["wslconfig_min_memory_gb"]
-    if floor is not None:
-        lines += [
-            "$WslConfig = @(",
-            "  '[wsl2]',",
-            f"  'memory={floor}GB',",
-            "  'swap=8GB'",
-            ")",
-            'Set-Content -LiteralPath "$env:USERPROFILE\\.wslconfig" '
-            "-Value $WslConfig -Encoding ascii",
-            "Write-Output 'wrote .wslconfig; the ceiling applies after wsl --shutdown'",
-        ]
+    lines += render_wslconfig_lines(spec)
     keepalive = spec["keepalive_task"]
     if keepalive is not None:
         lines += [
@@ -342,6 +365,7 @@ def _render_windows_script(spec: HostRunnerSpec) -> str:
     for install in windows_installs:
         lines.append("")
         lines += render_windows_install_lines(install)
+        lines += render_windows_python_toolcache_lines(install)
     if floor is None and keepalive is None and not windows_installs:
         lines.append("Write-Output 'nothing declared for the Windows side of this host'")
     return "\n".join(lines) + "\n"
@@ -396,6 +420,13 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
     Args:
         install: The install to configure, with ``side`` ``"wsl"``.
 
+    An install whose ``.runner`` file exists is already configured and
+    config.sh is skipped, and one whose ``.service`` file exists already
+    has its unit and ``svc.sh install`` is skipped: both refuse a second
+    run, and ``--rebuild`` re-runs every stage over a host that may be
+    half built. ``svc.sh start`` always runs; starting a running unit is
+    a no-op.
+
     Returns:
         The bash lines that download, configure and start it.
     """
@@ -414,14 +445,17 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         f"    rm {directory}/runner.tar.gz",
         "fi",
         f"chown -R gharunner:gharunner {directory}",
-        f'sudo -u gharunner bash -c "cd {directory} && ./config.sh --unattended '
+        f"if [ ! -f {directory}/.runner ]; then",
+        f'    sudo -u gharunner bash -c "cd {directory} && ./config.sh --unattended '
         f'--url https://github.com/{install["repo"]} --token \\"${{{token_var}}}\\" '
         f'--name {install["runner_name"]} --labels {labels} --replace"',
+        "fi",
         *(
             f"grep -qF ':{entry}' {directory}/.path || sed -i 's#$#:{entry}#' {directory}/.path"
             for entry in RUNNER_PATH_ENTRIES
         ),
-        f"(cd {directory} && ./svc.sh install gharunner && ./svc.sh start)",
+        f"[ -f {directory}/.service ] || (cd {directory} && ./svc.sh install gharunner)",
+        f"(cd {directory} && ./svc.sh start)",
     ]
 
 
@@ -507,5 +541,6 @@ __all__ = [
     "render_windows_install_lines",
     "render_windows_python_toolcache_lines",
     "render_wsl_install_lines",
+    "render_wslconfig_lines",
     "token_variable",
 ]

@@ -133,6 +133,22 @@ class NowProtocol(Protocol):
         """
 
 
+class SleepProtocol(Protocol):
+    """Waits a whole number of seconds.
+
+    A hook for the same reason the clock is one: ``--rebuild`` waits out a
+    host's reboot by polling, and a test that could not control the wait
+    could only run the poll in real time or not at all.
+    """
+
+    def __call__(self, seconds: int) -> None:
+        """Wait.
+
+        Args:
+            seconds: How long to wait.
+        """
+
+
 class ReadTextProtocol(Protocol):
     """Reads a file's whole contents as UTF-8."""
 
@@ -355,6 +371,15 @@ def _default_now() -> int:
     return int(time.time())
 
 
+def _default_sleep(seconds: int) -> None:
+    """Wait on the real clock.
+
+    Args:
+        seconds: How long to wait.
+    """
+    time.sleep(seconds)
+
+
 def _default_read_text(path: pathlib.Path) -> str:
     """Read a real file as UTF-8.
 
@@ -480,6 +505,7 @@ def _default_env(name: str) -> str | None:
 
 run: RunProtocol = _default_run
 now: NowProtocol = _default_now
+sleep: SleepProtocol = _default_sleep
 # The dispatch queue's network seam. The implementation is
 # ``platform_core.mcp_client.urllib_mcp_post``, shared with tools/board-watch:
 # the SEAM belongs to this package (production binds the real thing, a test
@@ -511,6 +537,7 @@ __all__ = [
     "ReadBytesProtocol",
     "ReadTextProtocol",
     "RunProtocol",
+    "SleepProtocol",
     "TempRootProtocol",
     "WriteTextProtocol",
     "append_text",
@@ -522,6 +549,7 @@ __all__ = [
     "read_bytes",
     "read_text",
     "run",
+    "sleep",
     "temp_root",
     "write_text",
 ]

@@ -43,7 +43,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import _test_hooks, remote, runner_audit, runner_render
+from fleet.core import _test_hooks, remote, runner_audit, runner_distro, runner_render
 
 #: The token mint's deadline, in seconds: one HTTPS round trip to GitHub.
 #: A minute outlasts any answer ``gh`` gives and ends a hung login prompt
@@ -79,13 +79,22 @@ def _repo_slug(repo: str) -> str:
     return repo.split("/")[1].lower()
 
 
-def plan_onboard(spec: HostRunnerSpec, repo: str, *, sides: tuple[str, ...]) -> OnboardPlan:
+def plan_onboard(
+    spec: HostRunnerSpec,
+    repo: str,
+    *,
+    sides: tuple[str, ...],
+    python_versions: tuple[str, ...],
+) -> OnboardPlan:
     """The installs onboarding will create, per the fleet convention.
 
     Args:
         spec: The target host's roster entry.
         repo: The repository, ``owner/name``.
         sides: Which environments to provision, from {"wsl", "windows"}.
+        python_versions: Exact Python versions the Windows install's tool
+            cache is seeded with, recorded on that install so a rebuild
+            seeds the same ones; empty for none.
 
     Returns:
         The plan.
@@ -128,6 +137,7 @@ def plan_onboard(spec: HostRunnerSpec, repo: str, *, sides: tuple[str, ...]) -> 
                 service=f"actions.runner.{owner_dashed}.lavender-wsl.service",
                 workdir=f"/home/gharunner/actions-runner-{slug}-1/_work",
                 labels=["lavender-wsl"],
+                python_toolcache=[],
             )
         )
     if "windows" in sides:
@@ -139,6 +149,7 @@ def plan_onboard(spec: HostRunnerSpec, repo: str, *, sides: tuple[str, ...]) -> 
                 service=f"actions.runner.{owner_dashed}.lavender",
                 workdir=f"C:/actions-runner-{slug}/_work",
                 labels=["lavender"],
+                python_toolcache=list(python_versions),
             )
         )
     return OnboardPlan(repo=repo, installs=installs)
@@ -193,30 +204,11 @@ def mint_registration_token(repo: str) -> str:
     return token
 
 
-def _windows_to_wsl_path(path: str) -> str:
-    """A Windows drive path as the distro sees it.
-
-    Args:
-        path: A forward-slashed drive-letter path, e.g. ``C:/fleet/stage``.
-
-    Returns:
-        The ``/mnt/<drive>/...`` form.
-
-    Raises:
-        ValueError: On a path with no drive letter -- translating a
-            relative or POSIX path would silently point the distro at the
-            wrong file.
-    """
-    if len(path) < 3 or not path[0].isalpha() or path[1] != ":" or path[2] != "/":
-        raise ValueError(f"not a forward-slashed drive path: {path!r}")
-    return f"/mnt/{path[0].lower()}{path[2:]}"
-
-
 def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> None:
     """Provision one WSL-side install on the host.
 
-    The bash payload is sent as a file and executed by path through a
-    one-line PowerShell driver, per the remote layer's rule; the token is
+    The bash payload is sent as a file and executed by path
+    (:func:`fleet.core.runner_distro.run_distro_script`); the token is
     injected as the payload's own environment variable line rather than a
     command-line argument, so it never crosses a shell boundary unquoted.
 
@@ -239,40 +231,23 @@ def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> 
             *runner_render.render_wsl_install_lines(install),
         ]
     )
-    windows_payload_path = f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}.sh"
-    remote.send_script(spec["host"], windows_payload_path, payload, platform="windows")
-    wsl_payload_path = _windows_to_wsl_path(windows_payload_path)
-    driver = "\n".join(
-        [
-            "$ErrorActionPreference = 'Stop'",
-            "$env:WSL_UTF8 = '1'",
-            f"wsl -d '{spec['wsl_distro']}' -u root -- bash '{wsl_payload_path}'",
-            "exit $LASTEXITCODE",
-        ]
-    )
-    remote.run_script(
-        spec["host"],
-        f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-driver.ps1",
-        driver,
-        platform="windows",
+    runner_distro.run_distro_script(
+        spec,
+        f"fleet-onboard-{_repo_slug(install['repo'])}",
+        payload,
+        timeout_seconds=remote.SSH_TIMEOUT_SECONDS,
     )
 
 
-def _provision_windows(
-    spec: HostRunnerSpec,
-    install: RunnerInstall,
-    token: str,
-    python_versions: tuple[str, ...],
-) -> None:
+def _provision_windows(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> None:
     """Provision one Windows-side install on the host.
 
     Args:
         spec: The host.
-        install: The install, ``side`` ``"windows"``.
+        install: The install, ``side`` ``"windows"``; its
+            ``python_toolcache`` versions are seeded so setup-python finds
+            instead of installing.
         token: The registration token.
-        python_versions: Exact Python versions to seed into the install's
-            tool cache, so setup-python finds instead of installing --
-            empty for repos that bring no Python.
 
     Raises:
         AppError: ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
@@ -284,9 +259,8 @@ def _provision_windows(
         "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
         f"$env:{token_var} = '{token}'",
         *runner_render.render_windows_install_lines(install),
+        *runner_render.render_windows_python_toolcache_lines(install),
     ]
-    if python_versions:
-        lines += runner_render.render_windows_python_toolcache_lines(install, python_versions)
     remote.run_script(
         spec["host"],
         f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-win.ps1",
@@ -327,13 +301,13 @@ def onboard(
             steps describe.
         ValueError: From the planner's flag validation.
     """
-    plan = plan_onboard(spec, repo, sides=sides)
+    plan = plan_onboard(spec, repo, sides=sides, python_versions=python_versions)
     token = mint_registration_token(repo)
     for install in plan["installs"]:
         if install["side"] == "wsl":
             _provision_wsl(spec, install, token)
         else:
-            _provision_windows(spec, install, token, python_versions)
+            _provision_windows(spec, install, token)
     spec["installs"].extend(plan["installs"])
     outcome = runner_audit.attempt_audit_host(spec)
     findings = outcome["findings"]

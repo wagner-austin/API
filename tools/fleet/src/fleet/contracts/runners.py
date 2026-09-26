@@ -32,11 +32,14 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     require_bool,
+    require_dict,
     require_list,
     require_str,
     require_str_list,
 )
 from typing_extensions import TypedDict
+
+from fleet.contracts.runner_base import HostBase, decode_host_base, encode_host_base
 
 
 class RunnerInstall(TypedDict):
@@ -69,6 +72,13 @@ class RunnerInstall(TypedDict):
             ``["lavender-wsl"]``. Labels are the pool: a workflow targets a
             label, never a machine, which is what makes a new box a five
             minute join instead of a workflow edit.
+        python_toolcache: Exact CPython versions seeded into a Windows
+            install's tool cache, so ``actions/setup-python`` finds instead
+            of installing (the install path needs registry rights the runner
+            service lacks). Empty for a WSL install, and for a Windows one
+            whose jobs bring no Python. Recorded here since 2026-09-26: the
+            seeds were an ``--onboard`` flag the roster never kept, so the
+            lavender rebuild had to recover them from the old disk.
     """
 
     repo: str
@@ -77,6 +87,7 @@ class RunnerInstall(TypedDict):
     service: str
     workdir: str
     labels: list[str]
+    python_toolcache: list[str]
 
 
 class FileAsset(TypedDict):
@@ -156,6 +167,9 @@ class HostRunnerSpec(TypedDict):
             provision, not an afterthought on one box's disk.
         installs: Every runner install this host carries.
         assets: Every path its job classes require.
+        base: What a stock Windows install needs before any runner can
+            register, and the distro's disk ceiling
+            (:mod:`fleet.contracts.runner_base`).
     """
 
     name: str
@@ -168,6 +182,7 @@ class HostRunnerSpec(TypedDict):
     systemd_timers: list[str]
     installs: list[RunnerInstall]
     assets: list[FileAsset]
+    base: HostBase
 
 
 class RunnerSpec(TypedDict):
@@ -196,6 +211,7 @@ def encode_runner_install(install: RunnerInstall) -> JSONObject:
         "service": install["service"],
         "workdir": install["workdir"],
         "labels": list(install["labels"]),
+        "python_toolcache": list(install["python_toolcache"]),
     }
 
 
@@ -245,6 +261,19 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
         raise JSONTypeError(
             f"a windows install's workdir must be a drive-letter path, got {workdir!r}"
         )
+    toolcache = require_str_list(value, "python_toolcache")
+    if side == "wsl" and toolcache:
+        raise JSONTypeError(
+            "python_toolcache must be empty on a wsl install: the seed is the Windows "
+            "tool cache's, and a WSL job's setup-python installs without registry rights"
+        )
+    for version in toolcache:
+        parts = version.split(".")
+        if len(parts) != 3 or not all(part.isdigit() for part in parts):
+            raise JSONTypeError(
+                f"python_toolcache versions must be exact X.Y.Z, got {version!r}; a floating "
+                "spec re-creates the drift the seed exists to prevent"
+            )
     return RunnerInstall(
         repo=repo,
         runner_name=require_str(value, "runner_name"),
@@ -252,6 +281,7 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
         service=require_str(value, "service"),
         workdir=workdir,
         labels=labels,
+        python_toolcache=toolcache,
     )
 
 
@@ -358,6 +388,7 @@ def encode_host_runner_spec(spec: HostRunnerSpec) -> JSONObject:
         "systemd_timers": list(spec["systemd_timers"]),
         "installs": [encode_runner_install(install) for install in spec["installs"]],
         "assets": [encode_file_asset(asset) for asset in spec["assets"]],
+        "base": encode_host_base(spec["base"]),
     }
 
 
@@ -442,6 +473,7 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
         systemd_timers=require_str_list(value, "systemd_timers"),
         installs=installs,
         assets=[decode_file_asset(entry) for entry in require_list(value, "assets")],
+        base=decode_host_base(require_dict(value, "base")),
     )
 
 

@@ -7,6 +7,14 @@ Usage:
     fleet-runners --spec runners.json --host lavender --sample load.jsonl
     fleet-runners --spec runners.json --report load.jsonl --cores 16
     fleet-runners --spec runners.json --host lavender --onboard owner/repo
+    fleet-runners --spec runners.json --host lavender --rebuild yes
+
+``--rebuild yes`` takes a machine node setup has made reachable, from a
+stock Windows install, to an audited runner host: the Windows base and the
+reboot it asks for, the pinned distro, the Linux base, fresh tokens, the
+roster's provision scripts, then the audit (:mod:`fleet.core.runner_rebuild`).
+Every stage is idempotent, so a cut-short rebuild is finished by running it
+again. The value is a confirmation, because the act lays a whole machine.
 
 ``--onboard`` is the operator's 2026-09-09 mandate made runnable: ONE
 command registers a repository's CI onto the self-hosted fleet -- token
@@ -60,7 +68,14 @@ from fleet.contracts.runners import (
     decode_runner_spec,
     encode_runner_spec,
 )
-from fleet.core import _test_hooks, runner_audit, runner_load, runner_onboard, runner_render
+from fleet.core import (
+    _test_hooks,
+    runner_audit,
+    runner_load,
+    runner_onboard,
+    runner_rebuild,
+    runner_render,
+)
 
 _log = get_logger(__name__)
 
@@ -82,6 +97,8 @@ SIDES_FLAG = "--sides"
 
 PYTHON_FLAG = "--python"
 
+REBUILD_FLAG = "--rebuild"
+
 _FLAGS = (
     SPEC_FLAG,
     HOST_FLAG,
@@ -92,6 +109,7 @@ _FLAGS = (
     ONBOARD_FLAG,
     SIDES_FLAG,
     PYTHON_FLAG,
+    REBUILD_FLAG,
 )
 
 
@@ -170,18 +188,7 @@ def _audit(hosts: Sequence[HostRunnerSpec]) -> int:
             _log.info("%s UNREACHABLE %s", host["name"], outcome["reason"])
             faults += 1
             continue
-        for finding in findings:
-            if finding["ok"]:
-                _log.info("%s OK %s", host["name"], finding["check_id"])
-            else:
-                _log.info(
-                    "%s DRIFT %s -- %s (%s)",
-                    host["name"],
-                    finding["check_id"],
-                    finding["detail"],
-                    finding["reason"],
-                )
-                faults += 1
+        faults += _log_findings(host, findings)
     if faults:
         _log.info("%d fault(s); the fleet does not match its roster", faults)
         return 1
@@ -319,6 +326,50 @@ def _onboard(
             ",".join(install["labels"]),
         )
     _log.info("roster rewritten: %s", spec_path)
+    faults = _log_findings(host, findings)
+    if faults:
+        _log.info("%d fault(s) after onboarding; the drift lines name the repairs", faults)
+        return 1
+    _log.info("onboarding verified: every check green, %s covered from birth", repo)
+    return 0
+
+
+def _rebuild(host: HostRunnerSpec) -> int:
+    """Rebuild one runner host and print each stage and the audit.
+
+    Args:
+        host: The host to rebuild.
+
+    Returns:
+        0 when the post-rebuild audit is clean; 1 when it reports drift, a
+        manual asset being the usual one, named by its own line.
+
+    Raises:
+        AppError: As :func:`fleet.core.runner_rebuild.rebuild` describes.
+    """
+    report = runner_rebuild.rebuild(host)
+    for step in report["steps"]:
+        _log.info("%s rebuild: %s", host["name"], step)
+    for step in report["manual_steps"]:
+        _log.info("%s %s", host["name"], step)
+    faults = _log_findings(host, report["findings"])
+    if faults:
+        _log.info("%d fault(s) after the rebuild; the drift lines name the repairs", faults)
+        return 1
+    _log.info("rebuild verified: every check green on %s", host["name"])
+    return 0
+
+
+def _log_findings(host: HostRunnerSpec, findings: Sequence[runner_audit.AuditFinding]) -> int:
+    """Print one host's audit verdicts.
+
+    Args:
+        host: The audited host.
+        findings: Its verdicts.
+
+    Returns:
+        How many drifted.
+    """
     faults = 0
     for finding in findings:
         if finding["ok"]:
@@ -332,15 +383,11 @@ def _onboard(
                 finding["reason"],
             )
             faults += 1
-    if faults:
-        _log.info("%d fault(s) after onboarding; the drift lines name the repairs", faults)
-        return 1
-    _log.info("onboarding verified: every check green, %s covered from birth", repo)
-    return 0
+    return faults
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Audit, render, sample, report or onboard, per the flags.
+    """Audit, render, sample, report, onboard or rebuild, per the flags.
 
     Args:
         argv: Command-line arguments excluding the program name. Defaults to
@@ -355,12 +402,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ValueError: When a flag is unknown, repeated, missing its value,
             ``--spec`` is absent, more than one mode flag is given (each
             names a different act and a combined invocation would do one
-            silently), ``--render`` was given without ``--host``,
+            silently), ``--render`` or ``--rebuild`` was given without
+            ``--host``, ``--rebuild`` with any value but ``yes``,
             ``--report`` without ``--cores``, or ``--cores`` is not a
             positive integer.
         AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN``,
-            ``RUNNER_AUDIT_UNPARSABLE``, ``NODE_UNREACHABLE`` or
-            ``DISPATCH_FAILED`` as the helpers describe.
+            ``RUNNER_AUDIT_UNPARSABLE``, ``RUNNER_TOKEN_UNAVAILABLE``,
+            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as the helpers
+            describe.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
@@ -370,7 +419,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{SPEC_FLAG} is required: the roster's path is passed, never searched for"
         )
     modes = [
-        flag for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG) if flag in parsed
+        flag
+        for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG, REBUILD_FLAG)
+        if flag in parsed
     ]
     if len(modes) > 1:
         raise ValueError(
@@ -387,6 +438,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     for orphan in (SIDES_FLAG, PYTHON_FLAG):
         if orphan in parsed:
             raise ValueError(f"{orphan} only means something with {ONBOARD_FLAG}")
+    if REBUILD_FLAG in parsed:
+        _require_rebuild_confirmation(parsed)
+        _require_host(parsed, REBUILD_FLAG, "a rebuild lays one machine")
+        return _rebuild(hosts[0])
     render_dir = parsed.get(RENDER_FLAG)
     if render_dir is not None:
         _require_host(parsed, RENDER_FLAG, "a render is for one machine")
@@ -413,6 +468,23 @@ def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
     """
     if parsed.get(HOST_FLAG) is None:
         raise ValueError(f"{flag} requires {HOST_FLAG}: {why}, and defaulting one would be a guess")
+
+
+def _require_rebuild_confirmation(parsed: dict[str, str]) -> None:
+    """Refuse a ``--rebuild`` whose value is not the literal ``yes``.
+
+    Args:
+        parsed: The parsed flags, ``--rebuild`` among them.
+
+    Raises:
+        ValueError: When the value is anything else: the act lays a whole
+            runner host, and the value is its confirmation.
+    """
+    if parsed[REBUILD_FLAG] != "yes":
+        raise ValueError(
+            f"{REBUILD_FLAG} takes the literal value yes, got {parsed[REBUILD_FLAG]!r}: it "
+            "lays a machine's whole runner host, and a value is its confirmation"
+        )
 
 
 def _split_flag(raw: str | None, *, default: tuple[str, ...]) -> tuple[str, ...]:
@@ -477,6 +549,7 @@ __all__ = [
     "HOST_FLAG",
     "ONBOARD_FLAG",
     "PYTHON_FLAG",
+    "REBUILD_FLAG",
     "RENDER_FLAG",
     "REPORT_FLAG",
     "SAMPLE_FLAG",

@@ -27,18 +27,10 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
+from fleet.core.script_values import scriptable
 
 #: File name the rendered audit script lands under in the host's scratch_dir.
 AUDIT_SCRIPT_NAME = "fleet-runner-audit.ps1"
-
-#: Characters a value must not carry to be embedded in the rendered script.
-#:
-#: Values land inside single-quoted PowerShell strings, where a quote ends the
-#: string and CR/LF end the statement. Escaping is refused in favour of
-#: rejection: every legitimate service name, path and task name in the roster
-#: is plain, so a value carrying one of these is a roster error to surface,
-#: not a case to accommodate.
-_UNSCRIPTABLE = ("'", '"', "\r", "\n", "`", "$")
 
 
 class ExpectedCheck(TypedDict):
@@ -88,30 +80,6 @@ class AuditOutcome(TypedDict):
     reason: str
 
 
-def _scriptable(value: str, *, label: str) -> str:
-    """Refuse a value the rendered script could not carry verbatim.
-
-    Args:
-        value: The roster value about to be embedded.
-        label: What the value is, for the error.
-
-    Returns:
-        The value, unchanged.
-
-    Raises:
-        JSONTypeError-free ValueError: deliberately a plain ValueError --
-            this is a roster-content precondition of the renderer, not a
-            JSON-shape fault, and the message names the field to fix.
-    """
-    for forbidden in _UNSCRIPTABLE:
-        if forbidden in value:
-            raise ValueError(
-                f"{label} {value!r} contains {forbidden!r}, which cannot be embedded in "
-                "the audit script verbatim; rename the item rather than escaping it"
-            )
-    return value
-
-
 def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
     """Every check the audit script for this host will report, in order.
 
@@ -141,6 +109,20 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
                 reason="two CI jobs must fit in the VM at once",
             )
         )
+    checks.append(
+        ExpectedCheck(
+            check_id=disk_check_id(spec),
+            reason="a runner host holds nothing that needs keeping, so its distro stays near "
+            "the idle baseline; growth past the ceiling is a leak, as on 2026-09-25",
+        )
+    )
+    checks.append(
+        ExpectedCheck(
+            check_id=f"execution-policy:LocalMachine:{spec['base']['execution_policy']}",
+            reason="a Windows runner's PowerShell steps run scripts from _temp, which the "
+            "Restricted default refuses",
+        )
+    )
     if spec["gpu_required"]:
         # One per WSL runner, on that runner's own PATH: the jobs that
         # digest the card are the runner's, and a host-level check from an
@@ -183,6 +165,53 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
                 ExpectedCheck(check_id=f"writable:{asset['path']}", reason=asset["reason"])
             )
     return checks
+
+
+def disk_check_id(spec: HostRunnerSpec) -> str:
+    """The disk row's id, which carries the ceiling and the idle baseline.
+
+    Both numbers are IN the id, so every audit line for the row, OK or
+    DRIFT, states what is allowed and what an idle rebuilt host measured
+    (board task 1aa6a021, A3).
+
+    Args:
+        spec: The host's roster entry.
+
+    Returns:
+        E.g. ``disk:/:ceiling-150gb:baseline-46gb@2026-09-26``.
+    """
+    disk = spec["base"]["disk"]
+    return (
+        f"disk:/:ceiling-{disk['ceiling_gb']}gb:"
+        f"baseline-{disk['baseline_gb']}gb@{disk['baseline_measured']}"
+    )
+
+
+def _disk_check_lines(spec: HostRunnerSpec, distro: str) -> list[str]:
+    """Script lines that hold the distro's root to the roster's ceiling.
+
+    Args:
+        spec: The host.
+        distro: The WSL distribution, already validated.
+
+    Returns:
+        The lines: ``df -BG`` of ``/`` inside the distro, parsed to whole GB,
+        and the Emit. An unreadable answer parses to -1 and drifts with df's
+        own words, never passes. The output is joined, never cast, for the
+        reason the asset pin in :func:`render_audit_script` gives.
+    """
+    disk = spec["base"]["disk"]
+    ceiling = disk["ceiling_gb"]
+    return [
+        f"$DiskLine = (@(wsl -d '{distro}' -- df -BG --output=used / 2>$null "
+        "| Select-Object -Skip 1 -First 1) -join '')",
+        "$UsedGb = -1",
+        "if ($DiskLine -match '(\\d+)G') { $UsedGb = [int]$Matches[1] }",
+        f"Emit '{disk_check_id(spec)}' ($UsedGb -ge 0 -and $UsedGb -le {ceiling}) "
+        f"('the distro root uses ' + $UsedGb + ' GB against a ceiling of {ceiling} GB; an "
+        f"idle rebuilt host used {disk['baseline_gb']} GB on {disk['baseline_measured']}; "
+        "df said: ' + $DiskLine)",
+    ]
 
 
 def _emit_wsl_state_check(distro: str, check_id: str, argv: str, expected: str) -> list[str]:
@@ -239,7 +268,7 @@ def _gpu_check_lines(spec: HostRunnerSpec, distro: str) -> list[str]:
     """
     lines: list[str] = []
     for install in (i for i in spec["installs"] if i["side"] == "wsl"):
-        runner_dir = _scriptable(install["workdir"].rsplit("/", 1)[0], label="workdir")
+        runner_dir = scriptable(install["workdir"].rsplit("/", 1)[0], label="workdir")
         check_id = f"gpu:{install['repo']}:wsl:{install['runner_name']}"
         lines += [
             f"$GpuName = (@(wsl -d '{distro}' -- sh -c 'PATH=$(cat {runner_dir}/.path) "
@@ -263,9 +292,9 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
 
     Raises:
         ValueError: When a roster value cannot be embedded verbatim; see
-            :func:`_scriptable`.
+            :func:`fleet.core.script_values.scriptable`.
     """
-    distro = _scriptable(spec["wsl_distro"], label="wsl_distro")
+    distro = scriptable(spec["wsl_distro"], label="wsl_distro")
     lines: list[str] = [
         "$ErrorActionPreference = 'Continue'",
         # wsl.exe writes UTF-16LE when redirected; forcing UTF-8 is what
@@ -279,7 +308,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
     ]
     keepalive = spec["keepalive_task"]
     if keepalive is not None:
-        task = _scriptable(keepalive, label="keepalive_task")
+        task = scriptable(keepalive, label="keepalive_task")
         lines += [
             f"$KeepaliveRow = [string](schtasks /query /tn '{task}' /fo csv 2>$null "
             "| Select-Object -Skip 1 -First 1)",
@@ -300,18 +329,25 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
             f"Emit 'memory-floor:{floor}gb' ($TotalMb -ge {floor_mb}) "
             "('the VM reports ' + $TotalMb + ' MB')",
         ]
+    lines += _disk_check_lines(spec, distro)
+    policy = scriptable(spec["base"]["execution_policy"], label="execution_policy")
+    lines += [
+        "$Policy = (@(Get-ExecutionPolicy -Scope LocalMachine) -join '')",
+        f"Emit 'execution-policy:LocalMachine:{policy}' ($Policy -eq '{policy}') "
+        "('Get-ExecutionPolicy -Scope LocalMachine said: ' + $Policy)",
+    ]
     if spec["gpu_required"]:
         lines += _gpu_check_lines(spec, distro)
     for timer in spec["systemd_timers"]:
-        name = _scriptable(timer, label="systemd timer")
+        name = scriptable(timer, label="systemd timer")
         lines += _emit_wsl_state_check(
             distro, f"timer:{name}", f"systemctl is-enabled '{name}'", "enabled"
         )
     for install in spec["installs"]:
-        service = _scriptable(install["service"], label="service")
-        workdir = _scriptable(install["workdir"], label="workdir")
-        repo = _scriptable(install["repo"], label="repo")
-        runner_name = _scriptable(install["runner_name"], label="runner_name")
+        service = scriptable(install["service"], label="service")
+        workdir = scriptable(install["workdir"], label="workdir")
+        repo = scriptable(install["repo"], label="repo")
+        runner_name = scriptable(install["runner_name"], label="runner_name")
         if install["side"] == "wsl":
             lines += _emit_wsl_state_check(
                 distro, f"service:wsl:{service}", f"systemctl is-active '{service}'", "active"
@@ -334,7 +370,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
                 f"('Test-Path {workdir}')",
             ]
     for asset in spec["assets"]:
-        path = _scriptable(asset["path"], label="asset path")
+        path = scriptable(asset["path"], label="asset path")
         lines += _emit_wsl_test_check(distro, f"asset:{path}", "-e", path)
         pin = asset["sha256"]
         if pin is not None:
@@ -454,6 +490,7 @@ __all__ = [
     "AuditOutcome",
     "ExpectedCheck",
     "attempt_audit_host",
+    "disk_check_id",
     "expected_checks",
     "parse_audit_transcript",
     "render_audit_script",

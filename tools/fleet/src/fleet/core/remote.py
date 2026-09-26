@@ -185,9 +185,21 @@ def attempt_ssh(host: str, argv: tuple[str, ...]) -> RemoteOutcome:
     Returns:
         The command's standard output, or the reason there is none.
     """
-    result = _test_hooks.run(
-        ["ssh", *SSH_OPTIONS, host, *argv], timeout_seconds=SSH_TIMEOUT_SECONDS
-    )
+    return _attempt_ssh_within(host, argv, timeout_seconds=SSH_TIMEOUT_SECONDS)
+
+
+def _attempt_ssh_within(host: str, argv: tuple[str, ...], *, timeout_seconds: int) -> RemoteOutcome:
+    """Run one argv on a node under a stated deadline, reporting failure as a value.
+
+    Args:
+        host: SSH destination, an alias from the user's ssh config.
+        argv: The remote command as a list of words.
+        timeout_seconds: The deadline for the whole command.
+
+    Returns:
+        The command's standard output, or the reason there is none.
+    """
+    result = _test_hooks.run(["ssh", *SSH_OPTIONS, host, *argv], timeout_seconds=timeout_seconds)
     failure = _failure_for(host, f"running `{' '.join(argv)}`", result)
     return RemoteOutcome(output="" if failure is not None else result["stdout"], failure=failure)
 
@@ -305,7 +317,43 @@ def run_script(host: str, remote_path: str, body: str, *, platform: NodePlatform
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``.
     """
-    outcome = attempt_script(host, remote_path, body, platform=platform)
+    return run_script_within(
+        host, remote_path, body, platform=platform, timeout_seconds=SSH_TIMEOUT_SECONDS
+    )
+
+
+def run_script_within(
+    host: str, remote_path: str, body: str, *, platform: NodePlatform, timeout_seconds: int
+) -> str:
+    """Send a script to a node and run it by path under a stated deadline.
+
+    For the one kind of remote work that is long by construction: a runner
+    host's rebuild stages download a distro image and install packages,
+    which :data:`SSH_TIMEOUT_SECONDS` was never sized for (board task
+    1aa6a021). Sending the file keeps the short deadline; only the run
+    takes the caller's.
+
+    Args:
+        host: SSH destination.
+        remote_path: Absolute path on the node to write and then execute.
+        body: The script's complete text.
+        platform: The node's declared platform.
+        timeout_seconds: The deadline for running the script.
+
+    Returns:
+        The script's standard output.
+
+    Raises:
+        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``; a script
+            still running at the deadline is ended and reported as the
+            latter.
+    """
+    _raise_on(attempt_send(host, remote_path, body, platform=platform))
+    outcome = _attempt_ssh_within(
+        host,
+        (*dialect.for_platform(platform).invocation(), remote_path),
+        timeout_seconds=timeout_seconds,
+    )
     _raise_on(outcome["failure"])
     return outcome["output"]
 
@@ -320,6 +368,7 @@ __all__ = [
     "attempt_send",
     "attempt_ssh",
     "run_script",
+    "run_script_within",
     "run_ssh",
     "send_script",
 ]
