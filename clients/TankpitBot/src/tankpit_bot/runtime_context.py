@@ -56,8 +56,8 @@ class RuntimeContextDict(TypedDict, total=False):
             attached when set, even if the value is 0.
         bot_state: ``"<mode>/<mode_state>"`` snapshot of the durable
             AI mode and its inner state. Empty string when none.
-        in_flight_action_kind: ``ActionKind`` literal of the bot's
-            current in-flight action, or ``"none"`` when idle.
+        in_flight_action_kind: The word of the bot's current in-flight
+            ``ActionKind``, ``"none"`` when idle.
     """
 
     tick_n: int
@@ -84,8 +84,8 @@ def set_runtime_context(
             previous value.
         bot_state: ``"<mode>/<mode_state>"`` snapshot, or ``None`` to
             keep the previous value.
-        in_flight_action_kind: ``ActionKind`` string, or ``None`` to
-            keep the previous value.
+        in_flight_action_kind: The in-flight ``ActionKind``'s word, or
+            ``None`` to keep the previous value.
     """
     if tick_n is not None:
         _TICK_N.set(tick_n)
