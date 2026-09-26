@@ -8,23 +8,24 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     load_json_str,
     narrow_json_to_dict,
     require_int,
     require_str,
 )
 from platform_core.logging import LogLevel, get_logger
+from platform_core.members import require_member
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.protocol.codec import ProtocolCodec, load_static_key
 from tankpit_bot.protocol.framing import decode_frame_header
 from tankpit_bot.resources import static_key_file_path
 from tankpit_bot.types import CaptureSession, decode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -56,7 +57,7 @@ class DecodedCommand(TypedDict):
     """
 
     timestamp_ms: int
-    direction: Literal["sent", "received"]
+    direction: MessageDirection
     raw_hex: str
     decoded_hex: str
     type_byte: int
@@ -75,7 +76,7 @@ class DecodedLobbyMessage(TypedDict):
     """
 
     timestamp_ms: int
-    direction: Literal["sent", "received"]
+    direction: MessageDirection
     prefix: str
     text: str
 
@@ -91,7 +92,7 @@ def encode_decoded_command(cmd: DecodedCommand) -> JSONObject:
     """
     return {
         "timestamp_ms": cmd["timestamp_ms"],
-        "direction": cmd["direction"],
+        "direction": cmd["direction"].value,
         "raw_hex": cmd["raw_hex"],
         "decoded_hex": cmd["decoded_hex"],
         "type_byte": cmd["type_byte"],
@@ -112,15 +113,9 @@ def decode_decoded_command(data: JSONObject) -> DecodedCommand:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    direction = require_str(data, "direction")
-    if direction not in ("sent", "received"):
-        raise JSONTypeError(f"Invalid direction: {direction}")
-
-    direction_literal: Literal["sent", "received"] = "sent" if direction == "sent" else "received"
-
     return DecodedCommand(
         timestamp_ms=require_int(data, "timestamp_ms"),
-        direction=direction_literal,
+        direction=require_member(data, "direction", MessageDirection),
         raw_hex=require_str(data, "raw_hex"),
         decoded_hex=require_str(data, "decoded_hex"),
         type_byte=require_int(data, "type_byte"),
@@ -140,7 +135,7 @@ def encode_decoded_lobby_message(msg: DecodedLobbyMessage) -> JSONObject:
     """
     return {
         "timestamp_ms": msg["timestamp_ms"],
-        "direction": msg["direction"],
+        "direction": msg["direction"].value,
         "prefix": msg["prefix"],
         "text": msg["text"],
     }
@@ -158,15 +153,9 @@ def decode_decoded_lobby_message(data: JSONObject) -> DecodedLobbyMessage:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    direction = require_str(data, "direction")
-    if direction not in ("sent", "received"):
-        raise JSONTypeError(f"Invalid direction: {direction}")
-
-    direction_literal: Literal["sent", "received"] = "sent" if direction == "sent" else "received"
-
     return DecodedLobbyMessage(
         timestamp_ms=require_int(data, "timestamp_ms"),
-        direction=direction_literal,
+        direction=require_member(data, "direction", MessageDirection),
         prefix=require_str(data, "prefix"),
         text=require_str(data, "text"),
     )
@@ -207,7 +196,7 @@ class SessionDecoder:
     def _decode_message(
         self,
         timestamp_ms: int,
-        direction: Literal["sent", "received"],
+        direction: MessageDirection,
         payload: str,
     ) -> None:
         """Decode a single message.
@@ -249,7 +238,7 @@ class SessionDecoder:
     def _decode_command(
         self,
         timestamp_ms: int,
-        direction: Literal["sent", "received"],
+        direction: MessageDirection,
         body: bytes,
     ) -> None:
         """Decode a game command.
@@ -290,7 +279,7 @@ class SessionDecoder:
     def _decode_lobby_message(
         self,
         timestamp_ms: int,
-        direction: Literal["sent", "received"],
+        direction: MessageDirection,
         body: bytes,
     ) -> None:
         """Decode a lobby/text message.

@@ -26,14 +26,16 @@ See docs/fuel_encoding.md for full research details.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     require_int,
     require_str,
 )
+from platform_core.members import require_member
+
+from tankpit_bot.types.literals import MessageDirection
 
 
 class TankStatus(TypedDict):
@@ -62,7 +64,7 @@ class StateMessage(TypedDict):
     """
 
     timestamp_ms: int
-    direction: Literal["sent", "received"]
+    direction: MessageDirection
     subtype: int
     body_hex: str
     length: int
@@ -81,7 +83,7 @@ class DecodedStateMessage(TypedDict):
     """
 
     timestamp_ms: int
-    direction: Literal["sent", "received"]
+    direction: MessageDirection
     subtype: int
     subtype_name: str
     body_hex: str
@@ -133,7 +135,7 @@ def decode_tank_status(body: bytes) -> TankStatus | None:
 
 def decode_state_message(
     timestamp_ms: int,
-    direction: Literal["sent", "received"],
+    direction: MessageDirection,
     body: bytes,
 ) -> DecodedStateMessage | None:
     """Decode a state message from raw bytes.
@@ -241,7 +243,7 @@ def encode_state_message(msg: StateMessage) -> JSONObject:
     """
     return {
         "timestamp_ms": msg["timestamp_ms"],
-        "direction": msg["direction"],
+        "direction": msg["direction"].value,
         "subtype": msg["subtype"],
         "body_hex": msg["body_hex"],
         "length": msg["length"],
@@ -260,15 +262,9 @@ def decode_state_message_json(data: JSONObject) -> StateMessage:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    direction = require_str(data, "direction")
-    if direction not in ("sent", "received"):
-        raise JSONTypeError(f"Invalid direction: {direction}")
-
-    direction_literal: Literal["sent", "received"] = "sent" if direction == "sent" else "received"
-
     return StateMessage(
         timestamp_ms=require_int(data, "timestamp_ms"),
-        direction=direction_literal,
+        direction=require_member(data, "direction", MessageDirection),
         subtype=require_int(data, "subtype"),
         body_hex=require_str(data, "body_hex"),
         length=require_int(data, "length"),
@@ -286,7 +282,7 @@ def encode_decoded_state_message(msg: DecodedStateMessage) -> JSONObject:
     """
     result: JSONObject = {
         "timestamp_ms": msg["timestamp_ms"],
-        "direction": msg["direction"],
+        "direction": msg["direction"].value,
         "subtype": msg["subtype"],
         "subtype_name": msg["subtype_name"],
         "body_hex": msg["body_hex"],
@@ -312,12 +308,6 @@ def decode_decoded_state_message_json(data: JSONObject) -> DecodedStateMessage:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    direction = require_str(data, "direction")
-    if direction not in ("sent", "received"):
-        raise JSONTypeError(f"Invalid direction: {direction}")
-
-    direction_literal: Literal["sent", "received"] = "sent" if direction == "sent" else "received"
-
     decoded_raw = data.get("decoded")
     decoded: TankStatus | None = None
     if decoded_raw is not None and isinstance(decoded_raw, dict):
@@ -325,7 +315,7 @@ def decode_decoded_state_message_json(data: JSONObject) -> DecodedStateMessage:
 
     return DecodedStateMessage(
         timestamp_ms=require_int(data, "timestamp_ms"),
-        direction=direction_literal,
+        direction=require_member(data, "direction", MessageDirection),
         subtype=require_int(data, "subtype"),
         subtype_name=require_str(data, "subtype_name"),
         body_hex=require_str(data, "body_hex"),
