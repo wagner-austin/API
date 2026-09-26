@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.contracts.base import LedgerInvariantError
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.fuel_book import (
     FuelEntryContract,
     FuelEntryKind,
@@ -167,12 +168,12 @@ def test_announced_gains_credit_the_live_book() -> None:
     from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
     ws = WorldService()
-    update_world_state_from_fuel_total(ws, 1000, "wire_0x44_fuel_gain")
+    update_world_state_from_fuel_total(ws, 1000, FactSource.WIRE_0X44_FUEL_GAIN)
     assert ws.fuel_book["entries"] == []
-    update_world_state_from_fuel_total(ws, 1200, "wire_0x44_fuel_gain")
+    update_world_state_from_fuel_total(ws, 1200, FactSource.WIRE_0X44_FUEL_GAIN)
     assert ws.fuel_book["entries"] == [{"kind": "pickup", "lo": 200, "hi": 200}]
-    update_world_state_from_fuel_total(ws, 1200, "wire_0x2E_tank_status_sync")
-    update_world_state_from_fuel_total(ws, 1200, "wire_0x2E_tank_status_sync")
+    update_world_state_from_fuel_total(ws, 1200, FactSource.WIRE_0X2E_TANK_STATUS_SYNC)
+    update_world_state_from_fuel_total(ws, 1200, FactSource.WIRE_0X2E_TANK_STATUS_SYNC)
     assert ws.fuel_book["windows"] == 1
     assert ws.fuel_book["divergences"] == 0
 
