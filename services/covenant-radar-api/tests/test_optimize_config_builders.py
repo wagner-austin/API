@@ -15,6 +15,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
+from covenant_ml.types import GrowthStrategy
 from scripts.optimize._config_builders import (
     _build_cleargbm_config,
     _build_lightgbm_config,
@@ -137,7 +138,7 @@ class TestBuildClearGBMConfig:
         assert config["max_bins"] == 64
         assert config["monotonic_constraints"] is None
         assert config["n_jobs"] == -1
-        assert config["growth_strategy"] == "depth_wise"
+        assert config["growth_strategy"] is GrowthStrategy.DEPTH_WISE
         assert config["num_leaves"] is None
 
     def test_unsampled_reg_defaults_to_the_trial_values(self) -> None:

@@ -6,7 +6,7 @@ from typing import Literal
 
 from covenant_ml.types import (
     ClearGBMConfig,
-    ClearGBMGrowthStrategy,
+    GrowthStrategy,
     LightGBMConfig,
     LogRegConfig,
     LogRegPenalty,
@@ -19,6 +19,7 @@ from platform_core.json_utils import (
     require_float,
     require_int,
 )
+from platform_core.members import find_member
 
 
 def _parse_optional_bool(
@@ -272,9 +273,9 @@ def _parse_cleargbm_config(
     """
     growth_strategy = _parse_cleargbm_growth_strategy(raw)
     num_leaves = _parse_cleargbm_num_leaves(raw)
-    if growth_strategy == "leaf_wise" and num_leaves is None:
+    if growth_strategy is GrowthStrategy.LEAF_WISE and num_leaves is None:
         raise JSONTypeError("leaf_wise growth requires num_leaves")
-    if growth_strategy == "depth_wise" and num_leaves is not None:
+    if growth_strategy is GrowthStrategy.DEPTH_WISE and num_leaves is not None:
         raise JSONTypeError("depth_wise growth takes no num_leaves budget")
     return {
         "n_estimators": require_int(raw, "n_estimators"),
@@ -301,14 +302,14 @@ def _parse_cleargbm_config(
     }
 
 
-def _parse_cleargbm_growth_strategy(raw: JSONObject) -> ClearGBMGrowthStrategy:
+def _parse_cleargbm_growth_strategy(raw: JSONObject) -> GrowthStrategy:
     """Parse and validate the ClearGBM growth_strategy field.
 
     Args:
         raw: JSON object that may contain a growth_strategy field.
 
     Returns:
-        Validated growth strategy; absent defaults to "depth_wise", the
+        Validated growth strategy; absent defaults to DEPTH_WISE, the
         historical behavior.
 
     Raises:
@@ -316,12 +317,11 @@ def _parse_cleargbm_growth_strategy(raw: JSONObject) -> ClearGBMGrowthStrategy:
     """
     val = raw.get("growth_strategy")
     if val is None:
-        return "depth_wise"
-    if val == "depth_wise":
-        return "depth_wise"
-    if val == "leaf_wise":
-        return "leaf_wise"
-    raise JSONTypeError("growth_strategy must be one of: depth_wise, leaf_wise")
+        return GrowthStrategy.DEPTH_WISE
+    strategy = find_member(val, GrowthStrategy) if isinstance(val, str) else None
+    if strategy is None:
+        raise JSONTypeError("growth_strategy must be one of: depth_wise, leaf_wise")
+    return strategy
 
 
 def _parse_cleargbm_num_leaves(raw: JSONObject) -> int | None:

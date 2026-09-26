@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.types import GrowthStrategy
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from covenant_radar_api.worker._train_external_parsers import (
@@ -104,7 +105,7 @@ class TestClearGBMConfig:
         assert result["config"]["reg_lambda"] == 1.0
         assert result["config"]["n_jobs"] == -1
         assert result["config"]["early_stopping_rounds"] == 10
-        assert result["config"]["growth_strategy"] == "depth_wise"
+        assert result["config"]["growth_strategy"] is GrowthStrategy.DEPTH_WISE
         assert result["config"]["num_leaves"] is None
 
     def test_with_monotonic_constraints(self) -> None:
@@ -227,7 +228,7 @@ class TestClearGBMConfig:
         result = _parse_external_train_config(config_json)
         if result["backend"] != "cleargbm":
             raise AssertionError("Expected cleargbm backend")
-        assert result["config"]["growth_strategy"] == "leaf_wise"
+        assert result["config"]["growth_strategy"] is GrowthStrategy.LEAF_WISE
         assert result["config"]["num_leaves"] == 31
 
     def test_explicit_depth_wise(self) -> None:
@@ -250,7 +251,7 @@ class TestClearGBMConfig:
         result = _parse_external_train_config(config_json)
         if result["backend"] != "cleargbm":
             raise AssertionError("Expected cleargbm backend")
-        assert result["config"]["growth_strategy"] == "depth_wise"
+        assert result["config"]["growth_strategy"] is GrowthStrategy.DEPTH_WISE
         assert result["config"]["num_leaves"] is None
 
     def test_leaf_wise_without_budget_raises(self) -> None:
@@ -310,7 +311,9 @@ class TestClearGBMConfig:
                 "growth_strategy": "best_first",
             }
         )
-        with pytest.raises(JSONTypeError, match="growth_strategy must be one of"):
+        with pytest.raises(
+            JSONTypeError, match=r"^growth_strategy must be one of: depth_wise, leaf_wise$"
+        ):
             _parse_external_train_config(config_json)
 
     def test_non_integer_num_leaves_raises(self) -> None:

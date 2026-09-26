@@ -41,6 +41,7 @@ from covenant_ml.types import (
     ClearGBMConfig,
     EvalMetrics,
     FeatureImportance,
+    GrowthStrategy,
     TrainOutcome,
     TrainProgress,
 )
@@ -127,7 +128,7 @@ class _FakeCVBackend:
 
     def __init__(self) -> None:
         self.inner_groups_seen: list[bool] = []
-        self.growth_strategies_seen: list[str] = []
+        self.growth_strategies_seen: list[GrowthStrategy] = []
         self.num_leaves_seen: list[int | None] = []
         self.min_data_in_bin_seen: list[int | None] = []
 
@@ -335,7 +336,8 @@ def test_leafwise_variant_runs_with_a_leaf_budget(
     assert main(["grouped_fake", "cleargbm-leafwise", "3", "7"], external_dir=tmp_path) == EXIT_OK
     out = capsys.readouterr().out.splitlines()
     assert "grouped_fake via cleargbm-leafwise: 120 rows, 12 groups, 3 folds, seed 7" in out
-    assert cv_hooks.growth_strategies_seen == ["leaf_wise", "leaf_wise", "leaf_wise"]
+    assert all(seen is GrowthStrategy.LEAF_WISE for seen in cv_hooks.growth_strategies_seen)
+    assert len(cv_hooks.growth_strategies_seen) == 3
     assert cv_hooks.num_leaves_seen == [31, 31, 31]
 
 

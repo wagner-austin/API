@@ -35,7 +35,7 @@ from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
     ClearGBMConfig,
-    ClearGBMGrowthStrategy,
+    GrowthStrategy,
     LightGBMConfig,
 )
 from covenant_ml.validation.splitter import group_kfold_split, group_stratified_kfold_split
@@ -59,7 +59,7 @@ INNER_RATIOS = (0.70, 0.15, 0.15)
 
 def _cleargbm_config(
     seed: int,
-    growth_strategy: ClearGBMGrowthStrategy,
+    growth_strategy: GrowthStrategy,
     min_data_in_bin: int | None,
 ) -> ClearGBMConfig:
     """Fixed ClearGBM hyperparameters for the evaluation protocol.
@@ -82,7 +82,7 @@ def _cleargbm_config(
     Returns:
         The training configuration.
     """
-    num_leaves = 31 if growth_strategy == "leaf_wise" else None
+    num_leaves = 31 if growth_strategy is GrowthStrategy.LEAF_WISE else None
     config = ClearGBMConfig(
         n_estimators=300,
         max_depth=5,
@@ -157,9 +157,9 @@ def _config_for(
         this protocol does not cover.
     """
     if backend == "cleargbm":
-        return "cleargbm", _cleargbm_config(seed, "depth_wise", min_data_in_bin)
+        return "cleargbm", _cleargbm_config(seed, GrowthStrategy.DEPTH_WISE, min_data_in_bin)
     if backend == "cleargbm-leafwise":
-        return "cleargbm", _cleargbm_config(seed, "leaf_wise", min_data_in_bin)
+        return "cleargbm", _cleargbm_config(seed, GrowthStrategy.LEAF_WISE, min_data_in_bin)
     if backend == "lightgbm":
         return "lightgbm", _lightgbm_config(seed)
     return None

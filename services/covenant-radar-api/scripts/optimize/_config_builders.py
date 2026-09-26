@@ -7,6 +7,7 @@ from typing import Literal
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.types import (
     ClearGBMConfig,
+    GrowthStrategy,
     LightGBMConfig,
     LogRegConfig,
     LogRegPenalty,
@@ -177,7 +178,7 @@ def _build_cleargbm_config(
         reg_alpha=float_params.get("reg_alpha", 0.0),
         reg_lambda=float_params.get("reg_lambda", 0.0),
         n_jobs=-1,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
         train_ratio=0.7,
         val_ratio=0.15,
