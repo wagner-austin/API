@@ -30,12 +30,18 @@ from tankpit_bot import protocol
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, build_session_xor_table
 from tankpit_bot.diagnostics.event_stream import scan_diagnostic_records
-from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
+from tankpit_bot.diagnostics.run_audit_types import (
+    CheckName,
+    FindingDict,
+    Severity,
+    make_finding,
+)
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
 from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.validate.fight_timeline import extract_human_episodes
 from tankpit_bot.validate.shadow_timeline import extract_shadow_timeline
 from tankpit_bot.wire.helpers import DecodeError
@@ -98,7 +104,7 @@ def _replay_frame_bodies(capture: CaptureSession) -> list[bytes]:
     """
     bodies: list[bytes] = []
     for message in capture["messages"]:
-        if message["direction"] != "received":
+        if message["direction"] is not MessageDirection.RECEIVED:
             continue
         # An audit reports what it cannot read rather than quietly
         # reading less — the private walk this replaced dropped a torn
@@ -180,7 +186,7 @@ def _own_tank_id(records: list[RuntimeEventRecordDict]) -> int:
 
 
 def _channel_diff_finding(
-    check: Literal["deactivation_channel_diff", "supervisor_channel_diff"],
+    check: Literal[CheckName.DEACTIVATION_CHANNEL_DIFF, CheckName.SUPERVISOR_CHANNEL_DIFF],
     label: str,
     wire_count: int,
     ledger_count: int,
@@ -201,7 +207,7 @@ def _channel_diff_finding(
     if wire_count != ledger_count:
         return make_finding(
             check,
-            "critical",
+            Severity.CRITICAL,
             f"{label}: capture replay found {wire_count} but the run "
             f"ingested {ledger_count} -- decode/dispatch gap",
             wire=wire_count,
@@ -209,7 +215,7 @@ def _channel_diff_finding(
         )
     return make_finding(
         check,
-        "info",
+        Severity.INFO,
         f"{label}: wire and ledger agree ({wire_count})",
         wire=wire_count,
         ledger=ledger_count,
@@ -263,8 +269,8 @@ def _dom_witness_findings(
         if banner_count > wire_count:
             findings.append(
                 make_finding(
-                    "dom_witness_diff",
-                    "critical",
+                    CheckName.DOM_WITNESS_DIFF,
+                    Severity.CRITICAL,
                     f"the client rendered {banner_count} {label}(s) but the "
                     f"wire carried only {wire_count} {wire_label} -- the "
                     "decoder is missing something the client can see",
@@ -275,8 +281,8 @@ def _dom_witness_findings(
         elif banner_count > 0:
             findings.append(
                 make_finding(
-                    "dom_witness_diff",
-                    "info",
+                    CheckName.DOM_WITNESS_DIFF,
+                    Severity.INFO,
                     f"{label}s consistent with the wire "
                     f"({banner_count} banner(s), {wire_count} wire message(s))",
                     banners=banner_count,
@@ -313,8 +319,8 @@ def _human_episode_findings(capture: CaptureSession) -> list[FindingDict]:
     for episode in episodes:
         findings.append(
             make_finding(
-                "human_episode",
-                "info",
+                CheckName.HUMAN_EPISODE,
+                Severity.INFO,
                 (
                     f"human {episode['name']}: {episode['shots_by_human']} shots taken, "
                     f"{episode['our_shots_in_window']} returned, "
@@ -333,8 +339,8 @@ def _human_episode_findings(capture: CaptureSession) -> list[FindingDict]:
         ):
             findings.append(
                 make_finding(
-                    "turret_exchange",
-                    "warning",
+                    CheckName.TURRET_EXCHANGE,
+                    Severity.WARNING,
                     (
                         f"stood on one tile for {episode['max_stationary_streak']} "
                         f"consecutive shots while {episode['name']} was firing -- "
@@ -365,8 +371,8 @@ def audit_capture(
     if magic is None:
         return [
             make_finding(
-                "capture_unreadable",
-                "warning",
+                CheckName.CAPTURE_UNREADABLE,
+                Severity.WARNING,
                 "capture carries no XOR magic -- replay audit skipped",
             )
         ]
@@ -380,8 +386,8 @@ def audit_capture(
         log.warning("replay audit skipped: %s", error)
         return [
             make_finding(
-                "capture_unreadable",
-                "warning",
+                CheckName.CAPTURE_UNREADABLE,
+                Severity.WARNING,
                 "XOR static key file missing -- replay audit skipped",
             )
         ]
@@ -392,8 +398,8 @@ def audit_capture(
     if decode_errors > 0:
         findings.append(
             make_finding(
-                "decode_error",
-                "critical",
+                CheckName.DECODE_ERROR,
+                Severity.CRITICAL,
                 f"{decode_errors} received frame(s) crashed the current "
                 "decoder -- the wire carries a shape the decoder rejects",
                 count=decode_errors,
@@ -405,8 +411,8 @@ def audit_capture(
         )
         findings.append(
             make_finding(
-                "unknown_container_subtypes",
-                "warning",
+                CheckName.UNKNOWN_CONTAINER_SUBTYPES,
+                Severity.WARNING,
                 f"{sum(unknown_subtypes.values())} 0x2E message(s) fell "
                 "through to unknown_container -- undecoded wire channels "
                 "(the June-blind-spot canary)",
@@ -419,7 +425,7 @@ def audit_capture(
     )
     findings.append(
         _channel_diff_finding(
-            "deactivation_channel_diff",
+            CheckName.DEACTIVATION_CHANNEL_DIFF,
             "0x41 deactivations",
             len(deactivations),
             ledger_deact_count,
@@ -428,7 +434,7 @@ def audit_capture(
     _, ledger_errors = scan_diagnostic_records(records, "command_error")
     findings.append(
         _channel_diff_finding(
-            "supervisor_channel_diff",
+            CheckName.SUPERVISOR_CHANNEL_DIFF,
             "0x52 command errors",
             len(supervisor_codes),
             len(ledger_errors),

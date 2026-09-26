@@ -20,8 +20,10 @@ from tankpit_bot.diagnostics.capture_audit import audit_capture
 from tankpit_bot.diagnostics.event_stream import load_event_records, run_analyzer_cli
 from tankpit_bot.diagnostics.ledger_audit import audit_ledger
 from tankpit_bot.diagnostics.run_audit_types import (
+    CheckName,
     FindingDict,
     RunAuditReportDict,
+    Severity,
     make_finding,
     make_run_audit_report,
     render_run_audit,
@@ -69,8 +71,8 @@ def _capture_findings(
     if not _test_hooks.path_exists(capture_path):
         return [
             make_finding(
-                "capture_missing",
-                "warning",
+                CheckName.CAPTURE_MISSING,
+                Severity.WARNING,
                 "no capture artifact beside the events file -- replay audit skipped",
             )
         ]

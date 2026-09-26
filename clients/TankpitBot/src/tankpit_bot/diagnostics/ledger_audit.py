@@ -23,7 +23,12 @@ from __future__ import annotations
 from datetime import datetime
 from itertools import pairwise
 
-from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
+from tankpit_bot.diagnostics.run_audit_types import (
+    CheckName,
+    FindingDict,
+    Severity,
+    make_finding,
+)
 from tankpit_bot.ledger.events import ACTION_KINDS
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
@@ -108,8 +113,8 @@ def _check_kill_double_registration(
         if previous is not None and now_s - previous[1] <= _KILL_WINDOW_S:
             findings.append(
                 make_finding(
-                    "kill_double_registration",
-                    "critical",
+                    CheckName.KILL_DOUBLE_REGISTRATION,
+                    Severity.CRITICAL,
                     f"victim {victim_id} registered twice within "
                     f"{_KILL_WINDOW_S}s -- two channels counted one death",
                     victim_id=victim_id,
@@ -133,8 +138,8 @@ def _check_unresolved_decisions(
                 continue
             findings.append(
                 make_finding(
-                    "unresolved_decision",
-                    "warning",
+                    CheckName.UNRESOLVED_DECISION,
+                    Severity.WARNING,
                     f"{kind} decision {event_id} never got an outcome before shutdown",
                     action_kind=kind,
                     decision_event_id=event_id,
@@ -173,8 +178,8 @@ def _classify_attempt_outcome(
     """
     if outcome == "stall_timeout":
         return make_finding(
-            "stall_timeout",
-            "critical",
+            CheckName.STALL_TIMEOUT,
+            Severity.CRITICAL,
             f"{action_kind} hit the stall timeout -- the wire "
             "never answered and the bot burned the full wait",
             action_kind=action_kind,
@@ -183,8 +188,8 @@ def _classify_attempt_outcome(
     if outcome == "command_rejected":
         error_code = _int_field(record, "error_code")
         return make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             f"server rejected a {action_kind} with error code "
             f"{-1 if error_code is None else error_code}",
             action_kind=action_kind,
@@ -193,8 +198,8 @@ def _classify_attempt_outcome(
         )
     if outcome == "pickup_empty":
         return make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             "pickup found the container drained -- consumed by someone "
             "else between scan and pickup",
             action_kind=action_kind,
@@ -202,8 +207,8 @@ def _classify_attempt_outcome(
         )
     if outcome == "inventory_full":
         return make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             "equipment pickup refused: all inventory slots full "
             "(beliefs reconciled) -- the fullness gate should have "
             "prevented this dispatch",
@@ -231,8 +236,8 @@ def _aggregate_findings(
         if count > _SUPERSEDED_CHURN_THRESHOLD:
             findings.append(
                 make_finding(
-                    "superseded_churn",
-                    "warning",
+                    CheckName.SUPERSEDED_CHURN,
+                    Severity.WARNING,
                     f"{count} {kind} decisions were superseded mid-action "
                     "-- heavy re-dispatch churn",
                     action_kind=kind,
@@ -243,8 +248,8 @@ def _aggregate_findings(
         if len(outcomes) >= 2:
             findings.append(
                 make_finding(
-                    "rejection_retry_loop",
-                    "critical",
+                    CheckName.REJECTION_RETRY_LOOP,
+                    Severity.CRITICAL,
                     f"{action_kind} at ({target_x},{target_y}) failed "
                     f"{len(outcomes)} times -- replanning is not learning "
                     "from the failure",
@@ -302,8 +307,8 @@ def _check_tick_cadence(records: list[RuntimeEventRecordDict]) -> list[FindingDi
         if gap_s > _CADENCE_GAP_S:
             findings.append(
                 make_finding(
-                    "tick_cadence_gap",
-                    "warning",
+                    CheckName.TICK_CADENCE_GAP,
+                    Severity.WARNING,
                     f"{gap_s}s of wall clock between ticks {prev_tick} and "
                     f"{next_tick} -- something waited longer than any "
                     "healthy cause explains",
@@ -322,8 +327,8 @@ def _check_session_exit(records: list[RuntimeEventRecordDict]) -> list[FindingDi
     if not scorecards:
         return [
             make_finding(
-                "session_exit",
-                "warning",
+                CheckName.SESSION_EXIT,
+                Severity.WARNING,
                 "no session scorecard in the artifact -- the run died before the shutdown path ran",
             )
         ]
@@ -333,8 +338,8 @@ def _check_session_exit(records: list[RuntimeEventRecordDict]) -> list[FindingDi
     kills = _int_field(record, "kills")
     return [
         make_finding(
-            "session_exit",
-            "info",
+            CheckName.SESSION_EXIT,
+            Severity.INFO,
             f"session ended: {exit_reason if isinstance(exit_reason, str) else 'unknown'}",
             exit_reason=exit_reason if isinstance(exit_reason, str) else "unknown",
             ticks=-1 if ticks is None else ticks,
@@ -356,8 +361,8 @@ def audit_ledger(records: list[RuntimeEventRecordDict]) -> list[FindingDict]:
     if not records:
         return [
             make_finding(
-                "empty_run",
-                "critical",
+                CheckName.EMPTY_RUN,
+                Severity.CRITICAL,
                 "the events artifact contains no records -- the session "
                 "died before the game loop produced anything",
             )

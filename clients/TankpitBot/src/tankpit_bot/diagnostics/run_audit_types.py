@@ -12,47 +12,58 @@ hand is a missing check (the ratchet rule, see wiki
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
-Severity = Literal["critical", "warning", "info"]
-"""How loudly a finding should be treated.
 
-``critical`` -- the run misbehaved or an audit invariant broke;
-``warning`` -- suspicious or wasteful but the run survived it;
-``info`` -- a verified fact worth surfacing (exits, matched channels).
-"""
+class Severity(StrEnum):
+    """How loudly a finding should be treated.
 
-CheckName = Literal[
-    "empty_run",
-    "kill_double_registration",
-    "unresolved_decision",
-    "stall_timeout",
-    "command_rejection",
-    "rejection_retry_loop",
-    "executor_discards",
-    "superseded_churn",
-    "tick_cadence_gap",
-    "session_exit",
-    "capture_missing",
-    "capture_unreadable",
-    "decode_error",
-    "unknown_container_subtypes",
-    "deactivation_channel_diff",
-    "supervisor_channel_diff",
-    "human_episode",
-    "turret_exchange",
-    "dom_witness_diff",
-]
-"""Closed set of audit checks; every finding names the check that produced it."""
+    ``critical`` -- the run misbehaved or an audit invariant broke;
+    ``warning`` -- suspicious or wasteful but the run survived it;
+    ``info`` -- a verified fact worth surfacing (exits, matched channels).
+    """
 
-_SEVERITY_ORDER: dict[Severity, int] = {"critical": 0, "warning": 1, "info": 2}
+    CRITICAL = "critical"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class CheckName(StrEnum):
+    """Closed set of audit checks; every finding names the check that produced it."""
+
+    EMPTY_RUN = "empty_run"
+    KILL_DOUBLE_REGISTRATION = "kill_double_registration"
+    UNRESOLVED_DECISION = "unresolved_decision"
+    STALL_TIMEOUT = "stall_timeout"
+    COMMAND_REJECTION = "command_rejection"
+    REJECTION_RETRY_LOOP = "rejection_retry_loop"
+    EXECUTOR_DISCARDS = "executor_discards"
+    SUPERSEDED_CHURN = "superseded_churn"
+    TICK_CADENCE_GAP = "tick_cadence_gap"
+    SESSION_EXIT = "session_exit"
+    CAPTURE_MISSING = "capture_missing"
+    CAPTURE_UNREADABLE = "capture_unreadable"
+    DECODE_ERROR = "decode_error"
+    UNKNOWN_CONTAINER_SUBTYPES = "unknown_container_subtypes"
+    DEACTIVATION_CHANNEL_DIFF = "deactivation_channel_diff"
+    SUPERVISOR_CHANNEL_DIFF = "supervisor_channel_diff"
+    HUMAN_EPISODE = "human_episode"
+    TURRET_EXCHANGE = "turret_exchange"
+    DOM_WITNESS_DIFF = "dom_witness_diff"
+
+
+_SEVERITY_ORDER: dict[Severity, int] = {
+    Severity.CRITICAL: 0,
+    Severity.WARNING: 1,
+    Severity.INFO: 2,
+}
 
 _SEVERITY_TAG: dict[Severity, str] = {
-    "critical": "CRIT",
-    "warning": "WARN",
-    "info": "INFO",
+    Severity.CRITICAL: "CRIT",
+    Severity.WARNING: "WARN",
+    Severity.INFO: "INFO",
 }
 
 
@@ -155,9 +166,9 @@ def make_run_audit_report(
         events_path=events_path,
         capture_path=capture_path,
         findings=ordered,
-        critical_count=sum(1 for f in ordered if f["severity"] == "critical"),
-        warning_count=sum(1 for f in ordered if f["severity"] == "warning"),
-        info_count=sum(1 for f in ordered if f["severity"] == "info"),
+        critical_count=sum(1 for f in ordered if f["severity"] is Severity.CRITICAL),
+        warning_count=sum(1 for f in ordered if f["severity"] is Severity.WARNING),
+        info_count=sum(1 for f in ordered if f["severity"] is Severity.INFO),
     )
 
 
