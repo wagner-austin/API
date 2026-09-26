@@ -14,6 +14,7 @@ from tankpit_bot.fleetshare.types import (
     FleetContainerSightingDict,
     FleetEnemySightingDict,
     FleetReportDict,
+    FleetRole,
     FleetScannedTileDict,
 )
 from tankpit_bot.runtime_artifacts import bot_run_dir
@@ -66,7 +67,7 @@ def test_exchange_publishes_and_merges_a_sibling(
         team=2,
         room="6",
         tank_id=1301,
-        role="fighter",
+        role=FleetRole.FIGHTER,
         x=90,
         y=90,
         war_ready=False,

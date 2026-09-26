@@ -31,6 +31,7 @@ from tankpit_bot.state import (
     make_tank_state,
 )
 from tankpit_bot.types.constants import EntitySource
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot._executor_support import (
     _make_bot,
     _make_snapshot,
@@ -145,8 +146,8 @@ class TestExecute:
         owned = AIStateDict(
             **{
                 **make_initial_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "combat_target_id": 77,
             }
         )

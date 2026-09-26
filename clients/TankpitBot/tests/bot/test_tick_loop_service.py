@@ -20,8 +20,10 @@ from tankpit_bot.bot.tick_loop import (
     _publish_session_status,
 )
 from tankpit_bot.bus.mode_bridge import ModeBridge
+from tankpit_bot.bus.session_status import WireMode
 from tankpit_bot.bus.status_bus import StatusBus
 from tankpit_bot.stream.types import StreamConfigDict
+from tankpit_bot.types.modes import AIMode
 
 
 class TestApplyPendingModeOverride:
@@ -41,7 +43,7 @@ class TestApplyPendingModeOverride:
         """A submitted ``"HUNT"`` becomes ``manual_mode = "HUNT"``."""
         bridge = ModeBridge()
         bot = Bot("https://test.tankpit.com/", mode_bridge=bridge)
-        bridge.submit("HUNT")
+        bridge.submit(WireMode.HUNT)
 
         _apply_pending_mode_override(bot)
 
@@ -51,7 +53,7 @@ class TestApplyPendingModeOverride:
         """A submitted ``"COLLECT"`` becomes ``manual_mode = "COLLECT"``."""
         bridge = ModeBridge()
         bot = Bot("https://test.tankpit.com/", mode_bridge=bridge)
-        bridge.submit("COLLECT")
+        bridge.submit(WireMode.COLLECT)
 
         _apply_pending_mode_override(bot)
 
@@ -61,7 +63,7 @@ class TestApplyPendingModeOverride:
         """A submitted ``"UNSET"`` becomes ``manual_mode = "UNSET"``."""
         bridge = ModeBridge()
         bot = Bot("https://test.tankpit.com/", mode_bridge=bridge)
-        bridge.submit("UNSET")
+        bridge.submit(WireMode.UNSET)
 
         _apply_pending_mode_override(bot)
 
@@ -72,11 +74,11 @@ class TestApplyPendingModeOverride:
         bridge = ModeBridge()
         bot = Bot("https://test.tankpit.com/", mode_bridge=bridge)
         # Start with a pinned HUNT — proves AUTO reverses it.
-        bridge.submit("HUNT")
+        bridge.submit(WireMode.HUNT)
         _apply_pending_mode_override(bot)
         assert bot._ai_state["manual_mode"] == "HUNT"
 
-        bridge.submit("AUTO")
+        bridge.submit(WireMode.AUTO)
         _apply_pending_mode_override(bot)
 
         assert bot._ai_state["manual_mode"] is None
@@ -85,7 +87,7 @@ class TestApplyPendingModeOverride:
         """The drained override does not fire again on the next tick."""
         bridge = ModeBridge()
         bot = Bot("https://test.tankpit.com/", mode_bridge=bridge)
-        bridge.submit("HUNT")
+        bridge.submit(WireMode.HUNT)
         _apply_pending_mode_override(bot)
         assert bot._ai_state["manual_mode"] == "HUNT"
 
@@ -127,7 +129,7 @@ class TestPublishSessionStatus:
 
         bus = StatusBus()
         bot = Bot("https://test.tankpit.com/", status_bus=bus)
-        bot._ai_state = AIStateDict(**{**bot._ai_state, "manual_mode": "HUNT"})
+        bot._ai_state = AIStateDict(**{**bot._ai_state, "manual_mode": AIMode.HUNT})
         subscriber = bus.subscribe()
         bot._start_timestamp_ms = 900
 
