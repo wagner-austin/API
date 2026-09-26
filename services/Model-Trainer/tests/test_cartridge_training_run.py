@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 import torch
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings, load_settings
 from model_trainer.core.contracts.cartridge import (
@@ -118,7 +118,7 @@ def _cfg(corpus_path: Path) -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,

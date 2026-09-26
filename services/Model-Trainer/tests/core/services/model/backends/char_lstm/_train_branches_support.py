@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.json_utils import JSONValue
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from platform_ml.testing import WandbTableProtocol
 
 from model_trainer.core.config.settings import Settings
@@ -139,7 +139,7 @@ def _make_cfg() -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

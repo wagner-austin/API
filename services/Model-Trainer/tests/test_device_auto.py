@@ -5,7 +5,7 @@ import os
 import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
-from platform_ml import RequestedDevice, RequestedPrecision, ResolvedDevice
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision, ResolvedDevice
 from platform_ml import torch_types as platform_ml_torch_types
 from platform_ml.testing import FakeTorchModule
 from platform_ml.torch_types import _TorchModuleProtocol
@@ -50,7 +50,7 @@ def _auto_payload() -> TrainRequestPayload:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": RequestedDevice.AUTO,
         "precision": RequestedPrecision.AUTO,
         "data_num_workers": None,

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.model import (
     GgufExportConfig,
@@ -46,7 +46,7 @@ class TestQueueEncodingRoundTrip:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CUDA,
             "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
@@ -96,7 +96,7 @@ class TestQueueEncodingRoundTrip:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CUDA,
             "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
@@ -142,7 +142,7 @@ class TestQueueEncodingRoundTrip:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CUDA,
             "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
@@ -187,7 +187,7 @@ class TestQueueEncodingRoundTrip:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CUDA,
             "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
@@ -400,7 +400,7 @@ class TestTrainingJobWithGgufExport:
                 "pretrained_run_id": None,
                 "freeze_embed": False,
                 "gradient_clipping": 1.0,
-                "optimizer": "adamw",
+                "optimizer": OptimizerName.ADAMW,
                 "device": RequestedDevice.CPU,
                 "data_num_workers": None,
                 "data_pin_memory": None,

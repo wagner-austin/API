@@ -8,7 +8,7 @@ from typing import Protocol
 
 import pytest
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
@@ -481,7 +481,7 @@ class TestDefaultCreateTrainer:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": ResolvedDevice.CPU,
             "precision": ResolvedPrecision.FP32,
             "data_num_workers": 0,

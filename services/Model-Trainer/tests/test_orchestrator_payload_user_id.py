@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from platform_core.json_utils import JSONValue
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.redis import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 
@@ -70,7 +70,7 @@ def test_orchestrator_threads_user_id() -> None:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": RequestedDevice.CPU,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
@@ -43,7 +43,7 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -141,7 +141,7 @@ def test_char_lstm_invalid_size_raises(settings_with_paths: Settings, tmp_path: 
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -188,7 +188,7 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         "pretrained_run_id": None,
         "freeze_embed": True,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -310,7 +310,7 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -398,7 +398,7 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -500,7 +500,7 @@ def test_char_lstm_forward_pass_shapes(settings_with_paths: Settings, tmp_path: 
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

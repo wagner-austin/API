@@ -11,7 +11,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str, narrow_json_to_dict
 from platform_core.trainer_keys import cancel_key
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.redis import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 
@@ -45,7 +45,7 @@ def _make_request() -> TrainRequest:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": RequestedDevice.CPU,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,

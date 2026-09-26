@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
@@ -76,7 +76,7 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -137,7 +137,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -238,7 +238,7 @@ def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -275,7 +275,7 @@ def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -320,7 +320,7 @@ def test_gpt2_evaluate_raises_when_tokenizer_id_none(
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

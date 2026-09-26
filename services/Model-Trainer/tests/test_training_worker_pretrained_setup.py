@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
@@ -104,7 +104,7 @@ def test_training_worker_loads_pretrained_model(
             "pretrained_run_id": pretrained_run_id,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,

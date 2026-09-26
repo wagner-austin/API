@@ -16,7 +16,7 @@ import torch
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONValue, load_json_str, narrow_json_to_dict
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.checkpoint import (
@@ -86,7 +86,7 @@ def _make_cfg(corpus_path: str, tokenizer_id: str) -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

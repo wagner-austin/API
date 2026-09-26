@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Literal, Protocol, TypedDict
 
 from platform_core.determinism_record import DeterminismRecord
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -212,7 +212,7 @@ class ModelTrainConfig(TypedDict):
     pretrained_run_id: str | None
     freeze_embed: bool
     gradient_clipping: float
-    optimizer: Literal["adamw", "adam", "sgd"]
+    optimizer: OptimizerName
     device: ResolvedDevice
     precision: ResolvedPrecision
     data_num_workers: int

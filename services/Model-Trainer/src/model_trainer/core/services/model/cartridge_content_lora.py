@@ -33,6 +33,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import torch
+from platform_ml import OptimizerName
 
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
@@ -177,7 +178,7 @@ def train_composition_lora_invariant(
     teachers = tuple(CartridgeModel(base=teacher_base, slots=member) for member in pool)
     student_dtype = compute_dtype(adapted)
     steps_per_epoch = sum(len(windows) for windows in member_windows)
-    optimiser = _get_optimizer_for_config("adamw")(
+    optimiser = _get_optimizer_for_config(OptimizerName.ADAMW)(
         [parameter for parameter in adapted.parameters() if parameter.requires_grad],
         lr=learning_rate,
     )

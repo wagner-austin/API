@@ -25,7 +25,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.members import require_member
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.dataset import require_corpus_format
 from model_trainer.core.contracts.queue_encoding_configs import (
@@ -143,27 +143,6 @@ def _narrow_model_family(
     )
 
 
-def _narrow_optimizer(raw: str) -> Literal["adamw", "adam", "sgd"]:
-    """Narrow optimizer string to Literal type with validation.
-
-    Args:
-        raw: Raw optimizer string.
-
-    Returns:
-        Narrowed Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid optimizer.
-    """
-    if raw == "adamw":
-        return "adamw"
-    if raw == "adam":
-        return "adam"
-    if raw == "sgd":
-        return "sgd"
-    raise JSONTypeError(f"Field 'optimizer' must be 'adamw', 'adam', or 'sgd', got '{raw}'")
-
-
 def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     """Decode JSONObject to TrainRequestPayload with full validation.
 
@@ -192,7 +171,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     pretrained_run_id = optional_str(obj, "pretrained_run_id")
     freeze_embed = require_bool(obj, "freeze_embed")
     gradient_clipping = require_float(obj, "gradient_clipping")
-    optimizer = _narrow_optimizer(require_str(obj, "optimizer"))
+    optimizer = require_member(obj, "optimizer", OptimizerName)
     device = require_member(obj, "device", RequestedDevice)
     precision = require_member(obj, "precision", RequestedPrecision)
     data_num_workers = optional_int(obj, "data_num_workers")

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import torch
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
     UNPINNED,
@@ -293,7 +293,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -382,7 +382,7 @@ def test_train_prepared_skips_save_when_cancelled(
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

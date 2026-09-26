@@ -32,6 +32,7 @@ from platform_core.run_record import (
     run_record,
 )
 from platform_core.testing import sample_run_fingerprint
+from platform_ml import OptimizerName
 from torch.nn.attention import SDPBackend
 
 from model_trainer.cli import _measurement_hooks as measurement_hooks
@@ -132,7 +133,7 @@ class TestTheStepItself:
     def test_it_uses_the_optimizer_the_trainer_uses(self) -> None:
         step = train_step_setup(CHEAP_SHAPE, "cpu")
 
-        assert TRAIN_OPTIMIZER == "adamw"
+        assert TRAIN_OPTIMIZER is OptimizerName.ADAMW
         assert type(step["optimizer"]).__name__ == "AdamW"
 
     def test_a_step_actually_moves_the_weights(self) -> None:

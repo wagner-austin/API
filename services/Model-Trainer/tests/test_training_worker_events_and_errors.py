@@ -4,7 +4,13 @@ from pathlib import Path
 from typing import Literal, NoReturn, Protocol
 
 import pytest
-from platform_ml import RequestedDevice, RequestedPrecision, ResolvedDevice, ResolvedPrecision
+from platform_ml import (
+    OptimizerName,
+    RequestedDevice,
+    RequestedPrecision,
+    ResolvedDevice,
+    ResolvedPrecision,
+)
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
@@ -85,7 +91,7 @@ def test_emit_metrics_helpers_publish() -> None:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -145,7 +151,7 @@ def test_process_train_job_sets_status_message_on_exception(
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": 0,
             "data_pin_memory": False,

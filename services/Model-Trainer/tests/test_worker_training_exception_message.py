@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from platform_core.errors import AppError
 from platform_core.job_types import job_key
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
@@ -59,7 +59,7 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,
@@ -133,7 +133,7 @@ def test_training_worker_sets_status_failed_when_corpus_fetch_raises(tmp_path: P
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,

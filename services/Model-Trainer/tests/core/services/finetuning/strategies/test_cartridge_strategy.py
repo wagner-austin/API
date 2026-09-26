@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.cartridge import (
     CARTRIDGE_WEIGHTS_NAME,
@@ -92,7 +92,7 @@ def make_train_config(cartridge: CartridgeConfig | None) -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,
@@ -172,7 +172,7 @@ def train_and_report(model: CartridgeModel, *, steps: int) -> tuple[float, float
         The first and final losses.
     """
     batch = tokens(batch_size=2, length=6)
-    optimiser = _get_optimizer_for_config("adamw")(model.parameters(), lr=0.1)
+    optimiser = _get_optimizer_for_config(OptimizerName.ADAMW)(model.parameters(), lr=0.1)
     first_loss = 0.0
     final_loss = 0.0
     for step in range(steps):
@@ -484,7 +484,9 @@ class TestAgainstARealTransformer:
         batch = tokens(batch_size=4, length=5)
 
         batched_model = adapt(tiny_gpt2())
-        optimiser = _get_optimizer_for_config("adamw")(batched_model.parameters(), lr=0.1)
+        optimiser = _get_optimizer_for_config(OptimizerName.ADAMW)(
+            batched_model.parameters(), lr=0.1
+        )
         param_before = batched_model.parameters()[0].detach().clone()
         before = batched_model.forward(input_ids=batch, labels=batch)
         first_loss = before.loss.item()

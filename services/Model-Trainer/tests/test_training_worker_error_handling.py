@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal, NoReturn, Protocol
 
 import pytest
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import (
     FakeRedisConditionalHsetError,
@@ -91,7 +91,7 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,
@@ -185,7 +185,7 @@ def test_process_train_job_logs_redis_error_on_handle_error(
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,

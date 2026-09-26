@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from typing import Protocol, TypedDict
 
 import torch
+from platform_ml import OptimizerName
 
 from model_trainer.core.contracts.paired_comparison import (
     PairedComparison,
@@ -387,7 +388,7 @@ def train_on(
         The mean loss of each epoch, in order, so a caller can show the run
         converged rather than asserting it did.
     """
-    optimiser = _get_optimizer_for_config("adamw")(model.parameters(), lr=learning_rate)
+    optimiser = _get_optimizer_for_config(OptimizerName.ADAMW)(model.parameters(), lr=learning_rate)
     model.train()
     epoch_losses: list[float] = []
     for _ in range(epochs):

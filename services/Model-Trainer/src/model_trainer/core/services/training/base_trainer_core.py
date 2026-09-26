@@ -12,7 +12,7 @@ from pathlib import Path
 import torch
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.logging import get_logger
-from platform_ml import ResolvedDevice
+from platform_ml import OptimizerName, ResolvedDevice
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core import _test_hooks
@@ -42,18 +42,9 @@ def _get_optimizer_class(name: str) -> OptimizerCtorProto:
     return cls
 
 
-# Map optimizer names from config to torch class names
-_OPTIMIZER_MAP: dict[str, str] = {
-    "adamw": "AdamW",
-    "adam": "Adam",
-    "sgd": "SGD",
-}
-
-
-def _get_optimizer_for_config(optimizer_name: str) -> OptimizerCtorProto:
-    """Get optimizer class for the given config name."""
-    torch_cls_name = _OPTIMIZER_MAP[optimizer_name]
-    return _get_optimizer_class(torch_cls_name)
+def _get_optimizer_for_config(optimizer_name: OptimizerName) -> OptimizerCtorProto:
+    """Get the torch.optim class the config's optimizer names."""
+    return _get_optimizer_class(optimizer_name.torch_class_name)
 
 
 # Expose AdamW symbol for tests to monkeypatch optimizer behavior

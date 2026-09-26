@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal, NotRequired
 
 from platform_core.comparability import RunFingerprint
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.cloze import ClozeItemOutcome
@@ -120,7 +120,7 @@ class TrainRequest(TypedDict, total=True):
     pretrained_run_id: str | None
     freeze_embed: bool
     gradient_clipping: float
-    optimizer: Literal["adamw", "adam", "sgd"]
+    optimizer: OptimizerName
     user_id: int
     device: RequestedDevice
     precision: RequestedPrecision

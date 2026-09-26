@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue
+from platform_ml import OptimizerName
 
 from model_trainer.api.validators.runs import _decode_evaluate_request, _decode_train_request
 from model_trainer.api.validators.tokenizers import _decode_tokenizer_train_request
@@ -412,7 +413,7 @@ def test_decode_train_request_optimizer_adam() -> None:
         "optimizer": "adam",
     }
     out = _decode_train_request(payload)
-    assert out["optimizer"] == "adam"
+    assert out["optimizer"] is OptimizerName.ADAM
 
 
 def test_decode_train_request_optimizer_sgd() -> None:
@@ -431,7 +432,7 @@ def test_decode_train_request_optimizer_sgd() -> None:
         "optimizer": "sgd",
     }
     out = _decode_train_request(payload)
-    assert out["optimizer"] == "sgd"
+    assert out["optimizer"] is OptimizerName.SGD
 
 
 def test_decode_train_request_freeze_embed_explicit_true() -> None:

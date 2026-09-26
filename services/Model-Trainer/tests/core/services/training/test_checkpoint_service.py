@@ -14,7 +14,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
@@ -57,7 +57,7 @@ def _make_cfg() -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,

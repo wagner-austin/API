@@ -7,7 +7,7 @@ from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from platform_core.members import as_member
 from platform_core.trainer_keys import eval_key
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
@@ -22,7 +22,6 @@ from model_trainer.worker.job_utils import (
 )
 from model_trainer.worker.manifest import (
     as_model_family,
-    as_optimizer,
     load_manifest_from_text,
 )
 
@@ -81,7 +80,7 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "pretrained_run_id": manifest["pretrained_run_id"],
             "freeze_embed": manifest["freeze_embed"],
             "gradient_clipping": manifest["gradient_clipping"],
-            "optimizer": as_optimizer(manifest["optimizer"]),
+            "optimizer": as_member(manifest["optimizer"], "optimizer", OptimizerName),
             "device": as_member(manifest["device"], "device", ResolvedDevice),
             "precision": as_member(manifest["precision"], "precision", ResolvedPrecision),
             "data_num_workers": 0,

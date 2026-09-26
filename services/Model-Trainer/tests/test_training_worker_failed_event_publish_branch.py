@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal, NoReturn, Protocol
 
 import pytest
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
@@ -101,7 +101,7 @@ def test_training_worker_failed_event_publish_branch(
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,

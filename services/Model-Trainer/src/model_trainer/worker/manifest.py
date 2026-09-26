@@ -47,17 +47,6 @@ def as_model_family(s: str) -> Literal["gpt2", "llama", "qwen", "char_lstm", "hf
     raise JSONTypeError(f"Invalid model_family: {s}")
 
 
-def as_optimizer(s: str) -> Literal["adamw", "adam", "sgd"]:
-    """Convert string to optimizer literal type."""
-    if s == "adamw":
-        return "adamw"
-    if s == "adam":
-        return "adam"
-    if s == "sgd":
-        return "sgd"
-    raise JSONTypeError(f"Invalid optimizer: {s}")
-
-
 def _decode_manifest_versions(obj: JSONObject) -> TrainingManifestVersions:
     vers = require_dict(obj, "versions")
     return {

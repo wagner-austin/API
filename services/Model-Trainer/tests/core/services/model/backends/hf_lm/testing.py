@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import torch
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.finetuning import StrategyName
 from model_trainer.core.contracts.model import GenerateConfig, ModelTrainConfig, ScoreConfig
@@ -239,7 +239,7 @@ def make_test_config(
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,

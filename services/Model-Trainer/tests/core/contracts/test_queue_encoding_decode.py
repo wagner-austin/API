@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.queue import TrainJobPayload, TrainRequestPayload
 from model_trainer.core.contracts.queue_encoding import (
@@ -36,7 +36,7 @@ class TestTrainRequestPayloadEncoding:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "precision": RequestedPrecision.FP32,
             "data_num_workers": None,
@@ -158,17 +158,20 @@ class TestTrainRequestPayloadEncoding:
 
     def test_decode_all_optimizers(self) -> None:
         """Test decoding all valid optimizer values."""
-        for opt in ("adamw", "adam", "sgd"):
+        for opt in OptimizerName:
             encoded = encode_train_request_payload(self._make_minimal_payload())
-            encoded["optimizer"] = opt
+            encoded["optimizer"] = opt.value
             decoded = decode_train_request_payload(encoded)
-            assert decoded["optimizer"] == opt
+            assert decoded["optimizer"] is opt
 
     def test_decode_invalid_optimizer(self) -> None:
-        """Test that invalid optimizer raises JSONTypeError."""
+        """An unknown optimizer is refused with every admitted word named."""
         encoded = encode_train_request_payload(self._make_minimal_payload())
         encoded["optimizer"] = "invalid"
-        with pytest.raises(JSONTypeError, match=r"optimizer.*must be"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid optimizer 'invalid': must be one of 'adamw', 'adam', 'sgd'$",
+        ):
             decode_train_request_payload(encoded)
 
     def test_decode_all_devices(self) -> None:
@@ -288,7 +291,7 @@ class TestTrainJobPayloadEncoding:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "precision": RequestedPrecision.FP32,
             "data_num_workers": None,

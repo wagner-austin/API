@@ -69,7 +69,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.model import CartridgeConfig, ModelTrainConfig
 from model_trainer.core.contracts.paired_comparison import PairedComparison
@@ -153,7 +153,7 @@ def _cfg(num_slots: int) -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,

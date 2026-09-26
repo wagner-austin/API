@@ -35,7 +35,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.members import require_member
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.queue_encoding_configs import (
@@ -51,10 +51,7 @@ from model_trainer.core.contracts.queue_encoding_configs import (
 
 from .dataset import require_corpus_format
 from .model import ModelTrainConfig
-from .queue_encoding import (
-    _narrow_model_family,
-    _narrow_optimizer,
-)
+from .queue_encoding import _narrow_model_family
 from .strategy_names import require_strategy_name
 
 #: Version stamp written into every checkpoint. A decoder that meets a
@@ -250,7 +247,7 @@ def decode_model_train_config(obj: JSONObject) -> ModelTrainConfig:
         "pretrained_run_id": optional_str(obj, "pretrained_run_id"),
         "freeze_embed": require_bool(obj, "freeze_embed"),
         "gradient_clipping": require_float(obj, "gradient_clipping"),
-        "optimizer": _narrow_optimizer(require_str(obj, "optimizer")),
+        "optimizer": require_member(obj, "optimizer", OptimizerName),
         # Resolved vocabularies have no 'auto' member: auto is a request-time
         # word, so a checkpoint config carrying it is refused here.
         "device": require_member(obj, "device", ResolvedDevice),

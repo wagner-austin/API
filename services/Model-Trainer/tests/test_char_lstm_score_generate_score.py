@@ -9,7 +9,7 @@ from typing import Protocol
 import pytest
 import torch
 from platform_core.errors import AppError
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
@@ -97,7 +97,7 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

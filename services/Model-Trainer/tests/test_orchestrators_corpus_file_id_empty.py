@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.testing import FakeRedis
 
 from model_trainer.api.schemas.runs import TrainRequest
@@ -73,7 +73,7 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": RequestedDevice.CPU,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,

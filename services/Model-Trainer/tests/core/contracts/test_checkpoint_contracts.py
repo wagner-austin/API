@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.checkpoint import (
     CHECKPOINT_SCHEMA_VERSION,
@@ -38,7 +38,7 @@ def _make_cfg() -> ModelTrainConfig:
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CUDA,
         "precision": ResolvedPrecision.FP32,
         "data_num_workers": 2,

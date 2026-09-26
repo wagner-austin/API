@@ -10,7 +10,7 @@ from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from platform_workers.testing import FakeRedis as _FakeRedis
 
 from model_trainer.core import _test_hooks
@@ -134,7 +134,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

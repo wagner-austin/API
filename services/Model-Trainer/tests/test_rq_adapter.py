@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQJobLike, RQRetryLike
 from platform_workers.testing import FakeJob, FakeRedisBytesClient, FakeRetry
@@ -168,7 +168,7 @@ def _train_payload() -> TrainJobPayload:
             "pretrained_run_id": None,
             "freeze_embed": False,
             "gradient_clipping": 1.0,
-            "optimizer": "adamw",
+            "optimizer": OptimizerName.ADAMW,
             "device": RequestedDevice.CPU,
             "precision": RequestedPrecision.AUTO,
             "data_num_workers": None,
@@ -293,7 +293,7 @@ def test_rq_enqueuer_methods() -> None:
                 "pretrained_run_id": None,
                 "freeze_embed": False,
                 "gradient_clipping": 1.0,
-                "optimizer": "adamw",
+                "optimizer": OptimizerName.ADAMW,
                 "device": RequestedDevice.CPU,
                 "precision": RequestedPrecision.AUTO,
                 "data_num_workers": None,
@@ -340,7 +340,7 @@ def test_rq_enqueuer_methods() -> None:
         assert req["pretrained_run_id"] is None
         assert req["freeze_embed"] is False
         assert req["gradient_clipping"] == 1.0
-        assert req["optimizer"] == "adamw"
+        assert req["optimizer"] is OptimizerName.ADAMW
         assert req["device"] is RequestedDevice.CPU
         assert req["precision"] is RequestedPrecision.AUTO
         assert req["data_num_workers"] is None

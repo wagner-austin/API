@@ -12,7 +12,7 @@ from platform_core.validators import (
     validate_optional_literal,
     validate_required_literal,
 )
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.strategy_names import StrategyName, require_strategy_name
 
@@ -225,14 +225,21 @@ def _narrow_gguf_output_type(raw: str) -> Literal["f32", "f16", "bf16", "q8_0"]:
     return "f32"
 
 
-def _narrow_optimizer(raw: str | None) -> Literal["adamw", "adam", "sgd"]:
-    """Narrow optimizer string to Literal type."""
-    val = raw if raw is not None else "adamw"
-    if val == "adam":
-        return "adam"
-    if val == "sgd":
-        return "sgd"
-    return "adamw"
+def _narrow_optimizer(raw: str | None) -> OptimizerName:
+    """Narrow an already-validated optimizer word to its member.
+
+    Args:
+        raw: A word from ``OptimizerName``, or None when the request
+            omitted the field.
+
+    Returns:
+        The member for ``raw``; ADAMW when the field was omitted.
+
+    Raises:
+        ValueError: If ``raw`` is not an optimizer word. The API edge
+            refuses such a request with a 400 before this is called.
+    """
+    return OptimizerName.ADAMW if raw is None else OptimizerName(raw)
 
 
 def _narrow_device(raw: str | None) -> RequestedDevice:

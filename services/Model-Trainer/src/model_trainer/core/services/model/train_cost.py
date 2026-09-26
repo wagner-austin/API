@@ -37,6 +37,7 @@ from __future__ import annotations
 from typing import Final
 
 import torch
+from platform_ml import OptimizerName
 from torch.nn.attention import SDPBackend
 from typing_extensions import TypedDict
 
@@ -81,9 +82,9 @@ TRAIN_LR = 1e-4
 #: Gradient-norm ceiling, matching the trainer's own default clipping.
 TRAIN_CLIP = 1.0
 
-#: The optimizer name the trainer's config uses, resolved through the
-#: trainer's own map so this cannot drift from what the service runs.
-TRAIN_OPTIMIZER = "adamw"
+#: The optimizer the trainer's config uses, resolved through the trainer's
+#: own lookup so this cannot drift from what the service runs.
+TRAIN_OPTIMIZER: Final = OptimizerName.ADAMW
 
 
 class TrainStep(TypedDict):

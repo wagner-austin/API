@@ -5,7 +5,7 @@ from typing import Literal, Protocol
 
 import pytest
 from platform_core.json_utils import JSONValue, load_json_str
-from platform_ml import ResolvedDevice, ResolvedPrecision
+from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.config.settings import Settings
@@ -133,7 +133,7 @@ def test_training_and_eval_tiny(
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
@@ -314,7 +314,7 @@ def test_cancel_during_eval_returns_partial_results(
         "pretrained_run_id": None,
         "freeze_embed": False,
         "gradient_clipping": 1.0,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,

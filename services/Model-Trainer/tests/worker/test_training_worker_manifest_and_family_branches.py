@@ -205,15 +205,6 @@ def test_load_manifest_pretrained_run_id_valid_string() -> None:
     assert result["pretrained_run_id"] == "run-base-123"
 
 
-def test_as_optimizer_variants_and_invalid() -> None:
-    """Cover manifest.py as_optimizer branches."""
-    assert manifest.as_optimizer("adamw") == "adamw"
-    assert manifest.as_optimizer("adam") == "adam"
-    assert manifest.as_optimizer("sgd") == "sgd"
-    with pytest.raises(JSONTypeError, match="optimizer"):
-        _ = manifest.as_optimizer("rmsprop")
-
-
 def test_load_manifest_freeze_embed_must_be_bool() -> None:
     """Cover manifest.py _decode_manifest_bool error case."""
     bad_manifest: dict[str, JSONValue] = {
