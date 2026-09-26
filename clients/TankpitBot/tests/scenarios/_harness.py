@@ -112,7 +112,7 @@ class BotScenario:
     def __init__(
         self,
         timestamp_ms: int = DEFAULT_START_TIMESTAMP_MS,
-        combat_feedback: CombatFeedback = "",
+        combat_feedback: CombatFeedback = CombatFeedback.NONE,
         config: AIConfigDict | None = None,
     ) -> None:
         """Build the scenario's world service and install its clock.
