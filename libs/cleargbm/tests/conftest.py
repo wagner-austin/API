@@ -25,9 +25,9 @@ def make_config(
     reg_lambda: float = 0.0,
     n_jobs: int = 1,
     early_stopping_rounds: int | None = None,
-    growth_strategy: GrowthStrategy = "depth_wise",
+    growth_strategy: GrowthStrategy = GrowthStrategy.DEPTH_WISE,
     num_leaves: int | None = None,
-    objective: Objective = "binary_log_loss",
+    objective: Objective = Objective.BINARY_LOG_LOSS,
     scale_pos_weight: float | None = 1.0,
 ) -> GradientBoostingConfig:
     """Create a test config.
@@ -113,7 +113,7 @@ def make_regression_config(
         n_estimators=n_estimators,
         max_depth=max_depth,
         early_stopping_rounds=early_stopping_rounds,
-        objective="squared_error",
+        objective=Objective.SQUARED_ERROR,
         scale_pos_weight=None,
     )
 

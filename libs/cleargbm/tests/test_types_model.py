@@ -6,8 +6,10 @@ import pytest
 
 from cleargbm.types import (
     GradientBoostingConfig,
+    GrowthStrategy,
     JSONDict,
     JSONTypeError,
+    Objective,
     decode_gradient_boosting_config,
     encode_gradient_boosting_config,
 )
@@ -45,9 +47,9 @@ class TestGradientBoostingConfig:
             "reg_lambda": 1.0,
             "n_jobs": 4,
             "early_stopping_rounds": 10,
-            "growth_strategy": "depth_wise",
+            "growth_strategy": GrowthStrategy.DEPTH_WISE,
             "num_leaves": None,
-            "objective": "binary_log_loss",
+            "objective": Objective.BINARY_LOG_LOSS,
             "scale_pos_weight": 1.0,
         }
         encoded = encode_gradient_boosting_config(original)
@@ -69,7 +71,7 @@ class TestGradientBoostingConfig:
         assert decoded["reg_lambda"] == 1.0
         assert decoded["n_jobs"] == 4
         assert decoded["early_stopping_rounds"] == 10
-        assert decoded["growth_strategy"] == "depth_wise"
+        assert decoded["growth_strategy"] is GrowthStrategy.DEPTH_WISE
         assert decoded["num_leaves"] is None
 
     def test_encode_decode_with_none_optionals(self) -> None:
@@ -97,9 +99,9 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
-            "growth_strategy": "depth_wise",
+            "growth_strategy": GrowthStrategy.DEPTH_WISE,
             "num_leaves": None,
-            "objective": "binary_log_loss",
+            "objective": Objective.BINARY_LOG_LOSS,
             "scale_pos_weight": 1.0,
         }
         encoded = encode_gradient_boosting_config(original)
@@ -270,9 +272,9 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": -1,
             "early_stopping_rounds": None,
-            "growth_strategy": "depth_wise",
+            "growth_strategy": GrowthStrategy.DEPTH_WISE,
             "num_leaves": None,
-            "objective": "binary_log_loss",
+            "objective": Objective.BINARY_LOG_LOSS,
             "scale_pos_weight": 1.0,
         }
         encoded = encode_gradient_boosting_config(original)

@@ -8,8 +8,10 @@ from cleargbm.types import (
     DecisionTree,
     GradientBoostingConfig,
     GradientBoostingModel,
+    GrowthStrategy,
     JSONDict,
     JSONTypeError,
+    Objective,
     TreeNode,
     decode_gradient_boosting_config,
     decode_gradient_boosting_model,
@@ -112,9 +114,9 @@ class TestGradientBoostingModel:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
-            "growth_strategy": "depth_wise",
+            "growth_strategy": GrowthStrategy.DEPTH_WISE,
             "num_leaves": None,
-            "objective": "binary_log_loss",
+            "objective": Objective.BINARY_LOG_LOSS,
             "scale_pos_weight": 1.0,
         }
         original: GradientBoostingModel = {

@@ -30,9 +30,9 @@ def _make_config(
     monotonic_constraints: tuple[int, ...] | None = None,
     early_stopping_rounds: int | None = None,
     n_jobs: int = 1,
-    growth_strategy: GrowthStrategy = "depth_wise",
+    growth_strategy: GrowthStrategy = GrowthStrategy.DEPTH_WISE,
     num_leaves: int | None = None,
-    objective: Objective = "binary_log_loss",
+    objective: Objective = Objective.BINARY_LOG_LOSS,
     scale_pos_weight: float | None = 1.0,
 ) -> GradientBoostingConfig:
     """Return a minimal valid training config."""
@@ -71,7 +71,7 @@ def _make_regression_config(n_estimators: int = 30) -> GradientBoostingConfig:
     return _make_config(
         n_estimators=n_estimators,
         max_depth=3,
-        objective="squared_error",
+        objective=Objective.SQUARED_ERROR,
         scale_pos_weight=None,
     )
 
@@ -180,7 +180,9 @@ class TestConfigToRustDict:
         Dropping either one is silent: the trainer would fall back to its own
         reading of the config and report an arm it did not run.
         """
-        result = _config_to_rust_dict(_make_config(growth_strategy="leaf_wise", num_leaves=31))
+        result = _config_to_rust_dict(
+            _make_config(growth_strategy=GrowthStrategy.LEAF_WISE, num_leaves=31)
+        )
         assert result["growth_strategy"] == "leaf_wise"
         assert result["num_leaves"] == 31
 

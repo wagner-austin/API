@@ -10,10 +10,10 @@ from __future__ import annotations
 import pytest
 
 from cleargbm.types import (
-    GROWTH_STRATEGIES,
-    OBJECTIVES,
+    GrowthStrategy,
     JSONDict,
     JSONTypeError,
+    Objective,
     decode_gradient_boosting_config,
     require_growth_strategy,
     require_leaf_budget,
@@ -24,20 +24,22 @@ from cleargbm.types import (
 class TestConfigAxes:
     """The growth, budget and objective axes through decode and require_*."""
 
-    def test_growth_strategies_enumerates_both_policies(self) -> None:
-        """The closed literal and its runtime tuple must not drift apart."""
-        assert GROWTH_STRATEGIES == ("depth_wise", "leaf_wise")
+    def test_growth_strategies_are_the_wire_spellings_rust_accepts(self) -> None:
+        """The members' values are exactly the two spellings the Rust side parses."""
+        assert [strategy.value for strategy in GrowthStrategy] == ["depth_wise", "leaf_wise"]
 
-    def test_require_growth_strategy_accepts_every_enumerated_value(self) -> None:
-        """Every value in the tuple must survive narrowing."""
-        narrowed = [
-            require_growth_strategy(value, "growth_strategy") for value in GROWTH_STRATEGIES
-        ]
-        assert narrowed == ["depth_wise", "leaf_wise"]
+    def test_require_growth_strategy_narrows_every_spelling_to_its_member(self) -> None:
+        """Every member's spelling narrows back to that member."""
+        for strategy in GrowthStrategy:
+            assert require_growth_strategy(strategy.value, "growth_strategy") is strategy
 
     def test_require_growth_strategy_rejects_unknown_value(self) -> None:
         """An unknown policy names itself and the accepted set."""
-        with pytest.raises(ValueError, match="growth_strategy must be one of"):
+        with pytest.raises(
+            ValueError,
+            match=r"^growth_strategy must be one of \['depth_wise', 'leaf_wise'\], "
+            r"got 'lossguide'$",
+        ):
             require_growth_strategy("lossguide", "growth_strategy")
 
     def test_require_leaf_budget_accepts_the_smallest_usable_budget(self) -> None:
@@ -48,28 +50,27 @@ class TestConfigAxes:
         with pytest.raises(ValueError, match="num_leaves must be >= 2"):
             require_leaf_budget(1, "num_leaves")
 
-    def test_objectives_enumerates_every_loss(self) -> None:
-        """The closed literal and its runtime tuple must not drift apart."""
-        assert OBJECTIVES == (
-            "binary_log_loss",
-            "squared_error",
-            "multiclass_softmax",
-            "lambdarank",
-        )
-
-    def test_require_objective_accepts_every_enumerated_value(self) -> None:
-        """Every value in the tuple must survive narrowing."""
-        narrowed = [require_objective(value, "objective") for value in OBJECTIVES]
-        assert narrowed == [
+    def test_objectives_are_the_wire_spellings_rust_accepts(self) -> None:
+        """The members' values are exactly the four spellings the Rust side parses."""
+        assert [objective.value for objective in Objective] == [
             "binary_log_loss",
             "squared_error",
             "multiclass_softmax",
             "lambdarank",
         ]
 
+    def test_require_objective_narrows_every_spelling_to_its_member(self) -> None:
+        """Every member's spelling narrows back to that member."""
+        for objective in Objective:
+            assert require_objective(objective.value, "objective") is objective
+
     def test_require_objective_rejects_unknown_value(self) -> None:
         """An unknown objective names itself and the accepted set."""
-        with pytest.raises(ValueError, match="objective must be one of"):
+        with pytest.raises(
+            ValueError,
+            match=r"^objective must be one of \['binary_log_loss', 'squared_error', "
+            r"'multiclass_softmax', 'lambdarank'\], got 'reg:squarederror'$",
+        ):
             require_objective("reg:squarederror", "objective")
 
     def test_decode_regression_config_with_null_weight(self) -> None:
@@ -107,7 +108,7 @@ class TestConfigAxes:
             "scale_pos_weight": None,
         }
         decoded = decode_gradient_boosting_config(raw)
-        assert decoded["objective"] == "squared_error"
+        assert decoded["objective"] is Objective.SQUARED_ERROR
         assert decoded["scale_pos_weight"] is None
 
     def test_decode_rejects_a_non_positive_weight(self) -> None:
@@ -278,7 +279,7 @@ class TestConfigAxes:
             "scale_pos_weight": 1.0,
         }
         decoded = decode_gradient_boosting_config(raw)
-        assert decoded["growth_strategy"] == "leaf_wise"
+        assert decoded["growth_strategy"] is GrowthStrategy.LEAF_WISE
         assert decoded["num_leaves"] == 31
 
     def test_decode_num_leaves_below_two(self) -> None:

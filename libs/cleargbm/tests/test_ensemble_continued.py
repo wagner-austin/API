@@ -21,6 +21,7 @@ from cleargbm.ensemble_continued import (
     continue_gradient_boosting_regression,
 )
 from cleargbm.ensemble_multiclass import train_gradient_boosting_multiclass
+from cleargbm.types import Objective
 from tests.conftest import make_config
 
 
@@ -88,7 +89,7 @@ class TestContinueBinary:
                 n_estimators=2,
                 n_classes=3,
                 max_bins=16,
-                objective="multiclass_softmax",
+                objective=Objective.MULTICLASS_SOFTMAX,
                 scale_pos_weight=None,
             ),
             ("f0", "f1"),
@@ -107,8 +108,12 @@ class TestContinueRegression:
         for i in range(12):
             x[i, 0] = float(i)
             y[i] = 2.0 * float(i)
-        config2 = make_config(n_estimators=2, objective="squared_error", scale_pos_weight=None)
-        config4 = make_config(n_estimators=4, objective="squared_error", scale_pos_weight=None)
+        config2 = make_config(
+            n_estimators=2, objective=Objective.SQUARED_ERROR, scale_pos_weight=None
+        )
+        config4 = make_config(
+            n_estimators=4, objective=Objective.SQUARED_ERROR, scale_pos_weight=None
+        )
         base = train_gradient_boosting_regression(x, y, None, None, config2, ("f0", "f1"))
         continued = continue_gradient_boosting_regression(base, x, y, None, None, 2)
         fresh = train_gradient_boosting_regression(x, y, None, None, config4, ("f0", "f1"))

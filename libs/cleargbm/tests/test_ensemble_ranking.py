@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from cleargbm.ensemble import predict_proba, predict_raw
 from cleargbm.ensemble_ranking import train_gradient_boosting_ranking
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 
 
 def _make_ranking_config(
@@ -45,9 +45,9 @@ def _make_ranking_config(
         reg_lambda=0.0,
         n_jobs=1,
         early_stopping_rounds=early_stopping_rounds,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="lambdarank",
+        objective=Objective.LAMBDARANK,
         scale_pos_weight=None,
     )
 

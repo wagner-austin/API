@@ -18,7 +18,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from cleargbm.ensemble import train_gradient_boosting
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 
 
 def _write(msg: str) -> None:
@@ -165,9 +165,9 @@ def make_config(
         reg_lambda=0.0,
         n_jobs=n_jobs,
         early_stopping_rounds=None,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="binary_log_loss",
+        objective=Objective.BINARY_LOG_LOSS,
         scale_pos_weight=1.0,
     )
 

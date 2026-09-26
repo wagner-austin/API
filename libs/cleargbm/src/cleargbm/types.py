@@ -32,8 +32,6 @@ from cleargbm._types_buffer import (
     encode_int_buffer_data,
 )
 from cleargbm._types_config import (
-    GROWTH_STRATEGIES,
-    OBJECTIVES,
     GradientBoostingConfig,
     GrowthStrategy,
     Objective,
@@ -101,8 +99,6 @@ from cleargbm._types_tuning import (
 )
 
 __all__ = [
-    "GROWTH_STRATEGIES",
-    "OBJECTIVES",
     "BinEdges",
     "DecisionTree",
     "FeatureBins",

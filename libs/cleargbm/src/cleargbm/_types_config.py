@@ -1,6 +1,6 @@
 """Training-configuration type definitions for ClearGBM.
 
-Provides the GrowthStrategy / Objective literals, the GradientBoostingConfig
+Provides the GrowthStrategy / Objective vocabularies, the GradientBoostingConfig
 TypedDict, its field validators, and the config encode/decode pair. Model
 and progress types live in ``_types_model``.
 
@@ -9,7 +9,8 @@ This module is private (underscore prefix) — not for external use.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict, get_args
+from enum import StrEnum
+from typing import TypedDict
 
 from cleargbm._types_json import (
     JSONDict,
@@ -27,41 +28,46 @@ from cleargbm._types_json import (
     require_unit_float,
 )
 
-GrowthStrategy = Literal["depth_wise", "leaf_wise"]
-"""Tree growth policy — the order in which nodes are chosen for splitting.
 
-``depth_wise`` expands every node at one depth before the next, bounded by
-``max_depth``. ``leaf_wise`` repeatedly splits the highest-gain leaf, bounded
-by a leaf budget. The two build different trees from identical data, so this
-is an algorithm parameter and not a fallback switch.
+class GrowthStrategy(StrEnum):
+    """Tree growth policy — the order in which nodes are chosen for splitting.
 
-A closed literal on purpose: variants are enumerated here and rejected at the
-Rust boundary if unimplemented, so a mistyped arm name fails rather than
-quietly training the default policy.
-"""
+    ``depth_wise`` expands every node at one depth before the next, bounded by
+    ``max_depth``. ``leaf_wise`` repeatedly splits the highest-gain leaf, bounded
+    by a leaf budget. The two build different trees from identical data, so this
+    is an algorithm parameter and not a fallback switch.
 
-GROWTH_STRATEGIES: tuple[GrowthStrategy, ...] = get_args(GrowthStrategy)
-"""Every accepted :data:`GrowthStrategy` value, for validation and iteration."""
+    A closed vocabulary on purpose: variants are enumerated here and rejected at
+    the Rust boundary if unimplemented, so a mistyped arm name fails rather than
+    quietly training the default policy. A member is a ``str`` whose value is the
+    wire spelling, which is what the Rust side extracts.
+    """
 
-Objective = Literal["binary_log_loss", "squared_error", "multiclass_softmax", "lambdarank"]
-"""Training objective — the loss whose gradients the trees descend.
+    DEPTH_WISE = "depth_wise"
+    LEAF_WISE = "leaf_wise"
 
-``binary_log_loss`` is binary classification: 0/1 labels, a log-odds base
-score, sigmoid probabilities. ``squared_error`` is regression: continuous
-targets, a label-mean base score, raw scores that ARE the predictions.
-``multiclass_softmax`` is K-class classification: integer class labels,
-one log-prior base score per class, ``n_classes`` trees per boosting round,
-softmax probabilities. ``lambdarank`` is learning-to-rank: integer
-relevance grades with query groups as data, zero base score, raw scores
-that are the ranking keys.
 
-A closed literal for the same reason :data:`GrowthStrategy` is: a mistyped
-objective fails at the Rust boundary rather than quietly training the wrong
-loss.
-"""
+class Objective(StrEnum):
+    """Training objective — the loss whose gradients the trees descend.
 
-OBJECTIVES: tuple[Objective, ...] = get_args(Objective)
-"""Every accepted :data:`Objective` value, for validation and iteration."""
+    ``binary_log_loss`` is binary classification: 0/1 labels, a log-odds base
+    score, sigmoid probabilities. ``squared_error`` is regression: continuous
+    targets, a label-mean base score, raw scores that ARE the predictions.
+    ``multiclass_softmax`` is K-class classification: integer class labels,
+    one log-prior base score per class, ``n_classes`` trees per boosting round,
+    softmax probabilities. ``lambdarank`` is learning-to-rank: integer
+    relevance grades with query groups as data, zero base score, raw scores
+    that are the ranking keys.
+
+    A closed vocabulary for the same reason :class:`GrowthStrategy` is: a
+    mistyped objective fails at the Rust boundary rather than quietly training
+    the wrong loss.
+    """
+
+    BINARY_LOG_LOSS = "binary_log_loss"
+    SQUARED_ERROR = "squared_error"
+    MULTICLASS_SOFTMAX = "multiclass_softmax"
+    LAMBDARANK = "lambdarank"
 
 
 class GradientBoostingConfig(TypedDict):
@@ -219,15 +225,16 @@ def require_growth_strategy(value: str, name: str) -> GrowthStrategy:
         name: Field name, used in the error message.
 
     Returns:
-        The value, narrowed to the literal type.
+        The member whose value is ``value``.
 
     Raises:
-        ValueError: If ``value`` is not one of :data:`GROWTH_STRATEGIES`.
+        ValueError: If no :class:`GrowthStrategy` member has ``value``.
     """
-    for strategy in GROWTH_STRATEGIES:
-        if value == strategy:
+    for strategy in GrowthStrategy:
+        if value == strategy.value:
             return strategy
-    raise ValueError(f"{name} must be one of {list(GROWTH_STRATEGIES)}, got {value!r}")
+    admitted = [strategy.value for strategy in GrowthStrategy]
+    raise ValueError(f"{name} must be one of {admitted}, got {value!r}")
 
 
 def require_objective(value: str, name: str) -> Objective:
@@ -238,15 +245,16 @@ def require_objective(value: str, name: str) -> Objective:
         name: Field name, used in the error message.
 
     Returns:
-        The value, narrowed to the literal type.
+        The member whose value is ``value``.
 
     Raises:
-        ValueError: If ``value`` is not one of :data:`OBJECTIVES`.
+        ValueError: If no :class:`Objective` member has ``value``.
     """
-    for objective in OBJECTIVES:
-        if value == objective:
+    for objective in Objective:
+        if value == objective.value:
             return objective
-    raise ValueError(f"{name} must be one of {list(OBJECTIVES)}, got {value!r}")
+    admitted = [objective.value for objective in Objective]
+    raise ValueError(f"{name} must be one of {admitted}, got {value!r}")
 
 
 def encode_gradient_boosting_config(
@@ -528,8 +536,6 @@ def decode_gradient_boosting_config(
 
 
 __all__ = [
-    "GROWTH_STRATEGIES",
-    "OBJECTIVES",
     "GradientBoostingConfig",
     "GrowthStrategy",
     "Objective",

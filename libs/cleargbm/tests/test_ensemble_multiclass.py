@@ -17,7 +17,7 @@ from cleargbm.ensemble_multiclass import (
     predict_raw_multiclass,
     train_gradient_boosting_multiclass,
 )
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 
 
 def _make_multiclass_config(
@@ -49,9 +49,9 @@ def _make_multiclass_config(
         reg_lambda=0.0,
         n_jobs=1,
         early_stopping_rounds=early_stopping_rounds,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="multiclass_softmax",
+        objective=Objective.MULTICLASS_SOFTMAX,
         scale_pos_weight=None,
     )
 
