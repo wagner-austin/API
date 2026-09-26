@@ -97,9 +97,19 @@ function Start-Process {{
     [pscustomobject]@{{ ExitCode = $script:MsiExit }}
 }}
 function Get-ExecutionPolicy {{ param([string]$Scope) $script:Policy }}
+function Get-ItemProperty {{
+    param([string]$LiteralPath)
+    [pscustomobject]@{{ LongPathsEnabled = $script:LongPaths }}
+}}
 function Set-ItemProperty {{
-    param([string]$LiteralPath, [string]$Name, [string]$Value)
-    $script:Policy = $Value
+    param([string]$LiteralPath, [string]$Name, [string]$Value, [string]$Type)
+    if ($Name -eq 'LongPathsEnabled') {{ $script:LongPaths = [int]$Value }}
+    else {{ $script:Policy = $Value }}
+}}
+function git {{
+    if ($args[2] -eq '--get') {{ return $script:GitLongPaths }}
+    $script:GitLongPaths = $args[3]
+    $global:LASTEXITCODE = 0
 }}
 function wsl {{
     if ($args[0] -eq '--version') {{ return $script:WslVersion }}
@@ -170,6 +180,8 @@ $script:Restart = $true
 $script:WslVersion = @()
 $script:MsiExit = 3010
 $script:Policy = 'Restricted'
+$script:LongPaths = 0
+$script:GitLongPaths = ''
 """
 
 _LAID = """$script:Features = @{ 'VirtualMachinePlatform' = 'Enabled'; \
@@ -178,6 +190,8 @@ $script:Restart = $false
 $script:WslVersion = @('WSL version: 2.7.14.0', 'Kernel version: 6.6.87.2-1')
 $script:MsiExit = 0
 $script:Policy = 'RemoteSigned'
+$script:LongPaths = 1
+$script:GitLongPaths = 'true'
 """
 
 
@@ -191,6 +205,8 @@ class TestTheWindowsBaseRunsForReal:
             "enabled Windows feature VirtualMachinePlatform",
             "installed WSL 2.7.14",
             "set the LocalMachine execution policy to RemoteSigned",
+            "enabled Win32 long paths",
+            "set git core.longpaths for the system",
             runner_base_render.REBOOT_MARKER,
         ]
         assert not (tmp_path / "wsl.2.7.14.0.x64.msi").exists()
