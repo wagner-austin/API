@@ -65,9 +65,10 @@ from typing_extensions import TypedDict
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.ledger import LedgerEntry
+from hpc3.contracts.status import JobState
 from hpc3.core.remote import token_batches
 
-FINISHED_STATE = "COMPLETED"
+FINISHED_STATE = JobState.COMPLETED
 """The only terminal state that means the artifact is the finished thing."""
 
 _PRESENT = "PRESENT|"
@@ -198,7 +199,7 @@ def parse_existence(output: str) -> set[str]:
     return present
 
 
-def finished_artifacts(entries: Sequence[LedgerEntry], states: Mapping[str, str]) -> set[str]:
+def finished_artifacts(entries: Sequence[LedgerEntry], states: Mapping[str, JobState]) -> set[str]:
     """Find artifacts some job actually ran to completion.
 
     Args:
@@ -220,7 +221,7 @@ def finished_artifacts(entries: Sequence[LedgerEntry], states: Mapping[str, str]
         artifact = entry["artifact"]
         if artifact is None:
             continue
-        if states.get(entry["job_id"]) == FINISHED_STATE:
+        if states.get(entry["job_id"]) is FINISHED_STATE:
             finished.add(artifact)
     return finished
 

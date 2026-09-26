@@ -13,8 +13,8 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.status import (
-    JOB_STATES,
     TERMINAL_STATES,
+    JobState,
     encode_job_status,
     gpu_hours,
     is_terminal,
@@ -83,25 +83,44 @@ class TestServiceUnits:
 
 class TestTerminality:
     def test_finished_states_are_terminal(self) -> None:
-        for state in ("COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "NODE_FAIL"):
+        for state in (
+            JobState.COMPLETED,
+            JobState.FAILED,
+            JobState.CANCELLED,
+            JobState.TIMEOUT,
+            JobState.NODE_FAIL,
+        ):
             assert is_terminal(state) is True
 
     def test_running_states_are_not_terminal(self) -> None:
-        for state in ("PENDING", "RUNNING", "SUSPENDED", "COMPLETING"):
+        for state in (
+            JobState.PENDING,
+            JobState.RUNNING,
+            JobState.SUSPENDED,
+            JobState.COMPLETING,
+        ):
             assert is_terminal(state) is False
 
     def test_requeued_is_not_terminal_because_protection_worked(self) -> None:
         """A requeued job is going back to the queue, not ending."""
-        assert is_terminal("REQUEUED") is False
-        assert "REQUEUED" not in TERMINAL_STATES
+        assert is_terminal(JobState.REQUEUED) is False
+        assert JobState.REQUEUED not in TERMINAL_STATES
 
     def test_preemption_and_oom_end_the_run(self) -> None:
-        assert is_terminal("PREEMPTED") is True
-        assert is_terminal("OUT_OF_MEMORY") is True
+        assert is_terminal(JobState.PREEMPTED) is True
+        assert is_terminal(JobState.OUT_OF_MEMORY) is True
 
-    def test_every_terminal_state_is_a_declared_state(self) -> None:
-        for state in TERMINAL_STATES:
-            assert state in JOB_STATES
+    def test_every_state_is_classified_and_spelled_as_sacct_spells_it(self) -> None:
+        live = {
+            JobState.PENDING,
+            JobState.RUNNING,
+            JobState.SUSPENDED,
+            JobState.COMPLETING,
+            JobState.REQUEUED,
+        }
+        assert set(JobState) == TERMINAL_STATES | live
+        for state in JobState:
+            assert state.value == state.name
 
 
 class TestDecode:

@@ -30,6 +30,7 @@ from platform_core.json_utils import JSONValue, dump_json_str
 
 from hpc3.cli import campaign as campaign_cli
 from hpc3.contracts.job import JobSpec
+from hpc3.contracts.status import JobState
 from hpc3.core.campaign import (
     existence_commands,
     finished_artifacts,
@@ -162,17 +163,17 @@ class TestAskingWhichArtifactsExist:
 class TestWhichArtifactsAJobActuallyFinished:
     def test_a_completed_job_finishes_its_artifact(self) -> None:
         entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.tr", artifact=_TR))]
-        assert finished_artifacts(entries, {"1": "COMPLETED"}) == {_TR}
+        assert finished_artifacts(entries, {"1": JobState.COMPLETED}) == {_TR}
 
     def test_a_preempted_job_does_not(self) -> None:
         """kk_best.pt after a preemption at 1273 seconds is a real file that
         no run finished."""
         entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.kk", artifact=_TR))]
-        assert finished_artifacts(entries, {"1": "PREEMPTED"}) == set()
+        assert finished_artifacts(entries, {"1": JobState.PREEMPTED}) == set()
 
     def test_a_failed_or_cancelled_job_does_not_either(self) -> None:
         entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.kk", artifact=_TR))]
-        for state in ("FAILED", "CANCELLED", "TIMEOUT"):
+        for state in (JobState.FAILED, JobState.CANCELLED, JobState.TIMEOUT):
             assert finished_artifacts(entries, {"1": state}) == set()
 
     def test_a_job_with_no_state_has_no_claim(self) -> None:
@@ -181,7 +182,7 @@ class TestWhichArtifactsAJobActuallyFinished:
 
     def test_a_job_declaring_no_artifact_finishes_nothing(self) -> None:
         entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.p6", artifact=None))]
-        assert finished_artifacts(entries, {"1": "COMPLETED"}) == set()
+        assert finished_artifacts(entries, {"1": JobState.COMPLETED}) == set()
 
     def test_one_completed_attempt_is_enough(self) -> None:
         """A member preempted twice and then finished is finished."""
@@ -189,7 +190,9 @@ class TestWhichArtifactsAJobActuallyFinished:
             decode_ledger_entry(ledger_row(job_id="1", name="abl.kk", artifact=_TR)),
             decode_ledger_entry(ledger_row(job_id="2", name="abl.kk-r2", artifact=_TR)),
         ]
-        assert finished_artifacts(entries, {"1": "PREEMPTED", "2": "COMPLETED"}) == {_TR}
+        assert finished_artifacts(entries, {"1": JobState.PREEMPTED, "2": JobState.COMPLETED}) == {
+            _TR
+        }
 
 
 class TestThePlan:

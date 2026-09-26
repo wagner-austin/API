@@ -34,7 +34,7 @@ reference material wearing a type's clothing. They live on the wiki page
 
 from __future__ import annotations
 
-from hpc3.contracts.cluster import ClusterFacts, PartitionFacts
+from hpc3.contracts.cluster import ClusterFacts, PartitionFacts, PreemptMode
 
 HPC3: ClusterFacts = ClusterFacts(
     slug="hpc3",
@@ -43,7 +43,7 @@ HPC3: ClusterFacts = ClusterFacts(
     partitions={
         "free-gpu": PartitionFacts(
             usage_factor=0.0,
-            preempt_mode="CANCEL",
+            preempt_mode=PreemptMode.CANCEL,
             max_hours=72,
             gpus=("V100", "A30", "A100"),
             max_gpus_per_user=24,
@@ -52,7 +52,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "free-gpu32": PartitionFacts(
             usage_factor=0.0,
-            preempt_mode="CANCEL",
+            preempt_mode=PreemptMode.CANCEL,
             max_hours=72,
             gpus=("L40S", "RTX6000"),
             max_gpus_per_user=4,
@@ -61,7 +61,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "gpu": PartitionFacts(
             usage_factor=1.0,
-            preempt_mode="OFF",
+            preempt_mode=PreemptMode.OFF,
             max_hours=336,
             gpus=("V100", "A30", "A100"),
             max_gpus_per_user=40,
@@ -70,7 +70,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "gpu32": PartitionFacts(
             usage_factor=1.0,
-            preempt_mode="OFF",
+            preempt_mode=PreemptMode.OFF,
             max_hours=336,
             gpus=("L40S", "RTX6000"),
             max_gpus_per_user=12,
@@ -79,7 +79,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "free": PartitionFacts(
             usage_factor=0.0,
-            preempt_mode="CANCEL",
+            preempt_mode=PreemptMode.CANCEL,
             max_hours=72,
             gpus=(),
             max_gpus_per_user=None,
@@ -88,7 +88,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "standard": PartitionFacts(
             usage_factor=1.0,
-            preempt_mode="OFF",
+            preempt_mode=PreemptMode.OFF,
             max_hours=336,
             gpus=(),
             max_gpus_per_user=None,

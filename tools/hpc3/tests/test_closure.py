@@ -17,7 +17,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.closure import Closure, decode_closure, encode_closure
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.contracts.status import JobStatus
+from hpc3.contracts.status import JobState, JobStatus
 from hpc3.core import ledger
 from hpc3.core.triage import closures_for, open_entries, unaccounted_jobs
 from tests.against_hpc3 import decode_job_status, decode_ledger_entry
@@ -156,7 +156,9 @@ class TestClosureStore:
 
     def test_a_written_closure_reads_back(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "l.jsonl.closed"
-        written = Closure(job_id="101", state="COMPLETED", closed_at=_AT, elapsed_seconds=1618)
+        written = Closure(
+            job_id="101", state=JobState.COMPLETED, closed_at=_AT, elapsed_seconds=1618
+        )
         ledger.append_closure(path, written)
         assert ledger.read_closures(path) == {"101": written}
 

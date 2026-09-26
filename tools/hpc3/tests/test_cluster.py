@@ -25,6 +25,7 @@ from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.cluster import (
     ClusterFacts,
     PartitionFacts,
+    PreemptMode,
     partition_bills,
     partition_facts,
     partition_names,
@@ -41,7 +42,7 @@ OTHER: ClusterFacts = ClusterFacts(
     partitions={
         "batch": PartitionFacts(
             usage_factor=0.5,
-            preempt_mode="OFF",
+            preempt_mode=PreemptMode.OFF,
             max_hours=8,
             gpus=("H100",),
             max_gpus_per_user=2,
@@ -50,7 +51,7 @@ OTHER: ClusterFacts = ClusterFacts(
         ),
         "scavenge": PartitionFacts(
             usage_factor=0.0,
-            preempt_mode="CANCEL",
+            preempt_mode=PreemptMode.CANCEL,
             max_hours=4,
             gpus=("MI300X",),
             max_gpus_per_user=1,
@@ -59,7 +60,7 @@ OTHER: ClusterFacts = ClusterFacts(
         ),
         "salvage": PartitionFacts(
             usage_factor=0.0,
-            preempt_mode="REQUEUE",
+            preempt_mode=PreemptMode.REQUEUE,
             max_hours=4,
             gpus=("MI300X",),
             max_gpus_per_user=1,
@@ -68,7 +69,7 @@ OTHER: ClusterFacts = ClusterFacts(
         ),
         "serial": PartitionFacts(
             usage_factor=0.0,
-            preempt_mode="OFF",
+            preempt_mode=PreemptMode.OFF,
             max_hours=2,
             gpus=(),
             max_gpus_per_user=None,

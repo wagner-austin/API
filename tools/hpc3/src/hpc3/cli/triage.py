@@ -42,6 +42,7 @@ from platform_core import cli_args
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.array import base_job_ids, expand_job_id
 from hpc3.contracts.pending import PendingJob
+from hpc3.contracts.status import JobState
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger, logs
 from hpc3.core.remote import run_remote, run_remote_batched
@@ -189,7 +190,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     pending_ids = [
         task_id
         for status in statuses
-        if status["state"] == "PENDING"
+        if status["state"] is JobState.PENDING
         for task_id in expand_job_id(status["job_id"])
     ]
     pending: list[PendingJob] = []

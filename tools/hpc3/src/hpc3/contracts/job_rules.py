@@ -15,6 +15,7 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from hpc3.contracts.cluster import (
     ClusterFacts,
     GpuRequest,
+    PreemptMode,
     partition_bills,
     partition_facts,
     partition_names,
@@ -237,7 +238,7 @@ def _check_preemption_protection(
             if it would survive but nothing asked Slurm to bring it back.
     """
     mode = partition_facts(cluster, partition)["preempt_mode"]
-    if mode == "OFF":
+    if mode is PreemptMode.OFF:
         return
     if minutes <= PREEMPTION_PROTECTION_THRESHOLD_MINUTES:
         return
@@ -268,7 +269,7 @@ def _check_preemption_protection(
             f"does not preempt.",
         )
     survives_eviction = resumes_from_checkpoint or deterministic
-    if survives_eviction and (mode == "CANCEL" or requeue):
+    if survives_eviction and (mode is PreemptMode.CANCEL or requeue):
         return
     if not survives_eviction:
         raise AppError(

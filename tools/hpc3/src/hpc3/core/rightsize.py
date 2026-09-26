@@ -45,6 +45,7 @@ from typing_extensions import TypedDict
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.project import ProjectConfig
+from hpc3.contracts.status import JobState
 
 HEADROOM = 4
 """How many times its longest observed run a project may ask for, unremarked.
@@ -87,7 +88,7 @@ class Oversized(TypedDict):
     evidence: str
 
 
-EVIDENCE_STATE = "COMPLETED"
+EVIDENCE_STATE = JobState.COMPLETED
 """The only terminal state that says how long the work takes.
 
 Both other cases were in the first live run of this check and both are
@@ -128,7 +129,7 @@ def observed_runtimes(
     runtimes: dict[str, list[tuple[int, str, str]]] = {}
     for entry in entries:
         closure = closures.get(entry["job_id"])
-        if closure is None or closure["state"] != EVIDENCE_STATE:
+        if closure is None or closure["state"] is not EVIDENCE_STATE:
             continue
         elapsed = closure["elapsed_seconds"]
         if elapsed is None:

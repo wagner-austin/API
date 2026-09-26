@@ -51,7 +51,13 @@ class CancelOutcome:
 
 
 _LIVE_BEFORE_CANCEL: frozenset[JobState] = frozenset(
-    {"PENDING", "RUNNING", "SUSPENDED", "COMPLETING", "REQUEUED"}
+    {
+        JobState.PENDING,
+        JobState.RUNNING,
+        JobState.SUSPENDED,
+        JobState.COMPLETING,
+        JobState.REQUEUED,
+    }
 )
 
 
@@ -117,7 +123,7 @@ def cancel(host: str, job_ids: Sequence[str], cluster: ClusterFacts) -> list[Can
         CancelOutcome(
             status["job_id"],
             status["state"],
-            was_running=before.get(status["job_id"], "COMPLETED") in _LIVE_BEFORE_CANCEL,
+            was_running=before.get(status["job_id"], JobState.COMPLETED) in _LIVE_BEFORE_CANCEL,
         )
         for status in after
     ]

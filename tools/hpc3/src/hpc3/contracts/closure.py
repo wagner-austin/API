@@ -81,7 +81,7 @@ def encode_closure(closure: Closure) -> dict[str, JSONValue]:
     """
     return {
         "job_id": closure["job_id"],
-        "state": closure["state"],
+        "state": closure["state"].value,
         "closed_at": closure["closed_at"],
         "elapsed_seconds": closure["elapsed_seconds"],
     }

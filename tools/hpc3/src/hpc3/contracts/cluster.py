@@ -25,30 +25,32 @@ cluster's partitions instead of some other machine's.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, require_int, require_str
 from typing_extensions import TypedDict
 
-PreemptMode = Literal["OFF", "CANCEL", "REQUEUE"]
-"""What a partition does to a job it preempts, as ``scontrol`` spells it.
 
-``OFF`` is a partition that does not preempt at all. The other two differ in
-who resubmits, and that difference decides whether ``--requeue`` buys
-anything: under ``REQUEUE`` Slurm resubmits the job itself, and under
-``CANCEL`` it does not, so the flag is inert and something outside Slurm has
-to resubmit.
+class PreemptMode(StrEnum):
+    """What a partition does to a job it preempts, as ``scontrol`` spells it.
 
-Stored as the mode rather than a preemptible/not flag because those are not
-the same question. A boolean answers "can this job be evicted?" and every
-consumer that needs to know "and does anything bring it back?" was left
-reading prose. That distinction sat in a docstring here for months while the
-submission guard demanded ``--requeue`` on partitions where it does nothing.
-"""
+    ``OFF`` is a partition that does not preempt at all. The other two differ in
+    who resubmits, and that difference decides whether ``--requeue`` buys
+    anything: under ``REQUEUE`` Slurm resubmits the job itself, and under
+    ``CANCEL`` it does not, so the flag is inert and something outside Slurm has
+    to resubmit.
 
-PREEMPT_MODES: tuple[PreemptMode, ...] = ("OFF", "CANCEL", "REQUEUE")
-"""Every mode this package recognises, for exhaustiveness in tests."""
+    Stored as the mode rather than a preemptible/not flag because those are not
+    the same question. A boolean answers "can this job be evicted?" and every
+    consumer that needs to know "and does anything bring it back?" was left
+    reading prose. That distinction sat in a docstring here for months while the
+    submission guard demanded ``--requeue`` on partitions where it does nothing.
+    """
+
+    OFF = "OFF"
+    CANCEL = "CANCEL"
+    REQUEUE = "REQUEUE"
 
 
 class GpuRequest(TypedDict):
@@ -336,6 +338,7 @@ __all__ = [
     "ClusterFacts",
     "GpuRequest",
     "PartitionFacts",
+    "PreemptMode",
     "decode_gpu_request",
     "describe_gpu_request",
     "encode_gpu_request",

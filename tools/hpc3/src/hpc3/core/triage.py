@@ -44,7 +44,7 @@ from hpc3.contracts.array import expand_job_id
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.pending import PendingJob, is_blocked
-from hpc3.contracts.status import JobStatus, is_terminal
+from hpc3.contracts.status import JobState, JobStatus, is_terminal
 
 
 class Finding:
@@ -281,7 +281,7 @@ def silent_jobs(
     """
     findings: list[Finding] = []
     for status in statuses:
-        if status["state"] != "RUNNING":
+        if status["state"] is not JobState.RUNNING:
             continue
         age = log_ages.get(status["job_id"])
         if age is None or age <= quiet_seconds:

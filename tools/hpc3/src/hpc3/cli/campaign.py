@@ -48,6 +48,7 @@ from platform_core.json_utils import load_json_str
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_sweep
+from hpc3.contracts.status import JobState
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
@@ -117,7 +118,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # than of the ledger.
     wanted = set(artifacts)
     candidates = [entry["job_id"] for entry in recorded if entry["artifact"] in wanted]
-    states: dict[str, str] = {}
+    states: dict[str, JobState] = {}
     if candidates != []:
         states = {
             status["job_id"]: status["state"]

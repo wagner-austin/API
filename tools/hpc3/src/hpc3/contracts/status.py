@@ -15,7 +15,7 @@ get the number that will eventually appear on the balance.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONTypeError,
@@ -23,43 +23,39 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, partition_facts, require_partition
 
-JobState = Literal[
-    "PENDING",
-    "RUNNING",
-    "SUSPENDED",
-    "COMPLETING",
-    "COMPLETED",
-    "FAILED",
-    "CANCELLED",
-    "TIMEOUT",
-    "PREEMPTED",
-    "NODE_FAIL",
-    "OUT_OF_MEMORY",
-    "REQUEUED",
-]
-"""Job states this package recognises, as ``sacct`` spells them."""
 
-JOB_STATES: tuple[JobState, ...] = (
-    "PENDING",
-    "RUNNING",
-    "SUSPENDED",
-    "COMPLETING",
-    "COMPLETED",
-    "FAILED",
-    "CANCELLED",
-    "TIMEOUT",
-    "PREEMPTED",
-    "NODE_FAIL",
-    "OUT_OF_MEMORY",
-    "REQUEUED",
-)
+class JobState(StrEnum):
+    """Job states this package recognises, as ``sacct`` spells them."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUSPENDED = "SUSPENDED"
+    COMPLETING = "COMPLETING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    TIMEOUT = "TIMEOUT"
+    PREEMPTED = "PREEMPTED"
+    NODE_FAIL = "NODE_FAIL"
+    OUT_OF_MEMORY = "OUT_OF_MEMORY"
+    REQUEUED = "REQUEUED"
+
 
 TERMINAL_STATES: frozenset[JobState] = frozenset(
-    {"COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "PREEMPTED", "NODE_FAIL", "OUT_OF_MEMORY"}
+    {
+        JobState.COMPLETED,
+        JobState.FAILED,
+        JobState.CANCELLED,
+        JobState.TIMEOUT,
+        JobState.PREEMPTED,
+        JobState.NODE_FAIL,
+        JobState.OUT_OF_MEMORY,
+    }
 )
 """States from which a job will not advance on its own.
 
@@ -192,11 +188,7 @@ def require_state(obj: dict[str, JSONValue], key: str) -> JobState:
             state this package does not recognise. An unrecognised state must
             not be treated as terminal or non-terminal by guess.
     """
-    raw = require_str(obj, key)
-    for candidate in JOB_STATES:
-        if raw == candidate:
-            return candidate
-    raise JSONTypeError(f"Field '{key}' must name one of {list(JOB_STATES)}, got {raw!r}")
+    return require_member(obj, key, JobState)
 
 
 def _require_nonnegative(obj: dict[str, JSONValue], key: str) -> int:
@@ -231,7 +223,7 @@ def encode_job_status(status: JobStatus) -> dict[str, JSONValue]:
         "job_id": status["job_id"],
         "name": status["name"],
         "partition": status["partition"],
-        "state": status["state"],
+        "state": status["state"].value,
         "elapsed_seconds": status["elapsed_seconds"],
         "billing_tres": status["billing_tres"],
         "gpu_count": status["gpu_count"],
@@ -278,7 +270,6 @@ def decode_job_status(value: JSONValue, cluster: ClusterFacts) -> JobStatus:
 
 
 __all__ = [
-    "JOB_STATES",
     "SECONDS_PER_HOUR",
     "TERMINAL_STATES",
     "JobState",
