@@ -13,43 +13,34 @@ books. See ``wiki/pages/physics-module-roadmap.md`` Phase 3.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.contracts.enforcement import enforce_contract, require
 
-FuelEntryKind = Literal[
-    "shot_single",
-    "shot_dual",
-    "shot_missile",
-    "shot_homing",
-    "homing_carry",
-    "walk",
-    "radar",
-    "mine_press",
-    "teleport",
-    "pickup",
-    "enemy_hit",
-    "detonation",
-    "boundary_strand",
-]
 
-FUEL_ENTRY_KINDS: tuple[FuelEntryKind, ...] = (
-    "shot_single",
-    "shot_dual",
-    "shot_missile",
-    "shot_homing",
-    "homing_carry",
-    "walk",
-    "radar",
-    "mine_press",
-    "teleport",
-    "pickup",
-    "enemy_hit",
-    "detonation",
-    "boundary_strand",
-)
-"""Every entry kind, for validation and iteration."""
+class FuelEntryKind(StrEnum):
+    """What caused one predicted fuel effect in the book.
+
+    The value is the name the entry carries in window verdicts and in the
+    session totals' ``<kind>_count`` / ``_fuel_lo`` / ``_fuel_hi`` fields.
+    """
+
+    SHOT_SINGLE = "shot_single"
+    SHOT_DUAL = "shot_dual"
+    SHOT_MISSILE = "shot_missile"
+    SHOT_HOMING = "shot_homing"
+    HOMING_CARRY = "homing_carry"
+    WALK = "walk"
+    RADAR = "radar"
+    MINE_PRESS = "mine_press"
+    TELEPORT = "teleport"
+    PICKUP = "pickup"
+    ENEMY_HIT = "enemy_hit"
+    DETONATION = "detonation"
+    BOUNDARY_STRAND = "boundary_strand"
+
 
 MAX_SERVE_CHARGE = 10
 """The largest single serve charge (a dual/missile/homing shot or a
@@ -151,11 +142,10 @@ class FuelEntryContract:
 
         Raises:
             LedgerInvariantError: If the interval is inverted or the
-                kind is unknown.
+                book has reached its entry ceiling.
         """
-        require(lo <= hi, LedgerInvariantError, kind=kind, lo=repr(lo), hi=repr(hi))
-        require(kind in FUEL_ENTRY_KINDS, LedgerInvariantError, kind=kind)
-        require(len(book["entries"]) < 10_000, LedgerInvariantError, kind=kind)
+        require(lo <= hi, LedgerInvariantError, kind=kind.value, lo=repr(lo), hi=repr(hi))
+        require(len(book["entries"]) < 10_000, LedgerInvariantError, kind=kind.value)
 
 
 class FuelReadingContract:
@@ -191,9 +181,9 @@ def record_fuel_entry(*, book: FuelBookDict, kind: FuelEntryKind, lo: int, hi: i
             positive ceilings are open credits such as pickups).
     """
     book["entries"].append(FuelEntryDict(kind=kind, lo=lo, hi=hi))
-    total = book["totals"].get(kind)
+    total = book["totals"].get(kind.value)
     if total is None:
-        book["totals"][kind] = FuelKindTotalDict(count=1, lo_sum=lo, hi_sum=hi)
+        book["totals"][kind.value] = FuelKindTotalDict(count=1, lo_sum=lo, hi_sum=hi)
     else:
         total["count"] += 1
         total["lo_sum"] += lo
@@ -252,7 +242,10 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
         # ONLY here, bounded to one serve charge each way (the
         # 2026-08-28 corpus mine: every strand gap was exactly one
         # weapon charge).
-        entries = [*entries, FuelEntryDict(kind="boundary_strand", lo=-MAX_SERVE_CHARGE, hi=0)]
+        entries = [
+            *entries,
+            FuelEntryDict(kind=FuelEntryKind.BOUNDARY_STRAND, lo=-MAX_SERVE_CHARGE, hi=0),
+        ]
     block_start = book["block_start_fuel"]
     residual = fuel_total - (block_start if block_start is not None else fuel_total)
     lo = sum(entry["lo"] for entry in entries)
@@ -262,9 +255,9 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
     if not balanced:
         book["divergences"] += 1
     book["entries"] = [
-        FuelEntryDict(kind="homing_carry", lo=-5, hi=0)
+        FuelEntryDict(kind=FuelEntryKind.HOMING_CARRY, lo=-5, hi=0)
         for entry in entries
-        if entry["kind"] == "shot_homing"
+        if entry["kind"] is FuelEntryKind.SHOT_HOMING
     ]
     if forced:
         # The mirror: an entry judged above may have its charge still
@@ -272,7 +265,9 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
         # block; and a stranded charge judged above surfaces as its
         # echo's un-fallen entry there.
         book["entries"].append(
-            FuelEntryDict(kind="boundary_strand", lo=-MAX_SERVE_CHARGE, hi=MAX_SERVE_CHARGE)
+            FuelEntryDict(
+                kind=FuelEntryKind.BOUNDARY_STRAND, lo=-MAX_SERVE_CHARGE, hi=MAX_SERVE_CHARGE
+            )
         )
     book["block_start_fuel"] = fuel_total
     book["readings_in_block"] = 0
@@ -282,7 +277,7 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
         residual=residual,
         lo=lo,
         hi=hi,
-        entry_kinds=",".join(entry["kind"] for entry in entries) or "(none)",
+        entry_kinds=",".join(entry["kind"].value for entry in entries) or "(none)",
     )
 
 
@@ -376,11 +371,11 @@ def widen_last_teleport_entry(*, book: FuelBookDict, widen_by: int) -> bool:
         block holding it has already been judged.
     """
     for entry in reversed(book["entries"]):
-        if entry["kind"] != "teleport":
+        if entry["kind"] is not FuelEntryKind.TELEPORT:
             continue
         new_lo = entry["lo"] - widen_by
         new_hi = min(entry["hi"] + widen_by, 0)
-        total = book["totals"]["teleport"]
+        total = book["totals"][FuelEntryKind.TELEPORT.value]
         total["lo_sum"] += new_lo - entry["lo"]
         total["hi_sum"] += new_hi - entry["hi"]
         entry["lo"] = new_lo
@@ -391,7 +386,6 @@ def widen_last_teleport_entry(*, book: FuelBookDict, widen_by: int) -> bool:
 
 __all__ = [
     "BLOCK_READING_CAP",
-    "FUEL_ENTRY_KINDS",
     "MAX_SERVE_CHARGE",
     "FuelBookDict",
     "FuelBookOnlyContract",
