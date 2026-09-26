@@ -7,8 +7,10 @@ from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
+from tankpit_bot.types.constants import TankLiveness
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -41,7 +43,7 @@ def _foreign_human(tank_id: int, timestamp_ms: int) -> TankStateDict:
         is_bot=False,
         is_self=False,
         timestamp_ms=timestamp_ms,
-        liveness="alive",
+        liveness=TankLiveness.ALIVE,
     )
 
 
@@ -101,7 +103,7 @@ class TestHarvestMemoryVeto:
             make_inventory(),
             now_ms,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -234,7 +236,7 @@ class TestPreHuntTopOffBias:
             make_inventory(default_count=30 if hunt_ready else 10),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -295,7 +297,6 @@ class TestNearestAliveEnemy:
         """Only alive, position-synced enemies qualify; nearest wins."""
         from tankpit_bot.bot.ai.resource_search import _nearest_alive_enemy
         from tankpit_bot.state.types import make_tank_state
-        from tankpit_bot.types.constants import TankLiveness
 
         ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=900)
@@ -315,12 +316,12 @@ class TestNearestAliveEnemy:
                 liveness=liveness,
             )
 
-        world["tanks"]["10"] = _tank(10, 101, 101, 1, "alive")  # ally
-        world["tanks"]["11"] = _tank(11, 102, 102, 2, "deactivated")  # corpse
-        world["tanks"]["12"] = _tank(12, 0, 0, 2, "alive")  # unsynced
-        world["tanks"]["13"] = _tank(13, 100, 130, 2, "alive")  # far enemy
-        world["tanks"]["14"] = _tank(14, 100, 110, 2, "alive")  # near enemy
-        world["tanks"]["15"] = _tank(15, 100, 140, 2, "alive")  # farther after near
+        world["tanks"]["10"] = _tank(10, 101, 101, 1, TankLiveness.ALIVE)  # ally
+        world["tanks"]["11"] = _tank(11, 102, 102, 2, TankLiveness.DEACTIVATED)  # corpse
+        world["tanks"]["12"] = _tank(12, 0, 0, 2, TankLiveness.ALIVE)  # unsynced
+        world["tanks"]["13"] = _tank(13, 100, 130, 2, TankLiveness.ALIVE)  # far enemy
+        world["tanks"]["14"] = _tank(14, 100, 110, 2, TankLiveness.ALIVE)  # near enemy
+        world["tanks"]["15"] = _tank(15, 100, 140, 2, TankLiveness.ALIVE)  # farther after near
         ctx = DecideCtx(
             world,
             self_state,
@@ -328,7 +329,7 @@ class TestNearestAliveEnemy:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -347,7 +348,7 @@ class TestNearestAliveEnemy:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -416,7 +417,7 @@ class TestBarrenScanVeto:
             make_inventory(),
             now_ms,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -516,7 +517,7 @@ class TestSearchHopReleasesHeldLocks:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         locked = set_resource_target(ctx.ai_state, "fuel", 104, 100)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
@@ -44,7 +45,9 @@ def test_hunt_acquire_teleports_back_to_an_affordable_off_viewport_lock() -> Non
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -88,7 +91,9 @@ def test_hunt_acquire_refuels_with_lock_held_when_return_unaffordable() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -124,7 +129,9 @@ def test_hunt_acquire_returns_to_the_locked_target_after_a_mode_interrupt() -> N
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -172,7 +179,9 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -208,7 +217,7 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -235,7 +244,9 @@ def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -263,7 +274,9 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -299,7 +312,7 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -326,7 +339,9 @@ def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -355,7 +370,9 @@ def test_hunt_engage_shoots_visible_locked_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -381,7 +398,9 @@ def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -403,7 +422,9 @@ def test_hunt_engage_without_locked_target_id_still_confirms_and_searches() -> N
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -433,7 +454,9 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -459,7 +482,9 @@ def test_scan_on_landing_reacquires_when_target_gone() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -485,7 +510,9 @@ def test_scan_on_landing_engages_when_target_present() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -515,7 +542,9 @@ def test_scan_on_landing_shoots_when_target_in_range() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 

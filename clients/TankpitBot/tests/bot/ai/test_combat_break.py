@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     make_enemy_threat,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._support import (
@@ -53,7 +54,7 @@ def _ctx(*, fuel: int, rank: int = 2, inventory: InventoryState | None = None) -
         inventory if inventory is not None else make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

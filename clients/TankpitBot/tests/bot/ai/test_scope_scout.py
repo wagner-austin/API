@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.scope_scout import (
     scope_scout_for_ferry,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.protocol.commands import (
     SCOPE_EAST,
     SCOPE_NORTH,
@@ -144,7 +145,7 @@ def _ctx(
         make_inventory(),
         now_ms,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

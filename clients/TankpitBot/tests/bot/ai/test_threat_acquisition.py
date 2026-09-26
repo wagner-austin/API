@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.threats import (
     find_locked_target_pursuit,
 )
+from tankpit_bot.types.constants import TankLiveness
 from tests.bot.ai._threat_fixtures import (
     _self_at,
     _tank,
@@ -63,7 +64,7 @@ class TestFindLockedTargetPursuit:
 
     def test_returns_none_when_target_deactivated(self) -> None:
         """A deactivated (corpse-window) tank is not a pursuit target."""
-        tank = _tank("50", x=105, y=100, team=1, liveness="deactivated")
+        tank = _tank("50", x=105, y=100, team=1, liveness=TankLiveness.DEACTIVATED)
         tank["timestamp_ms"] = 100000
         world = _world({"50": tank})
 

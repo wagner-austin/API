@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import (
     TickDecisionDict,
     make_tick_decision,
@@ -43,7 +44,9 @@ def _make_ctx(*, fuel: int = 1200, dual_count: int = 30, radar_count: int = 30) 
     ai_state = make_scanned_ai_state()
     inventory = make_inventory(default_count=30, dual_count=dual_count)
     inventory["extra_radars"]["count"] = radar_count
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    return DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
 
 def _make_hold_inventory(

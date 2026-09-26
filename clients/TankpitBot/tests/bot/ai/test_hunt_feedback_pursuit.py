@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -61,7 +62,9 @@ class TestDepartedTargetFollowUp:
         )
         inventory = make_inventory()
 
-        chase = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
+        chase = decide(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.MISS, ws=ws
+        )
         assert chase["command"]["cmd_type"] == "map_open"
         assert chase["updated_ai_state"]["combat_target_id"] == 50
         assert chase["updated_ai_state"]["blocked_combat_targets"] == {}
@@ -96,7 +99,9 @@ class TestDepartedTargetFollowUp:
             }
         )
 
-        decision = decide(world2, self_state2, chase_state, inventory, 102500, None, "", ws=ws)
+        decision = decide(
+            world2, self_state2, chase_state, inventory, 102500, None, CombatFeedback.NONE, ws=ws
+        )
 
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["updated_ai_state"]["combat_target_id"] == 50

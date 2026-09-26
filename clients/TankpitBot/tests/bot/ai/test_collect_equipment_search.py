@@ -13,6 +13,7 @@ from tankpit_bot.bot.ai.types import (
     make_default_ai_config,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
@@ -323,7 +324,9 @@ class TestRecoverEquipmentSearch:
         )
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
         terrain_data: dict[tuple[int, int], str] = dict.fromkeys(
             viewport_exploration_candidates(ctx),
             "W",
@@ -351,7 +354,7 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -380,7 +383,7 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import (
     InventoryItem,
     InventoryState,
@@ -96,7 +97,9 @@ class TestHuntDisengage:
             extra_radars=stocked_slot,
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
+        decision = decide(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.MISS, ws=ws
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] != "shoot"
@@ -165,7 +168,9 @@ class TestHuntDisengage:
             extra_radars=stocked_slot,
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
+        decision = decide(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.MISS, ws=ws
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] != "shoot"
@@ -214,7 +219,9 @@ class TestHuntDisengage:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "rejected", ws=ws)
+        decision = decide(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.REJECTED, ws=ws
+        )
 
         assert decision["command"]["cmd_type"] != "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == -1

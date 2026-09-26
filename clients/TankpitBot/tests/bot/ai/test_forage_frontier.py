@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.forage_frontier import (
     plan_forage_frontier_hop,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._support import (
@@ -59,7 +60,7 @@ def _frontier_ctx(
         inventory if inventory is not None else _deficient_inventory(),
         _NOW,
         terrain if terrain is not None else InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -86,7 +87,7 @@ def test_missing_terrain_declines() -> None:
         _deficient_inventory(),
         _NOW,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=WorldService(),
     )
 
@@ -284,7 +285,7 @@ def test_own_tile_center_is_never_a_goal() -> None:
         _deficient_inventory(),
         _NOW,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=WorldService(),
     )
 
@@ -491,7 +492,7 @@ def test_claimed_container_filter_prunes_and_passes_through() -> None:
         _deficient_inventory(),
         _NOW,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -514,7 +515,7 @@ def test_claimed_container_filter_prunes_and_passes_through() -> None:
         _deficient_inventory(),
         _NOW,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws_denied,
     )
     assert "120,100" not in ctx_denied.filtered["containers"]
@@ -533,7 +534,7 @@ def test_claimed_container_filter_prunes_and_passes_through() -> None:
         _deficient_inventory(),
         _NOW,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws_untouched,
     )
     assert "121,101" in ctx2.filtered["containers"]

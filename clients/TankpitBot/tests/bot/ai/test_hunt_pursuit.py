@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tankpit_bot.types.modes import AIModeState
@@ -42,7 +43,9 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -68,7 +71,9 @@ def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -93,7 +98,9 @@ def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -136,7 +143,9 @@ class TestPursuitHomingCapVsHumans:
                 "pursuit_shot_ms": pursuit_shot_ms,
             }
         )
-        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        return DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
     def test_first_pursuit_shot_fires_and_stamps_the_window(self) -> None:
         decision = decide_hunt_mode(self._ctx())
@@ -215,7 +224,9 @@ class TestPursuitFramesNearTargets:
                 "last_shot_target_id": 50,
             }
         )
-        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        return DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
     def test_near_pursuit_frames_and_keeps_the_homing_budget(self) -> None:
         decision = decide_hunt_mode(self._near_ctx())
@@ -256,7 +267,9 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -280,7 +293,9 @@ def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -304,7 +319,9 @@ def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -350,7 +367,9 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
             "last_shot_target_id": 50,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -399,7 +418,9 @@ def test_pursuit_tick_diverts_to_a_visible_bot_finisher_in_a_bot_fight() -> None
             "last_shot_target_id": 50,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -448,7 +469,9 @@ class TestMapReplacedInWindowTarget:
                 "pursuit_shot_ms": pursuit_shot_ms,
             }
         )
-        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        return DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
     def test_never_viewport_confirmed_in_window_dot_is_shot_not_map_chased(self) -> None:
         target = make_pursuit_target(x=104, y=100)
@@ -504,7 +527,9 @@ def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -536,7 +561,9 @@ def test_scan_on_landing_pursuit_past_the_trace_wall_chases_via_map() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 

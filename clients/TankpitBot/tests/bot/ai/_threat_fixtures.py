@@ -23,7 +23,7 @@ def _tank(
     name: str = "",
     is_bot: bool = True,
     is_self: bool = False,
-    liveness: TankLiveness = "alive",
+    liveness: TankLiveness = TankLiveness.ALIVE,
     rank: int = 1,
 ) -> TankStateDict:
     """Create a TankStateDict with defaults for testing.

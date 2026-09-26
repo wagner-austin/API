@@ -14,6 +14,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.combat_opportunity import collect_return_fire
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIConfigDict, AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_tank_state
@@ -81,7 +82,7 @@ def _ctx(
         make_inventory(dual_count=dual_count),
         _NOW,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.hunt_relay import stale_human_needs_map_refresh
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
@@ -52,7 +53,9 @@ def _stale_human_ctx(ws: WorldService, *, last_map_open_ms: int) -> DecideCtx:
             "last_map_open_ms": last_map_open_ms,
         }
     )
-    return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    return DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
 
 def test_map_refresh_is_refused_inside_the_open_cooldown() -> None:
@@ -105,7 +108,9 @@ def test_hunt_acquire_teleports_at_an_affordablemake_map_known_enemy() -> None:
             "last_map_open_ms": 99500,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -151,7 +156,7 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         # (50,100) is behind the bot (no progress); (230,100) makes the
         # most progress but costs 780 + 200 reserve > 700 fuel;
         # (150,100) is the affordable progress dot.
@@ -207,7 +212,7 @@ def test_relay_tries_the_next_enemy_when_the_nearest_is_dot_starved() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -265,7 +270,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -302,7 +307,7 @@ def test_hunt_relay_tie_breaks_on_cheaper_hop() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -340,7 +345,7 @@ def test_hunt_relay_exits_when_only_dot_is_impassable() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -382,7 +387,7 @@ def test_hunt_refuels_in_place_when_no_dot_makes_progress() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -425,7 +430,7 @@ def test_hunt_refuel_exits_at_fuel_capacity() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -461,7 +466,9 @@ def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 

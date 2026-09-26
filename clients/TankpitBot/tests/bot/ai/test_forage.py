@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_enter_collect,
     should_exit_collect,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.scan_coverage import tile_key
@@ -86,7 +87,7 @@ def _ctx(
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

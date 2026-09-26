@@ -14,6 +14,7 @@ from tankpit_bot.bot.ai.combat_target import (
     select_new_combat_target,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -43,7 +44,7 @@ class TestCombatTargetSelection:
             inventory,
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -67,7 +68,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -99,7 +100,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -124,7 +125,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -153,7 +154,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         ctx.blocked_targets["50"] = 100000
@@ -183,7 +184,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -214,7 +215,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -251,7 +252,7 @@ class TestCombatTargetSelection:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -273,7 +274,9 @@ class TestGetLockedTargetWorldStateFallback:
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         threats = [_enemy_threat(tank_id=50, x=101, y=100)]
 
         result = get_locked_target(ctx, threats)
@@ -317,7 +320,9 @@ class TestGetLockedTargetWorldStateFallback:
         world, self_state = make_world(fuel=800, tanks=tanks)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         assert get_locked_target(ctx, []) is None
 
@@ -326,7 +331,9 @@ class TestGetLockedTargetWorldStateFallback:
         ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         assert get_locked_target(ctx, []) is None
 
@@ -341,7 +348,9 @@ class TestIsAlreadyEngaged:
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
         ai_state["last_shot_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         assert is_already_engaged(ctx) is True
 
@@ -352,7 +361,9 @@ class TestIsAlreadyEngaged:
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
         ai_state["last_shot_target_id"] = -1
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         assert is_already_engaged(ctx) is False
 
@@ -369,7 +380,9 @@ class TestIsAlreadyEngaged:
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 60
         ai_state["last_shot_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         assert is_already_engaged(ctx) is False
 
@@ -385,7 +398,7 @@ def test_combat_landing_candidates_delegate_to_shared_helper() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

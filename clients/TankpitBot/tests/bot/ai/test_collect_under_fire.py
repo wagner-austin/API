@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_pickup_fuel_command, make_teleport_command
 from tankpit_bot.sniffer.world_service import WorldService
@@ -163,7 +164,7 @@ def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     decision = decide_collect_mode(ctx)
@@ -231,7 +232,7 @@ class TestEscapePlanContinuity:
             inventory,
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -288,7 +289,7 @@ class TestEscapePlanContinuity:
             make_inventory(),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -358,7 +359,7 @@ class TestEscapePlanContinuity:
             make_inventory(dual_count=3, default_count=30),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -435,7 +436,7 @@ class TestMovementDeadEscape:
             make_inventory(),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -491,7 +492,7 @@ class TestMovementDeadEscape:
             make_inventory(),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -532,7 +533,7 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
         make_inventory(dual_count=30, default_count=30),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

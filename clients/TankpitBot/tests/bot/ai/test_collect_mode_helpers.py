@@ -20,6 +20,7 @@ from tankpit_bot.bot.ai.context import (
     require_command,
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.types import make_move_command
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_mine_state
@@ -123,7 +124,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=30),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -160,7 +161,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -179,7 +180,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -202,7 +203,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -240,7 +241,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -258,7 +259,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -279,7 +280,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -301,7 +302,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -325,7 +326,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -348,7 +349,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -371,7 +372,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -394,7 +395,7 @@ class TestRecoveryHelpers:
             make_inventory(default_count=5),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

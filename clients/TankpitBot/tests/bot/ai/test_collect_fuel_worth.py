@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, make_container_state
 from tests.bot.ai._support import (
@@ -43,7 +44,7 @@ def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     container = make_container_state(
@@ -79,7 +80,7 @@ def test_readiness_completing_topoff_waives_the_sip_floor() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     container = make_container_state(
@@ -116,7 +117,7 @@ def test_adjacent_clamped_sliver_is_worth_taking() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     container = make_container_state(
@@ -154,7 +155,7 @@ def test_big_clamped_container_is_worth_a_long_walk() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     container = make_container_state(
@@ -190,7 +191,7 @@ def test_unclamped_pickup_is_worth_it_at_the_exact_rate_boundary() -> None:
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     container = make_container_state(
@@ -242,7 +243,9 @@ def test_critical_fuel_takes_any_reachable_sliver() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = select_and_pickup_fuel(ctx, ctx.base)
 
@@ -295,7 +298,9 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
         }
     )
     inventory = make_inventory(dual_count=3)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = select_and_pickup_fuel(ctx, ctx.base)
 
@@ -340,7 +345,7 @@ def test_walkworthy_iteration_takes_the_next_candidate_after_a_veto() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -406,7 +411,7 @@ def test_fuel_lock_steal_requires_an_executable_candidate() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

@@ -25,6 +25,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import (
     make_tick_decision,
 )
@@ -311,7 +312,7 @@ class TestGathererRoleGate:
             ctx.inventory,
             ctx.timestamp_ms,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ctx.ws,
         )
         assert hunt_entry_permitted(gatherer_ctx) is False
@@ -349,7 +350,7 @@ class TestWartimeReadinessFloor:
             name: str,
             *,
             is_self: bool = False,
-            liveness: TankLiveness = "alive",
+            liveness: TankLiveness = TankLiveness.ALIVE,
             stamp: int = 100000,
         ) -> TankStateDict:
             return make_tank_state(
@@ -371,7 +372,7 @@ class TestWartimeReadinessFloor:
             # Every skip arm of human_war_is_live gets a resident:
             "1": _resident(1, 0, "SelfTank", is_self=True),
             "2": _resident(2, 0, "AllyHuman"),
-            "3": _resident(3, 2, "Corpse", liveness="deactivated"),
+            "3": _resident(3, 2, "Corpse", liveness=TankLiveness.DEACTIVATED),
             "4": _resident(4, 2, "red-4"),
             "5": _resident(5, 2, "Silent"),
             "7": _resident(7, 2, "Departed", stamp=0),
@@ -379,7 +380,7 @@ class TestWartimeReadinessFloor:
                 60,
                 2,
                 "TESLA",
-                liveness="alive" if human_alive else "deactivated",
+                liveness=TankLiveness.ALIVE if human_alive else TankLiveness.DEACTIVATED,
                 stamp=100000 if human_fresh else 0,
             ),
         }
@@ -391,7 +392,9 @@ class TestWartimeReadinessFloor:
         inventory["extra_radars"]["count"] = radar_count
         state = make_scanned_ai_state()
         state["config"]["doctrine"] = doctrine
-        return DecideCtx(world, self_state, state, inventory, 100000, None, "", ws=ws)
+        return DecideCtx(
+            world, self_state, state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
     def test_war_floor_admits_the_eighty_fifty_bot(self) -> None:
         """24/30 weapons and 15/30 radars clear the wartime bar."""

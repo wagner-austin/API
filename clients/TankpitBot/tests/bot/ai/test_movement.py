@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.movement_exploration import (
     select_exploration_command,
     viewport_exploration_candidates,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -40,7 +41,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind=None)
 
@@ -57,7 +60,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
 
@@ -88,7 +93,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind=None)
 
@@ -106,7 +113,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind=None)
 
@@ -123,7 +132,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         ws.mark_move_target_failed(107, 100, 90000)
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
@@ -154,7 +165,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -167,7 +180,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = _direct_move_command(ctx, 72, 63)
 
@@ -181,7 +196,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = _direct_move_command(ctx, 107, 100)
 
@@ -210,7 +227,9 @@ class TestWalkOrTeleport:
         world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -223,7 +242,9 @@ class TestWalkOrTeleport:
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -237,7 +258,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory(default_count=5)
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -255,7 +278,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap(terrain_data)
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -267,7 +292,9 @@ class TestWalkOrTeleport:
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         base_candidates = viewport_exploration_candidates(ctx)
         rotated_candidates = viewport_exploration_candidates(ctx, candidate_offset=1)
@@ -282,7 +309,9 @@ class TestWalkOrTeleport:
         world["viewport"] = make_viewport_state(left=100, top=100, width=1, height=1)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         candidates = viewport_exploration_candidates(ctx)
 
@@ -312,7 +341,7 @@ class TestWalkOrTeleport:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -333,7 +362,9 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(103, 100): "~"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 105, 100, pickup_kind=None)
 
@@ -356,7 +387,9 @@ class TestWalkOrTeleport:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
         candidates = viewport_exploration_candidates(ctx)
         if not candidates:
             raise AssertionError("expected at least one exploration candidate")
@@ -384,7 +417,7 @@ class TestPlanViewportWalk:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -95,7 +96,9 @@ class TestExplorationSkipsTeleportLowFuel:
             }
         )
         inventory = _make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = select_exploration_command(ctx)
 

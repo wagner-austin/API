@@ -16,6 +16,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
 from tests.bot.ai._support import (
@@ -84,7 +85,7 @@ def _engage_ctx(*, fuel: int, damage_state: int = 3) -> DecideCtx:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -242,7 +243,7 @@ def test_latched_close_phase_stays_on_the_escape() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     decision = decide_hunt_mode(ctx)
@@ -275,7 +276,7 @@ def test_latch_without_a_lock_does_not_hijack_the_tick() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     decision = decide_hunt_mode(ctx)

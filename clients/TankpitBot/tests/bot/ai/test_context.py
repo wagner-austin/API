@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.types import make_initial_ai_state
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
@@ -79,7 +80,7 @@ class TestLockedResourceTarget:
             _dummy_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -96,7 +97,9 @@ class TestLockedResourceTarget:
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, state, _dummy_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         _, target = locked_resource_target(ctx, "equipment")
         assert target is None
 
@@ -109,7 +112,9 @@ class TestLockedResourceTarget:
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, state, _dummy_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         base_state, target = locked_resource_target(ctx, "fuel")
         assert target is None
         assert base_state["resource_target_kind"] == ""
@@ -123,7 +128,9 @@ class TestLockedResourceTarget:
         world = _world_with_container(10, 20, False, 0)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, state, _dummy_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         _, target = locked_resource_target(ctx, "fuel")
         assert target is None
 
@@ -136,7 +143,9 @@ class TestLockedResourceTarget:
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, state, _dummy_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         _, target = locked_resource_target(ctx, "equipment")
         assert target is None
 
@@ -149,7 +158,9 @@ class TestLockedResourceTarget:
         world = _world_with_container(10, 20, True, 500, failed_pickups=2)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, state, _dummy_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         _, target = locked_resource_target(ctx, "fuel")
         assert target is None
 
@@ -174,7 +185,9 @@ class TestLockedResourceTargetMissingContainer:
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, state, _dummy_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         assert ctx.base["resource_target_kind"] == "fuel"
         ctx.filtered = WorldStateDict(**{**ctx.filtered, "containers": {}})
         with pytest.raises(KeyError):
@@ -243,7 +256,7 @@ class TestTeleportFuelHelpers:
             _dummy_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -270,7 +283,7 @@ class TestTeleportFuelHelpers:
             _dummy_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -297,7 +310,7 @@ class TestTeleportFuelHelpers:
             _dummy_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

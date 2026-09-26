@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.collect_hops import hop_toward_equipment
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -55,7 +56,7 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -105,7 +106,7 @@ def test_hop_toward_equipment_prices_out_stale_sightings() -> None:
         make_inventory(default_count=15),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -153,7 +154,9 @@ def test_hop_toward_equipment_declines_when_every_slot_at_rank_cap() -> None:
             "config": {**base_ai_state["config"], "role": "gatherer"},
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     assert hop_toward_equipment(ctx, ctx.base) is None
 
@@ -182,7 +185,9 @@ def test_hop_toward_equipment_declines_during_a_held_lock_above_break() -> None:
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
     ai_state = AIStateDict(**{**make_scanned_ai_state(), "combat_target_id": 50})
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     assert hop_toward_equipment(ctx, ctx.base) is None
 
@@ -204,7 +209,9 @@ def test_hop_toward_equipment_fires_during_a_held_lock_at_weapon_break() -> None
     inventory = make_inventory(default_count=3)
     terrain = InMemoryTerrainMap()
     ai_state = AIStateDict(**{**make_scanned_ai_state(), "combat_target_id": 50})
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -246,7 +253,7 @@ def test_hop_toward_equipment_takes_in_viewport_walk_blocked_containers() -> Non
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -290,7 +297,7 @@ def test_hop_toward_equipment_skips_when_teleport_unaffordable() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -335,7 +342,7 @@ def test_hop_toward_equipment_skips_when_landing_tile_impassable() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -375,7 +382,7 @@ def test_hop_toward_equipment_never_teleports_to_its_own_tile() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -418,7 +425,7 @@ def test_hop_toward_equipment_skips_own_tile_for_a_real_candidate() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -487,7 +494,7 @@ def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -530,7 +537,7 @@ def test_hop_toward_equipment_declines_when_terrain_unknown() -> None:
         make_inventory(default_count=15),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

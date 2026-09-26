@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.collect_pickups import select_equipment_target
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -50,7 +51,7 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -89,7 +90,7 @@ def test_select_equipment_target_rejects_walk_unreachable_in_viewport() -> None:
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -141,7 +142,9 @@ def _make_blocked_equipment_setup(
             "attempted_equipment_targets": attempted_equipment_targets,
         }
     )
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+    return DecideCtx(
+        world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
 
 def test_rock_walled_equipment_is_skipped_for_forage() -> None:
@@ -201,7 +204,7 @@ def test_lock_steal_requires_an_executable_candidate() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -241,7 +244,7 @@ def test_lock_steal_allows_an_executable_closer_candidate() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

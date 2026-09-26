@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, make_mine_state
 from tests.bot.ai._collect_helper_fixtures import _enemy
@@ -211,7 +212,7 @@ class TestCollectModeMoves:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -237,7 +238,7 @@ class TestCollectModeMoves:
             make_inventory(),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         ws.mark_move_target_failed(107, 100, 90000)
@@ -260,7 +261,7 @@ class TestCollectModeMoves:
             make_inventory(),
             100000,
             InMemoryTerrainMap(),
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -282,7 +283,7 @@ class TestCollectModeMoves:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -308,7 +309,7 @@ class TestCollectModeMoves:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -326,7 +327,7 @@ class TestCollectModeMoves:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

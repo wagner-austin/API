@@ -14,6 +14,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.protocol.commands import SCOPE_NORTH
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
@@ -22,6 +23,7 @@ from tankpit_bot.state.types import (
     make_tank_state,
     make_viewport_state,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.bot.ai._combat_fixtures import _enemy_threat
 from tests.bot.ai._support import (
     make_inventory,
@@ -85,7 +87,7 @@ class TestKillShotWireGate:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         target = _enemy_threat(
@@ -179,7 +181,7 @@ class TestMissOnMovedTarget:
             make_inventory(),
             100000,
             None,
-            "miss",
+            CombatFeedback.MISS,
             ws=ws,
         )
         target = _enemy_threat(x=102, y=100, name="Mover", last_wire_seen_ms=100000)
@@ -207,7 +209,7 @@ class TestHasCombatShot:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         target = _enemy_threat(x=108, y=100)  # distance=8
@@ -226,7 +228,7 @@ class TestHasCombatShot:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         target = _enemy_threat(x=109, y=100)  # distance=9
@@ -282,7 +284,7 @@ class TestFrameTargetShift:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         target = _enemy_threat(x=tx, y=ty, name="EdgeSitter")
@@ -367,7 +369,7 @@ class TestFindCombatPickup:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -403,7 +405,7 @@ class TestFindCombatPickup:
             make_inventory(default_count=10),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -441,7 +443,7 @@ class TestFindCombatPickup:
                 make_inventory(),
                 100000,
                 None,
-                "",
+                CombatFeedback.NONE,
                 ws=ws,
             )
             return _find_combat_pickup(ctx)
@@ -480,7 +482,7 @@ class TestFindCombatPickup:
             make_inventory(dual_count=cap, default_count=cap),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -499,7 +501,7 @@ class TestFindCombatPickup:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -529,7 +531,7 @@ class TestFindCombatPickup:
                     name="Enemy",
                     is_bot=False,
                     is_self=False,
-                    source="viewport",
+                    source=EntitySource.VIEWPORT,
                     timestamp_ms=100000,
                     last_wire_seen_ms=100000,
                     last_position_update_ms=100000,
@@ -553,7 +555,7 @@ class TestFindCombatPickup:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         target = _enemy_threat(tank_id=50, x=101, y=100, last_wire_seen_ms=100000)
@@ -588,7 +590,7 @@ class TestFindCombatPickup:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         ctx.world = world_no_self

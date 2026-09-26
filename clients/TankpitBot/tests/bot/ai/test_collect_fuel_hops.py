@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_hops import desperation_fuel_hop, larder_harvest
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tests._runtime_logging_support import capture_runtime_events, event_fields
 from tests.bot.ai._support import (
@@ -48,7 +49,7 @@ def _ctx_stocked_larder_unknown_terrain() -> DecideCtx:
         make_inventory(default_count=15),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -97,7 +98,7 @@ def test_fuel_larder_declines_silently_at_capacity() -> None:
         make_inventory(default_count=15),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

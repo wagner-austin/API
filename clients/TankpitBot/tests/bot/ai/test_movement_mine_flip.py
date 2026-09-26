@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import walk_or_teleport
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -30,7 +31,7 @@ def _ctx(
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

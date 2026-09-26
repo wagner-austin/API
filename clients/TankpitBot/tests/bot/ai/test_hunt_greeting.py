@@ -7,6 +7,7 @@ import pytest
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
@@ -52,7 +53,7 @@ def test_greeting_approach_lands_a_few_tiles_off_an_unconsented_human() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -98,7 +99,7 @@ def test_visited_unconsented_human_is_left_alone() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -135,7 +136,7 @@ def test_greeting_approach_declines_when_teleport_unaffordable() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -179,7 +180,7 @@ def test_greeting_scan_ignores_map_stale_humans() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -215,7 +216,7 @@ def test_consented_human_map_winner_is_teleport_acquired() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

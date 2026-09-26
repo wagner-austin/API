@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
@@ -49,7 +50,9 @@ def test_collect_mode_continues_locked_fuel_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -99,7 +102,9 @@ def test_collect_mode_preserves_combat_lock_across_recovery() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -152,7 +157,9 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
     # (user mechanic 2026-07-18 -- at full inventory the pickup would
     # be a guaranteed code-7 rejection and is skipped).
     inventory = make_inventory(dual_count=20)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -177,7 +184,9 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -202,7 +211,9 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     )
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 1
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -248,7 +259,9 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
         for y in range(92, 108):
             terrain_data[(x, y)] = "W"
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
@@ -283,7 +296,7 @@ def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -322,7 +335,7 @@ def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -354,7 +367,9 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
             "mode_started_ms": 90000,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -391,7 +406,9 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
     )
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -427,7 +444,9 @@ def test_collect_takes_visible_equipment_before_search_hop() -> None:
     inventory = make_inventory()
     inventory["dual_shots"]["count"] = 3
     inventory["homing_shots"]["count"] = 3
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -464,7 +483,9 @@ def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
     inventory = make_inventory()
     inventory["dual_shots"]["count"] = 3
     inventory["homing_shots"]["count"] = 3
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 

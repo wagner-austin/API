@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TerrainTileDict
@@ -34,7 +35,7 @@ def _ctx(
         make_inventory(),
         100000,
         terrain if terrain is not None else InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -253,7 +254,7 @@ def test_dreg_waiver_needs_hunt_ready_inventory() -> None:
         make_inventory(default_count=0),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -446,7 +447,7 @@ def test_standing_at_the_boarding_tile_kills_the_ferry_served_candidate() -> Non
         make_inventory(),
         100000,
         _water_everywhere_terrain(),
-        "",
+        CombatFeedback.NONE,
         ws=WorldService(),
     )
     ctx.world["terrain"]["122,101"] = _ferry_tile(122, 101, observed_ms=100000)

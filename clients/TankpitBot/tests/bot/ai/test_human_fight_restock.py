@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_exit_collect,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
@@ -54,7 +55,9 @@ def _locked_ctx(
             "wind_down": wind_down,
         }
     )
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    return DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
 
 # The fixture self tank is rank 2: capacity 1200, inventory cap 30.
@@ -156,7 +159,7 @@ def test_hunt_entry_stays_full_bar_without_a_held_lock() -> None:
         _inventory(duals=15, homings=15, radars=10),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

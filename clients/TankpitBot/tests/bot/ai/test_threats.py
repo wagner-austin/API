@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.threats import (
     analyze_threats,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.constants import EntitySource, TankLiveness
 from tests.bot.ai._threat_fixtures import (
     _self_at,
     _tank,
@@ -148,7 +149,7 @@ class TestAnalyzeThreats:
         """Tanks in the ``deactivated`` corpse window are excluded."""
         world = _world(
             {
-                "10": _tank("10", x=110, y=100, team=1, liveness="deactivated"),
+                "10": _tank("10", x=110, y=100, team=1, liveness=TankLiveness.DEACTIVATED),
                 "20": _tank("20", x=120, y=100, team=2),  # alive enemy
             }
         )
@@ -197,7 +198,7 @@ class TestAnalyzeThreats:
                 tank_id=10,
                 timestamp_ms=0,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(110, 100),
                 team=1,
                 direction=32,

@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, make_container_state, make_mine_state
 from tests.bot.ai._support import (
@@ -61,7 +62,9 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -110,7 +113,9 @@ def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -178,7 +183,9 @@ def test_locked_fuel_holds_when_water_locked() -> None:
     terrain_data[(121, 101)] = "W"
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_collect_mode(ctx)
 
@@ -221,7 +228,9 @@ def test_inexecutable_lock_without_terrain_holds() -> None:
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision, held_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["130,100"]
@@ -276,7 +285,9 @@ def test_unservable_water_locked_fuel_releases_the_lock() -> None:
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     decision, released_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["120,100"]
@@ -337,7 +348,9 @@ def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     decision, released_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["130,100"]
@@ -398,7 +411,9 @@ def test_mine_denied_locked_fuel_holds_while_the_clearance_shot_exists() -> None
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, terrain, CombatFeedback.NONE, ws=ws
+    )
 
     _decision, held_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["104,100"]
@@ -455,7 +470,7 @@ def test_out_of_window_locked_fuel_holds_so_the_hop_can_fire() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -505,7 +520,9 @@ def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = select_and_pickup_fuel(ctx, ctx.base)
 
@@ -554,7 +571,9 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
     locked_target = world["containers"]["105,105"]
 
     decision, updated_state = continue_or_release_fuel_lock(

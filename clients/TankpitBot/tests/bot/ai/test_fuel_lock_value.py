@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.equipment import (
     fuel_deliverable_score,
     is_fuel_lock_release_warranted,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
@@ -156,7 +157,9 @@ class TestLockContinuationIntegration:
             },
         )
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision, updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(249, 18, 84)
@@ -187,7 +190,9 @@ class TestLockContinuationIntegration:
             containers={"105,105": _fuel_container(105, 105, 100)},
         )
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision, _updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(105, 105, 10)
@@ -218,7 +223,9 @@ class TestLockContinuationIntegration:
             },
         )
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision, updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(105, 105, 10)
@@ -240,7 +247,9 @@ class TestLockContinuationIntegration:
             },
         )
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision, _updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(105, 105, 300)

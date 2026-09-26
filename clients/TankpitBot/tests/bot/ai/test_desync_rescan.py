@@ -12,6 +12,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state.types import make_container_state
@@ -47,7 +48,9 @@ class TestDesyncRescan:
             }
         )
         ws.mark_container_desync(99000)
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision = decide_collect_mode(ctx)
 
@@ -80,7 +83,9 @@ class TestDesyncRescan:
                 "mode_started_ms": 90000,
             }
         )
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision = decide_collect_mode(ctx)
 
@@ -152,7 +157,9 @@ class TestRadarSpendEconomics:
             }
         )
         ws.mark_container_desync(99000)
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision = decide_collect_mode(ctx)
 
@@ -180,7 +187,9 @@ class TestRadarSpendEconomics:
         del world["scanned_tiles"][f"{left + 2},{top + 2}"]
         ai_state = make_scanned_ai_state()
 
-        stocked = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        stocked = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
         broke_far = DecideCtx(
             world,
             self_state,
@@ -188,7 +197,7 @@ class TestRadarSpendEconomics:
             make_inventory(default_count=0),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         near_world, near_self = make_world(scanned=True)
@@ -202,7 +211,7 @@ class TestRadarSpendEconomics:
             make_inventory(default_count=0),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -236,7 +245,7 @@ class TestRadarSpendEconomics:
             make_inventory(default_count=2),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         last_extra = DecideCtx(
@@ -246,7 +255,7 @@ class TestRadarSpendEconomics:
             make_inventory(default_count=1),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -268,7 +277,7 @@ class TestRadarSpendEconomics:
             make_inventory(default_count=1),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -309,7 +318,9 @@ class TestDisplacedLandingScanEconomics:
                 "resource_target_y": 100,
             }
         )
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision, updated = scan_on_landing_decision(ctx, ctx.base)
 
@@ -354,7 +365,9 @@ class TestMineRevealScan:
             }
         )
         ws.mark_mine_reveal_pending(99000)
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision = decide_collect_mode(ctx)
 

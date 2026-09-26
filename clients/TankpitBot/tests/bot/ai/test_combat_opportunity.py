@@ -53,7 +53,7 @@ def _locked_ctx(
     *,
     blocked: dict[str, int] | None = None,
     terrain: InMemoryTerrainMap | None = None,
-    combat_feedback: CombatFeedback = "",
+    combat_feedback: CombatFeedback = CombatFeedback.NONE,
 ) -> DecideCtx:
     """Build a ctx engaged on the tank with id 50 (self at (100,100))."""
     ws = WorldService()
@@ -309,7 +309,7 @@ class TestDivertFeedbackScoping:
         a map chase.
         """
         tanks = {"50": _tank(50, 101, 100, name="Main")}
-        ctx = _locked_ctx(tanks, combat_feedback="miss")
+        ctx = _locked_ctx(tanks, combat_feedback=CombatFeedback.MISS)
         # The last shot was a DIVERT at id 60; its miss arrives now.
         ctx.ai_state["last_shot_target_id"] = 60
         main = _enemy_threat(x=101, y=100, name="Main")
@@ -322,7 +322,7 @@ class TestDivertFeedbackScoping:
     def test_lock_miss_still_chases(self) -> None:
         """Feedback keyed to the lock keeps its stationary-miss verdict."""
         tanks = {"50": _tank(50, 101, 100, name="Main")}
-        ctx = _locked_ctx(tanks, combat_feedback="miss")
+        ctx = _locked_ctx(tanks, combat_feedback=CombatFeedback.MISS)
         main = _enemy_threat(x=101, y=100, name="Main")
 
         decision = engage_target(ctx, main)

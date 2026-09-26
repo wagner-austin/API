@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_hops import hop_toward_equipment
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -63,7 +64,7 @@ def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -121,7 +122,7 @@ def test_hop_never_re_boards_from_beside_the_boarding_tile() -> None:
         inventory,
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

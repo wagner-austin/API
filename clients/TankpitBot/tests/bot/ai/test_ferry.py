@@ -20,6 +20,7 @@ from tankpit_bot.state.types import (
 )
 from tankpit_bot.types.constants import (
     TERRAIN_GROUND,
+    EntitySource,
 )
 from tests.bot.ai._ferry_fixtures import (
     _NOW_MS,
@@ -251,8 +252,8 @@ class TestRidingAndComposition:
         every selector already uses.
         """
         world, _self_state = make_world(self_x=100, self_y=100)
-        world["mines"]["103,100"] = make_mine_state(103, 100, 0, -1, 3, source="radar")
-        world["mines"]["104,100"] = make_mine_state(104, 100, 0, -1, 1, source="radar")
+        world["mines"]["103,100"] = make_mine_state(103, 100, 0, -1, 3, source=EntitySource.RADAR)
+        world["mines"]["104,100"] = make_mine_state(104, 100, 0, -1, 1, source=EntitySource.RADAR)
 
         composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS, frozenset())
         if composed is None:

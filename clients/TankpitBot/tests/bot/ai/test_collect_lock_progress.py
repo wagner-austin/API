@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.collect_locks import continue_or_release_lock
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.intent import RESOURCE_LOCK_HOLD_BOUND_TICKS, set_resource_target
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -59,7 +60,7 @@ def _held_ctx(*, kind: str, held_ticks: int, is_fuel: bool) -> DecideCtx:
         make_inventory(default_count=15),
         100000,
         InMemoryTerrainMap(_rock_ring(104, 100)),
-        "",
+        CombatFeedback.NONE,
         ws=WorldService(),
     )
 

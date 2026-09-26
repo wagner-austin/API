@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.collect_mode_outcomes import _MAP_ANSWER_WAIT_MS
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.maroon_walk import _maroon_pan_toward
 from tankpit_bot.bot.ai.types import AIStateDict, make_default_ai_config
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
@@ -71,7 +72,7 @@ def _marooned_ctx(
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -122,7 +123,7 @@ def test_marooned_walk_targets_a_believed_container_too() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -265,7 +266,7 @@ def _edge_ctx(
         make_inventory(),
         100000,
         None if terrain_blind else (terrain if terrain is not None else InMemoryTerrainMap()),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -402,7 +403,7 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -459,7 +460,7 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
         make_inventory(),
         100000,
         InMemoryTerrainMap(terrain_data),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -506,7 +507,7 @@ def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> Non
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -574,7 +575,7 @@ def test_desperation_hop_picks_the_cheaper_of_two_dregs() -> None:
         make_inventory(),
         100000,
         terrain,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

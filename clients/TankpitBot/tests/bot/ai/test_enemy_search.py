@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.types import (
     make_default_ai_config,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
@@ -120,7 +121,7 @@ class TestDecideBlockedEdgeSearch:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
         terrain_data: dict[tuple[int, int], str] = {}

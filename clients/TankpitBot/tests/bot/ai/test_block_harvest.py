@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.block_harvest import (
     plan_block_harvest_leg,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.protocol.commands import (
     SCOPE_EAST,
     SCOPE_NORTH,
@@ -71,7 +72,7 @@ def test_harvest_declines_without_terrain_and_at_low_fuel() -> None:
         make_inventory(),
         _NOW,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
     assert plan_block_harvest_leg(no_terrain, make_scanned_ai_state()) is None

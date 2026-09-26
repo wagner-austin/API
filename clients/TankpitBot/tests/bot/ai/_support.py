@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
 from tankpit_bot.sniffer.world_service import WorldService
@@ -406,6 +407,6 @@ def make_sweep_ctx(
         inventory if inventory is not None else make_inventory(),
         now_ms,
         terrain if terrain is not None else InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )

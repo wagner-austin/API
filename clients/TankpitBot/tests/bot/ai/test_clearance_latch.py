@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.collect_pickups import mine_clearance_decision
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state, make_mine_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -37,7 +38,7 @@ def _ctx_with_covered_container(ai_state: AIStateDict) -> DecideCtx:
         make_inventory(),
         100000,
         InMemoryTerrainMap(),
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

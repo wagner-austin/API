@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import (
     walk_or_teleport,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._movement_fixtures import _NOW_MS
 from tests.bot.ai._support import (
@@ -71,7 +72,9 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 105, 100, pickup_kind="equipment")
 
@@ -107,7 +110,9 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
 
@@ -142,7 +147,9 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 100, 100, pickup_kind="equipment")
 
@@ -176,7 +183,9 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind="equipment")
 

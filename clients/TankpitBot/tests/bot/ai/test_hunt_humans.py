@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
@@ -50,7 +51,7 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         # (150,100) closes distance to Yuppler and is affordable.
         ws=ws,
     )
@@ -87,7 +88,9 @@ def test_human_pursuit_falls_back_to_bot_when_no_leg_helps() -> None:
             "last_map_open_ms": 99500,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -138,7 +141,7 @@ def test_recruit_human_is_not_pursued() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -183,7 +186,7 @@ def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -229,7 +232,7 @@ def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -265,7 +268,9 @@ def test_locked_human_with_no_relay_leg_falls_back_to_refuel() -> None:
             "combat_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -308,7 +313,7 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         # (230,100): most progress, cost ~780 -- beyond the 450 leg cap.
         # (150,100): cost 300 -- the correct capped leg.
         ws=ws,
@@ -349,7 +354,9 @@ def test_stale_known_human_forces_a_map_refresh_over_bot_farming() -> None:
             "last_map_open_ms": 90000,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -377,7 +384,9 @@ def test_fresh_map_showing_stale_human_farms_normally() -> None:
             "last_map_open_ms": 99500,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, make_inventory(), 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -463,7 +472,7 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

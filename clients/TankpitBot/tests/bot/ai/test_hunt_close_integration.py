@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.context import DecideCtx, filter_killed_tanks
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -347,7 +348,9 @@ class TestDecideTeleportToFarTarget:
         world, self_state = make_world(self_x=10, self_y=10, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
         target = EnemyThreatDict(
             tank_id=50,
             x=0,

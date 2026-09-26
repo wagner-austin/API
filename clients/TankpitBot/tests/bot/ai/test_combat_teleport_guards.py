@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.combat_close import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -62,7 +63,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -123,7 +124,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -176,7 +177,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -220,7 +221,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -264,7 +265,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -302,7 +303,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -346,7 +347,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -392,7 +393,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -449,7 +450,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -496,7 +497,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -541,7 +542,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -583,7 +584,7 @@ class TestCombatTeleportGuards:
             make_inventory(),
             100000,
             None,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

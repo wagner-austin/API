@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai.world_types import make_enemy_threat
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_tank_state
 from tests.bot.ai._support import make_container, make_inventory, make_scanned_ai_state, make_world
@@ -314,7 +315,9 @@ class TestDecideBlockedCombatTargets:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -354,7 +357,9 @@ class TestDecideBlockedCombatTargets:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -386,7 +391,9 @@ class TestDecideBlockedCombatTargets:
                 (105, 99): "W",
             }
         )
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, terrain, CombatFeedback.NONE, ws=ws
+        )
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -416,7 +423,9 @@ class TestDecideBlockedCombatTargets:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, containers=containers)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
         target = make_enemy_threat(
             tank_id=50,
             x=105,

@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._strategy_fixtures import (
     _c,
@@ -81,7 +82,9 @@ class TestLockedEquipmentTarget:
         )
         # Recruit (rank 0) cap is 20: the live arterial inventory.
         inventory = _make_inventory(dual_count=20, default_count=20, radar_count=20)
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+        ctx = DecideCtx(
+            world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+        )
 
         decision, updated_state = continue_or_release_lock(ctx, ctx.base)
 
@@ -285,7 +288,7 @@ class TestLockedFuelTarget:
             _make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 
@@ -329,7 +332,7 @@ class TestLockedFuelTarget:
             _make_inventory(),
             100000,
             terrain,
-            "",
+            CombatFeedback.NONE,
             ws=ws,
         )
 

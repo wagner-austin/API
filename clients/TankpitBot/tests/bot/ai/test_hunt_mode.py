@@ -7,6 +7,7 @@ import pytest
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
@@ -31,7 +32,9 @@ def test_hunt_acquire_searches_for_enemies_when_no_target_exists() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -64,7 +67,9 @@ def test_hunt_search_dispatches_map_open_not_radar_during_acquire() -> None:
     )
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -94,7 +99,9 @@ def test_hunt_acquire_exits_when_fresh_map_has_no_viable_targets() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     with pytest.raises(SessionExitError, match="no_viable_targets"):
         decide_hunt_mode(ctx)
@@ -124,7 +131,9 @@ def test_hunt_acquire_keeps_searching_when_data_is_stale_despite_fresh_dispatch(
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -153,7 +162,9 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     first_decision = decide_hunt_mode(ctx)
     if first_decision["command"]["cmd_type"] != "map_open":
@@ -167,7 +178,9 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
             "mode_started_ms": 90000,
         }
     )
-    next_ctx = DecideCtx(world, self_state, next_ai_state, inventory, 106000, None, "", ws=ws)
+    next_ctx = DecideCtx(
+        world, self_state, next_ai_state, inventory, 106000, None, CombatFeedback.NONE, ws=ws
+    )
 
     second_decision = decide_hunt_mode(next_ctx)
 
@@ -191,7 +204,9 @@ def test_hunt_acquire_uses_fresh_target_position_to_close_on_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -219,7 +234,9 @@ def test_hunt_acquire_targets_enemy_between_break_and_resume_thresholds() -> Non
     inventory = make_inventory(default_count=30, dual_count=18)
     inventory["homing_shots"]["count"] = 23
     inventory["extra_radars"]["count"] = 19
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -248,7 +265,9 @@ def test_hunt_refresh_engages_visible_adjacent_locked_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -277,7 +296,9 @@ def test_hunt_refresh_returns_close_decision_for_visible_nonadjacent_target() ->
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -318,7 +339,7 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
         inventory,
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 
@@ -346,7 +367,9 @@ def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -381,7 +404,9 @@ def test_hunt_acquire_resumes_visible_locked_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -415,7 +440,9 @@ def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+    ctx = DecideCtx(
+        world, self_state, ai_state, inventory, 100000, None, CombatFeedback.NONE, ws=ws
+    )
 
     decision = decide_hunt_mode(ctx)
 

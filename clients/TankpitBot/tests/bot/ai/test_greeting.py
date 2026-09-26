@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
 )
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import (
     make_chat_command,
@@ -61,7 +62,7 @@ def _ctx(tanks: dict[str, TankStateDict]) -> DecideCtx:
         make_inventory(),
         100000,
         None,
-        "",
+        CombatFeedback.NONE,
         ws=ws,
     )
 

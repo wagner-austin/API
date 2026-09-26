@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.combat_strategy import engage_target
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.mine_pin import MINE_PIN_REACH_TILES, mine_pin_decision
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._combat_fixtures import _enemy_threat
@@ -66,7 +67,9 @@ def _ctx(
             "mine_pin_presses": {} if presses is None else presses,
         }
     )
-    return DecideCtx(world, self_state, ai_state, make_inventory(), _NOW, None, "", ws=ws)
+    return DecideCtx(
+        world, self_state, ai_state, make_inventory(), _NOW, None, CombatFeedback.NONE, ws=ws
+    )
 
 
 def test_first_close_engage_tick_presses_the_pin() -> None:
