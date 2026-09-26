@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.explainers.types import ExplainerName
 from numpy.typing import NDArray
 from platform_core.json_utils import (
     JSONObject,
@@ -136,7 +137,7 @@ class TestRunExplanation:
 
         assert result["status"] == "complete"
         assert result["backend"] == "xgboost"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["n_samples_used"] == 50
         assert result["n_features"] == len(feature_names)
         assert result["target_class"] == 1
@@ -166,7 +167,7 @@ class TestRunExplanation:
         result = run_explanation(config_json, external_dir, tmp_path)
 
         assert result["status"] == "complete"
-        assert result["explainer"] == "shap_tree"
+        assert result["explainer"] is ExplainerName.SHAP_TREE
         assert len(result["feature_importances"]) == len(feature_names)
 
     def test_run_explanation_samples_all_when_n_samples_exceeds_dataset(
@@ -366,7 +367,7 @@ class TestProcessExplainJob:
             # Verify result structure and values
             assert result["status"] == "complete"
             assert result["backend"] == "xgboost"
-            assert result["explainer"] == "permutation"
+            assert result["explainer"] is ExplainerName.PERMUTATION
             assert result["n_samples_used"] == 20
             assert result["n_features"] == len(feature_names)
             assert result["target_class"] == 1

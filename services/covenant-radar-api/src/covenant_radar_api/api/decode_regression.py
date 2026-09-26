@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from covenant_ml import FeaturePreset
-from covenant_ml.explainers.types import SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import RequestedDevice
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
@@ -17,7 +17,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
-from platform_core.members import find_member
+from platform_core.members import find_member, require_member
 
 
 def _parse_optimize_feature_preset(raw: JSONValue | None) -> FeaturePreset:
@@ -45,33 +45,6 @@ def _parse_optimize_feature_preset(raw: JSONValue | None) -> FeaturePreset:
     if raw == "full":
         return "full"
     raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
-
-
-def _parse_explainer(raw: JSONValue) -> SupportedExplainer:
-    """Parse and validate explainer name.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        Validated SupportedExplainer literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid explainer name.
-    """
-    if not isinstance(raw, str):
-        raise JSONTypeError("explainer must be a string")
-    if raw == "permutation":
-        return "permutation"
-    if raw == "gradient":
-        return "gradient"
-    if raw == "integrated_gradients":
-        return "integrated_gradients"
-    if raw == "shap_tree":
-        return "shap_tree"
-    raise JSONTypeError(
-        "explainer must be one of: permutation, gradient, integrated_gradients, shap_tree"
-    )
 
 
 def _parse_device(raw: JSONValue | None) -> RequestedDevice:
@@ -328,7 +301,7 @@ class RegressionExplainRequest(TypedDict, total=True):
     dataset: str
     backend: RegressorBackendName
     model_path: str
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     n_samples: int
     random_state: int
 
@@ -355,7 +328,7 @@ class RegressionExplainParseResult(TypedDict, total=True):
     dataset: str
     backend: RegressorBackendName
     model_path: str
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     n_samples: int
     random_state: int
 
@@ -394,10 +367,7 @@ def parse_regression_explain_request(body: bytes) -> RegressionExplainParseResul
 
     model_path = require_str(raw, "model_path")
 
-    explainer_raw = raw.get("explainer")
-    if explainer_raw is None:
-        raise JSONTypeError("Missing required field 'explainer'")
-    explainer = _parse_explainer(explainer_raw)
+    explainer = require_member(raw, "explainer", ExplainerName)
 
     n_samples = _optional_int(raw, "n_samples", 1000)
     random_state = _optional_int(raw, "random_state", 42)

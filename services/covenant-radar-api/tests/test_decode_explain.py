@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.explainers.types import ExplainerName
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode_ml import (
@@ -33,7 +34,7 @@ class TestParseExplainRequest:
         assert result["dataset"] == "taiwan"
         assert result["backend"] == "xgboost"
         assert result["model_path"] == "/models/xgboost.ubj"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["target_class"] == 1
         assert result["n_samples"] == 500
         assert result["random_state"] == 42
@@ -51,7 +52,7 @@ class TestParseExplainRequest:
         assert result["dataset"] == "us"
         assert result["backend"] == "mlp"
         assert result["model_path"] == "/models/mlp.pt"
-        assert result["explainer"] == "gradient"
+        assert result["explainer"] is ExplainerName.GRADIENT
         assert result["target_class"] == 1
         assert result["n_samples"] == 1000
         assert result["random_state"] == 42
@@ -66,7 +67,7 @@ class TestParseExplainRequest:
         }"""
         result = parse_explain_request(body)
 
-        assert result["explainer"] == "integrated_gradients"
+        assert result["explainer"] is ExplainerName.INTEGRATED_GRADIENTS
         assert result["backend"] == "lstm"
 
     def test_valid_explainer_shap_tree(self) -> None:
@@ -79,7 +80,7 @@ class TestParseExplainRequest:
         }"""
         result = parse_explain_request(body)
 
-        assert result["explainer"] == "shap_tree"
+        assert result["explainer"] is ExplainerName.SHAP_TREE
         assert result["backend"] == "lightgbm"
 
     def test_all_valid_backends(self) -> None:
@@ -186,7 +187,13 @@ class TestParseExplainRequest:
             "model_path": "/models/model.ubj",
             "explainer": "invalid_explainer"
         }"""
-        with pytest.raises(JSONTypeError, match="explainer must be one of"):
+        with pytest.raises(
+            JSONTypeError,
+            match=(
+                r"^Invalid explainer 'invalid_explainer': must be one of 'permutation', "
+                r"'gradient', 'integrated_gradients', 'shap_tree'$"
+            ),
+        ):
             parse_explain_request(body)
 
     def test_non_string_backend_raises_json_type_error(self) -> None:
@@ -208,7 +215,7 @@ class TestParseExplainRequest:
             "model_path": "/models/model.ubj",
             "explainer": 123
         }"""
-        with pytest.raises(JSONTypeError, match="explainer must be a string"):
+        with pytest.raises(JSONTypeError, match=r"^Field 'explainer' must be a string, got int$"):
             parse_explain_request(body)
 
     def test_invalid_target_class_type_raises_json_type_error(self) -> None:
@@ -371,7 +378,7 @@ class TestParseRegressionExplainRequest:
         assert result["dataset"] == "financial_distress"
         assert result["backend"] == "xgboost_reg"
         assert result["model_path"] == "/models/xgb_reg.ubj"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["n_samples"] == 500
         assert result["random_state"] == 99
 
@@ -387,7 +394,7 @@ class TestParseRegressionExplainRequest:
 
         assert result["dataset"] == "financial_distress"
         assert result["backend"] == "lightgbm_reg"
-        assert result["explainer"] == "shap_tree"
+        assert result["explainer"] is ExplainerName.SHAP_TREE
         assert result["n_samples"] == 1000
         assert result["random_state"] == 42
 
@@ -490,7 +497,13 @@ class TestParseRegressionExplainRequest:
             "model_path": "/m",
             "explainer": "invalid"
         }"""
-        with pytest.raises(JSONTypeError, match="explainer must be one of"):
+        with pytest.raises(
+            JSONTypeError,
+            match=(
+                r"^Invalid explainer 'invalid': must be one of 'permutation', "
+                r"'gradient', 'integrated_gradients', 'shap_tree'$"
+            ),
+        ):
             parse_regression_explain_request(body)
 
     def test_non_string_backend_raises(self) -> None:
@@ -512,7 +525,7 @@ class TestParseRegressionExplainRequest:
             "model_path": "/m",
             "explainer": 123
         }"""
-        with pytest.raises(JSONTypeError, match="explainer must be a string"):
+        with pytest.raises(JSONTypeError, match=r"^Field 'explainer' must be a string, got int$"):
             parse_regression_explain_request(body)
 
     def test_invalid_n_samples_type_raises(self) -> None:

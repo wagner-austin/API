@@ -15,7 +15,7 @@ from typing import Literal, Protocol, TypedDict
 
 import numpy as np
 from covenant_ml.explainers.registry import ExplainerRegistry, default_explainer_registry
-from covenant_ml.explainers.types import ExplainResult, SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName, ExplainResult
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -26,6 +26,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import require_member
 from platform_ml.explainers.types import FeatureImportanceScore
 
 from covenant_radar_api.core.model_paths import resolve_model_path
@@ -58,7 +59,7 @@ class ExplainParseResult(TypedDict, total=True):
     dataset: str
     backend: BackendName
     model_path: str
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     target_class: int
     n_samples: int
     random_state: int
@@ -210,33 +211,6 @@ def _parse_lstm_config(raw: JSONObject) -> LSTMModelConfig:
     )
 
 
-def _parse_explainer(raw: JSONValue) -> SupportedExplainer:
-    """Parse and validate explainer name.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        Validated SupportedExplainer literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid explainer name.
-    """
-    if not isinstance(raw, str):
-        raise JSONTypeError("explainer must be a string")
-    if raw == "permutation":
-        return "permutation"
-    if raw == "gradient":
-        return "gradient"
-    if raw == "integrated_gradients":
-        return "integrated_gradients"
-    if raw == "shap_tree":
-        return "shap_tree"
-    raise JSONTypeError(
-        "explainer must be one of: permutation, gradient, integrated_gradients, shap_tree"
-    )
-
-
 def _parse_explain_config(config_json: str) -> ExplainParseResult:
     """Parse explanation config from JSON string.
 
@@ -266,10 +240,7 @@ def _parse_explain_config(config_json: str) -> ExplainParseResult:
 
     model_path = require_str(raw_obj, "model_path")
 
-    explainer_raw = raw_obj.get("explainer")
-    if explainer_raw is None:
-        raise JSONTypeError("explainer is required")
-    explainer = _parse_explainer(explainer_raw)
+    explainer = require_member(raw_obj, "explainer", ExplainerName)
 
     target_class = optional_int(raw_obj, "target_class", 1)
     n_samples = optional_int(raw_obj, "n_samples", 1000)

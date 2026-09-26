@@ -8,14 +8,14 @@ from typing import Protocol
 
 import numpy as np
 import pytest
+from covenant_ml.explainers.types import ExplainerName
 from numpy.typing import NDArray
-from platform_core.json_utils import JSONTypeError, dump_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from covenant_radar_api.worker.explain_regression_job import (
     RegressionExplainJobStatus,
     RegressionExplainProgressInfo,
     _optional_int,
-    _parse_explainer,
     _parse_regression_explain_config,
     _parse_regressor_backend,
     _sample_data,
@@ -87,25 +87,42 @@ class TestParseRegressorBackend:
 # ---------------------------------------------------------------------------
 
 
-class TestParseExplainer:
-    """Tests for _parse_explainer."""
+def _regression_config_json(explainer: JSONValue) -> str:
+    """Build a regression explain config carrying the given explainer value."""
+    return dump_json_str(
+        {
+            "dataset": "d",
+            "backend": "xgboost_reg",
+            "model_path": "/m",
+            "explainer": explainer,
+        }
+    )
 
-    def test_all_valid_explainers(self) -> None:
-        """Accepts all valid explainer names."""
-        assert _parse_explainer("permutation") == "permutation"
-        assert _parse_explainer("gradient") == "gradient"
-        assert _parse_explainer("integrated_gradients") == "integrated_gradients"
-        assert _parse_explainer("shap_tree") == "shap_tree"
+
+class TestParseRegressionExplainConfigExplainer:
+    """Tests for the explainer field of _parse_regression_explain_config."""
+
+    def test_parses_every_explainer_to_its_member(self) -> None:
+        """Each explainer word parses to the member that carries it."""
+        for member in ExplainerName:
+            result = _parse_regression_explain_config(_regression_config_json(member.value))
+            assert result["explainer"] is member
 
     def test_invalid_explainer_raises(self) -> None:
-        """Invalid explainer raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="explainer must be one of"):
-            _parse_explainer("invalid")
+        """An unknown word is refused with every admitted word named."""
+        with pytest.raises(
+            JSONTypeError,
+            match=(
+                r"^Invalid explainer 'invalid': must be one of 'permutation', "
+                r"'gradient', 'integrated_gradients', 'shap_tree'$"
+            ),
+        ):
+            _parse_regression_explain_config(_regression_config_json("invalid"))
 
     def test_non_string_raises(self) -> None:
-        """Non-string raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="explainer must be a string"):
-            _parse_explainer(42)
+        """A non-string explainer is refused by type."""
+        with pytest.raises(JSONTypeError, match=r"^Field 'explainer' must be a string, got int$"):
+            _parse_regression_explain_config(_regression_config_json(42))
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +148,7 @@ class TestParseRegressionExplainConfig:
         assert result["dataset"] == "financial_distress"
         assert result["backend"] == "xgboost_reg"
         assert result["model_path"] == "/models/xgb.ubj"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["n_samples"] == 500
         assert result["random_state"] == 99
 
@@ -162,7 +179,7 @@ class TestParseRegressionExplainConfig:
     def test_missing_explainer_raises(self) -> None:
         """Missing explainer raises JSONTypeError."""
         config_json = '{"dataset": "d", "backend": "xgboost_reg", "model_path": "/m"}'
-        with pytest.raises(JSONTypeError, match="explainer is required"):
+        with pytest.raises(JSONTypeError, match=r"^Missing required field 'explainer'$"):
             _parse_regression_explain_config(config_json)
 
     def test_missing_dataset_raises(self) -> None:
@@ -352,7 +369,7 @@ class TestRunRegressionExplanation:
 
         assert result["status"] == "complete"
         assert result["backend"] == "xgboost_reg"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["n_samples_used"] == 30
         assert result["n_features"] == len(feature_names)
         assert len(result["feature_importances"]) == len(feature_names)
@@ -385,7 +402,7 @@ class TestRunRegressionExplanation:
         result = run_regression_explanation(config_json, external_dir, tmp_path, registry=registry)
 
         assert result["status"] == "complete"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert len(result["feature_importances"]) == len(feature_names)
 
     def test_incompatible_explainer_raises(self, tmp_path: Path) -> None:
@@ -538,7 +555,7 @@ class TestProcessRegressionExplainJob:
 
             assert result["status"] == "complete"
             assert result["backend"] == "xgboost_reg"
-            assert result["explainer"] == "permutation"
+            assert result["explainer"] is ExplainerName.PERMUTATION
             assert result["n_samples_used"] == 15
             assert result["n_features"] == len(feature_names)
             duration = require_float(result, "duration_seconds")

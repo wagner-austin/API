@@ -16,7 +16,7 @@ from typing import Literal, Protocol, TypedDict
 
 import numpy as np
 from covenant_ml.explainers.regression_registry import RegressionExplainerRegistry
-from covenant_ml.explainers.types import RegressionExplainResult, SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName, RegressionExplainResult
 from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -27,6 +27,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import require_member
 from platform_ml.explainers.types import FeatureImportanceScore
 
 from covenant_radar_api.core.model_paths import resolve_model_path
@@ -69,7 +70,7 @@ class RegressionExplainParseResult(TypedDict, total=True):
     dataset: str
     backend: RegressorBackendName
     model_path: str
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     n_samples: int
     random_state: int
 
@@ -123,33 +124,6 @@ def _parse_regressor_backend(raw: JSONValue) -> RegressorBackendName:
     raise JSONTypeError("backend must be one of: xgboost_reg, lightgbm_reg, mlp_reg, lstm_reg")
 
 
-def _parse_explainer(raw: JSONValue) -> SupportedExplainer:
-    """Parse and validate explainer name.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        Validated SupportedExplainer literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid explainer name.
-    """
-    if not isinstance(raw, str):
-        raise JSONTypeError("explainer must be a string")
-    if raw == "permutation":
-        return "permutation"
-    if raw == "gradient":
-        return "gradient"
-    if raw == "integrated_gradients":
-        return "integrated_gradients"
-    if raw == "shap_tree":
-        return "shap_tree"
-    raise JSONTypeError(
-        "explainer must be one of: permutation, gradient, integrated_gradients, shap_tree"
-    )
-
-
 def _parse_regression_explain_config(
     config_json: str,
 ) -> RegressionExplainParseResult:
@@ -179,10 +153,7 @@ def _parse_regression_explain_config(
 
     model_path = require_str(raw_obj, "model_path")
 
-    explainer_raw = raw_obj.get("explainer")
-    if explainer_raw is None:
-        raise JSONTypeError("explainer is required")
-    explainer = _parse_explainer(explainer_raw)
+    explainer = require_member(raw_obj, "explainer", ExplainerName)
 
     n_samples = _optional_int(raw_obj, "n_samples", 1000)
     random_state = _optional_int(raw_obj, "random_state", 42)

@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import scripts._test_hooks as _hooks
-from covenant_ml.explainers.types import SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from platform_core.logging import LogLevel
@@ -64,7 +64,7 @@ class TestParseArgs:
         args = parse_args([])
         assert args.backend == "xgboost"
         assert args.dataset == "taiwan"
-        assert args.explainer == "permutation"
+        assert args.explainer is ExplainerName.PERMUTATION
         assert args.n_samples == 1000
         assert args.target_class == 1
         assert args.top_n == 20
@@ -80,7 +80,7 @@ class TestParseArgs:
         """Backend can be set with --backend flag."""
         args = parse_args(["--backend", "mlp", "-e", "gradient"])
         assert args.backend == "mlp"
-        assert args.explainer == "gradient"
+        assert args.explainer is ExplainerName.GRADIENT
 
     def test_parse_dataset_short_flag(self) -> None:
         """Dataset can be set with -d flag."""
@@ -90,7 +90,7 @@ class TestParseArgs:
     def test_parse_explainer_short_flag(self) -> None:
         """Explainer can be set with -e flag."""
         args = parse_args(["-e", "shap_tree"])
-        assert args.explainer == "shap_tree"
+        assert args.explainer is ExplainerName.SHAP_TREE
 
     def test_parse_n_samples_short_flag(self) -> None:
         """N samples can be set with -n flag."""
@@ -155,11 +155,9 @@ class TestParseExplainer:
     """Tests for _parse_explainer function."""
 
     def test_valid_explainers(self) -> None:
-        """All valid explainers are accepted."""
-        assert _parse_explainer("permutation") == "permutation"
-        assert _parse_explainer("gradient") == "gradient"
-        assert _parse_explainer("integrated_gradients") == "integrated_gradients"
-        assert _parse_explainer("shap_tree") == "shap_tree"
+        """Each explainer word parses to the member that carries it."""
+        for member in ExplainerName:
+            assert _parse_explainer(member.value) is member
 
     def test_invalid_explainer_exits(self) -> None:
         """Invalid explainer raises SystemExit."""
@@ -173,22 +171,22 @@ class TestValidateExplainerBackend:
 
     def test_valid_combinations(self) -> None:
         """Valid explainer/backend combinations are accepted."""
-        validate_explainer_backend("permutation", "xgboost")
-        validate_explainer_backend("shap_tree", "xgboost")
-        validate_explainer_backend("permutation", "mlp")
-        validate_explainer_backend("gradient", "mlp")
-        validate_explainer_backend("integrated_gradients", "lstm")
+        validate_explainer_backend(ExplainerName.PERMUTATION, "xgboost")
+        validate_explainer_backend(ExplainerName.SHAP_TREE, "xgboost")
+        validate_explainer_backend(ExplainerName.PERMUTATION, "mlp")
+        validate_explainer_backend(ExplainerName.GRADIENT, "mlp")
+        validate_explainer_backend(ExplainerName.INTEGRATED_GRADIENTS, "lstm")
 
     def test_invalid_gradient_on_xgboost_exits(self) -> None:
         """Gradient explainer on xgboost raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
-            validate_explainer_backend("gradient", "xgboost")
+            validate_explainer_backend(ExplainerName.GRADIENT, "xgboost")
         assert exc_info.value.code == 1
 
     def test_invalid_shap_tree_on_mlp_exits(self) -> None:
         """SHAP tree on MLP raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
-            validate_explainer_backend("shap_tree", "mlp")
+            validate_explainer_backend(ExplainerName.SHAP_TREE, "mlp")
         assert exc_info.value.code == 1
 
 
@@ -301,11 +299,11 @@ class TestPrintConfig:
 
     def test_print_config_executes(self) -> None:
         """print_config executes without error."""
-        print_config("xgboost", "taiwan", "permutation", 1000, None)
+        print_config("xgboost", "taiwan", ExplainerName.PERMUTATION, 1000, None)
 
     def test_print_config_with_model_path(self) -> None:
         """print_config with custom model path executes."""
-        print_config("mlp", "us", "gradient", 500, "/custom/path.pt")
+        print_config("mlp", "us", ExplainerName.GRADIENT, 500, "/custom/path.pt")
 
 
 class TestPrintResult:
@@ -405,14 +403,7 @@ class TestExplainerDescriptions:
 
     def test_all_explainers_have_descriptions(self) -> None:
         """All explainers have descriptions."""
-        explainers: list[SupportedExplainer] = [
-            "permutation",
-            "gradient",
-            "integrated_gradients",
-            "shap_tree",
-        ]
-        for explainer in explainers:
-            assert explainer in EXPLAINER_DESCRIPTIONS
+        assert set(EXPLAINER_DESCRIPTIONS) == set(ExplainerName)
 
 
 class TestBackendExplainers:
@@ -435,7 +426,7 @@ class TestExplainArgs:
         args = ExplainArgs()
         assert args.backend == "xgboost"
         assert args.dataset == "taiwan"
-        assert args.explainer == "permutation"
+        assert args.explainer is ExplainerName.PERMUTATION
         assert args.model_path is None
         assert args.n_samples == 1000
         assert args.target_class == 1
@@ -458,7 +449,7 @@ class TestParseArgsUnknownArgument:
         """Unknown arguments don't affect known arguments."""
         args = parse_args(["--unknown", "-b", "mlp", "-e", "gradient"])
         assert args.backend == "mlp"
-        assert args.explainer == "gradient"
+        assert args.explainer is ExplainerName.GRADIENT
 
 
 class TestModuleImport:

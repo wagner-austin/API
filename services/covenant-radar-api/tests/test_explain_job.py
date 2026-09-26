@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.explainers.types import ExplainerName
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
+    JSONValue,
     dump_json_str,
 )
 
 from covenant_radar_api.worker.explain_job import (
     _parse_explain_config,
-    _parse_explainer,
     _parse_int_tuple,
     _parse_lstm_config,
     _parse_mlp_config,
@@ -211,38 +212,43 @@ class TestParseLstmConfig:
             _parse_lstm_config(raw)
 
 
-class TestParseExplainer:
-    """Tests for _parse_explainer function."""
+def _xgboost_config_json(explainer: JSONValue) -> str:
+    """Build an xgboost explain config carrying the given explainer value."""
+    return dump_json_str(
+        {
+            "dataset": "taiwan",
+            "device": "cpu",
+            "backend": "xgboost",
+            "model_path": "/path/to/model.ubj",
+            "explainer": explainer,
+        }
+    )
 
-    def test_parses_permutation(self) -> None:
-        """Parses 'permutation' explainer."""
-        result = _parse_explainer("permutation")
-        assert result == "permutation"
 
-    def test_parses_gradient(self) -> None:
-        """Parses 'gradient' explainer."""
-        result = _parse_explainer("gradient")
-        assert result == "gradient"
+class TestParseExplainConfigExplainer:
+    """Tests for the explainer field of _parse_explain_config."""
 
-    def test_parses_integrated_gradients(self) -> None:
-        """Parses 'integrated_gradients' explainer."""
-        result = _parse_explainer("integrated_gradients")
-        assert result == "integrated_gradients"
+    def test_parses_every_explainer_to_its_member(self) -> None:
+        """Each explainer word parses to the member that carries it."""
+        for member in ExplainerName:
+            result = _parse_explain_config(_xgboost_config_json(member.value))
+            assert result["explainer"] is member
 
-    def test_parses_shap_tree(self) -> None:
-        """Parses 'shap_tree' explainer."""
-        result = _parse_explainer("shap_tree")
-        assert result == "shap_tree"
-
-    def test_raises_on_invalid_explainer(self) -> None:
-        """Raises JSONTypeError on invalid explainer name."""
-        with pytest.raises(JSONTypeError, match="explainer must be one of"):
-            _parse_explainer("invalid")
+    def test_raises_on_unknown_explainer(self) -> None:
+        """An unknown word is refused with every admitted word named."""
+        with pytest.raises(
+            JSONTypeError,
+            match=(
+                r"^Invalid explainer 'invalid': must be one of 'permutation', "
+                r"'gradient', 'integrated_gradients', 'shap_tree'$"
+            ),
+        ):
+            _parse_explain_config(_xgboost_config_json("invalid"))
 
     def test_raises_on_non_string(self) -> None:
-        """Raises JSONTypeError when value is not a string."""
-        with pytest.raises(JSONTypeError, match="explainer must be a string"):
-            _parse_explainer(123)
+        """A non-string explainer is refused by type."""
+        with pytest.raises(JSONTypeError, match=r"^Field 'explainer' must be a string, got int$"):
+            _parse_explain_config(_xgboost_config_json(123))
 
 
 class TestParseExplainConfig:
@@ -267,7 +273,7 @@ class TestParseExplainConfig:
         assert result["dataset"] == "taiwan"
         assert result["backend"] == "xgboost"
         assert result["model_path"] == "/path/to/model.ubj"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["target_class"] == 1
         assert result["n_samples"] == 500
         assert result["random_state"] == 123
@@ -358,7 +364,7 @@ class TestParseExplainConfig:
                 "model_path": "/path/to/model.ubj",
             }
         )
-        with pytest.raises(JSONTypeError, match="explainer is required"):
+        with pytest.raises(JSONTypeError, match=r"^Missing required field 'explainer'$"):
             _parse_explain_config(config_json)
 
     def test_raises_on_mlp_without_config(self) -> None:

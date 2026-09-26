@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import numpy as np
-from covenant_ml.explainers.types import ExplainResult, SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName, ExplainResult
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -43,7 +43,7 @@ class ExplainRunResult(TypedDict):
 
     backend: BackendName
     dataset: DatasetName
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     result: ExplainResult
     elapsed: float
     model_path: str
@@ -133,7 +133,7 @@ def _sample_data(
 def run_explanation(
     backend: BackendName,
     dataset: DatasetName,
-    explainer: SupportedExplainer,
+    explainer: ExplainerName,
     model_path: str | None,
     n_samples: int,
     target_class: int,

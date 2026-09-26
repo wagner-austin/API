@@ -8,7 +8,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from covenant_ml.explainers.types import SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import BackendName
 from platform_core.rich_logging import (
     RichTableProtocol,
@@ -40,7 +40,7 @@ BACKEND_DISPLAY_NAMES: dict[BackendName, str] = {
 def print_config(
     backend: BackendName,
     dataset: DatasetName,
-    explainer: SupportedExplainer,
+    explainer: ExplainerName,
     n_samples: int,
     model_path: str | None,
 ) -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from covenant_ml import FeaturePreset
-from covenant_ml.explainers.types import SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import (
     BackendName,
     RequestedDevice,
@@ -17,12 +17,12 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 
 from covenant_radar_api.api.decode_regression import (
     _optional_int,
     _parse_body_as_dict,
     _parse_device,
-    _parse_explainer,
     _parse_optimize_feature_preset,
 )
 
@@ -234,7 +234,7 @@ class ExplainRequest(TypedDict, total=True):
     dataset: DatasetName
     backend: BackendName
     model_path: str
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     target_class: int
     n_samples: int
     random_state: int
@@ -263,7 +263,7 @@ class ExplainParseResult(TypedDict, total=True):
     dataset: DatasetName
     backend: BackendName
     model_path: str
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     target_class: int
     n_samples: int
     random_state: int
@@ -335,10 +335,7 @@ def parse_explain_request(body: bytes) -> ExplainParseResult:
 
     model_path = require_str(raw, "model_path")
 
-    explainer_raw = raw.get("explainer")
-    if explainer_raw is None:
-        raise JSONTypeError("Missing required field 'explainer'")
-    explainer = _parse_explainer(explainer_raw)
+    explainer = require_member(raw, "explainer", ExplainerName)
 
     # Optional fields with defaults
     target_class = _optional_int(raw, "target_class", 1)

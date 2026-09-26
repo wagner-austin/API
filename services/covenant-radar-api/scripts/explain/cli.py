@@ -11,27 +11,28 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Literal
 
-from covenant_ml.explainers.types import SupportedExplainer
+from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import BackendName
+from platform_core.members import find_member
 from platform_core.rich_logging import get_rich_console
 
 # Type aliases
 DatasetName = Literal["taiwan", "us", "polish"]
 
 # Explainer descriptions for help text
-EXPLAINER_DESCRIPTIONS: dict[SupportedExplainer, str] = {
-    "permutation": "Permutation importance (all backends)",
-    "gradient": "Gradient-based (MLP, LSTM only)",
-    "integrated_gradients": "Integrated gradients (MLP, LSTM only)",
-    "shap_tree": "SHAP TreeExplainer (XGBoost, LightGBM only)",
+EXPLAINER_DESCRIPTIONS: dict[ExplainerName, str] = {
+    ExplainerName.PERMUTATION: "Permutation importance (all backends)",
+    ExplainerName.GRADIENT: "Gradient-based (MLP, LSTM only)",
+    ExplainerName.INTEGRATED_GRADIENTS: "Integrated gradients (MLP, LSTM only)",
+    ExplainerName.SHAP_TREE: "SHAP TreeExplainer (XGBoost, LightGBM only)",
 }
 
 # Backend to compatible explainers mapping
-BACKEND_EXPLAINERS: dict[BackendName, list[SupportedExplainer]] = {
-    "xgboost": ["permutation", "shap_tree"],
-    "lightgbm": ["permutation", "shap_tree"],
-    "mlp": ["permutation", "gradient", "integrated_gradients"],
-    "lstm": ["permutation", "gradient", "integrated_gradients"],
+BACKEND_EXPLAINERS: dict[BackendName, list[ExplainerName]] = {
+    "xgboost": [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE],
+    "lightgbm": [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE],
+    "mlp": [ExplainerName.PERMUTATION, ExplainerName.GRADIENT, ExplainerName.INTEGRATED_GRADIENTS],
+    "lstm": [ExplainerName.PERMUTATION, ExplainerName.GRADIENT, ExplainerName.INTEGRATED_GRADIENTS],
 }
 
 
@@ -51,7 +52,7 @@ class ExplainArgs:
 
     backend: BackendName
     dataset: DatasetName
-    explainer: SupportedExplainer
+    explainer: ExplainerName
     model_path: str | None
     n_samples: int
     target_class: int
@@ -62,7 +63,7 @@ class ExplainArgs:
         """Initialize with defaults."""
         self.backend = "xgboost"
         self.dataset = "taiwan"
-        self.explainer = "permutation"
+        self.explainer = ExplainerName.PERMUTATION
         self.model_path = None
         self.n_samples = 1000
         self.target_class = 1
@@ -150,27 +151,22 @@ def _parse_dataset(val: str) -> DatasetName:
     raise SystemExit(1)
 
 
-def _parse_explainer(val: str) -> SupportedExplainer:
+def _parse_explainer(val: str) -> ExplainerName:
     """Parse explainer value.
 
     Args:
         val: Explainer name string from CLI.
 
     Returns:
-        Validated explainer name literal.
+        The ExplainerName member the value names.
 
     Raises:
         SystemExit: If explainer name is invalid.
     """
+    explainer = find_member(val, ExplainerName)
+    if explainer is not None:
+        return explainer
     console = get_rich_console()
-    if val == "permutation":
-        return "permutation"
-    if val == "gradient":
-        return "gradient"
-    if val == "integrated_gradients":
-        return "integrated_gradients"
-    if val == "shap_tree":
-        return "shap_tree"
     console.print(
         f"[red]Invalid explainer: {val}. "
         f"Must be permutation, gradient, integrated_gradients, or shap_tree.[/red]"
@@ -200,7 +196,7 @@ def _handle_flag(result: ExplainArgs, arg: str) -> bool:
     return False
 
 
-def validate_explainer_backend(explainer: SupportedExplainer, backend: BackendName) -> None:
+def validate_explainer_backend(explainer: ExplainerName, backend: BackendName) -> None:
     """Validate that explainer is compatible with backend.
 
     Args:

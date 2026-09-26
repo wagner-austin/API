@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, DatasetRegistry, LoadedDataset
 from covenant_ml.explainers.registry import ExplainerRegistration, ExplainerRegistry
-from covenant_ml.explainers.types import ExplainResult, SupportedExplainer
+from covenant_ml.explainers.types import ExplainResult
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from platform_ml.explainers.protocol import FeatureExplainer, PredictorProtocol
@@ -34,7 +34,7 @@ def _make_fake_feature_importances(n_features: int = 10) -> list[FeatureImportan
 
 def _make_fake_explain_result(
     backend: BackendName = "xgboost",
-    explainer: SupportedExplainer = "permutation",
+    explainer: ExplainerName = ExplainerName.PERMUTATION,
     n_samples: int = 100,
     n_features: int = 10,
 ) -> ExplainResult:
@@ -54,7 +54,7 @@ def _make_fake_explain_result(
 def _make_fake_run_result(
     backend: BackendName = "xgboost",
     dataset: DatasetNameLiteral = "taiwan",
-    explainer: SupportedExplainer = "permutation",
+    explainer: ExplainerName = ExplainerName.PERMUTATION,
 ) -> ExplainRunResult:
     """Create a fake ExplainRunResult for testing."""
     return {
@@ -82,13 +82,13 @@ class FakePredictor:
 class FakeExplainer:
     """Fake explainer for testing."""
 
-    def __init__(self, name: SupportedExplainer = "permutation") -> None:
+    def __init__(self, name: ExplainerName = ExplainerName.PERMUTATION) -> None:
         """Initialize with explainer name."""
         self._name = name
 
     def explainer_name(self) -> ExplainerName:
         """Return the explainer name."""
-        return ExplainerName.PERMUTATION
+        return self._name
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
@@ -178,8 +178,6 @@ def _make_fake_explainer_registry() -> ExplainerRegistry:
         compatible_backends=backends,
         requires_gradients=False,
     )
-    registry.register("permutation", registration)
-    registry.register("shap_tree", registration)
-    registry.register("gradient", registration)
-    registry.register("integrated_gradients", registration)
+    for name in ExplainerName:
+        registry.register(name, registration)
     return registry

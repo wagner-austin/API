@@ -12,6 +12,7 @@ import pytest
 import scripts._test_hooks as _hooks
 from covenant_ml.datasets import DatasetConfig, LoadedDataset
 from covenant_ml.explainers.registry import ExplainerRegistration, ExplainerRegistry
+from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import BackendName
 from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
@@ -141,7 +142,7 @@ class TestRunExplanation:
             run_explanation(
                 backend="xgboost",
                 dataset="taiwan",
-                explainer="permutation",
+                explainer=ExplainerName.PERMUTATION,
                 model_path="/nonexistent/model.ubj",
                 n_samples=100,
                 target_class=1,
@@ -175,7 +176,7 @@ class TestRunExplanation:
                     compatible_backends=backends,
                     requires_gradients=True,
                 )
-                registry.register("gradient", registration)
+                registry.register(ExplainerName.GRADIENT, registration)
                 return registry
 
             _hooks.explainer_registry_factory = fake_registry_incompatible
@@ -184,7 +185,7 @@ class TestRunExplanation:
                 run_explanation(
                     backend="xgboost",
                     dataset="taiwan",
-                    explainer="gradient",
+                    explainer=ExplainerName.GRADIENT,
                     model_path=temp_path,
                     n_samples=100,
                     target_class=1,
@@ -239,7 +240,7 @@ class TestRunExplanation:
                 result = run_explanation(
                     backend="xgboost",
                     dataset="taiwan",
-                    explainer="permutation",
+                    explainer=ExplainerName.PERMUTATION,
                     model_path=temp_path,
                     n_samples=50,
                     target_class=1,
@@ -248,7 +249,7 @@ class TestRunExplanation:
                 # Verify result structure
                 assert result["backend"] == "xgboost"
                 assert result["dataset"] == "taiwan"
-                assert result["explainer"] == "permutation"
+                assert result["explainer"] is ExplainerName.PERMUTATION
                 assert result["result"]["status"] == "complete"
                 assert result["elapsed"] > 0.0
                 # Check first feature importance has expected structure
@@ -273,7 +274,7 @@ class TestRunExplanation:
             run_explanation(
                 backend="lstm",
                 dataset="polish",
-                explainer="permutation",
+                explainer=ExplainerName.PERMUTATION,
                 model_path=None,  # Use default
                 n_samples=100,
                 target_class=1,
@@ -333,7 +334,7 @@ class TestMainValueErrorHandler:
                     compatible_backends=backends,
                     requires_gradients=False,
                 )
-                registry.register("permutation", registration)
+                registry.register(ExplainerName.PERMUTATION, registration)
                 return registry
 
             _hooks.explainer_registry_factory = fake_registry_rejects_permutation
