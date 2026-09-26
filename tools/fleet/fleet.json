@@ -81,7 +81,7 @@
         "max_disk_gb": 40.0
       },
       "enabled": true,
-      "test_database": false
+      "test_database": true
     },
     "serendipity": {
       "host": "serendipity",
