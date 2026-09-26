@@ -60,7 +60,7 @@ def timestamp_game_log_entries(entries: list[GameLogEntry]) -> list[GameLogEntry
         GameLogEntryWithTimestamp(
             timestamp_ms=now,
             text=entry["text"],
-            category=entry["category"],
+            category=entry["category"].value,
         )
         for entry in entries
     ]

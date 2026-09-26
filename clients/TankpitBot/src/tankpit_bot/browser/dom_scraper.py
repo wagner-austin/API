@@ -7,7 +7,8 @@ with visible in-game messages.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
@@ -20,6 +21,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import require_member
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 
@@ -31,9 +33,17 @@ log = get_logger(__name__)
 # =============================================================================
 
 
-LogCategory = Literal[
-    "location", "action", "combat", "equipment", "teleport", "tip", "fuel", "other"
-]
+class LogCategory(StrEnum):
+    """What kind of game-log line an entry is, from its prefix or wording."""
+
+    LOCATION = "location"
+    ACTION = "action"
+    COMBAT = "combat"
+    EQUIPMENT = "equipment"
+    TELEPORT = "teleport"
+    TIP = "tip"
+    FUEL = "fuel"
+    OTHER = "other"
 
 
 class GameLogEntry(TypedDict):
@@ -235,27 +245,27 @@ def categorize_log_line(line: str) -> LogCategory:
         line: A single log line.
 
     Returns:
-        Category string for the log entry.
+        Category of the log entry.
     """
     # Check prefix-based categories first
     if line.startswith("LOCATION:"):
-        return "location"
+        return LogCategory.LOCATION
     if line.startswith("Teleporting to"):
-        return "teleport"
+        return LogCategory.TELEPORT
     if line.startswith("Tip"):
-        return "tip"
+        return LogCategory.TIP
 
     # Pattern-based matching (case-insensitive)
     line_lower = line.lower()
 
     if any(p in line_lower for p in _EQUIPMENT_PATTERNS):
-        return "equipment"
+        return LogCategory.EQUIPMENT
     if any(p in line_lower for p in _COMBAT_PATTERNS):
-        return "combat"
+        return LogCategory.COMBAT
     if any(p in line_lower for p in _ACTION_PATTERNS):
-        return "action"
+        return LogCategory.ACTION
 
-    return "other"
+    return LogCategory.OTHER
 
 
 def parse_game_log(raw_text: str) -> GameLogState:
@@ -353,7 +363,7 @@ class GameLogScraper:
         """
         new_entries = self.get_new_entries()
         for entry in new_entries:
-            prefix = f"[GAME:{entry['category'].upper()}]"
+            prefix = f"[GAME:{entry['category'].value.upper()}]"
             log.info("%s %s", prefix, entry["text"])
 
 
@@ -373,7 +383,7 @@ def encode_game_log_entry(entry: GameLogEntry) -> JSONObject:
     """
     return {
         "text": entry["text"],
-        "category": entry["category"],
+        "category": entry["category"].value,
     }
 
 
@@ -393,40 +403,6 @@ def encode_game_log_state(state: GameLogState) -> JSONObject:
     }
 
 
-VALID_CATEGORIES: frozenset[str] = frozenset(
-    ["location", "action", "combat", "equipment", "teleport", "tip", "other"]
-)
-
-
-def validate_log_category(value: str) -> LogCategory:
-    """Validate and narrow a string to a LogCategory literal.
-
-    Args:
-        value: String value to validate.
-
-    Returns:
-        The validated category as a Literal type.
-
-    Raises:
-        ValueError: If value is not a valid category.
-    """
-    if value == "location":
-        return "location"
-    if value == "action":
-        return "action"
-    if value == "combat":
-        return "combat"
-    if value == "equipment":
-        return "equipment"
-    if value == "teleport":
-        return "teleport"
-    if value == "tip":
-        return "tip"
-    if value == "other":
-        return "other"
-    raise ValueError(f"Invalid category '{value}', must be one of {VALID_CATEGORIES}")
-
-
 def decode_game_log_entry(obj: JSONObject) -> GameLogEntry:
     """Decode JSON object to GameLogEntry.
 
@@ -437,12 +413,11 @@ def decode_game_log_entry(obj: JSONObject) -> GameLogEntry:
         Validated GameLogEntry.
 
     Raises:
-        JSONTypeError: If required fields are missing or have wrong types.
-        ValueError: If category is not a valid value.
+        JSONTypeError: If required fields are missing or have wrong types, or
+            if ``category`` is not a :class:`LogCategory`.
     """
     text = require_str(obj, "text")
-    category_str = require_str(obj, "category")
-    category = validate_log_category(category_str)
+    category = require_member(obj, "category", LogCategory)
     return GameLogEntry(text=text, category=category)
 
 
@@ -471,7 +446,6 @@ def decode_game_log_state(obj: JSONObject) -> GameLogState:
 
 
 __all__ = [
-    "VALID_CATEGORIES",
     "GameLogEntry",
     "GameLogScraper",
     "GameLogState",
@@ -484,5 +458,4 @@ __all__ = [
     "parse_game_log",
     "scrape_game_log_text",
     "scrape_page_text",
-    "validate_log_category",
 ]
