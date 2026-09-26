@@ -502,12 +502,12 @@ def test_browser_session_process_game_log_entry_logs_each_entry() -> None:
     2026-06-19 (only the sniffer needs per-capture forensic stats);
     the base class now just logs each entry at INFO.
     """
-    from tankpit_bot.browser.dom_scraper import GameLogEntry
+    from tankpit_bot.browser.dom_scraper import GameLogEntry, LogCategory
 
     session = BrowserSession("https://example.com")
-    combat = GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
+    combat = GameLogEntry(text="You hit Tank123 for 50 damage", category=LogCategory.COMBAT)
     session._process_game_log_entry(combat)
-    non_combat = GameLogEntry(text="Zoom in", category="action")
+    non_combat = GameLogEntry(text="Zoom in", category=LogCategory.ACTION)
     session._process_game_log_entry(non_combat)
 
 
