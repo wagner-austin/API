@@ -6,7 +6,11 @@ from typing import Literal, Protocol
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseOverlapDict
+from tankpit_bot.action_lab.action_trace_types import (
+    ActionPhaseCycleDict,
+    ActionPhaseName,
+    ActionPhaseOverlapDict,
+)
 from tankpit_bot.action_lab.equipment_pickup import (
     get_completed_equipment_pickup_outcome,
     total_inventory_count,
@@ -73,7 +77,7 @@ class EquipmentProbePickupContextProtocol(
 
     def _start_action_phase(
         self,
-        phase: Literal["move", "pickup"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
@@ -465,8 +469,8 @@ def run_pickup_attempt_for_probe(
     self_state_before_pickup = probe._require_self_state()
     inventory_count_before_pickup = total_inventory_count(get_inventory_state(probe.world))
     pickup_started_ms = action_hooks.get_current_time_ms()
-    move_cycle = probe._start_action_phase("move", attempt_label=target["label"])
-    pickup_cycle = probe._start_action_phase("pickup", attempt_label=target["label"])
+    move_cycle = probe._start_action_phase(ActionPhaseName.MOVE, attempt_label=target["label"])
+    pickup_cycle = probe._start_action_phase(ActionPhaseName.PICKUP, attempt_label=target["label"])
     timeout_ms = effective_equipment_pickup_timeout_ms(
         current_x=self_state_before_pickup["x"],
         current_y=self_state_before_pickup["y"],

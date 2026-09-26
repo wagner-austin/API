@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
@@ -13,40 +13,19 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
-from tankpit_bot.types.constants import (
-    ContainerRefreshKind,
-    decode_container_refresh_kind,
-    encode_container_refresh_kind,
-)
-
-ActionPhaseName = Literal["teleport", "radar", "move", "pickup"]
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 
-def decode_action_phase_name(data: JSONObject, field: str) -> ActionPhaseName:
-    """Decode an action phase name from a JSON object.
+class ActionPhaseName(StrEnum):
+    """Which action a traced phase cycle belongs to."""
 
-    Args:
-        data: Source JSON object.
-        field: Field name to validate.
-
-    Returns:
-        Validated action phase name.
-
-    Raises:
-        JSONTypeError: If the field is not a supported action phase.
-    """
-    raw = require_str(data, field)
-    if raw == "teleport":
-        return "teleport"
-    if raw == "radar":
-        return "radar"
-    if raw == "move":
-        return "move"
-    if raw == "pickup":
-        return "pickup"
-    raise JSONTypeError(f"Field '{field}' has invalid action phase: {raw}")
+    TELEPORT = "teleport"
+    RADAR = "radar"
+    MOVE = "move"
+    PICKUP = "pickup"
 
 
 class ActionPhaseCycleDict(TypedDict):
@@ -78,7 +57,7 @@ class FuelDecisionCandidateDict(TypedDict):
     selected: bool
     actionable: bool
     reason: str
-    source: Literal["viewport", "radar", "world_state"]
+    source: EntitySource
     refresh_kind: ContainerRefreshKind
     refresh_timestamp_ms: int
     age_ms: int
@@ -106,7 +85,7 @@ def _encode_optional_int(value: int | None) -> JSONValue:
 def encode_action_phase_cycle(cycle: ActionPhaseCycleDict) -> JSONObject:
     """Encode an action phase cycle."""
     return {
-        "phase": cycle["phase"],
+        "phase": cycle["phase"].value,
         "cycle_id": cycle["cycle_id"],
         "started_ms": cycle["started_ms"],
     }
@@ -115,7 +94,7 @@ def encode_action_phase_cycle(cycle: ActionPhaseCycleDict) -> JSONObject:
 def decode_action_phase_cycle(data: JSONObject) -> ActionPhaseCycleDict:
     """Decode an action phase cycle."""
     return ActionPhaseCycleDict(
-        phase=decode_action_phase_name(data, "phase"),
+        phase=require_member(data, "phase", ActionPhaseName),
         cycle_id=require_int(data, "cycle_id"),
         started_ms=require_int(data, "started_ms"),
     )
@@ -124,10 +103,10 @@ def decode_action_phase_cycle(data: JSONObject) -> ActionPhaseCycleDict:
 def encode_action_phase_overlap(overlap: ActionPhaseOverlapDict) -> JSONObject:
     """Encode an action phase overlap event."""
     return {
-        "active_phase": overlap["active_phase"],
+        "active_phase": overlap["active_phase"].value,
         "active_cycle_id": overlap["active_cycle_id"],
         "active_started_ms": overlap["active_started_ms"],
-        "next_phase": overlap["next_phase"],
+        "next_phase": overlap["next_phase"].value,
         "next_cycle_id": overlap["next_cycle_id"],
         "next_started_ms": overlap["next_started_ms"],
     }
@@ -136,10 +115,10 @@ def encode_action_phase_overlap(overlap: ActionPhaseOverlapDict) -> JSONObject:
 def decode_action_phase_overlap(data: JSONObject) -> ActionPhaseOverlapDict:
     """Decode an action phase overlap event."""
     return ActionPhaseOverlapDict(
-        active_phase=decode_action_phase_name(data, "active_phase"),
+        active_phase=require_member(data, "active_phase", ActionPhaseName),
         active_cycle_id=require_int(data, "active_cycle_id"),
         active_started_ms=require_int(data, "active_started_ms"),
-        next_phase=decode_action_phase_name(data, "next_phase"),
+        next_phase=require_member(data, "next_phase", ActionPhaseName),
         next_cycle_id=require_int(data, "next_cycle_id"),
         next_started_ms=require_int(data, "next_started_ms"),
     )
@@ -155,8 +134,8 @@ def encode_fuel_decision_candidate(candidate: FuelDecisionCandidateDict) -> JSON
         "selected": candidate["selected"],
         "actionable": candidate["actionable"],
         "reason": candidate["reason"],
-        "source": candidate["source"],
-        "refresh_kind": encode_container_refresh_kind(candidate["refresh_kind"]),
+        "source": candidate["source"].value,
+        "refresh_kind": candidate["refresh_kind"].value,
         "refresh_timestamp_ms": candidate["refresh_timestamp_ms"],
         "age_ms": candidate["age_ms"],
     }
@@ -172,26 +151,11 @@ def decode_fuel_decision_candidate(data: JSONObject) -> FuelDecisionCandidateDic
         selected=require_bool(data, "selected"),
         actionable=require_bool(data, "actionable"),
         reason=require_str(data, "reason"),
-        source=_decode_entity_source(data, "source"),
-        refresh_kind=decode_container_refresh_kind(data, "refresh_kind"),
+        source=require_member(data, "source", EntitySource),
+        refresh_kind=require_member(data, "refresh_kind", ContainerRefreshKind),
         refresh_timestamp_ms=require_int(data, "refresh_timestamp_ms"),
         age_ms=require_int(data, "age_ms"),
     )
-
-
-def _decode_entity_source(
-    data: JSONObject,
-    field: str,
-) -> Literal["viewport", "radar", "world_state"]:
-    """Decode a coarse entity source for a fuel candidate."""
-    raw = require_str(data, field)
-    if raw == "viewport":
-        return "viewport"
-    if raw == "radar":
-        return "radar"
-    if raw == "world_state":
-        return "world_state"
-    raise JSONTypeError(f"Field '{field}' has invalid entity source: {raw}")
 
 
 def encode_fuel_decision_basis(basis: FuelDecisionBasisDict) -> JSONObject:
@@ -254,7 +218,6 @@ __all__ = [
     "FuelDecisionBasisDict",
     "FuelDecisionCandidateDict",
     "decode_action_phase_cycle",
-    "decode_action_phase_name",
     "decode_action_phase_overlap",
     "decode_fuel_decision_basis",
     "decode_fuel_decision_candidate",

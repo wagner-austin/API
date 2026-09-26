@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseName
 from tankpit_bot.action_lab.enemy_tracking_codecs import encode_enemy_tracking_probe_session
 from tankpit_bot.action_lab.enemy_tracking_records import (
     _build_sample_observations,
@@ -153,7 +154,9 @@ class EnemyTrackingProbe(ProbeBase):
             x=landing_x,
             y=landing_y,
         )
-        teleport_cycle = self._start_action_phase("teleport", attempt_label=landing["label"])
+        teleport_cycle = self._start_action_phase(
+            ActionPhaseName.TELEPORT, attempt_label=landing["label"]
+        )
         teleport_result, _started_ms = run_tracked_teleport_command(
             page,
             self,

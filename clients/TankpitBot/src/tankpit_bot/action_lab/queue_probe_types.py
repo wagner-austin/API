@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal
 
 from platform_core.json_utils import (
@@ -12,6 +13,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
@@ -20,11 +22,13 @@ from tankpit_bot.action_lab.types_codecs import (
     encode_teleport_startup_timing,
 )
 
-QueueExperimentKind = Literal[
-    "shoot_then_pickup",
-    "shoot_then_shoot",
-    "move_then_pickup",
-]
+
+class QueueExperimentKind(StrEnum):
+    """Which two-command queue experiment a probe run performs."""
+
+    SHOOT_THEN_PICKUP = "shoot_then_pickup"
+    SHOOT_THEN_SHOOT = "shoot_then_shoot"
+    MOVE_THEN_PICKUP = "move_then_pickup"
 
 
 class QueueCommandTimingDict(TypedDict):
@@ -80,18 +84,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
     return raw
 
 
-def _require_experiment_kind(data: JSONObject, field: str) -> QueueExperimentKind:
-    """Validate an experiment kind field."""
-    raw = require_str(data, field)
-    if raw == "shoot_then_pickup":
-        return "shoot_then_pickup"
-    if raw == "shoot_then_shoot":
-        return "shoot_then_shoot"
-    if raw == "move_then_pickup":
-        return "move_then_pickup"
-    raise JSONTypeError(f"Field '{field}' has invalid experiment kind: {raw}")
-
-
 def _require_experiment_status(
     data: JSONObject,
     field: str,
@@ -130,7 +122,7 @@ def decode_queue_command_timing(data: JSONObject) -> QueueCommandTimingDict:
 def encode_queue_experiment_result(result: QueueExperimentResultDict) -> JSONObject:
     """Encode a queue experiment result."""
     return {
-        "kind": result["kind"],
+        "kind": result["kind"].value,
         "status": result["status"],
         "primary": encode_queue_command_timing(result["primary"]),
         "secondary": encode_queue_command_timing(result["secondary"]),
@@ -150,7 +142,7 @@ def decode_queue_experiment_result(data: JSONObject) -> QueueExperimentResultDic
     if not isinstance(secondary_raw, dict):
         raise JSONTypeError("Field 'secondary' must be an object")
     return QueueExperimentResultDict(
-        kind=_require_experiment_kind(data, "kind"),
+        kind=require_member(data, "kind", QueueExperimentKind),
         status=_require_experiment_status(data, "status"),
         primary=decode_queue_command_timing(primary_raw),
         secondary=decode_queue_command_timing(secondary_raw),

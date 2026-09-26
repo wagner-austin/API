@@ -248,7 +248,7 @@ def run_shoot_then_pickup_experiment(
 
     end_ms = action_hooks.get_current_time_ms()
     return QueueExperimentResultDict(
-        kind="shoot_then_pickup",
+        kind=QueueExperimentKind.SHOOT_THEN_PICKUP,
         status=_determine_experiment_status(shoot_ack_ms, pickup_ack_ms),
         primary=_build_command_timing("shoot", shoot_sent_ms, shoot_ack_ms),
         secondary=_build_command_timing("pickup_fuel", pickup_sent_ms, pickup_ack_ms),
@@ -308,7 +308,7 @@ def run_shoot_then_shoot_experiment(
 
     end_ms = action_hooks.get_current_time_ms()
     return QueueExperimentResultDict(
-        kind="shoot_then_shoot",
+        kind=QueueExperimentKind.SHOOT_THEN_SHOOT,
         status=_determine_experiment_status(shoot1_ack_ms, shoot2_ack_ms),
         primary=_build_command_timing("shoot_1", shoot1_sent_ms, shoot1_ack_ms),
         secondary=_build_command_timing("shoot_2", shoot2_sent_ms, shoot2_ack_ms),
@@ -366,7 +366,7 @@ def run_move_then_pickup_experiment(
 
     end_ms = action_hooks.get_current_time_ms()
     return QueueExperimentResultDict(
-        kind="move_then_pickup",
+        kind=QueueExperimentKind.MOVE_THEN_PICKUP,
         status=_determine_experiment_status(move_ack_ms, pickup_ack_ms),
         primary=_build_command_timing("move", move_sent_ms, move_ack_ms),
         secondary=_build_command_timing("pickup_fuel", pickup_sent_ms, pickup_ack_ms),
@@ -397,9 +397,9 @@ def run_single_experiment(
     page.wait_for_timeout(float(_SETTLE_MS))
     action_hooks.drain_buffered_messages(probe, probe.world)
 
-    if kind == "shoot_then_pickup":
+    if kind is QueueExperimentKind.SHOOT_THEN_PICKUP:
         return run_shoot_then_pickup_experiment(probe, timeout_ms=timeout_ms)
-    if kind == "shoot_then_shoot":
+    if kind is QueueExperimentKind.SHOOT_THEN_SHOOT:
         return run_shoot_then_shoot_experiment(probe, timeout_ms=timeout_ms)
     return run_move_then_pickup_experiment(probe, timeout_ms=timeout_ms)
 

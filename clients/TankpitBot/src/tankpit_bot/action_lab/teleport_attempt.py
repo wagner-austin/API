@@ -7,7 +7,7 @@ from typing import Literal, NamedTuple, Protocol
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterProtocol,
@@ -26,7 +26,7 @@ class TeleportAttemptProbeProtocol(TeleportPhaseProbeProtocol, Protocol):
 
     def _start_action_phase(
         self,
-        phase: Literal["teleport"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
@@ -114,7 +114,9 @@ def run_tracked_teleport_attempt(
     if reset_to_idle_before_start:
         probe._reset_probe_state_to_idle()
     message_start_index = len(probe.messages)
-    teleport_cycle = probe._start_action_phase("teleport", attempt_label=attempt_label)
+    teleport_cycle = probe._start_action_phase(
+        ActionPhaseName.TELEPORT, attempt_label=attempt_label
+    )
     (
         acquisition_started_ms,
         acquisition_sync_timestamp_ms,

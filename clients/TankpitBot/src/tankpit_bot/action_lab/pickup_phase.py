@@ -6,7 +6,7 @@ from typing import Literal, Protocol
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
 
 _PICKUP_TIMEOUT_PER_TILE_MS = 500
@@ -26,7 +26,7 @@ class PickupPhaseProbeProtocol(action_session.BufferedWorldStateProviderProtocol
 
     def _start_action_phase(
         self,
-        phase: Literal["move", "pickup"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
@@ -241,8 +241,8 @@ def run_tracked_pickup_phase(
             fails.
     """
     pickup_started_ms = action_hooks.get_current_time_ms()
-    move_cycle = probe._start_action_phase("move", attempt_label=attempt_label)
-    pickup_cycle = probe._start_action_phase("pickup", attempt_label=attempt_label)
+    move_cycle = probe._start_action_phase(ActionPhaseName.MOVE, attempt_label=attempt_label)
+    pickup_cycle = probe._start_action_phase(ActionPhaseName.PICKUP, attempt_label=attempt_label)
     timeout_ms = compute_timeout(
         current_x=current_x,
         current_y=current_y,

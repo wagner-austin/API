@@ -7,7 +7,11 @@ from typing import Literal, Protocol
 
 from tankpit_bot._test_hooks import CDPSessionProtocol, TerrainMapProtocol
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseOverlapDict
+from tankpit_bot.action_lab.action_trace_types import (
+    ActionPhaseCycleDict,
+    ActionPhaseName,
+    ActionPhaseOverlapDict,
+)
 from tankpit_bot.action_lab.equipment_probe_types import EquipmentProbeAttemptResultDict
 from tankpit_bot.action_lab.equipment_target_phase import (
     BuildEquipmentRepositionMapSyncTimeoutResultProtocol,
@@ -49,7 +53,7 @@ class EquipmentCollectionPhaseProbeProtocol(
 
     def _start_action_phase(
         self,
-        phase: Literal["teleport", "radar"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:

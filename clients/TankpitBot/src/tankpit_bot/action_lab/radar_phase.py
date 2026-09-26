@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Protocol
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 
@@ -19,7 +19,7 @@ class RadarPhaseProbeProtocol(action_session.BufferedWorldStateProviderProtocol,
 
     def _start_action_phase(
         self,
-        phase: Literal["radar"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
@@ -70,7 +70,7 @@ def run_tracked_radar_phase(
     """
     action_hooks.drain_buffered_messages(probe, probe.world)
     clear_stale_radar_completion(probe.world)
-    radar_cycle = probe._start_action_phase("radar", attempt_label=attempt_label)
+    radar_cycle = probe._start_action_phase(ActionPhaseName.RADAR, attempt_label=attempt_label)
     radar_started_ms = action_hooks.get_current_time_ms()
     if not probe.use_radar():
         emit_command_dispatch_failure_diagnostic("radar", dispatch_failure_message)

@@ -25,22 +25,12 @@ class ActionCycleTracker:
 
     def __init__(self) -> None:
         """Initialize an empty cycle tracker."""
-        self._next_cycle_id_by_phase: dict[ActionPhaseName, int] = {
-            "teleport": 0,
-            "radar": 0,
-            "move": 0,
-            "pickup": 0,
-        }
+        self._next_cycle_id_by_phase: dict[ActionPhaseName, int] = dict.fromkeys(ActionPhaseName, 0)
         self._active_cycles: dict[ActionPhaseName, ActionPhaseCycleDict] = {}
 
     def reset(self) -> None:
         """Reset all cycle counters and active phases."""
-        self._next_cycle_id_by_phase = {
-            "teleport": 0,
-            "radar": 0,
-            "move": 0,
-            "pickup": 0,
-        }
+        self._next_cycle_id_by_phase = dict.fromkeys(ActionPhaseName, 0)
         self._active_cycles = {}
 
     def begin_phase(

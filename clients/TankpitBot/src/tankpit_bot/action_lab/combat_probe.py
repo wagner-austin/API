@@ -14,6 +14,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseName
 from tankpit_bot.action_lab.combat_probe_types import (
     CombatEngagementDict,
     CombatProbeSessionDict,
@@ -351,7 +352,7 @@ class CombatProbe(ProbeBase):
             y=landing_y,
         )
         teleport_cycle = self._start_action_phase(
-            "teleport",
+            ActionPhaseName.TELEPORT,
             attempt_label=landing_target["label"],
         )
 

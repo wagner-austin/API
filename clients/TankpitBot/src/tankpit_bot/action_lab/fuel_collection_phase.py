@@ -9,6 +9,7 @@ from tankpit_bot._test_hooks import CDPSessionProtocol, TerrainMapProtocol
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseCycleDict,
+    ActionPhaseName,
     ActionPhaseOverlapDict,
     FuelDecisionBasisDict,
 )
@@ -51,7 +52,7 @@ class FuelCollectionPhaseProbeProtocol(action_session.BufferedWorldStateProvider
 
     def _start_action_phase(
         self,
-        phase: Literal["teleport", "radar"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:

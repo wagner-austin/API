@@ -30,11 +30,7 @@ from tankpit_bot.action_lab.queue_probe_types import (
 
 log = get_logger(__name__)
 
-_DEFAULT_EXPERIMENT_KINDS: list[QueueExperimentKind] = [
-    "shoot_then_pickup",
-    "shoot_then_shoot",
-    "move_then_pickup",
-]
+_DEFAULT_EXPERIMENT_KINDS: list[QueueExperimentKind] = list(QueueExperimentKind)
 
 
 class QueueProbe(ProbeBase):
