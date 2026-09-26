@@ -30,7 +30,7 @@ the project's strictness rules.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
@@ -73,12 +73,13 @@ TILE_MIN: int = 0
 TILE_MAX: int = 255
 
 
-InvariantName = Literal[
-    "decision_target_on_map",
-    "decision_does_not_target_self",
-    "decision_does_not_teleport_to_origin_sentinel",
-    "decision_secondary_does_not_duplicate_primary",
-]
+class InvariantName(StrEnum):
+    """Stable name of each universal decision invariant, as violations report it."""
+
+    DECISION_TARGET_ON_MAP = "decision_target_on_map"
+    DECISION_DOES_NOT_TARGET_SELF = "decision_does_not_target_self"
+    DECISION_DOES_NOT_TELEPORT_TO_ORIGIN_SENTINEL = "decision_does_not_teleport_to_origin_sentinel"
+    DECISION_SECONDARY_DOES_NOT_DUPLICATE_PRIMARY = "decision_secondary_does_not_duplicate_primary"
 
 
 class InvariantViolation(TypedDict):
@@ -128,7 +129,7 @@ def check_target_on_map(decision: TickDecisionDict) -> InvariantViolation | None
     target_x, target_y = coords
     if not (TILE_MIN <= target_x <= TILE_MAX and TILE_MIN <= target_y <= TILE_MAX):
         return _make_violation(
-            "decision_target_on_map",
+            InvariantName.DECISION_TARGET_ON_MAP,
             f"target_x={target_x}, target_y={target_y} is off the {TILE_MIN}..{TILE_MAX} map",
         )
     return None
@@ -156,7 +157,7 @@ def check_does_not_target_self(
         case {"cmd_type": "shoot", "target_x": int(target_x), "target_y": int(target_y)}:
             if target_x == self_state["x"] and target_y == self_state["y"]:
                 return _make_violation(
-                    "decision_does_not_target_self",
+                    InvariantName.DECISION_DOES_NOT_TARGET_SELF,
                     f"shoot at ({target_x},{target_y}) which is self's own tile",
                 )
     return None
@@ -192,7 +193,7 @@ def check_does_not_teleport_to_origin_sentinel(
         case {"cmd_type": "teleport", "target_x": int(target_x), "target_y": int(target_y)}:
             if target_x == 0 and target_y == 0:
                 return _make_violation(
-                    "decision_does_not_teleport_to_origin_sentinel",
+                    InvariantName.DECISION_DOES_NOT_TELEPORT_TO_ORIGIN_SENTINEL,
                     "teleport target is (0, 0); this is the unsynced-tank "
                     "sentinel and never a valid teleport target",
                 )
@@ -223,7 +224,7 @@ def check_secondary_does_not_duplicate_primary(
     primary = decision["command"]
     if primary == secondary:
         return _make_violation(
-            "decision_secondary_does_not_duplicate_primary",
+            InvariantName.DECISION_SECONDARY_DOES_NOT_DUPLICATE_PRIMARY,
             f"secondary_command duplicates primary command {primary}",
         )
     return None
@@ -290,7 +291,7 @@ def assert_no_violations(
     violations = check_all_universal_invariants(decision, self_state, inventory)
     if not violations:
         return
-    lines = [f"  - {v['invariant']}: {v['detail']}" for v in violations]
+    lines = [f"  - {v['invariant'].value}: {v['detail']}" for v in violations]
     raise AssertionError("Universal decision invariants failed:\n" + "\n".join(lines))
 
 
