@@ -10,7 +10,7 @@ from .validators import (
     _validate_hex_color,
 )
 
-_DEFAULT_ECC: ECCLevel = "M"
+_DEFAULT_ECC = ECCLevel.M
 _DEFAULT_BOX_SIZE = 10
 _DEFAULT_BORDER = 1
 _DEFAULT_FILL = "#000000"

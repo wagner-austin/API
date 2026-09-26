@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
-ECCLevel = Literal["L", "M", "Q", "H"]
+
+class ECCLevel(StrEnum):
+    """QR error-correction level, as segno and the request body spell it."""
+
+    L = "L"
+    M = "M"
+    Q = "Q"
+    H = "H"
 
 
 class QRPayload(TypedDict, total=False):

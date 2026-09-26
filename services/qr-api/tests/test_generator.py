@@ -7,7 +7,7 @@ import pytest
 
 import qr_api.generator as gen
 from qr_api.generator import _load_segno_module, generate_png
-from qr_api.types import QROptions
+from qr_api.types import ECCLevel, QROptions
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +21,7 @@ def _restore_import_hook() -> Generator[None, None, None]:
 def test_generate_png_with_three_digit_hex() -> None:
     opts = QROptions(
         url="https://example.com",
-        ecc="M",
+        ecc=ECCLevel.M,
         box_size=5,
         border=2,
         fill_color="#0f0",

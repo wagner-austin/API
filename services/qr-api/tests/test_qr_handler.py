@@ -8,6 +8,7 @@ from starlette.requests import Request
 
 from qr_api.api.main import create_app
 from qr_api.settings import load_default_options_from_env
+from qr_api.types import ECCLevel
 from qr_api.validators import _decode_qr_payload
 
 _DEFAULTS = load_default_options_from_env()
@@ -16,7 +17,7 @@ _DEFAULTS = load_default_options_from_env()
 def test_qr_decode_generates_valid_options() -> None:
     opts = _decode_qr_payload({"url": "example.com"}, _DEFAULTS)
     assert opts["url"] == "https://example.com"
-    assert opts["ecc"] == "M"
+    assert opts["ecc"] is ECCLevel.M
     assert opts["box_size"] == 10
 
 

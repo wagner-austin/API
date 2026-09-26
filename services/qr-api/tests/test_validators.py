@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, ErrorCode
 
+from qr_api.types import ECCLevel
 from qr_api.validators import (
     Defaults,
     _decode_qr_payload,
@@ -61,7 +62,7 @@ def test_normalize_url_variants() -> None:
 
 def test_parse_qr_payload_defaults_and_errors() -> None:
     d: Defaults = {
-        "ecc": "M",
+        "ecc": ECCLevel.M,
         "box_size": 10,
         "border": 2,
         "fill_color": "#000000",
@@ -69,7 +70,7 @@ def test_parse_qr_payload_defaults_and_errors() -> None:
     }
     out = _decode_qr_payload({"url": "example.com"}, d)
     assert out["url"].startswith("https://")
-    assert out["ecc"] == d["ecc"]
+    assert out["ecc"] is d["ecc"]
     assert out["box_size"] == d["box_size"]
     assert out["border"] == d["border"]
     assert out["fill_color"] == d["fill_color"]
@@ -91,7 +92,7 @@ def test_parse_qr_payload_defaults_and_errors() -> None:
 
 def test_parse_qr_payload_with_explicit_options() -> None:
     d: Defaults = {
-        "ecc": "M",
+        "ecc": ECCLevel.M,
         "box_size": 10,
         "border": 2,
         "fill_color": "#000000",
@@ -108,7 +109,7 @@ def test_parse_qr_payload_with_explicit_options() -> None:
         },
         d,
     )
-    assert out["ecc"] == "Q"
+    assert out["ecc"] is ECCLevel.Q
     assert out["box_size"] == 12
     assert out["border"] == 3
     assert out["fill_color"] == "#0f0"

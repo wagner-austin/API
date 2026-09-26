@@ -5,6 +5,7 @@ from typing import Final, TypedDict
 
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 from platform_core.validators import load_json_dict
 
 from .types import ECCLevel, QROptions
@@ -96,14 +97,10 @@ def _validate_hex_color(color: str | None, default: str) -> str:
 def _validate_ecc(level: str | None, default: ECCLevel) -> ECCLevel:
     if level is None or level.strip() == "":
         return default
-    up = level.strip().upper()
-    # Segno supports the full set of QR ECC levels; enforce L/M/Q/H selection.
-    allowed: tuple[ECCLevel, ...] = ("L", "M", "Q", "H")
-    if up not in allowed:
+    ecc = find_member(level.strip().upper(), ECCLevel)
+    if ecc is None:
         raise AppError(ErrorCode.INVALID_INPUT, "Invalid error correction. Choose L, M, Q, H")
-    # Return as ECCLevel without casts by mapping through a typed dict
-    mapping: dict[str, ECCLevel] = {"L": "L", "M": "M", "Q": "Q", "H": "H"}
-    return mapping[up]
+    return ecc
 
 
 def _validate_box_size(value: str | int | float | None, default: int) -> int:

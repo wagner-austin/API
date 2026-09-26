@@ -5,6 +5,7 @@ from platform_core.errors import AppError
 
 from qr_api.api import _test_hooks
 from qr_api.settings import load_default_options_from_env
+from qr_api.types import ECCLevel
 
 
 def test_load_defaults_from_env_respects_overrides() -> None:
@@ -19,7 +20,7 @@ def test_load_defaults_from_env_respects_overrides() -> None:
 
     defaults = load_default_options_from_env()
 
-    assert defaults["ecc"] == "H"
+    assert defaults["ecc"] is ECCLevel.H
     assert defaults["box_size"] == 12
     assert defaults["border"] == 3
     assert defaults["fill_color"] == "#123456"
@@ -39,7 +40,7 @@ def test_load_defaults_from_env_returns_defaults() -> None:
 
     defaults = load_default_options_from_env()
 
-    assert defaults["ecc"] == "M"
+    assert defaults["ecc"] is ECCLevel.M
     assert defaults["box_size"] == 10
     assert defaults["border"] == 1
     assert defaults["fill_color"] == "#000000"
