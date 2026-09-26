@@ -13,7 +13,7 @@ import shutil
 import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
-from fleet.core import runner_account, runner_render
+from fleet.core import runner_account, runner_keepalive, runner_render
 from tests._runner_fixtures import a_base
 
 
@@ -103,10 +103,10 @@ class TestWindowsScript:
         assert ".wslconfig" in rendered["windows_script"]
 
     def test_the_keepalive_task_is_registered_and_started(self) -> None:
-        script = runner_render.render_provision(_host())["windows_script"]
-        assert "/tn 'wsl-keepalive'" in script
-        assert "schtasks /run /tn 'wsl-keepalive'" in script
-        assert "sleep infinity" in script
+        spec = _host()
+        script = runner_render.render_provision(spec)["windows_script"]
+        assert "\n".join(runner_keepalive.render_keepalive_lines(spec)) in script
+        assert "schtasks" not in script
 
     def test_a_windows_side_install_joins_the_windows_script(self) -> None:
         spec = _host()
@@ -377,9 +377,11 @@ class TestRerunsOverAHalfBuiltHost:
         assert lines[guard + 3] == "}"
         # The account convergence closes the install, ahead of any seeding
         # its work-tree removal would otherwise undo.
-        assert lines[guard + 4 :] == runner_account.render_service_account_lines(
-            self._install("windows")
-        )
+        install = self._install("windows")
+        assert lines[guard + 4 :] == [
+            *runner_account.render_service_account_lines(install),
+            *runner_account.render_service_running_lines(install),
+        ]
 
     def test_an_install_seeding_nothing_renders_no_toolcache_lines(self) -> None:
         assert runner_render.render_windows_python_toolcache_lines(self._install("windows")) == []

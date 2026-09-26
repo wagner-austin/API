@@ -173,6 +173,36 @@ class TestConvergenceRunsForReal:
         assert (tmp_path / "_work" / "checkout.txt").exists()
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="the lines are PowerShell; run them here")
+class TestStartingRunsForReal:
+    """A stopped service is started; a running one is left alone."""
+
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            ("Stopped", [f"CALL Start-Service {_SERVICE}", f"started {_SERVICE}"]),
+            ("Running", []),
+        ],
+    )
+    def test_the_service_is_left_running(
+        self, tmp_path: pathlib.Path, status: str, expected: list[str]
+    ) -> None:
+        fakes = (
+            "function Get-Service { param([string]$Name) "
+            f"[pscustomobject]@{{ Status = '{status}' }} }}\n"
+            "function Start-Service { param([string]$Name) "
+            "Write-Output ('CALL Start-Service ' + $Name) }\n"
+        )
+        script = tmp_path / "start.ps1"
+        lines = runner_account.render_service_running_lines(_install(tmp_path / "_work"))
+        script.write_text(fakes + "\n".join(lines) + "\n", encoding="utf-8")
+        ran = subprocess.run(
+            [*POWERSHELL_INVOCATION, str(script)], capture_output=True, text=True, check=False
+        )
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout.splitlines() == expected
+
+
 #: The audit's other host-level reads, answered as a laid host answers them.
 _AUDIT_FAKES = """function wsl { $global:LASTEXITCODE = 0; return @('Used', '  46G') }
 function Get-ExecutionPolicy { param([string]$Scope) return 'RemoteSigned' }
