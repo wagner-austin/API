@@ -392,9 +392,11 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
     req_workers = req.get("data_num_workers")
     req_pinmem = req.get("data_pin_memory")
     cpu_count = int(os.cpu_count() or 1)
-    default_workers = min(4, cpu_count) if resolved_device == "cuda" else 0
+    default_workers = min(4, cpu_count) if resolved_device is ResolvedDevice.CUDA else 0
     data_num_workers = default_workers if req_workers is None else int(req_workers)
-    data_pin_memory = (resolved_device == "cuda") if req_pinmem is None else bool(req_pinmem)
+    data_pin_memory = (
+        (resolved_device is ResolvedDevice.CUDA) if req_pinmem is None else bool(req_pinmem)
+    )
 
     # THE DECLARED BATCH SIZE IS THE BATCH SIZE. This used to be handed to
     # `recommended_batch_size_for`, which rewrote any value of 4 or less on

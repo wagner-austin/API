@@ -7,6 +7,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.model import LoraConfig, ModelTrainConfig, QuantizationConfig
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks, reset_hooks
@@ -64,8 +65,8 @@ def make_test_config(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cuda",
-        "precision": "fp16",
+        "device": ResolvedDevice.CUDA,
+        "precision": ResolvedPrecision.FP16,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 3,

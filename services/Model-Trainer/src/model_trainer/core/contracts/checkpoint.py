@@ -19,7 +19,7 @@ and raises ``JSONTypeError`` with a named field on any violation.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from typing import Final
 
 from platform_core.json_utils import (
     JSONObject,
@@ -34,6 +34,8 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.queue_encoding_configs import (
@@ -163,49 +165,6 @@ def decode_epoch_summary(obj: JSONObject) -> EpochSummaryRecord:
     }
 
 
-def _narrow_resolved_device(raw: str) -> Literal["cpu", "cuda"]:
-    """Narrow a resolved device string to its Literal type.
-
-    Args:
-        raw: Raw device string.
-
-    Returns:
-        The narrowed value, one of ``cpu`` or ``cuda``.
-
-    Raises:
-        JSONTypeError: If the value is not a resolved device. ``auto`` is
-            a request-time value and never appears in a resolved config.
-    """
-    if raw == "cpu":
-        return "cpu"
-    if raw == "cuda":
-        return "cuda"
-    raise JSONTypeError(f"Field 'device' must be 'cpu' or 'cuda', got '{raw}'")
-
-
-def _narrow_resolved_precision(raw: str) -> Literal["fp32", "fp16", "bf16"]:
-    """Narrow a resolved precision string to its Literal type.
-
-    Args:
-        raw: Raw precision string.
-
-    Returns:
-        The narrowed value, one of ``fp32``, ``fp16`` or ``bf16``.
-
-    Raises:
-        JSONTypeError: If the value is not a resolved precision. ``auto``
-            is a request-time value and never appears in a resolved
-            config.
-    """
-    if raw == "fp32":
-        return "fp32"
-    if raw == "fp16":
-        return "fp16"
-    if raw == "bf16":
-        return "bf16"
-    raise JSONTypeError(f"Field 'precision' must be 'fp32', 'fp16', or 'bf16', got '{raw}'")
-
-
 def encode_model_train_config(cfg: ModelTrainConfig) -> JSONObject:
     """Encode a ModelTrainConfig to a JSONObject.
 
@@ -292,8 +251,10 @@ def decode_model_train_config(obj: JSONObject) -> ModelTrainConfig:
         "freeze_embed": require_bool(obj, "freeze_embed"),
         "gradient_clipping": require_float(obj, "gradient_clipping"),
         "optimizer": _narrow_optimizer(require_str(obj, "optimizer")),
-        "device": _narrow_resolved_device(require_str(obj, "device")),
-        "precision": _narrow_resolved_precision(require_str(obj, "precision")),
+        # Resolved vocabularies have no 'auto' member: auto is a request-time
+        # word, so a checkpoint config carrying it is refused here.
+        "device": require_member(obj, "device", ResolvedDevice),
+        "precision": require_member(obj, "precision", ResolvedPrecision),
         "data_num_workers": require_int(obj, "data_num_workers"),
         "data_pin_memory": require_bool(obj, "data_pin_memory"),
         "early_stopping_patience": require_int(obj, "early_stopping_patience"),

@@ -9,6 +9,7 @@ from typing import Protocol
 import pytest
 import torch
 from platform_core.errors import AppError
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
@@ -97,14 +98,14 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,

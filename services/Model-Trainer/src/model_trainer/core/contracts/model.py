@@ -4,6 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Literal, Protocol, TypedDict
 
 from platform_core.determinism_record import DeterminismRecord
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -212,8 +213,8 @@ class ModelTrainConfig(TypedDict):
     freeze_embed: bool
     gradient_clipping: float
     optimizer: Literal["adamw", "adam", "sgd"]
-    device: Literal["cpu", "cuda"]
-    precision: Literal["fp32", "fp16", "bf16"]
+    device: ResolvedDevice
+    precision: ResolvedPrecision
     data_num_workers: int
     data_pin_memory: bool
     early_stopping_patience: int

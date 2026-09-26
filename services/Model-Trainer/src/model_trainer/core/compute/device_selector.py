@@ -13,8 +13,6 @@ point ran it. What a payload declares is not a suggestion.
 
 from __future__ import annotations
 
-from typing import Final, Literal
-
 from platform_ml import RequestedDevice as RequestedDevice
 from platform_ml import RequestedPrecision as RequestedPrecision
 from platform_ml import ResolvedDevice as ResolvedDevice
@@ -22,8 +20,3 @@ from platform_ml import ResolvedPrecision as ResolvedPrecision
 from platform_ml import recommended_batch_size as recommended_batch_size
 from platform_ml import resolve_device as resolve_device
 from platform_ml import resolve_precision as resolve_precision
-
-ModelFamily = Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
-
-_CUDA: Final[ResolvedDevice] = "cuda"
-_CPU: Final[ResolvedDevice] = "cpu"

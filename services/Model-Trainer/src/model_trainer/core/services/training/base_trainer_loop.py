@@ -7,6 +7,7 @@ from typing import Literal
 
 import torch
 from platform_core.logging import get_logger
+from platform_ml import ResolvedPrecision
 
 from model_trainer.core.contracts.model import (
     ValidationMetrics,
@@ -354,7 +355,7 @@ class _TrainerLoop(_TrainerCheckpoints):
 
         # Precision setup
         precision = self._cfg["precision"]
-        use_fp16_scaler = precision == "fp16" and self._device.type == "cuda"
+        use_fp16_scaler = precision is ResolvedPrecision.FP16 and self._device.type == "cuda"
         autocast_ctx = _get_autocast_context(precision, self._device)
         scaler: _GradScalerProto | None = _create_grad_scaler() if use_fp16_scaler else None
 

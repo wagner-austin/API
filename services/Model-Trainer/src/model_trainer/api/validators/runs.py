@@ -12,6 +12,7 @@ from platform_core.validators import (
     validate_required_literal,
     validate_str,
 )
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from model_trainer.api.validators.runs_config import (
     _decode_loss_mask_prefix_separator,
@@ -38,8 +39,8 @@ from ..schemas.runs import (
 
 _MODEL_FAMILIES: frozenset[str] = frozenset({"gpt2", "llama", "qwen", "char_lstm", "hf_lm"})
 _OPTIMIZERS: frozenset[str] = frozenset({"adamw", "adam", "sgd"})
-_DEVICES: frozenset[str] = frozenset({"cpu", "cuda", "auto"})
-_PRECISIONS: frozenset[str] = frozenset({"fp32", "fp16", "bf16", "auto"})
+_DEVICES: frozenset[str] = frozenset(RequestedDevice)
+_PRECISIONS: frozenset[str] = frozenset(RequestedPrecision)
 _SPLITS: frozenset[str] = frozenset({"validation", "test"})
 _DETAIL_LEVELS: frozenset[str] = frozenset({"summary", "per_char"})
 #: Derived from the CorpusFormat Literal rather than restated, so the HTTP

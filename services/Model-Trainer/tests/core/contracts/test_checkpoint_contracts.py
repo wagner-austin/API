@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.checkpoint import (
     CHECKPOINT_SCHEMA_VERSION,
@@ -38,8 +39,8 @@ def _make_cfg() -> ModelTrainConfig:
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cuda",
-        "precision": "fp32",
+        "device": ResolvedDevice.CUDA,
+        "precision": ResolvedPrecision.FP32,
         "data_num_workers": 2,
         "data_pin_memory": True,
         "early_stopping_patience": 0,
@@ -130,10 +131,10 @@ class TestModelTrainConfigCodec:
 
     def test_cpu_and_reduced_precision_round_trip(self) -> None:
         cfg = _make_cfg()
-        cfg["device"] = "cpu"
-        cfg["precision"] = "fp16"
+        cfg["device"] = ResolvedDevice.CPU
+        cfg["precision"] = ResolvedPrecision.FP16
         assert decode_model_train_config(encode_model_train_config(cfg)) == cfg
-        cfg["precision"] = "bf16"
+        cfg["precision"] = ResolvedPrecision.BF16
         assert decode_model_train_config(encode_model_train_config(cfg)) == cfg
 
     def test_auto_device_rejected(self) -> None:

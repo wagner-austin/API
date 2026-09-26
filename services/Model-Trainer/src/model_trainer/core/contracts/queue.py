@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from platform_ml import RequestedDevice, RequestedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.model import (
@@ -48,8 +49,8 @@ class TrainRequestPayload(TypedDict):
     freeze_embed: bool
     gradient_clipping: float
     optimizer: Literal["adamw", "adam", "sgd"]
-    device: Literal["cpu", "cuda", "auto"]
-    precision: Literal["fp32", "fp16", "bf16", "auto"]
+    device: RequestedDevice
+    precision: RequestedPrecision
     data_num_workers: int | None
     data_pin_memory: bool | None
     early_stopping_patience: int

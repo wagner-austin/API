@@ -5,6 +5,7 @@ from typing import Literal, Protocol
 
 import pytest
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.config.settings import Settings
@@ -133,14 +134,14 @@ def test_training_and_eval_tiny(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
@@ -314,14 +315,14 @@ def test_cancel_during_eval_returns_partial_results(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,

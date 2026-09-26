@@ -7,6 +7,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks, reset_hooks
@@ -36,8 +37,8 @@ def make_test_config() -> ModelTrainConfig:
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
-        "precision": "fp32",
+        "device": ResolvedDevice.CPU,
+        "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 3,

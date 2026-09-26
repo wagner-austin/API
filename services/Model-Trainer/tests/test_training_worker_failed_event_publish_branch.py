@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal, NoReturn, Protocol
 
 import pytest
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
@@ -101,14 +102,14 @@ def test_training_worker_failed_event_publish_branch(
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
-            "precision": "auto",
+            "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,

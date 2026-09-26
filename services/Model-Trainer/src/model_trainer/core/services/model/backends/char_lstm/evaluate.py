@@ -3,10 +3,10 @@ from __future__ import annotations
 import math
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
-from typing import Literal
 
 import torch
 from platform_core.json_utils import dump_json_str
+from platform_ml import ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetBuilder, DatasetConfig
@@ -22,7 +22,7 @@ from .io import token_ids
 
 
 def _get_autocast_context(
-    precision: Literal["fp32", "fp16", "bf16"], device_type: str
+    precision: ResolvedPrecision, device_type: str
 ) -> AbstractContextManager[None]:
     """Get autocast context manager based on precision and device type.
 
@@ -33,12 +33,12 @@ def _get_autocast_context(
     Returns:
         A context manager for autocast, or nullcontext for fp32/cpu.
     """
-    if precision == "fp32":
+    if precision is ResolvedPrecision.FP32:
         return nullcontext()
     if device_type != "cuda":
         return nullcontext()
     torch_amp = __import__("torch.amp", fromlist=["autocast"])
-    dtype = torch.float16 if precision == "fp16" else torch.bfloat16
+    dtype = torch.float16 if precision is ResolvedPrecision.FP16 else torch.bfloat16
     ctx: AbstractContextManager[None] = torch_amp.autocast(device_type="cuda", dtype=dtype)
     return ctx
 

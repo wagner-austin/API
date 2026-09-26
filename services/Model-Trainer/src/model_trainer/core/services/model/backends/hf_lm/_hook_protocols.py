@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 import torch
 from platform_core.determinism_record import DeterminismRecord
+from platform_ml import ResolvedPrecision
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -414,9 +415,7 @@ class EvalDirFn(Protocol):
 class AutocastContextFn(Protocol):
     """Protocol for getting autocast context manager."""
 
-    def __call__(
-        self, precision: Literal["fp32", "fp16", "bf16"], device_type: str
-    ) -> torch.autocast:
+    def __call__(self, precision: ResolvedPrecision, device_type: str) -> torch.autocast:
         """Get autocast context for precision and device.
 
         Args:

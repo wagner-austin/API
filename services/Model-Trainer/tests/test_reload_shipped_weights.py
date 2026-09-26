@@ -22,6 +22,7 @@ import pytest
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import dump_json_str, load_json_str
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.cartridge import (
     CARTRIDGE_MANIFEST_NAME,
@@ -77,8 +78,8 @@ def _cartridge_cfg() -> ModelTrainConfig:
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
-        "precision": "fp32",
+        "device": ResolvedDevice.CPU,
+        "precision": ResolvedPrecision.FP32,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 3,

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from platform_core.errors import AppError
 from platform_core.job_types import job_key
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
@@ -59,14 +60,14 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
-            "precision": "auto",
+            "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
@@ -133,14 +134,14 @@ def test_training_worker_sets_status_failed_when_corpus_fetch_raises(tmp_path: P
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
-            "precision": "auto",
+            "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,

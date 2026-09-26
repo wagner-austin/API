@@ -6,6 +6,7 @@ import warnings
 
 import pytest
 import torch
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
     UNPINNED,
@@ -26,7 +27,7 @@ def test_setup_device_cuda_not_available() -> None:
 
     _test_hooks.cuda_is_available = lambda: False
 
-    cfg: ModelTrainConfig = {**_make_cfg(), "device": "cuda"}
+    cfg: ModelTrainConfig = {**_make_cfg(), "device": ResolvedDevice.CUDA}
 
     trainer = bt.BaseTrainer(
         _make_prepared(),
@@ -47,7 +48,7 @@ def test_setup_device_cuda_not_available() -> None:
 
 def test_get_autocast_context_fp32_returns_nullcontext() -> None:
     """Test that fp32 precision returns nullcontext (no autocast)."""
-    ctx = bt_grad._get_autocast_context("fp32", torch.device("cpu"))
+    ctx = bt_grad._get_autocast_context(ResolvedPrecision.FP32, torch.device("cpu"))
     # Verify the context is a no-op by entering and exiting it
     with ctx:
         pass  # No exception means it worked
@@ -55,7 +56,7 @@ def test_get_autocast_context_fp32_returns_nullcontext() -> None:
 
 def test_get_autocast_context_fp16_on_cpu_returns_nullcontext() -> None:
     """Test that fp16 on CPU returns nullcontext (autocast only on CUDA)."""
-    ctx = bt_grad._get_autocast_context("fp16", torch.device("cpu"))
+    ctx = bt_grad._get_autocast_context(ResolvedPrecision.FP16, torch.device("cpu"))
     # Verify the context is a no-op by entering and exiting it
     with ctx:
         pass  # No exception means it worked
@@ -63,7 +64,7 @@ def test_get_autocast_context_fp16_on_cpu_returns_nullcontext() -> None:
 
 def test_get_autocast_context_bf16_on_cpu_returns_nullcontext() -> None:
     """Test that bf16 on CPU returns nullcontext (autocast only on CUDA)."""
-    ctx = bt_grad._get_autocast_context("bf16", torch.device("cpu"))
+    ctx = bt_grad._get_autocast_context(ResolvedPrecision.BF16, torch.device("cpu"))
     # Verify the context is a no-op by entering and exiting it
     with ctx:
         pass  # No exception means it worked
@@ -74,7 +75,7 @@ def test_get_autocast_context_fp16_on_cuda() -> None:
     # Create a mock CUDA device (doesn't require actual CUDA)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ctx = bt_grad._get_autocast_context("fp16", torch.device("cuda"))
+        ctx = bt_grad._get_autocast_context(ResolvedPrecision.FP16, torch.device("cuda"))
         # Verify the context can be entered and exited
         with ctx:
             pass  # Autocast context entered successfully
@@ -84,7 +85,7 @@ def test_get_autocast_context_bf16_on_cuda() -> None:
     """Test that bf16 on CUDA returns autocast context."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ctx = bt_grad._get_autocast_context("bf16", torch.device("cuda"))
+        ctx = bt_grad._get_autocast_context(ResolvedPrecision.BF16, torch.device("cuda"))
         # Verify the context can be entered and exited
         with ctx:
             pass  # Autocast context entered successfully
@@ -126,7 +127,7 @@ def test_train_one_epoch_fp16_scaler_paths() -> None:
     optim = torch.optim.SGD([model._p], lr=0.01)
 
     # Create config with fp16 precision
-    cfg: ModelTrainConfig = {**_make_cfg(), "precision": "fp16"}
+    cfg: ModelTrainConfig = {**_make_cfg(), "precision": ResolvedPrecision.FP16}
 
     trainer = bt.BaseTrainer(
         _make_prepared(),
@@ -165,7 +166,7 @@ def test_evaluate_get_autocast_context_cuda_fp16() -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ctx = char_eval._get_autocast_context("fp16", "cuda")
+        ctx = char_eval._get_autocast_context(ResolvedPrecision.FP16, "cuda")
         with ctx:
             pass  # Autocast context entered successfully
 
@@ -176,7 +177,7 @@ def test_evaluate_get_autocast_context_cuda_bf16() -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ctx = char_eval._get_autocast_context("bf16", "cuda")
+        ctx = char_eval._get_autocast_context(ResolvedPrecision.BF16, "cuda")
         with ctx:
             pass  # Autocast context entered successfully
 
@@ -185,7 +186,7 @@ def test_evaluate_get_autocast_context_cpu_fp16() -> None:
     """Test char_lstm evaluate._get_autocast_context with fp16 on CPU returns nullcontext."""
     from model_trainer.core.services.model.backends.char_lstm import evaluate as char_eval
 
-    ctx = char_eval._get_autocast_context("fp16", "cpu")
+    ctx = char_eval._get_autocast_context(ResolvedPrecision.FP16, "cpu")
     with ctx:
         pass  # Returns nullcontext on non-cuda
 
@@ -196,7 +197,7 @@ def test_gpt2_evaluate_get_autocast_context_cuda_fp16() -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ctx = gpt2_eval._get_autocast_context("fp16", "cuda")
+        ctx = gpt2_eval._get_autocast_context(ResolvedPrecision.FP16, "cuda")
         with ctx:
             pass  # Autocast context entered successfully
 
@@ -207,7 +208,7 @@ def test_gpt2_evaluate_get_autocast_context_cuda_bf16() -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ctx = gpt2_eval._get_autocast_context("bf16", "cuda")
+        ctx = gpt2_eval._get_autocast_context(ResolvedPrecision.BF16, "cuda")
         with ctx:
             pass  # Autocast context entered successfully
 
@@ -216,7 +217,7 @@ def test_gpt2_evaluate_get_autocast_context_cpu_fp16() -> None:
     """Test gpt2 evaluate._get_autocast_context with fp16 on CPU returns nullcontext."""
     from model_trainer.core.services.model.backends.gpt2 import evaluate as gpt2_eval
 
-    ctx = gpt2_eval._get_autocast_context("fp16", "cpu")
+    ctx = gpt2_eval._get_autocast_context(ResolvedPrecision.FP16, "cpu")
     with ctx:
         pass  # Returns nullcontext on non-cuda
 
@@ -227,7 +228,7 @@ def test_setup_device_cuda_available() -> None:
 
     _test_hooks.cuda_is_available = lambda: True
 
-    cfg: ModelTrainConfig = {**_make_cfg(), "device": "cuda"}
+    cfg: ModelTrainConfig = {**_make_cfg(), "device": ResolvedDevice.CUDA}
 
     trainer = bt.BaseTrainer(
         _make_prepared(),

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import torch
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
     UNPINNED,
@@ -293,14 +294,14 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
@@ -382,14 +383,14 @@ def test_train_prepared_skips_save_when_cancelled(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,

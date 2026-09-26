@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal, NotRequired
 
 from platform_core.comparability import RunFingerprint
+from platform_ml import RequestedDevice, RequestedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.cloze import ClozeItemOutcome
@@ -121,8 +122,8 @@ class TrainRequest(TypedDict, total=True):
     gradient_clipping: float
     optimizer: Literal["adamw", "adam", "sgd"]
     user_id: int
-    device: Literal["cpu", "cuda", "auto"]
-    precision: Literal["fp32", "fp16", "bf16", "auto"]
+    device: RequestedDevice
+    precision: RequestedPrecision
     # Data loading knobs (optional at API layer; resolved in worker)
     data_num_workers: NotRequired[int | None]
     data_pin_memory: NotRequired[bool | None]

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from contextlib import AbstractContextManager, nullcontext
-from typing import Literal, Protocol
+from typing import Protocol
 
 import torch
 from platform_core.logging import get_logger
+from platform_ml import ResolvedPrecision
 
 from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.types import (
@@ -97,7 +98,7 @@ def _freeze_embeddings(model: LMModelProto) -> None:
 
 
 def _get_autocast_context(
-    precision: Literal["fp32", "fp16", "bf16"], device: torch.device
+    precision: ResolvedPrecision, device: torch.device
 ) -> AbstractContextManager[None]:
     """Get autocast context manager based on precision and device.
 
@@ -108,13 +109,13 @@ def _get_autocast_context(
     Returns:
         A context manager for autocast, or nullcontext for fp32.
     """
-    if precision == "fp32":
+    if precision is ResolvedPrecision.FP32:
         return nullcontext()
     if device.type != "cuda":
         return nullcontext()
     # Get autocast from torch.amp (PyTorch 2.0+ API)
     torch_amp = __import__("torch.amp", fromlist=["autocast"])
-    dtype = torch.float16 if precision == "fp16" else torch.bfloat16
+    dtype = torch.float16 if precision is ResolvedPrecision.FP16 else torch.bfloat16
     ctx: AbstractContextManager[None] = torch_amp.autocast(device_type="cuda", dtype=dtype)
     return ctx
 

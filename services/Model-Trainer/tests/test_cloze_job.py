@@ -19,6 +19,7 @@ from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, cloze_key
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from platform_workers.testing import FakeRedis as _FakeRedis
 
 from model_trainer.core import _test_hooks
@@ -127,14 +128,14 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,

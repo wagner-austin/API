@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.model import (
     GgufExportConfig,
@@ -46,8 +47,8 @@ class TestQueueEncodingRoundTrip:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cuda",
-            "precision": "fp16",
+            "device": RequestedDevice.CUDA,
+            "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
             "data_pin_memory": True,
             "early_stopping_patience": 3,
@@ -96,8 +97,8 @@ class TestQueueEncodingRoundTrip:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cuda",
-            "precision": "fp16",
+            "device": RequestedDevice.CUDA,
+            "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
             "data_pin_memory": True,
             "early_stopping_patience": 3,
@@ -142,8 +143,8 @@ class TestQueueEncodingRoundTrip:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cuda",
-            "precision": "fp16",
+            "device": RequestedDevice.CUDA,
+            "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
             "data_pin_memory": True,
             "early_stopping_patience": 3,
@@ -187,8 +188,8 @@ class TestQueueEncodingRoundTrip:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cuda",
-            "precision": "fp16",
+            "device": RequestedDevice.CUDA,
+            "precision": RequestedPrecision.FP16,
             "data_num_workers": 0,
             "data_pin_memory": True,
             "early_stopping_patience": 3,
@@ -400,14 +401,14 @@ class TestTrainingJobWithGgufExport:
                 "freeze_embed": False,
                 "gradient_clipping": 1.0,
                 "optimizer": "adamw",
-                "device": "cpu",
+                "device": RequestedDevice.CPU,
                 "data_num_workers": None,
                 "data_pin_memory": None,
                 "early_stopping_patience": 5,
                 "test_split_ratio": 0.15,
                 "finetune_lr_cap": 5e-5,
                 "loss_mask_prefix_separator": None,
-                "precision": "fp32",
+                "precision": RequestedPrecision.FP32,
                 "hub_model_id": "meta-llama/Llama-2-7b-hf",
                 "finetuning_strategy": "lora",
                 "lora": LoraConfig(

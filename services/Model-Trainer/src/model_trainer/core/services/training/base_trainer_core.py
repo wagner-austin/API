@@ -12,6 +12,7 @@ from pathlib import Path
 import torch
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.logging import get_logger
+from platform_ml import ResolvedDevice
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core import _test_hooks
@@ -257,8 +258,7 @@ class _TrainerCore:
         Raises:
             RuntimeError: If CUDA requested but not available.
         """
-        device_str = self._cfg["device"]
-        if device_str == "cuda":
+        if self._cfg["device"] is ResolvedDevice.CUDA:
             if not _test_hooks.cuda_is_available():
                 raise RuntimeError("CUDA requested but not available")
             return _test_hooks.torch_device("cuda")

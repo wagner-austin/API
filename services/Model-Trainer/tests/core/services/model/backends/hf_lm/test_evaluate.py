@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 
+from platform_ml import ResolvedPrecision
+
 from model_trainer.core.services.model.backends.hf_lm.evaluate import (
     EvalResult,
     _get_autocast_context,
@@ -15,13 +17,13 @@ class TestGetAutocastContext:
 
     def test_returns_nullcontext_for_fp32(self) -> None:
         """Test that fp32 precision returns nullcontext."""
-        ctx = _get_autocast_context("fp32", "cuda")
+        ctx = _get_autocast_context(ResolvedPrecision.FP32, "cuda")
         assert type(ctx) is type(nullcontext())
 
     def test_returns_nullcontext_for_cpu(self) -> None:
         """Test that CPU device returns nullcontext regardless of precision."""
-        ctx_fp16 = _get_autocast_context("fp16", "cpu")
-        ctx_bf16 = _get_autocast_context("bf16", "cpu")
+        ctx_fp16 = _get_autocast_context(ResolvedPrecision.FP16, "cpu")
+        ctx_bf16 = _get_autocast_context(ResolvedPrecision.BF16, "cpu")
         assert type(ctx_fp16) is type(nullcontext())
         assert type(ctx_bf16) is type(nullcontext())
 

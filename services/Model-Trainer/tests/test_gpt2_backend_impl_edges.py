@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
+from platform_ml import ResolvedDevice, ResolvedPrecision
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -73,14 +75,14 @@ def test_gpt2_backend_impl_name_and_type_errors(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,

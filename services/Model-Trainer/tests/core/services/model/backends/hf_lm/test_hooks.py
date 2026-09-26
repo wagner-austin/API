@@ -8,6 +8,7 @@ from typing import Protocol
 
 import pytest
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
@@ -481,8 +482,8 @@ class TestDefaultCreateTrainer:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
-            "precision": "fp32",
+            "device": ResolvedDevice.CPU,
+            "precision": ResolvedPrecision.FP32,
             "data_num_workers": 0,
             "data_pin_memory": False,
             "early_stopping_patience": 3,

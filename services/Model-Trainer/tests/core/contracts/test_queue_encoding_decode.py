@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.queue import TrainJobPayload, TrainRequestPayload
 from model_trainer.core.contracts.queue_encoding import (
@@ -36,8 +37,8 @@ class TestTrainRequestPayloadEncoding:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
-            "precision": "fp32",
+            "device": RequestedDevice.CPU,
+            "precision": RequestedPrecision.FP32,
             "data_num_workers": None,
             "data_pin_memory": None,
             "early_stopping_patience": 3,
@@ -288,8 +289,8 @@ class TestTrainJobPayloadEncoding:
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
-            "precision": "fp32",
+            "device": RequestedDevice.CPU,
+            "precision": RequestedPrecision.FP32,
             "data_num_workers": None,
             "data_pin_memory": None,
             "early_stopping_patience": 3,

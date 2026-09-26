@@ -58,26 +58,6 @@ def as_optimizer(s: str) -> Literal["adamw", "adam", "sgd"]:
     raise JSONTypeError(f"Invalid optimizer: {s}")
 
 
-def as_device(s: str) -> Literal["cpu", "cuda"]:
-    """Convert string to device literal type."""
-    if s == "cpu":
-        return "cpu"
-    if s == "cuda":
-        return "cuda"
-    raise JSONTypeError(f"Invalid device: {s}")
-
-
-def as_precision(s: str) -> Literal["fp32", "fp16", "bf16"]:
-    """Convert string to precision literal type."""
-    if s == "fp32":
-        return "fp32"
-    if s == "fp16":
-        return "fp16"
-    if s == "bf16":
-        return "bf16"
-    raise JSONTypeError(f"Invalid precision: {s}")
-
-
 def _decode_manifest_versions(obj: JSONObject) -> TrainingManifestVersions:
     vers = require_dict(obj, "versions")
     return {

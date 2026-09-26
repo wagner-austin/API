@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from platform_ml import ResolvedDevice, ResolvedPrecision
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.model.backends.char_lstm.io import get_model_max_seq_len
@@ -64,14 +66,14 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
+            "device": ResolvedDevice.CPU,
             "data_num_workers": 0,
             "data_pin_memory": False,
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
-            "precision": "fp32",
+            "precision": ResolvedPrecision.FP32,
             "finetuning_strategy": "full",
             "hub_model_id": None,
             "lora": None,
@@ -98,14 +100,14 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
+            "device": ResolvedDevice.CPU,
             "data_num_workers": 0,
             "data_pin_memory": False,
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
-            "precision": "fp32",
+            "precision": ResolvedPrecision.FP32,
             "finetuning_strategy": "full",
             "hub_model_id": None,
             "lora": None,

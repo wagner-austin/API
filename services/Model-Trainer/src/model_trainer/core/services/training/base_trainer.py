@@ -13,6 +13,7 @@ from pathlib import Path
 
 import torch
 from platform_core.logging import get_logger
+from platform_ml import ResolvedDevice
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.model import (
@@ -171,7 +172,7 @@ class BaseTrainer(_TrainerLoop):
         # Get GPU peak memory (None if CPU training)
         peak_gpu_memory_bytes = _test_hooks.gpu_max_memory_allocated()
         peak_gpu_memory_mb: float | None = None
-        if self._cfg["device"] == "cuda" and peak_gpu_memory_bytes > 0:
+        if self._cfg["device"] is ResolvedDevice.CUDA and peak_gpu_memory_bytes > 0:
             peak_gpu_memory_mb = peak_gpu_memory_bytes / (1024 * 1024)
 
         # Compute average throughput

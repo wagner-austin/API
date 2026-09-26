@@ -214,23 +214,6 @@ def test_as_optimizer_variants_and_invalid() -> None:
         _ = manifest.as_optimizer("rmsprop")
 
 
-def test_as_device_variants_and_invalid() -> None:
-    """Cover manifest.py as_device branches (lines 42-46)."""
-    assert manifest.as_device("cpu") == "cpu"
-    assert manifest.as_device("cuda") == "cuda"
-    with pytest.raises(JSONTypeError, match="device"):
-        _ = manifest.as_device("tpu")
-
-
-def test_as_precision_variants_and_invalid() -> None:
-    """Cover manifest.py as_precision branches."""
-    assert manifest.as_precision("fp32") == "fp32"
-    assert manifest.as_precision("fp16") == "fp16"
-    assert manifest.as_precision("bf16") == "bf16"
-    with pytest.raises(JSONTypeError, match="precision"):
-        _ = manifest.as_precision("int8")
-
-
 def test_load_manifest_freeze_embed_must_be_bool() -> None:
     """Cover manifest.py _decode_manifest_bool error case."""
     bad_manifest: dict[str, JSONValue] = {

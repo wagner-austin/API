@@ -21,7 +21,9 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.logging import get_logger
+from platform_core.members import as_member
 from platform_core.trainer_keys import cloze_key
+from platform_ml import ResolvedDevice
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
@@ -38,7 +40,7 @@ from model_trainer.worker.job_utils import (
     redis_client,
     setup_job_logging,
 )
-from model_trainer.worker.manifest import as_device, as_model_family, load_manifest_from_text
+from model_trainer.worker.manifest import as_model_family, load_manifest_from_text
 
 
 class ClozeCacheModel(TypedDict, total=False):
@@ -166,7 +168,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
         backend = container.model_registry.get(as_model_family(manifest["model_family"]))
         prepared = backend.load(str(normalized), settings, tokenizer=tok_handle)
 
-        device = as_device(manifest["device"])
+        device = as_member(manifest["device"], "device", ResolvedDevice)
         fingerprint = capture_run_fingerprint(device, determinism)
 
         result = score_cloze_items(

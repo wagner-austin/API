@@ -7,6 +7,8 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Protocol
 
+from platform_ml import ResolvedPrecision
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
@@ -73,17 +75,17 @@ class TestGetAutocastContext:
 
     def test_returns_nullcontext_for_fp32(self) -> None:
         """Test that fp32 returns nullcontext."""
-        ctx = _get_autocast_context("fp32", "cpu")
+        ctx = _get_autocast_context(ResolvedPrecision.FP32, "cpu")
         assert type(ctx) is type(nullcontext())
 
     def test_returns_nullcontext_for_cpu_fp16(self) -> None:
         """Test that CPU with fp16 returns nullcontext."""
-        ctx = _get_autocast_context("fp16", "cpu")
+        ctx = _get_autocast_context(ResolvedPrecision.FP16, "cpu")
         assert type(ctx) is type(nullcontext())
 
     def test_returns_nullcontext_for_cpu_bf16(self) -> None:
         """Test that CPU with bf16 returns nullcontext."""
-        ctx = _get_autocast_context("bf16", "cpu")
+        ctx = _get_autocast_context(ResolvedPrecision.BF16, "cpu")
         assert type(ctx) is type(nullcontext())
 
     def test_returns_autocast_for_cuda_fp16(self) -> None:
@@ -92,7 +94,7 @@ class TestGetAutocastContext:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            ctx = _get_autocast_context("fp16", "cuda")
+            ctx = _get_autocast_context(ResolvedPrecision.FP16, "cuda")
             # Should not be nullcontext - it's a torch.amp.autocast
             assert type(ctx) is not type(nullcontext())
 
@@ -102,7 +104,7 @@ class TestGetAutocastContext:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            ctx = _get_autocast_context("bf16", "cuda")
+            ctx = _get_autocast_context(ResolvedPrecision.BF16, "cuda")
             # Should not be nullcontext - it's a torch.amp.autocast
             assert type(ctx) is not type(nullcontext())
 

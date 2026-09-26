@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.json_utils import JSONValue
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from platform_ml.testing import WandbTableProtocol
 
 from model_trainer.core.config.settings import Settings
@@ -139,14 +140,14 @@ def _make_cfg() -> ModelTrainConfig:
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,

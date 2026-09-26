@@ -7,6 +7,7 @@ from platform_core.errors import AppError
 from platform_core.job_types import JobStatus
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.trainer_keys import eval_key
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_workers.testing import FakeRedis
 
 from model_trainer.api.schemas.runs import EvaluateRequest, TrainRequest
@@ -97,12 +98,12 @@ def test_orchestrator_unsupported_model_raises() -> None:
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
-        "precision": "auto",
+        "precision": RequestedPrecision.AUTO,
         "data_num_workers": None,
         "data_pin_memory": None,
         "hub_model_id": None,

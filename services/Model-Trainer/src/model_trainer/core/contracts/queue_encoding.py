@@ -24,6 +24,8 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.dataset import require_corpus_format
 from model_trainer.core.contracts.queue_encoding_configs import (
@@ -162,50 +164,6 @@ def _narrow_optimizer(raw: str) -> Literal["adamw", "adam", "sgd"]:
     raise JSONTypeError(f"Field 'optimizer' must be 'adamw', 'adam', or 'sgd', got '{raw}'")
 
 
-def _narrow_device(raw: str) -> Literal["cpu", "cuda", "auto"]:
-    """Narrow device string to Literal type with validation.
-
-    Args:
-        raw: Raw device string.
-
-    Returns:
-        Narrowed Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid device.
-    """
-    if raw == "cpu":
-        return "cpu"
-    if raw == "cuda":
-        return "cuda"
-    if raw == "auto":
-        return "auto"
-    raise JSONTypeError(f"Field 'device' must be 'cpu', 'cuda', or 'auto', got '{raw}'")
-
-
-def _narrow_precision(raw: str) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Narrow precision string to Literal type with validation.
-
-    Args:
-        raw: Raw precision string.
-
-    Returns:
-        Narrowed Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid precision.
-    """
-    if raw == "fp32":
-        return "fp32"
-    if raw == "fp16":
-        return "fp16"
-    if raw == "bf16":
-        return "bf16"
-    if raw == "auto":
-        return "auto"
-    raise JSONTypeError(f"Field 'precision' must be 'fp32', 'fp16', 'bf16', or 'auto', got '{raw}'")
-
-
 def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     """Decode JSONObject to TrainRequestPayload with full validation.
 
@@ -235,8 +193,8 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     freeze_embed = require_bool(obj, "freeze_embed")
     gradient_clipping = require_float(obj, "gradient_clipping")
     optimizer = _narrow_optimizer(require_str(obj, "optimizer"))
-    device = _narrow_device(require_str(obj, "device"))
-    precision = _narrow_precision(require_str(obj, "precision"))
+    device = require_member(obj, "device", RequestedDevice)
+    precision = require_member(obj, "precision", RequestedPrecision)
     data_num_workers = optional_int(obj, "data_num_workers")
     data_pin_memory_raw = obj.get("data_pin_memory")
     data_pin_memory: bool | None

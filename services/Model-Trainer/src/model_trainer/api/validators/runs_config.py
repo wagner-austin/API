@@ -12,6 +12,7 @@ from platform_core.validators import (
     validate_optional_literal,
     validate_required_literal,
 )
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from model_trainer.core.contracts.strategy_names import StrategyName, require_strategy_name
 
@@ -234,26 +235,38 @@ def _narrow_optimizer(raw: str | None) -> Literal["adamw", "adam", "sgd"]:
     return "adamw"
 
 
-def _narrow_device(raw: str | None) -> Literal["cpu", "cuda", "auto"]:
-    """Narrow device string to Literal type."""
-    val = raw if raw is not None else "auto"
-    if val == "cuda":
-        return "cuda"
-    if val == "cpu":
-        return "cpu"
-    return "auto"
+def _narrow_device(raw: str | None) -> RequestedDevice:
+    """Narrow an already-validated device word to its member.
+
+    Args:
+        raw: A word from ``RequestedDevice``, or None when the request
+            omitted the field.
+
+    Returns:
+        The member for ``raw``; AUTO when the field was omitted.
+
+    Raises:
+        ValueError: If ``raw`` is not a device word. The API edge refuses
+            such a request with a 400 before this is called.
+    """
+    return RequestedDevice.AUTO if raw is None else RequestedDevice(raw)
 
 
-def _narrow_precision(raw: str | None) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Narrow precision string to Literal type."""
-    val = raw if raw is not None else "auto"
-    if val == "fp32":
-        return "fp32"
-    if val == "fp16":
-        return "fp16"
-    if val == "bf16":
-        return "bf16"
-    return "auto"
+def _narrow_precision(raw: str | None) -> RequestedPrecision:
+    """Narrow an already-validated precision word to its member.
+
+    Args:
+        raw: A word from ``RequestedPrecision``, or None when the request
+            omitted the field.
+
+    Returns:
+        The member for ``raw``; AUTO when the field was omitted.
+
+    Raises:
+        ValueError: If ``raw`` is not a precision word. The API edge
+            refuses such a request with a 400 before this is called.
+    """
+    return RequestedPrecision.AUTO if raw is None else RequestedPrecision(raw)
 
 
 def _decode_lora_config(d: dict[str, JSONValue]) -> LoraConfigRequest:

@@ -8,6 +8,7 @@ import torch
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.trainer_keys import artifact_file_id_key
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
@@ -404,14 +405,14 @@ def test_training_worker_spm_artifact_and_completed(
             "freeze_embed": False,
             "gradient_clipping": 1.0,
             "optimizer": "adamw",
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "data_num_workers": None,
             "data_pin_memory": None,
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
-            "precision": "auto",
+            "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,

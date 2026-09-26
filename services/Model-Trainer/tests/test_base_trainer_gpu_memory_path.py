@@ -11,6 +11,7 @@ from typing import Literal, Protocol
 
 import torch
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
@@ -118,14 +119,14 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",  # Use CPU for actual tensors
+        "device": ResolvedDevice.CPU,  # Use CPU for actual tensors
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
@@ -176,7 +177,7 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
 
     # Temporarily modify cfg to have device='cuda' to trigger the conditional
     # The actual tensor operations happen on CPU, but the string check passes
-    cfg["device"] = "cuda"
+    cfg["device"] = ResolvedDevice.CUDA
 
     # Track losses during training for loss decrease verification
     train_losses: list[float] = []
@@ -281,14 +282,14 @@ def test_a_cpu_run_records_no_card_even_on_a_cuda_box(
         "freeze_embed": False,
         "gradient_clipping": 1.0,
         "optimizer": "adamw",
-        "device": "cpu",
+        "device": ResolvedDevice.CPU,
         "data_num_workers": 0,
         "data_pin_memory": False,
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
-        "precision": "fp32",
+        "precision": ResolvedPrecision.FP32,
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
