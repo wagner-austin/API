@@ -13,6 +13,7 @@ import pytest
 
 from tankpit_bot.protocol.commands import CMD_MAP_TELEPORT
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.validate.wire_timeline import extract_wire_timeline
 from tests.validate.builders import (
     ENEMY_ID,
@@ -83,20 +84,20 @@ def test_untracked_and_malformed_frames_are_skipped() -> None:
         [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="%%%not-base64%%%",
                 ws_url="wss://tankpit.com/ws",
             ),
             frame_message(200, text_body, "received"),
             CapturedMessage(
                 timestamp_ms=300,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=base64.b64encode(zero_len_frame).decode("ascii"),
                 ws_url="wss://tankpit.com/ws",
             ),
             CapturedMessage(
                 timestamp_ms=400,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=base64.b64encode(overflow_frame).decode("ascii"),
                 ws_url="wss://tankpit.com/ws",
             ),

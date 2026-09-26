@@ -7,6 +7,7 @@ import base64
 import pytest
 
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.validate.shadow_timeline import extract_shadow_timeline
 from tests.validate.builders import (
     ENEMY_ID,
@@ -149,25 +150,25 @@ def test_short_body_below_min_length_is_skipped() -> None:
 def test_unparseable_payloads_yield_no_events() -> None:
     not_base64 = CapturedMessage(
         timestamp_ms=0,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload="!!!not-base64!!!",
         ws_url="wss://tankpit.com/ws",
     )
     too_short = CapturedMessage(
         timestamp_ms=0,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=base64.b64encode(b"\x01\x00").decode("ascii"),
         ws_url="wss://tankpit.com/ws",
     )
     zero_length = CapturedMessage(
         timestamp_ms=0,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=base64.b64encode(b"\x00\x00\x21\x00").decode("ascii"),
         ws_url="wss://tankpit.com/ws",
     )
     torn_frame = CapturedMessage(
         timestamp_ms=0,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=base64.b64encode(b"\xff\x00\x21\x00").decode("ascii"),
         ws_url="wss://tankpit.com/ws",
     )

@@ -12,6 +12,7 @@ import base64
 
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 
 MAGIC = "auditmagic"
 
@@ -58,7 +59,7 @@ def frame_message(timestamp_ms: int, body: bytes, direction: str) -> CapturedMes
     sent: bool = direction == "sent"
     return CapturedMessage(
         timestamp_ms=timestamp_ms,
-        direction="sent" if sent else "received",
+        direction=MessageDirection.SENT if sent else MessageDirection.RECEIVED,
         payload=base64.b64encode(frame).decode("ascii"),
         ws_url="wss://tankpit.com/ws",
     )
