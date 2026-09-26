@@ -18,8 +18,9 @@ graceful-shutdown, so the tick loop needs no new signalling code.
 from __future__ import annotations
 
 import threading
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 from platform_core.logging import get_logger
 
@@ -32,7 +33,13 @@ from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
 log = get_logger(__name__)
 
-SessionRunnerState = Literal["idle", "running", "stopping"]
+
+class SessionRunnerState(StrEnum):
+    """The session runner's lifecycle: idle, a session running, or stopping one."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    STOPPING = "stopping"
 
 
 class BotFactoryProtocol(Protocol):
@@ -142,7 +149,7 @@ class SessionRunner:
         self._status_bus = status_bus
         self._stop_file_path = stop_file_path
         self._state_lock = threading.Lock()
-        self._state: SessionRunnerState = "idle"
+        self._state = SessionRunnerState.IDLE
 
     def state(self) -> SessionRunnerState:
         """Return the current lifecycle state.
@@ -162,7 +169,7 @@ class SessionRunner:
             True while the state is ``"running"`` or ``"stopping"``.
         """
         with self._state_lock:
-            return self._state != "idle"
+            return self._state is not SessionRunnerState.IDLE
 
     def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
         """Run one session start-to-finish on the calling thread.
@@ -183,9 +190,11 @@ class SessionRunner:
                 or stopping.
         """
         with self._state_lock:
-            if self._state != "idle":
-                raise SessionAlreadyRunningError(f"cannot start: SessionRunner is {self._state!r}")
-            self._state = "running"
+            if self._state is not SessionRunnerState.IDLE:
+                raise SessionAlreadyRunningError(
+                    f"cannot start: SessionRunner is {self._state.value!r}"
+                )
+            self._state = SessionRunnerState.RUNNING
 
         try:
             self._clear_stop_file()
@@ -243,7 +252,7 @@ class SessionRunner:
             log.info("Session end: bot.run returned")
         finally:
             with self._state_lock:
-                self._state = "idle"
+                self._state = SessionRunnerState.IDLE
             self._publish_idle_status()
 
     def request_stop(self) -> None:
@@ -254,10 +263,10 @@ class SessionRunner:
         an idle state or during a stop-in-progress is a no-op.
         """
         with self._state_lock:
-            if self._state == "idle":
+            if self._state is SessionRunnerState.IDLE:
                 log.info("Stop requested while idle; ignoring")
                 return
-            self._state = "stopping"
+            self._state = SessionRunnerState.STOPPING
         _test_hooks.write_text(self._stop_file_path, "")
         log.info("Stop requested: wrote %s", self._stop_file_path)
 
