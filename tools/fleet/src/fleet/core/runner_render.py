@@ -41,6 +41,17 @@ RUNNER_VERSION = "2.337.0"
 #: each WSL runner's ``.path`` (see :func:`render_wsl_install_lines`).
 LOCAL_BIN = "/home/gharunner/.local/bin"
 
+#: Where WSL mounts ``nvidia-smi`` and the GPU driver libraries from the
+#: Windows driver, also appended to each WSL runner's ``.path``. An
+#: interactive ``wsl`` shell has it on PATH; a runner configured under
+#: ``sudo`` does not, and on the rebuilt lavender Model-Trainer's job died at
+#: ``nvidia-smi: command not found`` while the host audit, which ran
+#: nvidia-smi from an interactive shell, passed (board task 1aa6a021).
+WSL_LIB = "/usr/lib/wsl/lib"
+
+#: The entries every WSL runner's ``.path`` must carry, in append order.
+RUNNER_PATH_ENTRIES: tuple[str, ...] = (LOCAL_BIN, WSL_LIB)
+
 #: The daily hygiene script, installed to /usr/local/bin/ci-clean.
 #:
 #: DOCKER FIRST, AND UNGATED. The Actions runner removes a job's service
@@ -371,14 +382,16 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
     the declaration while the runner lived somewhere else.
 
     ``--replace`` takes back a registration of the same name, as on the
-    Windows side. ``~/.local/bin`` goes onto the runner's ``.path`` AFTER
-    config.sh, which writes that file, and BEFORE the service starts,
+    Windows side. :data:`RUNNER_PATH_ENTRIES` go onto the runner's ``.path``
+    AFTER config.sh, which writes that file, and BEFORE the service starts,
     because runsvc.sh reads it once at start and exports it as every job
-    step's PATH. That is where ``pipx install poetry`` puts its shims, and
-    a systemd-started runner has no login shell to add it: without it, a
-    job that installs poetry dies one step later at ``poetry: command not
-    found``, exit 127 (measured on lavender; MCPs
+    step's PATH, and a systemd-started runner has no login shell to add
+    anything. ``~/.local/bin`` is where ``pipx install poetry`` puts its
+    shims: without it, a job that installs poetry dies one step later at
+    ``poetry: command not found``, exit 127 (measured on lavender; MCPs
     scripts/ops/provision-wsl-runner.ps1 carried it by hand).
+    ``/usr/lib/wsl/lib`` is where WSL mounts nvidia-smi (see
+    :data:`WSL_LIB`).
 
     Args:
         install: The install to configure, with ``side`` ``"wsl"``.
@@ -404,8 +417,10 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         f'sudo -u gharunner bash -c "cd {directory} && ./config.sh --unattended '
         f'--url https://github.com/{install["repo"]} --token \\"${{{token_var}}}\\" '
         f'--name {install["runner_name"]} --labels {labels} --replace"',
-        f"grep -qF ':{LOCAL_BIN}' {directory}/.path || "
-        f"sed -i 's#$#:{LOCAL_BIN}#' {directory}/.path",
+        *(
+            f"grep -qF ':{entry}' {directory}/.path || sed -i 's#$#:{entry}#' {directory}/.path"
+            for entry in RUNNER_PATH_ENTRIES
+        ),
         f"(cd {directory} && ./svc.sh install gharunner && ./svc.sh start)",
     ]
 
@@ -484,7 +499,9 @@ __all__ = [
     "CI_CLEAN_SERVICE",
     "CI_CLEAN_TIMER",
     "LOCAL_BIN",
+    "RUNNER_PATH_ENTRIES",
     "RUNNER_VERSION",
+    "WSL_LIB",
     "RenderedProvision",
     "render_provision",
     "render_windows_install_lines",

@@ -142,11 +142,17 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
             )
         )
     if spec["gpu_required"]:
-        checks.append(
+        # One per WSL runner, on that runner's own PATH: the jobs that
+        # digest the card are the runner's, and a host-level check from an
+        # interactive shell passed on the rebuilt lavender while its runners
+        # could not find nvidia-smi (board task 1aa6a021).
+        checks.extend(
             ExpectedCheck(
-                check_id="gpu:nvidia-smi",
+                check_id=f"gpu:{install['repo']}:wsl:{install['runner_name']}",
                 reason="runner jobs on this host digest a real GPU",
             )
+            for install in spec["installs"]
+            if install["side"] == "wsl"
         )
     for timer in spec["systemd_timers"]:
         checks.append(
@@ -215,6 +221,36 @@ def _emit_wsl_test_check(distro: str, check_id: str, test_flag: str, path: str) 
     ]
 
 
+def _gpu_check_lines(spec: HostRunnerSpec, distro: str) -> list[str]:
+    """Script lines that ask each WSL runner's own PATH for the GPU.
+
+    Args:
+        spec: The host, with ``gpu_required`` set.
+        distro: The WSL distribution, already validated.
+
+    Returns:
+        Two lines per WSL install: nvidia-smi run with PATH read from the
+        runner's ``.path`` (the PATH runsvc.sh gives its jobs), and the
+        Emit. The output is joined, never cast, for the reason the asset
+        pin in :func:`render_audit_script` gives.
+
+    Raises:
+        ValueError: When a runner directory cannot be embedded verbatim.
+    """
+    lines: list[str] = []
+    for install in (i for i in spec["installs"] if i["side"] == "wsl"):
+        runner_dir = _scriptable(install["workdir"].rsplit("/", 1)[0], label="workdir")
+        check_id = f"gpu:{install['repo']}:wsl:{install['runner_name']}"
+        lines += [
+            f"$GpuName = (@(wsl -d '{distro}' -- sh -c 'PATH=$(cat {runner_dir}/.path) "
+            "nvidia-smi --query-gpu=name --format=csv,noheader' 2>$null "
+            "| Select-Object -First 1) -join '')",
+            f"Emit '{check_id}' ($GpuName.Trim().Length -gt 0) "
+            "('nvidia-smi on the runner PATH said: ' + $GpuName)",
+        ]
+    return lines
+
+
 def render_audit_script(spec: HostRunnerSpec) -> str:
     """The PowerShell audit driver for one host.
 
@@ -265,11 +301,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
             "('the VM reports ' + $TotalMb + ' MB')",
         ]
     if spec["gpu_required"]:
-        lines += [
-            f"$GpuName = [string](wsl -d '{distro}' -- nvidia-smi --query-gpu=name "
-            "--format=csv,noheader 2>$null | Select-Object -First 1)",
-            "Emit 'gpu:nvidia-smi' ($GpuName.Trim().Length -gt 0) ('nvidia-smi said: ' + $GpuName)",
-        ]
+        lines += _gpu_check_lines(spec, distro)
     for timer in spec["systemd_timers"]:
         name = _scriptable(timer, label="systemd timer")
         lines += _emit_wsl_state_check(
