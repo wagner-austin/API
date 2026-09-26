@@ -12,7 +12,12 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import CalibrationRunnerResultDict
 from handwriting_ai.training.calibration._types import Candidate
-from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
+from handwriting_ai.training.calibration.ds_spec import (
+    AugmentSpec,
+    BaseKind,
+    InlineSpec,
+    PreprocessSpec,
+)
 from handwriting_ai.training.calibration.runner import (
     _child_entry,
     _mnist_find_raw_dir,
@@ -91,7 +96,7 @@ def test_child_entry_emits_logs_and_writes_result(tmp_path: Path) -> None:
     log_q: mp.Queue[logging.LogRecord] = mp.Queue()
 
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": InlineSpec(n=1, sleep_s=0.0, fail=False),
         "augment": AugmentSpec(
@@ -196,7 +201,7 @@ def test_child_entry_handler_without_flush(tmp_path: Path) -> None:
     log_q: mp.Queue[logging.LogRecord] = mp.Queue()
 
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": InlineSpec(n=1, sleep_s=0.0, fail=False),
         "augment": AugmentSpec(

@@ -16,6 +16,7 @@ from handwriting_ai.training.calibration._types import (
 )
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
+    BaseKind,
     InlineSpec,
     PreprocessSpec,
 )
@@ -108,7 +109,7 @@ def test_child_entry_inline_executes_and_writes_result(tmp_path: Path) -> None:
     }
     inline: InlineSpec = {"n": 4, "sleep_s": 0.0, "fail": False}
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline,
         "augment": aug,
@@ -334,7 +335,7 @@ def test_child_entry_flush_branch_no_flush_handler(tmp_path: Path) -> None:
     }
     inline: InlineSpec = {"n": 1, "sleep_s": 0.0, "fail": False}
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline,
         "augment": aug,

@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from handwriting_ai.training.calibrate import _candidate_workers, calibrate_input_pipeline
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
+    BaseKind,
     InlineSpec,
     PreprocessSpec,
 )
@@ -36,7 +37,7 @@ def test_calibrate_persists_and_reuses_cache(tmp_path: Path) -> None:
         morph="none",
     )
     base = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=8, sleep_s=0.0, fail=False),
         augment=aug,
@@ -101,7 +102,7 @@ def test_calibrate_force_recomputes(tmp_path: Path) -> None:
         morph="none",
     )
     base = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=8, sleep_s=0.0, fail=False),
         augment=aug,

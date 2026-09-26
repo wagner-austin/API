@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Annotated
 
-from fastapi import Depends
 from platform_core.config import _require_env_str
 from platform_core.queues import DIGITS_QUEUE
 from platform_workers.redis import RedisStrProto
@@ -23,9 +21,6 @@ from handwriting_ai.config import Settings
 def get_settings() -> Settings:
     """Dependency: typed application settings from environment."""
     return _test_hooks.load_settings()
-
-
-SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _get_redis_url() -> str:
@@ -88,8 +83,3 @@ def get_queue() -> QueueProtocol:
             return job
 
     return _QueueAdapter()
-
-
-RedisDep = Annotated[RedisStrProto, Depends(get_redis)]
-LoggerDep = Annotated[LoggerInstanceProtocol, Depends(get_request_logger)]
-QueueDep = Annotated[QueueProtocol, Depends(get_queue)]

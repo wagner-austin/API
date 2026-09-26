@@ -21,6 +21,7 @@ from handwriting_ai.training.calibration._types import (
 )
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
+    BaseKind,
     InlineSpec,
     PreprocessSpec,
 )
@@ -115,7 +116,7 @@ def test_subprocess_runner_success() -> None:
 def test_subprocess_runner_timeout() -> None:
     # Build inline spec with per-item sleep so child exceeds timeout
     spec = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=8, sleep_s=0.25, fail=False),
         augment=AugmentSpec(
@@ -141,7 +142,7 @@ def test_subprocess_runner_timeout() -> None:
 
 def test_subprocess_runner_runtime_error() -> None:
     spec = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=8, sleep_s=0.0, fail=True),
         augment=AugmentSpec(
@@ -284,7 +285,7 @@ def test_child_entry_flush_handles_handlers_without_flush(tmp_path: Path) -> Non
     out_path = tmp_path / "child_result.txt"
 
     spec = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=0, sleep_s=0.0, fail=False),
         augment=AugmentSpec(

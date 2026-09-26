@@ -19,7 +19,12 @@ from handwriting_ai.training.calibration.calibrator import (
 from handwriting_ai.training.calibration.calibrator import (
     calibrate_input_pipeline as _cal,
 )
-from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
+from handwriting_ai.training.calibration.ds_spec import (
+    AugmentSpec,
+    BaseKind,
+    InlineSpec,
+    PreprocessSpec,
+)
 from handwriting_ai.training.resources import ResourceLimits
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
@@ -112,7 +117,7 @@ def test_calibrator_raises_on_empty_stage_a(tmp_path: Path) -> None:
         morph="none",
     )
     base = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=4, sleep_s=0.0, fail=False),
         augment=aug,
@@ -157,7 +162,7 @@ def test_calibrator_raises_on_empty_stage_b(tmp_path: Path) -> None:
         morph="none",
     )
     base = PreprocessSpec(
-        base_kind="inline",
+        base_kind=BaseKind.INLINE,
         mnist=None,
         inline=InlineSpec(n=4, sleep_s=0.0, fail=False),
         augment=aug,

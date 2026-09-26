@@ -6,7 +6,12 @@ from pathlib import Path
 from platform_core.logging import get_logger
 
 from handwriting_ai.training.calibration._types import Candidate
-from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
+from handwriting_ai.training.calibration.ds_spec import (
+    AugmentSpec,
+    BaseKind,
+    InlineSpec,
+    PreprocessSpec,
+)
 from handwriting_ai.training.calibration.runner import _build_dataset_from_spec, _child_entry
 
 
@@ -24,7 +29,12 @@ def test_build_dataset_from_spec_inline_ok() -> None:
         "blur_sigma": 0.0,
         "morph": "none",
     }
-    spec: PreprocessSpec = {"base_kind": "inline", "mnist": None, "inline": inline, "augment": aug}
+    spec: PreprocessSpec = {
+        "base_kind": BaseKind.INLINE,
+        "mnist": None,
+        "inline": inline,
+        "augment": aug,
+    }
     ds = _build_dataset_from_spec(spec)
     assert len(ds) == 1
 
@@ -49,7 +59,7 @@ def test_child_entry_removes_stream_handlers(tmp_path: Path) -> None:
         "morph": "none",
     }
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline,
         "augment": aug,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TypedDict
 
 from torch import Tensor
@@ -16,6 +15,3 @@ class PredictOutput(TypedDict):
 class PreprocessOutput(TypedDict):
     tensor: Tensor
     visual_png: bytes | None
-
-
-Probs = Sequence[float]

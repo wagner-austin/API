@@ -438,25 +438,21 @@ def _rotate_tensor(x: Tensor, degrees: float) -> Tensor:
     )
 
 
-LoadedStateDict = dict[str, Tensor]
-WrappedStateDict = dict[str, LoadedStateDict]
-
-
 class _TorchLoadFn(Protocol):
     def __call__(
         self, f: str, *, map_location: torch.device, weights_only: bool
-    ) -> LoadedStateDict | WrappedStateDict: ...
+    ) -> dict[str, Tensor] | dict[str, dict[str, Tensor]]: ...
 
 
 def _is_wrapped_state_dict(
-    value: LoadedStateDict | WrappedStateDict,
-) -> TypeGuard[WrappedStateDict]:
+    value: dict[str, Tensor] | dict[str, dict[str, Tensor]],
+) -> TypeGuard[dict[str, dict[str, Tensor]]]:
     return _test_hooks.is_wrapped_state_dict(value)
 
 
 def _is_flat_state_dict(
-    value: LoadedStateDict | WrappedStateDict,
-) -> TypeGuard[LoadedStateDict]:
+    value: dict[str, Tensor] | dict[str, dict[str, Tensor]],
+) -> TypeGuard[dict[str, Tensor]]:
     return _test_hooks.is_flat_state_dict(value)
 
 
@@ -472,7 +468,7 @@ def _load_state_dict_file(path: Path) -> dict[str, Tensor]:
         nested = loaded_raw["state_dict"]
         if not isinstance(nested, dict):
             raise JSONTypeError("state_dict wrapper must contain a dict")
-        sd_source: LoadedStateDict = nested
+        sd_source: dict[str, Tensor] = nested
     elif _is_flat_state_dict(loaded_raw):
         sd_source = loaded_raw
     else:

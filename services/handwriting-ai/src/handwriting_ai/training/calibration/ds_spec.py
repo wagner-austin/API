@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TypedDict
 
-BaseKind = Literal["mnist", "inline"]
+
+class BaseKind(StrEnum):
+    """Which dataset a calibration child builds before augmenting it."""
+
+    MNIST = "mnist"
+    INLINE = "inline"
 
 
 class MNISTSpec(TypedDict):

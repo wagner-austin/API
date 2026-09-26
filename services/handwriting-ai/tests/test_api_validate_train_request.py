@@ -6,11 +6,12 @@ from typing import Protocol
 
 import pytest
 from platform_core.errors import AppError
+from platform_core.json_utils import JSONValue
 
 from handwriting_ai.api.routes.training import (
+    _require_body_object,
     _validate_train_request,
 )
-from handwriting_ai.api.types import JsonDict
 
 
 class _RedisConnectionProto(Protocol):
@@ -24,7 +25,7 @@ class _RedisConnectionProto(Protocol):
 
 def test_validate_train_request_valid_payload() -> None:
     """Test _validate_train_request with valid payload."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 123,
         "model_id": "test-model",
         "epochs": 10,
@@ -45,9 +46,19 @@ def test_validate_train_request_valid_payload() -> None:
     assert result["notes"] == "Test notes"
 
 
+def test_a_body_that_is_not_an_object_is_refused() -> None:
+    with pytest.raises(AppError, match="request body must be a JSON object"):
+        _require_body_object([1, 2])
+
+
+def test_an_object_body_passes_through_unchanged() -> None:
+    body: JSONValue = {"user_id": 1}
+    assert _require_body_object(body) == {"user_id": 1}
+
+
 def test_validate_train_request_notes_null() -> None:
     """Test _validate_train_request with null notes."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -63,7 +74,7 @@ def test_validate_train_request_notes_null() -> None:
 
 def test_validate_train_request_notes_missing() -> None:
     """Test _validate_train_request with missing notes (defaults to None)."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -77,7 +88,7 @@ def test_validate_train_request_notes_missing() -> None:
 
 def test_validate_train_request_augment_default() -> None:
     """Test _validate_train_request with missing augment (defaults to False)."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -91,7 +102,7 @@ def test_validate_train_request_augment_default() -> None:
 
 def test_validate_train_request_lr_as_int() -> None:
     """Test _validate_train_request accepts lr as int."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -106,7 +117,7 @@ def test_validate_train_request_lr_as_int() -> None:
 
 def test_validate_train_request_invalid_user_id_type() -> None:
     """Test _validate_train_request rejects non-int user_id."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": "not-an-int",
         "model_id": "m",
         "epochs": 1,
@@ -120,7 +131,7 @@ def test_validate_train_request_invalid_user_id_type() -> None:
 
 def test_validate_train_request_user_id_bool_rejected() -> None:
     """Test _validate_train_request rejects bool user_id."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": True,
         "model_id": "m",
         "epochs": 1,
@@ -134,7 +145,7 @@ def test_validate_train_request_user_id_bool_rejected() -> None:
 
 def test_validate_train_request_invalid_model_id() -> None:
     """Test _validate_train_request rejects empty model_id."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "",
         "epochs": 1,
@@ -148,7 +159,7 @@ def test_validate_train_request_invalid_model_id() -> None:
 
 def test_validate_train_request_model_id_whitespace() -> None:
     """Test _validate_train_request rejects whitespace-only model_id."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "   ",
         "epochs": 1,
@@ -162,7 +173,7 @@ def test_validate_train_request_model_id_whitespace() -> None:
 
 def test_validate_train_request_model_id_not_string() -> None:
     """Test _validate_train_request rejects non-string model_id."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": 123,
         "epochs": 1,
@@ -176,7 +187,7 @@ def test_validate_train_request_model_id_not_string() -> None:
 
 def test_validate_train_request_invalid_epochs() -> None:
     """Test _validate_train_request rejects non-positive epochs."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 0,
@@ -190,7 +201,7 @@ def test_validate_train_request_invalid_epochs() -> None:
 
 def test_validate_train_request_epochs_bool_rejected() -> None:
     """Test _validate_train_request rejects bool epochs."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": True,
@@ -204,7 +215,7 @@ def test_validate_train_request_epochs_bool_rejected() -> None:
 
 def test_validate_train_request_invalid_batch_size() -> None:
     """Test _validate_train_request rejects non-positive batch_size."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -218,7 +229,7 @@ def test_validate_train_request_invalid_batch_size() -> None:
 
 def test_validate_train_request_batch_size_bool_rejected() -> None:
     """Test _validate_train_request rejects bool batch_size."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -232,7 +243,7 @@ def test_validate_train_request_batch_size_bool_rejected() -> None:
 
 def test_validate_train_request_invalid_lr_zero() -> None:
     """Test _validate_train_request rejects zero lr."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -246,7 +257,7 @@ def test_validate_train_request_invalid_lr_zero() -> None:
 
 def test_validate_train_request_invalid_lr_negative() -> None:
     """Test _validate_train_request rejects negative lr."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -260,7 +271,7 @@ def test_validate_train_request_invalid_lr_negative() -> None:
 
 def test_validate_train_request_lr_bool_rejected() -> None:
     """Test _validate_train_request rejects bool lr."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -274,7 +285,7 @@ def test_validate_train_request_lr_bool_rejected() -> None:
 
 def test_validate_train_request_invalid_seed() -> None:
     """Test _validate_train_request rejects non-int seed."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -288,7 +299,7 @@ def test_validate_train_request_invalid_seed() -> None:
 
 def test_validate_train_request_seed_bool_rejected() -> None:
     """Test _validate_train_request rejects bool seed."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -302,7 +313,7 @@ def test_validate_train_request_seed_bool_rejected() -> None:
 
 def test_validate_train_request_invalid_augment() -> None:
     """Test _validate_train_request rejects non-bool augment."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,
@@ -317,7 +328,7 @@ def test_validate_train_request_invalid_augment() -> None:
 
 def test_validate_train_request_invalid_notes_type() -> None:
     """Test _validate_train_request rejects non-string notes."""
-    payload: JsonDict = {
+    payload: dict[str, JSONValue] = {
         "user_id": 1,
         "model_id": "m",
         "epochs": 1,

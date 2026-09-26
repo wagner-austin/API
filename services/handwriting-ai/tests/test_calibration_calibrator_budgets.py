@@ -17,7 +17,12 @@ from handwriting_ai.training.calibration._types import (
     OrchestratorConfig,
 )
 from handwriting_ai.training.calibration.calibrator import calibrate_input_pipeline as _cal
-from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
+from handwriting_ai.training.calibration.ds_spec import (
+    AugmentSpec,
+    BaseKind,
+    InlineSpec,
+    PreprocessSpec,
+)
 from handwriting_ai.training.resources import ResourceLimits
 
 
@@ -112,7 +117,7 @@ def test_calibrator_low_mem_branch() -> None:
     }
     inline: InlineSpec = {"n": 8, "sleep_s": 0.0, "fail": False}
     base: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline,
         "augment": aug,
@@ -201,7 +206,7 @@ def test_calibrator_high_mem_branch() -> None:
     }
     inline: InlineSpec = {"n": 8, "sleep_s": 0.0, "fail": False}
     base: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline,
         "augment": aug,

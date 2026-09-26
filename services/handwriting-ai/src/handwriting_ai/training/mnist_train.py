@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, Dataset
 from handwriting_ai import _test_hooks
 from handwriting_ai.monitoring import log_memory_snapshot
 
-from .calibration.ds_spec import AugmentSpec, MNISTSpec, PreprocessSpec
+from .calibration.ds_spec import AugmentSpec, BaseKind, MNISTSpec, PreprocessSpec
 from .dataset import MNISTLike
 from .dataset import make_loaders as _make_loaders_impl
 from .optim import build_optimizer_and_scheduler as _build_optimizer_and_scheduler
@@ -347,7 +347,7 @@ def _build_calibration_spec(cfg: TrainConfig) -> PreprocessSpec:
         morph=str(cfg["morph"]),
     )
     mnist_spec = MNISTSpec(root=cfg["data_root"], train=True)
-    return PreprocessSpec(base_kind="mnist", mnist=mnist_spec, inline=None, augment=aug_spec)
+    return PreprocessSpec(base_kind=BaseKind.MNIST, mnist=mnist_spec, inline=None, augment=aug_spec)
 
 
 def _memory_tier_name(memory_bytes: int | None) -> str:

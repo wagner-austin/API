@@ -9,27 +9,42 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols import LoggerInstanceProtocol
 from handwriting_ai.training.calibration.cache import _decode_float, _decode_int, _read_cache
 
-LogArg = float | int | str | Path | BaseException
-
-
-ExtraDict = dict[str, str | int | float | bool | None]
-
 
 class _LogStub:
     def __init__(self, sink: list[str]) -> None:
         self._sink = sink
 
-    def info(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+    def info(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
         pass
 
-    def warning(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+    def warning(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
         pass
 
-    def error(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+    def error(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
         formatted = msg % args if args else msg
         self._sink.append(formatted)
 
-    def debug(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+    def debug(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
         pass
 
 

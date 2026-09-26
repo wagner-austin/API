@@ -13,6 +13,7 @@ from PIL import Image
 from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
+    BaseKind,
     InlineSpec,
     MNISTSpec,
     PreprocessSpec,
@@ -97,7 +98,7 @@ def test_to_spec_from_dataset() -> None:
     ds = PreprocessDataset(base, _CFG)
     spec = _to_spec(ds)
     # spec is PreprocessSpec TypedDict
-    assert spec["base_kind"] == "inline"
+    assert spec["base_kind"] is BaseKind.INLINE
     inline = spec["inline"]
     assert inline is not None and inline["n"] == len(ds)
     # Ensure knobs are mapped
@@ -120,7 +121,7 @@ def test_to_spec_pass_through_for_spec() -> None:
         "morph": "none",
     }
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline_spec,
         "augment": aug_spec,
@@ -144,7 +145,7 @@ def test_build_dataset_from_spec_inline_success() -> None:
     }
     inline: InlineSpec = {"n": 7, "sleep_s": 0.0, "fail": False}
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline,
         "augment": aug,
@@ -170,7 +171,7 @@ def test_build_dataset_from_spec_inline_fail_and_sleep(tmp_path: Path) -> None:
     }
     inline_fail: InlineSpec = {"n": 1, "sleep_s": 0.0, "fail": True}
     spec_fail: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline_fail,
         "augment": aug,
@@ -182,7 +183,7 @@ def test_build_dataset_from_spec_inline_fail_and_sleep(tmp_path: Path) -> None:
     # sleep_s>0 exercises sleep branch in _InlineDataset.__getitem__
     inline_sleep: InlineSpec = {"n": 1, "sleep_s": 0.001, "fail": False}
     spec_sleep: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": inline_sleep,
         "augment": aug,
@@ -206,7 +207,7 @@ def test_build_dataset_from_spec_inline_missing_details() -> None:
         "morph": "none",
     }
     spec: PreprocessSpec = {
-        "base_kind": "inline",
+        "base_kind": BaseKind.INLINE,
         "mnist": None,
         "inline": None,
         "augment": aug,
@@ -333,7 +334,7 @@ def test_build_dataset_from_spec_mnist(tmp_path: Path) -> None:
     }
     mnist: MNISTSpec = {"root": tmp_path, "train": True}
     spec: PreprocessSpec = {
-        "base_kind": "mnist",
+        "base_kind": BaseKind.MNIST,
         "mnist": mnist,
         "inline": None,
         "augment": aug,
@@ -362,7 +363,7 @@ def test_build_mnist_dataset_missing_details_raises() -> None:
         "morph": "none",
     }
     spec: PreprocessSpec = {
-        "base_kind": "mnist",
+        "base_kind": BaseKind.MNIST,
         "mnist": None,
         "inline": None,
         "augment": aug,

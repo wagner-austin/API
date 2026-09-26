@@ -31,6 +31,7 @@ from handwriting_ai.training.calibration._types import (
 )
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
+    BaseKind,
     InlineSpec,
     PreprocessSpec,
 )
@@ -159,7 +160,7 @@ def _child_entry(
         # Inline specs are used for lightweight tests and documentation
         # examples; keep their batch size fixed to the requested candidate
         # value to avoid surprising headroom expansions.
-        enable_headroom = spec["base_kind"] != "inline"
+        enable_headroom = spec["base_kind"] is not BaseKind.INLINE
         res = _test_hooks.measure_candidate_internal(
             ds,
             cand,
@@ -469,7 +470,7 @@ def _to_spec(ds: PreprocessDatasetProtocol | PreprocessSpec) -> PreprocessSpec:
         "morph": str(k["morph_mode"]),
     }
     inline: InlineSpec = {"n": len(ds), "sleep_s": 0.0, "fail": False}
-    return {"base_kind": "inline", "mnist": None, "inline": inline, "augment": aug}
+    return {"base_kind": BaseKind.INLINE, "mnist": None, "inline": inline, "augment": aug}
 
 
 def _augment_config_from_spec(spec: PreprocessSpec) -> AugmentConfig:
@@ -491,19 +492,13 @@ def _augment_config_from_spec(spec: PreprocessSpec) -> AugmentConfig:
 
 
 def _build_dataset_from_spec(spec: PreprocessSpec) -> PreprocessDataset:
-    if spec["base_kind"] == "mnist":
+    if spec["base_kind"] is BaseKind.MNIST:
         return _build_mnist_dataset(spec)
-
-    if spec["base_kind"] == "inline":
-        if spec["inline"] is None:
-            raise RuntimeError("inline spec missing details")
-
-        base = _InlineDataset(
-            spec["inline"]["n"], spec["inline"]["sleep_s"], spec["inline"]["fail"]
-        )
-        return PreprocessDataset(base, _augment_config_from_spec(spec))
-
-    raise RuntimeError(f"unknown base_kind: {spec['base_kind']}")
+    assert spec["base_kind"] is BaseKind.INLINE
+    if spec["inline"] is None:
+        raise RuntimeError("inline spec missing details")
+    base = _InlineDataset(spec["inline"]["n"], spec["inline"]["sleep_s"], spec["inline"]["fail"])
+    return PreprocessDataset(base, _augment_config_from_spec(spec))
 
 
 def _mnist_find_raw_dir(root: Path) -> Path:

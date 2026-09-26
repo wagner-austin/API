@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from typing import Annotated, Literal, Protocol, TypedDict
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 from fastapi.params import Depends as DependsParamType
 from fastapi.responses import JSONResponse
 from platform_core.errors import AppError, ErrorCode
+from platform_core.json_utils import JSONValue, load_json_bytes
 from platform_core.security import ApiKeyCheckFn
 
-from ..dependencies import LoggerDep, QueueDep
-from ..types import JsonDict, UnknownJson
+from ..._hook_protocols import LoggerInstanceProtocol
+from ..dependencies import get_queue, get_request_logger
+from ..types import QueueProtocol, UnknownJson
 
 
 class _DependsCtor(Protocol):
@@ -51,8 +53,35 @@ class TrainJobResponse(TypedDict):
     status: Literal["queued"]
 
 
-def _validate_train_request(payload: JsonDict) -> TrainJobRequest:
-    """Validate and parse training job request payload."""
+def _require_body_object(body: JSONValue) -> dict[str, JSONValue]:
+    """Narrow a decoded request body to a JSON object.
+
+    Args:
+        body: The request body as decoded from JSON.
+
+    Returns:
+        The body as an object.
+
+    Raises:
+        AppError: ``INVALID_INPUT`` when the body is not a JSON object.
+    """
+    if not isinstance(body, dict):
+        raise AppError(ErrorCode.INVALID_INPUT, "request body must be a JSON object")
+    return body
+
+
+def _validate_train_request(payload: dict[str, JSONValue]) -> TrainJobRequest:
+    """Validate and parse training job request payload.
+
+    Args:
+        payload: The request body's fields.
+
+    Returns:
+        The validated training request.
+
+    Raises:
+        AppError: ``INVALID_INPUT`` when a field is missing or out of range.
+    """
     user_id = payload.get("user_id")
     if not isinstance(user_id, int) or isinstance(user_id, bool):
         raise AppError(ErrorCode.INVALID_INPUT, "user_id must be an integer")
@@ -100,64 +129,84 @@ def _validate_train_request(payload: JsonDict) -> TrainJobRequest:
     }
 
 
+def _enqueue_training_job(
+    req: TrainJobRequest,
+    queue: QueueProtocol,
+    logger: LoggerInstanceProtocol,
+) -> JSONResponse:
+    """Enqueue a validated training request for the digits worker.
+
+    Args:
+        req: The validated training request.
+        queue: The RQ queue the digits worker consumes.
+        logger: The request-scoped logger.
+
+    Returns:
+        A 202 response naming the queued job.
+    """
+    request_id = str(uuid4())
+    user_id = req["user_id"]
+    model_id = req["model_id"]
+
+    logger.info(
+        "Enqueuing training job",
+        extra={"request_id": request_id, "model_id": model_id, "user_id": user_id},
+    )
+
+    # Build typed payload for the worker
+    job_payload: dict[str, UnknownJson] = {
+        "type": "digits.train.v1",
+        "request_id": request_id,
+        "user_id": user_id,
+        "model_id": model_id,
+        "epochs": req["epochs"],
+        "batch_size": req["batch_size"],
+        "lr": req["lr"],
+        "seed": req["seed"],
+        "augment": req["augment"],
+        "notes": req["notes"],
+    }
+
+    # Enqueue the job
+    job = queue.enqueue(
+        "handwriting_ai.jobs.digits.process_train_job",
+        job_payload,
+        job_timeout=3600,  # 1 hour timeout for training
+        result_ttl=86400,  # Keep results for 24 hours
+        failure_ttl=86400,
+        description=f"digits:train:{model_id}:{request_id}",
+    )
+
+    logger.info(
+        "Training job enqueued",
+        extra={"request_id": request_id, "job_id": job.get_id()},
+    )
+
+    response: dict[str, str | int | bool | None] = {
+        "job_id": job.get_id(),
+        "request_id": request_id,
+        "user_id": user_id,
+        "model_id": model_id,
+        "status": "queued",
+    }
+    return JSONResponse(content=response, status_code=202)
+
+
 def build_router(api_key_dep: ApiKeyCheckFn) -> APIRouter:
     """Build training router with job submission endpoint."""
     router = APIRouter(dependencies=[_typed_depends(api_key_dep)])
 
     async def create_training_job(
-        payload: JsonDict,
-        queue: QueueDep,
-        logger: LoggerDep,
+        request: Request,
+        queue: Annotated[QueueProtocol, Depends(get_queue)],
+        logger: Annotated[LoggerInstanceProtocol, Depends(get_request_logger)],
     ) -> JSONResponse:
         """Create a new digit training job and enqueue for background processing."""
-        req = _validate_train_request(payload)
-
-        request_id = str(uuid4())
-        user_id = req["user_id"]
-        model_id = req["model_id"]
-
-        logger.info(
-            "Enqueuing training job",
-            extra={"request_id": request_id, "model_id": model_id, "user_id": user_id},
+        return _enqueue_training_job(
+            _validate_train_request(_require_body_object(load_json_bytes(await request.body()))),
+            queue,
+            logger,
         )
-
-        # Build typed payload for the worker
-        job_payload: dict[str, UnknownJson] = {
-            "type": "digits.train.v1",
-            "request_id": request_id,
-            "user_id": user_id,
-            "model_id": model_id,
-            "epochs": req["epochs"],
-            "batch_size": req["batch_size"],
-            "lr": req["lr"],
-            "seed": req["seed"],
-            "augment": req["augment"],
-            "notes": req["notes"],
-        }
-
-        # Enqueue the job
-        job = queue.enqueue(
-            "handwriting_ai.jobs.digits.process_train_job",
-            job_payload,
-            job_timeout=3600,  # 1 hour timeout for training
-            result_ttl=86400,  # Keep results for 24 hours
-            failure_ttl=86400,
-            description=f"digits:train:{model_id}:{request_id}",
-        )
-
-        logger.info(
-            "Training job enqueued",
-            extra={"request_id": request_id, "job_id": job.get_id()},
-        )
-
-        response: dict[str, str | int | bool | None] = {
-            "job_id": job.get_id(),
-            "request_id": request_id,
-            "user_id": user_id,
-            "model_id": model_id,
-            "status": "queued",
-        }
-        return JSONResponse(content=response, status_code=202)
 
     router.add_api_route("/api/v1/training/jobs", create_training_job, methods=["POST"])
     return router
