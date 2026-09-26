@@ -16,6 +16,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 from tests.fakes.cdp import (
     FakeCDPSession,
     FakeCDPSessionRateLimited,
@@ -352,7 +353,7 @@ class FakePageGrowingMessages:
             self._messages.append(
                 CapturedMessage(
                     timestamp_ms=self._call_count,
-                    direction="received",
+                    direction=MessageDirection.RECEIVED,
                     payload="growing",
                     ws_url="ws://test",
                 ),
