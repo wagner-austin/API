@@ -332,7 +332,7 @@ def stage(
     remote.run_script(
         host,
         spoken.script_path(target, names.INIT_REPOSITORY_STEM),
-        spoken.checked_script(dialect.init_repository_commands(target)),
+        spoken.checked_script(dialect.init_repository_commands(target, run_id)),
         platform=platform,
     )
     return target

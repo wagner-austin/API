@@ -57,16 +57,33 @@ from fleet.contracts.node import NodePlatform
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
 
-#: Who a companion's one commit is authored by, passed to ``git`` with
-#: ``-c`` on the commit itself.
+#: Who a staged tree's one commit is authored by, a project's export and a
+#: companion's alike, passed to ``git`` with ``-c`` on the commit itself.
 #:
 #: A node has no git identity and is not given one: a dispatch that
 #: configured ``user.email`` would leave that setting behind on somebody's
 #: workstation, and the next thing they committed there would carry it. The
 #: address is in the reserved ``.invalid`` domain (RFC 2606), so it cannot
 #: reach anybody even if a tree staged here were ever pushed.
-COMPANION_AUTHOR_NAME = "fleet"
-COMPANION_AUTHOR_EMAIL = "fleet@corvis.invalid"
+EXPORT_AUTHOR_NAME = "fleet"
+EXPORT_AUTHOR_EMAIL = "fleet@corvis.invalid"
+
+
+def _commit_command(target: str, message: str) -> str:
+    """The one commit of a staged tree, under the export identity.
+
+    Args:
+        target: Absolute remote directory holding the repository.
+        message: The commit message; single-quoted into the script, so it
+            carries no quote by construction (a sha or a run id).
+
+    Returns:
+        The command line.
+    """
+    return (
+        f"git -C '{target}' -c user.name='{EXPORT_AUTHOR_NAME}' "
+        f"-c user.email='{EXPORT_AUTHOR_EMAIL}' commit --quiet --message '{message}'"
+    )
 
 
 class Dialect(Protocol):
@@ -352,14 +369,14 @@ def extract_commands(archive: str, destination: str) -> tuple[str, ...]:
 def companion_repository_commands(target: str, sha: str) -> tuple[str, ...]:
     """The commands that make a staged companion a one-commit repository.
 
-    THEY COMMIT, where :func:`init_repository_commands` deliberately does
-    not. A companion exists to be read as a workspace, and the thing that
-    reads it reads HEAD -- slime's lift check compares its lifted files
-    against ``git show HEAD:<path>`` precisely so that an uncommitted edit
-    in the workspace is not mistaken for the code. On a node there is no
-    HEAD until one is made, so the export is committed here, and the
-    identity is passed with ``-c`` rather than configured: nothing this
-    package does leaves state on a node.
+    A companion exists to be read as a workspace, and the thing that reads
+    it reads HEAD -- slime's lift check compares its lifted files against
+    ``git show HEAD:<path>`` precisely so that an uncommitted edit in the
+    workspace is not mistaken for the code. On a node there is no HEAD
+    until one is made, so the export is committed here, as the project's
+    own tree is (:func:`init_repository_commands`), and the identity is
+    passed with ``-c`` rather than configured: nothing this package does
+    leaves state on a node.
 
     ``--force`` on the add, which the project's tree does not use and must
     not: there the ``.gitignore`` is what makes a staged tree index the same
@@ -380,14 +397,12 @@ def companion_repository_commands(target: str, sha: str) -> tuple[str, ...]:
     return (
         f"git -C '{target}' init --quiet",
         f"git -C '{target}' add --all --force",
-        f"git -C '{target}' -c user.name='{COMPANION_AUTHOR_NAME}' "
-        f"-c user.email='{COMPANION_AUTHOR_EMAIL}' commit --quiet "
-        f"--message 'fleet companion export {sha}'",
+        _commit_command(target, f"fleet companion export {sha}"),
     )
 
 
-def init_repository_commands(target: str) -> tuple[str, ...]:
-    """The commands that make a staged tree a git repository.
+def init_repository_commands(target: str, run_id: str) -> tuple[str, ...]:
+    """The commands that make a staged tree a one-commit git repository.
 
     THE SAME ON BOTH PLATFORMS, and without them a staged build lints
     different files from a local one. Ruff honours ``.gitignore`` and applies
@@ -420,24 +435,40 @@ def init_repository_commands(target: str) -> tuple[str, ...]:
     suite was written against. ``git add --all`` under the tree's own
     ``.gitignore`` indexes what a checkout tracks: an export is the tracked
     files by construction, and a working tree's ignored build output stays
-    out the way it does in the checkout. Nothing is committed, because
-    nothing reads a commit in the tree the recipe runs in; the one staged
-    tree that IS read as a commit is a companion, and
-    :func:`companion_repository_commands` says why it is the exception.
+    out the way it does in the checkout.
+
+    AND THE INDEX IS COMMITTED, since MCPs board task 6bbfd171
+    (2026-09-26). This docstring said until then that nothing reads a commit
+    in the tree the recipe runs in, and it was false for every package whose
+    suite migrates a test database: ``packages/db``'s migrator admits a test
+    migration only against ``git rev-parse HEAD`` and ``git ls-tree HEAD``
+    (``src/migrate/test-admission.ts``), and on diphtheria that day a staged
+    MCPs tree with no commit failed it with ``TEST_MIGRATION_PROVENANCE_UNAVAILABLE:
+    git rev-parse: fatal: ambiguous argument 'HEAD'``. The same tree with
+    one commit applied 557 migrations and ``packages/tenant`` read ``ALL
+    CHECKS PASSED``. The commit is made here, before any install step runs,
+    so no hook the project's install configures (husky's
+    ``core.hooksPath``) exists yet to run on it.
 
     Args:
         target: Absolute remote directory holding the staged tree.
+        run_id: The dispatch, recorded in the message so the tree on the
+            node names the run it was staged for.
 
     Returns:
-        The two command lines, in order, for a dialect's
+        The three command lines, in order, for a dialect's
         :meth:`Dialect.checked_script`.
     """
-    return (f"git -C '{target}' init --quiet", f"git -C '{target}' add --all")
+    return (
+        f"git -C '{target}' init --quiet",
+        f"git -C '{target}' add --all",
+        _commit_command(target, f"fleet export {run_id}"),
+    )
 
 
 __all__ = [
-    "COMPANION_AUTHOR_EMAIL",
-    "COMPANION_AUTHOR_NAME",
+    "EXPORT_AUTHOR_EMAIL",
+    "EXPORT_AUTHOR_NAME",
     "Dialect",
     "companion_repository_commands",
     "extract_commands",
