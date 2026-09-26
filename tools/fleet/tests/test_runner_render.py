@@ -13,7 +13,7 @@ import shutil
 import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
-from fleet.core import runner_render
+from fleet.core import runner_account, runner_render
 from tests._runner_fixtures import a_base
 
 
@@ -133,6 +133,35 @@ class TestWindowsScript:
         # cannot run it.
         assert "config.cmd" not in runner_render.render_provision(spec)["linux_script"]
 
+    def test_a_seeded_tool_cache_gets_pip_entry_points_from_its_bundled_wheel(self) -> None:
+        """The NuGet package ships no ``Scripts``, and a workflow's bare
+        ``pip`` resolves only there (MCPs run 36254365786), so the seed is
+        judged, and repaired, by ``Scripts\\pip.exe``."""
+        lines = runner_render.render_windows_python_toolcache_lines(
+            RunnerInstall(
+                repo="wagner-austin/MCPs",
+                runner_name="lavender",
+                side="windows",
+                service="actions.runner.wagner-austin-MCPs.lavender",
+                workdir="C:/actions-runner/_work",
+                labels=["lavender"],
+                python_toolcache=["3.11.9"],
+            )
+        )
+        assert lines[0] == "$ToolDir = 'C:\\actions-runner\\_work\\_tool'"
+        assert lines[2] == "if (-not (Test-Path (Join-Path $Target 'Scripts\\pip.exe'))) {"
+        assert lines[10:15] == [
+            "    $Wheel = @(Get-ChildItem -LiteralPath "
+            "(Join-Path $Target 'Lib\\ensurepip\\_bundled') -Filter 'pip-*.whl')",
+            "    if ($Wheel.Count -ne 1) { throw "
+            '"expected one bundled pip wheel in seeded 3.11.9, found $($Wheel.Count)" }',
+            "    & (Join-Path $Target 'python.exe') -m pip install --force-reinstall --no-deps "
+            "--no-index --no-warn-script-location --disable-pip-version-check $Wheel[0].FullName",
+            "    if ($LASTEXITCODE -ne 0) { throw 'pip reinstall failed in seeded 3.11.9' }",
+            "    if (-not (Test-Path (Join-Path $Target 'Scripts\\pip.exe'))) { "
+            "throw 'pip.exe missing in seeded 3.11.9' }",
+        ]
+
     def test_a_host_declaring_neither_says_so_instead_of_vanishing(self) -> None:
         rendered = runner_render.render_provision(
             _host(keepalive_task=None, wslconfig_min_memory_gb=None)
@@ -206,7 +235,10 @@ class TestLinuxScript:
             for line in runner_render.render_windows_install_lines(windows)
             if "config.cmd' --unattended" in line
         ]
-        assert configure_cmd.endswith("--name lavender --labels lavender --runasservice --replace")
+        assert configure_cmd.endswith(
+            "--name lavender --labels lavender --runasservice "
+            "--windowslogonaccount 'NT AUTHORITY\\SYSTEM' --replace"
+        )
 
     def test_the_local_bin_line_appends_once_when_run_for_real(
         self, tmp_path: pathlib.Path
@@ -342,7 +374,12 @@ class TestRerunsOverAHalfBuiltHost:
             "if ($LASTEXITCODE -ne 0) { throw 'config.cmd for wagner-austin/MCPs"
             in (lines[guard + 2])
         )
-        assert lines[-1] == "}"
+        assert lines[guard + 3] == "}"
+        # The account convergence closes the install, ahead of any seeding
+        # its work-tree removal would otherwise undo.
+        assert lines[guard + 4 :] == runner_account.render_service_account_lines(
+            self._install("windows")
+        )
 
     def test_an_install_seeding_nothing_renders_no_toolcache_lines(self) -> None:
         assert runner_render.render_windows_python_toolcache_lines(self._install("windows")) == []
