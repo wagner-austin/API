@@ -23,6 +23,7 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_tank_state,
 )
+from tankpit_bot.types.constants import TankLiveness
 from tests.conftest import FakeFileSystem
 
 _NOW = 100000
@@ -144,7 +145,7 @@ class TestBuildFleetReport:
             timestamp_ms=_NOW,
             last_wire_seen_ms=_NOW,
             last_position_update_ms=_NOW,
-            liveness="deactivated",
+            liveness=TankLiveness.DEACTIVATED,
         )
         unplaced = make_tank_state(
             tank_id=602,
