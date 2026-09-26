@@ -16,6 +16,7 @@ from tankpit_bot.types.constants import (
     TEAM_RED,
     TERRAIN_BLOCK_BRIDGE,
     TERRAIN_GROUND,
+    EntitySource,
 )
 
 
@@ -182,5 +183,5 @@ def test_world_state_source_maps_to_world_state_refresh_kind() -> None:
     """
     from tankpit_bot.state.types import make_container_state
 
-    container = make_container_state(10, 20, True, 300, source="world_state")
+    container = make_container_state(10, 20, True, 300, source=EntitySource.WORLD_STATE)
     assert container["refresh_kind"] == "world_state"

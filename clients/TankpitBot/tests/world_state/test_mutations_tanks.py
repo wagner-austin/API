@@ -8,6 +8,7 @@ from tankpit_bot.state import (
     make_empty_world_state,
     remove_tank,
 )
+from tankpit_bot.types.constants import EntitySource
 
 
 class TestRemoveTank:
@@ -34,7 +35,7 @@ class TestRemoveTank:
                 tank_id=42,
                 timestamp_ms=500,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(50, 50),
                 team=0,
                 rank=1,
@@ -82,7 +83,7 @@ class TestDeactivateTank:
                 tank_id=505,
                 timestamp_ms=500,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(202, 194),
                 team=3,
                 rank=1,
@@ -99,7 +100,7 @@ class TestDeactivateTank:
                 tank_id=505,
                 timestamp_ms=30_000,
                 is_wire_sourced=False,
-                storage_source="world_state",
+                storage_source=EntitySource.WORLD_STATE,
                 fact_source="wire_0x4C_map_data",
                 position_is_authoritative=True,
                 position=(40, 61),
@@ -122,7 +123,7 @@ class TestDeactivateTank:
                 tank_id=505,
                 timestamp_ms=500,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(202, 194),
                 team=3,
                 rank=1,
@@ -138,7 +139,7 @@ class TestDeactivateTank:
                 tank_id=505,
                 timestamp_ms=30_000,
                 is_wire_sourced=False,
-                storage_source="world_state",
+                storage_source=EntitySource.WORLD_STATE,
                 fact_source="wire_0x48_enemy_detect",
                 position_is_authoritative=False,
                 position=(40, 61),
@@ -148,7 +149,7 @@ class TestDeactivateTank:
         assert still_dead["tanks"]["505"]["liveness"] == "deactivated"
 
     def test_marks_tank_deactivated(self) -> None:
-        """Existing tank flips to ``liveness="deactivated"`` and keeps tile.
+        """Existing tank flips to ``liveness=TankLiveness.DEACTIVATED`` and keeps tile.
 
         Replays the 2026-06-20 ghost_visual kill cycle at the
         world-state layer: TankEntry establishes orange-8 at
@@ -166,7 +167,7 @@ class TestDeactivateTank:
                 tank_id=534,
                 timestamp_ms=500,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(170, 174),
                 team=3,
                 rank=2,

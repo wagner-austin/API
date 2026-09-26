@@ -7,6 +7,7 @@ from tankpit_bot.state.types import (
     make_empty_world_state,
     make_tank_state,
 )
+from tankpit_bot.types.constants import EntitySource
 
 
 def make_world_with_seed(
@@ -56,7 +57,7 @@ def make_world_with_seed(
         name=name,
         is_bot=is_bot,
         is_self=False,
-        source="viewport",
+        source=EntitySource.VIEWPORT,
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=last_wire_seen_ms,
         last_position_update_ms=last_position_update_ms,

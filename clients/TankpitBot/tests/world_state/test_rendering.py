@@ -36,6 +36,7 @@ from tankpit_bot.types.constants import (
     TERRAIN_FERRY,
     TERRAIN_FERRY_ROCK,
     TERRAIN_GROUND,
+    EntitySource,
 )
 
 _IMAGE = load_pillow_image_module()
@@ -148,7 +149,7 @@ class TestRenderWorldAscii:
                 tank_id=42,
                 timestamp_ms=1000,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(5, 5),
                 team=TEAM_RED,
                 rank=1,
@@ -179,7 +180,7 @@ class TestRenderWorldAscii:
                 tank_id=42,
                 timestamp_ms=1000,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(5, 5),
                 team=TEAM_BLUE,
                 rank=1,
@@ -237,7 +238,7 @@ class TestRenderWorldAscii:
                 tank_id=10,
                 timestamp_ms=600,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(5, 5),
                 team=TEAM_BLUE,
                 rank=1,
@@ -251,7 +252,7 @@ class TestRenderWorldAscii:
                 tank_id=20,
                 timestamp_ms=700,
                 is_wire_sourced=True,
-                storage_source="viewport",
+                storage_source=EntitySource.VIEWPORT,
                 position=(6, 6),
                 team=TEAM_RED,
                 rank=1,

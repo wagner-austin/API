@@ -12,6 +12,7 @@ from tankpit_bot.state.types import (
     make_empty_world_state,
     make_tank_observation,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.world_state._observation_fixtures import make_world_with_seed
 
 
@@ -25,7 +26,7 @@ class TestInvariantTimestampAlwaysAdvances:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
         )
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["timestamp_ms"] == 5000
@@ -37,7 +38,7 @@ class TestInvariantTimestampAlwaysAdvances:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=False,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -54,7 +55,7 @@ class TestInvariantWireSeenRequiresWire:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
         )
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["last_wire_seen_ms"] == 5000
@@ -66,7 +67,7 @@ class TestInvariantWireSeenRequiresWire:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=False,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -79,7 +80,7 @@ class TestInvariantWireSeenRequiresWire:
             tank_id=99,
             timestamp_ms=5000,
             is_wire_sourced=False,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -106,7 +107,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -123,7 +124,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             damage_state=2,
         )
         result = apply_tank_observation(state, obs)
@@ -145,7 +146,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             timestamp_ms=5000,
             is_wire_sourced=False,
             position_is_authoritative=True,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -167,7 +168,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             timestamp_ms=5000,
             is_wire_sourced=False,
             position_is_authoritative=True,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -182,7 +183,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             timestamp_ms=5000,
             is_wire_sourced=True,
             position_is_authoritative=True,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -204,7 +205,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             timestamp_ms=5000,
             is_wire_sourced=False,
             position_is_authoritative=False,
-            storage_source="radar",
+            storage_source=EntitySource.RADAR,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -220,7 +221,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             timestamp_ms=5000,
             is_wire_sourced=False,
             position_is_authoritative=True,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -236,7 +237,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             timestamp_ms=5000,
             is_wire_sourced=False,
             position_is_authoritative=False,
-            storage_source="radar",
+            storage_source=EntitySource.RADAR,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -251,7 +252,7 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
             tank_id=99,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             damage_state=2,
         )
         result = apply_tank_observation(state, obs)

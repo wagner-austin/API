@@ -11,6 +11,7 @@ from tankpit_bot.state.types import (
     make_empty_world_state,
     make_tank_observation,
 )
+from tankpit_bot.types.constants import EntitySource
 from tests.world_state._observation_fixtures import make_world_with_seed
 
 
@@ -24,7 +25,7 @@ class TestFieldMergeSemantics:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             position=(99, 88),
         )
         result = apply_tank_observation(state, obs)
@@ -38,7 +39,7 @@ class TestFieldMergeSemantics:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             damage_state=2,
         )
         result = apply_tank_observation(state, obs)
@@ -52,7 +53,7 @@ class TestFieldMergeSemantics:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             team=3,
             rank=5,
             damage_state=2,
@@ -72,7 +73,7 @@ class TestFieldMergeSemantics:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
         )
         result = apply_tank_observation(state, obs)
         tank = result["tanks"][key]
@@ -88,7 +89,7 @@ class TestFieldMergeSemantics:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             name="new",
             is_bot=True,
         )
@@ -104,7 +105,7 @@ class TestFieldMergeSemantics:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
         )
         result = apply_tank_observation(state, obs)
         tank = result["tanks"][key]
@@ -122,7 +123,7 @@ class TestTankCreationOnFirstObservation:
             tank_id=77,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             position=(40, 50),
             team=1,
             rank=2,
@@ -149,7 +150,7 @@ class TestTankCreationOnFirstObservation:
             tank_id=77,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             damage_state=2,
         )
         result = apply_tank_observation(state, obs)
@@ -177,7 +178,7 @@ class TestTankCreationOnFirstObservation:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             position=(40, 50),
         )
         result = apply_tank_observation(state, obs)
@@ -194,7 +195,7 @@ class TestStorageSourceIsRecorded:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
         )
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["source"] == "viewport"
@@ -206,7 +207,7 @@ class TestStorageSourceIsRecorded:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="radar",
+            storage_source=EntitySource.RADAR,
         )
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["source"] == "radar"
@@ -218,7 +219,7 @@ class TestStorageSourceIsRecorded:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=False,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
         )
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["source"] == "world_state"
@@ -234,7 +235,7 @@ class TestOuterTimestampAdvances:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
         )
         result = apply_tank_observation(state, obs)
         assert result["timestamp_ms"] == 5000
@@ -257,7 +258,7 @@ class TestMapPositionDeferSentinel:
             timestamp_ms=5000,
             is_wire_sourced=False,
             position_is_authoritative=True,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)

@@ -13,6 +13,7 @@ from tankpit_bot.state.types import (
     encode_tank_observation,
     make_tank_observation,
 )
+from tankpit_bot.types.constants import EntitySource
 
 
 class TestTankObservationCodec:
@@ -24,7 +25,7 @@ class TestTankObservationCodec:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=True,
-            storage_source="viewport",
+            storage_source=EntitySource.VIEWPORT,
             position=(40, 50),
             team=2,
             rank=3,
@@ -43,7 +44,7 @@ class TestTankObservationCodec:
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=False,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
         )
         encoded = encode_tank_observation(obs)
         decoded = decode_tank_observation(encoded)
@@ -189,7 +190,7 @@ class TestTankObservationCodec:
             decode_tank_observation(data)
 
     def test_decode_rejects_unknown_storage_source(self) -> None:
-        """Unknown ``storage_source`` raises via shared validator."""
+        """Unknown ``storage_source`` is refused by name via ``require_member``."""
         data: JSONObject = {
             "tank_id": 42,
             "timestamp_ms": 5000,
@@ -203,7 +204,7 @@ class TestTankObservationCodec:
             "name": None,
             "is_bot": None,
         }
-        with pytest.raises(JSONTypeError, match="storage_source must be"):
+        with pytest.raises(JSONTypeError, match="Invalid storage_source 'moon'"):
             decode_tank_observation(data)
 
     def test_decode_rejects_bool_in_optional_int_field(self) -> None:

@@ -16,11 +16,7 @@ from tankpit_bot.state import (
     make_empty_world_state,
     update_container_from_radar,
 )
-from tankpit_bot.types.constants import (
-    CONTAINER_REFRESH_KINDS,
-    decode_container_refresh_kind,
-    encode_container_refresh_kind,
-)
+from tankpit_bot.types.constants import ContainerRefreshKind, TankLiveness
 
 
 class TestDecodeTankState:
@@ -124,14 +120,14 @@ class TestDecodeTankState:
             "last_position_update_ms": 0,
             "liveness": "alive",
         }
-        with pytest.raises(JSONTypeError, match="source must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid source 'invalid'"):
             decode_tank_state(data)
 
     def test_invalid_liveness_raises(self) -> None:
         """Raises JSONTypeError for an unsupported tank liveness value.
 
-        Locks in ``require_tank_liveness`` rejects anything outside
-        the three documented states.
+        Locks in that the decoder rejects anything outside the
+        ``TankLiveness`` members.
         """
         data: JSONObject = {
             "tank_id": 42,
@@ -150,12 +146,12 @@ class TestDecodeTankState:
             "last_position_update_ms": 0,
             "liveness": "zombified",
         }
-        with pytest.raises(JSONTypeError, match="liveness must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid liveness 'zombified'"):
             decode_tank_state(data)
 
     def test_all_liveness_states_decode(self) -> None:
-        """Each of ``alive`` / ``deactivated`` decodes."""
-        for state in ("alive", "deactivated"):
+        """Every ``TankLiveness`` member decodes from its wire word."""
+        for state in TankLiveness:
             data: JSONObject = {
                 "tank_id": 42,
                 "x": 100,
@@ -171,10 +167,10 @@ class TestDecodeTankState:
                 "timestamp_ms": 5000,
                 "last_wire_seen_ms": 0,
                 "last_position_update_ms": 0,
-                "liveness": state,
+                "liveness": state.value,
             }
             tank = decode_tank_state(data)
-            assert tank["liveness"] == state
+            assert tank["liveness"] is state
 
 
 class TestDecodeContainerState:
@@ -203,22 +199,39 @@ class TestDecodeContainerState:
         assert container["timestamp_ms"] == 5000
         assert container["failed_pickups"] == 0
 
-    @pytest.mark.parametrize("refresh_kind", CONTAINER_REFRESH_KINDS)
-    def test_decodes_all_refresh_kinds(self, refresh_kind: str) -> None:
-        """Decodes every supported container refresh kind."""
-        data: JSONObject = {"refresh_kind": refresh_kind}
+    @pytest.mark.parametrize("refresh_kind", list(ContainerRefreshKind))
+    def test_decodes_all_refresh_kinds(self, refresh_kind: ContainerRefreshKind) -> None:
+        """Decodes every supported container refresh kind from its wire word."""
+        data: JSONObject = {
+            "x": 50,
+            "y": 75,
+            "is_fuel": True,
+            "volume": 300,
+            "source": "radar",
+            "refresh_kind": refresh_kind.value,
+            "timestamp_ms": 5000,
+            "failed_pickups": 0,
+        }
 
-        decoded = decode_container_refresh_kind(data, "refresh_kind")
+        decoded = decode_container_state(data)
 
-        assert decoded == refresh_kind
-        assert encode_container_refresh_kind(decoded) == refresh_kind
+        assert decoded["refresh_kind"] is refresh_kind
 
     def test_invalid_refresh_kind_raises(self) -> None:
-        """Raises JSONTypeError for an unsupported refresh kind."""
-        data: JSONObject = {"refresh_kind": "invalid"}
+        """Raises JSONTypeError naming an unsupported refresh kind."""
+        data: JSONObject = {
+            "x": 50,
+            "y": 75,
+            "is_fuel": True,
+            "volume": 300,
+            "source": "radar",
+            "refresh_kind": "invalid",
+            "timestamp_ms": 5000,
+            "failed_pickups": 0,
+        }
 
-        with pytest.raises(JSONTypeError, match="refresh_kind must be one of"):
-            decode_container_refresh_kind(data, "refresh_kind")
+        with pytest.raises(JSONTypeError, match="Invalid refresh_kind 'invalid'"):
+            decode_container_state(data)
 
 
 class TestDecodeMineState:
