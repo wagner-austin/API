@@ -49,6 +49,7 @@ from tankpit_bot.sim.transport import (
     split_client_frames,
 )
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.wire.helpers import EncodeError
 
 _WS_OPEN = 1
@@ -206,7 +207,7 @@ class SimCDPSession:
             self.wire_log.append(
                 CapturedMessage(
                     timestamp_ms=get_current_time_ms(),
-                    direction="received",
+                    direction=MessageDirection.RECEIVED,
                     payload=payload,
                     ws_url=_SIM_WS_URL,
                 )
@@ -308,7 +309,7 @@ class SimCDPSession:
         self.wire_log.append(
             CapturedMessage(
                 timestamp_ms=now,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url=_SIM_WS_URL,
             )
@@ -485,7 +486,7 @@ def deliver_batch(buffer: list[str], messages: list[BinaryMessage], link: SimCDP
     link.wire_log.append(
         CapturedMessage(
             timestamp_ms=get_current_time_ms(),
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=payload,
             ws_url=_SIM_WS_URL,
         )
