@@ -31,6 +31,7 @@ from platform_core.json_utils import (
     JSONValue,
     require_dict,
     require_int,
+    require_list,
     require_str,
     require_str_list,
 )
@@ -73,6 +74,22 @@ class DiskCeiling(TypedDict):
     baseline_measured: str
 
 
+class MachineVariable(TypedDict):
+    """One machine-scope environment variable every runner service inherits.
+
+    Attributes:
+        name: The variable's name, a plain identifier. ``Path`` is refused:
+            the machine PATH is ``machine_path_entries``, appended to rather
+            than replaced.
+        value: The exact value the variable must hold.
+        reason: Why the host needs it, printed beside a drifted audit row.
+    """
+
+    name: str
+    value: str
+    reason: str
+
+
 class HostBase(TypedDict):
     """Everything a stock Windows install needs before a runner can register.
 
@@ -86,6 +103,8 @@ class HostBase(TypedDict):
         apt_packages: Packages installed inside the distro before any runner.
         machine_path_entries: Directories appended to the machine PATH, which
             every Windows runner service inherits.
+        machine_environment: Machine-scope variables every Windows runner
+            service inherits, distinct by name.
         execution_policy: The LocalMachine execution policy, one of
             :data:`EXECUTION_POLICIES`.
         disk: The distro's disk ceiling and its idle baseline.
@@ -97,6 +116,7 @@ class HostBase(TypedDict):
     distro_dir: str
     apt_packages: list[str]
     machine_path_entries: list[str]
+    machine_environment: list[MachineVariable]
     execution_policy: str
     disk: DiskCeiling
 
@@ -191,6 +211,73 @@ def decode_disk_ceiling(value: JSONValue) -> DiskCeiling:
     return DiskCeiling(ceiling_gb=ceiling, baseline_gb=baseline, baseline_measured=measured)
 
 
+def encode_machine_variable(variable: MachineVariable) -> JSONObject:
+    """Encode one machine variable.
+
+    Args:
+        variable: The variable.
+
+    Returns:
+        JSON-serialisable mapping carrying every field.
+    """
+    return {"name": variable["name"], "value": variable["value"], "reason": variable["reason"]}
+
+
+def decode_machine_variable(value: JSONValue) -> MachineVariable:
+    """Decode and validate one machine variable.
+
+    Args:
+        value: Value produced by the JSON loader.
+
+    Returns:
+        The validated variable.
+
+    Raises:
+        JSONTypeError: If the value is not an object, a field is missing or
+            mistyped, the name is not a plain identifier or is ``Path``, or
+            the value or reason is empty. An empty value would delete the
+            variable the row exists to hold.
+    """
+    if not isinstance(value, dict):
+        raise JSONTypeError(f"machine variable must be a JSON object, got {type(value).__name__}")
+    name = require_str(value, "name")
+    if not (name[:1].isalpha() or name[:1] == "_") or not all(
+        c.isalnum() or c == "_" for c in name
+    ):
+        raise JSONTypeError(f"a machine variable's name must be a plain identifier, got {name!r}")
+    if name.lower() == "path":
+        raise JSONTypeError("the machine PATH is machine_path_entries, not a machine variable")
+    held = require_str(value, "value")
+    reason = require_str(value, "reason")
+    if not held or not reason:
+        raise JSONTypeError(f"machine variable {name} needs a non-empty value and reason")
+    return MachineVariable(name=name, value=held, reason=reason)
+
+
+def _decode_machine_environment(value: JSONObject) -> list[MachineVariable]:
+    """Decode the base's machine variables, refusing a name declared twice.
+
+    Args:
+        value: The base's JSON object.
+
+    Returns:
+        The variables, in declaration order.
+
+    Raises:
+        JSONTypeError: If the field is missing or not a list, an entry is invalid, or
+            two entries share a name, compared case-insensitively as Windows
+            compares them. Two values for one variable make the base rewrite
+            it on every run and the audit fail one of the rows forever.
+    """
+    variables = [
+        decode_machine_variable(entry) for entry in require_list(value, "machine_environment")
+    ]
+    names = [variable["name"].lower() for variable in variables]
+    if len(set(names)) != len(names):
+        raise JSONTypeError(f"machine_environment declares a name twice: {names}")
+    return variables
+
+
 def encode_host_base(base: HostBase) -> JSONObject:
     """Encode a host's base.
 
@@ -207,6 +294,9 @@ def encode_host_base(base: HostBase) -> JSONObject:
         "distro_dir": base["distro_dir"],
         "apt_packages": list(base["apt_packages"]),
         "machine_path_entries": list(base["machine_path_entries"]),
+        "machine_environment": [
+            encode_machine_variable(variable) for variable in base["machine_environment"]
+        ],
         "execution_policy": base["execution_policy"],
         "disk": encode_disk_ceiling(base["disk"]),
     }
@@ -250,6 +340,7 @@ def decode_host_base(value: JSONValue) -> HostBase:
         distro_dir=distro_dir,
         apt_packages=packages,
         machine_path_entries=require_str_list(value, "machine_path_entries"),
+        machine_environment=_decode_machine_environment(value),
         execution_policy=policy,
         disk=decode_disk_ceiling(require_dict(value, "disk")),
     )
@@ -259,11 +350,14 @@ __all__ = [
     "EXECUTION_POLICIES",
     "DiskCeiling",
     "HostBase",
+    "MachineVariable",
     "PinnedDownload",
     "decode_disk_ceiling",
     "decode_host_base",
+    "decode_machine_variable",
     "decode_pinned_download",
     "encode_disk_ceiling",
     "encode_host_base",
+    "encode_machine_variable",
     "encode_pinned_download",
 ]

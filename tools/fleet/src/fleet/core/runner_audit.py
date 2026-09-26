@@ -34,6 +34,10 @@ from fleet.core.runner_account import (
     service_account_check_id,
 )
 from fleet.core.runner_base_render import LONG_PATHS_KEY
+from fleet.core.runner_machine_env import (
+    machine_variable_check_id,
+    render_machine_environment_check_lines,
+)
 from fleet.core.script_values import scriptable
 
 #: File name the rendered audit script lands under in the host's scratch_dir.
@@ -139,6 +143,10 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
             reason="CI trees under the runner service's temp directory pass 260 characters, "
             "which a fresh install refuses",
         )
+    )
+    checks.extend(
+        ExpectedCheck(check_id=machine_variable_check_id(variable), reason=variable["reason"])
+        for variable in spec["base"]["machine_environment"]
     )
     if spec["gpu_required"]:
         # One per WSL runner, on that runner's own PATH: the jobs that
@@ -362,6 +370,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         "$GitLongPaths = (@(git config --system --get core.longpaths) -join '')",
         f"Emit '{LONG_PATHS_CHECK_ID}' ($LongPaths -eq 1 -and $GitLongPaths -eq 'true') "
         "('LongPathsEnabled=' + $LongPaths + ' git core.longpaths=' + $GitLongPaths)",
+        *render_machine_environment_check_lines(spec),
     ]
     if spec["gpu_required"]:
         lines += _gpu_check_lines(spec, distro)

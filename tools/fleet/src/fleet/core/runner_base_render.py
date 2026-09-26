@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_render
+from fleet.core.runner_machine_env import render_machine_environment_lines
 from fleet.core.script_values import scriptable
 
 #: The line the Windows base stage prints when Windows must restart first.
@@ -95,7 +96,8 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
 
     Returns:
         The complete PowerShell text. It prints :data:`REBOOT_MARKER` when
-        an enabled feature or the WSL install asks for a restart.
+        an enabled feature or the WSL install asks for a restart, or when a
+        machine variable changed (:mod:`fleet.core.runner_machine_env`).
 
     Raises:
         ValueError: When a roster value cannot be embedded verbatim.
@@ -185,6 +187,7 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
             f"    Write-Output 'added to the machine PATH: {entry}'",
             "}",
         ]
+    lines += render_machine_environment_lines(spec)
     lines += runner_render.render_wslconfig_lines(spec)
     lines += [f"if ($Reboot) {{ Write-Output '{REBOOT_MARKER}' }}", "exit 0"]
     return "\n".join(lines) + "\n"
