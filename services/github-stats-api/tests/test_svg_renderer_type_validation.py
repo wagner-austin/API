@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from platform_codebase import CapabilityStrength
+
 from github_stats_api.api.schemas.stats import (
     Capability,
 )
@@ -176,7 +178,7 @@ class TestBuildCapabilitiesResponse:
         """Test building capabilities response."""
         cap: Capability = {
             "name": "xgboost_tabular",
-            "strength": "strong",
+            "strength": CapabilityStrength.STRONG,
             "tags": ("ml", "tabular", "xgboost"),
             "description": "XGBoost gradient boosting",
         }

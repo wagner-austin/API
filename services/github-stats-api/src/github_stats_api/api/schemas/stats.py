@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from platform_codebase import CapabilityStrength
 from typing_extensions import TypedDict
 
 # Theme literal type for reuse across all request types
@@ -119,10 +120,6 @@ class LangsResponse(TypedDict, total=True):
     total_size: int
 
 
-# Capability strength literal type (matches platform_codebase)
-CapabilityStrength = Literal["strong", "moderate", "basic"]
-
-
 class HeroRequest(TypedDict, total=True):
     """Request for full-width hero card with rain animation.
 
@@ -213,7 +210,6 @@ __all__ = [
     "CapabilitiesRequest",
     "CapabilitiesResponse",
     "Capability",
-    "CapabilityStrength",
     "HeroRequest",
     "LangsRequest",
     "LangsResponse",

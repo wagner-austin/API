@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from platform_codebase import CapabilityStrength
+
 from github_stats_api.api.schemas.stats import (
     CapabilitiesResponse,
     Capability,
@@ -18,7 +20,7 @@ class TestRenderCapabilitiesCardWithEffects:
         """Test that radical theme includes all visual effects."""
         cap: Capability = {
             "name": "test_cap",
-            "strength": "strong",
+            "strength": CapabilityStrength.STRONG,
             "tags": (),
             "description": "Test",
         }
@@ -53,7 +55,7 @@ class TestRenderCapabilitiesCard:
         """Test rendering capabilities card."""
         cap: Capability = {
             "name": "xgboost_tabular",
-            "strength": "strong",
+            "strength": CapabilityStrength.STRONG,
             "tags": ("ml", "tabular"),
             "description": "XGBoost gradient boosting",
         }
@@ -87,19 +89,19 @@ class TestRenderCapabilitiesCard:
         caps: tuple[Capability, ...] = (
             {
                 "name": "xgboost_tabular",
-                "strength": "strong",
+                "strength": CapabilityStrength.STRONG,
                 "tags": ("ml",),
                 "description": "XGBoost",
             },
             {
                 "name": "fastapi_rest",
-                "strength": "moderate",
+                "strength": CapabilityStrength.MODERATE,
                 "tags": ("web",),
                 "description": "FastAPI REST",
             },
             {
                 "name": "pytorch_cv",
-                "strength": "basic",
+                "strength": CapabilityStrength.BASIC,
                 "tags": ("cv",),
                 "description": "PyTorch CV",
             },
@@ -159,7 +161,7 @@ class TestRenderCapabilitiesCard:
         """Test that theme colors are applied."""
         cap: Capability = {
             "name": "test_cap",
-            "strength": "strong",
+            "strength": CapabilityStrength.STRONG,
             "tags": (),
             "description": "Test",
         }
