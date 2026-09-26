@@ -49,6 +49,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
 
@@ -262,7 +263,7 @@ def sample_host(spec: HostRunnerSpec, *, at: int) -> LoadSample:
             spec["host"],
             f"{spec['scratch_dir']}/{FOREST_SCRIPT_NAME}",
             WINDOWS_FOREST_SCRIPT,
-            platform="windows",
+            platform=NodePlatform.WINDOWS,
         )
     return take_sample(spec, wsl_output, windows_output, at=at)
 

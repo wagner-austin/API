@@ -334,7 +334,7 @@ def for_platform(platform: NodePlatform) -> Dialect:
     Returns:
         The dialect.
     """
-    if platform == "windows":
+    if platform is NodePlatform.WINDOWS:
         return WindowsDialect()
     return LinuxDialect()
 

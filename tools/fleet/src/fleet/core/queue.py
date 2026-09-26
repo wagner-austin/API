@@ -39,7 +39,7 @@ from fleet.contracts.dispatch import (
     decode_listing_page,
     decode_reported,
 )
-from fleet.contracts.tags import NodeTag
+from fleet.contracts.tags import NodeTag, encode_tags
 from fleet.core import _test_hooks
 
 #: Environment variable holding fleet-mcp's ``x-api-key`` value.
@@ -156,8 +156,8 @@ def claim_next(
         AppError: Any transport or contract failure from the underlying call.
     """
     arguments: JSONObject = {
-        "lane": lane,
-        "tags": list(tags),
+        "lane": lane.value,
+        "tags": encode_tags(tags),
         "leaseSeconds": lease_seconds,
         **identity,
     }
@@ -282,7 +282,7 @@ def report_close(
     arguments: JSONObject = {
         "action": "close",
         "jobId": job_id,
-        "status": status,
+        "status": status.value,
         "detail": detail,
         **identity,
     }

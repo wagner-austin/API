@@ -25,6 +25,7 @@ from __future__ import annotations
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
 from fleet.core.runner_base_render import LONG_PATHS_KEY
@@ -491,7 +492,7 @@ def attempt_audit_host(spec: HostRunnerSpec) -> AuditOutcome:
         spec["host"],
         f"{spec['scratch_dir']}/{AUDIT_SCRIPT_NAME}",
         render_audit_script(spec),
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
     )
     failure = outcome["failure"]
     if failure is not None:

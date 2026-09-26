@@ -42,6 +42,7 @@ from __future__ import annotations
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, remote, runner_audit, runner_distro, runner_render
 
@@ -265,7 +266,7 @@ def _provision_windows(spec: HostRunnerSpec, install: RunnerInstall, token: str)
         spec["host"],
         f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-win.ps1",
         "\n".join(lines),
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
     )
 
 

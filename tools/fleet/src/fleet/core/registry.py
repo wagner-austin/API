@@ -275,8 +275,8 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
             enabled_here_disabled_there.append(name)
         if not node["enabled"] and declared["enabled"]:
             disabled_here_enabled_there.append(name)
-        if node["platform"] != declared["platform"]:
-            platform_disagrees.append((name, node["platform"], declared["platform"]))
+        if node["platform"] is not declared["platform"]:
+            platform_disagrees.append((name, node["platform"].value, declared["platform"].value))
         here_cuda = node["gpu"] is not None
         if here_cuda != declared["cuda"]:
             gpu_disagrees.append((name, here_cuda, declared["cuda"]))

@@ -123,7 +123,7 @@ def emit(
         run_id: The dispatch the event belongs to.
         node: Its node's workspace name.
         project: Repo-relative project path.
-        kind: What happened. Typed as the Literal rather than a string, so a
+        kind: What happened. Typed as the enum rather than a string, so a
             kind that does not exist is a type error here rather than a
             decode failure in whoever reads the feed next.
         detail: Human-readable specifics.
@@ -189,7 +189,7 @@ def take(
         run_id=lease["run_id"],
         node=node_name,
         project=project,
-        kind="leased",
+        kind=FeedKind.LEASED,
         detail=f"{workers} worker(s)",
         now_unix=now_unix,
     )
@@ -230,7 +230,7 @@ def abandon(
         run_id=lease["run_id"],
         node=lease["node"],
         project=lease["project"],
-        kind="refused",
+        kind=FeedKind.REFUSED,
         detail=detail,
         now_unix=now_unix,
     )

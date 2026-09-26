@@ -16,6 +16,7 @@ re-expands its argument, which turned a ``sed`` expression's ``$`` into
 
 from __future__ import annotations
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
 
@@ -100,7 +101,7 @@ def run_distro_script(spec: HostRunnerSpec, stem: str, body: str, *, timeout_sec
         spec["host"],
         f"{spec['scratch_dir']}/{stem}-driver.ps1",
         driver,
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         timeout_seconds=timeout_seconds,
     )
 

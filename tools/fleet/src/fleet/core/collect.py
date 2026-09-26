@@ -131,7 +131,7 @@ def outcome_for(exit_code: int) -> LedgerOutcome:
         reason: the ledger's ``outcome`` says what the WORK did, and the
         command that collected it exits 0 either way.
     """
-    return "passed" if exit_code == PASSING_EXIT_CODE else "failed"
+    return LedgerOutcome.PASSED if exit_code == PASSING_EXIT_CODE else LedgerOutcome.FAILED
 
 
 def describe(node: NodeConfig, *, run_id: str, exit_code: int) -> str:

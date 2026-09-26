@@ -58,6 +58,7 @@ import pathlib
 import re
 from typing import Final, TypedDict
 
+from fleet.contracts.dispatch import DispatchCommand
 from fleet.core import _test_hooks
 from fleet.core._test_hooks import CommandResult
 from fleet.core.published_tree import PublishedTree
@@ -81,25 +82,21 @@ TARGET_INVALID_CODE: Final = "RESTART_TARGET_INVALID"
 #: queue that has stopped enforcing its own CHECK, which is worth naming.
 TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 
-#: The two session verbs this runner executes on the hub, and the
-#: session-audit mode each maps to (MCPs migs 507 and 525). ``revive-session``
-#: (board task 1fe89973) is the twin of ``restart-session`` for a session
-#: with NO pane and no process: session-audit opens a new tmux window and
-#: resumes the transcript there. One table, one runner path, so the second
-#: verb is a row here rather than a second copy of the job.
-RESTART_COMMAND: Final = "restart-session"
-REVIVE_COMMAND: Final = "revive-session"
-KILL_COMMAND: Final = "kill-session"
-KILL_HARD_COMMAND: Final = "kill-session-hard"
-#: MCPs mig 564, board task 01f31e4a: shrinking a working session that got
-#: too big, the operator's "/compact if they get too big", never an exit.
-COMPACT_COMMAND: Final = "compact-session"
-SESSION_COMMANDS: Final[tuple[str, ...]] = (
-    RESTART_COMMAND,
-    REVIVE_COMMAND,
-    KILL_COMMAND,
-    KILL_HARD_COMMAND,
-    COMPACT_COMMAND,
+#: The session verbs this runner executes on the hub, each mapped to a
+#: session-audit mode by :func:`session_invocation` (MCPs migs 507, 525, 526
+#: and 564). ``revive-session`` (board task 1fe89973) is the twin of
+#: ``restart-session`` for a session with NO pane and no process:
+#: session-audit opens a new tmux window and resumes the transcript there.
+#: ``compact-session`` (board task 01f31e4a) shrinks a working session that
+#: got too big, the operator's "/compact if they get too big", never an
+#: exit. The words are the queue's own :class:`DispatchCommand` members, so
+#: one vocabulary names them.
+SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
+    DispatchCommand.RESTART_SESSION,
+    DispatchCommand.REVIVE_SESSION,
+    DispatchCommand.KILL_SESSION,
+    DispatchCommand.KILL_SESSION_HARD,
+    DispatchCommand.COMPACT_SESSION,
 )
 
 #: Detail prefix for a command this module has no invocation for.
@@ -308,7 +305,7 @@ class SessionInvocation(TypedDict):
 def session_invocation(
     mcps_root: pathlib.Path,
     tree: PublishedTree,
-    command: str,
+    command: DispatchCommand,
     session_target: str,
     requested_by: str,
 ) -> SessionInvocation:
@@ -331,7 +328,7 @@ def session_invocation(
             here, so this names a routing defect rather than guessing.
     """
     registry_dir = tree["registry_dir"]
-    if command == RESTART_COMMAND:
+    if command is DispatchCommand.RESTART_SESSION:
         return SessionInvocation(
             verb="restart",
             mode="rollover",
@@ -340,7 +337,7 @@ def session_invocation(
             commit=tree["commit"],
             python_path=tree["python_path"],
         )
-    if command == REVIVE_COMMAND:
+    if command is DispatchCommand.REVIVE_SESSION:
         return SessionInvocation(
             verb="revive",
             mode="revive",
@@ -349,7 +346,7 @@ def session_invocation(
             commit=tree["commit"],
             python_path=tree["python_path"],
         )
-    if command in (KILL_COMMAND, KILL_HARD_COMMAND):
+    if command in (DispatchCommand.KILL_SESSION, DispatchCommand.KILL_SESSION_HARD):
         return SessionInvocation(
             verb="kill",
             mode="kill",
@@ -358,13 +355,13 @@ def session_invocation(
                 registry_dir,
                 session_target,
                 requested_by,
-                hard=command == KILL_HARD_COMMAND,
+                hard=command is DispatchCommand.KILL_SESSION_HARD,
             ),
             types_requester=True,
             commit=tree["commit"],
             python_path=tree["python_path"],
         )
-    if command == COMPACT_COMMAND:
+    if command is DispatchCommand.COMPACT_SESSION:
         return SessionInvocation(
             verb="compact",
             mode="compact",
@@ -373,7 +370,7 @@ def session_invocation(
             commit=tree["commit"],
             python_path=tree["python_path"],
         )
-    raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command!r} is not a session verb")
+    raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command.value!r} is not a session verb")
 
 
 def requester_refusal(requested_by: str) -> str | None:
@@ -469,14 +466,9 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
 
 __all__ = [
     "COMMAND_UNKNOWN_CODE",
-    "COMPACT_COMMAND",
-    "KILL_COMMAND",
-    "KILL_HARD_COMMAND",
     "LABEL_PATTERN",
     "PYTHONPATH_VARIABLE",
     "REQUESTER_INVALID_CODE",
-    "RESTART_COMMAND",
-    "REVIVE_COMMAND",
     "ROOT_MISSING_CODE",
     "SESSION_AUDIT_DIR",
     "SESSION_COMMANDS",

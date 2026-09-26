@@ -92,7 +92,7 @@ def started_row(
         session_id=lease["session_id"],
         started_unix=lease["acquired_unix"],
         ended_unix=lease["acquired_unix"],
-        outcome="running",
+        outcome=LedgerOutcome.RUNNING,
         exit_code=NO_EXIT_CODE,
         workers=workers,
         detail=detail,
@@ -365,7 +365,7 @@ def launch(
         run_id=run_id,
         node=node_name,
         project=project,
-        kind="staged",
+        kind=FeedKind.STAGED,
         # Counted, not listed. A real dispatch carries about forty-six members
         # -- the project, its dependencies, and one manifest per package for
         # the guard rules that scan them all -- and naming each turned one feed
@@ -395,7 +395,7 @@ def launch(
             run_id=run_id,
             node=node_name,
             project=project,
-            kind="staged",
+            kind=FeedKind.STAGED,
             detail=(
                 f"{len(companion['data'])} bytes, the {companion['directory']} companion "
                 f"at {companion['sha']}, to {beside}"
@@ -429,7 +429,7 @@ def launch(
         run_id=run_id,
         node=node_name,
         project=project,
-        kind="started",
+        kind=FeedKind.STARTED,
         detail=f"make {MAKE_TARGET} at {workers} worker(s)",
         now_unix=_test_hooks.now(),
     )
@@ -502,12 +502,12 @@ def finish(
 #: Spelling the overlap once, here, is what stops a reader assuming the two
 #: enums are interchangeable.
 _OUTCOME_EVENT: dict[LedgerOutcome, FeedKind] = {
-    "refused": "refused",
-    "passed": "passed",
-    "failed": "failed",
-    "cancelled": "cancelled",
-    "lost": "lost",
-    "running": "heartbeat",
+    LedgerOutcome.REFUSED: FeedKind.REFUSED,
+    LedgerOutcome.PASSED: FeedKind.PASSED,
+    LedgerOutcome.FAILED: FeedKind.FAILED,
+    LedgerOutcome.CANCELLED: FeedKind.CANCELLED,
+    LedgerOutcome.LOST: FeedKind.LOST,
+    LedgerOutcome.RUNNING: FeedKind.HEARTBEAT,
 }
 
 

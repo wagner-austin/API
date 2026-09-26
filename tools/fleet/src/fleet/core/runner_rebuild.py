@@ -41,6 +41,7 @@ from __future__ import annotations
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import (
     _test_hooks,
@@ -113,7 +114,7 @@ def _boot_instant(spec: HostRunnerSpec) -> str | None:
         spec["host"],
         _script_path(spec, "fleet-rebuild-boot.ps1"),
         BOOT_INSTANT_SCRIPT,
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
     )
     if outcome["failure"] is not None:
         return None
@@ -139,13 +140,13 @@ def reboot_and_wait(spec: HostRunnerSpec) -> str:
         spec["host"],
         _script_path(spec, "fleet-rebuild-boot.ps1"),
         BOOT_INSTANT_SCRIPT,
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
     ).strip()
     remote.run_script(
         spec["host"],
         _script_path(spec, "fleet-rebuild-restart.ps1"),
         "shutdown.exe /r /t 10 /c 'fleet-runners --rebuild'\nexit $LASTEXITCODE\n",
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
     )
     deadline = _test_hooks.now() + REBOOT_DEADLINE_SECONDS
     while _test_hooks.now() < deadline:
@@ -177,7 +178,11 @@ def _windows_base(spec: HostRunnerSpec, steps: list[str]) -> None:
     script = runner_base_render.render_windows_base_script(spec)
     path = _script_path(spec, "fleet-rebuild-windows-base.ps1")
     output = remote.run_script_within(
-        spec["host"], path, script, platform="windows", timeout_seconds=STAGE_TIMEOUT_SECONDS
+        spec["host"],
+        path,
+        script,
+        platform=NodePlatform.WINDOWS,
+        timeout_seconds=STAGE_TIMEOUT_SECONDS,
     )
     if runner_base_render.REBOOT_MARKER not in output:
         steps.append("windows base: in place")
@@ -185,7 +190,11 @@ def _windows_base(spec: HostRunnerSpec, steps: list[str]) -> None:
     boot = reboot_and_wait(spec)
     steps.append(f"windows base: laid, and the host restarted for it (booted {boot})")
     again = remote.run_script_within(
-        spec["host"], path, script, platform="windows", timeout_seconds=STAGE_TIMEOUT_SECONDS
+        spec["host"],
+        path,
+        script,
+        platform=NodePlatform.WINDOWS,
+        timeout_seconds=STAGE_TIMEOUT_SECONDS,
     )
     if runner_base_render.REBOOT_MARKER in again:
         raise AppError(
@@ -210,7 +219,7 @@ def _distro(spec: HostRunnerSpec, steps: list[str]) -> None:
         spec["host"],
         _script_path(spec, "fleet-rebuild-import.ps1"),
         runner_base_render.render_import_script(spec),
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         timeout_seconds=STAGE_TIMEOUT_SECONDS,
     ).strip()
     steps.append(f"distro: {imported or 'already registered'}")
@@ -226,7 +235,7 @@ def _distro(spec: HostRunnerSpec, steps: list[str]) -> None:
             spec["host"],
             _script_path(spec, "fleet-rebuild-terminate.ps1"),
             f"wsl --terminate '{distro}'\nexit $LASTEXITCODE\n",
-            platform="windows",
+            platform=NodePlatform.WINDOWS,
         )
         steps.append("wsl.conf: written, and the distro restarted into systemd")
     else:
@@ -285,7 +294,7 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> list[str]:
         spec["host"],
         _script_path(spec, "fleet-rebuild-provision.ps1"),
         windows_script,
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         timeout_seconds=STAGE_TIMEOUT_SECONDS,
     )
     steps.append(f"provision.ps1: ran for {len(windows_repos)} Windows-side repositories")
