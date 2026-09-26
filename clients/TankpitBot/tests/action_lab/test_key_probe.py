@@ -39,6 +39,7 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import make_self_state, make_viewport_state
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
@@ -103,7 +104,7 @@ class _KeyHarness(KeyProbe):
         self._fake_messages.append(
             CapturedMessage(
                 timestamp_ms=self._clock.now_ms,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="",
                 ws_url="wss://test",
             )

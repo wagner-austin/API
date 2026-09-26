@@ -47,6 +47,7 @@ from tankpit_bot.types import (
     CapturedMessage,
     decode_capture_session,
 )
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_execute_raises_when_playwright_is_missing() -> None:
@@ -245,7 +246,7 @@ def test_on_message_captured_buffers_received() -> None:
 
     probe = TeleportProbe("https://tankpit.com/play", headless=True)
     msg = CapturedMessage(
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload="dGVzdA==",
         timestamp_ms=1000,
         ws_url="wss://tankpit.com/ws/",
@@ -259,7 +260,7 @@ def test_on_message_captured_ignores_sent() -> None:
 
     probe = TeleportProbe("https://tankpit.com/play", headless=True)
     msg = CapturedMessage(
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload="dGVzdA==",
         timestamp_ms=1000,
         ws_url="wss://tankpit.com/ws/",

@@ -42,6 +42,7 @@ from tankpit_bot.state import (
 from tankpit_bot.types import (
     CapturedMessage,
 )
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
@@ -332,10 +333,10 @@ class _SingleTargetHarness(MovementProbe):
         self._messages.append(
             CapturedMessage(
                 timestamp_ms=action_hooks.get_current_time_ms(),
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload="map",
                 ws_url="wss://x",
-                sent_origin="bot_injected",
+                sent_origin=SentFrameOrigin.BOT_INJECTED,
                 sent_label="map_open",
             )
         )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.probe_factory import create_probe
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_factory_creates_probe_with_injected_services() -> None:
@@ -18,14 +19,18 @@ def test_factory_creates_probe_with_injected_services() -> None:
 def test_messages_property_delegates_to_cdp_service() -> None:
     probe = ProbeBase("https://test.com")
     assert probe.messages == []
-    msg = CapturedMessage(timestamp_ms=1, direction="received", payload="x", ws_url="wss://t")
+    msg = CapturedMessage(
+        timestamp_ms=1, direction=MessageDirection.RECEIVED, payload="x", ws_url="wss://t"
+    )
     probe._cdp_service.messages.append(msg)
     assert len(probe.messages) == 1
 
 
 def test_messages_setter_delegates_to_cdp_service() -> None:
     probe = ProbeBase("https://test.com")
-    msg = CapturedMessage(timestamp_ms=1, direction="received", payload="x", ws_url="wss://t")
+    msg = CapturedMessage(
+        timestamp_ms=1, direction=MessageDirection.RECEIVED, payload="x", ws_url="wss://t"
+    )
     probe._messages = [msg]
     assert probe._cdp_service.messages == [msg]
 
@@ -51,7 +56,9 @@ def test_captured_message_count() -> None:
     probe = ProbeBase("https://test.com")
     assert probe.captured_message_count() == 0
     probe._cdp_service.messages.append(
-        CapturedMessage(timestamp_ms=1, direction="received", payload="x", ws_url="wss://t"),
+        CapturedMessage(
+            timestamp_ms=1, direction=MessageDirection.RECEIVED, payload="x", ws_url="wss://t"
+        ),
     )
     assert probe.captured_message_count() == 1
 

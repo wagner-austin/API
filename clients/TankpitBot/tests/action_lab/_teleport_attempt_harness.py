@@ -24,6 +24,7 @@ from tankpit_bot.state import (
     make_empty_world_state,
 )
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 
 class _Probe:
@@ -35,7 +36,7 @@ class _Probe:
         self.world = ws
         self._messages = [
             CapturedMessage(
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload="a",
                 timestamp_ms=1,
                 ws_url="wss://example.test/ws/",

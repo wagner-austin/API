@@ -34,6 +34,7 @@ from tankpit_bot.state.types import (
     make_viewport_state,
 )
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
@@ -69,7 +70,7 @@ def _ack_message(enabled: bool) -> CapturedMessage:
     frame = bytes([0x02, 0x00]) + (b"A1" if enabled else b"A0")
     return CapturedMessage(
         timestamp_ms=1000,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=base64.b64encode(frame).decode("ascii"),
         ws_url="wss://test",
     )
@@ -84,7 +85,7 @@ def _truncated_message() -> CapturedMessage:
     """
     return CapturedMessage(
         timestamp_ms=1000,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=base64.b64encode(bytes([0xFF, 0x00, 0x41])).decode("ascii"),
         ws_url="wss://test",
     )
@@ -100,25 +101,25 @@ def _noise_messages() -> list[CapturedMessage]:
     return [
         CapturedMessage(
             timestamp_ms=1000,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload=base64.b64encode(bytes([0x02, 0x00, 0x41, 0x01])).decode("ascii"),
             ws_url="wss://test",
         ),
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="",
             ws_url="wss://test",
         ),
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=base64.b64encode(bytes([0x03, 0x00, 0x2E, 0x01, 0x02])).decode("ascii"),
             ws_url="wss://test",
         ),
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=base64.b64encode(
                 bytes([0x07, 0x00, 0x41, 0x00, 0x0A, 0x02, 0x00, 0x24, 0x0A])
             ).decode("ascii"),

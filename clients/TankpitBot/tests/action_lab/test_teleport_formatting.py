@@ -30,6 +30,7 @@ from tankpit_bot.action_lab.types import (
 from tankpit_bot.types import (
     CapturedMessage,
 )
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 
 def test_format_attempt_window_entries_filters_direction_and_reports_more() -> None:
@@ -37,25 +38,25 @@ def test_format_attempt_window_entries_filters_direction_and_reports_more() -> N
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="$1|0",
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1001,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%AUTH",
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1002,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%MOVE",
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1003,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%RADAR",
             ws_url="wss://tankpit.com/ws/",
         ),
@@ -64,7 +65,7 @@ def test_format_attempt_window_entries_filters_direction_and_reports_more() -> N
     summary = _format_attempt_window_entries(
         provider,
         message_start_index=0,
-        direction="sent",
+        direction=MessageDirection.SENT,
         limit=2,
     )
 
@@ -78,13 +79,13 @@ def test_format_attempt_window_entries_returns_exact_window_without_more_suffix(
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1001,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%AUTH",
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1002,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%MOVE",
             ws_url="wss://tankpit.com/ws/",
         ),
@@ -93,7 +94,7 @@ def test_format_attempt_window_entries_returns_exact_window_without_more_suffix(
     summary = _format_attempt_window_entries(
         provider,
         message_start_index=0,
-        direction="sent",
+        direction=MessageDirection.SENT,
         limit=2,
     )
 
@@ -107,7 +108,7 @@ def test_format_attempt_window_entries_for_received_messages_omits_sent_metadata
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="bad",
             ws_url="wss://tankpit.com/ws/",
         )
@@ -116,7 +117,7 @@ def test_format_attempt_window_entries_for_received_messages_omits_sent_metadata
     summary = _format_attempt_window_entries(
         provider,
         message_start_index=0,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         limit=6,
     )
 
@@ -128,25 +129,25 @@ def test_format_attempt_window_entries_includes_sent_origin_metadata() -> None:
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1001,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%AUTH",
             ws_url="wss://tankpit.com/ws/",
-            sent_origin="bot_injected",
+            sent_origin=SentFrameOrigin.BOT_INJECTED,
             sent_label="teleport(129,106)",
         ),
         CapturedMessage(
             timestamp_ms=1002,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="%MOVE",
             ws_url="wss://tankpit.com/ws/",
-            sent_origin="page_client",
+            sent_origin=SentFrameOrigin.PAGE_CLIENT,
         ),
     ]
 
     summary = _format_attempt_window_entries(
         provider,
         message_start_index=0,
-        direction="sent",
+        direction=MessageDirection.SENT,
         limit=6,
     )
 
@@ -164,19 +165,19 @@ def test_find_map_data_message_index_skips_earlier_and_sent_messages() -> None:
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=map_data_payload,
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1001,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload=map_data_payload,
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1002,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=map_data_payload,
             ws_url="wss://tankpit.com/ws/",
         ),
@@ -197,13 +198,13 @@ def test_find_map_data_message_index_skips_non_map_data_received_messages() -> N
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="bad",
             ws_url="wss://tankpit.com/ws/",
         ),
         CapturedMessage(
             timestamp_ms=1001,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=map_data_payload,
             ws_url="wss://tankpit.com/ws/",
         ),

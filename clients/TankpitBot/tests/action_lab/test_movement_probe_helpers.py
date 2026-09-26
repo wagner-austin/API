@@ -27,32 +27,35 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import (
     CapturedMessage,
 )
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 
 def test_find_first_sent_label_timestamp_returns_first_matching_bot_send() -> None:
     messages = [
         CapturedMessage(
             timestamp_ms=10,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="a",
             ws_url="wss://x",
-            sent_origin="page_client",
+            sent_origin=SentFrameOrigin.PAGE_CLIENT,
         ),
-        CapturedMessage(timestamp_ms=20, direction="received", payload="b", ws_url="wss://x"),
+        CapturedMessage(
+            timestamp_ms=20, direction=MessageDirection.RECEIVED, payload="b", ws_url="wss://x"
+        ),
         CapturedMessage(
             timestamp_ms=30,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="c",
             ws_url="wss://x",
-            sent_origin="bot_injected",
+            sent_origin=SentFrameOrigin.BOT_INJECTED,
             sent_label="map_open",
         ),
         CapturedMessage(
             timestamp_ms=40,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="d",
             ws_url="wss://x",
-            sent_origin="bot_injected",
+            sent_origin=SentFrameOrigin.BOT_INJECTED,
             sent_label="map_open",
         ),
     ]

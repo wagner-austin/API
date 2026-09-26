@@ -36,6 +36,7 @@ from tankpit_bot.state import (
 from tankpit_bot.types import (
     CapturedMessage,
 )
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_wait_for_teleport_outcome_records_exact_landing() -> None:
@@ -82,7 +83,7 @@ def test_wait_for_teleport_outcome_captures_after_map_data_snapshot() -> None:
     provider._messages = [
         CapturedMessage(
             timestamp_ms=1200,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload=map_data_payload,
             ws_url="wss://tankpit.com/ws/",
         )

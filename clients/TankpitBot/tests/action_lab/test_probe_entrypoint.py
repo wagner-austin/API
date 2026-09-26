@@ -17,6 +17,7 @@ from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
 )
 from tankpit_bot.types import CapturedMessage, decode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 
 
 class _ProbeHarness(ProbeArtifactsProtocol):
@@ -29,13 +30,13 @@ class _ProbeHarness(ProbeArtifactsProtocol):
         return [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="abc",
                 ws_url="wss://tankpit.com/ws/",
             ),
             CapturedMessage(
                 timestamp_ms=250,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload="def",
                 ws_url="wss://tankpit.com/ws/",
             ),

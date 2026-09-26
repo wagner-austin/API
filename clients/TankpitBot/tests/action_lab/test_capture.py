@@ -9,6 +9,7 @@ from tests.conftest import FakeFileSystem
 
 from tankpit_bot.action_lab.capture import build_capture_output_path, save_capture_session
 from tankpit_bot.types import CapturedMessage, decode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_build_capture_output_path_replaces_existing_suffix() -> None:
@@ -26,7 +27,7 @@ def test_save_capture_session_writes_replayable_session(fake_fs: FakeFileSystem)
     messages = [
         CapturedMessage(
             timestamp_ms=10,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload="abc",
             ws_url="wss://dorothy.tankpit.com/ws/",
         )

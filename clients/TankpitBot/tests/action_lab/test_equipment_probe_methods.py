@@ -26,6 +26,7 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
 from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 
 class _EquipmentTargetingModuleProtocol(Protocol):
@@ -110,7 +111,7 @@ def _make_probe() -> EquipmentProbe:
     probe._messages = [
         CapturedMessage(
             timestamp_ms=1000,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="",
             ws_url="wss://test",
         )

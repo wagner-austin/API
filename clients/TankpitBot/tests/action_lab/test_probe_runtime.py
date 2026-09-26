@@ -27,6 +27,7 @@ from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
@@ -47,7 +48,7 @@ class _ProbeHarness:
         self._messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=1,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="x",
                 ws_url="wss://tankpit.com/ws/",
             )

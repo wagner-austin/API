@@ -33,6 +33,7 @@ from tankpit_bot.state import (
     make_container_state,
 )
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_finalize_attempt_delay_skips_zero_delay() -> None:
@@ -89,7 +90,7 @@ def test_build_attempt_result_for_probe_uses_message_count() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="",
                 ws_url="wss://test",
             )
