@@ -225,7 +225,7 @@ class _FakeOptimizer:
 
     def strategy_name(self) -> OptimizerStrategyName:
         """Return 'optuna_tpe' as the strategy name."""
-        return "optuna_tpe"
+        return OptimizerStrategyName.OPTUNA_TPE
 
     def capabilities(self) -> OptimizerStrategyCapabilities:
         """Return default capabilities."""
@@ -437,7 +437,7 @@ def _make_fake_optimizer_registry(optimizer: _FakeOptimizer) -> OptimizerStrateg
     def _factory(o: _FakeOptimizer = optimizer) -> _FakeOptimizer:
         return o
 
-    registry.register("optuna_tpe", OptimizerStrategyRegistration(_factory))
+    registry.register(OptimizerStrategyName.OPTUNA_TPE, OptimizerStrategyRegistration(_factory))
     return registry
 
 

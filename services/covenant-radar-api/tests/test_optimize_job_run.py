@@ -29,6 +29,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
     TrialResult,
+    TrialState,
 )
 from covenant_ml.types import (
     BackendName,
@@ -330,7 +331,7 @@ class TestRunOptimization:
                             float_params=SampledFloatParams(learning_rate=0.05),
                             string_params=SampledStringParams(),
                             value=0.88,
-                            state="complete",
+                            state=TrialState.COMPLETE,
                             duration_seconds=0.5,
                         )
                     )
@@ -455,7 +456,7 @@ class TestRunOptimization:
                             float_params=SampledFloatParams(learning_rate=0.1),
                             string_params=SampledStringParams(),
                             value=0.85,
-                            state="complete",
+                            state=TrialState.COMPLETE,
                             duration_seconds=0.5,
                         )
                     )
@@ -467,7 +468,7 @@ class TestRunOptimization:
                             float_params=SampledFloatParams(learning_rate=0.05),
                             string_params=SampledStringParams(),
                             value=0.90,
-                            state="complete",
+                            state=TrialState.COMPLETE,
                             duration_seconds=0.5,
                         )
                     )
@@ -479,7 +480,7 @@ class TestRunOptimization:
                             float_params=SampledFloatParams(learning_rate=0.2),
                             string_params=SampledStringParams(),
                             value=0.80,
-                            state="complete",
+                            state=TrialState.COMPLETE,
                             duration_seconds=0.5,
                         )
                     )
@@ -553,7 +554,7 @@ class TestRunOptimization:
                             float_params=SampledFloatParams(learning_rate=0.1),
                             string_params=SampledStringParams(),
                             value=0.85,
-                            state="complete",
+                            state=TrialState.COMPLETE,
                             duration_seconds=0.5,
                         )
                     )

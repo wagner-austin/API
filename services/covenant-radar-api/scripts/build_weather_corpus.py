@@ -44,6 +44,7 @@ import numpy as np
 from covenant_ml.datasets.loaders._netcdf_heat_metrics import fit_temporal_features
 from covenant_ml.datasets.types_temporal import (
     SeasonalCycleCoefficients,
+    SeasonDefinition,
     TailThresholds,
     TemporalFeatureConfig,
     TemporalFeatureState,
@@ -69,7 +70,7 @@ TEMPORAL_CONFIG = TemporalFeatureConfig(
     n_fourier_harmonics=5,
     hot_cutoff_percentile=95.0,
     cold_cutoff_percentile=5.0,
-    season="warm",
+    season=SeasonDefinition.WARM,
     season_months=SEASON_MONTHS,
     compute_ar1=False,
 )

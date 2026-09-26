@@ -220,7 +220,7 @@ def _make_trial_result(
     Returns:
         Complete TrialResult.
     """
-    state: TrialState = "complete"
+    state: TrialState = TrialState.COMPLETE
     return TrialResult(
         trial_number=trial_number,
         int_params=SampledIntParams(max_depth=5),
@@ -353,7 +353,7 @@ class _FakeOptimizer:
 
     def strategy_name(self) -> OptimizerStrategyName:
         """Return 'optuna_tpe'."""
-        return "optuna_tpe"
+        return OptimizerStrategyName.OPTUNA_TPE
 
     def capabilities(self) -> OptimizerStrategyCapabilities:
         """Return default capabilities."""
@@ -445,7 +445,7 @@ def _make_fake_optimizer_registry(optimizer: _FakeOptimizer) -> OptimizerStrateg
     def _factory(o: _FakeOptimizer = optimizer) -> _FakeOptimizer:
         return o
 
-    registry.register("optuna_tpe", OptimizerStrategyRegistration(_factory))
+    registry.register(OptimizerStrategyName.OPTUNA_TPE, OptimizerStrategyRegistration(_factory))
     return registry
 
 

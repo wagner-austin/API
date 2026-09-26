@@ -17,6 +17,7 @@ from pathlib import Path
 from covenant_ml.datasets.types import LoadProgress
 from covenant_ml.optimizer import OptimizationSummary, SearchSpace, TrialResult
 from covenant_ml.optimizer.protocol import TrialCallbackProtocol as _TrialCallbackProtocol
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from covenant_ml.types import BackendName
 from platform_core.json_utils import (
     JSONTypeError,
@@ -339,7 +340,7 @@ def run_optimization(
     )
 
     # Run optimization via strategy registry
-    optimizer = hooks.optimizer_registry_factory().get("optuna_tpe")
+    optimizer = hooks.optimizer_registry_factory().get(OptimizerStrategyName.OPTUNA_TPE)
     summary: OptimizationSummary = optimizer.optimize(
         x_features=dataset["x"],
         y_labels=dataset["y"],

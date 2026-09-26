@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from covenant_ml.datasets.types_temporal import (
     SeasonalCycleCoefficients,
+    SeasonDefinition,
     TailThresholds,
     TemporalFeatureConfig,
     TemporalFeatureState,
@@ -63,7 +64,7 @@ def _make_single_location_state(
         "n_fourier_harmonics": n_harmonics,
         "hot_cutoff_percentile": 95.0,
         "cold_cutoff_percentile": 5.0,
-        "season": "warm",
+        "season": SeasonDefinition.WARM,
         "season_months": (6, 7, 8),
         "compute_ar1": False,
     }
@@ -117,7 +118,7 @@ def _make_multi_location_state(
         "n_fourier_harmonics": 1,
         "hot_cutoff_percentile": 95.0,
         "cold_cutoff_percentile": 5.0,
-        "season": "warm",
+        "season": SeasonDefinition.WARM,
         "season_months": (6, 7, 8),
         "compute_ar1": False,
     }

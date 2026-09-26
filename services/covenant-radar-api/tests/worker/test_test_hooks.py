@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from covenant_ml.features import FeaturePreset
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from numpy.typing import NDArray
 
@@ -172,7 +173,7 @@ class TestRealOptimizerRegistry:
 
         registry = _real_optimizer_registry()
         # Registry supports .get() — optuna_tpe should be registered
-        strategy = registry.get("optuna_tpe")
+        strategy = registry.get(OptimizerStrategyName.OPTUNA_TPE)
         assert callable(strategy.optimize)
 
 

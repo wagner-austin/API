@@ -17,6 +17,7 @@ import numpy as np
 from covenant_ml.datasets.types import LoadProgress
 from covenant_ml.optimizer import OptimizationSummary, SearchSpace, TrialResult
 from covenant_ml.optimizer.protocol import TrialCallbackProtocol as _TrialCallbackProtocol
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -350,7 +351,7 @@ def run_regression_optimization(
     y_zeros: NDArray[np.int64] = np.zeros(n_samples, dtype=np.int64)
 
     # Run optimization via strategy registry
-    optimizer = classifier_hooks.optimizer_registry_factory().get("optuna_tpe")
+    optimizer = classifier_hooks.optimizer_registry_factory().get(OptimizerStrategyName.OPTUNA_TPE)
     summary: OptimizationSummary = optimizer.optimize(
         x_features=dataset["x"],
         y_labels=y_zeros,
