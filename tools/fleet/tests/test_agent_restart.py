@@ -303,6 +303,50 @@ class TestRestartLane:
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"session-audit kill at {COMMIT} exited 0: {line.strip()}"
 
+    def test_a_claimed_compact_runs_session_audits_compact_mode_and_closes_with_its_line(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs mig 564, board task 01f31e4a: the compact rides the one
+        session job path, runs ``session-audit compact`` with the submitter,
+        and the closing detail carries the executor's outcome line, which
+        the room's supervisor lifts into its digest."""
+        mcps = checkout(tmp_path)
+        scratch = tmp_path / "scratch"
+        tree = plant_extraction(scratch)
+        line = f"COMPACT - COMPACTED session {TARGET}: 640000 -> 90000 tokens\n"
+        runner = FakeRun(
+            [
+                *extraction_replies(),
+                _test_hooks.CommandResult(returncode=0, stdout=line, stderr="", timed_out=False),
+            ]
+        )
+        _test_hooks.run = runner
+        command = "compact-session"
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"claimed": restart_row(command=command)}),
+                dump_json_str(
+                    {"job": restart_row(command=command, status="running", node="austinpc")}
+                ),
+                dump_json_str(
+                    {"job": restart_row(command=command, status="passed", node="austinpc")}
+                ),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(hub_argv(config_path, repo, mcps)) == 0
+
+        assert runner.calls == [
+            *extraction_calls(mcps, scratch),
+            restart.compact_argv(mcps, tree["registry_dir"], TARGET, "fable-dm-versionsplit-0912"),
+        ]
+        assert endpoint.arguments[1]["runId"] == f"compact-{DEFAULT_JOB_ID}"
+        closed = endpoint.arguments[2]
+        assert closed["status"] == "passed"
+        detail = narrow_json_to_str(closed["detail"])
+        assert detail == f"session-audit compact at {COMMIT} exited 0: {line.strip()}"
+
     def test_a_kill_session_audit_did_not_carry_out_closes_failed(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:

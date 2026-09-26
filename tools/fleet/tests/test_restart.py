@@ -64,6 +64,21 @@ class TestRestartArgv:
             "revive-session",
             "kill-session",
             "kill-session-hard",
+            "compact-session",
+        )
+
+    def test_composes_the_exact_compact_invocation(self) -> None:
+        """MCPs mig 564, board task 01f31e4a: the compact carries the
+        submitter so session-audit prints who asked, and no kill flag."""
+        assert restart.compact_argv(ROOT, REGISTRY, TARGET, "opus-super-fleet-0926") == (
+            *PREFIX,
+            "compact",
+            "--session",
+            TARGET,
+            "--requested-by",
+            "opus-super-fleet-0926",
+            "--registry-dir",
+            REGISTRY,
         )
 
     def test_composes_the_exact_kill_invocations_and_only_the_hard_verb_is_hard(self) -> None:
@@ -110,6 +125,13 @@ class TestRestartArgv:
         }
         hard = restart.session_invocation(ROOT, TREE, "kill-session-hard", TARGET, label)
         assert hard["argv"] == restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=True)
+        assert restart.session_invocation(ROOT, TREE, "compact-session", TARGET, label) == {
+            "verb": "compact",
+            "mode": "compact",
+            "argv": restart.compact_argv(ROOT, REGISTRY, TARGET, label),
+            "types_requester": True,
+            **pinned,
+        }
 
     def test_a_command_that_is_not_a_session_verb_is_refused_by_code(self) -> None:
         refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
