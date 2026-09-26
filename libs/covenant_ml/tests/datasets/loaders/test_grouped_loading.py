@@ -19,9 +19,11 @@ from covenant_ml.datasets.loaders.arff_loader import ARFFLoader
 from covenant_ml.datasets.loaders.csv_loader import CSVLoader
 from covenant_ml.datasets.loaders.timeseries_csv_loader import TimeSeriesCSVLoader
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -58,7 +60,7 @@ def _grouped_config(group_column: str | None = "match") -> DatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -127,7 +129,7 @@ def test_timeseries_loader_refuses_a_grouped_config(tmp_path: Path) -> None:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -138,7 +140,7 @@ def test_timeseries_loader_refuses_a_grouped_config(tmp_path: Path) -> None:
         time_series=TimeSeriesSpec(
             entity_column="match",
             time_column="frame",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             labels_file="labels.csv",
             labels_entity_column="match",
             include_rank_features=False,

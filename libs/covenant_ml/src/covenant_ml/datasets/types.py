@@ -7,7 +7,7 @@ All types are immutable (total=True) and strictly typed.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,15 +21,15 @@ class FileFormat(StrEnum):
     EXCEL = "excel"
 
 
-# Loading phase literals for progress reporting
-LoadPhase = Literal[
-    "reading",  # Reading raw data from file
-    "parsing",  # Parsing and converting data types
-    "encoding",  # Building categorical encodings
-    "aggregating",  # Aggregating time-series data
-    "caching",  # Writing to parquet cache
-    "loading_cache",  # Loading from parquet cache
-]
+class LoadPhase(StrEnum):
+    """The step of dataset loading a progress report describes."""
+
+    READING = "reading"  # Reading raw data from file
+    PARSING = "parsing"  # Parsing and converting data types
+    ENCODING = "encoding"  # Building categorical encodings
+    AGGREGATING = "aggregating"  # Aggregating time-series data
+    CACHING = "caching"  # Writing to parquet cache
+    LOADING_CACHE = "loading_cache"  # Loading from parquet cache
 
 
 class LoadProgress(TypedDict, total=True):
@@ -80,16 +80,22 @@ class FileEncoding(StrEnum):
         return "utf8-lossy"
 
 
-# Label type literals (how the target column encodes classes)
-LabelType = Literal["binary_int", "binary_str", "multiclass_int", "multiclass_str"]
+class LabelType(StrEnum):
+    """How a target column encodes its classes."""
 
-# Aggregation strategy for time-series data
-AggregationStrategy = Literal[
-    "last",  # Take last observation per entity (most recent)
-    "first",  # Take first observation per entity (oldest)
-    "mean",  # Compute mean of each feature per entity
-    "statistics",  # Compute mean, std, min, max per feature (4x features)
-]
+    BINARY_INT = "binary_int"
+    BINARY_STR = "binary_str"
+    MULTICLASS_INT = "multiclass_int"
+    MULTICLASS_STR = "multiclass_str"
+
+
+class AggregationStrategy(StrEnum):
+    """How a time-series dataset reduces each entity's rows to one."""
+
+    LAST = "last"  # Take last observation per entity (most recent)
+    FIRST = "first"  # Take first observation per entity (oldest)
+    MEAN = "mean"  # Compute mean of each feature per entity
+    STATISTICS = "statistics"  # Compute mean, std, min, max per feature (4x features)
 
 
 class CategoricalEncoding(TypedDict, total=True):

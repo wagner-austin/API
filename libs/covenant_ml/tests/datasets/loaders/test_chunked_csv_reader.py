@@ -14,7 +14,7 @@ from covenant_ml.datasets.loaders.chunked_csv_reader import (
     read_csv_to_dataframe,
     read_csv_with_progress,
 )
-from covenant_ml.datasets.types import FileEncoding, LoadProgress
+from covenant_ml.datasets.types import FileEncoding, LoadPhase, LoadProgress
 
 
 def _get_fixtures_dir() -> Path:
@@ -80,7 +80,7 @@ class TestReadCSVWithProgress:
         assert len(progress_updates) == 2
         # Verify first update is parsing phase with row-based progress
         first_update = progress_updates[0]
-        assert first_update["phase"] == "parsing"
+        assert first_update["phase"] is LoadPhase.PARSING
         assert first_update["bytes_read"] == 0  # Row-based progress
         assert first_update["bytes_total"] == 0  # Row-based progress
         assert first_update["rows_processed"] == 0
@@ -227,7 +227,7 @@ class TestMakeProgress:
     def test_make_progress_bytes_based(self) -> None:
         """Progress calculates percent from bytes when bytes_total > 0."""
         result = _make_progress(
-            phase="reading",
+            phase=LoadPhase.READING,
             bytes_read=500,
             bytes_total=1000,
             rows_processed=0,
@@ -235,7 +235,7 @@ class TestMakeProgress:
             message="Reading file...",
         )
 
-        assert result["phase"] == "reading"
+        assert result["phase"] is LoadPhase.READING
         assert result["percent_complete"] == 50.0
         assert result["bytes_read"] == 500
         assert result["bytes_total"] == 1000
@@ -244,7 +244,7 @@ class TestMakeProgress:
     def test_make_progress_rows_based(self) -> None:
         """Progress calculates percent from rows when bytes_total = 0."""
         result = _make_progress(
-            phase="parsing",
+            phase=LoadPhase.PARSING,
             bytes_read=0,
             bytes_total=0,
             rows_processed=25,
@@ -252,7 +252,7 @@ class TestMakeProgress:
             message="Parsing rows...",
         )
 
-        assert result["phase"] == "parsing"
+        assert result["phase"] is LoadPhase.PARSING
         assert result["percent_complete"] == 25.0
         assert result["rows_processed"] == 25
         assert result["rows_total"] == 100
@@ -260,7 +260,7 @@ class TestMakeProgress:
     def test_make_progress_zero_totals(self) -> None:
         """Progress returns 0% when both totals are zero."""
         result = _make_progress(
-            phase="reading",
+            phase=LoadPhase.READING,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -273,7 +273,7 @@ class TestMakeProgress:
     def test_make_progress_caps_at_100(self) -> None:
         """Progress caps at 100% even if read exceeds total."""
         result = _make_progress(
-            phase="reading",
+            phase=LoadPhase.READING,
             bytes_read=1500,
             bytes_total=1000,
             rows_processed=0,
@@ -312,7 +312,7 @@ class TestLargeFileProgress:
             )
 
             # Should have reading phase progress reports for large files
-            reading_updates = [p for p in progress_updates if p["phase"] == "reading"]
+            reading_updates = [p for p in progress_updates if p["phase"] is LoadPhase.READING]
             assert len(reading_updates) >= 2  # At least start and end reading reports
 
     def test_large_row_count_periodic_progress(self) -> None:
@@ -338,7 +338,7 @@ class TestLargeFileProgress:
             )
 
             # Should have parsing phase progress reports for periodic updates
-            parsing_updates = [p for p in progress_updates if p["phase"] == "parsing"]
+            parsing_updates = [p for p in progress_updates if p["phase"] is LoadPhase.PARSING]
             # At least 2: the periodic one at 100k and the final one
             assert len(parsing_updates) >= 2
             # Verify row counts in periodic updates - should have exactly one at 100k

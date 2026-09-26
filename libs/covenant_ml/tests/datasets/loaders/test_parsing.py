@@ -23,7 +23,7 @@ from covenant_ml.datasets.loaders._parsing import (
     is_simple_numeric,
     parse_numeric_value,
 )
-from covenant_ml.datasets.types import CategoricalEncoding, TargetColumnSpec
+from covenant_ml.datasets.types import CategoricalEncoding, LabelType, TargetColumnSpec
 
 
 class TestMissingValues:
@@ -261,7 +261,7 @@ class TestEncodeLabel:
         """Encode positive integer label."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         )
@@ -271,7 +271,7 @@ class TestEncodeLabel:
         """Encode negative integer label."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         )
@@ -281,7 +281,7 @@ class TestEncodeLabel:
         """Encode positive string label."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("yes", "true"),
             negative_values=("no", "false"),
         )
@@ -292,7 +292,7 @@ class TestEncodeLabel:
         """Encode negative string label."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("yes",),
             negative_values=("no",),
         )
@@ -302,7 +302,7 @@ class TestEncodeLabel:
         """Label encoding is case-insensitive for strings."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("YES",),
             negative_values=("NO",),
         )
@@ -313,7 +313,7 @@ class TestEncodeLabel:
         """Label encoding strips whitespace."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         )
@@ -323,7 +323,7 @@ class TestEncodeLabel:
         """Raise ValueError for unknown label value."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         )
@@ -334,7 +334,7 @@ class TestEncodeLabel:
         """Error message includes row number."""
         spec = TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         )

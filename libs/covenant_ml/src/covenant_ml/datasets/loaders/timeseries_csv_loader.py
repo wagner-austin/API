@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.datasets.loaders._cache_keys import timeseries_config_hash
 from covenant_ml.datasets.loaders._parquet_cache_io import _CacheLock
 from covenant_ml.datasets.loaders._parsing import encode_label, find_column_index
 from covenant_ml.datasets.loaders._polars_aggregation import (
@@ -40,7 +41,6 @@ from covenant_ml.datasets.loaders._polars_window import (
     compute_multi_window_features,
 )
 from covenant_ml.datasets.loaders.parquet_cache import (
-    _compute_config_hash,
     check_cache,
     get_cache_dir,
     load_from_cache,
@@ -48,9 +48,11 @@ from covenant_ml.datasets.loaders.parquet_cache import (
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     DatasetMeta,
     FileEncoding,
     LoadedDataset,
+    LoadPhase,
     LoadProgress,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -112,7 +114,7 @@ class TimeSeriesCSVLoader:
         file_path = external_dir / config["folder"] / config["file_name"]
 
         # Check cache
-        config_hash = _compute_config_hash(self._build_config_string(config))
+        config_hash = timeseries_config_hash(config)
         cache_dir = get_cache_dir(external_dir, config["folder"], config_hash)
 
         with _CacheLock(cache_dir):
@@ -127,33 +129,6 @@ class TimeSeriesCSVLoader:
         save_to_cache(dataset, cache_dir, progress_callback)
 
         return dataset
-
-    def _build_config_string(self, config: TimeSeriesDatasetConfig) -> str:
-        """Build config string for cache hash.
-
-        Args:
-            config: Dataset configuration.
-
-        Returns:
-            String representation for hashing.
-        """
-        ts_spec = config["time_series"]
-        parts = [
-            config["name"],
-            config["file_name"],
-            config["encoding"],
-            str(config["target"]),
-            str(config["exclude_columns"]),
-            ts_spec["entity_column"],
-            ts_spec["time_column"],
-            ts_spec["aggregation"],
-            ts_spec["labels_file"],
-            str(ts_spec["include_rank_features"]),
-            str(ts_spec["include_diff_features"]),
-            str(ts_spec["include_window_features"]),
-            str(ts_spec["window_sizes"]),
-        ]
-        return "|".join(parts)
 
     def _load_from_csv(
         self,
@@ -199,7 +174,7 @@ class TimeSeriesCSVLoader:
         report_progress(
             progress_callback,
             LoadProgress(
-                phase="encoding",
+                phase=LoadPhase.ENCODING,
                 bytes_read=0,
                 bytes_total=0,
                 rows_processed=0,
@@ -215,7 +190,7 @@ class TimeSeriesCSVLoader:
         report_progress(
             progress_callback,
             LoadProgress(
-                phase="encoding",
+                phase=LoadPhase.ENCODING,
                 bytes_read=0,
                 bytes_total=0,
                 rows_processed=df.height,
@@ -235,7 +210,7 @@ class TimeSeriesCSVLoader:
         aggregation = ts_spec["aggregation"]
         n_base_features = len(feature_columns)
 
-        if aggregation == "statistics":
+        if aggregation is AggregationStrategy.STATISTICS:
             n_output_features = n_base_features * 4
             output_feature_names = build_statistics_feature_names(feature_columns)
         else:
@@ -245,7 +220,7 @@ class TimeSeriesCSVLoader:
         report_progress(
             progress_callback,
             LoadProgress(
-                phase="aggregating",
+                phase=LoadPhase.AGGREGATING,
                 bytes_read=0,
                 bytes_total=0,
                 rows_processed=0,
@@ -296,7 +271,7 @@ class TimeSeriesCSVLoader:
         report_progress(
             progress_callback,
             LoadProgress(
-                phase="aggregating",
+                phase=LoadPhase.AGGREGATING,
                 bytes_read=0,
                 bytes_total=0,
                 rows_processed=n_entities,
@@ -358,7 +333,7 @@ class TimeSeriesCSVLoader:
         report_progress(
             progress_callback,
             LoadProgress(
-                phase="reading",
+                phase=LoadPhase.READING,
                 bytes_read=0,
                 bytes_total=file_size,
                 rows_processed=0,
@@ -382,7 +357,7 @@ class TimeSeriesCSVLoader:
         report_progress(
             progress_callback,
             LoadProgress(
-                phase="reading",
+                phase=LoadPhase.READING,
                 bytes_read=file_size,
                 bytes_total=file_size,
                 rows_processed=df.height,

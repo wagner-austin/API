@@ -16,6 +16,7 @@ from covenant_ml.datasets.types import (
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     RegressionDatasetConfig,
     RegressionTargetSpec,
     TargetColumnSpec,
@@ -33,7 +34,7 @@ def _make_test_config(name: str = "test") -> DatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),

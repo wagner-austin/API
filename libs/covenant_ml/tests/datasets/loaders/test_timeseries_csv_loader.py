@@ -12,7 +12,9 @@ from covenant_ml.datasets.loaders.timeseries_csv_loader import (
     create_timeseries_csv_loader,
 )
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     LoadedDataset,
+    LoadPhase,
     LoadProgress,
 )
 from tests.datasets.loaders._timeseries_fixtures import (
@@ -32,7 +34,7 @@ class TestTimeSeriesCSVLoader:
             tmp_path: Pytest temp directory for isolated testing.
         """
         loader = TimeSeriesCSVLoader()
-        config = _make_timeseries_config(aggregation="last")
+        config = _make_timeseries_config(aggregation=AggregationStrategy.LAST)
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
@@ -58,7 +60,7 @@ class TestTimeSeriesCSVLoader:
             tmp_path: Pytest temp directory for isolated testing.
         """
         loader = TimeSeriesCSVLoader()
-        config = _make_timeseries_config(aggregation="first")
+        config = _make_timeseries_config(aggregation=AggregationStrategy.FIRST)
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
@@ -80,7 +82,7 @@ class TestTimeSeriesCSVLoader:
             tmp_path: Pytest temp directory for isolated testing.
         """
         loader = TimeSeriesCSVLoader()
-        config = _make_timeseries_config(aggregation="mean")
+        config = _make_timeseries_config(aggregation=AggregationStrategy.MEAN)
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
@@ -102,7 +104,7 @@ class TestTimeSeriesCSVLoader:
             tmp_path: Pytest temp directory for isolated testing.
         """
         loader = TimeSeriesCSVLoader()
-        config = _make_timeseries_config(aggregation="statistics")
+        config = _make_timeseries_config(aggregation=AggregationStrategy.STATISTICS)
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
@@ -127,7 +129,7 @@ class TestTimeSeriesCSVLoader:
     def test_load_returns_correct_labels(self) -> None:
         """Load returns correct labels from labels file."""
         loader = TimeSeriesCSVLoader()
-        config = _make_timeseries_config(aggregation="last")
+        config = _make_timeseries_config(aggregation=AggregationStrategy.LAST)
         fixtures_dir = _get_fixtures_dir()
 
         result = loader.load(config, fixtures_dir)
@@ -187,7 +189,7 @@ class TestTimeSeriesCSVLoader:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
         )
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical")
 
@@ -246,7 +248,7 @@ class TestTimeSeriesCSVLoader:
         assert len(progress_updates) >= 4
 
         # Check for aggregating phase (start and complete)
-        aggregating_updates = [p for p in progress_updates if p["phase"] == "aggregating"]
+        aggregating_updates = [p for p in progress_updates if p["phase"] is LoadPhase.AGGREGATING]
         assert len(aggregating_updates) == 2
         # First should be start (0%)
         assert aggregating_updates[0]["percent_complete"] == 0.0
@@ -270,7 +272,7 @@ class TestTimeSeriesCSVLoaderAggregationDetails:
             tmp_path: Pytest temp directory for isolated testing.
         """
         loader = TimeSeriesCSVLoader()
-        config = _make_timeseries_config(aggregation="statistics")
+        config = _make_timeseries_config(aggregation=AggregationStrategy.STATISTICS)
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
@@ -308,7 +310,7 @@ class TestTimeSeriesCSVLoaderAMEXSample:
             folder="timeseries_amex_sample",
             entity_column="customer_ID",
             time_column="S_2",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             labels_file="labels.csv",
             labels_entity_column="customer_ID",
             n_samples_expected=4,

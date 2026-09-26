@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.datasets.loaders._cache_keys import csv_config_hash
 from covenant_ml.datasets.loaders._parquet_cache_io import _CacheLock
 from covenant_ml.datasets.loaders._parsing import (
     build_categorical_encodings,
@@ -25,7 +26,6 @@ from covenant_ml.datasets.loaders._parsing import (
 )
 from covenant_ml.datasets.loaders.chunked_csv_reader import read_csv_with_progress
 from covenant_ml.datasets.loaders.parquet_cache import (
-    _compute_config_hash,
     check_cache,
     get_cache_dir,
     load_from_cache,
@@ -37,6 +37,7 @@ from covenant_ml.datasets.types import (
     DatasetMeta,
     FileEncoding,
     LoadedDataset,
+    LoadPhase,
     LoadProgress,
     TargetColumnSpec,
 )
@@ -84,17 +85,7 @@ class CSVLoader:
         file_path = external_dir / config["folder"] / config["file_name"]
         encoding: FileEncoding = config["encoding"]
 
-        # Compute config hash for cache key
-        config_parts = [
-            config["name"],
-            config["file_name"],
-            config["encoding"],
-            str(config["target"]),
-            str(config["exclude_columns"]),
-            str(config.get("group_column")),
-        ]
-        config_str = "|".join(config_parts)
-        config_hash = _compute_config_hash(config_str)
+        config_hash = csv_config_hash(config)
         cache_dir = get_cache_dir(external_dir, config["folder"], config_hash)
 
         # Check if valid cache exists under a cache lock to prevent races
@@ -149,7 +140,7 @@ class CSVLoader:
         if progress_callback is not None:
             progress_callback(
                 LoadProgress(
-                    phase="encoding",
+                    phase=LoadPhase.ENCODING,
                     bytes_read=0,
                     bytes_total=0,
                     rows_processed=0,
@@ -173,7 +164,7 @@ class CSVLoader:
         if progress_callback is not None:
             progress_callback(
                 LoadProgress(
-                    phase="encoding",
+                    phase=LoadPhase.ENCODING,
                     bytes_read=0,
                     bytes_total=0,
                     rows_processed=n_samples,

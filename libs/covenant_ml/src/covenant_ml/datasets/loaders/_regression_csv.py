@@ -27,6 +27,7 @@ from covenant_ml.datasets.loaders.chunked_csv_reader import read_csv_with_progre
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
     FileEncoding,
+    LoadPhase,
     LoadProgress,
     RegressionDatasetConfig,
     RegressionDatasetMeta,
@@ -122,7 +123,7 @@ class RegressionCSVLoader:
         if progress_callback is not None:
             progress_callback(
                 LoadProgress(
-                    phase="encoding",
+                    phase=LoadPhase.ENCODING,
                     bytes_read=0,
                     bytes_total=0,
                     rows_processed=0,
@@ -144,7 +145,7 @@ class RegressionCSVLoader:
         if progress_callback is not None:
             progress_callback(
                 LoadProgress(
-                    phase="encoding",
+                    phase=LoadPhase.ENCODING,
                     bytes_read=0,
                     bytes_total=0,
                     rows_processed=n_samples,

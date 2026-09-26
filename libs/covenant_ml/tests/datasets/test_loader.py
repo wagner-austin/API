@@ -8,15 +8,17 @@ import numpy as np
 import pytest
 
 from covenant_ml.datasets.loader import DatasetLoader, create_dataset_loader
+from covenant_ml.datasets.loaders._cache_keys import csv_config_hash
 from covenant_ml.datasets.loaders.parquet_cache import (
-    _compute_config_hash,
     get_cache_dir,
     invalidate_cache,
 )
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     LoadedDataset,
     RegressionDatasetConfig,
     RegressionTargetSpec,
@@ -38,17 +40,7 @@ def _clear_csv_cache(config: DatasetConfig, fixtures_dir: Path) -> None:
         config: Dataset configuration.
         fixtures_dir: Path to fixtures directory.
     """
-    config_parts = [
-        config["name"],
-        config["file_name"],
-        config["encoding"],
-        str(config["target"]),
-        str(config["exclude_columns"]),
-        str(config.get("group_column")),
-    ]
-    config_str = "|".join(config_parts)
-    config_hash = _compute_config_hash(config_str)
-    cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
+    cache_dir = get_cache_dir(fixtures_dir, config["folder"], csv_config_hash(config))
     invalidate_cache(cache_dir)
 
 
@@ -67,7 +59,7 @@ def _make_csv_config(
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -93,7 +85,7 @@ def _make_arff_config(
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="class",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -171,7 +163,7 @@ class TestDatasetLoader:
             encoding=FileEncoding.UTF_8,
             target=TargetColumnSpec(
                 column_name="target",
-                label_type="binary_int",
+                label_type=LabelType.BINARY_INT,
                 positive_values=(1,),
                 negative_values=(0,),
             ),
@@ -230,7 +222,7 @@ def _make_timeseries_config(
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -241,7 +233,7 @@ def _make_timeseries_config(
         time_series=TimeSeriesSpec(
             entity_column="entity_id",
             time_column="timestamp",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             labels_file="labels.csv",
             labels_entity_column="entity_id",
             include_rank_features=False,

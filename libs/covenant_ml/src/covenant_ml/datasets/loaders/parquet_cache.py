@@ -27,6 +27,7 @@ from covenant_ml.datasets.types import (
     CategoricalEncoding,
     DatasetMeta,
     LoadedDataset,
+    LoadPhase,
     LoadProgress,
 )
 
@@ -290,7 +291,7 @@ def load_from_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="loading_cache",
+            phase=LoadPhase.LOADING_CACHE,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -338,7 +339,7 @@ def load_from_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="loading_cache",
+            phase=LoadPhase.LOADING_CACHE,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -355,7 +356,7 @@ def load_from_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="loading_cache",
+            phase=LoadPhase.LOADING_CACHE,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -379,7 +380,7 @@ def load_from_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="loading_cache",
+            phase=LoadPhase.LOADING_CACHE,
             bytes_read=0,
             bytes_total=0,
             rows_processed=n_samples,
@@ -441,7 +442,7 @@ def save_to_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="caching",
+            phase=LoadPhase.CACHING,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -471,7 +472,7 @@ def save_to_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="caching",
+            phase=LoadPhase.CACHING,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -492,7 +493,7 @@ def save_to_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="caching",
+            phase=LoadPhase.CACHING,
             bytes_read=0,
             bytes_total=0,
             rows_processed=0,
@@ -527,7 +528,7 @@ def save_to_cache(
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
-            phase="caching",
+            phase=LoadPhase.CACHING,
             bytes_read=0,
             bytes_total=0,
             rows_processed=meta["n_samples"],

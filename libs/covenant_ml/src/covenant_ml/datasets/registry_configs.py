@@ -9,9 +9,11 @@ serve.
 from __future__ import annotations
 
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     RegressionDatasetConfig,
     RegressionTargetSpec,
     TargetColumnSpec,
@@ -31,7 +33,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="Bankrupt?",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -50,7 +52,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8_SIG,
         target=TargetColumnSpec(
             column_name="status_label",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("failed",),
             negative_values=("alive",),
         ),
@@ -69,7 +71,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="class",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -88,7 +90,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="Bankrupt?",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -107,7 +109,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="default.payment.next.month",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -126,7 +128,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="loan_status",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -145,7 +147,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="RiskPerformance",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("Bad",),
             negative_values=("Good",),
         ),
@@ -164,7 +166,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="SeriousDlqin2yrs",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -189,7 +191,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -211,7 +213,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="Status",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -240,7 +242,7 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="real",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -266,7 +268,7 @@ VERIFIED_TIMESERIES_CONFIGS: tuple[TimeSeriesDatasetConfig, ...] = (
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -277,7 +279,7 @@ VERIFIED_TIMESERIES_CONFIGS: tuple[TimeSeriesDatasetConfig, ...] = (
         time_series=TimeSeriesSpec(
             entity_column="customer_ID",
             time_column="S_2",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             labels_file="train_labels.csv",
             labels_entity_column="customer_ID",
             include_rank_features=False,

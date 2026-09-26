@@ -8,9 +8,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from covenant_ml.datasets.loaders._cache_keys import csv_config_hash
 from covenant_ml.datasets.loaders.csv_loader import CSVLoader, create_csv_loader
 from covenant_ml.datasets.loaders.parquet_cache import (
-    _compute_config_hash,
     get_cache_dir,
     invalidate_cache,
 )
@@ -20,6 +20,7 @@ from covenant_ml.datasets.types import (
     FileFormat,
     LabelType,
     LoadedDataset,
+    LoadPhase,
     LoadProgress,
     TargetColumnSpec,
 )
@@ -61,17 +62,7 @@ def _clear_cache_for_config(config: DatasetConfig, fixtures_dir: Path) -> None:
         config: Dataset configuration.
         fixtures_dir: Path to fixtures directory.
     """
-    config_parts = [
-        config["name"],
-        config["file_name"],
-        config["encoding"],
-        str(config["target"]),
-        str(config["exclude_columns"]),
-        str(config.get("group_column")),
-    ]
-    config_str = "|".join(config_parts)
-    config_hash = _compute_config_hash(config_str)
-    cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
+    cache_dir = get_cache_dir(fixtures_dir, config["folder"], csv_config_hash(config))
     invalidate_cache(cache_dir)
 
 
@@ -80,7 +71,7 @@ def _make_config(
     folder: str = "small_csv",
     file_name: str = "data.csv",
     target_column: str = "target",
-    label_type: LabelType = "binary_int",
+    label_type: LabelType = LabelType.BINARY_INT,
     positive_values: tuple[str | int, ...] = (1,),
     negative_values: tuple[str | int, ...] = (0,),
     exclude_columns: tuple[str, ...] = (),
@@ -173,7 +164,7 @@ class TestCSVLoader:
         config = _make_config(
             folder="string_labels",
             target_column="status",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("bankrupt",),
             negative_values=("healthy",),
             exclude_columns=("id",),
@@ -194,7 +185,7 @@ class TestCSVLoader:
         config = _make_config(
             folder="string_labels",
             target_column="status",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("bankrupt",),
             negative_values=("healthy",),
             exclude_columns=("id",),
@@ -216,7 +207,7 @@ class TestCSVLoader:
         config = _make_config(
             folder="string_labels",
             target_column="status",
-            label_type="binary_str",
+            label_type=LabelType.BINARY_STR,
             positive_values=("bankrupt",),
             negative_values=("healthy",),
             exclude_columns=("id",),
@@ -489,7 +480,7 @@ class TestCSVLoader:
         # At least: parse start, parse end, encode start, encode end
         assert len(progress_updates) >= 3
         # Check we have encoding phase updates (our new code)
-        encoding_updates = [p for p in progress_updates if p["phase"] == "encoding"]
+        encoding_updates = [p for p in progress_updates if p["phase"] is LoadPhase.ENCODING]
         assert len(encoding_updates) == 2  # Start and complete
         # Last encoding update should be 100%
         assert encoding_updates[-1]["percent_complete"] == 100.0
@@ -515,7 +506,7 @@ class TestCSVLoader:
 
         # Should have exactly 4 progress updates from loading_cache phase
         # (start, metadata loaded, features loaded, labels loaded)
-        cache_updates = [p for p in progress_updates if p["phase"] == "loading_cache"]
+        cache_updates = [p for p in progress_updates if p["phase"] is LoadPhase.LOADING_CACHE]
         assert len(cache_updates) == 4
         # Last cache update should be 100%
         assert cache_updates[-1]["percent_complete"] == 100.0

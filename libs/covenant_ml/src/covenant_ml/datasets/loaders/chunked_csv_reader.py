@@ -189,7 +189,7 @@ def read_csv_with_progress(
     if file_size >= PROGRESS_THRESHOLD_BYTES:
         _report_progress(
             callback=progress_callback,
-            phase="reading",
+            phase=LoadPhase.READING,
             bytes_read=0,
             bytes_total=file_size,
             rows_processed=0,
@@ -213,7 +213,7 @@ def read_csv_with_progress(
     if file_size >= PROGRESS_THRESHOLD_BYTES:
         _report_progress(
             callback=progress_callback,
-            phase="reading",
+            phase=LoadPhase.READING,
             bytes_read=file_size,
             bytes_total=file_size,
             rows_processed=n_rows,
@@ -228,7 +228,7 @@ def read_csv_with_progress(
     # Use row-based progress (bytes=0) since file is already read
     _report_progress(
         callback=progress_callback,
-        phase="parsing",
+        phase=LoadPhase.PARSING,
         bytes_read=0,
         bytes_total=0,
         rows_processed=0,
@@ -247,7 +247,7 @@ def read_csv_with_progress(
         if progress_callback is not None and (i + 1) % DEFAULT_BATCH_SIZE == 0:
             _report_progress(
                 callback=progress_callback,
-                phase="parsing",
+                phase=LoadPhase.PARSING,
                 bytes_read=0,
                 bytes_total=0,
                 rows_processed=i + 1,
@@ -258,7 +258,7 @@ def read_csv_with_progress(
     # Final progress - use row-based for consistency
     _report_progress(
         callback=progress_callback,
-        phase="parsing",
+        phase=LoadPhase.PARSING,
         bytes_read=0,
         bytes_total=0,
         rows_processed=n_rows,
@@ -299,7 +299,7 @@ def read_csv_to_dataframe(
     # Report initial progress
     _report_progress(
         callback=progress_callback,
-        phase="reading",
+        phase=LoadPhase.READING,
         bytes_read=0,
         bytes_total=file_size,
         rows_processed=0,
@@ -319,7 +319,7 @@ def read_csv_to_dataframe(
 
     _report_progress(
         callback=progress_callback,
-        phase="reading",
+        phase=LoadPhase.READING,
         bytes_read=file_size,
         bytes_total=file_size,
         rows_processed=df.height,

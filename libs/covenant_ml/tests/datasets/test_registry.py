@@ -11,9 +11,11 @@ from covenant_ml.datasets.registry import (
     make_default_timeseries_registry,
 )
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -31,7 +33,7 @@ def _make_test_config(name: str) -> DatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -231,7 +233,7 @@ def _make_test_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -242,7 +244,7 @@ def _make_test_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
         time_series=TimeSeriesSpec(
             entity_column="entity_id",
             time_column="timestamp",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             labels_file="labels.csv",
             labels_entity_column="entity_id",
             include_rank_features=False,

@@ -37,6 +37,7 @@ from covenant_ml.datasets.types import (
     CategoricalEncoding,
     DatasetMeta,
     LoadedDataset,
+    LoadPhase,
     LoadProgress,
 )
 
@@ -335,7 +336,7 @@ class TestSaveAndLoadCache:
             assert len(progress_updates) == 4
             # All should be caching phase
             for update in progress_updates:
-                assert update["phase"] == "caching"
+                assert update["phase"] is LoadPhase.CACHING
             # Last should be 100% complete
             assert progress_updates[-1]["percent_complete"] == 100.0
 
@@ -356,7 +357,7 @@ class TestSaveAndLoadCache:
             # Should have 4 progress updates (start, features, labels, complete)
             assert len(progress_updates) == 4
             for update in progress_updates:
-                assert update["phase"] == "loading_cache"
+                assert update["phase"] is LoadPhase.LOADING_CACHE
             # Last should be 100% complete
             assert progress_updates[-1]["percent_complete"] == 100.0
             # Last message should indicate completion with sample count

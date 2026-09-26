@@ -38,11 +38,11 @@ def aggregate_timeseries(
     Returns:
         Tuple of (feature_array, entity_ids).
     """
-    if aggregation == "last":
+    if aggregation is AggregationStrategy.LAST:
         return _aggregate_last(df, entity_col, time_col, feature_columns)
-    if aggregation == "first":
+    if aggregation is AggregationStrategy.FIRST:
         return _aggregate_first(df, entity_col, time_col, feature_columns)
-    if aggregation == "mean":
+    if aggregation is AggregationStrategy.MEAN:
         return _aggregate_mean(df, entity_col, feature_columns)
     return _aggregate_statistics(df, entity_col, feature_columns)
 

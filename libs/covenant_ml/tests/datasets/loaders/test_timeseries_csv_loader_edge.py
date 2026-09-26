@@ -9,6 +9,7 @@ import pytest
 from covenant_ml.datasets.loaders.timeseries_csv_loader import (
     TimeSeriesCSVLoader,
 )
+from covenant_ml.datasets.types import AggregationStrategy
 from tests.datasets.loaders._timeseries_fixtures import (
     _copy_fixture_to_temp,
     _get_fixtures_dir,
@@ -70,7 +71,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_string_time",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
         )
         fixtures_dir = _get_fixtures_dir()
 
@@ -84,7 +85,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_missing_time",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
         )
         fixtures_dir = _get_fixtures_dir()
 
@@ -101,7 +102,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical_missing",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
         )
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical_missing")
 
@@ -146,7 +147,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="large_data",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
         )
 
         result = loader.load(config, tmp_path)
@@ -166,7 +167,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical",
-            aggregation="mean",
+            aggregation=AggregationStrategy.MEAN,
         )
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical")
 
@@ -185,7 +186,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical",
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
         )
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical")
 
@@ -204,7 +205,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_all_missing",
-            aggregation="mean",
+            aggregation=AggregationStrategy.MEAN,
         )
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_all_missing")
 
@@ -222,7 +223,7 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_all_missing",
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
         )
         fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_all_missing")
 
