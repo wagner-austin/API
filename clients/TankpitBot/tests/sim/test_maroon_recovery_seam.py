@@ -20,6 +20,7 @@ from collections.abc import Callable
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.session import deliver_batch
@@ -79,11 +80,11 @@ def test_marooned_tank_pans_and_walks_to_fuel_beyond_the_window() -> None:
     assert link.sent_commands.count(ClientCommandKind.SCOPE) >= 2, (
         f"the window-edge clamp never drew its pans: {link.sent_commands}"
     )
-    scope_outcomes = outcome_counts(ws.ledger, "scope")
+    scope_outcomes = outcome_counts(ws.ledger, ActionKind.SCOPE)
     assert scope_outcomes.get("confirmed", 0) >= 2, (
         f"pans dispatched but not confirmed over the seam: {scope_outcomes}"
     )
-    collect_outcomes = outcome_counts(ws.ledger, "collect")
+    collect_outcomes = outcome_counts(ws.ledger, ActionKind.COLLECT)
     assert sum(collect_outcomes.values()) >= 1, (
         f"the walk never ended in a pickup: {collect_outcomes}"
     )
