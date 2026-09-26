@@ -662,42 +662,7 @@ so the shapes had to live somewhere neither imports.[^guard]
     {
       "id": "outcomes-actionoutcome",
       "code": "tankpit_bot.ledger.outcomes:ActionOutcome",
-      "law": "ActionOutcome."
-    },
-    {
-      "id": "outcomes-collectoutcome",
-      "code": "tankpit_bot.ledger.outcomes:CollectOutcome",
-      "law": "CollectOutcome."
-    },
-    {
-      "id": "outcomes-mapopenoutcome",
-      "code": "tankpit_bot.ledger.outcomes:MapOpenOutcome",
-      "law": "MapOpenOutcome."
-    },
-    {
-      "id": "outcomes-moveoutcome",
-      "code": "tankpit_bot.ledger.outcomes:MoveOutcome",
-      "law": "MoveOutcome."
-    },
-    {
-      "id": "outcomes-scanoutcome",
-      "code": "tankpit_bot.ledger.outcomes:ScanOutcome",
-      "law": "ScanOutcome."
-    },
-    {
-      "id": "outcomes-shootoutcome",
-      "code": "tankpit_bot.ledger.outcomes:ShootOutcome",
-      "law": "ShootOutcome."
-    },
-    {
-      "id": "outcomes-teleportoutcome",
-      "code": "tankpit_bot.ledger.outcomes:TeleportOutcome",
-      "law": "TeleportOutcome."
-    },
-    {
-      "id": "outcomes-scopeoutcome",
-      "code": "tankpit_bot.ledger.outcomes:ScopeOutcome",
-      "law": "Scope-pan resolutions: 0x5A confirmed, superseded, or stalled - the pan is a tracked action since 2026-08-20 (the scope-pending radar drop)."
+      "law": "Every outcome the ledger records is one member of this StrEnum, whose value is the word written to the ledger; the per-kind subsets (scan, move, teleport, collect, map_open, shoot, scope) are documented on the class. Scope-pan resolutions are 0x5A confirmed, superseded, or stalled - the pan is a tracked action since 2026-08-20 (the scope-pending radar drop)."
     },
     {
       "id": "outcome-scope-emit-confirmed",
