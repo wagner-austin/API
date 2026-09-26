@@ -693,7 +693,7 @@
       "worker_ram_gb": 0.3,
       "minimum_workers": 2,
       "expected_minutes": 8,
-      "required_tags": [],
+      "required_tags": ["windows"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/session-audit",
