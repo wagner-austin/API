@@ -13,6 +13,7 @@ from platform_core.logging import LogLevel
 from ._utils import (
     _parse_bool,
     _parse_int,
+    _parse_log_level,
     _parse_str,
 )
 
@@ -125,21 +126,8 @@ def load_settings() -> Settings:
     Returns:
         Complete Settings TypedDict.
     """
-    level_str = _parse_str("LOGGING__LEVEL", "INFO")
-    level: LogLevel = "INFO"
-    if level_str == "DEBUG":
-        level = "DEBUG"
-    elif level_str == "INFO":
-        level = "INFO"
-    elif level_str == "WARNING":
-        level = "WARNING"
-    elif level_str == "ERROR":
-        level = "ERROR"
-    elif level_str == "CRITICAL":
-        level = "CRITICAL"
-
     logging_cfg: LoggingConfig = {
-        "level": level,
+        "level": _parse_log_level("LOGGING__LEVEL", LogLevel.INFO),
     }
 
     redis_cfg: RedisConfig = {

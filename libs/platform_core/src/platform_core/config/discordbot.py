@@ -135,7 +135,7 @@ def load_settings() -> Settings:
         "token": _parse_str("DISCORD_TOKEN", ""),
         "guild_id": single_guild,
         "guild_ids": guild_ids,
-        "log_level": _parse_log_level("LOG_LEVEL", "INFO"),
+        "log_level": _parse_log_level("LOG_LEVEL", LogLevel.INFO),
         "commands_sync_global": _parse_bool("COMMANDS_SYNC_GLOBAL", False),
     }
 

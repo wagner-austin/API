@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from typing import Literal
 
+import pytest
+
 from platform_core.config.model_trainer import Settings, load_settings
+from platform_core.json_utils import JSONTypeError
+from platform_core.logging import LogLevel
 from platform_core.testing import make_fake_env
 
 
 def test_model_trainer_settings_defaults() -> None:
     make_fake_env()
     cfg: Settings = load_settings()
-    assert cfg["logging"]["level"] == "INFO"
+    assert cfg["logging"]["level"] is LogLevel.INFO
     assert cfg["redis"] == {"enabled": True, "url": "redis://redis:6379/0"}
     assert cfg["rq"]["queue_name"] == "trainer"
     assert cfg["rq"]["job_timeout_sec"] == 86_400
@@ -70,7 +74,7 @@ def test_model_trainer_settings_env_overrides() -> None:
     env.set("APP_ENV", "prod")
 
     cfg = load_settings()
-    assert cfg["logging"]["level"] == "DEBUG"
+    assert cfg["logging"]["level"] is LogLevel.DEBUG
     assert cfg["redis"] == {"enabled": False, "url": "redis://override:6379/1"}
     assert cfg["rq"]["queue_name"] == "trainer"
     assert cfg["rq"]["job_timeout_sec"] == 100
@@ -109,22 +113,22 @@ def test_model_trainer_settings_log_levels() -> None:
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "WARNING")
     cfg = load_settings()
-    assert cfg["logging"]["level"] == "WARNING"
+    assert cfg["logging"]["level"] is LogLevel.WARNING
 
     # Test ERROR
     env.clear()
     env.set("LOGGING__LEVEL", "ERROR")
     cfg = load_settings()
-    assert cfg["logging"]["level"] == "ERROR"
+    assert cfg["logging"]["level"] is LogLevel.ERROR
 
     # Test CRITICAL
     env.clear()
     env.set("LOGGING__LEVEL", "CRITICAL")
     cfg = load_settings()
-    assert cfg["logging"]["level"] == "CRITICAL"
+    assert cfg["logging"]["level"] is LogLevel.CRITICAL
 
-    # Test invalid level falls back to INFO
+    # An unknown level is refused, never silently read as INFO
     env.clear()
     env.set("LOGGING__LEVEL", "INVALID")
-    cfg = load_settings()
-    assert cfg["logging"]["level"] == "INFO"
+    with pytest.raises(JSONTypeError, match="Invalid log level: INVALID"):
+        load_settings()

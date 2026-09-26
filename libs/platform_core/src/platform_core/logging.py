@@ -6,14 +6,29 @@ import multiprocessing as _mp
 import socket
 import sys
 import time
+from enum import StrEnum
 from types import TracebackType
-from typing import Literal, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.request_context import request_id_var
 
-LogFormat = Literal["json", "text"]
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+class LogFormat(StrEnum):
+    """How a service's log lines are rendered: one JSON object, or plain text."""
+
+    JSON = "json"
+    TEXT = "text"
+
+
+class LogLevel(StrEnum):
+    """The five standard log levels, spelled as the environment spells them."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
 
 
 class _OsModule(Protocol):
@@ -212,11 +227,11 @@ def _compute_instance_id() -> str:
 def _level_to_int(level: LogLevel) -> int:
     """Convert string log level to integer constant."""
     level_map: dict[LogLevel, int] = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
+        LogLevel.DEBUG: logging.DEBUG,
+        LogLevel.INFO: logging.INFO,
+        LogLevel.WARNING: logging.WARNING,
+        LogLevel.ERROR: logging.ERROR,
+        LogLevel.CRITICAL: logging.CRITICAL,
     }
     return level_map[level]
 
@@ -247,8 +262,8 @@ def setup_logging(
     Example:
         >>> from platform_core.logging import setup_logging
         >>> logger = setup_logging(
-        ...     level="INFO",
-        ...     format_mode="json",
+        ...     level=LogLevel.INFO,
+        ...     format_mode=LogFormat.JSON,
         ...     service_name="my-api",
         ...     instance_id=None,
         ...     extra_fields=None
@@ -276,7 +291,7 @@ def setup_logging(
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.DEBUG)
 
-    if format_mode == "json":
+    if format_mode is LogFormat.JSON:
         handler.setFormatter(
             JsonFormatter(static_fields=static_fields, extra_field_names=extra_field_names)
         )

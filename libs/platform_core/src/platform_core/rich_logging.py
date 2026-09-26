@@ -231,7 +231,7 @@ def _load_rich_progress_components() -> _RichProgressComponents:
 
 def setup_rich_logging(
     *,
-    level: LogLevel = "INFO",
+    level: LogLevel = LogLevel.INFO,
     show_time: bool = True,
     show_path: bool = False,
 ) -> logging.Logger:
@@ -251,7 +251,7 @@ def setup_rich_logging(
 
     Example:
         >>> from platform_core.rich_logging import setup_rich_logging, get_rich_console
-        >>> logger = setup_rich_logging(level="INFO")
+        >>> logger = setup_rich_logging(level=LogLevel.INFO)
         >>> logger.info("Starting optimization...")
         >>> console = get_rich_console()
         >>> # Use console for Tables, Panels, Progress

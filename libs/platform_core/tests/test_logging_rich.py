@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from platform_core.logging import (
+    LogLevel,
     stdlib_logging,
 )
 
@@ -13,7 +14,7 @@ def test_setup_rich_logging_returns_logger() -> None:
     """Test setup_rich_logging returns configured root logger."""
     from platform_core.rich_logging import setup_rich_logging
 
-    logger = setup_rich_logging(level="INFO")
+    logger = setup_rich_logging(level=LogLevel.INFO)
 
     assert logger.level == stdlib_logging.INFO
     assert len(logger.handlers) == 1
@@ -24,7 +25,7 @@ def test_setup_rich_logging_with_options() -> None:
     from platform_core.rich_logging import setup_rich_logging
 
     logger = setup_rich_logging(
-        level="DEBUG",
+        level=LogLevel.DEBUG,
         show_time=False,
         show_path=True,
     )
@@ -36,7 +37,7 @@ def test_setup_rich_logging_silences_third_party() -> None:
     """Test setup_rich_logging sets WARNING level for noisy loggers."""
     from platform_core.rich_logging import setup_rich_logging
 
-    setup_rich_logging(level="DEBUG")
+    setup_rich_logging(level=LogLevel.DEBUG)
 
     assert stdlib_logging.getLogger("urllib3").level == stdlib_logging.WARNING
     assert stdlib_logging.getLogger("httpx").level == stdlib_logging.WARNING

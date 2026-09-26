@@ -8,10 +8,6 @@ from platform_core.members import MemberT, find_member
 
 from . import _test_hooks
 
-_VALID_LOG_LEVELS: frozenset[LogLevel] = frozenset(
-    {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-)
-
 
 class _EnvError(RuntimeError):
     pass
@@ -121,18 +117,10 @@ def _validate_log_level(value: str) -> LogLevel:
             from the running process, and the levels they are most likely to
             mistype are the verbose ones they reached for while debugging.
     """
-    upper = value.upper()
-    if upper == "DEBUG":
-        return "DEBUG"
-    if upper == "INFO":
-        return "INFO"
-    if upper == "WARNING":
-        return "WARNING"
-    if upper == "ERROR":
-        return "ERROR"
-    if upper == "CRITICAL":
-        return "CRITICAL"
-    raise JSONTypeError(f"Invalid log level: {value}")
+    level = find_member(value.upper(), LogLevel)
+    if level is None:
+        raise JSONTypeError(f"Invalid log level: {value}")
+    return level
 
 
 def _validate_log_format(value: str) -> LogFormat:
@@ -147,12 +135,10 @@ def _validate_log_format(value: str) -> LogFormat:
     Raises:
         JSONTypeError: If the value names no format.
     """
-    lower = value.lower()
-    if lower == "json":
-        return "json"
-    if lower == "text":
-        return "text"
-    raise JSONTypeError(f"Invalid log format: {value}")
+    log_format = find_member(value.lower(), LogFormat)
+    if log_format is None:
+        raise JSONTypeError(f"Invalid log format: {value}")
+    return log_format
 
 
 def _parse_log_level(key: str, default: LogLevel) -> LogLevel:

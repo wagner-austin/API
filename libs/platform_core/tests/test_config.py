@@ -23,6 +23,7 @@ from platform_core.config.art_trainer import load_settings as load_art_trainer_s
 from platform_core.config.data_bank import load_settings as load_data_bank_settings
 from platform_core.config.turkic_api import load_settings as load_turkic_api_settings
 from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_core.logging import LogFormat, LogLevel
 from platform_core.testing import make_fake_env
 
 
@@ -209,54 +210,54 @@ def test_parse_bool() -> None:
 
 def test_parse_log_level() -> None:
     env = make_fake_env()
-    assert _parse_log_level("LOG_LEVEL", "INFO") == "INFO"
+    assert _parse_log_level("LOG_LEVEL", LogLevel.INFO) is LogLevel.INFO
 
     for level in ["DEBUG", "debug", "Debug"]:
         env.set("LOG_LEVEL", level)
-        assert _parse_log_level("LOG_LEVEL", "INFO") == "DEBUG"
+        assert _parse_log_level("LOG_LEVEL", LogLevel.INFO) is LogLevel.DEBUG
 
     env.clear()
     for level in ["INFO", "info", "Info"]:
         env.set("LOG_LEVEL", level)
-        assert _parse_log_level("LOG_LEVEL", "DEBUG") == "INFO"
+        assert _parse_log_level("LOG_LEVEL", LogLevel.DEBUG) is LogLevel.INFO
 
     env.clear()
     for level in ["WARNING", "warning", "Warning"]:
         env.set("LOG_LEVEL", level)
-        assert _parse_log_level("LOG_LEVEL", "INFO") == "WARNING"
+        assert _parse_log_level("LOG_LEVEL", LogLevel.INFO) is LogLevel.WARNING
 
     env.clear()
     for level in ["ERROR", "error", "Error"]:
         env.set("LOG_LEVEL", level)
-        assert _parse_log_level("LOG_LEVEL", "INFO") == "ERROR"
+        assert _parse_log_level("LOG_LEVEL", LogLevel.INFO) is LogLevel.ERROR
 
     env.clear()
     for level in ["CRITICAL", "critical", "Critical"]:
         env.set("LOG_LEVEL", level)
-        assert _parse_log_level("LOG_LEVEL", "INFO") == "CRITICAL"
+        assert _parse_log_level("LOG_LEVEL", LogLevel.INFO) is LogLevel.CRITICAL
 
     env.clear()
     env.set("LOG_LEVEL", "invalid")
     with pytest.raises(JSONTypeError, match="Invalid log level: invalid"):
-        _parse_log_level("LOG_LEVEL", "WARNING")
+        _parse_log_level("LOG_LEVEL", LogLevel.WARNING)
 
 
 def test_parse_log_format() -> None:
     env = make_fake_env()
-    assert _parse_log_format("LOG_FORMAT", "json") == "json"
+    assert _parse_log_format("LOG_FORMAT", LogFormat.JSON) is LogFormat.JSON
 
     for spelling in ["TEXT", "text", "Text"]:
         env.set("LOG_FORMAT", spelling)
-        assert _parse_log_format("LOG_FORMAT", "json") == "text"
+        assert _parse_log_format("LOG_FORMAT", LogFormat.JSON) is LogFormat.TEXT
 
     env.clear()
     env.set("LOG_FORMAT", "json")
-    assert _parse_log_format("LOG_FORMAT", "text") == "json"
+    assert _parse_log_format("LOG_FORMAT", LogFormat.TEXT) is LogFormat.JSON
 
     env.clear()
     env.set("LOG_FORMAT", "yaml")
     with pytest.raises(JSONTypeError, match="Invalid log format: yaml"):
-        _parse_log_format("LOG_FORMAT", "json")
+        _parse_log_format("LOG_FORMAT", LogFormat.JSON)
 
 
 class TestValidatingALogLevel:
@@ -272,11 +273,11 @@ class TestValidatingALogLevel:
     """
 
     def test_every_level_is_accepted_in_any_case(self) -> None:
-        assert _validate_log_level("debug") == "DEBUG"
-        assert _validate_log_level("INFO") == "INFO"
-        assert _validate_log_level("Warning") == "WARNING"
-        assert _validate_log_level("ERROR") == "ERROR"
-        assert _validate_log_level("critical") == "CRITICAL"
+        assert _validate_log_level("debug") is LogLevel.DEBUG
+        assert _validate_log_level("INFO") is LogLevel.INFO
+        assert _validate_log_level("Warning") is LogLevel.WARNING
+        assert _validate_log_level("ERROR") is LogLevel.ERROR
+        assert _validate_log_level("critical") is LogLevel.CRITICAL
 
     def test_an_unrecognised_level_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="Invalid log level: TRACE"):
@@ -292,8 +293,8 @@ class TestValidatingALogFormat:
     """
 
     def test_both_formats_are_accepted_in_any_case(self) -> None:
-        assert _validate_log_format("JSON") == "json"
-        assert _validate_log_format("Text") == "text"
+        assert _validate_log_format("JSON") is LogFormat.JSON
+        assert _validate_log_format("Text") is LogFormat.TEXT
 
     def test_an_unrecognised_format_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="Invalid log format: console"):
@@ -355,7 +356,7 @@ def test_load_art_trainer_settings_defaults() -> None:
     make_fake_env()
     cfg = load_art_trainer_settings()
     assert cfg["app_env"] == "dev"
-    assert cfg["logging"]["level"] == "INFO"
+    assert cfg["logging"]["level"] is LogLevel.INFO
     assert cfg["redis"]["enabled"] is True
     assert cfg["redis"]["url"] == "redis://redis:6379/0"
     assert cfg["rq"]["queue_name"] == "art-trainer"
@@ -406,7 +407,7 @@ def test_load_art_trainer_settings_log_level_debug() -> None:
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "DEBUG")
     cfg = load_art_trainer_settings()
-    assert cfg["logging"]["level"] == "DEBUG"
+    assert cfg["logging"]["level"] is LogLevel.DEBUG
 
 
 def test_load_art_trainer_settings_log_level_warning() -> None:
@@ -414,7 +415,7 @@ def test_load_art_trainer_settings_log_level_warning() -> None:
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "WARNING")
     cfg = load_art_trainer_settings()
-    assert cfg["logging"]["level"] == "WARNING"
+    assert cfg["logging"]["level"] is LogLevel.WARNING
 
 
 def test_load_art_trainer_settings_log_level_error() -> None:
@@ -422,7 +423,7 @@ def test_load_art_trainer_settings_log_level_error() -> None:
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "ERROR")
     cfg = load_art_trainer_settings()
-    assert cfg["logging"]["level"] == "ERROR"
+    assert cfg["logging"]["level"] is LogLevel.ERROR
 
 
 def test_load_art_trainer_settings_log_level_critical() -> None:
@@ -430,7 +431,7 @@ def test_load_art_trainer_settings_log_level_critical() -> None:
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "CRITICAL")
     cfg = load_art_trainer_settings()
-    assert cfg["logging"]["level"] == "CRITICAL"
+    assert cfg["logging"]["level"] is LogLevel.CRITICAL
 
 
 def test_load_art_trainer_settings_custom_values() -> None:
@@ -457,9 +458,9 @@ def test_load_art_trainer_settings_custom_values() -> None:
     assert cfg["security"]["api_key"] == "secret-key"
 
 
-def test_load_art_trainer_settings_log_level_invalid_uses_info() -> None:
-    """Test load_art_trainer_settings uses INFO for invalid log level."""
+def test_load_art_trainer_settings_log_level_invalid_is_refused() -> None:
+    """An unknown LOGGING__LEVEL is refused rather than silently read as INFO."""
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "INVALID")
-    cfg = load_art_trainer_settings()
-    assert cfg["logging"]["level"] == "INFO"
+    with pytest.raises(JSONTypeError, match="Invalid log level: INVALID"):
+        load_art_trainer_settings()

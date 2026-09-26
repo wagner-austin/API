@@ -8,6 +8,8 @@ from platform_core.json_utils import load_json_str
 from platform_core.logging import (
     JsonFormatter,
     LogEventFields,
+    LogFormat,
+    LogLevel,
     TextFormatter,
     get_logger,
     setup_logging,
@@ -18,8 +20,8 @@ from platform_core.logging import (
 def test_setup_logging_json_format() -> None:
     """Test setup_logging configures JSON formatter correctly."""
     logger = setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="test-service",
         instance_id="test-instance",
         extra_fields=None,
@@ -34,8 +36,8 @@ def test_setup_logging_json_format() -> None:
 def test_setup_logging_text_format() -> None:
     """Test setup_logging configures text formatter correctly."""
     logger = setup_logging(
-        level="DEBUG",
-        format_mode="text",
+        level=LogLevel.DEBUG,
+        format_mode=LogFormat.TEXT,
         service_name="test-service",
         instance_id=None,
         extra_fields=["field1"],
@@ -52,8 +54,8 @@ def test_setup_logging_clears_handlers() -> None:
     root = stdlib_logging.getLogger()
 
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="svc1",
         instance_id=None,
         extra_fields=None,
@@ -61,8 +63,8 @@ def test_setup_logging_clears_handlers() -> None:
     count_after_first = len(root.handlers)
 
     setup_logging(
-        level="WARNING",
-        format_mode="text",
+        level=LogLevel.WARNING,
+        format_mode=LogFormat.TEXT,
         service_name="svc2",
         instance_id=None,
         extra_fields=None,
@@ -77,8 +79,8 @@ def test_setup_logging_clears_handlers() -> None:
 def test_setup_logging_debug() -> None:
     """Test setup_logging with DEBUG level."""
     logger = setup_logging(
-        level="DEBUG",
-        format_mode="json",
+        level=LogLevel.DEBUG,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -89,8 +91,8 @@ def test_setup_logging_debug() -> None:
 def test_setup_logging_info() -> None:
     """Test setup_logging with INFO level."""
     logger = setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -101,8 +103,8 @@ def test_setup_logging_info() -> None:
 def test_setup_logging_warning() -> None:
     """Test setup_logging with WARNING level."""
     logger = setup_logging(
-        level="WARNING",
-        format_mode="json",
+        level=LogLevel.WARNING,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -113,8 +115,8 @@ def test_setup_logging_warning() -> None:
 def test_setup_logging_error() -> None:
     """Test setup_logging with ERROR level."""
     logger = setup_logging(
-        level="ERROR",
-        format_mode="json",
+        level=LogLevel.ERROR,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -125,8 +127,8 @@ def test_setup_logging_error() -> None:
 def test_setup_logging_critical() -> None:
     """Test setup_logging with CRITICAL level."""
     logger = setup_logging(
-        level="CRITICAL",
-        format_mode="json",
+        level=LogLevel.CRITICAL,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -137,8 +139,8 @@ def test_setup_logging_critical() -> None:
 def test_setup_logging_auto_instance_id() -> None:
     """Test setup_logging generates instance_id when None."""
     logger = setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -167,8 +169,8 @@ def test_setup_logging_auto_instance_id() -> None:
 def test_setup_logging_with_extra_fields() -> None:
     """Test setup_logging with extra fields configuration."""
     logger = setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id="inst-1",
         extra_fields=["custom_field"],
@@ -250,8 +252,8 @@ def test_log_event_fields_partial() -> None:
 def test_setup_logging_silences_third_party() -> None:
     """Test setup_logging sets WARNING level for noisy third-party loggers."""
     setup_logging(
-        level="DEBUG",
-        format_mode="json",
+        level=LogLevel.DEBUG,
+        format_mode=LogFormat.JSON,
         service_name="test",
         instance_id=None,
         extra_fields=None,

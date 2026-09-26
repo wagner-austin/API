@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from platform_core.config.covenant_radar import DatadogEnv, MLBackend, Settings, load_settings
+from platform_core.json_utils import JSONTypeError
+from platform_core.logging import LogLevel
 from platform_core.testing import make_fake_env
 
 
@@ -27,7 +29,7 @@ def test_load_covenant_radar_settings_success() -> None:
     assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
     assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
     assert settings["rq"]["queue_name"] == "covenant"
-    assert settings["logging"]["level"] == "INFO"
+    assert settings["logging"]["level"] is LogLevel.INFO
     assert settings["app_env"] == "dev"
 
 
@@ -143,22 +145,27 @@ def test_load_covenant_radar_settings_logging_levels() -> None:
     # Test DEBUG level
     env.set("LOGGING__LEVEL", "DEBUG")
     settings = load_settings()
-    assert settings["logging"]["level"] == "DEBUG"
+    assert settings["logging"]["level"] is LogLevel.DEBUG
 
     # Test WARNING level
     env.set("LOGGING__LEVEL", "WARNING")
     settings = load_settings()
-    assert settings["logging"]["level"] == "WARNING"
+    assert settings["logging"]["level"] is LogLevel.WARNING
 
     # Test ERROR level
     env.set("LOGGING__LEVEL", "ERROR")
     settings = load_settings()
-    assert settings["logging"]["level"] == "ERROR"
+    assert settings["logging"]["level"] is LogLevel.ERROR
 
     # Test CRITICAL level
     env.set("LOGGING__LEVEL", "CRITICAL")
     settings = load_settings()
-    assert settings["logging"]["level"] == "CRITICAL"
+    assert settings["logging"]["level"] is LogLevel.CRITICAL
+
+    # An unknown level is refused, never silently read as INFO
+    env.set("LOGGING__LEVEL", "VERBOSE")
+    with pytest.raises(JSONTypeError, match="Invalid log level: VERBOSE"):
+        load_settings()
 
 
 def test_covenant_radar_settings_is_typed_dict() -> None:

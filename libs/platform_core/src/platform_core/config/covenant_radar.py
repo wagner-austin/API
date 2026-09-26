@@ -5,7 +5,14 @@ from typing import Literal, TypedDict
 
 from platform_core.logging import LogLevel
 
-from ._utils import _parse_bool, _parse_int, _parse_member, _parse_str, _require_env_str
+from ._utils import (
+    _parse_bool,
+    _parse_int,
+    _parse_log_level,
+    _parse_member,
+    _parse_str,
+    _require_env_str,
+)
 
 
 class MLBackend(StrEnum):
@@ -127,19 +134,8 @@ def load_settings() -> Settings:
         DATADOG__TRACE_ENABLED: Enable APM tracing (default: true)
         DATABASE_URL: PostgreSQL connection URL (required)
     """
-    level_str = _parse_str("LOGGING__LEVEL", "INFO")
-    level: LogLevel = "INFO"
-    if level_str == "DEBUG":
-        level = "DEBUG"
-    elif level_str == "WARNING":
-        level = "WARNING"
-    elif level_str == "ERROR":
-        level = "ERROR"
-    elif level_str == "CRITICAL":
-        level = "CRITICAL"
-
     logging_cfg: LoggingConfig = {
-        "level": level,
+        "level": _parse_log_level("LOGGING__LEVEL", LogLevel.INFO),
     }
 
     redis_cfg: RedisConfig = {
