@@ -254,6 +254,14 @@ class FleetErrorCode(ErrorCodeBase):
     # edits that line. Sending the second reader to look for their own
     # unpushed work would waste the one fact the refusal has.
     COMPANION_REF_NOT_ON_REMOTE = "COMPANION_REF_NOT_ON_REMOTE"
+    # The sixth (MCPs board task 8454b6a9): an install step fleet.json
+    # declares today names a path the exported commit does not contain,
+    # because the step was declared after the commit was made. Measured
+    # 2026-09-26: packages/db at a 2026-09-21 commit ran 'bash
+    # scripts/testdb-setup.sh' and closed exit 127, which read as a broken
+    # commit. It is neither the commit nor the submitter: today's registry
+    # cannot build that commit, so it is refused before any lease.
+    INSTALL_PATH_NOT_IN_COMMIT = "INSTALL_PATH_NOT_IN_COMMIT"
 
     # Dispatch and its record.
     DISPATCH_FAILED = "DISPATCH_FAILED"
