@@ -24,6 +24,16 @@ collapsed onto a shared ``StrategyName``, forking a near-identical rule for it
 would have been the very duplication both rules exist to prevent, so the
 machinery takes its subject as configuration and is registered once per set.
 
+WHY ``finetuning_strategy`` IS NO LONGER REGISTERED. Model-Trainer's
+``StrategyName`` became a StrEnum (board task 1374feba), which removed the
+``STRATEGY_NAMES`` tuple this rule read. An enum is a type the checker
+relates: a field annotated with an inline ``Literal`` of strategy words
+cannot receive a ``StrategyName`` member, and cannot be passed to the
+registry, the queue decoder or the config that take one, so the drift this
+rule exists to catch fails to type-check at the first boundary instead.
+Keeping the registration would have left it reporting that it checks
+nothing, so it was retired rather than pointed at an empty tuple.
+
 Violations, per configured subject:
 - <subject>-literal-drift: a Literal disagrees with the declaring tuple
 - <subject>-tuple-missing: the declaring module no longer declares the tuple
@@ -109,20 +119,6 @@ CORPUS_FORMAT_SET: Final = LiteralSet(
     ),
 )
 
-STRATEGY_NAME_SET: Final = LiteralSet(
-    subject="strategy-name",
-    defining_module="model_trainer/core/contracts/strategy_names.py",
-    tuple_name="STRATEGY_NAMES",
-    field_names=frozenset({"finetuning_strategy"}),
-    consequence=(
-        "the HTTP layer, the queue decoder and the registry would accept different "
-        "sets, so a request naming a strategy would be admitted at one layer and "
-        "refused at another -- or admitted everywhere and silently dropped from a "
-        "checkpoint's metadata, depending on which copy was stale"
-    ),
-)
-
-
 RISK_TIER_SET: Final = LiteralSet(
     subject="risk-tier",
     defining_module="platform_core/risk_tiers.py",
@@ -164,7 +160,6 @@ REGISTERED_SETS: Final[tuple[LiteralSet, ...]] = (
     CORPUS_FORMAT_SET,
     EVALUATION_STATUS_SET,
     RISK_TIER_SET,
-    STRATEGY_NAME_SET,
 )
 """Every set this rule is registered for, listed once.
 
@@ -402,7 +397,6 @@ __all__ = [
     "PACKAGE_SOURCE_GLOB",
     "REGISTERED_SETS",
     "RISK_TIER_SET",
-    "STRATEGY_NAME_SET",
     "LiteralSet",
     "LiteralSetRule",
 ]
