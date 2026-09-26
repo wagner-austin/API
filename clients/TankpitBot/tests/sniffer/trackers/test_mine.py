@@ -7,6 +7,7 @@ import base64
 from tankpit_bot.capture.trackers.mine import MineTracker
 from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
 from tests.wire_builders import frame_payload
@@ -46,7 +47,7 @@ class TestMineTracker:
         assert tracker._xor_table is None
         payload = frame_payload(bytes([0x21, 0x6B, 10, 20, 0]))
 
-        assert tracker.process_message(payload, direction="sent") is None
+        assert tracker.process_message(payload, direction=MessageDirection.SENT) is None
 
     def test_mines_placed_property(self) -> None:
         """Test mines_placed property returns count."""
@@ -153,7 +154,7 @@ class TestMineTrackerEdgeCases:
 
         body = bytes(encrypted)
         payload = frame_payload(body)
-        result = tracker.process_message(payload, direction="sent")
+        result = tracker.process_message(payload, direction=MessageDirection.SENT)
         assert result, "Expected non-None result"
         assert "MINE:DROP" in result
 
@@ -299,7 +300,7 @@ class TestMineTrackerEdgeCases:
 
         body = bytes(encrypted)
         payload = frame_payload(body)
-        result = tracker.process_message(payload, direction="sent")
+        result = tracker.process_message(payload, direction=MessageDirection.SENT)
         assert result is None
 
     def test_parse_mine_detonation_no_readable_positions(self, fake_fs: FakeFileSystem) -> None:
