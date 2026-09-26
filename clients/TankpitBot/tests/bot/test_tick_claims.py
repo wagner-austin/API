@@ -12,7 +12,7 @@ import pytest
 from platform_core.json_utils import dump_json_str, load_json_str
 
 from tankpit_bot.bot.ai.intent import set_resource_target
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.tick_claims import _arbitrate_collect_claim, _drop_held_claim
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
@@ -53,7 +53,7 @@ def _decision(ai_state: AIStateDict) -> TickDecisionDict:
     """
     return make_tick_decision(
         command=make_hold_command(),
-        behavior=make_behavior_score("COLLECT", 100, 10, 20, "fuel_locked"),
+        behavior=make_behavior_score(BehaviorMode.COLLECT, 100, 10, 20, ReasonKind.FUEL_LOCKED),
         updated_ai_state=ai_state,
         desired_equipment=[1, 2],
     )

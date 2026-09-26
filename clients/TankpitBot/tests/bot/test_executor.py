@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.executor import (
@@ -112,7 +112,9 @@ class TestExecute:
         bot, fake_cdp = _make_bot(fake_env)
         # Set all slots to enabled so execute needs to disable 1, 2, 4
         update_inventory_from_toggle(bot.world, [True, True, True, True, True])
-        behavior = make_behavior_score("HUNT", 50, 100, 200, "search_collect_local")
+        behavior = make_behavior_score(
+            BehaviorMode.HUNT, 50, 100, 200, ReasonKind.SEARCH_COLLECT_LOCAL
+        )
         decision = make_tick_decision(
             command=make_move_command(100, 200),
             behavior=behavior,
@@ -150,7 +152,9 @@ class TestExecute:
         )
         decision = make_tick_decision(
             command=make_move_command(100, 200),
-            behavior=make_behavior_score("HUNT", 800, 100, 200, "opportunity_shot"),
+            behavior=make_behavior_score(
+                BehaviorMode.HUNT, 800, 100, 200, ReasonKind.OPPORTUNITY_SHOT
+            ),
             updated_ai_state=owned,
             desired_equipment=[],
         )
@@ -172,7 +176,7 @@ class TestExecute:
         bot, _fake_cdp = _make_bot(fake_env)
         decision = make_tick_decision(
             command=make_hold_command(),
-            behavior=make_behavior_score("HUNT", 0, 0, 0, "manual_hold"),
+            behavior=make_behavior_score(BehaviorMode.HUNT, 0, 0, 0, ReasonKind.MANUAL_HOLD),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )
@@ -186,7 +190,9 @@ class TestExecute:
         bot, _fake_cdp = _make_bot(fake_env)
         decision = make_tick_decision(
             command=make_move_command(100, 200),
-            behavior=make_behavior_score("COLLECT", 500, 100, 200, "search_collect_local"),
+            behavior=make_behavior_score(
+                BehaviorMode.COLLECT, 500, 100, 200, ReasonKind.SEARCH_COLLECT_LOCAL
+            ),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )
@@ -215,7 +221,9 @@ class TestExecute:
         """
         bot, fake_cdp = _make_bot(fake_env)
         _store_tank(bot.world, 10, x=105, y=103, source=EntitySource.WORLD_STATE)
-        behavior = make_behavior_score("HUNT", 800, 105, 103, "shoot_target", target_id=10)
+        behavior = make_behavior_score(
+            BehaviorMode.HUNT, 800, 105, 103, ReasonKind.SHOOT_TARGET, target_id=10
+        )
         decision = make_tick_decision(
             command=make_shoot_command(105, 103, 10),
             behavior=behavior,
@@ -270,7 +278,7 @@ class TestSecondaryCommandDispatch:
             timestamp_ms=1000,
         )
 
-        behavior = make_behavior_score("HUNT", 900, 101, 100, "shoot_target")
+        behavior = make_behavior_score(BehaviorMode.HUNT, 900, 101, 100, ReasonKind.SHOOT_TARGET)
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 50),
             behavior=behavior,
@@ -289,7 +297,7 @@ class TestSecondaryCommandDispatch:
         update_world_state_from_fuel_total(ws, 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
-        behavior = make_behavior_score("HUNT", 900, 101, 100, "shoot_target")
+        behavior = make_behavior_score(BehaviorMode.HUNT, 900, 101, 100, ReasonKind.SHOOT_TARGET)
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 999),
             behavior=behavior,
@@ -314,7 +322,7 @@ class TestTickDecisionCodecs:
 
         decision = make_tick_decision(
             command=make_shoot_command(50, 60, 99),
-            behavior=make_behavior_score("HUNT", 900, 50, 60, "shoot_target"),
+            behavior=make_behavior_score(BehaviorMode.HUNT, 900, 50, 60, ReasonKind.SHOOT_TARGET),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[1, 2],
             secondary_command=make_pickup_fuel_command(49, 60),
@@ -335,7 +343,7 @@ class TestTickDecisionCodecs:
 
         decision = make_tick_decision(
             command=make_radar_command(),
-            behavior=make_behavior_score("HUNT", 500, 0, 0, "scan_on_landing"),
+            behavior=make_behavior_score(BehaviorMode.HUNT, 500, 0, 0, ReasonKind.SCAN_ON_LANDING),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )

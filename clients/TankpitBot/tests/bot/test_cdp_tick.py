@@ -187,7 +187,11 @@ class TestBotTickOnce:
 
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
-        from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+        from tankpit_bot.bot.ai.scoring_types import (
+            BehaviorMode,
+            ReasonKind,
+            make_behavior_score,
+        )
         from tankpit_bot.bot.ai.types import AIStateDict
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -227,7 +231,9 @@ class TestBotTickOnce:
         )
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 10),
-            behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot_target", target_id=10),
+            behavior=make_behavior_score(
+                BehaviorMode.HUNT, 800, 101, 100, ReasonKind.SHOOT_TARGET, target_id=10
+            ),
             updated_ai_state=dispatched_state,
             desired_equipment=[],
         )
@@ -281,7 +287,11 @@ class TestBotTickOnce:
 
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
-        from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+        from tankpit_bot.bot.ai.scoring_types import (
+            BehaviorMode,
+            ReasonKind,
+            make_behavior_score,
+        )
         from tankpit_bot.bot.ai.types import AIStateDict
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -321,7 +331,9 @@ class TestBotTickOnce:
         )
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 10),
-            behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot_target", target_id=10),
+            behavior=make_behavior_score(
+                BehaviorMode.HUNT, 800, 101, 100, ReasonKind.SHOOT_TARGET, target_id=10
+            ),
             updated_ai_state=failed_state,
             desired_equipment=[],
         )
