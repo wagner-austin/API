@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..icons import MultiPathIcon, get_skill_icon
-from ..themes import get_theme
+from ..themes import ThemeName, get_theme
 from ._common import (
     escape_xml,
     get_glow_css,
@@ -38,7 +38,7 @@ def _render_icon(icon: MultiPathIcon, x: float, y: float, size: int) -> str:
 
 def render_skills_card(
     skills: tuple[str, ...],
-    theme_name: str,
+    theme_name: ThemeName,
     hide_border: bool,
     disable_animations: bool,
 ) -> str:

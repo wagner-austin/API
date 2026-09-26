@@ -5,19 +5,7 @@ from typing import Literal
 from platform_codebase import CapabilityStrength
 from typing_extensions import TypedDict
 
-# Theme literal type for reuse across all request types
-ThemeName = Literal[
-    "default",
-    "dark",
-    "dracula",
-    "github_dark",
-    "transparent",
-    "cyberpunk",
-    "synthwave",
-    "neon",
-    "aurora",
-    "radical",
-]
+from ...themes import ThemeName
 
 
 class StatsRequest(TypedDict, total=True):
@@ -216,6 +204,5 @@ __all__ = [
     "LanguageStats",
     "SkillsRequest",
     "StatsRequest",
-    "ThemeName",
     "UserStats",
 ]

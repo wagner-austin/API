@@ -6,6 +6,7 @@ from github_stats_api.renderers import (
     render_hero_card,
     render_skills_card,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestRenderHeroCard:
@@ -17,7 +18,7 @@ class TestRenderHeroCard:
             name="Austin Wagner",
             subtitle="Full-Stack Developer",
             lines=("Location: Irvine", "Education: UC Irvine"),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             disable_animations=False,
         )
 
@@ -34,7 +35,7 @@ class TestRenderHeroCard:
             name="Test User",
             subtitle="",
             lines=(),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             disable_animations=False,
         )
 
@@ -47,7 +48,7 @@ class TestRenderHeroCard:
             name="Test",
             subtitle="",
             lines=(),
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             disable_animations=False,
         )
 
@@ -60,7 +61,7 @@ class TestRenderHeroCard:
             name="Test",
             subtitle="",
             lines=(),
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             disable_animations=True,
         )
 
@@ -73,7 +74,7 @@ class TestRenderHeroCard:
             name="Test",
             subtitle="",
             lines=(),
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             disable_animations=False,
         )
 
@@ -86,7 +87,7 @@ class TestRenderHeroCard:
             name="Test & User",
             subtitle="Dev <JS>",
             lines=("Line with 'quotes'",),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             disable_animations=True,
         )
 
@@ -101,7 +102,7 @@ class TestRenderHeroCard:
             name="Test",
             subtitle="",
             lines=("Line 1",),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             disable_animations=True,
         )
 
@@ -109,7 +110,7 @@ class TestRenderHeroCard:
             name="Test",
             subtitle="",
             lines=("Line 1", "Line 2", "Line 3", "Line 4"),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             disable_animations=True,
         )
 
@@ -125,7 +126,7 @@ class TestRenderSkillsCard:
         """Test rendering basic skills card."""
         svg = render_skills_card(
             skills=("Python", "TypeScript", "React"),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=False,
         )
@@ -141,7 +142,7 @@ class TestRenderSkillsCard:
         """Test that cyberpunk theme includes glow effect."""
         svg = render_skills_card(
             skills=("Python",),
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             hide_border=False,
             disable_animations=False,
         )
@@ -153,7 +154,7 @@ class TestRenderSkillsCard:
         """Test that cyberpunk theme includes sparkles."""
         svg = render_skills_card(
             skills=("Python",),
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             hide_border=False,
             disable_animations=False,
         )
@@ -165,7 +166,7 @@ class TestRenderSkillsCard:
         """Test that disabling animations removes effects."""
         svg = render_skills_card(
             skills=("Python",),
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             hide_border=True,
             disable_animations=True,
         )
@@ -177,7 +178,7 @@ class TestRenderSkillsCard:
         """Test that hide_border sets border opacity to 0."""
         svg = render_skills_card(
             skills=("Python",),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=True,
             disable_animations=True,
         )
@@ -188,7 +189,7 @@ class TestRenderSkillsCard:
         """Test that special characters are escaped."""
         svg = render_skills_card(
             skills=("C++", "C#", "F#"),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=True,
         )
@@ -201,7 +202,7 @@ class TestRenderSkillsCard:
         """Test that height adjusts based on skill count."""
         svg_few = render_skills_card(
             skills=("Python", "React"),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=True,
         )
@@ -217,7 +218,7 @@ class TestRenderSkillsCard:
                 "PostgreSQL",
                 "Git",
             ),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=True,
         )
@@ -230,7 +231,7 @@ class TestRenderSkillsCard:
         """Test that skills have colored circle icons."""
         svg = render_skills_card(
             skills=("Python", "Docker"),
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=True,
         )

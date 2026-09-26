@@ -8,6 +8,7 @@ from platform_core.errors import AppError
 from github_stats_api.api.validators.stats import (
     decode_skills_request,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestDecodeSkillsRequest:
@@ -23,7 +24,7 @@ class TestDecodeSkillsRequest:
         )
 
         assert req["skills"] == ("Python", "TypeScript", "FastAPI")
-        assert req["theme"] == "default"
+        assert req["theme"] is ThemeName.DEFAULT
         assert req["hide_border"] is False
         assert req["disable_animations"] is False
 
@@ -37,7 +38,7 @@ class TestDecodeSkillsRequest:
         )
 
         assert req["skills"] == ("Python", "React")
-        assert req["theme"] == "cyberpunk"
+        assert req["theme"] is ThemeName.CYBERPUNK
         assert req["hide_border"] is True
         assert req["disable_animations"] is True
 

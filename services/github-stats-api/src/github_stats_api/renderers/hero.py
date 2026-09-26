@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..themes import get_theme
+from ..themes import ThemeName, get_theme
 from ._common import escape_xml, get_glow_css, render_background
 
 
@@ -48,7 +48,7 @@ def render_hero_card(
     name: str,
     subtitle: str,
     lines: tuple[str, ...],
-    theme_name: str,
+    theme_name: ThemeName,
     disable_animations: bool,
 ) -> str:
     """Render a full-width hero card with rain animation."""

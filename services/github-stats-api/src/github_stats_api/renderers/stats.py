@@ -6,7 +6,7 @@ import math
 from typing import Literal
 
 from ..api.schemas.stats import UserStats
-from ..themes import get_theme
+from ..themes import ThemeName, get_theme
 from ._common import (
     escape_xml,
     format_number,
@@ -55,7 +55,7 @@ def _calculate_rank(
 
 def render_stats_card(
     stats: UserStats,
-    theme_name: str,
+    theme_name: ThemeName,
     hide_border: bool,
     show_icons: bool,
     hide: tuple[str, ...],

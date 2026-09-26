@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
@@ -55,23 +55,23 @@ class Theme(TypedDict, total=True):
     sparkle_count: int
 
 
-# Type alias for theme names
-ThemeNameLiteral = Literal[
-    "default",
-    "dark",
-    "dracula",
-    "github_dark",
-    "transparent",
-    "cyberpunk",
-    "synthwave",
-    "neon",
-    "aurora",
-    "radical",
-]
+class ThemeName(StrEnum):
+    """A card color theme, as the theme query parameter spells it."""
+
+    DEFAULT = "default"
+    DARK = "dark"
+    DRACULA = "dracula"
+    GITHUB_DARK = "github_dark"
+    TRANSPARENT = "transparent"
+    CYBERPUNK = "cyberpunk"
+    SYNTHWAVE = "synthwave"
+    NEON = "neon"
+    AURORA = "aurora"
+    RADICAL = "radical"
 
 
-_THEMES: dict[str, Theme] = {
-    "default": {
+_THEMES: dict[ThemeName, Theme] = {
+    ThemeName.DEFAULT: {
         "bg_color": "#fffefe",
         "title_color": "#2f80ed",
         "text_color": "#434d58",
@@ -82,7 +82,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": None,
         "sparkle_count": 0,
     },
-    "dark": {
+    ThemeName.DARK: {
         "bg_color": "#151515",
         "title_color": "#fff",
         "text_color": "#9f9f9f",
@@ -93,7 +93,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": None,
         "sparkle_count": 0,
     },
-    "dracula": {
+    ThemeName.DRACULA: {
         "bg_color": "#282a36",
         "title_color": "#ff79c6",
         "text_color": "#f8f8f2",
@@ -104,7 +104,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": None,
         "sparkle_count": 0,
     },
-    "github_dark": {
+    ThemeName.GITHUB_DARK: {
         "bg_color": "#0d1117",
         "title_color": "#58a6ff",
         "text_color": "#c9d1d9",
@@ -115,7 +115,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": None,
         "sparkle_count": 0,
     },
-    "transparent": {
+    ThemeName.TRANSPARENT: {
         "bg_color": "#00000000",
         "title_color": "#58a6ff",
         "text_color": "#c9d1d9",
@@ -127,7 +127,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_count": 0,
     },
     # --- New premium themes with visual effects ---
-    "cyberpunk": {
+    ThemeName.CYBERPUNK: {
         "bg_color": "#0a0a0f",
         "title_color": "#00fff9",
         "text_color": "#e0e0e0",
@@ -145,7 +145,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": "#ff00ff",
         "sparkle_count": 8,
     },
-    "synthwave": {
+    ThemeName.SYNTHWAVE: {
         "bg_color": "#1a1a2e",
         "title_color": "#f72585",
         "text_color": "#e0e0e0",
@@ -163,7 +163,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": "#4cc9f0",
         "sparkle_count": 6,
     },
-    "neon": {
+    ThemeName.NEON: {
         "bg_color": "#0d0d0d",
         "title_color": "#39ff14",
         "text_color": "#ffffff",
@@ -180,7 +180,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": "#ff073a",
         "sparkle_count": 10,
     },
-    "aurora": {
+    ThemeName.AURORA: {
         "bg_color": "#0f0c29",
         "title_color": "#a8ff78",
         "text_color": "#e0e0e0",
@@ -199,7 +199,7 @@ _THEMES: dict[str, Theme] = {
         "sparkle_color": "#a8ff78",
         "sparkle_count": 12,
     },
-    "radical": {
+    ThemeName.RADICAL: {
         "bg_color": "#141321",
         "title_color": "#fe428e",
         "text_color": "#f8f8f2",
@@ -220,32 +220,22 @@ _THEMES: dict[str, Theme] = {
 }
 
 
-def get_theme(name: str) -> Theme:
+def get_theme(name: ThemeName) -> Theme:
     """Get theme by name.
 
     Args:
-        name: Theme name.
+        name: Theme name; every member has an entry.
 
     Returns:
         Theme TypedDict.
     """
-    return _THEMES.get(name, _THEMES["default"])
-
-
-def get_theme_names() -> tuple[str, ...]:
-    """Get all available theme names.
-
-    Returns:
-        Tuple of theme name strings.
-    """
-    return tuple(_THEMES.keys())
+    return _THEMES[name]
 
 
 __all__ = [
     "Gradient",
     "GradientStop",
     "Theme",
-    "ThemeNameLiteral",
+    "ThemeName",
     "get_theme",
-    "get_theme_names",
 ]

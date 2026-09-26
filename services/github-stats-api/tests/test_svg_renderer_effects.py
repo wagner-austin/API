@@ -10,6 +10,7 @@ from github_stats_api.renderers import (
     render_langs_card,
     render_stats_card,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestRenderStatsCardWithEffects:
@@ -31,7 +32,7 @@ class TestRenderStatsCardWithEffects:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             show_icons=True,
             hide=(),
@@ -57,7 +58,7 @@ class TestRenderStatsCardWithEffects:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             hide_border=False,
             show_icons=True,
             hide=(),
@@ -84,7 +85,7 @@ class TestRenderStatsCardWithEffects:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             hide_border=False,
             show_icons=True,
             hide=(),
@@ -110,7 +111,7 @@ class TestRenderStatsCardWithEffects:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="cyberpunk",
+            theme_name=ThemeName.CYBERPUNK,
             hide_border=False,
             show_icons=True,
             hide=(),
@@ -135,7 +136,7 @@ class TestRenderLangsCardWithEffects:
             username="testuser",
             languages=languages,
             total_size=50000,
-            theme_name="neon",
+            theme_name=ThemeName.NEON,
             hide_border=False,
             layout="default",
             langs_count=8,
@@ -156,7 +157,7 @@ class TestRenderLangsCardWithEffects:
             username="testuser",
             languages=languages,
             total_size=50000,
-            theme_name="aurora",
+            theme_name=ThemeName.AURORA,
             hide_border=False,
             layout="compact",
             langs_count=8,

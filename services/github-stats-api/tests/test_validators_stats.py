@@ -9,6 +9,7 @@ from github_stats_api.api.validators.stats import (
     decode_langs_request,
     decode_stats_request,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestDecodeStatsRequest:
@@ -27,7 +28,7 @@ class TestDecodeStatsRequest:
         )
 
         assert req["username"] == "testuser"
-        assert req["theme"] == "default"
+        assert req["theme"] is ThemeName.DEFAULT
         assert req["hide_border"] is False
         assert req["show_icons"] is True
         assert req["include_all_commits"] is False
@@ -47,7 +48,7 @@ class TestDecodeStatsRequest:
         )
 
         assert req["username"] == "wagner-austin"
-        assert req["theme"] == "dracula"
+        assert req["theme"] is ThemeName.DRACULA
         assert req["hide_border"] is True
         assert req["show_icons"] is False
         assert req["include_all_commits"] is True
@@ -241,7 +242,7 @@ class TestDecodeLangsRequest:
         )
 
         assert req["username"] == "testuser"
-        assert req["theme"] == "default"
+        assert req["theme"] is ThemeName.DEFAULT
         assert req["hide_border"] is False
         assert req["layout"] == "default"
         assert req["langs_count"] == 8
@@ -261,7 +262,7 @@ class TestDecodeLangsRequest:
         )
 
         assert req["username"] == "testuser"
-        assert req["theme"] == "github_dark"
+        assert req["theme"] is ThemeName.GITHUB_DARK
         assert req["hide_border"] is True
         assert req["layout"] == "compact"
         assert req["langs_count"] == 10
@@ -341,7 +342,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "transparent"
+        assert req["theme"] is ThemeName.TRANSPARENT
 
     def test_decode_stats_request_github_dark_theme(self) -> None:
         """Test github_dark theme is accepted."""
@@ -354,7 +355,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "github_dark"
+        assert req["theme"] is ThemeName.GITHUB_DARK
 
     def test_decode_stats_request_default_theme_explicit(self) -> None:
         """Test explicit 'default' theme is accepted."""
@@ -367,7 +368,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "default"
+        assert req["theme"] is ThemeName.DEFAULT
 
     def test_decode_stats_request_dark_theme(self) -> None:
         """Test dark theme is accepted."""
@@ -380,7 +381,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "dark"
+        assert req["theme"] is ThemeName.DARK
 
     def test_decode_stats_request_cyberpunk_theme(self) -> None:
         """Test cyberpunk theme is accepted."""
@@ -393,7 +394,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "cyberpunk"
+        assert req["theme"] is ThemeName.CYBERPUNK
 
     def test_decode_stats_request_synthwave_theme(self) -> None:
         """Test synthwave theme is accepted."""
@@ -406,7 +407,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "synthwave"
+        assert req["theme"] is ThemeName.SYNTHWAVE
 
     def test_decode_stats_request_neon_theme(self) -> None:
         """Test neon theme is accepted."""
@@ -419,7 +420,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "neon"
+        assert req["theme"] is ThemeName.NEON
 
     def test_decode_stats_request_aurora_theme(self) -> None:
         """Test aurora theme is accepted."""
@@ -432,7 +433,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "aurora"
+        assert req["theme"] is ThemeName.AURORA
 
     def test_decode_stats_request_radical_theme(self) -> None:
         """Test radical theme is accepted."""
@@ -445,7 +446,7 @@ class TestDecodeLangsRequest:
             hide=None,
             disable_animations=None,
         )
-        assert req["theme"] == "radical"
+        assert req["theme"] is ThemeName.RADICAL
 
     def test_decode_langs_request_donut_layout(self) -> None:
         """Test donut layout is accepted."""

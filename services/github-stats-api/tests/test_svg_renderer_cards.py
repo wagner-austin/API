@@ -10,6 +10,7 @@ from github_stats_api.renderers import (
     render_langs_card,
     render_stats_card,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestRenderStatsCard:
@@ -31,7 +32,7 @@ class TestRenderStatsCard:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             show_icons=True,
             hide=(),
@@ -60,7 +61,7 @@ class TestRenderStatsCard:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             show_icons=True,
             hide=("stars", "commits"),
@@ -87,7 +88,7 @@ class TestRenderStatsCard:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="dracula",
+            theme_name=ThemeName.DRACULA,
             hide_border=False,
             show_icons=True,
             hide=(),
@@ -112,7 +113,7 @@ class TestRenderLangsCard:
             username="testuser",
             languages=languages,
             total_size=100000,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             layout="default",
             langs_count=8,
@@ -134,7 +135,7 @@ class TestRenderLangsCard:
             username="testuser",
             languages=languages,
             total_size=50000,
-            theme_name="dracula",
+            theme_name=ThemeName.DRACULA,
             hide_border=True,
             layout="compact",
             langs_count=8,
@@ -155,7 +156,7 @@ class TestRenderLangsCard:
             username="testuser",
             languages=languages,
             total_size=100000,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             layout="donut",
             langs_count=8,
@@ -175,7 +176,7 @@ class TestRenderLangsCard:
             username="testuser",
             languages=languages,
             total_size=50000,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             layout="pie",
             langs_count=8,
@@ -196,7 +197,7 @@ class TestRenderLangsCard:
             username="testuser",
             languages=languages,
             total_size=100,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             layout="compact",
             langs_count=8,
@@ -226,7 +227,7 @@ class TestRenderStatsCardVariations:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             show_icons=False,
             hide=(),
@@ -254,7 +255,7 @@ class TestRenderStatsCardVariations:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=True,
             show_icons=True,
             hide=("prs", "issues"),
@@ -281,7 +282,7 @@ class TestRenderStatsCardVariations:
 
         svg = render_stats_card(
             stats=stats,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             show_icons=True,
             hide=("contribs",),

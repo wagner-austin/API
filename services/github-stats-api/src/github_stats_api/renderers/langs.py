@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..api.schemas.stats import LanguageStats
-from ..themes import get_theme
+from ..themes import ThemeName, get_theme
 from ._common import (
     escape_xml,
     get_animation_css,
@@ -18,7 +18,7 @@ def render_langs_card(
     username: str,
     languages: list[LanguageStats],
     total_size: int,
-    theme_name: str,
+    theme_name: ThemeName,
     hide_border: bool,
     layout: str,
     langs_count: int,

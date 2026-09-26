@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..api.schemas.stats import CapabilitiesResponse, Capability
-from ..themes import get_theme
+from ..themes import ThemeName, get_theme
 from ._common import (
     escape_xml,
     get_animation_css,
@@ -16,7 +16,7 @@ from ._common import (
 
 def render_capabilities_card(
     response: CapabilitiesResponse,
-    theme_name: str,
+    theme_name: ThemeName,
     hide_border: bool,
     disable_animations: bool,
 ) -> str:

@@ -9,6 +9,7 @@ from github_stats_api.api.validators.stats import (
     decode_capabilities_request,
     decode_hero_request,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestDecodeCapabilitiesRequest:
@@ -24,7 +25,7 @@ class TestDecodeCapabilitiesRequest:
         )
 
         assert req["repo"] == "owner/repo"
-        assert req["theme"] == "default"
+        assert req["theme"] is ThemeName.DEFAULT
         assert req["hide_border"] is False
         assert req["disable_animations"] is False
 
@@ -38,7 +39,7 @@ class TestDecodeCapabilitiesRequest:
         )
 
         assert req["repo"] == "wagner-austin/API"
-        assert req["theme"] == "dracula"
+        assert req["theme"] is ThemeName.DRACULA
         assert req["hide_border"] is True
         assert req["disable_animations"] is True
 
@@ -221,7 +222,7 @@ class TestDecodeHeroRequest:
         assert req["name"] == "Austin Wagner"
         assert req["subtitle"] == ""
         assert req["lines"] == ()
-        assert req["theme"] == "default"
+        assert req["theme"] is ThemeName.DEFAULT
         assert req["disable_animations"] is False
 
     def test_decode_hero_request_all_options(self) -> None:
@@ -237,7 +238,7 @@ class TestDecodeHeroRequest:
         assert req["name"] == "Austin Wagner"
         assert req["subtitle"] == "Full-Stack Dev | ML Researcher"
         assert req["lines"] == ("Location: Irvine", "Education: UC Irvine")
-        assert req["theme"] == "cyberpunk"
+        assert req["theme"] is ThemeName.CYBERPUNK
         assert req["disable_animations"] is True
 
     def test_decode_hero_request_missing_name_raises(self) -> None:

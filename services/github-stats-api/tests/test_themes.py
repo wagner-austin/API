@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from github_stats_api.themes import get_theme, get_theme_names
+from github_stats_api.themes import ThemeName, get_theme
 
 
 class TestGetTheme:
@@ -8,7 +8,7 @@ class TestGetTheme:
 
     def test_get_theme_default(self) -> None:
         """Test getting default theme."""
-        theme = get_theme("default")
+        theme = get_theme(ThemeName.DEFAULT)
 
         assert theme["bg_color"] == "#fffefe"
         assert theme["title_color"] == "#2f80ed"
@@ -22,7 +22,7 @@ class TestGetTheme:
 
     def test_get_theme_dracula(self) -> None:
         """Test getting dracula theme."""
-        theme = get_theme("dracula")
+        theme = get_theme(ThemeName.DRACULA)
 
         assert theme["bg_color"] == "#282a36"
         assert theme["title_color"] == "#ff79c6"
@@ -34,7 +34,7 @@ class TestGetTheme:
 
     def test_get_theme_dark(self) -> None:
         """Test getting dark theme."""
-        theme = get_theme("dark")
+        theme = get_theme(ThemeName.DARK)
 
         assert theme["bg_color"] == "#151515"
         assert theme["title_color"] == "#fff"
@@ -42,7 +42,7 @@ class TestGetTheme:
 
     def test_get_theme_github_dark(self) -> None:
         """Test getting github_dark theme."""
-        theme = get_theme("github_dark")
+        theme = get_theme(ThemeName.GITHUB_DARK)
 
         assert theme["bg_color"] == "#0d1117"
         assert theme["title_color"] == "#58a6ff"
@@ -50,18 +50,11 @@ class TestGetTheme:
 
     def test_get_theme_transparent(self) -> None:
         """Test getting transparent theme."""
-        theme = get_theme("transparent")
+        theme = get_theme(ThemeName.TRANSPARENT)
 
         assert theme["bg_color"] == "#00000000"
         assert theme["border_color"] == "#00000000"
         assert theme["gradient"] is None
-
-    def test_get_theme_unknown_returns_default(self) -> None:
-        """Test that unknown theme returns default."""
-        theme = get_theme("nonexistent-theme")
-
-        assert theme["bg_color"] == "#fffefe"
-        assert theme["title_color"] == "#2f80ed"
 
 
 class TestGetThemeCyberpunk:
@@ -69,7 +62,7 @@ class TestGetThemeCyberpunk:
 
     def test_get_theme_cyberpunk_colors(self) -> None:
         """Test cyberpunk theme base colors."""
-        theme = get_theme("cyberpunk")
+        theme = get_theme(ThemeName.CYBERPUNK)
 
         assert theme["bg_color"] == "#0a0a0f"
         assert theme["title_color"] == "#00fff9"
@@ -79,7 +72,7 @@ class TestGetThemeCyberpunk:
 
     def test_get_theme_cyberpunk_gradient(self) -> None:
         """Test cyberpunk theme gradient."""
-        theme = get_theme("cyberpunk")
+        theme = get_theme(ThemeName.CYBERPUNK)
 
         gradient = theme["gradient"]
         # Gradient must be defined for cyberpunk theme
@@ -94,7 +87,7 @@ class TestGetThemeCyberpunk:
 
     def test_get_theme_cyberpunk_effects(self) -> None:
         """Test cyberpunk theme visual effects."""
-        theme = get_theme("cyberpunk")
+        theme = get_theme(ThemeName.CYBERPUNK)
 
         assert theme["glow_color"] == "#00fff9"
         assert theme["sparkle_color"] == "#ff00ff"
@@ -106,7 +99,7 @@ class TestGetThemeSynthwave:
 
     def test_get_theme_synthwave_colors(self) -> None:
         """Test synthwave theme base colors."""
-        theme = get_theme("synthwave")
+        theme = get_theme(ThemeName.SYNTHWAVE)
 
         assert theme["bg_color"] == "#1a1a2e"
         assert theme["title_color"] == "#f72585"
@@ -114,7 +107,7 @@ class TestGetThemeSynthwave:
 
     def test_get_theme_synthwave_gradient(self) -> None:
         """Test synthwave theme gradient."""
-        theme = get_theme("synthwave")
+        theme = get_theme(ThemeName.SYNTHWAVE)
 
         gradient = theme["gradient"]
         assert gradient == {
@@ -128,7 +121,7 @@ class TestGetThemeSynthwave:
 
     def test_get_theme_synthwave_effects(self) -> None:
         """Test synthwave theme visual effects."""
-        theme = get_theme("synthwave")
+        theme = get_theme(ThemeName.SYNTHWAVE)
 
         assert theme["glow_color"] == "#f72585"
         assert theme["sparkle_color"] == "#4cc9f0"
@@ -140,7 +133,7 @@ class TestGetThemeNeon:
 
     def test_get_theme_neon_colors(self) -> None:
         """Test neon theme base colors."""
-        theme = get_theme("neon")
+        theme = get_theme(ThemeName.NEON)
 
         assert theme["bg_color"] == "#0d0d0d"
         assert theme["title_color"] == "#39ff14"
@@ -148,7 +141,7 @@ class TestGetThemeNeon:
 
     def test_get_theme_neon_gradient(self) -> None:
         """Test neon theme gradient."""
-        theme = get_theme("neon")
+        theme = get_theme(ThemeName.NEON)
 
         gradient = theme["gradient"]
         assert gradient == {
@@ -161,7 +154,7 @@ class TestGetThemeNeon:
 
     def test_get_theme_neon_effects(self) -> None:
         """Test neon theme visual effects."""
-        theme = get_theme("neon")
+        theme = get_theme(ThemeName.NEON)
 
         assert theme["glow_color"] == "#39ff14"
         assert theme["sparkle_color"] == "#ff073a"
@@ -173,7 +166,7 @@ class TestGetThemeAurora:
 
     def test_get_theme_aurora_colors(self) -> None:
         """Test aurora theme base colors."""
-        theme = get_theme("aurora")
+        theme = get_theme(ThemeName.AURORA)
 
         assert theme["bg_color"] == "#0f0c29"
         assert theme["title_color"] == "#a8ff78"
@@ -181,7 +174,7 @@ class TestGetThemeAurora:
 
     def test_get_theme_aurora_gradient(self) -> None:
         """Test aurora theme gradient."""
-        theme = get_theme("aurora")
+        theme = get_theme(ThemeName.AURORA)
 
         gradient = theme["gradient"]
         assert gradient == {
@@ -196,7 +189,7 @@ class TestGetThemeAurora:
 
     def test_get_theme_aurora_effects(self) -> None:
         """Test aurora theme visual effects."""
-        theme = get_theme("aurora")
+        theme = get_theme(ThemeName.AURORA)
 
         assert theme["glow_color"] == "#78ffd6"
         assert theme["sparkle_color"] == "#a8ff78"
@@ -208,7 +201,7 @@ class TestGetThemeRadical:
 
     def test_get_theme_radical_colors(self) -> None:
         """Test radical theme base colors."""
-        theme = get_theme("radical")
+        theme = get_theme(ThemeName.RADICAL)
 
         assert theme["bg_color"] == "#141321"
         assert theme["title_color"] == "#fe428e"
@@ -216,7 +209,7 @@ class TestGetThemeRadical:
 
     def test_get_theme_radical_gradient(self) -> None:
         """Test radical theme gradient."""
-        theme = get_theme("radical")
+        theme = get_theme(ThemeName.RADICAL)
 
         gradient = theme["gradient"]
         assert gradient == {
@@ -230,37 +223,19 @@ class TestGetThemeRadical:
 
     def test_get_theme_radical_effects(self) -> None:
         """Test radical theme visual effects."""
-        theme = get_theme("radical")
+        theme = get_theme(ThemeName.RADICAL)
 
         assert theme["glow_color"] == "#fe428e"
         assert theme["sparkle_color"] == "#a9fef7"
         assert theme["sparkle_count"] == 8
 
 
-class TestGetThemeNames:
-    """Tests for get_theme_names function."""
+class TestThemeName:
+    """Tests for the ThemeName vocabulary."""
 
-    def test_get_theme_names_returns_all_themes(self) -> None:
-        """Test that get_theme_names returns all theme names."""
-        names = get_theme_names()
-
-        assert "default" in names
-        assert "dark" in names
-        assert "dracula" in names
-        assert "github_dark" in names
-        assert "transparent" in names
-        assert "cyberpunk" in names
-        assert "synthwave" in names
-        assert "neon" in names
-        assert "aurora" in names
-        assert "radical" in names
-
-    def test_get_theme_names_returns_tuple_of_ten(self) -> None:
-        """Test that get_theme_names returns exactly 10 theme names."""
-        names = get_theme_names()
-
-        # Verify exact expected output
-        assert names == (
+    def test_members_carry_the_query_words_in_order(self) -> None:
+        """The ten members are the words the theme parameter accepts."""
+        assert [str(name) for name in ThemeName] == [
             "default",
             "dark",
             "dracula",
@@ -271,4 +246,8 @@ class TestGetThemeNames:
             "neon",
             "aurora",
             "radical",
-        )
+        ]
+
+    def test_every_member_has_its_own_theme(self) -> None:
+        """get_theme resolves each member to a distinct table entry."""
+        assert len({id(get_theme(name)) for name in ThemeName}) == 10

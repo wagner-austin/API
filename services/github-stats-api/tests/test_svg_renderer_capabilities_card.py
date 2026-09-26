@@ -11,6 +11,7 @@ from github_stats_api.api.schemas.stats import (
 from github_stats_api.renderers import (
     render_capabilities_card,
 )
+from github_stats_api.themes import ThemeName
 
 
 class TestRenderCapabilitiesCardWithEffects:
@@ -36,7 +37,7 @@ class TestRenderCapabilitiesCardWithEffects:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="radical",
+            theme_name=ThemeName.RADICAL,
             hide_border=False,
             disable_animations=False,
         )
@@ -71,7 +72,7 @@ class TestRenderCapabilitiesCard:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=False,
         )
@@ -118,7 +119,7 @@ class TestRenderCapabilitiesCard:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="dracula",
+            theme_name=ThemeName.DRACULA,
             hide_border=True,
             disable_animations=False,
         )
@@ -148,7 +149,7 @@ class TestRenderCapabilitiesCard:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=False,
         )
@@ -177,7 +178,7 @@ class TestRenderCapabilitiesCard:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="dracula",
+            theme_name=ThemeName.DRACULA,
             hide_border=False,
             disable_animations=False,
         )
@@ -207,7 +208,7 @@ class TestRenderCapabilitiesCard:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=False,
             disable_animations=False,
         )
@@ -227,7 +228,7 @@ class TestRenderCapabilitiesCard:
 
         svg = render_capabilities_card(
             response=response,
-            theme_name="default",
+            theme_name=ThemeName.DEFAULT,
             hide_border=True,
             disable_animations=False,
         )

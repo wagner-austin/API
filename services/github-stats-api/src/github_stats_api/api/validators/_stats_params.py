@@ -1,29 +1,13 @@
-"""stats: _THEMES and related definitions."""
+"""stats: query-parameter validators shared by the card request decoders."""
 
 from __future__ import annotations
 
 from typing import Literal
 
 from platform_core.errors import AppError, ErrorCode
+from platform_core.members import find_member
 
-from ..schemas.stats import (
-    ThemeName,
-)
-
-_THEMES: frozenset[str] = frozenset(
-    {
-        "default",
-        "dark",
-        "dracula",
-        "github_dark",
-        "transparent",
-        "cyberpunk",
-        "synthwave",
-        "neon",
-        "aurora",
-        "radical",
-    }
-)
+from ...themes import ThemeName
 
 _LAYOUTS: frozenset[str] = frozenset(
     {
@@ -94,58 +78,27 @@ def _require_username(username: str | None) -> str:
 
 
 def _require_theme(raw: str | None) -> ThemeName:
-    """Validate and narrow theme string to ThemeName Literal type.
+    """Validate and narrow the theme query parameter to a ThemeName member.
 
     Args:
         raw: Raw theme string from query params.
 
     Returns:
-        Validated theme literal.
+        The named theme, or ThemeName.DEFAULT when the parameter is absent.
 
     Raises:
         AppError: If theme is invalid.
     """
     if raw is None:
-        return "default"
-    if raw not in _THEMES:
+        return ThemeName.DEFAULT
+    theme = find_member(raw, ThemeName)
+    if theme is None:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
-            message=f"theme must be one of: {', '.join(sorted(_THEMES))}",
+            message=f"theme must be one of: {', '.join(sorted(ThemeName))}",
             http_status=400,
         )
-    return _narrow_theme_unchecked(raw)
-
-
-def _narrow_theme_unchecked(raw: str) -> ThemeName:
-    """Narrow validated theme string to ThemeName Literal.
-
-    This function assumes the theme has already been validated against _THEMES.
-
-    Args:
-        raw: Validated theme string.
-
-    Returns:
-        Theme literal.
-    """
-    if raw == "dark":
-        return "dark"
-    if raw == "dracula":
-        return "dracula"
-    if raw == "github_dark":
-        return "github_dark"
-    if raw == "transparent":
-        return "transparent"
-    if raw == "cyberpunk":
-        return "cyberpunk"
-    if raw == "synthwave":
-        return "synthwave"
-    if raw == "neon":
-        return "neon"
-    if raw == "aurora":
-        return "aurora"
-    if raw == "radical":
-        return "radical"
-    return "default"
+    return theme
 
 
 def _narrow_layout(
