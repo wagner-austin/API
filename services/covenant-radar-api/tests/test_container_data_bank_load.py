@@ -13,6 +13,7 @@ from covenant_ml.trainer_fit import (
 )
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from numpy.typing import NDArray
+from platform_core.config.covenant_radar import MLBackend
 from platform_workers.testing import FakeRedis, FakeRedisBytesClient
 
 from covenant_radar_api.core import ServiceContainer
@@ -87,7 +88,7 @@ def test_container_load_model_now_tries_data_bank_when_configured(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0},
         region_encoder={"North America": 0},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",
@@ -145,7 +146,7 @@ def test_container_load_model_now_returns_false_when_data_bank_fails(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",
@@ -178,7 +179,7 @@ def test_container_load_model_now_skips_when_no_file_id(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="",
@@ -261,7 +262,7 @@ def test_container_get_model_tries_data_bank_when_configured(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0},
         region_encoder={"North America": 0},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",
@@ -321,7 +322,7 @@ def test_container_get_model_raises_when_data_bank_fails(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",
@@ -375,7 +376,7 @@ def test_container_get_model_lightgbm_backend_loads_successfully(
             model_output_dir=tmp_path,
             sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
             region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-            ml_backend="lightgbm",
+            ml_backend=MLBackend.LIGHTGBM,
         )
 
         loaded_model = container.get_model()

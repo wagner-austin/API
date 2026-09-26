@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
+from platform_core.config.covenant_radar import MLBackend
 from platform_workers.testing import FakeRedis, FakeRedisBytesClient
 
 from covenant_radar_api.core import ServiceContainer
@@ -28,7 +29,7 @@ def test_container_get_model_file_id_xgboost(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_model_file_id="active_xgb.ubj",
     )
     assert container._get_model_file_id() == "active_xgb.ubj"
@@ -53,7 +54,7 @@ def test_container_get_model_file_id_mlp(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="mlp",
+        ml_backend=MLBackend.MLP,
         data_bank_model_file_id="active_mlp.pt",
     )
     assert container._get_model_file_id() == "active_mlp.pt"
@@ -78,7 +79,7 @@ def test_container_get_model_file_id_lstm(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="lstm",
+        ml_backend=MLBackend.LSTM,
         data_bank_model_file_id="active_lstm.pt",
     )
     assert container._get_model_file_id() == "active_lstm.pt"
@@ -103,7 +104,7 @@ def test_container_get_model_file_id_lightgbm(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="lightgbm",
+        ml_backend=MLBackend.LIGHTGBM,
         data_bank_model_file_id="active_lgbm.txt",
     )
     assert container._get_model_file_id() == "active_lgbm.txt"
@@ -128,7 +129,7 @@ def test_container_download_model_from_data_bank_not_configured(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="",  # Not configured
         data_bank_key="",
     )
@@ -185,7 +186,7 @@ def test_container_download_model_from_data_bank_success(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",
@@ -248,7 +249,7 @@ def test_container_download_model_from_data_bank_not_found(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",
@@ -307,7 +308,7 @@ def test_container_download_model_from_data_bank_client_error(
         model_output_dir=tmp_path,
         sector_encoder={},
         region_encoder={},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
         data_bank_model_file_id="active_xgb.ubj",

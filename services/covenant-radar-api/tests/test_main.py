@@ -5,6 +5,7 @@ from __future__ import annotations
 from covenant_persistence import ConnectionProtocol
 from covenant_persistence.testing import InMemoryConnection
 from fastapi.testclient import TestClient
+from platform_core.config.covenant_radar import DatadogEnv
 
 from covenant_radar_api.api.main import create_app
 from covenant_radar_api.core import _test_hooks as core_hooks
@@ -125,7 +126,7 @@ class TestCreateAppDatadogIntegration:
             "datadog": {
                 "enabled": True,
                 "service": "test-service",
-                "env": "staging",
+                "env": DatadogEnv.STAGING,
                 "version": "1.2.3",
                 "agent_host": "localhost",
                 "dogstatsd_port": 8125,
@@ -158,7 +159,7 @@ class TestCreateAppDatadogIntegration:
             "datadog": {
                 "enabled": False,
                 "service": "test-service",
-                "env": "dev",
+                "env": DatadogEnv.DEV,
                 "version": "1.0.0",
                 "agent_host": "localhost",
                 "dogstatsd_port": 8125,
@@ -190,7 +191,7 @@ class TestCreateAppDatadogIntegration:
             "datadog": {
                 "enabled": True,
                 "service": "test-service",
-                "env": "production",
+                "env": DatadogEnv.PRODUCTION,
                 "version": "2.0.0",
                 "agent_host": "localhost",
                 "dogstatsd_port": 8125,

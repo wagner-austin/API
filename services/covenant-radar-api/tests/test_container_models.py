@@ -14,6 +14,7 @@ from covenant_ml.trainer_fit import (
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from lightgbm.basic import LightGBMError
 from numpy.typing import NDArray
+from platform_core.config.covenant_radar import MLBackend
 from platform_workers.testing import FakeRedis, FakeRedisBytesClient
 
 from covenant_radar_api.core import ServiceContainer
@@ -104,7 +105,7 @@ def test_container_load_model_now_mlp_backend_raises_file_not_found(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="mlp",
+        ml_backend=MLBackend.MLP,
     )
 
     with pytest.raises(FileNotFoundError) as exc_info:
@@ -139,7 +140,7 @@ def test_container_get_model_mlp_backend_raises_file_not_found(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="mlp",
+        ml_backend=MLBackend.MLP,
     )
 
     with pytest.raises(FileNotFoundError) as exc_info:
@@ -204,7 +205,7 @@ def test_container_load_model_now_lstm_backend_raises_file_not_found(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="lstm",
+        ml_backend=MLBackend.LSTM,
     )
 
     with pytest.raises(FileNotFoundError) as exc_info:
@@ -238,7 +239,7 @@ def test_container_load_model_now_lightgbm_backend_returns_false_when_missing(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="lightgbm",
+        ml_backend=MLBackend.LIGHTGBM,
     )
 
     result = container.load_model_now()
@@ -296,7 +297,7 @@ def test_container_load_model_now_lightgbm_backend_returns_true(
             model_output_dir=tmp_path,
             sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
             region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-            ml_backend="lightgbm",
+            ml_backend=MLBackend.LIGHTGBM,
         )
 
         result = container.load_model_now()
@@ -330,7 +331,7 @@ def test_container_get_model_lstm_backend_raises_file_not_found(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="lstm",
+        ml_backend=MLBackend.LSTM,
     )
 
     with pytest.raises(FileNotFoundError) as exc_info:
@@ -368,7 +369,7 @@ def test_container_get_model_lightgbm_backend_raises_file_not_found(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="lightgbm",
+        ml_backend=MLBackend.LIGHTGBM,
     )
 
     with pytest.raises(FileNotFoundError) as exc_info:

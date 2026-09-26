@@ -203,7 +203,7 @@ class ServiceContainer:
         # and a reader could not tell which one was authoritative.
         backend_model_path = (
             settings["app"]["active_model_path_xgb"]
-            if ml_backend == "xgboost"
+            if ml_backend is MLBackend.XGBOOST
             else settings["app"]["active_model_path_mlp"]
         )
         resolved_model_path = model_path if model_path else backend_model_path
@@ -465,11 +465,11 @@ class ServiceContainer:
                 return False
 
         # Load model based on configured backend
-        if self._ml_backend == "xgboost":
+        if self._ml_backend is MLBackend.XGBOOST:
             self._model = self._load_xgboost_model(str(model_path))
-        elif self._ml_backend == "mlp":
+        elif self._ml_backend is MLBackend.MLP:
             self._model = self._load_mlp_model(str(model_path))
-        elif self._ml_backend == "lstm":
+        elif self._ml_backend is MLBackend.LSTM:
             self._model = self._load_lstm_model(str(model_path))
         else:  # lightgbm
             self._model = self._load_lightgbm_model(str(model_path))
@@ -516,11 +516,11 @@ class ServiceContainer:
                         "Train a model first or configure data-bank integration."
                     )
 
-            if self._ml_backend == "xgboost":
+            if self._ml_backend is MLBackend.XGBOOST:
                 self._model = self._load_xgboost_model(str(model_path))
-            elif self._ml_backend == "mlp":
+            elif self._ml_backend is MLBackend.MLP:
                 self._model = self._load_mlp_model(str(model_path))
-            elif self._ml_backend == "lstm":
+            elif self._ml_backend is MLBackend.LSTM:
                 self._model = self._load_lstm_model(str(model_path))
             else:  # lightgbm
                 self._model = self._load_lightgbm_model(str(model_path))

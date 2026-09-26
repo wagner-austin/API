@@ -12,6 +12,7 @@ from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from platform_core.config import _test_hooks as config_test_hooks
+from platform_core.config.covenant_radar import DatadogEnv, MLBackend
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_workers.redis import RedisBytesProto, RedisStrProto
 from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
@@ -91,7 +92,7 @@ def _make_test_settings(tmp_path: Path) -> Settings:
             "data_root": str(data_root),
             "models_root": str(models_root),
             "logs_root": str(logs_root),
-            "ml_backend": "xgboost",
+            "ml_backend": MLBackend.XGBOOST,
             "active_model_path_xgb": str(models_root / "active_xgb.ubj"),
             "active_model_path_mlp": str(models_root / "active_mlp.pt"),
             "data_bank_api_url": "",
@@ -101,7 +102,7 @@ def _make_test_settings(tmp_path: Path) -> Settings:
         "datadog": {
             "enabled": False,
             "service": "covenant-radar-api",
-            "env": "dev",
+            "env": DatadogEnv.DEV,
             "version": "0.0.0",
             "agent_host": "localhost",
             "dogstatsd_port": 8125,
@@ -153,7 +154,7 @@ def _make_container_with_store(
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
-        ml_backend="xgboost",
+        ml_backend=MLBackend.XGBOOST,
     )
 
     yield ContainerAndStore(container, in_memory_store, fake_queue)
