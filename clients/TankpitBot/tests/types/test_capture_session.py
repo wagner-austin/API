@@ -12,13 +12,14 @@ from tankpit_bot.types import (
     decode_capture_session,
     encode_capture_session,
 )
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_encode_capture_session() -> None:
     """Test encoding CaptureSession to JSON."""
     msg = CapturedMessage(
         timestamp_ms=1000,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload="test",
         ws_url="wss://example.com",
     )
@@ -84,7 +85,7 @@ def test_decode_capture_session() -> None:
     result = decode_capture_session(data)
     assert result["session_id"] == "abc-123"
     assert len(result["messages"]) == 1
-    assert result["messages"][0]["direction"] == "sent"
+    assert result["messages"][0]["direction"] is MessageDirection.SENT
     assert result["magic"] == "decoded_magic_key"
 
 

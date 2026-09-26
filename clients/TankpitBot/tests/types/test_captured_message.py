@@ -10,13 +10,14 @@ from tankpit_bot.types import (
     decode_captured_message,
     encode_captured_message,
 )
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 
 def test_encode_captured_message() -> None:
     """Test encoding CapturedMessage to JSON."""
     msg = CapturedMessage(
         timestamp_ms=1234567890,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload='{"type":"move"}',
         ws_url="wss://tankpit.com/game",
     )
@@ -31,10 +32,10 @@ def test_encode_captured_message_with_sent_metadata() -> None:
     """Test encoding CapturedMessage with outbound provenance metadata."""
     msg = CapturedMessage(
         timestamp_ms=1234567890,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload='{"type":"move"}',
         ws_url="wss://tankpit.com/game",
-        sent_origin="bot_injected",
+        sent_origin=SentFrameOrigin.BOT_INJECTED,
         sent_label="teleport(129,106)",
         sent_stack="Error\\n at send",
     )
@@ -56,7 +57,7 @@ def test_decode_captured_message_sent() -> None:
     }
     result = decode_captured_message(data)
     assert result["timestamp_ms"] == 1234567890
-    assert result["direction"] == "sent"
+    assert result["direction"] is MessageDirection.SENT
     assert result["payload"] == '{"type":"move"}'
     assert result["ws_url"] == "wss://tankpit.com/game"
 
@@ -70,7 +71,7 @@ def test_decode_captured_message_received() -> None:
         "ws_url": "wss://tankpit.com/game",
     }
     result = decode_captured_message(data)
-    assert result["direction"] == "received"
+    assert result["direction"] is MessageDirection.RECEIVED
 
 
 def test_decode_captured_message_with_sent_metadata() -> None:
@@ -85,7 +86,7 @@ def test_decode_captured_message_with_sent_metadata() -> None:
         "sent_stack": "Error\\n at anonymous",
     }
     result = decode_captured_message(data)
-    assert result["sent_origin"] == "page_client"
+    assert result.get("sent_origin") is SentFrameOrigin.PAGE_CLIENT
     assert result["sent_label"] == ""
     assert result["sent_stack"] == "Error\\n at anonymous"
 
@@ -100,7 +101,7 @@ def test_decode_captured_message_with_unknown_sent_origin() -> None:
         "sent_origin": "unknown",
     }
     result = decode_captured_message(data)
-    assert result["sent_origin"] == "unknown"
+    assert result.get("sent_origin") is SentFrameOrigin.UNKNOWN
 
 
 def test_decode_captured_message_invalid_direction() -> None:
@@ -111,8 +112,9 @@ def test_decode_captured_message_invalid_direction() -> None:
         "payload": "test",
         "ws_url": "wss://example.com",
     }
-    with pytest.raises(JSONTypeError, match="must be 'sent' or 'received'"):
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_captured_message(data)
+    assert str(excinfo.value) == "Invalid direction 'invalid': must be one of 'sent', 'received'"
 
 
 def test_decode_captured_message_invalid_sent_origin() -> None:
@@ -124,11 +126,11 @@ def test_decode_captured_message_invalid_sent_origin() -> None:
         "ws_url": "wss://example.com",
         "sent_origin": "mystery",
     }
-    with pytest.raises(
-        JSONTypeError,
-        match="must be 'bot_injected', 'page_client', or 'unknown'",
-    ):
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_captured_message(data)
+    assert str(excinfo.value) == (
+        "Invalid sent_origin 'mystery': must be one of 'bot_injected', 'page_client', 'unknown'"
+    )
 
 
 def test_decode_captured_message_missing_field() -> None:

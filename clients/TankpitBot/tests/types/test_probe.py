@@ -16,6 +16,7 @@ from tankpit_bot.types import (
     encode_probe_result,
     encode_probe_session,
 )
+from tankpit_bot.types.literals import InputType, MessageDirection
 
 # =============================================================================
 # ProbeResult Tests
@@ -25,10 +26,10 @@ from tankpit_bot.types import (
 def test_encode_probe_result() -> None:
     """Test encoding ProbeResult to JSON."""
     key_inp = KeyInput(key="w")
-    probe_inp = ProbeInput(input_type="key", key_input=key_inp, mouse_input=None)
+    probe_inp = ProbeInput(input_type=InputType.KEY, key_input=key_inp, mouse_input=None)
     msg = CapturedMessage(
         timestamp_ms=1000,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload="test",
         ws_url="wss://example.com",
     )
@@ -49,7 +50,7 @@ def test_encode_probe_result() -> None:
 def test_encode_probe_result_empty_messages() -> None:
     """Test encoding ProbeResult with no messages after."""
     key_inp = KeyInput(key="s")
-    probe_inp = ProbeInput(input_type="key", key_input=key_inp, mouse_input=None)
+    probe_inp = ProbeInput(input_type=InputType.KEY, key_input=key_inp, mouse_input=None)
     result_obj = ProbeResult(
         input=probe_inp,
         timestamp_ms=500,
@@ -135,7 +136,7 @@ def test_decode_probe_result_invalid_messages_after() -> None:
 def test_encode_probe_session() -> None:
     """Test encoding ProbeSession to JSON."""
     key_inp = KeyInput(key="w")
-    probe_inp = ProbeInput(input_type="key", key_input=key_inp, mouse_input=None)
+    probe_inp = ProbeInput(input_type=InputType.KEY, key_input=key_inp, mouse_input=None)
     result_obj = ProbeResult(
         input=probe_inp,
         timestamp_ms=500,
