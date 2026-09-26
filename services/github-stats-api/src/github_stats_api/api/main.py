@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.request_context import install_request_id_middleware
 
 from ..settings import Settings, load_settings
@@ -20,8 +20,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         Configured FastAPI application.
     """
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="github-stats-api",
         instance_id=None,
         extra_fields=["request_id"],
