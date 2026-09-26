@@ -12,13 +12,9 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
-from tankpit_bot.types.literals import (
-    InputType,
-    MouseButton,
-    require_input_type,
-    require_mouse_button,
-)
+from tankpit_bot.types.literals import InputType, MouseButton
 from tankpit_bot.types.message import (
     CapturedMessage,
     decode_captured_message,
@@ -90,7 +86,7 @@ def encode_mouse_input(inp: MouseInput) -> JSONObject:
     result: JSONObject = {
         "x": inp["x"],
         "y": inp["y"],
-        "button": inp["button"],
+        "button": inp["button"].value,
     }
     return result
 
@@ -110,7 +106,7 @@ def decode_mouse_input(data: JSONObject) -> MouseInput:
     return MouseInput(
         x=require_int(data, "x"),
         y=require_int(data, "y"),
-        button=require_mouse_button(data, "button"),
+        button=require_member(data, "button", MouseButton),
     )
 
 
@@ -138,7 +134,7 @@ def encode_probe_input(inp: ProbeInput) -> JSONObject:
         JSON-serializable dict representation.
     """
     result: JSONObject = {
-        "input_type": inp["input_type"],
+        "input_type": inp["input_type"].value,
         "key_input": encode_key_input(inp["key_input"]) if inp["key_input"] else None,
         "mouse_input": encode_mouse_input(inp["mouse_input"]) if inp["mouse_input"] else None,
     }
@@ -157,7 +153,7 @@ def decode_probe_input(data: JSONObject) -> ProbeInput:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    input_type = require_input_type(data, "input_type")
+    input_type = require_member(data, "input_type", InputType)
 
     key_input: KeyInput | None = None
     key_input_raw = data.get("key_input")

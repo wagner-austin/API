@@ -1,114 +1,54 @@
-"""Literal types and validation helpers for TypedDict fields."""
+"""Closed vocabularies for TypedDict fields, and dict conversion helpers.
+
+Each vocabulary is a StrEnum whose members are the words the capture
+files and probe records carry, so a decoder narrows untrusted text with
+:func:`platform_core.members.require_member` and an encoder writes
+``.value``.
+"""
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
-from platform_core.json_utils import JSONObject, JSONTypeError, require_str
-
-# =============================================================================
-# Literal Types
-# =============================================================================
-
-MessageDirection = Literal["sent", "received"]
-InputType = Literal["key", "mouse"]
-MouseButton = Literal["left", "right", "middle"]
-SentFrameOrigin = Literal["bot_injected", "page_client", "unknown"]
-
+from platform_core.json_utils import JSONObject
 
 # =============================================================================
-# Validation Helpers
+# Vocabularies
 # =============================================================================
 
 
-def require_message_direction(obj: JSONObject, key: str) -> MessageDirection:
-    """Extract and validate MessageDirection from JSON object.
+class MessageDirection(StrEnum):
+    """Which side of the wire a message or frame travelled.
 
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated MessageDirection literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid MessageDirection.
+    Sent messages carry our own commands (the same XOR cipher covers both
+    directions); received messages are the server's stream.
     """
-    value = require_str(obj, key)
-    if value == "sent":
-        return "sent"
-    if value == "received":
-        return "received"
-    raise JSONTypeError(f"Field '{key}' must be 'sent' or 'received', got '{value}'")
+
+    SENT = "sent"
+    RECEIVED = "received"
 
 
-def require_input_type(obj: JSONObject, key: str) -> InputType:
-    """Extract and validate InputType from JSON object.
+class InputType(StrEnum):
+    """Which device a recorded probe input came from."""
 
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated InputType literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid InputType.
-    """
-    value = require_str(obj, key)
-    if value == "key":
-        return "key"
-    if value == "mouse":
-        return "mouse"
-    raise JSONTypeError(f"Field '{key}' must be 'key' or 'mouse', got '{value}'")
+    KEY = "key"
+    MOUSE = "mouse"
 
 
-def require_mouse_button(obj: JSONObject, key: str) -> MouseButton:
-    """Extract and validate MouseButton from JSON object.
+class MouseButton(StrEnum):
+    """Which mouse button a recorded probe click used."""
 
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated MouseButton literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid MouseButton.
-    """
-    value = require_str(obj, key)
-    if value == "left":
-        return "left"
-    if value == "right":
-        return "right"
-    if value == "middle":
-        return "middle"
-    raise JSONTypeError(f"Field '{key}' must be 'left', 'right', or 'middle', got '{value}'")
+    LEFT = "left"
+    RIGHT = "right"
+    MIDDLE = "middle"
 
 
-def require_sent_frame_origin(obj: JSONObject, key: str) -> SentFrameOrigin:
-    """Extract and validate SentFrameOrigin from JSON object.
+class SentFrameOrigin(StrEnum):
+    """Who put a sent frame on the wire: the bot, or the page's own client."""
 
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated SentFrameOrigin literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid SentFrameOrigin.
-    """
-    value = require_str(obj, key)
-    if value == "bot_injected":
-        return "bot_injected"
-    if value == "page_client":
-        return "page_client"
-    if value == "unknown":
-        return "unknown"
-    raise JSONTypeError(
-        f"Field '{key}' must be 'bot_injected', 'page_client', or 'unknown', got '{value}'"
-    )
+    BOT_INJECTED = "bot_injected"
+    PAGE_CLIENT = "page_client"
+    UNKNOWN = "unknown"
 
 
 # =============================================================================
@@ -168,9 +108,5 @@ __all__ = [
     "SentFrameOrigin",
     "int_dict_to_json",
     "mixed_dict_to_json",
-    "require_input_type",
-    "require_message_direction",
-    "require_mouse_button",
-    "require_sent_frame_origin",
     "str_dict_to_json",
 ]

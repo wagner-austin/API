@@ -28,9 +28,6 @@ from tankpit_bot.types.literals import (
     MouseButton,
     int_dict_to_json,
     mixed_dict_to_json,
-    require_input_type,
-    require_message_direction,
-    require_mouse_button,
     str_dict_to_json,
 )
 from tankpit_bot.types.message import (
@@ -125,8 +122,5 @@ __all__ = [
     "encode_websocket_info",
     "int_dict_to_json",
     "mixed_dict_to_json",
-    "require_input_type",
-    "require_message_direction",
-    "require_mouse_button",
     "str_dict_to_json",
 ]

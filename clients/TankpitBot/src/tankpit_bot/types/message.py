@@ -5,13 +5,9 @@ from __future__ import annotations
 from typing import NotRequired, TypedDict
 
 from platform_core.json_utils import JSONObject, optional_str, require_int, require_str
+from platform_core.members import as_member, require_member
 
-from tankpit_bot.types.literals import (
-    MessageDirection,
-    SentFrameOrigin,
-    require_message_direction,
-    require_sent_frame_origin,
-)
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 
 class CapturedMessage(TypedDict):
@@ -47,12 +43,12 @@ def encode_captured_message(msg: CapturedMessage) -> JSONObject:
     """
     result: JSONObject = {
         "timestamp_ms": msg["timestamp_ms"],
-        "direction": msg["direction"],
+        "direction": msg["direction"].value,
         "payload": msg["payload"],
         "ws_url": msg["ws_url"],
     }
     if "sent_origin" in msg:
-        result["sent_origin"] = msg["sent_origin"]
+        result["sent_origin"] = msg["sent_origin"].value
     if "sent_label" in msg:
         result["sent_label"] = msg["sent_label"]
     if "sent_stack" in msg:
@@ -74,16 +70,13 @@ def decode_captured_message(data: JSONObject) -> CapturedMessage:
     """
     result = CapturedMessage(
         timestamp_ms=require_int(data, "timestamp_ms"),
-        direction=require_message_direction(data, "direction"),
+        direction=require_member(data, "direction", MessageDirection),
         payload=require_str(data, "payload"),
         ws_url=require_str(data, "ws_url"),
     )
     sent_origin = optional_str(data, "sent_origin")
     if sent_origin is not None:
-        result["sent_origin"] = require_sent_frame_origin(
-            {"sent_origin": sent_origin},
-            "sent_origin",
-        )
+        result["sent_origin"] = as_member(sent_origin, "sent_origin", SentFrameOrigin)
     sent_label = optional_str(data, "sent_label")
     if sent_label is not None:
         result["sent_label"] = sent_label
