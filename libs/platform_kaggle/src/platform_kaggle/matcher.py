@@ -238,12 +238,12 @@ def _determine_recommendation(score: float) -> MatchRecommendation:
         MatchRecommendation based on score.
     """
     if score >= 0.8:
-        return "strong_fit"
+        return MatchRecommendation.STRONG_FIT
     if score >= 0.5:
-        return "good_fit"
+        return MatchRecommendation.GOOD_FIT
     if score >= 0.2:
-        return "stretch"
-    return "new_territory"
+        return MatchRecommendation.STRETCH
+    return MatchRecommendation.NEW_TERRITORY
 
 
 # -----------------------------------------------------------------------------

@@ -161,7 +161,7 @@ def find_competitions(
                 match_score=0.5,
                 matched_capabilities=(),
                 missing_capabilities=(),
-                recommendation="good_fit",
+                recommendation=MatchRecommendation.GOOD_FIT,
             )
         )
     return tuple(result)

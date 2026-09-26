@@ -17,8 +17,6 @@ from platform_codebase import (
     decode_profile,
     encode_capability,
     encode_profile,
-    require_recommendation,
-    require_strength,
 )
 
 from platform_kaggle._types_competition import (
@@ -93,6 +91,4 @@ __all__ = [
     "encode_filter",
     "encode_match",
     "encode_profile",
-    "require_recommendation",
-    "require_strength",
 ]

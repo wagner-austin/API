@@ -14,7 +14,7 @@ from platform_kaggle.testing import (
     make_fake_kaggle_competition,
     make_fake_profile,
 )
-from platform_kaggle.types import CompetitionCategory, KaggleClientProtocol
+from platform_kaggle.types import CapabilityStrength, CompetitionCategory, KaggleClientProtocol
 
 
 class TestFakeKaggleCompetition:
@@ -357,7 +357,7 @@ class TestMakeFakeCapability:
         """Test creating capability with default values."""
         cap = make_fake_capability()
         assert cap.name == "test_capability"
-        assert cap.strength == "moderate"
+        assert cap.strength is CapabilityStrength.MODERATE
         assert cap.tags == ("test",)
         assert cap.description == "Test capability"
 
@@ -365,12 +365,12 @@ class TestMakeFakeCapability:
         """Test creating capability with custom values."""
         cap = make_fake_capability(
             name="xgboost_tabular",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("tabular", "classification"),
             description="XGBoost for tabular data",
         )
         assert cap.name == "xgboost_tabular"
-        assert cap.strength == "strong"
+        assert cap.strength is CapabilityStrength.STRONG
         assert cap.tags == ("tabular", "classification")
         assert cap.description == "XGBoost for tabular data"
 

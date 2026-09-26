@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from platform_codebase import (
+    CapabilityStrength,
     CodebaseCapability,
     LibInfo,
     ServiceInfo,
@@ -35,7 +36,7 @@ def _detect_nlp_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="language_identification",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("nlp", "language-detection", "multilingual"),
                 description="FastText for language identification",
             )
@@ -46,7 +47,7 @@ def _detect_nlp_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="speech_to_text",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("nlp", "speech", "transcription", "whisper"),
                 description="OpenAI Whisper for speech-to-text",
             )
@@ -58,7 +59,7 @@ def _detect_nlp_capabilities(
             capabilities.append(
                 CodebaseCapability(
                     name="transliteration",
-                    strength="moderate",
+                    strength=CapabilityStrength.MODERATE,
                     tags=("nlp", "transliteration", "script-conversion"),
                     description="Rule-based transliteration between scripts",
                 )

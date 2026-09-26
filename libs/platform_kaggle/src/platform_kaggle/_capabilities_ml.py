@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from platform_codebase import (
+    CapabilityStrength,
     CodebaseCapability,
     LibInfo,
     ServiceInfo,
@@ -36,7 +37,7 @@ def _detect_ml_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="xgboost_tabular",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "tabular",
                     "classification",
@@ -55,7 +56,7 @@ def _detect_ml_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="lightgbm_tabular",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "tabular",
                     "classification",
@@ -74,7 +75,7 @@ def _detect_ml_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="pytorch_deep_learning",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=("deep-learning", "neural-network", "pytorch", "ml", "ai"),
                 description="PyTorch for deep learning models",
             )
@@ -85,7 +86,7 @@ def _detect_ml_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="hyperparameter_optimization",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=("optimization", "hyperparameter-tuning", "optuna", "ml"),
                 description="Optuna for hyperparameter optimization",
             )
@@ -96,7 +97,7 @@ def _detect_ml_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="sklearn_ml",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=(
                     "tabular",
                     "classification",
@@ -134,7 +135,7 @@ def _detect_cv_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="torchvision_cv",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=("computer-vision", "image", "pytorch", "image-classification"),
                 description="TorchVision for computer vision tasks",
             )
@@ -145,7 +146,7 @@ def _detect_cv_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="image_processing",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("image", "image-processing", "pillow"),
                 description="Pillow for image manipulation and processing",
             )
@@ -156,7 +157,7 @@ def _detect_cv_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="opencv_cv",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=("computer-vision", "image", "opencv", "video"),
                 description="OpenCV for computer vision and video processing",
             )
@@ -186,7 +187,7 @@ def _detect_transformers_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="huggingface_transformers",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "nlp",
                     "transformers",
@@ -204,7 +205,7 @@ def _detect_transformers_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="huggingface_datasets",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("data", "huggingface", "datasets"),
                 description="Hugging Face Datasets for ML data loading",
             )
@@ -215,7 +216,7 @@ def _detect_transformers_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="tokenization",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("nlp", "tokenization", "huggingface"),
                 description="Fast tokenization for NLP models",
             )
@@ -226,7 +227,7 @@ def _detect_transformers_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="sentencepiece_tokenization",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("nlp", "tokenization", "sentencepiece"),
                 description="SentencePiece for subword tokenization",
             )

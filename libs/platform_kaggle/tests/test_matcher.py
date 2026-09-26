@@ -17,7 +17,7 @@ from platform_kaggle.testing import (
     make_fake_competition,
     make_fake_competition_pages,
 )
-from platform_kaggle.types import CodebaseProfile
+from platform_kaggle.types import CodebaseProfile, MatchRecommendation
 
 
 class TestNormalizeTag:
@@ -180,23 +180,23 @@ class TestDetermineRecommendation:
 
     def test_strong_fit(self) -> None:
         """Test strong_fit recommendation for high score."""
-        assert _determine_recommendation(0.9) == "strong_fit"
-        assert _determine_recommendation(0.8) == "strong_fit"
+        assert _determine_recommendation(0.9) is MatchRecommendation.STRONG_FIT
+        assert _determine_recommendation(0.8) is MatchRecommendation.STRONG_FIT
 
     def test_good_fit(self) -> None:
         """Test good_fit recommendation for medium score."""
-        assert _determine_recommendation(0.7) == "good_fit"
-        assert _determine_recommendation(0.5) == "good_fit"
+        assert _determine_recommendation(0.7) is MatchRecommendation.GOOD_FIT
+        assert _determine_recommendation(0.5) is MatchRecommendation.GOOD_FIT
 
     def test_stretch(self) -> None:
         """Test stretch recommendation for low-medium score."""
-        assert _determine_recommendation(0.4) == "stretch"
-        assert _determine_recommendation(0.2) == "stretch"
+        assert _determine_recommendation(0.4) is MatchRecommendation.STRETCH
+        assert _determine_recommendation(0.2) is MatchRecommendation.STRETCH
 
     def test_new_territory(self) -> None:
         """Test new_territory recommendation for very low score."""
-        assert _determine_recommendation(0.1) == "new_territory"
-        assert _determine_recommendation(0.0) == "new_territory"
+        assert _determine_recommendation(0.1) is MatchRecommendation.NEW_TERRITORY
+        assert _determine_recommendation(0.0) is MatchRecommendation.NEW_TERRITORY
 
 
 class TestMatchCompetition:

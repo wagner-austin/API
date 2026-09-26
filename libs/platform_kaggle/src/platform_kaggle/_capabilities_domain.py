@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from platform_codebase import (
+    CapabilityStrength,
     CodebaseCapability,
     LibInfo,
     ServiceInfo,
@@ -33,7 +34,7 @@ def _detect_domain_capabilities(
             capabilities.append(
                 CodebaseCapability(
                     name="loan_covenant_monitoring",
-                    strength="strong",
+                    strength=CapabilityStrength.STRONG,
                     tags=(
                         "fintech",
                         "finance",
@@ -71,7 +72,7 @@ def _detect_observability_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="datadog_apm",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "observability",
                     "monitoring",
@@ -88,7 +89,7 @@ def _detect_observability_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="prometheus_metrics",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("observability", "monitoring", "metrics", "prometheus"),
                 description="Prometheus client for metrics collection",
             )
@@ -99,7 +100,7 @@ def _detect_observability_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="opentelemetry",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("observability", "tracing", "opentelemetry", "otel"),
                 description="OpenTelemetry for observability instrumentation",
             )
@@ -129,7 +130,7 @@ def _detect_streaming_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="confluent_kafka",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "streaming",
                     "kafka",
@@ -147,7 +148,7 @@ def _detect_streaming_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="kafka_python",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("streaming", "kafka", "real-time", "message-queue"),
                 description="Kafka Python client for message streaming",
             )
@@ -158,7 +159,7 @@ def _detect_streaming_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="redis",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("caching", "redis", "pub-sub", "message-queue"),
                 description="Redis for caching and pub/sub messaging",
             )
@@ -169,7 +170,7 @@ def _detect_streaming_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="rabbitmq",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("messaging", "rabbitmq", "amqp", "message-queue"),
                 description="RabbitMQ for message queuing",
             )

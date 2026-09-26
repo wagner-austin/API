@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from platform_codebase import (
+    CapabilityStrength,
     CodebaseCapability,
     LibInfo,
     ServiceInfo,
@@ -32,7 +33,7 @@ def _detect_llm_api_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="gemini_api",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "llm",
                     "gemini",
@@ -50,7 +51,7 @@ def _detect_llm_api_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="vertex_ai",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "llm",
                     "vertex-ai",
@@ -67,7 +68,7 @@ def _detect_llm_api_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="anthropic_claude",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=("llm", "claude", "anthropic", "generative-ai", "text-generation"),
                 description="Anthropic Claude API for generative AI",
             )
@@ -78,7 +79,7 @@ def _detect_llm_api_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="openai_api",
-                strength="strong",
+                strength=CapabilityStrength.STRONG,
                 tags=(
                     "llm",
                     "openai",
@@ -96,7 +97,7 @@ def _detect_llm_api_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="langchain",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("llm", "langchain", "orchestration", "agents", "rag"),
                 description="LangChain for LLM application orchestration",
             )
@@ -126,7 +127,7 @@ def _detect_cloud_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="google_cloud_storage",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("cloud", "google-cloud", "storage", "gcs"),
                 description="Google Cloud Storage for object storage",
             )
@@ -137,7 +138,7 @@ def _detect_cloud_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="bigquery",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("cloud", "google-cloud", "bigquery", "data-warehouse", "sql"),
                 description="Google BigQuery for data warehousing",
             )
@@ -148,7 +149,7 @@ def _detect_cloud_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="aws_sdk",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("cloud", "aws", "boto3", "s3"),
                 description="AWS SDK for cloud services",
             )
@@ -159,7 +160,7 @@ def _detect_cloud_capabilities(
         capabilities.append(
             CodebaseCapability(
                 name="azure_sdk",
-                strength="moderate",
+                strength=CapabilityStrength.MODERATE,
                 tags=("cloud", "azure", "microsoft"),
                 description="Azure SDK for Microsoft cloud services",
             )

@@ -15,6 +15,7 @@ from platform_kaggle import (
     hooks as kaggle_hooks,
 )
 from platform_kaggle.testing import FakeKaggleClient, FakeKagglePageFetcher
+from platform_kaggle.types import MatchRecommendation
 
 
 class TestFindCompetitions:
@@ -91,7 +92,7 @@ lightgbm = "^4.0.0"
         assert len(matches) == 1
         # Default match has score 0.5 and recommendation "good_fit"
         assert matches[0].match_score == 0.5
-        assert matches[0].recommendation == "good_fit"
+        assert matches[0].recommendation is MatchRecommendation.GOOD_FIT
         assert matches[0].matched_capabilities == ()
         assert matches[0].missing_capabilities == ()
 

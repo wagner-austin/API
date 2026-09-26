@@ -6,6 +6,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from platform_kaggle.types import (
+    CapabilityStrength,
     CodebaseCapability,
     CodebaseProfile,
     decode_capability,
@@ -23,12 +24,12 @@ class TestCodebaseCapability:
         """Test creating a CodebaseCapability instance."""
         cap = CodebaseCapability(
             name="xgboost_tabular",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("tabular", "classification"),
             description="XGBoost for tabular data",
         )
         assert cap.name == "xgboost_tabular"
-        assert cap.strength == "strong"
+        assert cap.strength is CapabilityStrength.STRONG
         assert cap.tags == ("tabular", "classification")
         assert cap.description == "XGBoost for tabular data"
 
@@ -36,19 +37,19 @@ class TestCodebaseCapability:
         """Test CodebaseCapability equality comparison."""
         cap1 = CodebaseCapability(
             name="test",
-            strength="moderate",
+            strength=CapabilityStrength.MODERATE,
             tags=("test",),
             description="Test",
         )
         cap2 = CodebaseCapability(
             name="test",
-            strength="moderate",
+            strength=CapabilityStrength.MODERATE,
             tags=("test",),
             description="Test",
         )
         cap3 = CodebaseCapability(
             name="other",
-            strength="moderate",
+            strength=CapabilityStrength.MODERATE,
             tags=("test",),
             description="Test",
         )
@@ -59,7 +60,7 @@ class TestCodebaseCapability:
         """Test CodebaseCapability encode/decode roundtrip."""
         original = CodebaseCapability(
             name="xgboost_tabular",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("tabular", "classification", "regression"),
             description="XGBoost gradient boosting",
         )
@@ -69,16 +70,15 @@ class TestCodebaseCapability:
 
     def test_decode_capability_all_strengths(self) -> None:
         """Test decode_capability handles all valid strengths."""
-        strengths = ["strong", "moderate", "basic"]
-        for strength in strengths:
+        for strength in CapabilityStrength:
             data: JSONObject = {
                 "name": "test",
-                "strength": strength,
+                "strength": strength.value,
                 "tags": ["test"],
                 "description": "Test",
             }
             decoded = decode_capability(data)
-            assert decoded.strength == strength
+            assert decoded.strength is strength
 
     def test_decode_capability_invalid_strength(self) -> None:
         """Test decode_capability raises on invalid strength."""
@@ -88,7 +88,10 @@ class TestCodebaseCapability:
             "tags": ["test"],
             "description": "Test",
         }
-        with pytest.raises(JSONTypeError, match="must be strong/moderate/basic"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid strength 'super': must be one of 'strong', 'moderate', 'basic'$",
+        ):
             decode_capability(data)
 
 
@@ -99,7 +102,7 @@ class TestCodebaseProfile:
         """Test creating a CodebaseProfile instance."""
         cap = CodebaseCapability(
             name="test",
-            strength="moderate",
+            strength=CapabilityStrength.MODERATE,
             tags=("test",),
             description="Test",
         )
@@ -141,7 +144,7 @@ class TestCodebaseProfile:
         """Test CodebaseProfile encode/decode roundtrip."""
         cap = CodebaseCapability(
             name="xgboost_tabular",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("tabular",),
             description="XGBoost",
         )

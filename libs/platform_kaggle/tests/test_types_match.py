@@ -10,6 +10,7 @@ from platform_kaggle.types import (
     CompetitionCategory,
     CompetitionMatch,
     InterestFilter,
+    MatchRecommendation,
     decode_filter,
     decode_match,
     encode_filter,
@@ -39,13 +40,13 @@ class TestCompetitionMatch:
             match_score=0.75,
             matched_capabilities=("xgboost_tabular",),
             missing_capabilities=("pytorch_deep_learning",),
-            recommendation="good_fit",
+            recommendation=MatchRecommendation.GOOD_FIT,
         )
         assert match.competition == comp
         assert match.match_score == 0.75
         assert match.matched_capabilities == ("xgboost_tabular",)
         assert match.missing_capabilities == ("pytorch_deep_learning",)
-        assert match.recommendation == "good_fit"
+        assert match.recommendation is MatchRecommendation.GOOD_FIT
 
     def test_match_equality(self) -> None:
         """Test CompetitionMatch equality comparison."""
@@ -65,21 +66,21 @@ class TestCompetitionMatch:
             match_score=0.75,
             matched_capabilities=(),
             missing_capabilities=(),
-            recommendation="good_fit",
+            recommendation=MatchRecommendation.GOOD_FIT,
         )
         match2 = CompetitionMatch(
             competition=comp,
             match_score=0.75,
             matched_capabilities=(),
             missing_capabilities=(),
-            recommendation="good_fit",
+            recommendation=MatchRecommendation.GOOD_FIT,
         )
         match3 = CompetitionMatch(
             competition=comp,
             match_score=0.5,
             matched_capabilities=(),
             missing_capabilities=(),
-            recommendation="stretch",
+            recommendation=MatchRecommendation.STRETCH,
         )
         assert _matches_equal(match1, match2)
         assert not _matches_equal(match1, match3)
@@ -102,7 +103,7 @@ class TestCompetitionMatch:
             match_score=0.85,
             matched_capabilities=("xgboost_tabular", "lightgbm_tabular"),
             missing_capabilities=("pytorch_deep_learning",),
-            recommendation="strong_fit",
+            recommendation=MatchRecommendation.STRONG_FIT,
         )
         encoded = encode_match(original)
         decoded = decode_match(encoded)
@@ -110,8 +111,7 @@ class TestCompetitionMatch:
 
     def test_decode_match_all_recommendations(self) -> None:
         """Test decode_match handles all valid recommendations."""
-        recommendations = ["strong_fit", "good_fit", "stretch", "new_territory"]
-        for rec in recommendations:
+        for rec in MatchRecommendation:
             data: JSONObject = {
                 "competition": {
                     "ref": "test",
@@ -127,10 +127,10 @@ class TestCompetitionMatch:
                 "match_score": 0.5,
                 "matched_capabilities": [],
                 "missing_capabilities": [],
-                "recommendation": rec,
+                "recommendation": rec.value,
             }
             decoded = decode_match(data)
-            assert decoded.recommendation == rec
+            assert decoded.recommendation is rec
 
     def test_decode_match_invalid_recommendation(self) -> None:
         """Test decode_match raises on invalid recommendation."""
@@ -151,7 +151,11 @@ class TestCompetitionMatch:
             "missing_capabilities": [],
             "recommendation": "invalid",
         }
-        with pytest.raises(JSONTypeError, match="must be a valid recommendation"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid recommendation 'invalid': must be one of 'strong_fit', 'good_fit', "
+            r"'stretch', 'new_territory'$",
+        ):
             decode_match(data)
 
     def test_decode_match_invalid_competition_type(self) -> None:
