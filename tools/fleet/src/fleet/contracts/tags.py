@@ -1,15 +1,16 @@
 """What a node CAN run, as tags derived from what was measured about it.
 
 A project says what it needs (``required_tags``); a node never declares tags
-at all. Its tags are DERIVED from the two measured fields the node contract
-already carries: its ``platform`` and whether ``gpu`` is a device rather than
-None. That is the whole reason this module exists beside :mod:`node`: a
-declared ``tags`` column on the node would be a second copy of those two
-facts, and the copy is the one that drifts (a box whose card was pulled
-would keep its ``gpu`` tag until somebody remembered the list). Deriving
-means the tag is exactly as true as the measurement.
+at all. Its tags are DERIVED from the fields the node contract already
+carries: its ``platform``, whether ``gpu`` is a device rather than None, and
+whether it runs the fleet test database (``test_database``). That is the
+whole reason this module exists beside :mod:`node`: a declared ``tags``
+column on the node would be a second copy of those facts, and the copy is
+the one that drifts (a box whose card was pulled would keep its ``gpu`` tag
+until somebody remembered the list). Deriving means the tag is exactly as
+true as the declaration it comes from.
 
-WHY THESE THREE. ``windows`` and ``linux`` because a suite may run on one
+WHY THESE FOUR. ``windows`` and ``linux`` because a suite may run on one
 dialect only: slime's browser project launches Chromium with ANGLE over
 Direct3D 11 and refuses every other platform by name
 (``slime/scripts/chromium-launch.ts``, MCPs board task 41f45bd7), so it needs
@@ -21,7 +22,13 @@ node contract has always meant, and NOT an integrated adapter. The identity
 registry (``fleet-mcp/fleet-nodes.json``) records both kinds per node with
 the probe that measured each, so which windows nodes may carry this tag is a
 recorded fact rather than a guess: on 2026-09-21 austinpc, sedona and
-lavender, and diphtheria on linux.
+lavender, and diphtheria on linux. ``testdb`` because 17 MCPs packages start
+their suites from ``packages/db``'s global test setup, which needs a migrated
+``corvis_test`` and its owner role, and no Windows node can reach a test
+database (MCPs board task 6bbfd171, measured 2026-09-26): the tag means the
+node runs ``corvis-fleet-testdb``, the loopback container MCPs
+``scripts/testdb-setup.sh`` restarts empty and migrates before each run, so
+such a package lands only where its global setup can succeed.
 
 A project naming both platforms is refused at decode: no node is both, so
 the declaration could never match anything, and the honest way to say "either"
@@ -37,10 +44,12 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 from fleet.contracts.node import NodeConfig
 
 #: A capability a project may require of a node.
-NodeTag = Literal["windows", "linux", "gpu"]
+NodeTag = Literal["windows", "linux", "gpu", "testdb"]
 
-#: Every tag, for the decoder's refusal and the reader's reference.
-NODE_TAGS: Final[tuple[NodeTag, ...]] = ("windows", "linux", "gpu")
+#: Every tag, for the decoder's refusal and the reader's reference. The
+#: dispatch queue's vocabulary CHECK (MCPs migrations 532 and 563) is the
+#: same four words.
+NODE_TAGS: Final[tuple[NodeTag, ...]] = ("windows", "linux", "gpu", "testdb")
 
 
 def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
@@ -50,11 +59,14 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
         node: The node's declaration.
 
     Returns:
-        Its platform, plus ``gpu`` when the node declares a CUDA device.
+        Its platform, plus ``gpu`` when the node declares a CUDA device and
+        ``testdb`` when it declares the fleet test database.
     """
     tags: set[NodeTag] = {node["platform"]}
     if node["gpu"] is not None:
         tags.add("gpu")
+    if node["test_database"]:
+        tags.add("testdb")
     return frozenset(tags)
 
 
@@ -78,8 +90,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
             return tag
     raise JSONTypeError(
         f"{field} must be one of {', '.join(NODE_TAGS)}, got {value!r}; a tag names a fact "
-        "the node contract measures (its platform, or a CUDA device nvidia-smi reports), and "
-        "one it does not measure could never be satisfied"
+        "the node contract carries (its platform, a CUDA device nvidia-smi reports, or the "
+        "fleet test database), and one it does not carry could never be satisfied"
     )
 
 

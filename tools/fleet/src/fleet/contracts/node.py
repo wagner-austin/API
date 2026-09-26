@@ -111,6 +111,21 @@ class NodeConfig(TypedDict):
             which was refused outright. Declared here rather than derived,
             because the API repo must be able to dispatch without an MCPs
             checkout; ``fleet-nodes --registry`` reconciles the two.
+        test_database: Whether the node runs the fleet test database: the
+            loopback postgres container ``corvis-fleet-testdb`` that MCPs
+            ``scripts/testdb-setup.sh --container`` restarts empty and
+            migrates before each run, provisioned on diphtheria by MCPs
+            ``scripts/host/diphtheria/provision.sh``. True gives the node
+            the ``testdb`` tag (:mod:`fleet.contracts.tags`), which every
+            project whose suite needs a migrated ``corvis_test`` requires.
+
+            DECLARED, AND REQUIRED LIKE ``enabled`` (MCPs board task
+            6bbfd171). No Windows node can reach a test database (measured
+            2026-09-26: sedona and serendipity both refuse the cluster's
+            6432), so a Postgres-backed package handed to one fails its
+            global setup; a default of false would hide a provisioned node
+            from those packages and a default of true would send them to
+            nodes with no database, so the workspace says which.
         budget: What share of this machine a dispatch may take.
     """
 
@@ -121,6 +136,7 @@ class NodeConfig(TypedDict):
     ram_gb: float
     gpu: NodeGpu | None
     enabled: bool
+    test_database: bool
     budget: NodeBudget
 
 
@@ -216,6 +232,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "ram_gb": node["ram_gb"],
         "gpu": None if gpu is None else encode_node_gpu(gpu),
         "enabled": node["enabled"],
+        "test_database": node["test_database"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -251,6 +268,12 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
             "timeout at a time; defaulting it to false would silently shrink the fleet. "
             "Neither guess is safe, so the workspace says which."
         )
+    if "test_database" not in value:
+        raise JSONTypeError(
+            "node must declare 'test_database': true only for a node that runs the fleet test "
+            "database (corvis-fleet-testdb), false otherwise. A Postgres-backed package handed "
+            "to a node without one fails its global setup, so neither default is safe."
+        )
     logical_cores = require_int(value, "logical_cores")
     if logical_cores < 1:
         raise JSONTypeError(f"logical_cores must be at least 1, got {logical_cores}")
@@ -266,6 +289,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         ram_gb=_positive_float(value, "ram_gb"),
         gpu=None if gpu_value is None else decode_node_gpu(gpu_value),
         enabled=require_bool(value, "enabled"),
+        test_database=require_bool(value, "test_database"),
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 
