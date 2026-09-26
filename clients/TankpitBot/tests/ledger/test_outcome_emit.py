@@ -29,6 +29,7 @@ from tankpit_bot.ledger.outcome.teleport import (
 from tankpit_bot.ledger.records import RING_CAPACITY
 from tankpit_bot.ledger.ring import outcome_counts, recent_outcomes
 from tankpit_bot.ledger.service import LedgerService
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 
 
@@ -188,9 +189,14 @@ def test_teleport_dispatch_context_flows_into_the_outcome(ledger: LedgerService)
         landed_x=10,
         landed_y=20,
         messages=[
-            {"direction": "sent", "payload": "74AABB", "timestamp_ms": 1, "ws_url": "ws://game"},
             {
-                "direction": "received",
+                "direction": MessageDirection.SENT,
+                "payload": "74AABB",
+                "timestamp_ms": 1,
+                "ws_url": "ws://game",
+            },
+            {
+                "direction": MessageDirection.RECEIVED,
                 "payload": "3D0102030405",
                 "timestamp_ms": 2,
                 "ws_url": "ws://game",
