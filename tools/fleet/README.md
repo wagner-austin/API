@@ -154,7 +154,7 @@ nothing: an install whose `.runner` exists is not configured twice.
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
 | ci-clean script, service and timer | Rendered from `runner_render` and installed by provision.sh |
 | The distro itself | Imported from the pinned image |
-| Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1 |
+| Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1; the keepalive is registered through S4U at startup, so it holds the distro open after a reboot with nobody logged on |
 | Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned, and the audit's `account:windows:<service>:LocalSystem` row drifts on any other |
 | Machine variables (`base.machine_environment`) | Written by the Windows base, which asks for a reboot when one changed, because a service only sees the environment built at boot; each has a `machine-env:<name>` audit row. `POETRY_CACHE_DIR` is `C:\fleet\poetry` because SYSTEM's profile is under System32, where 32-bit `make` is redirected to SysWOW64 and cannot launch a venv's python |
 | Each Windows runner's Python tool cache | Seeded by provision.ps1 from the NuGet CPython package, with pip's `Scripts` entry points written from its bundled wheel |
