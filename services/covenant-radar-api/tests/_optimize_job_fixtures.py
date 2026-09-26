@@ -18,6 +18,8 @@ from covenant_ml.datasets import (
     DatasetConfig,
     DatasetMeta,
     DatasetRegistry,
+    FileEncoding,
+    FileFormat,
     LoadedDataset,
     TimeSeriesDatasetRegistry,
 )
@@ -96,8 +98,8 @@ def _make_fake_standard_config(name: str) -> DatasetConfig:
         "display_name": f"Fake {name}",
         "folder": f"{name}_data",
         "file_name": "data.csv",
-        "file_format": "csv",
-        "encoding": "utf-8",
+        "file_format": FileFormat.CSV,
+        "encoding": FileEncoding.UTF_8,
         "target": {
             "column_name": "target",
             "label_type": "binary_int",

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
+from covenant_ml.datasets import FileEncoding
 from platform_core.rich_logging import (
     RichConsoleProtocol,
     RichRenderableProtocol,
 )
-from scripts.discover_datasets.types import DiscoveredDataset
+from scripts.discover_datasets.types import DiscoveredDataset, DiscoveredFormat
 
 from scripts.discover_datasets import _test_hooks
 
@@ -87,8 +88,8 @@ def _make_success_dataset() -> DiscoveredDataset:
     return {
         "folder_name": "test_dataset",
         "file_name": "data.csv",
-        "file_format": "csv",
-        "encoding": "utf-8",
+        "file_format": DiscoveredFormat.CSV,
+        "encoding": FileEncoding.UTF_8,
         "n_rows": 1000,
         "n_columns": 10,
         "target_candidates": (
@@ -115,8 +116,8 @@ def _make_warning_dataset() -> DiscoveredDataset:
     return {
         "folder_name": "warning_dataset",
         "file_name": "data.csv",
-        "file_format": "csv",
-        "encoding": "utf-8",
+        "file_format": DiscoveredFormat.CSV,
+        "encoding": FileEncoding.UTF_8,
         "n_rows": 500,
         "n_columns": 5,
         "target_candidates": (),
@@ -136,8 +137,8 @@ def _make_error_dataset() -> DiscoveredDataset:
     return {
         "folder_name": "error_dataset",
         "file_name": "",
-        "file_format": "unknown",
-        "encoding": "utf-8",
+        "file_format": DiscoveredFormat.UNKNOWN,
+        "encoding": FileEncoding.UTF_8,
         "n_rows": 0,
         "n_columns": 0,
         "target_candidates": (),

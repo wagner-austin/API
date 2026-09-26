@@ -6,7 +6,8 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+
+from covenant_ml.datasets.types import FileEncoding
 
 
 def _has_continuation_bytes(raw: bytes, start: int, count: int) -> bool:
@@ -61,7 +62,7 @@ def _is_valid_utf8(raw: bytes) -> bool:
     return True
 
 
-def detect_encoding(path: Path) -> Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
+def detect_encoding(path: Path) -> FileEncoding:
     """Detect file encoding by checking byte patterns.
 
     Args:
@@ -75,21 +76,21 @@ def detect_encoding(path: Path) -> Literal["utf-8", "utf-8-sig", "latin-1", "cp1
 
     # Check for UTF-8 BOM
     if raw.startswith(b"\xef\xbb\xbf"):
-        return "utf-8-sig"
+        return FileEncoding.UTF_8_SIG
 
     # Check for UTF-16 BOM (would need conversion, treat as latin-1)
     if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
-        return "latin-1"
+        return FileEncoding.LATIN_1
 
     # Check if all bytes are ASCII (< 0x80)
     if not any(byte >= 0x80 for byte in raw):
-        return "utf-8"
+        return FileEncoding.UTF_8
 
     # Validate UTF-8 byte sequences
     if _is_valid_utf8(raw):
-        return "utf-8"
+        return FileEncoding.UTF_8
 
-    return "latin-1"
+    return FileEncoding.LATIN_1
 
 
 __all__ = [

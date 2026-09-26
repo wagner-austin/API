@@ -5,6 +5,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from scripts.discover_datasets.types import DiscoveredFormat
+
 from scripts.discover_datasets import scanner as scanner_mod
 
 from .conftest import get_workbook_ctor, get_xlwt_workbook_ctor
@@ -35,7 +37,7 @@ class TestScanDatasetFolder:
 
             assert result["status"] == "success"
             assert result["file_name"] == "data.csv"
-            assert result["file_format"] == "csv"
+            assert result["file_format"] is DiscoveredFormat.CSV
             assert result["n_rows"] == 2
             assert result["n_columns"] == 3
             assert result["recommended_target"] == "target"

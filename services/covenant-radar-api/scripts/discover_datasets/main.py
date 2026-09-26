@@ -270,8 +270,8 @@ def _generate_config_code(ds: DiscoveredDataset) -> str:
     display_name="{ds["folder_name"].replace("_", " ").title()}",
     folder="{ds["folder_name"]}",
     file_name="{ds["file_name"]}",
-    file_format="{ds["file_format"]}",
-    encoding="{ds["encoding"]}",
+    file_format=FileFormat.{ds["file_format"].name},
+    encoding=FileEncoding.{ds["encoding"].name},
     target=TargetColumnSpec(
         column_name="{target_col}",
         label_type="{label_type}",

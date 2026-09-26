@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from covenant_ml.datasets import FileEncoding, FileFormat
 from covenant_ml.types import RequestedDevice
 from numpy.typing import NDArray
 from scripts.amex._hook_protocols import (
@@ -216,8 +217,8 @@ class TestFakeTimeseriesLoader:
             display_name="AMEX Train",
             folder="train",
             file_name="train_data.csv",
-            file_format="csv",
-            encoding="utf-8",
+            file_format=FileFormat.CSV,
+            encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
                 "label_type": "binary_int",

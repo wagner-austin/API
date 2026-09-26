@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from covenant_ml.datasets import FileEncoding
 from scripts.discover_datasets.encoding import (
     _has_continuation_bytes,
     _is_valid_utf8,
@@ -92,7 +93,7 @@ class TestDetectEncoding:
         result = detect_encoding(path)
         path.unlink()
 
-        assert result == "utf-8"
+        assert result is FileEncoding.UTF_8
 
     def test_utf8_with_bom(self) -> None:
         """Test UTF-8 encoding detection with BOM."""
@@ -103,7 +104,7 @@ class TestDetectEncoding:
         result = detect_encoding(path)
         path.unlink()
 
-        assert result == "utf-8-sig"
+        assert result is FileEncoding.UTF_8_SIG
 
     def test_utf16_bom_le(self) -> None:
         """Test UTF-16 LE BOM detection (returns latin-1 as fallback)."""
@@ -114,7 +115,7 @@ class TestDetectEncoding:
         result = detect_encoding(path)
         path.unlink()
 
-        assert result == "latin-1"
+        assert result is FileEncoding.LATIN_1
 
     def test_utf16_bom_be(self) -> None:
         """Test UTF-16 BE BOM detection (returns latin-1 as fallback)."""
@@ -125,7 +126,7 @@ class TestDetectEncoding:
         result = detect_encoding(path)
         path.unlink()
 
-        assert result == "latin-1"
+        assert result is FileEncoding.LATIN_1
 
     def test_latin1_encoding(self) -> None:
         """Test Latin-1 encoding detection."""
@@ -136,7 +137,7 @@ class TestDetectEncoding:
         result = detect_encoding(path)
         path.unlink()
 
-        assert result == "latin-1"
+        assert result is FileEncoding.LATIN_1
 
     def test_valid_utf8_multibyte(self) -> None:
         """Test valid UTF-8 with multibyte characters."""
@@ -147,4 +148,4 @@ class TestDetectEncoding:
         result = detect_encoding(path)
         path.unlink()
 
-        assert result == "utf-8"
+        assert result is FileEncoding.UTF_8

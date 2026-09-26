@@ -7,7 +7,7 @@ from typing import Literal
 
 import numpy as np
 from covenant_ml.backends.protocol import ClassifierBackend
-from covenant_ml.datasets import TimeSeriesDatasetConfig
+from covenant_ml.datasets import FileEncoding, FileFormat, TimeSeriesDatasetConfig
 from covenant_ml.types import (
     BackendName,
     LightGBMConfig,
@@ -44,8 +44,8 @@ def build_dataset_config(
         display_name="AMEX Training Data",
         folder=data_dir.name,
         file_name="train_data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target={
             "column_name": "target",
             "label_type": "binary_int",
@@ -96,8 +96,8 @@ def build_test_config(
         display_name="AMEX Test Data",
         folder=data_dir.name,
         file_name="test_data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target={
             "column_name": "target",
             "label_type": "binary_int",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from covenant_ml.datasets import FileEncoding
 from scripts.discover_datasets.parsers.csv import (
     detect_csv_delimiter,
     read_csv_header_and_sample,
@@ -117,7 +118,7 @@ class TestReadCsvHeaderAndSample:
         ) as f:
             path = Path(f.name)
 
-        columns, n_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ()
@@ -132,7 +133,7 @@ class TestReadCsvHeaderAndSample:
             f.write("a,b,c\n")
             path = Path(f.name)
 
-        columns, n_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("a", "b", "c")
@@ -147,7 +148,7 @@ class TestReadCsvHeaderAndSample:
             f.write("a,b,c\n1,2,3\n4,5,6\n")
             path = Path(f.name)
 
-        columns, n_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("a", "b", "c")
@@ -160,7 +161,7 @@ class TestReadCsvHeaderAndSample:
             f.write(b"\xef\xbb\xbfa,b\n1,2\n")
             path = Path(f.name)
 
-        columns, n_rows, _sample = read_csv_header_and_sample(path, "utf-8-sig")
+        columns, n_rows, _sample = read_csv_header_and_sample(path, FileEncoding.UTF_8_SIG)
         path.unlink()
 
         assert columns == ("a", "b")
@@ -174,7 +175,7 @@ class TestReadCsvHeaderAndSample:
             f.write("a;b;c\n1;2;3\n4;5;6\n")
             path = Path(f.name)
 
-        columns, n_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("a", "b", "c")
@@ -189,7 +190,7 @@ class TestReadCsvHeaderAndSample:
             f.write("a\tb\tc\n1\t2\t3\n")
             path = Path(f.name)
 
-        columns, n_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("a", "b", "c")
@@ -204,7 +205,7 @@ class TestReadCsvHeaderAndSample:
             f.write('"a","b","c"\n"1","2","3"\n')
             path = Path(f.name)
 
-        columns, n_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("a", "b", "c")
@@ -227,7 +228,7 @@ class TestReadCsvHeaderAndSample:
                 f.write(f"{i},value\n")
             path = Path(f.name)
 
-        columns, total_rows, sample = read_csv_header_and_sample(path, "utf-8")
+        columns, total_rows, sample = read_csv_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("a", "b")
@@ -248,7 +249,7 @@ class TestReadDataHeaderAndSample:
             f.write("1 2 3 4\n5 6 7 8\n")
             path = Path(f.name)
 
-        columns, n_rows, sample = read_data_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_data_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         # .data files have no header, columns are X1, X2, ..., class (last is target)
@@ -264,7 +265,7 @@ class TestReadDataHeaderAndSample:
         ) as f:
             path = Path(f.name)
 
-        columns, n_rows, _sample = read_data_header_and_sample(path, "utf-8")
+        columns, n_rows, _sample = read_data_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ()
@@ -279,7 +280,7 @@ class TestReadDataHeaderAndSample:
             f.write("1 0.5 0.3 1\n2 0.6 0.4 2\n3 0.7 0.5 1\n")
             path = Path(f.name)
 
-        columns, n_rows, _sample = read_data_header_and_sample(path, "utf-8")
+        columns, n_rows, _sample = read_data_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         # Last column should be named 'class' for target detection
@@ -294,7 +295,7 @@ class TestReadDataHeaderAndSample:
             f.write("1 2 3 4\n")
             path = Path(f.name)
 
-        columns, n_rows, sample = read_data_header_and_sample(path, "utf-8")
+        columns, n_rows, sample = read_data_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("X1", "X2", "X3", "class")
@@ -316,7 +317,7 @@ class TestReadDataHeaderAndSample:
                 f.write(f"{i} value 1\n")
             path = Path(f.name)
 
-        columns, total_rows, sample = read_data_header_and_sample(path, "utf-8")
+        columns, total_rows, sample = read_data_header_and_sample(path, FileEncoding.UTF_8)
         path.unlink()
 
         assert columns == ("X1", "X2", "class")

@@ -10,6 +10,8 @@ import pytest
 from covenant_ml.datasets.types import (
     DatasetConfig,
     DatasetMeta,
+    FileEncoding,
+    FileFormat,
     LoadedDataset,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
@@ -121,8 +123,8 @@ def make_test_dataset_config(name: str = "test_dataset") -> DatasetConfig:
         display_name=f"Test Dataset ({name})",
         folder=f"{name}_data",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
             label_type="binary_int",
@@ -150,8 +152,8 @@ def make_test_timeseries_config(name: str = "test_ts") -> TimeSeriesDatasetConfi
         display_name=f"Test Time-Series ({name})",
         folder=f"{name}_data",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
             label_type="binary_int",

@@ -5,6 +5,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from scripts.discover_datasets.types import DiscoveredFormat
+
 from scripts.discover_datasets import scanner as scanner_mod
 
 
@@ -14,37 +16,37 @@ class TestDetectFileFormat:
     def test_csv_format(self) -> None:
         """Test CSV format detection."""
         result = scanner_mod._detect_file_format(Path("data.csv"))
-        assert result == "csv"
+        assert result is DiscoveredFormat.CSV
 
     def test_csv_format_uppercase(self) -> None:
         """Test CSV format detection with uppercase extension."""
         result = scanner_mod._detect_file_format(Path("DATA.CSV"))
-        assert result == "csv"
+        assert result is DiscoveredFormat.CSV
 
     def test_arff_format(self) -> None:
         """Test ARFF format detection."""
         result = scanner_mod._detect_file_format(Path("data.arff"))
-        assert result == "arff"
+        assert result is DiscoveredFormat.ARFF
 
     def test_xlsx_format(self) -> None:
         """Test XLSX format detection."""
         result = scanner_mod._detect_file_format(Path("data.xlsx"))
-        assert result == "xlsx"
+        assert result is DiscoveredFormat.XLSX
 
     def test_xls_format(self) -> None:
         """Test XLS format detection."""
         result = scanner_mod._detect_file_format(Path("data.xls"))
-        assert result == "xls"
+        assert result is DiscoveredFormat.XLS
 
     def test_data_format(self) -> None:
         """Test .data format detection (space/tab delimited)."""
         result = scanner_mod._detect_file_format(Path("german.data"))
-        assert result == "data"
+        assert result is DiscoveredFormat.DATA
 
     def test_unknown_format(self) -> None:
         """Test unknown format detection."""
         result = scanner_mod._detect_file_format(Path("data.txt"))
-        assert result == "unknown"
+        assert result is DiscoveredFormat.UNKNOWN
 
 
 class TestFindDataFile:

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.datasets import FileEncoding
 from scripts.discover_datasets.main import (
     _classify_dataset_for_validation,
     _format_value_tuple,
     _is_valid_numeric,
     _print_validation,
 )
-from scripts.discover_datasets.types import DiscoveredDataset
+from scripts.discover_datasets.types import DiscoveredDataset, DiscoveredFormat
 
 from tests.scripts._discover_datasets_fixtures import (
     _get_test_console,
@@ -85,8 +86,8 @@ class TestClassifyDatasetForValidation:
         ds: DiscoveredDataset = {
             "folder_name": "test",
             "file_name": "",
-            "file_format": "unknown",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.UNKNOWN,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 0,
             "n_columns": 0,
             "target_candidates": (),
@@ -106,8 +107,8 @@ class TestClassifyDatasetForValidation:
         ds: DiscoveredDataset = {
             "folder_name": "test",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -127,8 +128,8 @@ class TestClassifyDatasetForValidation:
         ds: DiscoveredDataset = {
             "folder_name": "test",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -148,8 +149,8 @@ class TestClassifyDatasetForValidation:
         ds: DiscoveredDataset = {
             "folder_name": "test",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -173,8 +174,8 @@ class TestPrintValidation:
         ds: DiscoveredDataset = {
             "folder_name": "error_folder",
             "file_name": "",
-            "file_format": "unknown",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.UNKNOWN,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 0,
             "n_columns": 0,
             "target_candidates": (),
@@ -197,8 +198,8 @@ class TestPrintValidation:
         ds: DiscoveredDataset = {
             "folder_name": "no_target_folder",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -221,8 +222,8 @@ class TestPrintValidation:
         ds: DiscoveredDataset = {
             "folder_name": "warn_folder",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -245,8 +246,8 @@ class TestPrintValidation:
         ds: DiscoveredDataset = {
             "folder_name": "warn_folder",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -269,8 +270,8 @@ class TestPrintValidation:
         ds: DiscoveredDataset = {
             "folder_name": "warn_folder",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),
@@ -293,8 +294,8 @@ class TestPrintValidation:
         ds: DiscoveredDataset = {
             "folder_name": "pass_folder",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),

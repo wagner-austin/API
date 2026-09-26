@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.datasets import FileEncoding, FileFormat
 from covenant_ml.features import FeaturePreset
 from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
@@ -73,8 +74,8 @@ class TestRegressionDatasetLoaderHook:
             display_name="Test Regression",
             folder="nonexistent_folder",
             file_name="nonexistent.csv",
-            file_format="csv",
-            encoding="utf-8",
+            file_format=FileFormat.CSV,
+            encoding=FileEncoding.UTF_8,
             target=RegressionTargetSpec(column_name="target"),
             exclude_columns=(),
             n_samples_expected=100,

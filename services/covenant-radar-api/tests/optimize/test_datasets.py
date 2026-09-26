@@ -11,7 +11,7 @@ from pathlib import Path
 from shutil import copyfile
 
 import scripts._test_hooks as _hooks
-from covenant_ml.datasets import TimeSeriesDatasetConfig
+from covenant_ml.datasets import FileEncoding, FileFormat, TimeSeriesDatasetConfig
 from covenant_ml.features import FeaturePreset
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
@@ -88,8 +88,8 @@ class TestRealTimeseriesHooks:
             display_name="AMEX Sample",
             folder="amex_sample",
             file_name="data.csv",
-            file_format="csv",
-            encoding="utf-8",
+            file_format=FileFormat.CSV,
+            encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
                 "label_type": "binary_int",

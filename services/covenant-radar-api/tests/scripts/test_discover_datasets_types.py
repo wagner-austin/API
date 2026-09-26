@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from covenant_ml.datasets import FileEncoding
 from scripts.discover_datasets.types import (
     DetectionStatus,
     DiscoveredDataset,
+    DiscoveredFormat,
     DiscoverySummary,
     TargetColumnCandidate,
 )
@@ -46,8 +48,8 @@ class TestDiscoveredDataset:
         dataset: DiscoveredDataset = {
             "folder_name": "test_dataset",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 1000,
             "n_columns": 10,
             "target_candidates": (
@@ -78,8 +80,8 @@ class TestDiscoveredDataset:
         dataset: DiscoveredDataset = {
             "folder_name": "empty_folder",
             "file_name": "",
-            "file_format": "unknown",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.UNKNOWN,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 0,
             "n_columns": 0,
             "target_candidates": (),
@@ -116,8 +118,8 @@ class TestDiscoverySummary:
         dataset: DiscoveredDataset = {
             "folder_name": "test",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (),

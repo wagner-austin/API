@@ -16,6 +16,8 @@ from covenant_ml.backends.regressor_registry import (
     RegressorRegistry,
 )
 from covenant_ml.datasets import (
+    FileEncoding,
+    FileFormat,
     RegressionDatasetConfig,
     RegressionDatasetRegistry,
     RegressionLoadedDataset,
@@ -80,8 +82,8 @@ def _make_fake_regression_config(name: str) -> RegressionDatasetConfig:
         display_name=f"Fake {name}",
         folder=f"{name}_data",
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=RegressionTargetSpec(column_name="target"),
         exclude_columns=(),
         n_samples_expected=80,

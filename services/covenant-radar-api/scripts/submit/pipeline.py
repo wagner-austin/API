@@ -15,6 +15,8 @@ from typing import Literal, TypedDict
 import numpy as np
 from covenant_ml.backends.protocol import ClassifierBackend, PreparedClassifier
 from covenant_ml.datasets import (
+    FileEncoding,
+    FileFormat,
     LoadedDataset,
     TimeSeriesDatasetConfig,
     create_timeseries_csv_loader,
@@ -120,8 +122,8 @@ def build_dataset_config(
         display_name="Submit Data",
         folder=data_dir.name,
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target={
             "column_name": "target",
             "label_type": "binary_int",

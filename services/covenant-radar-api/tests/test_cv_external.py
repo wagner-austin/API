@@ -27,6 +27,8 @@ from covenant_ml.datasets.registry import DatasetRegistry
 from covenant_ml.datasets.types import (
     DatasetConfig,
     DatasetMeta,
+    FileEncoding,
+    FileFormat,
     LoadedDataset,
     TargetColumnSpec,
 )
@@ -63,8 +65,8 @@ def _dataset_config(name: str, grouped: bool) -> DatasetConfig:
         display_name=f"Test {name}",
         folder=name,
         file_name="data.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
             label_type="binary_int",

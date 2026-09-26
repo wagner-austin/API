@@ -12,6 +12,8 @@ from shutil import copyfile
 import pytest
 from covenant_ml.datasets import (
     DatasetConfig,
+    FileEncoding,
+    FileFormat,
     LoadedDataset,
     TimeSeriesDatasetConfig,
 )
@@ -337,8 +339,8 @@ class TestWorkerTimeseriesHooks:
             display_name="AMEX Sample",
             folder="amex_sample",
             file_name="data.csv",
-            file_format="csv",
-            encoding="utf-8",
+            file_format=FileFormat.CSV,
+            encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
                 "label_type": "binary_int",

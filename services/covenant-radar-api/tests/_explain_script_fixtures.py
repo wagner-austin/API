@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
-from covenant_ml.datasets import DatasetConfig, DatasetMeta, DatasetRegistry, LoadedDataset
+from covenant_ml.datasets import (
+    DatasetConfig,
+    DatasetMeta,
+    DatasetRegistry,
+    FileEncoding,
+    FileFormat,
+    LoadedDataset,
+)
 from covenant_ml.explainers.registry import ExplainerRegistration, ExplainerRegistry
 from covenant_ml.explainers.types import ExplainResult
 from covenant_ml.types import BackendName
@@ -139,8 +146,8 @@ def _make_fake_dataset_config(name: str) -> DatasetConfig:
         "display_name": f"Fake {name}",
         "folder": f"{name}_data",
         "file_name": "data.csv",
-        "file_format": "csv",
-        "encoding": "utf-8",
+        "file_format": FileFormat.CSV,
+        "encoding": FileEncoding.UTF_8,
         "target": {
             "column_name": "target",
             "label_type": "binary_int",

@@ -9,6 +9,8 @@ import csv
 from pathlib import Path
 from typing import Literal
 
+from covenant_ml.datasets.types import FileEncoding
+
 # Maximum rows to sample for analysis
 MAX_SAMPLE_ROWS = 1000
 
@@ -70,7 +72,7 @@ def strip_quotes(value: str) -> str:
 
 def read_csv_header_and_sample(
     path: Path,
-    encoding: Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"],
+    encoding: FileEncoding,
 ) -> tuple[tuple[str, ...], int, tuple[tuple[str, ...], ...]]:
     """Read CSV header and sample rows.
 
@@ -113,7 +115,7 @@ def read_csv_header_and_sample(
 
 def read_data_header_and_sample(
     path: Path,
-    encoding: Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"],
+    encoding: FileEncoding,
 ) -> tuple[tuple[str, ...], int, tuple[tuple[str, ...], ...]]:
     """Read space-delimited .data file (no header row).
 

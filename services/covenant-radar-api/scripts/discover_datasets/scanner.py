@@ -7,7 +7,9 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Final, Literal, TypedDict
+
+from covenant_ml.datasets.types import FileEncoding
 
 from scripts.discover_datasets.detection import (
     calculate_positive_ratio,
@@ -26,15 +28,19 @@ from scripts.discover_datasets.parsers import (
 )
 from scripts.discover_datasets.types import (
     DiscoveredDataset,
+    DiscoveredFormat,
     DiscoverySummary,
     TargetColumnCandidate,
 )
 
-# Type alias for file format
-FileFormat = Literal["csv", "arff", "xlsx", "xls", "data", "unknown"]
-
-# Type alias for file encoding
-FileEncoding = Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"]
+# Extensions discovery reads a sample from; any other reads as UNKNOWN.
+_FORMAT_BY_SUFFIX: Final[dict[str, DiscoveredFormat]] = {
+    ".csv": DiscoveredFormat.CSV,
+    ".arff": DiscoveredFormat.ARFF,
+    ".xlsx": DiscoveredFormat.XLSX,
+    ".xls": DiscoveredFormat.XLS,
+    ".data": DiscoveredFormat.DATA,
+}
 
 
 class TargetInfo(TypedDict, total=True):
@@ -67,27 +73,16 @@ class FileData(TypedDict, total=True):
     sample_rows: tuple[tuple[str, ...], ...]
 
 
-def _detect_file_format(path: Path) -> FileFormat:
+def _detect_file_format(path: Path) -> DiscoveredFormat:
     """Detect file format from extension.
 
     Args:
         path: Path to the file.
 
     Returns:
-        Detected file format literal.
+        Detected file format, UNKNOWN for an unrecognised extension.
     """
-    suffix = path.suffix.lower()
-    if suffix == ".csv":
-        return "csv"
-    if suffix == ".arff":
-        return "arff"
-    if suffix == ".xlsx":
-        return "xlsx"
-    if suffix == ".xls":
-        return "xls"
-    if suffix == ".data":
-        return "data"
-    return "unknown"
+    return _FORMAT_BY_SUFFIX.get(path.suffix.lower(), DiscoveredFormat.UNKNOWN)
 
 
 def _find_data_file(folder: Path) -> tuple[Path | None, str]:
@@ -134,7 +129,7 @@ def _find_data_file(folder: Path) -> tuple[Path | None, str]:
 
 def _read_file_by_format(
     data_file: Path,
-    file_format: FileFormat,
+    file_format: DiscoveredFormat,
     encoding: FileEncoding,
 ) -> FileData:
     """Read header and sample rows from a file based on its format.
@@ -147,13 +142,13 @@ def _read_file_by_format(
     Returns:
         FileData with columns, row count, and sample rows.
     """
-    if file_format == "csv":
+    if file_format is DiscoveredFormat.CSV:
         columns, n_rows, sample_rows = read_csv_header_and_sample(data_file, encoding)
-    elif file_format == "data":
+    elif file_format is DiscoveredFormat.DATA:
         columns, n_rows, sample_rows = read_data_header_and_sample(data_file, encoding)
-    elif file_format == "arff":
+    elif file_format is DiscoveredFormat.ARFF:
         columns, n_rows, sample_rows = read_arff_header_and_sample(data_file)
-    elif file_format == "xlsx":
+    elif file_format is DiscoveredFormat.XLSX:
         columns, n_rows, sample_rows = read_excel_header_and_sample(data_file)
     else:  # xls (legacy Excel format)
         columns, n_rows, sample_rows = read_xls_header_and_sample(data_file)
@@ -243,8 +238,8 @@ def _create_empty_result(folder_name: str, message: str) -> DiscoveredDataset:
     return DiscoveredDataset(
         folder_name=folder_name,
         file_name="",
-        file_format="unknown",
-        encoding="utf-8",
+        file_format=DiscoveredFormat.UNKNOWN,
+        encoding=FileEncoding.UTF_8,
         n_rows=0,
         n_columns=0,
         target_candidates=(),
@@ -276,8 +271,8 @@ def scan_dataset_folder(folder: Path) -> DiscoveredDataset:
 
     # Detect file format and encoding
     file_format = _detect_file_format(data_file)
-    needs_encoding = file_format in ("csv", "data")
-    encoding: FileEncoding = detect_encoding(data_file) if needs_encoding else "utf-8"
+    needs_encoding = file_format is DiscoveredFormat.CSV or file_format is DiscoveredFormat.DATA
+    encoding = detect_encoding(data_file) if needs_encoding else FileEncoding.UTF_8
 
     # Read file data
     file_data = _read_file_by_format(data_file, file_format, encoding)

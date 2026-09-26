@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.datasets import FileEncoding
 from scripts.discover_datasets.main import (
     _format_dataset_row,
     _generate_config_code,
     _print_dataset_detail,
     _print_summary,
 )
-from scripts.discover_datasets.types import DiscoveredDataset, DiscoverySummary
+from scripts.discover_datasets.types import DiscoveredDataset, DiscoveredFormat, DiscoverySummary
 
 from tests.scripts._discover_datasets_fixtures import (
     _get_test_console,
@@ -180,8 +181,8 @@ class TestPrintDatasetDetail:
         ds: DiscoveredDataset = {
             "folder_name": "empty_values_test",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 2,
             "target_candidates": (
@@ -221,6 +222,8 @@ class TestGenerateConfigCode:
         assert "DatasetConfig(" in code
         assert 'name="test_dataset"' in code
         assert 'file_name="data.csv"' in code
+        assert "file_format=FileFormat.CSV," in code
+        assert "encoding=FileEncoding.UTF_8," in code
         assert 'column_name="target"' in code
         assert 'label_type="binary_int"' in code
 
@@ -244,8 +247,8 @@ class TestGenerateConfigCode:
         ds: DiscoveredDataset = {
             "folder_name": "multi",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 5,
             "target_candidates": (
@@ -282,8 +285,8 @@ class TestGenerateConfigCode:
         ds: DiscoveredDataset = {
             "folder_name": "orphan_target",
             "file_name": "data.csv",
-            "file_format": "csv",
-            "encoding": "utf-8",
+            "file_format": DiscoveredFormat.CSV,
+            "encoding": FileEncoding.UTF_8,
             "n_rows": 100,
             "n_columns": 3,
             "target_candidates": (

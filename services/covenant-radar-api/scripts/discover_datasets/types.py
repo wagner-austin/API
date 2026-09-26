@@ -5,10 +5,28 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
+
+from covenant_ml.datasets.types import FileEncoding
 
 # Detection status literals
 DetectionStatus = Literal["success", "warning", "error"]
+
+
+class DiscoveredFormat(StrEnum):
+    """File format of a scanned data file, read from its extension.
+
+    Wider than covenant_ml's FileFormat: discovery reports every file it can
+    read a sample from, and UNKNOWN for one whose extension it does not know.
+    """
+
+    CSV = "csv"
+    ARFF = "arff"
+    XLSX = "xlsx"
+    XLS = "xls"
+    DATA = "data"
+    UNKNOWN = "unknown"
 
 
 class TargetColumnCandidate(TypedDict, total=True):
@@ -33,7 +51,7 @@ class DiscoveredDataset(TypedDict, total=True):
     Attributes:
         folder_name: Name of the folder in data/external/.
         file_name: Detected primary data file name.
-        file_format: Detected file format (csv, arff, excel).
+        file_format: Detected file format, from the file's extension.
         encoding: Detected or assumed file encoding.
         n_rows: Number of rows in the dataset.
         n_columns: Number of columns in the dataset.
@@ -50,8 +68,8 @@ class DiscoveredDataset(TypedDict, total=True):
 
     folder_name: str
     file_name: str
-    file_format: Literal["csv", "arff", "xlsx", "xls", "data", "unknown"]
-    encoding: Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"]
+    file_format: DiscoveredFormat
+    encoding: FileEncoding
     n_rows: int
     n_columns: int
     target_candidates: tuple[TargetColumnCandidate, ...]
@@ -112,6 +130,7 @@ class ValidationResult(TypedDict, total=True):
 __all__ = [
     "DetectionStatus",
     "DiscoveredDataset",
+    "DiscoveredFormat",
     "DiscoverySummary",
     "TargetColumnCandidate",
     "ValidationResult",
