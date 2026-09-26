@@ -11,6 +11,7 @@ import logging
 import pytest
 from discord.abc import Snowflake as DiscordSnowflake
 from discord.app_commands import AppCommand
+from platform_core.logging import LogFormat, LogLevel
 from tests.support.discord_fakes import FakeBot
 from tests.support.settings import build_settings
 
@@ -77,9 +78,9 @@ def test_default_setup_logging_calls_platform_core() -> None:
     """Test _default_setup_logging calls platform_core setup_logging."""
     # Call the function - it should not raise
     _test_hooks._default_setup_logging(
-        level="INFO",
+        level=LogLevel.INFO,
         service_name="test-service",
-        format_mode="text",
+        format_mode=LogFormat.TEXT,
     )
 
 

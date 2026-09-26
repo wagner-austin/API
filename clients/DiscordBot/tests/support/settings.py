@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Final, Protocol
 
+from platform_core.logging import LogLevel
+
 from clubbot.config import (
     DigitsConfig,
     DiscordConfig,
@@ -128,7 +130,7 @@ def build_settings(
         "token": token,
         "guild_id": guild_id,
         "guild_ids": guild_ids if guild_ids is not None else [],
-        "log_level": "INFO",
+        "log_level": LogLevel.INFO,
         "commands_sync_global": sync_global,
     }
 

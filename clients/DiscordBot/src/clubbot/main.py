@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from platform_core.logging import LogFormat
+
 from . import _test_hooks
 
 
@@ -7,7 +9,7 @@ def main() -> None:
     container = _test_hooks.create_service_container()
     _test_hooks.setup_logging(
         level=container.cfg["discord"]["log_level"],
-        format_mode="text",
+        format_mode=LogFormat.TEXT,
         service_name="discordbot",
         instance_id=None,
         extra_fields=["request_id"],
