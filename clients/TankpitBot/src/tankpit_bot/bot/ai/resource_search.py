@@ -51,6 +51,7 @@ from tankpit_bot.state.scan_coverage import (
     is_viewport_untouched,
 )
 from tankpit_bot.state.types import has_known_position
+from tankpit_bot.types.constants import TankLiveness
 
 _HUNT_BIAS_HALF_SCORE_TILES = 16
 """Distance at which the pre-hunt top-off bias halves a dot's score.
@@ -202,7 +203,7 @@ def _nearest_alive_enemy(ctx: DecideCtx) -> tuple[int, int] | None:
     for tank in ctx.world["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
-        if tank["liveness"] != "alive" or not has_known_position(tank):
+        if tank["liveness"] is not TankLiveness.ALIVE or not has_known_position(tank):
             continue
         dist = abs(tank["x"] - sx) + abs(tank["y"] - sy)
         if best is None or dist < best_dist:

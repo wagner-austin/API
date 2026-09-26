@@ -34,6 +34,7 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+from tankpit_bot.types.constants import TankLiveness
 
 
 def _nearest_ungreeted_viewport_human(
@@ -64,7 +65,7 @@ def _nearest_ungreeted_viewport_human(
     for tank in ctx.world["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
-        if tank["liveness"] != "alive":
+        if tank["liveness"] is not TankLiveness.ALIVE:
             continue
         if not is_human_name(tank["name"]):
             continue

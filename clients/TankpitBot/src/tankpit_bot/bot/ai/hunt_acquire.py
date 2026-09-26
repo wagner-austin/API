@@ -66,6 +66,7 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
 from tankpit_bot.state.types import has_known_position
+from tankpit_bot.types.constants import TankLiveness
 
 
 def search_for_enemies(
@@ -267,7 +268,7 @@ def _unvisited_unconsented_human(
     for tank in ctx.filtered["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
-        if tank["liveness"] != "alive" or not has_known_position(tank):
+        if tank["liveness"] is not TankLiveness.ALIVE or not has_known_position(tank):
             continue
         if not is_human_name(tank["name"]):
             continue

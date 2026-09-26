@@ -33,6 +33,7 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     has_known_position,
 )
+from tankpit_bot.types.constants import TankLiveness
 
 
 def _doctrine_rejection_reason(
@@ -148,7 +149,7 @@ def _acquisition_rejection_reason(
     from tankpit_bot.bot.ai.combat_target import has_standoff_landing
     from tankpit_bot.physics.costs import teleport_cost
 
-    if tank["liveness"] != "alive":
+    if tank["liveness"] is not TankLiveness.ALIVE:
         return "not_alive"
     human_rejection = _human_rejection_reason(
         ws, tank, human_min_rank=human_min_rank, human_max_rank=human_max_rank, doctrine=doctrine

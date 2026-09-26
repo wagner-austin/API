@@ -32,6 +32,7 @@ from tankpit_bot.bot.ai.context import (
 from tankpit_bot.bot.ai.mine_pin import mine_pin_decision
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
@@ -280,9 +281,11 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     # blocking the main lock as an "afterimage" would end a live
     # fight over someone else's corpse.
     feedback = (
-        ctx.combat_feedback if ctx.ai_state["last_shot_target_id"] == target["tank_id"] else ""
+        ctx.combat_feedback
+        if ctx.ai_state["last_shot_target_id"] == target["tank_id"]
+        else CombatFeedback.NONE
     )
-    if feedback == "rejected":
+    if feedback is CombatFeedback.REJECTED:
         # The server refused the previous dispatch outright (0x52
         # code 0/3/8) -- no ShootEvent, no ammo delta. With the aim
         # clamp below every dispatch is viewport-legal, so a residual
@@ -298,7 +301,7 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         )
         return block_combat_target_and_replan(ctx, target)
 
-    if feedback == "miss":
+    if feedback is CombatFeedback.MISS:
         last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
         target_stationary = (target["x"], target["y"]) == last_shot_at
         dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])

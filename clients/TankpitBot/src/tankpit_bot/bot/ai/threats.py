@@ -32,6 +32,7 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     has_known_position,
 )
+from tankpit_bot.types.constants import TankLiveness
 
 
 def analyze_threats(
@@ -78,7 +79,7 @@ def analyze_threats(
         # filter -- ``apply_tank_observation`` now routes both
         # corpse-direction wire arrivals and 0x41 Deactivation to
         # ``liveness == "deactivated"``.
-        if tank["liveness"] != "alive":
+        if tank["liveness"] is not TankLiveness.ALIVE:
             continue
         # Position-confirmation gate: the login roster dump (0x21
         # TankInfo, full map, no coordinates) leaves every tank at the
@@ -190,7 +191,7 @@ def find_locked_target_pursuit(
     tank = world["tanks"].get(str(locked_target_id))
     if tank is None:
         return None
-    if tank["liveness"] != "alive":
+    if tank["liveness"] is not TankLiveness.ALIVE:
         return None
     if not has_known_position(tank):
         return None

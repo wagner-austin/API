@@ -18,6 +18,7 @@ from tankpit_bot.bot.ai.threat_primitives import human_combat_consented
 from tankpit_bot.bot.config import resolve_weapon_resume_slack
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.naming import is_human_name
+from tankpit_bot.types.constants import TankLiveness
 
 
 def should_enter_collect(ctx: DecideCtx) -> bool:
@@ -281,7 +282,7 @@ def _live_consented_human_ids(ctx: DecideCtx) -> list[int]:
     for tank in ctx.filtered["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
-        if tank["liveness"] != "alive":
+        if tank["liveness"] is not TankLiveness.ALIVE:
             continue
         if ctx.timestamp_ms - tank["timestamp_ms"] > _WAR_PRESENCE_TTL_MS:
             continue
