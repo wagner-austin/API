@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Final
 
 from .types import (
-    Scalar,
     ToneMappingConfig,
     ToneMappingConfigExposureGamma,
     ToneMappingConfigFilmic,
@@ -13,7 +12,7 @@ from .types import (
 _SUPPORTED_TONE_TYPES: Final[set[str]] = {"exposure_gamma", "reinhard", "filmic"}
 
 
-def _as_float(value: Scalar, *, name: str) -> float:
+def _as_float(value: float | int | bool | str, *, name: str) -> float:
     # Accept ints/floats only; reject bools and strings to keep semantics strict.
     if isinstance(value, bool):
         raise ValueError(f"{name} must be a number")
@@ -22,7 +21,7 @@ def _as_float(value: Scalar, *, name: str) -> float:
     raise ValueError(f"{name} must be a number")
 
 
-def decode_tone_mapping(raw: dict[str, Scalar]) -> ToneMappingConfig:
+def decode_tone_mapping(raw: dict[str, float | int | bool | str]) -> ToneMappingConfig:
     """Decode a raw Python dict into a strict ToneMappingConfig.
 
     Args:

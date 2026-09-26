@@ -5,15 +5,8 @@ from typing import Literal, NotRequired
 from typing_extensions import TypedDict
 
 # ---------------------------------------------------------------------------
-# Scalar and basic aliases
+# Basic aliases
 # ---------------------------------------------------------------------------
-
-FloatScalar = float
-IntScalar = int
-StrScalar = str
-BoolScalar = bool
-Scalar = FloatScalar | IntScalar | BoolScalar | StrScalar
-ScalarSequence = list[Scalar]
 
 FrameIndex = int
 Fps = int
@@ -176,28 +169,22 @@ class RenderJobConfig(TypedDict):
 
 __all__ = [
     "BaseLayerCommon",
-    "BoolScalar",
     "CameraConfig",
     "CameraConfigCircular",
     "CameraConfigFigure8",
-    "FloatScalar",
     "Fps",
     "FrameIndex",
     "Height",
-    "IntScalar",
     "LayerConfig",
     "NeonGlowConfig",
     "RenderJobConfig",
     "RenderTimingConfig",
     "Resolution",
-    "Scalar",
-    "ScalarSequence",
     "SceneConfig",
     "ScheduleConfig",
     "ScheduleConfigConstant",
     "ScheduleConfigLinear",
     "Seconds",
-    "StrScalar",
     "ToneMappingConfig",
     "ToneMappingConfigExposureGamma",
     "ToneMappingConfigFilmic",
