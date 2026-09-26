@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from rw_bot.harness.search import (
-    Candidate,
     SearchError,
     apply_moves,
     candidate_label,
@@ -100,10 +99,10 @@ def test_paired_delta_summarizes_shared_seeds_only() -> None:
 
 
 def test_the_halving_keeps_the_best_with_stable_ties() -> None:
-    a: Candidate = (("raid", 3),)
-    b: Candidate = (("raid", 5),)
-    c: Candidate = (("tech", 2),)
-    scores: dict[Candidate, float] = {a: 0.5, b: 0.5, c: -1.0}
+    a: tuple[tuple[str, int], ...] = (("raid", 3),)
+    b: tuple[tuple[str, int], ...] = (("raid", 5),)
+    c: tuple[tuple[str, int], ...] = (("tech", 2),)
+    scores: dict[tuple[tuple[str, int], ...], float] = {a: 0.5, b: 0.5, c: -1.0}
     assert keep_top(scores, 1) == (a,)
     assert keep_top(scores, 2) == (a, b)
     assert keep_top(scores, 0) == ()
