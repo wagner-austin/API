@@ -67,19 +67,27 @@
           "labels": ["lavender"]
         },
         {
-          "repo": "wagner-austin/portable-claude",
+          "repo": "wagner-austin/corvis-stick",
           "runner_name": "lavender-wsl",
           "side": "wsl",
-          "service": "actions.runner.wagner-austin-portable-claude.lavender-wsl.service",
-          "workdir": "/home/gharunner/actions-runner-portable-claude-1/_work",
+          "service": "actions.runner.wagner-austin-corvis-stick.lavender-wsl.service",
+          "workdir": "/home/gharunner/actions-runner-corvis-stick-1/_work",
           "labels": ["lavender-wsl"]
         },
         {
-          "repo": "wagner-austin/portable-claude",
+          "repo": "wagner-austin/corvis-stick",
           "runner_name": "lavender",
           "side": "windows",
-          "service": "actions.runner.wagner-austin-portable-claude.lavender",
-          "workdir": "C:/actions-runner-portable-claude/_work",
+          "service": "actions.runner.wagner-austin-corvis-stick.lavender",
+          "workdir": "C:/actions-runner-corvis-stick/_work",
+          "labels": ["lavender"]
+        },
+        {
+          "repo": "wagner-austin/chat",
+          "runner_name": "lavender",
+          "side": "windows",
+          "service": "actions.runner.wagner-austin-chat.lavender",
+          "workdir": "C:/actions-runner-chat/_work",
           "labels": ["lavender"]
         },
         {
