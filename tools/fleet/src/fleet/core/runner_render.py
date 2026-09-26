@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
+from fleet.core.runner_account import WINDOWS_SERVICE_ACCOUNT, render_service_account_lines
 
 #: The GitHub Actions runner release the rendered provision installs.
 #:
@@ -208,7 +209,9 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         second configuration and ``--rebuild`` re-runs every stage over a
         host that may be half built. Duplicate installs are the roster's
         to prevent, and ``--onboard`` refuses a repo the roster already
-        carries on the host.
+        carries on the host. The service runs as SYSTEM, a deliberate
+        privilege decision whose reasons and cost
+        :mod:`fleet.core.runner_account` states.
     """
     token_var = token_variable(install["repo"])
     directory = _install_root_for(install)
@@ -228,10 +231,12 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         f"if (-not (Test-Path '{directory}\\.runner')) {{",
         f"    & '{directory}\\config.cmd' --unattended "
         f"--url https://github.com/{install['repo']} --token $env:{token_var} "
-        f"--name {install['runner_name']} --labels {labels} --runasservice --replace",
+        f"--name {install['runner_name']} --labels {labels} --runasservice "
+        f"--windowslogonaccount '{WINDOWS_SERVICE_ACCOUNT}' --replace",
         f"    if ($LASTEXITCODE -ne 0) {{ throw 'config.cmd for {install['repo']} "
         f"{install['runner_name']} exited ' + $LASTEXITCODE }}",
         "}",
+        *render_service_account_lines(install),
     ]
 
 
@@ -247,6 +252,14 @@ def render_windows_python_toolcache_lines(install: RunnerInstall) -> list[str]:
     Python with pip, no installer, no registry -- exactly the property a
     service-account tool cache needs. The find path wants only
     ``Python/<ver>/x64/python.exe`` plus an ``x64.complete`` marker.
+
+    The package carries pip as a module but no ``Scripts`` directory, and
+    setup-python puts ``Scripts`` on PATH, so a workflow's bare ``pip``
+    fails on a seed that stops at the copy (measured on MCPs run
+    36254365786, session-audit: CommandNotFoundException for pip). pip is
+    therefore reinstalled from the package's own bundled wheel, offline,
+    which writes the entry points; ``Scripts\\pip.exe`` is both the
+    idempotency test and the verification.
 
     Args:
         install: The windows-side install whose tool cache to seed, with the
@@ -268,7 +281,7 @@ def render_windows_python_toolcache_lines(install: RunnerInstall) -> list[str]:
     for version in install["python_toolcache"]:
         lines += [
             f"$Target = Join-Path $ToolDir 'Python\\{version}\\x64'",
-            "if (-not (Test-Path (Join-Path $Target 'python.exe'))) {",
+            "if (-not (Test-Path (Join-Path $Target 'Scripts\\pip.exe'))) {",
             "    $Work = Join-Path $env:TEMP ([guid]::NewGuid().ToString('N'))",
             "    New-Item -ItemType Directory -Path $Work | Out-Null",
             "    $Zip = Join-Path $Work 'python.nupkg.zip'",
@@ -278,8 +291,15 @@ def render_windows_python_toolcache_lines(install: RunnerInstall) -> list[str]:
             "    Expand-Archive -LiteralPath $Zip -DestinationPath $Work -Force",
             "    New-Item -ItemType Directory -Force -Path $Target | Out-Null",
             "    Copy-Item -Path (Join-Path $Work 'tools\\*') -Destination $Target -Recurse -Force",
-            "    & (Join-Path $Target 'python.exe') -m pip --version",
-            f"    if ($LASTEXITCODE -ne 0) {{ throw 'pip missing in seeded {version}' }}",
+            "    $Wheel = @(Get-ChildItem -LiteralPath "
+            "(Join-Path $Target 'Lib\\ensurepip\\_bundled') -Filter 'pip-*.whl')",
+            "    if ($Wheel.Count -ne 1) { throw "
+            f'"expected one bundled pip wheel in seeded {version}, found $($Wheel.Count)" }}',
+            "    & (Join-Path $Target 'python.exe') -m pip install --force-reinstall --no-deps "
+            "--no-index --no-warn-script-location --disable-pip-version-check $Wheel[0].FullName",
+            f"    if ($LASTEXITCODE -ne 0) {{ throw 'pip reinstall failed in seeded {version}' }}",
+            "    if (-not (Test-Path (Join-Path $Target 'Scripts\\pip.exe'))) { "
+            f"throw 'pip.exe missing in seeded {version}' }}",
             "    New-Item -ItemType File -Force -Path "
             f"(Join-Path $ToolDir 'Python\\{version}\\x64.complete') | Out-Null",
             "    Remove-Item -Recurse -Force $Work",
