@@ -17,9 +17,10 @@ import sys
 
 import pytest
 
-from fleet.contracts.runners import RunnerInstall
-from fleet.core import runner_account
+from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
+from fleet.core import runner_account, runner_audit
 from fleet.core.dialect_windows import POWERSHELL_INVOCATION
+from tests._runner_fixtures import a_base
 
 #: The service every case converges.
 _SERVICE = "actions.runner.wagner-austin-MCPs.lavender"
@@ -170,3 +171,114 @@ class TestConvergenceRunsForReal:
             f"CALL sc.exe config {_SERVICE} obj= LocalSystem",
         ]
         assert (tmp_path / "_work" / "checkout.txt").exists()
+
+
+#: The audit's other host-level reads, answered as a laid host answers them.
+_AUDIT_FAKES = """function wsl { $global:LASTEXITCODE = 0; return @('Used', '  46G') }
+function Get-ExecutionPolicy { param([string]$Scope) return 'RemoteSigned' }
+function Get-ItemProperty { param([string]$LiteralPath) [pscustomobject]@{ LongPathsEnabled = 1 } }
+function git { return 'true' }
+function Get-Service {
+    param([string]$Name, [string]$ErrorAction)
+    [pscustomobject]@{ Status = 'Running' }
+}
+"""
+
+
+def _audit(tmp_path: pathlib.Path, start_name: str | None) -> list[str]:
+    """Run the whole rendered audit for a host with one Windows-side install.
+
+    Args:
+        tmp_path: The test's directory; the install's real ``_work`` is here.
+        start_name: What ``Win32_Service.StartName`` reads, or ``None`` for
+            a service that is not installed.
+
+    Returns:
+        The CHECK lines the script emitted.
+    """
+    workdir = tmp_path / "_work"
+    workdir.mkdir()
+    spec = HostRunnerSpec(
+        name="lavender",
+        host="lavender",
+        wsl_distro="Ubuntu",
+        keepalive_task=None,
+        wslconfig_min_memory_gb=None,
+        scratch_dir=tmp_path.as_posix(),
+        gpu_required=False,
+        systemd_timers=[],
+        installs=[_install(workdir)],
+        assets=[],
+        base=a_base(),
+    )
+    start_value = "$null" if start_name is None else "'" + start_name + "'"
+    script = tmp_path / "audit.ps1"
+    script.write_text(
+        f"$script:StartName = {start_value}\n"
+        + _FAKES
+        + _AUDIT_FAKES
+        + runner_audit.render_audit_script(spec),
+        encoding="utf-8",
+    )
+    ran = subprocess.run(
+        [*POWERSHELL_INVOCATION, str(script)], capture_output=True, text=True, check=False
+    )
+    assert ran.returncode == 0, ran.stderr
+    return [line for line in ran.stdout.splitlines() if line.startswith("CHECK ")]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the audit is PowerShell; run it here")
+class TestTheAccountRowRunsForReal:
+    """The audit row executed: one line per Windows-side service, after its
+    workdir row, whatever the service reports."""
+
+    @pytest.mark.parametrize(
+        ("start_name", "verdict"),
+        [
+            ("LocalSystem", "OK"),
+            (
+                "NT AUTHORITY\\NetworkService",
+                "DRIFT Win32_Service StartName: NT AUTHORITY\\NetworkService",
+            ),
+            (None, "DRIFT Win32_Service StartName: "),
+        ],
+    )
+    def test_the_row_passes_system_and_drifts_anything_else(
+        self, tmp_path: pathlib.Path, start_name: str | None, verdict: str
+    ) -> None:
+        lines = _audit(tmp_path, start_name)
+        assert lines == [
+            "CHECK disk:/:ceiling-150gb:baseline-46gb@2026-09-26 OK",
+            "CHECK execution-policy:LocalMachine:RemoteSigned OK",
+            f"CHECK {runner_audit.LONG_PATHS_CHECK_ID} OK",
+            f"CHECK service:windows:{_SERVICE} OK",
+            "CHECK workdir:wagner-austin/MCPs:windows:lavender OK",
+            f"CHECK account:windows:{_SERVICE}:LocalSystem {verdict}",
+        ]
+
+    def test_the_rows_the_script_emits_are_the_rows_the_roster_expects(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        workdir = tmp_path / "w" / "_work"
+        expected = runner_audit.expected_checks(
+            HostRunnerSpec(
+                name="lavender",
+                host="lavender",
+                wsl_distro="Ubuntu",
+                keepalive_task=None,
+                wslconfig_min_memory_gb=None,
+                scratch_dir=tmp_path.as_posix(),
+                gpu_required=False,
+                systemd_timers=[],
+                installs=[_install(workdir)],
+                assets=[],
+                base=a_base(),
+            )
+        )
+        assert expected[-1] == runner_audit.ExpectedCheck(
+            check_id=f"account:windows:{_SERVICE}:LocalSystem",
+            reason=runner_account.SERVICE_ACCOUNT_REASON,
+        )
+        assert [f"CHECK {check['check_id']} OK" for check in expected] == _audit(
+            tmp_path, "LocalSystem"
+        )
