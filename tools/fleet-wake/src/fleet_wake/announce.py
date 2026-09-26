@@ -83,7 +83,8 @@ def _body(project: str, agent: str, entries: Sequence[LedgerEntry]) -> str:
     """
     counts: dict[str, int] = {}
     for entry in entries:
-        counts[entry["outcome"]] = counts.get(entry["outcome"], 0) + 1
+        word = entry["outcome"].value
+        counts[word] = counts.get(word, 0) + 1
     tally = ", ".join(f"{outcome} x{count}" for outcome, count in sorted(counts.items()))
 
     lines = [f"{MARKER} {project}: {len(entries)} dispatch(es) ended ({tally})"]

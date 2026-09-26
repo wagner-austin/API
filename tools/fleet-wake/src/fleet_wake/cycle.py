@@ -85,7 +85,7 @@ def run_cycle(loaded: LoadedWorkspace) -> None:
     for entry in fresh:
         append_announced(
             marks,
-            AnnouncedRun(run_id=entry["run_id"], outcome=entry["outcome"], announced_unix=at),
+            AnnouncedRun(run_id=entry["run_id"], outcome=entry["outcome"].value, announced_unix=at),
         )
     _test_hooks.emit(
         f"cycle: {len(rows)} recorded, {len(fresh)} newly terminal, positions recorded"
