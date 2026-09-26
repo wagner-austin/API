@@ -23,7 +23,7 @@ from platform_email.fake_hooks import (
     make_raising_http_get,
     make_raising_http_send,
 )
-from platform_email.types import OAuthCredentials, OAuthTokens, OutlookOAuthConfig
+from platform_email.types import OAuthCredentials, OAuthTokens, OutlookOAuthConfig, TokenType
 
 # =============================================================================
 # HTTP Hook Factory Tests
@@ -117,7 +117,7 @@ class TestMakeFakeTokens:
             access_token="access123",
             refresh_token="refresh456",
             expires_at=9999999999,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
         hook = make_fake_tokens(tokens)
         result = hook()

@@ -27,7 +27,7 @@ from platform_email.auth.common import (
 )
 from platform_email.config import GMAIL_AUTH_URL, GMAIL_EMAIL_SCOPES, GMAIL_TOKEN_URL
 from platform_email.testing import hooks
-from platform_email.types import OAuthCredentials, OAuthTokens
+from platform_email.types import OAuthCredentials, OAuthTokens, TokenType
 
 
 def build_gmail_auth_url(
@@ -128,7 +128,7 @@ def exchange_gmail_code_for_tokens(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_at=expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 
@@ -190,7 +190,7 @@ def refresh_gmail_access_token(
         access_token=access_token,
         refresh_token=refresh_token,  # Keep original refresh token
         expires_at=expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 

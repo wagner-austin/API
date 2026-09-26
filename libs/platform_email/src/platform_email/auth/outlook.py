@@ -27,7 +27,7 @@ from platform_email.auth.common import (
 )
 from platform_email.config import OUTLOOK_EMAIL_SCOPES, outlook_auth_url, outlook_token_url
 from platform_email.testing import hooks
-from platform_email.types import OAuthTokens, OutlookOAuthConfig
+from platform_email.types import OAuthTokens, OutlookOAuthConfig, TokenType
 
 
 def build_outlook_auth_url(
@@ -130,7 +130,7 @@ def exchange_outlook_code_for_tokens(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_at=expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 
@@ -198,7 +198,7 @@ def refresh_outlook_access_token(
         access_token=access_token,
         refresh_token=final_refresh_token,
         expires_at=expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 

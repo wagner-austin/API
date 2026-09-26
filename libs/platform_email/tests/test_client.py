@@ -8,7 +8,7 @@ import pytest
 
 from platform_email.client import gmail_email_client, outlook_email_client
 from platform_email.testing import hooks, reset_hooks
-from platform_email.types import OAuthTokens
+from platform_email.types import OAuthTokens, TokenType
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +24,7 @@ def _make_tokens() -> OAuthTokens:
         access_token="test_access_token",
         refresh_token="test_refresh_token",
         expires_at=9999999999,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 

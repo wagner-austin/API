@@ -24,7 +24,7 @@ from platform_email.testing import (
     hooks,
     reset_hooks,
 )
-from platform_email.types import OAuthTokens, encode_oauth_tokens
+from platform_email.types import OAuthTokens, TokenType, encode_oauth_tokens
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +40,7 @@ def _make_tokens() -> OAuthTokens:
         access_token="test_access",
         refresh_token="test_refresh",
         expires_at=9999999999,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 
