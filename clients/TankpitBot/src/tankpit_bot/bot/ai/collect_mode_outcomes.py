@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
 )
 from tankpit_bot.bot.ai.intent import (
+    PlanReleaseReason,
     current_collect_plan,
     plan_completes_here,
     release_collect_plan,
@@ -561,7 +562,7 @@ def scan_on_landing_decision(
         "scan_on_landing",
         AIStateDict(
             **{
-                **release_collect_plan(base_state, reason="landing_scan_reset"),
+                **release_collect_plan(base_state, reason=PlanReleaseReason.LANDING_SCAN_RESET),
                 "last_landing_scan_viewport": origin_key,
             }
         ),

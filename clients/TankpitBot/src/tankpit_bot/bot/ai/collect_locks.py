@@ -26,6 +26,7 @@ from tankpit_bot.bot.ai.equipment_search import (
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import (
     RESOURCE_LOCK_HOLD_BOUND_TICKS,
+    PlanReleaseReason,
     hold_resource_target,
     release_collect_plan,
     set_resource_target,
@@ -123,7 +124,7 @@ def _hold_or_stall(
             target_y,
             held["resource_target_held_ticks"],
         )
-        return release_collect_plan(held, reason="progress_stalled")
+        return release_collect_plan(held, reason=PlanReleaseReason.PROGRESS_STALLED)
     emit_ai(
         "locked %s target at (%d,%d) not executable this tick - holding plan",
         kind,
@@ -173,14 +174,14 @@ def _continue_or_release_equipment_lock(
             locked_target["x"],
             locked_target["y"],
         )
-        return None, release_collect_plan(base_state, reason="tank_at_capacity")
+        return None, release_collect_plan(base_state, reason=PlanReleaseReason.TANK_AT_CAPACITY)
     if _superior_equipment_candidate(ctx, locked_target) is not None:
         emit_ai(
             "releasing equipment lock at (%d,%d): markedly closer equipment is visible",
             locked_target["x"],
             locked_target["y"],
         )
-        return None, release_collect_plan(base_state, reason="superior_candidate")
+        return None, release_collect_plan(base_state, reason=PlanReleaseReason.SUPERIOR_CANDIDATE)
     target_x = locked_target["x"]
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
@@ -205,14 +206,14 @@ def _continue_or_release_equipment_lock(
                 target_x,
                 target_y,
             )
-            return None, release_collect_plan(base_state, reason="not_executable")
+            return None, release_collect_plan(base_state, reason=PlanReleaseReason.NOT_EXECUTABLE)
         if _locked_target_is_unservable(ctx, target_x, target_y):
             emit_ai(
                 "locked equipment target at (%d,%d) is unservable by any lane - releasing",
                 target_x,
                 target_y,
             )
-            return None, release_collect_plan(base_state, reason="unservable")
+            return None, release_collect_plan(base_state, reason=PlanReleaseReason.UNSERVABLE)
         return None, _hold_or_stall(base_state, "equipment", target_x, target_y)
     emit_ai("continue locked equipment target at (%d,%d)", target_x, target_y)
     decision = make_decision(
@@ -249,14 +250,14 @@ def continue_or_release_fuel_lock(
             locked_target["y"],
             ctx.fuel,
         )
-        return None, release_collect_plan(base_state, reason="tank_at_capacity")
+        return None, release_collect_plan(base_state, reason=PlanReleaseReason.TANK_AT_CAPACITY)
     if _superior_fuel_candidate(ctx, locked_target) is not None:
         emit_ai(
             "releasing fuel lock at (%d,%d): markedly closer fuel is visible",
             locked_target["x"],
             locked_target["y"],
         )
-        return None, release_collect_plan(base_state, reason="superior_candidate")
+        return None, release_collect_plan(base_state, reason=PlanReleaseReason.SUPERIOR_CANDIDATE)
     target_x = locked_target["x"]
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
@@ -269,14 +270,14 @@ def continue_or_release_fuel_lock(
                 target_x,
                 target_y,
             )
-            return None, release_collect_plan(base_state, reason="not_executable")
+            return None, release_collect_plan(base_state, reason=PlanReleaseReason.NOT_EXECUTABLE)
         if _locked_target_is_unservable(ctx, target_x, target_y):
             emit_ai(
                 "locked fuel target at (%d,%d) is unservable by any lane - releasing",
                 target_x,
                 target_y,
             )
-            return None, release_collect_plan(base_state, reason="unservable")
+            return None, release_collect_plan(base_state, reason=PlanReleaseReason.UNSERVABLE)
         return None, _hold_or_stall(base_state, "fuel", target_x, target_y)
     emit_ai(
         "continue locked fuel target at (%d,%d) vol=%d (fuel=%d)",

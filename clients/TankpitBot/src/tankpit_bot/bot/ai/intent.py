@@ -35,14 +35,13 @@ to hunt plans (close/pursuit) per [[committed-intent]].
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     require_int,
-    require_str,
 )
+from platform_core.members import find_member, require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.equipment import is_container_pursuable
@@ -50,70 +49,59 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import WorldStateDict
 
-CollectPlanKind = Literal["fuel", "equipment"]
 
-COLLECT_PLAN_KINDS: tuple[CollectPlanKind, ...] = ("fuel", "equipment")
-"""Closed vocabulary of collect-plan kinds.
+class CollectPlanKind(StrEnum):
+    """Closed vocabulary of collect-plan kinds.
 
-Matches the resource-lock kinds ``set_resource_target`` writes; the
-empty string means "no plan" and never appears inside a plan dict.
-"""
+    Matches the resource-lock kinds ``set_resource_target`` writes; the
+    empty string means "no plan" and never appears inside a plan dict.
+    """
 
-PlanReleaseReason = Literal[
-    "tank_at_capacity",
-    "superior_candidate",
-    "not_executable",
-    "landing_scan_reset",
-    "walk_for_fuel_override",
-    "target_gone",
-    "target_not_pursuable",
-    "kind_invalid",
-    "unservable",
-    "claim_lost",
-    "relocated",
-    "progress_stalled",
-]
+    FUEL = "fuel"
+    EQUIPMENT = "equipment"
 
-PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
-    "tank_at_capacity",
-    "superior_candidate",
-    "not_executable",
-    "landing_scan_reset",
-    "walk_for_fuel_override",
-    "target_gone",
-    "target_not_pursuable",
-    "kind_invalid",
-    "unservable",
-    "claim_lost",
-    "relocated",
-    "progress_stalled",
-)
-"""Closed vocabulary of plan-release reason codes.
 
-``tank_at_capacity`` is a completion (the fuel plan's purpose is
-served); every other code is an invalidation. ``unservable`` is the
-structural release (2026-08-05): the locked container has no legal
-teleport landing AND no fresh ferry on its own water body, so no
-lane — walk, hop, or ride — can ever serve it and no move-failed
-mark will ever arrive (run bot-20260804-234008 held such a lock for
-11 minutes). The vocabulary is closed on purpose: a new release site
-means a new documented reason here, not an invented string — churn
-analysis groups the ``plan_released`` events by this field.
-``claim_lost`` is the fleet arbitration release (2026-09-02,
-[[fleet-forage-allocation]]): a sibling won the container's
-authoritative claim file in the same tick this plan latched, so the
-plan dies before its first command dispatches — one held beat paid
-instead of a whole doomed journey.
-``relocated`` is the cascade-bottom release (2026-09-02,
-[[flag-triage-20260902]]): every serving lane declined the held plan
-this tick and the resource-search hop is moving the tank elsewhere —
-before it, that site cleared the lock silently, invisible to churn
-analysis.
-``progress_stalled`` is the progress invariant
-(:data:`RESOURCE_LOCK_HOLD_BOUND_TICKS`) — the continuation held the
-plan that many consecutive ticks without one dispatch, which no
-legitimate transient produces.
-"""
+class PlanReleaseReason(StrEnum):
+    """Closed vocabulary of plan-release reason codes.
+
+    ``tank_at_capacity`` is a completion (the fuel plan's purpose is
+    served); every other code is an invalidation. ``unservable`` is the
+    structural release (2026-08-05): the locked container has no legal
+    teleport landing AND no fresh ferry on its own water body, so no
+    lane — walk, hop, or ride — can ever serve it and no move-failed
+    mark will ever arrive (run bot-20260804-234008 held such a lock for
+    11 minutes). The vocabulary is closed on purpose: a new release site
+    means a new documented reason here, not an invented string — churn
+    analysis groups the ``plan_released`` events by this field.
+    ``claim_lost`` is the fleet arbitration release (2026-09-02,
+    [[fleet-forage-allocation]]): a sibling won the container's
+    authoritative claim file in the same tick this plan latched, so the
+    plan dies before its first command dispatches — one held beat paid
+    instead of a whole doomed journey.
+    ``relocated`` is the cascade-bottom release (2026-09-02,
+    [[flag-triage-20260902]]): every serving lane declined the held plan
+    this tick and the resource-search hop is moving the tank elsewhere —
+    before it, that site cleared the lock silently, invisible to churn
+    analysis.
+    ``progress_stalled`` is the progress invariant
+    (:data:`RESOURCE_LOCK_HOLD_BOUND_TICKS`) — the continuation held the
+    plan that many consecutive ticks without one dispatch, which no
+    legitimate transient produces.
+    """
+
+    TANK_AT_CAPACITY = "tank_at_capacity"
+    SUPERIOR_CANDIDATE = "superior_candidate"
+    NOT_EXECUTABLE = "not_executable"
+    LANDING_SCAN_RESET = "landing_scan_reset"
+    WALK_FOR_FUEL_OVERRIDE = "walk_for_fuel_override"
+    TARGET_GONE = "target_gone"
+    TARGET_NOT_PURSUABLE = "target_not_pursuable"
+    KIND_INVALID = "kind_invalid"
+    UNSERVABLE = "unservable"
+    CLAIM_LOST = "claim_lost"
+    RELOCATED = "relocated"
+    PROGRESS_STALLED = "progress_stalled"
+
 
 RESOURCE_LOCK_HOLD_BOUND_TICKS = 8
 """Consecutive dispatch-less continuation holds that release a plan.
@@ -242,26 +230,6 @@ class CollectPlanDict(TypedDict):
     target_y: int
 
 
-def _require_plan_kind(data: JSONObject, key: str) -> CollectPlanKind:
-    """Validate and return a collect-plan kind field.
-
-    Args:
-        data: JSON object holding the field.
-        key: Field name to read.
-
-    Returns:
-        The validated plan kind.
-
-    Raises:
-        JSONTypeError: If the value is not a supported plan kind.
-    """
-    raw = require_str(data, key)
-    for kind in COLLECT_PLAN_KINDS:
-        if raw == kind:
-            return kind
-    raise JSONTypeError(f"{key} must be one of {COLLECT_PLAN_KINDS}, got {raw!r}")
-
-
 def encode_collect_plan(plan: CollectPlanDict) -> JSONObject:
     """Serialize a collect plan to a JSON object.
 
@@ -272,7 +240,7 @@ def encode_collect_plan(plan: CollectPlanDict) -> JSONObject:
         JSON object with the plan's fields.
     """
     return {
-        "kind": plan["kind"],
+        "kind": plan["kind"].value,
         "target_x": plan["target_x"],
         "target_y": plan["target_y"],
     }
@@ -289,10 +257,10 @@ def decode_collect_plan(data: JSONObject) -> CollectPlanDict:
 
     Raises:
         JSONTypeError: If a field is missing, mistyped, or the kind is
-            not in :data:`COLLECT_PLAN_KINDS`.
+            not a :class:`CollectPlanKind`.
     """
     return CollectPlanDict(
-        kind=_require_plan_kind(data, "kind"),
+        kind=require_member(data, "kind", CollectPlanKind),
         target_x=require_int(data, "target_x"),
         target_y=require_int(data, "target_y"),
     )
@@ -311,15 +279,14 @@ def current_collect_plan(ai_state: AIStateDict) -> CollectPlanDict | None:
         ``kind_invalid`` at context construction, so cascade code
         never sees one.
     """
-    kind = ai_state["resource_target_kind"]
-    for plan_kind in COLLECT_PLAN_KINDS:
-        if kind == plan_kind:
-            return CollectPlanDict(
-                kind=plan_kind,
-                target_x=ai_state["resource_target_x"],
-                target_y=ai_state["resource_target_y"],
-            )
-    return None
+    plan_kind = find_member(ai_state["resource_target_kind"], CollectPlanKind)
+    if plan_kind is None:
+        return None
+    return CollectPlanDict(
+        kind=plan_kind,
+        target_x=ai_state["resource_target_x"],
+        target_y=ai_state["resource_target_y"],
+    )
 
 
 def plan_completes_here(plan: CollectPlanDict, self_x: int, self_y: int) -> bool:
@@ -356,7 +323,7 @@ def release_collect_plan(
 
     Args:
         ai_state: AI state possibly holding a plan.
-        reason: Release reason code (:data:`PLAN_RELEASE_REASONS`).
+        reason: Release reason code.
 
     Returns:
         AI state with the lock fields zeroed (unchanged content when
@@ -367,10 +334,10 @@ def release_collect_plan(
         return ai_state
     emit_diagnostic(
         diagnostic_kind="plan_released",
-        plan_kind=plan["kind"],
+        plan_kind=plan["kind"].value,
         target_x=plan["target_x"],
         target_y=plan["target_y"],
-        reason=reason,
+        reason=reason.value,
     )
     return clear_resource_target(ai_state)
 
@@ -406,20 +373,18 @@ def validate_collect_plan(
             plan_kind=kind,
             target_x=ai_state["resource_target_x"],
             target_y=ai_state["resource_target_y"],
-            reason="kind_invalid",
+            reason=PlanReleaseReason.KIND_INVALID.value,
         )
         return clear_resource_target(ai_state)
     target = world["containers"].get(f"{plan['target_x']},{plan['target_y']}")
     if target is None:
-        return release_collect_plan(ai_state, reason="target_gone")
-    if not is_container_pursuable(target, want_fuel=plan["kind"] == "fuel"):
-        return release_collect_plan(ai_state, reason="target_not_pursuable")
+        return release_collect_plan(ai_state, reason=PlanReleaseReason.TARGET_GONE)
+    if not is_container_pursuable(target, want_fuel=plan["kind"] is CollectPlanKind.FUEL):
+        return release_collect_plan(ai_state, reason=PlanReleaseReason.TARGET_NOT_PURSUABLE)
     return ai_state
 
 
 __all__ = [
-    "COLLECT_PLAN_KINDS",
-    "PLAN_RELEASE_REASONS",
     "PLAN_SERVE_REACH",
     "RESOURCE_LOCK_HOLD_BOUND_TICKS",
     "CollectPlanDict",

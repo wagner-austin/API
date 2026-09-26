@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
-from tankpit_bot.bot.ai.intent import release_collect_plan
+from tankpit_bot.bot.ai.intent import PlanReleaseReason, release_collect_plan
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.scope_scout import SCOPE_REACH_TILES, pan_plan_toward
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -109,7 +109,7 @@ def _maroon_pan_toward(
         "walk_for_fuel_pan",
         AIStateDict(
             **{
-                **release_collect_plan(base_state, reason="walk_for_fuel_override"),
+                **release_collect_plan(base_state, reason=PlanReleaseReason.WALK_FOR_FUEL_OVERRIDE),
                 "maroon_pan_x": sx,
                 "maroon_pan_y": sy,
             }
@@ -212,7 +212,7 @@ def walk_for_fuel_last_resort(
             leg_x,
             leg_y,
             "walk_for_fuel",
-            release_collect_plan(base_state, reason="walk_for_fuel_override"),
+            release_collect_plan(base_state, reason=PlanReleaseReason.WALK_FOR_FUEL_OVERRIDE),
             ctx.equip,
         )
     return None

@@ -32,7 +32,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.intent import release_collect_plan
+from tankpit_bot.bot.ai.intent import PlanReleaseReason, release_collect_plan
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.scoring_types import (
     BehaviorMode,
@@ -511,7 +511,7 @@ def make_resource_search_hop(
         # exists to prevent. The drop is enumerated — before
         # 2026-09-02 this site cleared the lock silently, invisible
         # to churn analysis ([[flag-triage-20260902]]).
-        release_collect_plan(base_state, reason="relocated"),
+        release_collect_plan(base_state, reason=PlanReleaseReason.RELOCATED),
         ctx.equip,
     )
 
