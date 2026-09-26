@@ -17,10 +17,11 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.logging import get_logger
+from platform_core.members import find_member
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.browser.accounts import accounts_file_path, load_accounts
-from tankpit_bot.fleetshare.types import ENGAGEMENT_DOCTRINES, FLEET_ROLES, FleetRole
+from tankpit_bot.fleetshare.types import EngagementDoctrine, FleetRole
 from tankpit_bot.runtime_artifacts import TANK_REGISTRY_PATH
 from tankpit_bot.service.fleet_error import FleetError
 from tankpit_bot.types.constants import TROOP_COLOR_NAMES
@@ -63,12 +64,11 @@ def resolve_role(role: str) -> FleetRole:
     Raises:
         FleetError: If the selector is not a fleet role.
     """
-    candidate = role or "fighter"
-    for known in FLEET_ROLES:
-        if candidate == known:
-            return known
-    known_roles = ", ".join(FLEET_ROLES)
-    raise FleetError(f"role {role!r} is not a fleet role (one of: {known_roles})")
+    resolved = find_member(role or FleetRole.FIGHTER.value, FleetRole)
+    if resolved is None:
+        known_roles = ", ".join(known.value for known in FleetRole)
+        raise FleetError(f"role {role!r} is not a fleet role (one of: {known_roles})")
+    return resolved
 
 
 def resolve_troop(troop: str) -> str:
@@ -113,13 +113,13 @@ def resolve_doctrine(doctrine: str) -> str:
     """
     if doctrine == "":
         return ""
-    for known in ENGAGEMENT_DOCTRINES:
-        if doctrine == known:
-            return known
-    known_doctrines = ", ".join(ENGAGEMENT_DOCTRINES)
-    raise FleetError(
-        f"doctrine {doctrine!r} is not an engagement doctrine (one of: {known_doctrines})"
-    )
+    resolved = find_member(doctrine, EngagementDoctrine)
+    if resolved is None:
+        known_doctrines = ", ".join(known.value for known in EngagementDoctrine)
+        raise FleetError(
+            f"doctrine {doctrine!r} is not an engagement doctrine (one of: {known_doctrines})"
+        )
+    return resolved.value
 
 
 #: Lowest human rank a bot may open a fight on in the PRACTICE room.
@@ -229,13 +229,13 @@ def engagement_doctrines() -> list[str]:
     themselves, so the operator states it at spawn instead of setting
     ``TANKPIT_DOCTRINE`` by hand.
 
-    Vocabulary order is the doctrine tuple's own, and the first entry
-    is what an unset environment resolves to.
+    Vocabulary order is ``EngagementDoctrine``'s declaration order, and
+    the first entry is what an unset environment resolves to.
 
     Returns:
         Doctrine names, the first being the default.
     """
-    return list(ENGAGEMENT_DOCTRINES)
+    return [doctrine.value for doctrine in EngagementDoctrine]
 
 
 def tank_registry() -> JSONObject:

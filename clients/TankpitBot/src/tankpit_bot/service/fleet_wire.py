@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     JSONValue,
     narrow_json_to_dict,
     require_bool,
@@ -19,9 +18,10 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
-from tankpit_bot.fleetshare.types import FLEET_ROLES, FleetRole
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service.fleet_bot import FleetBotDict
 
 
@@ -77,28 +77,6 @@ class SpawnRequestDict(TypedDict):
     doctrine: str
 
 
-def _require_role(data: JSONObject, key: str) -> FleetRole:
-    """Read a required field as a fleet role.
-
-    Args:
-        data: Decoded JSON object.
-        key: Field name.
-
-    Returns:
-        The validated role.
-
-    Raises:
-        JSONTypeError: If the field is missing, not a string, or not a
-            known fleet role.
-    """
-    value = require_str(data, key)
-    for known in FLEET_ROLES:
-        if value == known:
-            return known
-    known_roles = ", ".join(FLEET_ROLES)
-    raise JSONTypeError(f"field '{key}' is not a fleet role: {value!r} (one of: {known_roles})")
-
-
 def _require_returncode(data: JSONObject, key: str) -> int | None:
     """Read the exit code, which is absent while a bot runs.
 
@@ -131,7 +109,7 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
     return {
         "instance": bot["instance"],
         "account": bot["account"],
-        "role": bot["role"],
+        "role": bot["role"].value,
         "room": bot["room"],
         "troop": bot["troop"],
         "doctrine": bot["doctrine"],
@@ -160,7 +138,7 @@ def decode_fleet_bot(data: JSONObject) -> FleetBotDict:
     return FleetBotDict(
         instance=require_str(data, "instance"),
         account=require_str(data, "account"),
-        role=_require_role(data, "role"),
+        role=require_member(data, "role", FleetRole),
         room=require_str(data, "room"),
         troop=require_str(data, "troop"),
         doctrine=require_str(data, "doctrine"),

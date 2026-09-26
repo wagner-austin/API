@@ -27,7 +27,6 @@ from pathlib import Path
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     dump_json_str,
     load_json_str,
     narrow_json_to_dict,
@@ -35,10 +34,11 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks as top_hooks
-from tankpit_bot.fleetshare.types import FLEET_ROLES, FleetRole
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.runtime_artifacts import bot_run_dir
 
 #: File name of the per-instance spawn record, inside the instance's
@@ -106,28 +106,6 @@ def process_record_path(instance: str) -> Path:
     return bot_run_dir(instance) / PROCESS_RECORD_NAME
 
 
-def _require_role(data: JSONObject, key: str) -> FleetRole:
-    """Read a required field as a fleet role.
-
-    Args:
-        data: Decoded JSON object.
-        key: Field name.
-
-    Returns:
-        The validated role.
-
-    Raises:
-        JSONTypeError: If the field is missing, not a string, or not
-            one of the known fleet roles.
-    """
-    value = require_str(data, key)
-    for known in FLEET_ROLES:
-        if value == known:
-            return known
-    known_roles = ", ".join(FLEET_ROLES)
-    raise JSONTypeError(f"field '{key}' is not a fleet role: {value!r} (one of: {known_roles})")
-
-
 def encode_process_record(record: FleetProcessRecordDict) -> JSONObject:
     """Encode one spawn record for storage.
 
@@ -140,7 +118,7 @@ def encode_process_record(record: FleetProcessRecordDict) -> JSONObject:
     return {
         "instance": record["instance"],
         "account": record["account"],
-        "role": record["role"],
+        "role": record["role"].value,
         "room": record["room"],
         "troop": record["troop"],
         "doctrine": record["doctrine"],
@@ -168,7 +146,7 @@ def decode_process_record(data: JSONObject) -> FleetProcessRecordDict:
     return FleetProcessRecordDict(
         instance=require_str(data, "instance"),
         account=require_str(data, "account"),
-        role=_require_role(data, "role"),
+        role=require_member(data, "role", FleetRole),
         room=require_str(data, "room"),
         troop=require_str(data, "troop"),
         doctrine=require_str(data, "doctrine"),

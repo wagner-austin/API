@@ -12,43 +12,16 @@ from platform_core.json_utils import (
     JSONObject,
     require_bool,
     require_int,
-    require_str,
 )
+from platform_core.members import require_member
 
 from tankpit_bot.bus.session_status import (
-    WIRE_MODES,
     LiveStatsDict,
     SessionStatusDict,
     WireMode,
 )
 from tankpit_bot.service.types import ModeCommandDict
-from tankpit_bot.types.modes import (
-    is_valid_ai_mode_state,
-    require_ai_mode,
-    require_ai_mode_state,
-)
-
-
-def _require_wire_mode(data: JSONObject, key: str) -> WireMode:
-    """Validate and extract a :data:`WireMode` from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated :data:`WireMode` value.
-
-    Raises:
-        ValueError: If the value is not one of :data:`WIRE_MODES`.
-        JSONTypeError: If the value is missing or not a string.
-    """
-    raw = require_str(data, key)
-    for mode in WIRE_MODES:
-        if raw == mode:
-            return mode
-    raise ValueError(f"{key} must be one of {WIRE_MODES}, got {raw!r}")
-
+from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
 
 # =========================================================================
 # ModeCommandDict codecs
@@ -64,7 +37,7 @@ def encode_mode_command(cmd: ModeCommandDict) -> JSONObject:
     Returns:
         JSON-serializable dict representation.
     """
-    return {"manual_mode": cmd["manual_mode"]}
+    return {"manual_mode": cmd["manual_mode"].value}
 
 
 def decode_mode_command(data: JSONObject) -> ModeCommandDict:
@@ -77,10 +50,10 @@ def decode_mode_command(data: JSONObject) -> ModeCommandDict:
         Validated :class:`ModeCommandDict`.
 
     Raises:
-        ValueError: If ``manual_mode`` is not one of :data:`WIRE_MODES`.
-        JSONTypeError: If ``manual_mode`` is missing or the wrong type.
+        JSONTypeError: If ``manual_mode`` is missing, the wrong type, or
+            not a :class:`WireMode` word.
     """
-    return ModeCommandDict(manual_mode=_require_wire_mode(data, "manual_mode"))
+    return ModeCommandDict(manual_mode=require_member(data, "manual_mode", WireMode))
 
 
 # =========================================================================
@@ -143,9 +116,9 @@ def encode_session_status(status: SessionStatusDict) -> JSONObject:
     """
     return {
         "running": status["running"],
-        "manual_mode": status["manual_mode"],
-        "active_mode": status["active_mode"],
-        "active_mode_state": status["active_mode_state"],
+        "manual_mode": status["manual_mode"].value,
+        "active_mode": status["active_mode"].value,
+        "active_mode_state": status["active_mode_state"].value,
         "session_started_ms": status["session_started_ms"],
         "tick_timestamp_ms": status["tick_timestamp_ms"],
         "stats": encode_live_stats(status["stats"]),
@@ -181,21 +154,21 @@ def decode_session_status(data: JSONObject) -> SessionStatusDict:
         Validated :class:`SessionStatusDict`.
 
     Raises:
-        ValueError: If ``manual_mode`` is not a :data:`WireMode`, if
-            the ``active_mode`` / ``active_mode_state`` pair is invalid,
-            or if ``stats`` is missing / not an object.
-        JSONTypeError: If any required field is missing or the wrong
-            primitive type.
+        ValueError: If the ``active_mode`` / ``active_mode_state`` pair is
+            invalid, or if ``stats`` is missing / not an object.
+        JSONTypeError: If any required field is missing, the wrong
+            primitive type, or a mode word outside its vocabulary.
     """
-    active_mode = require_ai_mode(data, "active_mode")
-    active_mode_state = require_ai_mode_state(data, "active_mode_state")
+    active_mode = require_member(data, "active_mode", AIMode)
+    active_mode_state = require_member(data, "active_mode_state", AIModeState)
     if not is_valid_ai_mode_state(active_mode, active_mode_state):
         raise ValueError(
-            f"active_mode_state {active_mode_state!r} is invalid for active_mode {active_mode!r}"
+            f"active_mode_state {active_mode_state.value!r} is invalid"
+            f" for active_mode {active_mode.value!r}"
         )
     return SessionStatusDict(
         running=require_bool(data, "running"),
-        manual_mode=_require_wire_mode(data, "manual_mode"),
+        manual_mode=require_member(data, "manual_mode", WireMode),
         active_mode=active_mode,
         active_mode_state=active_mode_state,
         session_started_ms=require_int(data, "session_started_ms"),
