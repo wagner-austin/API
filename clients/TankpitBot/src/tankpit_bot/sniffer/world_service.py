@@ -377,7 +377,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self,
         x: int,
         y: int,
-        fact_source: FactSource = "wire_0x3D_movement",
+        fact_source: FactSource = FactSource.WIRE_0X3D_MOVEMENT,
     ) -> None:
         """Update world state with new self position.
 

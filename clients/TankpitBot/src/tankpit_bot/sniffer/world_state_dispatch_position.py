@@ -5,6 +5,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import protocol
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_tanks import (
@@ -65,7 +66,9 @@ def _handle_waypoint_movement(
     final_x, final_y = _resolve_waypoint_destination(sx, sy, wps)
     for tank in ws.world_state["tanks"].values():
         if tank["x"] == sx and tank["y"] == sy and not tank["is_self"]:
-            _update_tank_position(ws, tank["tank_id"], final_x, final_y, "wire_0x47_movement")
+            _update_tank_position(
+                ws, tank["tank_id"], final_x, final_y, FactSource.WIRE_0X47_MOVEMENT
+            )
             break
 
 
@@ -97,8 +100,8 @@ def _dispatch_protocol_movement_update(
     is_self = self_state is not None and tank_id == self_state["tank_id"]
     if is_self:
         final_x, final_y = _resolve_waypoint_destination(start_x, start_y, waypoints)
-        ws.update_world_state_from_position(final_x, final_y, "wire_0x47_movement")
-        ws.update_world_state_from_rank(rank, "wire_0x47_movement")
+        ws.update_world_state_from_position(final_x, final_y, FactSource.WIRE_0X47_MOVEMENT)
+        ws.update_world_state_from_rank(rank, FactSource.WIRE_0X47_MOVEMENT)
         if path_tiles > 0:
             record_fuel_entry(book=ws.fuel_book, kind=FuelEntryKind.WALK, lo=-path_tiles, hi=0)
         render_ascii_if_available(ws, "SelfMovement")

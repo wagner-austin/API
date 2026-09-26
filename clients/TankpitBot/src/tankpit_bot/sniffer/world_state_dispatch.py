@@ -15,6 +15,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.ammo_book import record_ammo_death
 from tankpit_bot.ledger.fuel_book import reset_fuel_book_on_death
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_NAMES
@@ -100,7 +101,7 @@ def _update_tank_from_position_status(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source=EntitySource.VIEWPORT,
-        fact_source="wire_0x3D_movement",
+        fact_source=FactSource.WIRE_0X3D_MOVEMENT,
         position=(x, y),
         team=team,
         rank=rank,
@@ -190,7 +191,7 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             # promotion.
             self_state = ws.world_state["self_state"]
             if self_state is not None and self_state["tank_id"] == tid:
-                ws.update_world_state_from_rank(rank, "wire_0x2E_tank_status_sync")
+                ws.update_world_state_from_rank(rank, FactSource.WIRE_0X2E_TANK_STATUS_SYNC)
                 if promo > 0:
                     emit_diagnostic(
                         diagnostic_kind="self_promo_eligible",
@@ -364,7 +365,7 @@ def _dispatch_map_data(
             is_wire_sourced=False,
             position_is_authoritative=True,
             storage_source=EntitySource.WORLD_STATE,
-            fact_source="wire_0x4C_map_data",
+            fact_source=FactSource.WIRE_0X4C_MAP_DATA,
             position=(entry["x"], entry["y"]),
             team=entry["team"],
             rank=entry["rank"],
@@ -406,8 +407,8 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
             # in the fuel-bearing 0x2E at the kill tick). Apply the
             # rank alongside the fuel so a mid-session promotion
             # reaches the rank-derived bars the tick it lands.
-            update_world_state_from_fuel_total(ws, fuel, "wire_0x2E_tank_status_sync")
-            ws.update_world_state_from_rank(rank, "wire_0x2E_tank_status_sync")
+            update_world_state_from_fuel_total(ws, fuel, FactSource.WIRE_0X2E_TANK_STATUS_SYNC)
+            ws.update_world_state_from_rank(rank, FactSource.WIRE_0X2E_TANK_STATUS_SYNC)
             # Promotion PROGRESS telemetry. ``promo_state`` is the bar
             # the client fills to ``2 * promo_state`` pixels: it climbs
             # with damage dealt and resets at the promoting kill
@@ -440,7 +441,7 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
             "fuel_total": int(fuel_total),
             "is_free": bool(is_free),
         }:
-            update_world_state_from_fuel_total(ws, fuel_total, "wire_0x44_fuel_gain")
+            update_world_state_from_fuel_total(ws, fuel_total, FactSource.WIRE_0X44_FUEL_GAIN)
             emit_diagnostic(
                 diagnostic_kind="fuel_gain",
                 fuel_total=fuel_total,
@@ -448,7 +449,7 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
             )
             return True
         case {"msg_type": 0x64, "fuel_total": int(fuel_total)}:
-            update_world_state_from_fuel_total(ws, fuel_total, "wire_0x64_fuel_total")
+            update_world_state_from_fuel_total(ws, fuel_total, FactSource.WIRE_0X64_FUEL_TOTAL)
             return True
         case {"msg_type": 0x49, "counts": list(counts), "enabled": list(enabled)}:
             update_inventory_from_protocol(ws, counts, enabled)

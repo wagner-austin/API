@@ -40,7 +40,7 @@ approaches 60k."""
 def update_world_state_from_fuel_total(
     ws: WorldService,
     fuel_total: int,
-    fact_source: FactSource = "wire_0x2E_tank_status_sync",
+    fact_source: FactSource = FactSource.WIRE_0X2E_TANK_STATUS_SYNC,
 ) -> None:
     """Update world state with new absolute fuel level.
 
@@ -91,7 +91,10 @@ def update_world_state_from_fuel_total(
     ws.world_state = set_self_fuel(ws.world_state, fuel_total, ts, fact_source)
     delta = fuel_total - old_fuel
     emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
-    if fact_source != "wire_0x2E_tank_status_sync" and ws.fuel_book["last_fuel"] is not None:
+    if (
+        fact_source is not FactSource.WIRE_0X2E_TANK_STATUS_SYNC
+        and ws.fuel_book["last_fuel"] is not None
+    ):
         # 0x44 gains and 0x64 deposit totals ANNOUNCE their own delta:
         # the wire message is the explanation, so the book credits it
         # exactly before folding the reading in (2026-07-21 soak 2:

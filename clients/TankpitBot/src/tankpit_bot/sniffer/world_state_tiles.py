@@ -18,6 +18,7 @@ from typing import TypeVar
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.facts.provenance import make_provenance
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
@@ -296,7 +297,7 @@ def update_terrain_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) 
             y=y,
             terrain_type=terrain_type,
             observed_ms=timestamp_ms,
-            provenance=make_provenance("wire_0x4A_terrain_update", []),
+            provenance=make_provenance(FactSource.WIRE_0X4A_TERRAIN_UPDATE, []),
         )
 
     ws.world_state = WorldStateDict(

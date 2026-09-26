@@ -53,7 +53,7 @@ def update_world_state_from_tank_entry(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source=EntitySource.VIEWPORT,
-        fact_source="wire_0x28_tank_entry",
+        fact_source=FactSource.WIRE_0X28_TANK_ENTRY,
         position=(x, y),
         team=team,
         rank=rank,
@@ -84,7 +84,7 @@ def update_world_state_from_tank_info(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source=EntitySource.VIEWPORT,
-        fact_source="wire_0x21_tank_info",
+        fact_source=FactSource.WIRE_0X21_TANK_INFO,
         team=team,
         name=name,
     )
@@ -115,7 +115,7 @@ def update_world_state_from_tank_status(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source=EntitySource.VIEWPORT,
-        fact_source="wire_0x3E_tank_status",
+        fact_source=FactSource.WIRE_0X3E_TANK_STATUS,
         team=team,
         rank=rank,
         name=name,
@@ -160,7 +160,7 @@ def update_world_state_from_move_response_full(
                 fuel=self_state["fuel"] if self_state else 0,
                 leaderboard_position=0,
                 observed_ms=ts,
-                provenance=make_provenance("wire_0x3D_movement", []),
+                provenance=make_provenance(FactSource.WIRE_0X3D_MOVEMENT, []),
             ),
             tanks=ws.world_state["tanks"],
             containers=ws.world_state["containers"],
@@ -172,14 +172,14 @@ def update_world_state_from_move_response_full(
         )
     elif self_state["tank_id"] == tank_id:
         ws.update_world_state_from_position(x, y)
-        ws.update_world_state_from_rank(rank, "wire_0x3D_movement")
+        ws.update_world_state_from_rank(rank, FactSource.WIRE_0X3D_MOVEMENT)
 
     obs = make_tank_observation(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source=EntitySource.VIEWPORT,
-        fact_source="wire_0x3D_movement",
+        fact_source=FactSource.WIRE_0X3D_MOVEMENT,
         position=(x, y),
         team=team,
         rank=rank,
@@ -212,7 +212,7 @@ def update_world_state_from_tank_damage(
         timestamp_ms=browser.get_current_time_ms(),
         is_wire_sourced=True,
         storage_source=previous["source"],
-        fact_source="wire_0x2E_tank_status_sync",
+        fact_source=FactSource.WIRE_0X2E_TANK_STATUS_SYNC,
         damage_state=damage_state,
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)
@@ -345,7 +345,7 @@ def _update_enemy_from_detection(
         timestamp_ms=ts,
         is_wire_sourced=False,
         storage_source=EntitySource.WORLD_STATE,
-        fact_source="wire_0x48_enemy_detect",
+        fact_source=FactSource.WIRE_0X48_ENEMY_DETECT,
         position=(x, y),
         team=team,
         rank=rank,

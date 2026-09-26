@@ -9,6 +9,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.protocol.decorations import decoration_name
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
@@ -267,7 +268,7 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
             "drop_y": int(dy),
             "obstacle_type": int(obstacle_type),
         }:
-            _update_tank_position(ws, tid, sx, sy, "wire_0x42_build_pickup")
+            _update_tank_position(ws, tid, sx, sy, FactSource.WIRE_0X42_BUILD_PICKUP)
             emit_diagnostic(
                 diagnostic_kind="build_pickup",
                 tank_id=tid,

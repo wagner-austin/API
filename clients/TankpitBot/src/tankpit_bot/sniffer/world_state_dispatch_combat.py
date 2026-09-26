@@ -9,6 +9,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.ammo_book import record_ammo_enemy_shot, record_ammo_shot
 from tankpit_bot.ledger.damage_book import record_incoming_shot, record_own_shot_echo
 from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
@@ -217,7 +218,7 @@ def _dispatch_shoot_event(
         )
         mark_combat_hit(ws, weapon, victim_id)
     elif shooter_id > 0:
-        _update_tank_position(ws, shooter_id, sx, sy, "wire_0x53_shoot_event")
+        _update_tank_position(ws, shooter_id, sx, sy, FactSource.WIRE_0X53_SHOOT_EVENT)
         _record_enemy_aim(ws, shooter_id, aim_x, aim_y, weapon)
         if aim_drift:
             log.info(
