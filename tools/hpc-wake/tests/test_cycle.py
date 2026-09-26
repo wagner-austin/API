@@ -7,6 +7,7 @@ import pathlib
 import pytest
 from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.ledger import LedgerEntry
+from hpc3.contracts.status import JobState
 from hpc3.contracts.workspace import WorkspaceConnection, decode_workspace_connection
 from hpc3.core import _test_hooks as hpc3_hooks
 from hpc3.core import ledger
@@ -157,7 +158,7 @@ class TestQuietCycles:
             ledger.closure_path(path),
             {
                 "job_id": "101",
-                "state": "COMPLETED",
+                "state": JobState.COMPLETED,
                 "closed_at": frozen_clock,
                 "elapsed_seconds": 4688,
             },
@@ -258,7 +259,7 @@ class TestAnnouncingCycles:
         assert "@label-a-0906" in body
 
         closed = ledger.read_closures(ledger.closure_path(path))
-        assert closed["101"]["state"] == "COMPLETED"
+        assert closed["101"]["state"] is JobState.COMPLETED
         assert closed["101"]["closed_at"] == frozen_clock
         assert closed["101"]["elapsed_seconds"] == 4688
         assert emitted == [
@@ -322,7 +323,7 @@ class TestAnnouncingCycles:
             ledger.closure_path(path),
             {
                 "job_id": "555_2",
-                "state": "CANCELLED",
+                "state": JobState.CANCELLED,
                 "closed_at": "2026-09-06T06:00:00+00:00",
                 "elapsed_seconds": 0,
             },

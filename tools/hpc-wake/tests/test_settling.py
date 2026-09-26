@@ -13,6 +13,7 @@ from typing import Final
 
 import pytest
 from hpc3.contracts.closure import Closure
+from hpc3.contracts.status import JobState
 from platform_core.error_codes_tooling import HpcWakeErrorCode
 from platform_core.errors import AppError
 
@@ -48,7 +49,7 @@ def record(job_id: str, observed_epoch: int) -> PendingClosure:
     return PendingClosure(
         closure=Closure(
             job_id=job_id,
-            state="COMPLETED",
+            state=JobState.COMPLETED,
             closed_at="2026-09-07T00:00:00+00:00",
             elapsed_seconds=10,
         ),

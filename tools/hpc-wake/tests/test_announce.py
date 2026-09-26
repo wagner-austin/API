@@ -42,7 +42,9 @@ def _entry(
     )
 
 
-def _closure(job_id: str, *, state: JobState = "COMPLETED", elapsed: int | None = 4688) -> Closure:
+def _closure(
+    job_id: str, *, state: JobState = JobState.COMPLETED, elapsed: int | None = 4688
+) -> Closure:
     """Build a closure.
 
     Args:
@@ -85,7 +87,7 @@ class TestOneAnnouncement:
     def test_the_tally_counts_every_state(self) -> None:
         closures = [
             _closure("101"),
-            _closure("102", state="FAILED", elapsed=12),
+            _closure("102", state=JobState.FAILED, elapsed=12),
             _closure("103"),
         ]
         entries = {job_id: _entry(job_id) for job_id in ("101", "102", "103")}

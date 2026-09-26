@@ -13,6 +13,7 @@ import pathlib
 
 import pytest
 from hpc3.contracts.closure import Closure
+from hpc3.contracts.status import JobState
 from platform_core.json_utils import InvalidJsonError, JSONTypeError
 
 from hpc_wake.pending import (
@@ -38,7 +39,7 @@ def a_record(job_id: str = "55802014_1", observed_epoch: int = 1757200000) -> Pe
     return PendingClosure(
         closure=Closure(
             job_id=job_id,
-            state="COMPLETED",
+            state=JobState.COMPLETED,
             closed_at="2026-09-07T00:00:00+00:00",
             elapsed_seconds=4175,
         ),
