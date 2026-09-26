@@ -42,6 +42,7 @@ from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -91,7 +92,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
     received_payloads: list[tuple[int, str]] = [
         (msg["timestamp_ms"], msg["payload"])
         for msg in session["messages"]
-        if msg["direction"] == "received"
+        if msg["direction"] is MessageDirection.RECEIVED
     ]
     received_payloads.sort(key=_sort_by_timestamp)
 
