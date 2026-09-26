@@ -30,6 +30,7 @@ from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core.archive_scope import EXCLUDE, WHOLE_TREE, archive_pathspec, owns
+from fleet.core.dialect import EXPORT_AUTHOR_EMAIL
 
 API: Final[str] = "https://github.com/wagner-austin/API.git"
 MCPS: Final[str] = "https://github.com/wagner-austin/MCPs.git"
@@ -99,17 +100,26 @@ def _is_a_git_checkout() -> bool:
     serendipity at 3482c418 and reading the log: 3 failed, 8 errors, every
     one of them this.
 
+    AND "HEAD RESOLVES" STOPPED MEANING "CHECKOUT" ON 2026-09-26 (MCPs board
+    task 6bbfd171): the runner now commits the staged export once, as
+    :data:`~fleet.core.dialect.EXPORT_AUTHOR_EMAIL`, because MCPs
+    packages/db's migrator reads ``HEAD``. The first dispatch of this suite
+    after that change, c8e38453 on sedona, failed six cases here that took
+    the export for a checkout. So a tree is a checkout when ``HEAD``
+    resolves to a commit someone other than the runner authored.
+
     Returns:
-        True when ``HEAD`` resolves, which is a developer checkout and CI.
+        True when ``HEAD`` resolves to a commit not authored by the fleet
+        runner, which is a developer checkout and CI.
     """
     done = subprocess.run(
-        ("git", "-C", str(REPO_ROOT), "rev-parse", "--verify", "--quiet", "HEAD"),
+        ("git", "-C", str(REPO_ROOT), "log", "-1", "--format=%ae", "HEAD"),
         capture_output=True,
         text=True,
         check=False,
         timeout=GIT_TIMEOUT_SECONDS,
     )
-    return done.returncode == 0
+    return done.returncode == 0 and done.stdout.strip() != EXPORT_AUTHOR_EMAIL
 
 
 def _require_git() -> None:
@@ -123,7 +133,8 @@ def _require_git() -> None:
     """
     if not _is_a_git_checkout():
         pytest.skip(
-            f"not applicable: {REPO_ROOT} has no git history, so this is a staged export "
+            f"not applicable: {REPO_ROOT} has no history but the runner's own export "
+            "commit, so this is a staged export "
             "rather than a checkout. The scope's effect on this tree is asserted directly "
             "by TestTheStagedTreeItself, which reads the files the dispatch delivered."
         )
