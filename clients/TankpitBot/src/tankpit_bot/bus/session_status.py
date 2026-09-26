@@ -11,21 +11,20 @@ internally it maps to ``manual_mode = None``.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
 from tankpit_bot.types.modes import AIMode, AIModeState
 
-WireMode = Literal["UNSET", "HUNT", "COLLECT", "AUTO"]
 
+class WireMode(StrEnum):
+    """The manual-mode words the SPA and the HTTP API exchange."""
 
-WIRE_MODES: tuple[WireMode, ...] = (
-    "UNSET",
-    "HUNT",
-    "COLLECT",
-    "AUTO",
-)
+    UNSET = "UNSET"
+    HUNT = "HUNT"
+    COLLECT = "COLLECT"
+    AUTO = "AUTO"
 
 
 class LiveStatsDict(TypedDict):
@@ -178,9 +177,9 @@ def idle_session_status(tick_timestamp_ms: int) -> SessionStatusDict:
     """
     return make_session_status(
         running=False,
-        manual_mode="AUTO",
-        active_mode="UNSET",
-        active_mode_state="",
+        manual_mode=WireMode.AUTO,
+        active_mode=AIMode.UNSET,
+        active_mode_state=AIModeState.NONE,
         session_started_ms=0,
         tick_timestamp_ms=tick_timestamp_ms,
         stats=zero_live_stats(),
@@ -188,51 +187,42 @@ def idle_session_status(tick_timestamp_ms: int) -> SessionStatusDict:
 
 
 def wire_mode_to_manual(wire: WireMode) -> AIMode | None:
-    """Translate a wire mode literal to an :data:`AIMode` override.
+    """Translate a wire mode to an :class:`AIMode` override.
 
-    ``"AUTO"`` means "restore auto-arbitration" and maps to ``None``;
-    the three :data:`AIMode` literals pass through and pin the durable
-    HFSM to that mode.
+    ``WireMode.AUTO`` means "restore auto-arbitration" and maps to
+    ``None``; the other three wire words are exactly the :class:`AIMode`
+    words and pin the durable HFSM to that mode.
 
     Args:
-        wire: The wire-level mode literal.
+        wire: The wire-level mode.
 
     Returns:
-        The :data:`AIMode` value to pin the arbitrator to, or ``None``
-        when auto-arbitration should run.
+        The :class:`AIMode` to pin the arbitrator to, or ``None`` when
+        auto-arbitration should run.
     """
-    if wire == "AUTO":
+    if wire is WireMode.AUTO:
         return None
-    if wire == "UNSET":
-        return "UNSET"
-    if wire == "HUNT":
-        return "HUNT"
-    return "COLLECT"
+    return AIMode(wire.value)
 
 
 def manual_to_wire_mode(manual: AIMode | None) -> WireMode:
-    """Translate an :data:`AIMode` override to a wire mode literal.
+    """Translate an :class:`AIMode` override to a wire mode.
 
     Inverse of :func:`wire_mode_to_manual`.
 
     Args:
-        manual: The :data:`AIMode` the arbitrator is pinned to, or
+        manual: The :class:`AIMode` the arbitrator is pinned to, or
             ``None`` when auto-arbitration is active.
 
     Returns:
-        The wire-level mode literal equivalent.
+        The equivalent wire-level mode.
     """
     if manual is None:
-        return "AUTO"
-    if manual == "UNSET":
-        return "UNSET"
-    if manual == "HUNT":
-        return "HUNT"
-    return "COLLECT"
+        return WireMode.AUTO
+    return WireMode(manual.value)
 
 
 __all__ = [
-    "WIRE_MODES",
     "LiveStatsDict",
     "SessionStatusDict",
     "WireMode",
