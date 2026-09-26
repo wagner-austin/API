@@ -3,6 +3,7 @@
 Removal, deactivation, and last-aim recording.
 """
 
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state import (
     deactivate_tank,
     make_empty_world_state,
@@ -101,7 +102,7 @@ class TestDeactivateTank:
                 timestamp_ms=30_000,
                 is_wire_sourced=False,
                 storage_source=EntitySource.WORLD_STATE,
-                fact_source="wire_0x4C_map_data",
+                fact_source=FactSource.WIRE_0X4C_MAP_DATA,
                 position_is_authoritative=True,
                 position=(40, 61),
             ),
@@ -140,7 +141,7 @@ class TestDeactivateTank:
                 timestamp_ms=30_000,
                 is_wire_sourced=False,
                 storage_source=EntitySource.WORLD_STATE,
-                fact_source="wire_0x48_enemy_detect",
+                fact_source=FactSource.WIRE_0X48_ENEMY_DETECT,
                 position_is_authoritative=False,
                 position=(40, 61),
             ),

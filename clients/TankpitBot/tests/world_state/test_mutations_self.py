@@ -3,6 +3,7 @@
 Rank, fuel, and the movement-response position update.
 """
 
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
@@ -36,7 +37,7 @@ class TestUpdateSelfRank:
     def test_applies_a_promotion(self) -> None:
         """A wire rank change lands in self_state (the promoting-kill flip)."""
         state = self._state_with_self(rank=0)
-        updated = update_self_rank(state, 1, 1000, "wire_0x2E_tank_status_sync")
+        updated = update_self_rank(state, 1, 1000, FactSource.WIRE_0X2E_TANK_STATUS_SYNC)
         self_state = get_self_state(updated)
         assert self_state["rank"] == 1
         assert self_state["x"] == 100
@@ -45,12 +46,12 @@ class TestUpdateSelfRank:
     def test_same_rank_is_a_no_op(self) -> None:
         """An unchanged rank returns the state untouched."""
         state = self._state_with_self(rank=1)
-        assert update_self_rank(state, 1, 1000, "wire_0x3D_movement") is state
+        assert update_self_rank(state, 1, 1000, FactSource.WIRE_0X3D_MOVEMENT) is state
 
     def test_no_self_state_is_a_no_op(self) -> None:
         """Rank cannot precede join."""
         state = make_empty_world_state()
-        assert update_self_rank(state, 1, 1000, "wire_0x47_movement") is state
+        assert update_self_rank(state, 1, 1000, FactSource.WIRE_0X47_MOVEMENT) is state
 
 
 class TestUpdateSelfFromMovementResponse:
