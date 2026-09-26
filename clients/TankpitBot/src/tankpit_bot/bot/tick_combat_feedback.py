@@ -23,6 +23,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.ledger.damage_book import resolve_dealt
 from tankpit_bot.ledger.outcome.shoot import (
+    HitSignal,
     emit_shoot_command_rejected,
     emit_shoot_fired,
     emit_shoot_hit,
@@ -288,7 +289,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             target_name=target_name,
             victim_id=victim_id,
             on_intended_target=on_intended,
-            hit_signal="tile_occupied",
+            hit_signal=HitSignal.TILE_OCCUPIED,
         )
         resolve_dealt(bot.world.damage_book, victim_id, target_name, target_id)
         _inc_hit()
@@ -301,7 +302,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             target_name=target_name,
             victim_id=target_id,
             on_intended_target=True,
-            hit_signal="kill_confirmed",
+            hit_signal=HitSignal.KILL_CONFIRMED,
         )
         resolve_dealt(bot.world.damage_book, target_id, target_name, target_id)
         _inc_hit()
@@ -332,7 +333,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             target_name=target_name,
             victim_id=victim_id,
             on_intended_target=True,
-            hit_signal="ammo_delta",
+            hit_signal=HitSignal.AMMO_DELTA,
         )
         resolve_dealt(bot.world.damage_book, victim_id, target_name, target_id)
         _inc_hit()

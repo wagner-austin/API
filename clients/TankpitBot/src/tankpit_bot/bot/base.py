@@ -66,6 +66,7 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.stream.capture import DisplayCapture
 from tankpit_bot.stream.types import StreamConfigDict
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -228,7 +229,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             message: The captured message.
         """
         super()._on_message_captured(message)
-        if message["direction"] == "received":
+        if message["direction"] is MessageDirection.RECEIVED:
             log.debug("CDP_BUFFER: +1 (total=%d)", len(self._cdp_message_buffer))
 
     def _require_cdp(self) -> CDPSessionProtocol:

@@ -10,7 +10,11 @@ ever reaches the wire ([[fleet-forage-allocation]]).
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.intent import current_collect_plan, release_collect_plan
+from tankpit_bot.bot.ai.intent import (
+    PlanReleaseReason,
+    current_collect_plan,
+    release_collect_plan,
+)
 from tankpit_bot.bot.ai.scoring_types import make_behavior_score
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_hold_command
@@ -132,7 +136,7 @@ def _arbitrate_collect_claim(
         y=target_y,
     )
     ws.claim_denied_tiles[f"{target_x},{target_y}"] = now_ms
-    released = release_collect_plan(next_state, reason="claim_lost")
+    released = release_collect_plan(next_state, reason=PlanReleaseReason.CLAIM_LOST)
     return make_tick_decision(
         command=make_hold_command(),
         behavior=make_behavior_score("COLLECT", 0, target_x, target_y, "claim_denied"),
