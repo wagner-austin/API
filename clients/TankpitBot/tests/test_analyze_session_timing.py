@@ -14,6 +14,7 @@ from scripts.analyze_session_timing import analyze_timing, render_timing_report
 from scripts import _test_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.types import encode_captured_message
+from tankpit_bot.types.literals import MessageDirection
 
 
 def _make_capture(messages_data: list[JSONObject]) -> JSONObject:
@@ -34,7 +35,7 @@ def _sent(ts: int, label: str) -> JSONObject:
     return encode_captured_message(
         {
             "timestamp_ms": ts,
-            "direction": "sent",
+            "direction": MessageDirection.SENT,
             "payload": "binary_data",
             "ws_url": "wss://test",
             "sent_label": label,
@@ -47,7 +48,7 @@ def _received(ts: int) -> JSONObject:
     return encode_captured_message(
         {
             "timestamp_ms": ts,
-            "direction": "received",
+            "direction": MessageDirection.RECEIVED,
             "payload": "binary_response",
             "ws_url": "wss://test",
         }

@@ -5,8 +5,6 @@ Strict typing: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from typing import Literal
-
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
@@ -26,6 +24,7 @@ from tankpit_bot.state_decoder import (
     get_subtype_name,
     is_state_message,
 )
+from tankpit_bot.types.literals import MessageDirection
 
 # =============================================================================
 # Helper Functions
@@ -52,7 +51,7 @@ def require_tank_status(body: bytes) -> TankStatus:
 
 def require_decoded_state(
     timestamp_ms: int,
-    direction: str,
+    direction: MessageDirection,
     body: bytes,
 ) -> DecodedStateMessage:
     """Decode state message, raising if None.
@@ -68,8 +67,7 @@ def require_decoded_state(
     Raises:
         ValueError: If decode returns None.
     """
-    dir_literal: Literal["sent", "received"] = "sent" if direction == "sent" else "received"
-    result = decode_state_message(timestamp_ms, dir_literal, body)
+    result = decode_state_message(timestamp_ms, direction, body)
     if result is None:
         raise ValueError("Expected valid DecodedStateMessage")
     return result
@@ -168,7 +166,7 @@ def test_encode_state_message() -> None:
     """Encode StateMessage to JSON."""
     msg: StateMessage = StateMessage(
         timestamp_ms=12345678,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         subtype=0x14,
         body_hex="2e14584114351c310fcf063c7141",
         length=14,
@@ -196,7 +194,7 @@ def test_decode_state_message_json() -> None:
     result = decode_state_message_json(data)
 
     assert result["timestamp_ms"] == 12345678
-    assert result["direction"] == "sent"
+    assert result["direction"] is MessageDirection.SENT
     assert result["subtype"] == 0x14
 
 
@@ -218,7 +216,7 @@ def test_state_message_roundtrip() -> None:
     """Encode then decode produces same values."""
     original: StateMessage = StateMessage(
         timestamp_ms=99999,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         subtype=0x7D,
         body_hex="2e7d0102030405",
         length=7,
@@ -249,7 +247,7 @@ def test_decode_state_message_tank_status() -> None:
     """Decode tank status message."""
     body = bytes.fromhex("2e14584114351c310fcf063c7141")
 
-    result = require_decoded_state(12345, "received", body)
+    result = require_decoded_state(12345, MessageDirection.RECEIVED, body)
 
     assert result["subtype"] == 0x14
     assert result["subtype_name"] == "TANK_STATUS"
@@ -264,7 +262,7 @@ def test_decode_state_message_unknown_subtype() -> None:
     """Decode message with unknown subtype."""
     body = bytes.fromhex("2eFF010203040506070809")
 
-    result = require_decoded_state(12345, "received", body)
+    result = require_decoded_state(12345, MessageDirection.RECEIVED, body)
 
     assert result["subtype"] == 0xFF
     assert result["subtype_name"] == "UNKNOWN_0xFF"
@@ -275,7 +273,7 @@ def test_decode_state_message_heartbeat() -> None:
     """Decode heartbeat message."""
     body = bytes.fromhex("2e0000")
 
-    result = require_decoded_state(12345, "received", body)
+    result = require_decoded_state(12345, MessageDirection.RECEIVED, body)
 
     assert result["subtype"] == 0x00
     assert result["subtype_name"] == "HEARTBEAT"
@@ -285,7 +283,7 @@ def test_decode_state_message_not_state() -> None:
     """Return None for non-state message."""
     body = bytes.fromhex("21020304")  # Starts with '!' not '.'
 
-    result = decode_state_message(12345, "received", body)
+    result = decode_state_message(12345, MessageDirection.RECEIVED, body)
 
     assert result is None
 
@@ -294,7 +292,7 @@ def test_decode_state_message_too_short() -> None:
     """Return None for too short message."""
     body = bytes.fromhex("2e")  # Only 1 byte
 
-    result = decode_state_message(12345, "received", body)
+    result = decode_state_message(12345, MessageDirection.RECEIVED, body)
 
     assert result is None
 
@@ -303,7 +301,7 @@ def test_decode_state_message_empty() -> None:
     """Return None for empty message."""
     body = b""
 
-    result = decode_state_message(12345, "received", body)
+    result = decode_state_message(12345, MessageDirection.RECEIVED, body)
 
     assert result is None
 
@@ -312,7 +310,7 @@ def test_encode_decoded_state_message_with_decoded() -> None:
     """Encode DecodedStateMessage with decoded payload."""
     msg: DecodedStateMessage = DecodedStateMessage(
         timestamp_ms=12345,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         subtype=0x14,
         subtype_name="TANK_STATUS",
         body_hex="2e14584114351c310fcf063c7141",
@@ -333,7 +331,7 @@ def test_encode_decoded_state_message_without_decoded() -> None:
     """Encode DecodedStateMessage without decoded payload."""
     msg: DecodedStateMessage = DecodedStateMessage(
         timestamp_ms=12345,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         subtype=0xFF,
         subtype_name="UNKNOWN_0xFF",
         body_hex="2eff0102",
@@ -399,7 +397,7 @@ def test_decoded_state_message_roundtrip() -> None:
     """Encode then decode produces same values."""
     original: DecodedStateMessage = DecodedStateMessage(
         timestamp_ms=99999,
-        direction="sent",
+        direction=MessageDirection.SENT,
         subtype=0x14,
         subtype_name="TANK_STATUS",
         body_hex="2e14aabbccdd",
@@ -504,7 +502,7 @@ def test_decode_heartbeat_message() -> None:
     """Decode heartbeat message."""
     body = bytes.fromhex("2e0000")
 
-    result = require_decoded_state(12345, "received", body)
+    result = require_decoded_state(12345, MessageDirection.RECEIVED, body)
 
     assert result["subtype"] == 0x00
     assert result["subtype_name"] == "HEARTBEAT"
@@ -515,7 +513,7 @@ def test_decode_sync_message() -> None:
     """Decode sync message."""
     body = bytes.fromhex("2e055a")
 
-    result = require_decoded_state(12345, "received", body)
+    result = require_decoded_state(12345, MessageDirection.RECEIVED, body)
 
     assert result["subtype"] == 0x05
     assert result["subtype_name"] == "SYNC"

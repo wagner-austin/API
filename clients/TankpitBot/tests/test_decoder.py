@@ -28,6 +28,7 @@ from tankpit_bot.types import (
     CapturedMessage,
     CaptureSession,
 )
+from tankpit_bot.types.literals import MessageDirection
 from tests.wire_builders import frame_payload
 
 
@@ -35,7 +36,7 @@ def test_encode_decoded_command() -> None:
     """Test encoding DecodedCommand to JSON."""
     cmd = DecodedCommand(
         timestamp_ms=1000,
-        direction="sent",
+        direction=MessageDirection.SENT,
         raw_hex="21303132",
         decoded_hex="21414243",
         type_byte=0x41,
@@ -69,7 +70,7 @@ def test_decode_decoded_command() -> None:
     result = decode_decoded_command(data)
 
     assert result["timestamp_ms"] == 2000
-    assert result["direction"] == "received"
+    assert result["direction"] is MessageDirection.RECEIVED
     assert result["type_byte"] == 0x11
 
 
@@ -101,7 +102,7 @@ def test_encode_decoded_lobby_message() -> None:
     """Test encoding DecodedLobbyMessage to JSON."""
     msg = DecodedLobbyMessage(
         timestamp_ms=3000,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         prefix="+",
         text="4|Room Name|5",
     )
@@ -126,7 +127,7 @@ def test_decode_decoded_lobby_message() -> None:
     result = decode_decoded_lobby_message(data)
 
     assert result["timestamp_ms"] == 4000
-    assert result["direction"] == "sent"
+    assert result["direction"] is MessageDirection.SENT
     assert result["prefix"] == "*"
     assert result["text"] == "4"
 
@@ -161,7 +162,7 @@ def test_session_decoder_decodes_command() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -177,7 +178,7 @@ def test_session_decoder_decodes_command() -> None:
     assert len(decoder.commands) == 1
     assert decoder.commands[0]["type_byte"] == 0x30
     assert decoder.commands[0]["cmd_byte"] == 0x42
-    assert decoder.commands[0]["direction"] == "sent"
+    assert decoder.commands[0]["direction"] is MessageDirection.SENT
 
 
 def test_session_decoder_drops_a_frame_truncated_mid_body() -> None:
@@ -204,7 +205,7 @@ def test_session_decoder_drops_a_frame_truncated_mid_body() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -236,7 +237,7 @@ def test_session_decoder_decodes_lobby_message() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -270,7 +271,7 @@ def test_session_decoder_skips_state_messages() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -302,7 +303,7 @@ def test_session_decoder_skips_short_messages() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -333,7 +334,7 @@ def test_session_decoder_skips_incomplete_frame() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -364,7 +365,7 @@ def test_session_decoder_skips_empty_body() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -396,7 +397,7 @@ def test_session_decoder_skips_short_command() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -428,7 +429,7 @@ def test_session_decoder_decodes_command_with_data() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )

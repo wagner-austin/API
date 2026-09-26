@@ -17,6 +17,7 @@ from tankpit_bot.types import (
     CapturedMessage,
     CaptureSession,
 )
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import (
     FakeEnv,
     FakeFileSystem,
@@ -37,7 +38,7 @@ def test_session_decoder_handles_all_lobby_prefixes() -> None:
         messages.append(
             CapturedMessage(
                 timestamp_ms=i * 100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
@@ -141,7 +142,7 @@ def test_session_decoder_skips_unknown_prefix() -> None:
         messages=[
             CapturedMessage(
                 timestamp_ms=500,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test.com/ws",
             )
