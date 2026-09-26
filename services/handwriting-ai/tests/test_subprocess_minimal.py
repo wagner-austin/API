@@ -7,11 +7,11 @@ from platform_core.logging import get_logger
 
 def child_func(msg: str) -> str:
     """Child process function."""
-    from platform_core.logging import get_logger, setup_logging
+    from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="test",
         instance_id=None,
         extra_fields=None,
@@ -22,11 +22,11 @@ def child_func(msg: str) -> str:
 
 
 if __name__ == "__main__":
-    from platform_core.logging import get_logger, setup_logging
+    from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="test",
         instance_id=None,
         extra_fields=None,

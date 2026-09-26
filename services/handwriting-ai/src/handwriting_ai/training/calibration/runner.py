@@ -11,6 +11,8 @@ from typing import Protocol, runtime_checkable
 
 from PIL import Image as _Image
 from platform_core.logging import (
+    LogFormat,
+    LogLevel,
     get_logger,
     load_queue_handler_factory,
     load_queue_listener_factory,
@@ -99,8 +101,8 @@ def _child_entry(
 
     # Child process needs to initialize its own logging
     _test_hooks.runner_setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="handwriting-calibration",
         instance_id=None,
         extra_fields=None,

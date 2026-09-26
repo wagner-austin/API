@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 import torch
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_ml import ResolvedDevice, ResolvedPrecision, resolve_device, resolve_precision
 from torch import Tensor
 from torch.nn import Module
@@ -173,8 +173,8 @@ def _train_epoch(
 def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> TrainingResult:
     # Ensure logger is initialized for scripts/CLI contexts
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="handwriting-trainer",
         instance_id=None,
         extra_fields=None,

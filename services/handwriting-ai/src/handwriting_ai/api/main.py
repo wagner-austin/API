@@ -6,7 +6,7 @@ from weakref import WeakKeyDictionary
 from fastapi import FastAPI
 from platform_core.errors import ErrorCode
 from platform_core.fastapi import install_exception_handlers_fastapi
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.request_context import install_request_id_middleware
 from platform_core.security import ApiKeyCheckFn, create_api_key_dependency
 
@@ -137,8 +137,8 @@ def create_app(
     base_settings = settings or load_settings()
     s = ensure_settings(base_settings, create_dirs=True)
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="handwriting-ai",
         instance_id=None,
         extra_fields=["request_id", "latency_ms", "digit", "confidence", "model_id", "uncertain"],

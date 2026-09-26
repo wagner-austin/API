@@ -4,7 +4,7 @@ import gzip
 import tempfile
 from pathlib import Path
 
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from handwriting_ai.training.mnist_train import train_with_config
 from handwriting_ai.training.train_config import default_train_config
@@ -12,8 +12,8 @@ from handwriting_ai.training.train_config import default_train_config
 if __name__ == "__main__":
     # Simulate production environment
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="test-prod-calibration",
         instance_id=None,
         extra_fields=None,
