@@ -7,6 +7,7 @@ tick, in-flight, feedback, and health-gate suites are now siblings.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed,
@@ -86,10 +87,10 @@ class TestBotWithCDP:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         result = bot.move_to(100, 100)
         assert result is True
-        assert bot.get_state() == "MOVING"
+        assert bot.get_state() is BotState.MOVING
 
     def test_pickup_fuel_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.pickup_fuel_to succeeds with CDP session."""
@@ -102,10 +103,10 @@ class TestBotWithCDP:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         result = bot.pickup_fuel_to(100, 100)
         assert result is True
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_teleport_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.teleport_to succeeds with CDP session."""
@@ -119,10 +120,10 @@ class TestBotWithCDP:
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         result = bot.teleport_to(200, 200)
         assert result is True
-        assert bot.get_state() == "TELEPORTING"
+        assert bot.get_state() is BotState.TELEPORTING
 
     def test_teleport_to_clears_stale_landed_flag(self, fake_env: FakeEnv) -> None:
         """A new teleport drains any stale TeleportLanded ack before sending."""
@@ -137,7 +138,7 @@ class TestBotWithCDP:
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
 
         result = bot.teleport_to(200, 200)
 
@@ -155,10 +156,10 @@ class TestBotWithCDP:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         result = bot.shoot_at(55, 53)  # Within 9-tile viewport of (50,50)
         assert result is True
-        assert bot.get_state() == "COMBAT"
+        assert bot.get_state() is BotState.COMBAT
 
     def test_shoot_at_already_combat(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at stays in COMBAT if already in COMBAT."""
@@ -171,10 +172,10 @@ class TestBotWithCDP:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "COMBAT"
+        bot._state_data["state"] = BotState.COMBAT
         result = bot.shoot_at(55, 53)  # Within 9-tile viewport of (50,50)
         assert result is True
-        assert bot.get_state() == "COMBAT"
+        assert bot.get_state() is BotState.COMBAT
 
     def test_use_radar_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.use_radar succeeds with CDP session."""
@@ -187,10 +188,10 @@ class TestBotWithCDP:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         result = bot.use_radar()
         assert result is True
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
     def test_open_map_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.open_map succeeds with CDP session."""
@@ -202,7 +203,7 @@ class TestBotWithCDP:
         bot._cdp = fake_cdp
         result = bot.open_map()
         assert result is True
-        assert bot._state_data["in_flight_action"]["kind"] == "map_open"
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.MAP_OPEN
 
     def test_close_map_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Bot.close_map dispatches a synthetic 'm' keyDown+keyUp pair via CDP.
@@ -282,10 +283,10 @@ class TestBotTeleportBranches:
         bot._cdp = fake_cdp
         bot._page = None  # No page - skips wait_for_timeout calls
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         result = bot.teleport_to(100, 100)
         assert result is True
-        assert bot.get_state() == "TELEPORTING"
+        assert bot.get_state() is BotState.TELEPORTING
 
 
 class TestRequireCdp:
@@ -378,5 +379,5 @@ class TestScopeShiftDispatch:
         result = bot.scope_shift(3)
 
         assert result is True
-        assert bot._state_data["in_flight_action"]["kind"] == "scope"
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.SCOPE
         assert ws.check_and_clear_viewport_update_processed() is False

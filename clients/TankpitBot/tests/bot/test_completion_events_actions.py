@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.bot.tick_loop_actions import (
     _clear_stalled_action,
 )
@@ -35,8 +36,8 @@ class TestCompletionEventActions:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="COLLECTING",
-            action_kind="collect",
+            state=BotState.COLLECTING,
+            action_kind=ActionKind.COLLECT,
             target_x=80,
             target_y=90,
             started_ms=get_current_time_ms() - 1,
@@ -83,8 +84,8 @@ class TestCompletionEventActions:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="COLLECTING",
-            action_kind="collect",
+            state=BotState.COLLECTING,
+            action_kind=ActionKind.COLLECT,
             target_x=80,
             target_y=90,
             started_ms=get_current_time_ms() - 1,
@@ -101,7 +102,7 @@ class TestCompletionEventActions:
         ws.last_command_error = 4
 
         assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is False
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
         ws.last_command_error = -1
         assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is True
@@ -118,8 +119,8 @@ class TestCompletionEventActions:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="COLLECTING",
-            action_kind="collect",
+            state=BotState.COLLECTING,
+            action_kind=ActionKind.COLLECT,
             target_x=80,
             target_y=90,
             started_ms=get_current_time_ms() - 1,
@@ -161,8 +162,8 @@ class TestCompletionEventActions:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="SCANNING",
-            action_kind="scan",
+            state=BotState.SCANNING,
+            action_kind=ActionKind.SCAN,
             target_x=0,
             target_y=0,
             started_ms=get_current_time_ms() - 1,
@@ -192,8 +193,8 @@ class TestCompletionEventActions:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="MOVING",
-            action_kind="move",
+            state=BotState.MOVING,
+            action_kind=ActionKind.MOVE,
             target_x=180,
             target_y=200,
             started_ms=1,

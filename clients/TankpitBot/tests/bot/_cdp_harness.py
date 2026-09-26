@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from tankpit_bot.bot.states import (
     ActionKind,
+    BotState,
     BotStateDataDict,
-    StateName,
     make_in_flight_action,
 )
 from tankpit_bot.browser import get_current_time_ms
@@ -41,7 +41,7 @@ def _make_snapshot(*, map_visible: bool = False) -> PageClientSnapshotDict:
 
 def _sba(
     sd: BotStateDataDict,
-    state: StateName,
+    state: BotState,
     kind: ActionKind,
     tx: int,
     ty: int,
@@ -51,7 +51,7 @@ def _sba(
 
     Args:
         sd: Current state data.
-        state: New state name.
+        state: New state.
         kind: Action kind.
         tx: Target X.
         ty: Target Y.

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import (
-    InFlightActionDict,
-)
+from tankpit_bot.bot.states import ActionKind, ActionOutcome, BotState, InFlightActionDict
 from tankpit_bot.bot.tick_loop_actions import _clear_rejected_movement
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_service import WorldService
@@ -31,7 +29,7 @@ class TestPublishTickContext:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = bot._state_data.copy()
         bot._state_data["in_flight_action"] = make_in_flight_action(
-            kind="shoot",
+            kind=ActionKind.SHOOT,
             target_x=131,
             target_y=124,
             started_ms=get_current_time_ms(),
@@ -73,11 +71,11 @@ class TestClearRejectedMovement:
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         action = InFlightActionDict(
-            kind="teleport",
+            kind=ActionKind.TELEPORT,
             target_x=100,
             target_y=100,
             started_ms=1000,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
 
         result = _clear_rejected_movement(bot, action)
@@ -91,11 +89,11 @@ class TestClearRejectedMovement:
         ws.update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         action = InFlightActionDict(
-            kind="move",
+            kind=ActionKind.MOVE,
             target_x=150,
             target_y=150,
             started_ms=1000,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
 
         result = _clear_rejected_movement(bot, action)
@@ -109,24 +107,24 @@ class TestClearRejectedMovement:
         ws.update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "MOVING"
+        bot._state_data["state"] = BotState.MOVING
 
         tx, ty = 150, 150
         now_ms = get_current_time_ms()
         ws.mark_move_target_failed(tx, ty, now_ms)
 
         action = InFlightActionDict(
-            kind="move",
+            kind=ActionKind.MOVE,
             target_x=tx,
             target_y=ty,
             started_ms=1000,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
 
         result = _clear_rejected_movement(bot, action)
 
         assert result is True
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_collect_with_failed_target_increments_failed_pickups(self, fake_env: FakeEnv) -> None:
         """A collect whose target was marked failed also marks the container."""
@@ -136,24 +134,24 @@ class TestClearRejectedMovement:
         update_world_state_from_fuel_total(ws, 800)
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "COLLECTING"
+        bot._state_data["state"] = BotState.COLLECTING
 
         tx, ty = 120, 130
         now_ms = get_current_time_ms()
         ws.mark_move_target_failed(tx, ty, now_ms)
 
         action = InFlightActionDict(
-            kind="collect",
+            kind=ActionKind.COLLECT,
             target_x=tx,
             target_y=ty,
             started_ms=1000,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
 
         result = _clear_rejected_movement(bot, action)
 
         assert result is True
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
 
 class TestWaitForMapOpenAction:
@@ -168,11 +166,11 @@ class TestWaitForMapOpenAction:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
 
         action = InFlightActionDict(
-            kind="map_open",
+            kind=ActionKind.MAP_OPEN,
             target_x=0,
             target_y=0,
             started_ms=get_current_time_ms(),
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
 
         result = _wait_for_map_open_action(bot, action)
@@ -193,21 +191,21 @@ class TestWaitForMovementActionRejected:
         ws.update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "MOVING"
+        bot._state_data["state"] = BotState.MOVING
 
         tx, ty = 150, 150
         now_ms = get_current_time_ms()
         ws.mark_move_target_failed(tx, ty, now_ms)
 
         action = InFlightActionDict(
-            kind="move",
+            kind=ActionKind.MOVE,
             target_x=tx,
             target_y=ty,
             started_ms=now_ms,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
 
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE

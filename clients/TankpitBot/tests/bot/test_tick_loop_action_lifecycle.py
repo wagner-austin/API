@@ -9,7 +9,13 @@ action still in flight, and does a refused move belong to it.
 from __future__ import annotations
 
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import ActionKind, InFlightActionDict, make_in_flight_action
+from tankpit_bot.bot.states import (
+    ActionKind,
+    ActionOutcome,
+    BotState,
+    InFlightActionDict,
+    make_in_flight_action,
+)
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeEnv
@@ -36,8 +42,8 @@ class TestInFlightActionLifecycle:
         """Only a PENDING action is still in flight.
 
         The kind survives its resolution -- ``in_flight_action`` keeps
-        ``kind="move"`` after the move confirms, and only ``outcome``
-        moves to ``confirmed``. Gating on the kind alone therefore hands
+        ``kind=ActionKind.MOVE`` after the move confirms, and only
+        ``outcome`` moves to ``CONFIRMED``. Gating on the kind alone therefore hands
         an already-resolved action back to the movement waiter, which
         re-runs its stall and rejection checks against a target the bot
         has finished with and can clear state the next plan depends on.
@@ -45,14 +51,14 @@ class TestInFlightActionLifecycle:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 
         bot = Bot("https://test.tankpit.com/", headless=True, world=WorldService())
-        pending = _pending("move", 150, 150)
+        pending = _pending(ActionKind.MOVE, 150, 150)
         bot._state_data = bot._state_data.copy()
         bot._state_data["in_flight_action"] = InFlightActionDict(
             kind=pending["kind"],
             target_x=pending["target_x"],
             target_y=pending["target_y"],
             started_ms=pending["started_ms"],
-            outcome="confirmed",
+            outcome=ActionOutcome.CONFIRMED,
         )
 
         assert has_in_flight_action(bot) is False
@@ -63,7 +69,7 @@ class TestInFlightActionLifecycle:
 
         bot = Bot("https://test.tankpit.com/", headless=True, world=WorldService())
         bot._state_data = bot._state_data.copy()
-        bot._state_data["in_flight_action"] = _pending("move", 150, 150)
+        bot._state_data["in_flight_action"] = _pending(ActionKind.MOVE, 150, 150)
 
         assert has_in_flight_action(bot) is True
 
@@ -85,7 +91,7 @@ class TestInFlightActionLifecycle:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         ws.mark_move_target_failed(150, 150, get_current_time_ms())
 
-        assert _clear_rejected_movement(bot, _pending("teleport", 150, 150)) is False
+        assert _clear_rejected_movement(bot, _pending(ActionKind.TELEPORT, 150, 150)) is False
 
     def test_control_a_walk_to_that_tile_is_cleared(self, fake_env: FakeEnv) -> None:
         """Control: the same refused tile DOES clear a move action."""
@@ -95,7 +101,7 @@ class TestInFlightActionLifecycle:
         ws.update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "MOVING"
+        bot._state_data["state"] = BotState.MOVING
         ws.mark_move_target_failed(150, 150, get_current_time_ms())
 
-        assert _clear_rejected_movement(bot, _pending("move", 150, 150)) is True
+        assert _clear_rejected_movement(bot, _pending(ActionKind.MOVE, 150, 150)) is True

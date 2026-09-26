@@ -8,9 +8,7 @@ the map_open/scope completion holds are
 
 from __future__ import annotations
 
-from tankpit_bot.bot.states import (
-    make_in_flight_action,
-)
+from tankpit_bot.bot.states import ActionKind, BotState, make_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import (
@@ -39,14 +37,14 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_fuel_zero_move_holds_through_the_slow_service_window(self, fake_env: FakeEnv) -> None:
         """A fuel-0 move 12 s in is NOT a stall — the wire is just slow.
@@ -68,13 +66,13 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
         bot._state_data["in_flight_action"]["started_ms"] = get_current_time_ms() - 12_000
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is True
-        assert bot.get_state() == "MOVING"
+        assert bot.get_state() is BotState.MOVING
         assert not ws.is_move_target_failed(15, 10, get_current_time_ms())
 
     def test_fuel_zero_move_still_stalls_past_the_extended_budget(self, fake_env: FakeEnv) -> None:
@@ -90,13 +88,13 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
         bot._state_data["in_flight_action"]["started_ms"] = get_current_time_ms() - 21_000
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
         assert ws.is_move_target_failed(15, 10, get_current_time_ms())
 
     def test_fuel_zero_extension_is_move_only(self, fake_env: FakeEnv) -> None:
@@ -117,13 +115,13 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "TELEPORTING", "teleport", 128, 128)
+        bot._state_data = _sba(bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 128, 128)
         bot._state_data["in_flight_action"]["started_ms"] = get_current_time_ms() - 12_000
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_fuel_zero_move_helper_needs_a_self_state(self, fake_env: FakeEnv) -> None:
         """No self_state yet: the helper stays False (standard budget)."""
@@ -134,7 +132,7 @@ class TestStallTimeouts:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
 
-        assert _fuel_zero_move(bot, "move") is False
+        assert _fuel_zero_move(bot, ActionKind.MOVE) is False
 
     def test_has_in_flight_action_clears_stalled_collection(self, fake_env: FakeEnv) -> None:
         """Stalled collection times out so the bot can replan."""
@@ -153,14 +151,14 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 72, 63)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 72, 63)
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_has_in_flight_action_clears_stalled_teleport(self, fake_env: FakeEnv) -> None:
         """Stalled teleport times out so the bot can replan."""
@@ -175,14 +173,14 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "TELEPORTING", "teleport", 128, 128)
+        bot._state_data = _sba(bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 128, 128)
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_stalled_map_open_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A map_open that stalls past timeout clears so the bot can replan."""
@@ -197,14 +195,14 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0)
+        bot._state_data = _sba(bot._state_data, BotState.IDLE, ActionKind.MAP_OPEN, 0, 0)
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_stall_guard_prevents_clear_when_started_ms_is_zero(
         self,
@@ -217,7 +215,7 @@ class TestStallTimeouts:
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         action: InFlightActionDict = make_in_flight_action(
-            "move",
+            ActionKind.MOVE,
             15,
             10,
             0,
@@ -233,11 +231,11 @@ class TestStallTimeouts:
         from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot._state_data = _sba(bot._state_data, "SCANNING", "scan", 0, 0)
+        bot._state_data = _sba(bot._state_data, BotState.SCANNING, ActionKind.SCAN, 0, 0)
         action = bot._state_data["in_flight_action"]
 
         assert _clear_stalled_action(bot, action) is False
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
     def test_stalled_scan_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A scan that stalls past timeout clears so the bot can replan."""
@@ -252,14 +250,14 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "SCANNING", "scan", 0, 0)
+        bot._state_data = _sba(bot._state_data, BotState.SCANNING, ActionKind.SCAN, 0, 0)
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
         assert ws.is_scan_viewport_failed(0, 0, get_current_time_ms()) is True
 
     def test_stalled_move_marks_failed_move_target(self, fake_env: FakeEnv) -> None:
@@ -276,7 +274,7 @@ class TestStallTimeouts:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 73, 158)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 73, 158)
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 

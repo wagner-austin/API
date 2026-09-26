@@ -11,9 +11,9 @@ from platform_core.json_utils import (
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.states import (
     ActionKind,
+    BotState,
     BotStateDataDict,
     InFlightActionDict,
-    StateName,
     make_in_flight_action,
     make_initial_state_data,
 )
@@ -49,7 +49,7 @@ def _decode_action_outcome_lines(jsonl: str) -> list[RuntimeEventRecordDict]:
 def _make_bot_with_in_flight(
     *,
     world: WorldService,
-    state: StateName,
+    state: BotState,
     action_kind: ActionKind,
     target_x: int,
     target_y: int,
@@ -60,7 +60,7 @@ def _make_bot_with_in_flight(
     Args:
         world: The world service the bot reads its beliefs from -- the
             caller seeds it, so the bot must be given that same service.
-        state: HFSM state name to install.
+        state: HFSM state to install.
         action_kind: Kind for the in-flight action record.
         target_x: Target X coordinate stamped on the action record.
         target_y: Target Y coordinate stamped on the action record.

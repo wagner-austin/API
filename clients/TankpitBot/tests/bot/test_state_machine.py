@@ -7,8 +7,12 @@ a sibling.
 from __future__ import annotations
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from tankpit_bot.bot.states import (
+    ActionKind,
+    ActionOutcome,
+    BotState,
     make_in_flight_action,
     make_no_action,
 )
@@ -31,10 +35,10 @@ class TestBotStateUpdates:
         from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        assert bot.get_state() == "INITIALIZING"
+        assert bot.get_state() is BotState.INITIALIZING
         bot._magic = "test_magic_key"
         bot._update_state_from_world()
-        assert bot.get_state() == "WAITING_FOR_POSITION"
+        assert bot.get_state() is BotState.WAITING_FOR_POSITION
 
     def test_update_state_waiting_to_idle(self, fake_env: FakeEnv) -> None:
         """Test transition from WAITING_FOR_POSITION to IDLE."""
@@ -45,7 +49,7 @@ class TestBotStateUpdates:
         bot._update_state_from_world()
         bot.world.update_world_state_from_position(50, 50)
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_update_state_low_fuel(self, fake_env: FakeEnv) -> None:
         """Test transition to LOW_FUEL when fuel below threshold."""
@@ -56,11 +60,11 @@ class TestBotStateUpdates:
         bot._update_state_from_world()
         bot.world.update_world_state_from_position(50, 50)
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
         bot._state_data = bot._state_data.copy()
         bot._state_data["fuel_threshold"] = 2000
         bot._update_state_from_world()
-        assert bot.get_state() == "LOW_FUEL"
+        assert bot.get_state() is BotState.LOW_FUEL
 
     def test_update_state_scanning_to_idle(self, fake_env: FakeEnv) -> None:
         """SCANNING completes when a radar response arrives."""
@@ -72,15 +76,15 @@ class TestBotStateUpdates:
         bot.world.update_world_state_from_position(50, 50)
         _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
+        bot._state_data = _set_bot_action(bot._state_data, BotState.SCANNING, ActionKind.SCAN, 0, 0)
         from tankpit_bot.protocol import RadarContainerDict
 
         update_world_state_from_radar(
             bot.world, [RadarContainerDict(x=100, y=100, volume=50)], [], []
         )
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
-        assert bot._state_data["in_flight_action"]["kind"] == "none"
+        assert bot.get_state() is BotState.IDLE
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.NONE
 
     def test_update_state_scanning_to_idle_on_empty_radar(
         self,
@@ -95,11 +99,11 @@ class TestBotStateUpdates:
         bot.world.update_world_state_from_position(50, 50)
         _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
+        bot._state_data = _set_bot_action(bot._state_data, BotState.SCANNING, ActionKind.SCAN, 0, 0)
         update_world_state_from_radar(bot.world, [], [], [])
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
-        assert bot._state_data["in_flight_action"]["kind"] == "none"
+        assert bot.get_state() is BotState.IDLE
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.NONE
 
     def test_update_state_moving_to_idle_at_target(
         self,
@@ -114,9 +118,9 @@ class TestBotStateUpdates:
         bot.world.update_world_state_from_position(50, 50)
         _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 50, 50)
+        bot._state_data = _set_bot_action(bot._state_data, BotState.MOVING, ActionKind.MOVE, 50, 50)
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_update_state_collecting_to_idle_at_target(
         self,
@@ -131,9 +135,11 @@ class TestBotStateUpdates:
         bot.world.update_world_state_from_position(100, 100)
         _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 100, 100)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 100, 100
+        )
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_update_state_collecting_to_idle_when_target_container_removed(
         self,
@@ -157,107 +163,114 @@ class TestBotStateUpdates:
         ]
         mines: list[RadarMineDict] = []
         update_world_state_from_radar(bot.world, containers, mines, [])
-        bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 205, 82)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 205, 82
+        )
         update_world_state_from_container_pickup(bot.world, 205, 82)
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
 
 class TestBotStates:
     """Tests for bot state machine functions."""
 
-    def test_bot_state_enum_values(self) -> None:
-        """Test BotState enum has expected states."""
-        from tankpit_bot.bot.states import BotState
+    def test_bot_state_members_carry_their_names(self) -> None:
+        """Every BotState member's word is its own name."""
+        assert [state.value for state in BotState] == [state.name for state in BotState]
+        assert len(BotState) == 10
 
-        # Verify key states have auto-generated int values
-        assert BotState.INITIALIZING.value == 1
-        assert BotState.WAITING_FOR_POSITION.value == 2
-        assert BotState.IDLE.value == 3
-        assert BotState.SCANNING.value == 4
-        assert BotState.MOVING.value == 5
-        assert BotState.TELEPORTING.value == 6
+    def test_every_state_has_a_transition_row(self) -> None:
+        """The transition table covers every state, so a lookup never needs a default."""
+        from tankpit_bot.bot.states import VALID_TRANSITIONS
+
+        assert set(VALID_TRANSITIONS) == set(BotState)
 
     def test_make_initial_state_data(self) -> None:
         """Test make_initial_state_data creates proper state dict."""
         from tankpit_bot.bot.states import make_initial_state_data
 
         state = make_initial_state_data()
-        assert state["state"] == "INITIALIZING"
+        assert state["state"] is BotState.INITIALIZING
         assert state["fuel_threshold"] == 200
         action = state["in_flight_action"]
-        assert action["kind"] == "none"
-        assert action["outcome"] == "confirmed"
+        assert action["kind"] is ActionKind.NONE
+        assert action["outcome"] is ActionOutcome.CONFIRMED
 
     def test_is_valid_transition_valid(self) -> None:
         """Test is_valid_transition returns True for valid transitions."""
         from tankpit_bot.bot.states import is_valid_transition
 
-        assert is_valid_transition("INITIALIZING", "WAITING_FOR_POSITION")
+        assert is_valid_transition(BotState.INITIALIZING, BotState.WAITING_FOR_POSITION)
 
     def test_low_fuel_to_combat_is_valid(self) -> None:
         """LOW_FUEL -> COMBAT is valid for low-fuel defense scenarios."""
         from tankpit_bot.bot.states import is_valid_transition
 
-        assert is_valid_transition("LOW_FUEL", "COMBAT")
+        assert is_valid_transition(BotState.LOW_FUEL, BotState.COMBAT)
 
     def test_is_valid_transition_invalid(self) -> None:
         """Test is_valid_transition returns False for invalid transitions."""
         from tankpit_bot.bot.states import is_valid_transition
 
-        assert not is_valid_transition("IDLE", "INITIALIZING")
+        assert not is_valid_transition(BotState.IDLE, BotState.INITIALIZING)
 
     def test_validate_transition_valid(self) -> None:
         """Test validate_transition does not raise for valid transitions."""
         from tankpit_bot.bot.states import validate_transition
 
-        validate_transition("INITIALIZING", "WAITING_FOR_POSITION")
+        validate_transition(BotState.INITIALIZING, BotState.WAITING_FOR_POSITION)
 
     def test_validate_transition_invalid(self) -> None:
-        """Test validate_transition raises for invalid transitions."""
+        """validate_transition names both states and the allowed ones by word."""
         from tankpit_bot.bot.states import validate_transition
 
-        with pytest.raises(ValueError, match="Invalid transition"):
-            validate_transition("IDLE", "INITIALIZING")
+        with pytest.raises(
+            ValueError,
+            match=(
+                r"Invalid transition from DISCONNECTED to IDLE\. "
+                r"Allowed: \['INITIALIZING'\]"
+            ),
+        ):
+            validate_transition(BotState.DISCONNECTED, BotState.IDLE)
 
     def test_transition_to(self) -> None:
         """Test transition_to updates state."""
         from tankpit_bot.bot.states import make_initial_state_data, transition_to
 
         state = make_initial_state_data()
-        new_state = transition_to(state, "WAITING_FOR_POSITION")
-        assert new_state["state"] == "WAITING_FOR_POSITION"
+        new_state = transition_to(state, BotState.WAITING_FOR_POSITION)
+        assert new_state["state"] is BotState.WAITING_FOR_POSITION
 
     def test_transition_to_with_action(self) -> None:
         """transition_to replaces in_flight_action when provided."""
         from tankpit_bot.bot.states import make_initial_state_data, transition_to
 
         state = make_initial_state_data()
-        action = make_in_flight_action("move", 10, 20, 5000)
+        action = make_in_flight_action(ActionKind.MOVE, 10, 20, 5000)
         new_state = transition_to(
             state,
-            "WAITING_FOR_POSITION",
+            BotState.WAITING_FOR_POSITION,
             in_flight_action=action,
         )
-        assert new_state["in_flight_action"]["kind"] == "move"
+        assert new_state["in_flight_action"]["kind"] is ActionKind.MOVE
         assert new_state["in_flight_action"]["target_x"] == 10
         assert new_state["in_flight_action"]["target_y"] == 20
         assert new_state["in_flight_action"]["started_ms"] == 5000
-        assert new_state["in_flight_action"]["outcome"] == "pending"
+        assert new_state["in_flight_action"]["outcome"] is ActionOutcome.PENDING
 
     def test_transition_to_inherits_action_when_none(self) -> None:
         """transition_to inherits current action when no new one given."""
         from tankpit_bot.bot.states import make_initial_state_data, transition_to
 
         state = make_initial_state_data()
-        action = make_in_flight_action("teleport", 50, 60, 1000)
+        action = make_in_flight_action(ActionKind.TELEPORT, 50, 60, 1000)
         state_with_action = transition_to(
             state,
-            "WAITING_FOR_POSITION",
+            BotState.WAITING_FOR_POSITION,
             in_flight_action=action,
         )
-        inherited = transition_to(state_with_action, "IDLE")
-        assert inherited["in_flight_action"]["kind"] == "teleport"
+        inherited = transition_to(state_with_action, BotState.IDLE)
+        assert inherited["in_flight_action"]["kind"] is ActionKind.TELEPORT
         assert inherited["in_flight_action"]["target_x"] == 50
 
     def test_set_fuel_threshold(self) -> None:
@@ -271,17 +284,17 @@ class TestBotStates:
     def test_make_no_action(self) -> None:
         """make_no_action creates a confirmed no-op action."""
         action = make_no_action()
-        assert action["kind"] == "none"
-        assert action["outcome"] == "confirmed"
+        assert action["kind"] is ActionKind.NONE
+        assert action["outcome"] is ActionOutcome.CONFIRMED
         assert action["target_x"] == 0
         assert action["target_y"] == 0
         assert action["started_ms"] == 0
 
     def test_make_in_flight_action(self) -> None:
         """make_in_flight_action creates a pending action with target."""
-        action = make_in_flight_action("collect", 42, 99, 5000)
-        assert action["kind"] == "collect"
-        assert action["outcome"] == "pending"
+        action = make_in_flight_action(ActionKind.COLLECT, 42, 99, 5000)
+        assert action["kind"] is ActionKind.COLLECT
+        assert action["outcome"] is ActionOutcome.PENDING
         assert action["target_x"] == 42
         assert action["target_y"] == 99
         assert action["started_ms"] == 5000
@@ -293,10 +306,14 @@ class TestBotStates:
             encode_in_flight_action,
         )
 
-        original = make_in_flight_action("teleport", 128, 64, 9999)
+        original = make_in_flight_action(ActionKind.TELEPORT, 128, 64, 9999)
         encoded = encode_in_flight_action(original)
+        assert encoded["kind"] == "teleport"
+        assert encoded["outcome"] == "pending"
         decoded = decode_in_flight_action(encoded)
         assert decoded == original
+        assert decoded["kind"] is ActionKind.TELEPORT
+        assert decoded["outcome"] is ActionOutcome.PENDING
 
     def test_decode_invalid_action_kind_raises(self) -> None:
         """Decode rejects invalid action kind."""
@@ -311,7 +328,7 @@ class TestBotStates:
             "started_ms": 0,
             "outcome": "pending",
         }
-        with pytest.raises(ValueError, match="must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid kind 'INVALID'"):
             decode_in_flight_action(data)
 
     def test_decode_invalid_action_outcome_raises(self) -> None:
@@ -327,7 +344,7 @@ class TestBotStates:
             "started_ms": 0,
             "outcome": "BOGUS",
         }
-        with pytest.raises(ValueError, match="must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid outcome 'BOGUS'"):
             decode_in_flight_action(data)
 
 
@@ -351,7 +368,7 @@ class TestBotOnMessageCaptured:
             ws_url="wss://test.tankpit.com/ws",
         )
         bot._on_message_captured(msg)
-        assert bot.get_state() == "INITIALIZING"
+        assert bot.get_state() is BotState.INITIALIZING
 
 
 class TestBotStateUpdateBranches:
@@ -370,9 +387,11 @@ class TestBotStateUpdateBranches:
         bot.world.update_world_state_from_position(50, 50)
         _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 100, 100)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.MOVING, ActionKind.MOVE, 100, 100
+        )
         bot._update_state_from_world()
-        assert bot.get_state() == "MOVING"
+        assert bot.get_state() is BotState.MOVING
 
     def test_update_state_teleporting_without_landing_stays_teleporting(
         self,
@@ -387,6 +406,8 @@ class TestBotStateUpdateBranches:
         bot.world.update_world_state_from_position(196, 85)
         _sm_update_fuel(bot.world, 582)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 196, 86
+        )
         bot._update_state_from_world()
-        assert bot.get_state() == "TELEPORTING"
+        assert bot.get_state() is BotState.TELEPORTING

@@ -10,9 +10,7 @@ import pytest
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import (
-    InFlightActionDict,
-)
+from tankpit_bot.bot.states import ActionKind, ActionOutcome, BotState, InFlightActionDict
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
@@ -62,7 +60,7 @@ class TestEarlyWakeSleep:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._cdp_message_buffer = []
         bot._state_data["in_flight_action"] = make_in_flight_action(
-            "scan", 0, 0, get_current_time_ms()
+            ActionKind.SCAN, 0, 0, get_current_time_ms()
         )
         waits: list[float] = []
 
@@ -89,7 +87,7 @@ class TestEarlyWakeSleep:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._cdp_message_buffer = []
         bot._state_data["in_flight_action"] = make_in_flight_action(
-            "scan", 0, 0, get_current_time_ms()
+            ActionKind.SCAN, 0, 0, get_current_time_ms()
         )
         waits: list[float] = []
 
@@ -249,13 +247,13 @@ class TestDrainReceipt:
         ws.record_own_gain(get_current_time_ms())
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "MOVING"
+        bot._state_data["state"] = BotState.MOVING
         action = InFlightActionDict(
-            kind="collect",
+            kind=ActionKind.COLLECT,
             target_x=150,
             target_y=150,
             started_ms=started_ms,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
         ws.last_command_error = 4
 
@@ -320,13 +318,13 @@ class TestDetonationInterruptedWalk:
         ws.last_own_mine_hit_ms = get_current_time_ms()
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "MOVING"
+        bot._state_data["state"] = BotState.MOVING
         action = InFlightActionDict(
-            kind="collect",
+            kind=ActionKind.COLLECT,
             target_x=103,
             target_y=147,
             started_ms=started_ms,
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
         ws.last_command_error = 1
 
@@ -346,13 +344,13 @@ class TestDetonationInterruptedWalk:
         ws = self._make_world_with_container()
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "MOVING"
+        bot._state_data["state"] = BotState.MOVING
         action = InFlightActionDict(
-            kind="collect",
+            kind=ActionKind.COLLECT,
             target_x=103,
             target_y=147,
             started_ms=get_current_time_ms(),
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
         ws.last_command_error = 1
 
@@ -377,13 +375,13 @@ class TestTeleportPreconditionReceipt:
         ws.update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "TELEPORTING"
+        bot._state_data["state"] = BotState.TELEPORTING
         action = InFlightActionDict(
-            kind="teleport",
+            kind=ActionKind.TELEPORT,
             target_x=221,
             target_y=209,
             started_ms=get_current_time_ms(),
-            outcome="pending",
+            outcome=ActionOutcome.PENDING,
         )
         ws.last_command_error = 0
 

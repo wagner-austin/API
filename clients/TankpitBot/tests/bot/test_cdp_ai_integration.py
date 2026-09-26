@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.browser import _test_hooks as browser_hooks
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_service import WorldService
@@ -45,7 +46,7 @@ class TestBotAIIntegration:
             def __init__(self, target_url: str, *, headless: bool) -> None:
                 super().__init__(target_url, headless=headless)
                 self._world_reads = 0
-                self._state_data["state"] = "IDLE"
+                self._state_data["state"] = BotState.IDLE
 
             def get_world_state(self) -> WorldStateDict:
                 """Return populated state once, then lose self.
@@ -120,7 +121,7 @@ class TestBotAIIntegration:
             def __init__(self, target_url: str, *, headless: bool) -> None:
                 super().__init__(target_url, headless=headless)
                 self._world_reads = 0
-                self._state_data["state"] = "IDLE"
+                self._state_data["state"] = BotState.IDLE
 
             def get_world_state(self) -> WorldStateDict:
                 self._world_reads += 1
@@ -205,7 +206,7 @@ class TestBotAIIntegration:
 
         _tick_once(bot)
 
-        assert bot.get_state() == "WAITING_FOR_POSITION"
+        assert bot.get_state() is BotState.WAITING_FOR_POSITION
         assert fake_cdp._sent_methods == []
 
     def test_tick_once_nothing_to_do_opens_map(self, fake_env: FakeEnv) -> None:
@@ -223,7 +224,7 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         # Set last_scan_ms so radar doesn't fire first
         from tankpit_bot.bot.ai.types import AIStateDict
 
@@ -284,7 +285,7 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         _tick_once(bot)
         assert bot._ai_state["mode"] == "HUNT"
 
@@ -303,7 +304,7 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         from tankpit_bot.bot.ai.types import AIStateDict
 
         bot._ai_state = AIStateDict(**{**bot._ai_state, "last_scan_ms": 1})
@@ -325,9 +326,9 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         dispatch_command(bot, make_move_command(100, 100), _make_snapshot())
-        assert bot.get_state() == "MOVING"
+        assert bot.get_state() is BotState.MOVING
 
     def test_dispatch_command_pickup_fuel(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches pickup_fuel to pickup_fuel_to."""
@@ -343,9 +344,9 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         dispatch_command(bot, make_pickup_fuel_command(100, 100), _make_snapshot())
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_dispatch_command_shoot(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches shoot to shoot_at."""
@@ -361,9 +362,9 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         dispatch_command(bot, make_shoot_command(55, 53), _make_snapshot())  # Within viewport
-        assert bot.get_state() == "COMBAT"
+        assert bot.get_state() is BotState.COMBAT
 
     def test_dispatch_command_radar(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches radar to use_radar."""
@@ -379,9 +380,9 @@ class TestBotAIIntegration:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         dispatch_command(bot, make_radar_command(), _make_snapshot())
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
     def test_dispatch_command_teleport(self, fake_env: FakeEnv) -> None:
         """With the map open, dispatch_command sends the teleport directly."""
@@ -405,12 +406,12 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         # The previous tick's dispatch WAS the open (the deferral
         # contract): the overlay alone no longer certifies the map.
         ws.last_wire_command_name = "map_open"
         dispatch_command(bot, make_teleport_command(150, 150), _make_snapshot(map_visible=True))
-        assert bot.get_state() == "TELEPORTING"
+        assert bot.get_state() is BotState.TELEPORTING
 
     def test_dispatch_command_teleport_defers_until_map_open(self, fake_env: FakeEnv) -> None:
         """With the map closed, the tick opens the map instead of teleporting.
@@ -433,12 +434,12 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
 
         achieved = dispatch_command(
             bot, make_teleport_command(200, 200), _make_snapshot(map_visible=False)
         )
 
         assert achieved is True
-        assert bot.get_state() == "IDLE"
-        assert bot._state_data["in_flight_action"]["kind"] == "map_open"
+        assert bot.get_state() is BotState.IDLE
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.MAP_OPEN

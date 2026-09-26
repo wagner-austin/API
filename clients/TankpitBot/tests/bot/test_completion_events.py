@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.bot.tick_loop_actions import (
     has_in_flight_action,
 )
@@ -47,8 +48,8 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="IDLE",
-            action_kind="map_open",
+            state=BotState.IDLE,
+            action_kind=ActionKind.MAP_OPEN,
             target_x=0,
             target_y=0,
             started_ms=get_current_time_ms() - 1,
@@ -81,8 +82,8 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="MOVING",
-            action_kind="move",
+            state=BotState.MOVING,
+            action_kind=ActionKind.MOVE,
             target_x=120,
             target_y=130,
             started_ms=get_current_time_ms() - 1,
@@ -124,8 +125,8 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="TELEPORTING",
-            action_kind="teleport",
+            state=BotState.TELEPORTING,
+            action_kind=ActionKind.TELEPORT,
             target_x=200,
             target_y=210,
             started_ms=get_current_time_ms() - 1,
@@ -180,8 +181,8 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="TELEPORTING",
-            action_kind="teleport",
+            state=BotState.TELEPORTING,
+            action_kind=ActionKind.TELEPORT,
             target_x=200,
             target_y=210,
             started_ms=get_current_time_ms() - 1,
@@ -232,8 +233,8 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="TELEPORTING",
-            action_kind="teleport",
+            state=BotState.TELEPORTING,
+            action_kind=ActionKind.TELEPORT,
             target_x=200,
             target_y=210,
             started_ms=get_current_time_ms() - 1,
@@ -284,8 +285,8 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="TELEPORTING",
-            action_kind="teleport",
+            state=BotState.TELEPORTING,
+            action_kind=ActionKind.TELEPORT,
             target_x=200,
             target_y=210,
             started_ms=get_current_time_ms() - 1,
@@ -324,8 +325,8 @@ def test_artifact_jsonl_lines_round_trip_through_real_decoder(
 
     bot = _make_bot_with_in_flight(
         world=ws,
-        state="SCANNING",
-        action_kind="scan",
+        state=BotState.SCANNING,
+        action_kind=ActionKind.SCAN,
         target_x=0,
         target_y=0,
         started_ms=get_current_time_ms() - 1,
@@ -391,15 +392,15 @@ class TestWalkGateOwnershipChecks:
         configure_bot_runtime_logging("20260331-230405")
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="TELEPORTING",
-            action_kind="teleport",
+            state=BotState.TELEPORTING,
+            action_kind=ActionKind.TELEPORT,
             target_x=30,
             target_y=40,
             started_ms=get_current_time_ms() - 1,
         )
 
         assert bot._maybe_complete_walk(_self_on_tile(30, 40)) is False
-        assert bot._state_data["state"] == "TELEPORTING"
+        assert bot._state_data["state"] is BotState.TELEPORTING
 
     def test_a_walk_cannot_complete_while_the_tank_is_unseen(
         self,
@@ -416,15 +417,15 @@ class TestWalkGateOwnershipChecks:
         configure_bot_runtime_logging("20260331-230405")
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="MOVING",
-            action_kind="move",
+            state=BotState.MOVING,
+            action_kind=ActionKind.MOVE,
             target_x=30,
             target_y=40,
             started_ms=get_current_time_ms() - 1,
         )
 
         assert bot._maybe_complete_walk(None) is False
-        assert bot._state_data["state"] == "MOVING"
+        assert bot._state_data["state"] is BotState.MOVING
 
     def test_control_the_same_tile_completes_a_walk(
         self,
@@ -440,12 +441,12 @@ class TestWalkGateOwnershipChecks:
         configure_bot_runtime_logging("20260331-230405")
         bot = _make_bot_with_in_flight(
             world=ws,
-            state="MOVING",
-            action_kind="move",
+            state=BotState.MOVING,
+            action_kind=ActionKind.MOVE,
             target_x=30,
             target_y=40,
             started_ms=get_current_time_ms() - 1,
         )
 
         assert bot._maybe_complete_walk(_self_on_tile(30, 40)) is True
-        assert bot._state_data["state"] == "IDLE"
+        assert bot._state_data["state"] is BotState.IDLE

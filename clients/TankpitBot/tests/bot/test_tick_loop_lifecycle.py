@@ -239,6 +239,7 @@ class TestAppendIndexRowEndToEnd:
             decode_row,
         )
         from tankpit_bot.ledger.decision import record_decision
+        from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
         from tankpit_bot.ledger.outcome.map_open import emit_map_open_data_processed
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
@@ -250,7 +251,7 @@ class TestAppendIndexRowEndToEnd:
         # pending at shutdown (unresolved-decisions line).
         record_decision(
             ws.ledger,
-            action_kind="map_open",
+            action_kind=LedgerActionKind.MAP_OPEN,
             cmd_type="map_open",
             mode="HUNT",
             score=800,
@@ -263,7 +264,7 @@ class TestAppendIndexRowEndToEnd:
         emit_map_open_data_processed(ws.ledger, duration_ms=500)
         record_decision(
             ws.ledger,
-            action_kind="scan",
+            action_kind=LedgerActionKind.SCAN,
             cmd_type="radar",
             mode="HUNT",
             score=700,

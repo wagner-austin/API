@@ -7,7 +7,9 @@ and the scope completion hold. The stall timeouts are
 
 from __future__ import annotations
 
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
@@ -40,13 +42,13 @@ class TestBotInFlightGuards:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
         action = bot._state_data["in_flight_action"]
 
         cleared = _clear_blocked_walk(bot, action)
 
         assert cleared is True
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_has_in_flight_action_clears_blocked_walk(self, fake_env: FakeEnv) -> None:
         """Blocked walking returns False from the in-flight gate after clearing state."""
@@ -63,12 +65,12 @@ class TestBotInFlightGuards:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_clear_blocked_walk_returns_false_without_self_state(self, fake_env: FakeEnv) -> None:
         """Blocked-walk helper does nothing when self position is unknown."""
@@ -76,11 +78,11 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_walk
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
 
         action = bot._state_data["in_flight_action"]
         assert _clear_blocked_walk(bot, action) is False
-        assert bot.get_state() == "MOVING"
+        assert bot.get_state() is BotState.MOVING
 
     def test_clear_blocked_collection_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked collection clears COLLECTING so the bot can replan."""
@@ -101,13 +103,13 @@ class TestBotInFlightGuards:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 15, 10)
         action = bot._state_data["in_flight_action"]
 
         cleared = _clear_blocked_collection(bot, action)
 
         assert cleared is True
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_clear_blocked_collection_returns_false_when_viewport_path_exists(
         self,
@@ -131,13 +133,13 @@ class TestBotInFlightGuards:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 12, 10)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 12, 10)
         action = bot._state_data["in_flight_action"]
 
         cleared = _clear_blocked_collection(bot, action)
 
         assert cleared is False
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_has_in_flight_action_clears_blocked_collection(self, fake_env: FakeEnv) -> None:
         """Blocked collection returns False from the in-flight gate after clearing state."""
@@ -158,12 +160,12 @@ class TestBotInFlightGuards:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 15, 10)
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_has_in_flight_action_false_for_shoot_kind(
         self,
@@ -174,7 +176,7 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot._state_data = _sba(bot._state_data, "COMBAT", "shoot", 50, 50)
+        bot._state_data = _sba(bot._state_data, BotState.COMBAT, ActionKind.SHOOT, 50, 50)
 
         assert has_in_flight_action(bot) is False
 
@@ -194,11 +196,13 @@ class TestBotInFlightGuards:
 
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         started_ms = get_current_time_ms()
-        bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0, started_ms=started_ms)
+        bot._state_data = _sba(
+            bot._state_data, BotState.IDLE, ActionKind.MAP_OPEN, 0, 0, started_ms=started_ms
+        )
         ws.world_state = WorldStateDict(**{**ws.world_state, "timestamp_ms": started_ms})
 
         assert has_in_flight_action(bot) is True
-        assert bot._state_data["in_flight_action"]["kind"] == "map_open"
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.MAP_OPEN
 
     def test_has_in_flight_action_holds_map_open_until_map_data_processed(
         self,
@@ -223,7 +227,9 @@ class TestBotInFlightGuards:
 
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         started_ms = get_current_time_ms()
-        bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0, started_ms=started_ms)
+        bot._state_data = _sba(
+            bot._state_data, BotState.IDLE, ActionKind.MAP_OPEN, 0, 0, started_ms=started_ms
+        )
         # Bump world_state timestamp the way an unrelated sync would --
         # this MUST NOT clear the action; the old proxy gate would have
         # fired here.
@@ -231,14 +237,14 @@ class TestBotInFlightGuards:
 
         assert has_in_flight_action(bot) is True
         kind_before_signal = bot._state_data["in_flight_action"]["kind"]
-        assert kind_before_signal == "map_open"
+        assert kind_before_signal is ActionKind.MAP_OPEN
 
         # Now mark the authoritative MAP_DATA signal; the wait should clear.
         ws.mark_map_data_processed()
 
         assert has_in_flight_action(bot) is False
         kind_after_signal = bot._state_data["in_flight_action"]["kind"]
-        assert kind_after_signal == "none"
+        assert kind_after_signal is ActionKind.NONE
 
     def test_clear_blocked_collection_returns_false_when_adjacent(self, fake_env: FakeEnv) -> None:
         """Adjacent collection remains viable even if the target tile itself is blocked."""
@@ -259,11 +265,11 @@ class TestBotInFlightGuards:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 15, 10)
 
         action = bot._state_data["in_flight_action"]
         assert _clear_blocked_collection(bot, action) is False
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_clear_blocked_collection_returns_false_without_self_state(
         self,
@@ -274,11 +280,11 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 15, 10)
 
         action = bot._state_data["in_flight_action"]
         assert _clear_blocked_collection(bot, action) is False
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_tick_once_waits_for_pending_scan(self, fake_env: FakeEnv) -> None:
         """_tick_once does not fire new commands while radar results are pending."""
@@ -294,12 +300,12 @@ class TestBotInFlightGuards:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = _sba(bot._state_data, "SCANNING", "scan", 0, 0)
+        bot._state_data = _sba(bot._state_data, BotState.SCANNING, ActionKind.SCAN, 0, 0)
 
         _tick_once(bot)
 
         assert fake_cdp._sent_methods == []
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
 
 class TestScopeInFlight:
@@ -333,19 +339,21 @@ class TestScopeInFlight:
 
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         started_ms = get_current_time_ms()
-        bot._state_data = _sba(bot._state_data, "IDLE", "scope", 0, 0, started_ms=started_ms)
+        bot._state_data = _sba(
+            bot._state_data, BotState.IDLE, ActionKind.SCOPE, 0, 0, started_ms=started_ms
+        )
         ws.world_state = WorldStateDict(**{**ws.world_state, "timestamp_ms": started_ms + 1})
 
         assert has_in_flight_action(bot) is True
         kind_before_signal = bot._state_data["in_flight_action"]["kind"]
-        assert kind_before_signal == "scope"
+        assert kind_before_signal is ActionKind.SCOPE
 
         ws.mark_viewport_update_processed()
 
         assert has_in_flight_action(bot) is False
         kind_after_signal = bot._state_data["in_flight_action"]["kind"]
-        assert kind_after_signal == "none"
-        outcomes = [record["outcome"] for record in ws.ledger.rings["scope"]]
+        assert kind_after_signal is ActionKind.NONE
+        outcomes = [record["outcome"] for record in ws.ledger.rings[LedgerActionKind.SCOPE]]
         assert outcomes == ["confirmed"]
 
     def test_stalled_scope_clears_via_timeout(self, fake_env: FakeEnv) -> None:
@@ -367,12 +375,12 @@ class TestScopeInFlight:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
-        bot._state_data = _sba(bot._state_data, "IDLE", "scope", 0, 0)
+        bot._state_data = _sba(bot._state_data, BotState.IDLE, ActionKind.SCOPE, 0, 0)
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
         waiting = has_in_flight_action(bot)
 
         assert waiting is False
-        assert bot._state_data["in_flight_action"]["kind"] == "none"
-        outcomes = [record["outcome"] for record in ws.ledger.rings["scope"]]
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.NONE
+        outcomes = [record["outcome"] for record in ws.ledger.rings[LedgerActionKind.SCOPE]]
         assert outcomes == ["stall_timeout"]

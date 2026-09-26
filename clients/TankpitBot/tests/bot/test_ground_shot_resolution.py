@@ -19,6 +19,7 @@ from tankpit_bot.bot.executor import dispatch_command, execute
 from tankpit_bot.bot.tick_combat_feedback import _resolve_pending_ground_shot
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_shoot_command
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.ring import outcome_counts, recent_outcomes
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_CANT_DO
 from tankpit_bot.sniffer.world_service import WorldService
@@ -83,7 +84,7 @@ class TestGroundShotResolver:
 
         _resolve_pending_ground_shot(bot)
 
-        fired = recent_outcomes(ws.ledger, "shoot", 1)[0]
+        fired = recent_outcomes(ws.ledger, ActionKind.SHOOT, 1)[0]
         assert fired["outcome"] == "fired"
         assert fired["detail"] == {"aim_x": 227, "aim_y": 171}
         assert ws.pending_ground_shot_dispatch_ms == 0
@@ -107,7 +108,7 @@ class TestGroundShotResolver:
 
         _resolve_pending_ground_shot(bot)
 
-        assert recent_outcomes(ws.ledger, "shoot", 1)[0]["outcome"] == "fired"
+        assert recent_outcomes(ws.ledger, ActionKind.SHOOT, 1)[0]["outcome"] == "fired"
         assert ws.got_confirmed_hit is False
         assert ws.last_shot_victim_id == -1
 
@@ -124,7 +125,7 @@ class TestGroundShotResolver:
 
         _resolve_pending_ground_shot(bot)
 
-        rejected = recent_outcomes(ws.ledger, "shoot", 1)[0]
+        rejected = recent_outcomes(ws.ledger, ActionKind.SHOOT, 1)[0]
         assert rejected["outcome"] == "command_rejected"
         assert rejected["detail"]["error_code"] == SUPERVISOR_ERROR_CANT_DO
         assert ws.pending_ground_shot_dispatch_ms == 0
@@ -139,7 +140,7 @@ class TestGroundShotResolver:
         _resolve_pending_ground_shot(bot)
 
         assert ws.pending_ground_shot_dispatch_ms == 1000
-        assert outcome_counts(ws.ledger, "shoot") == {}
+        assert outcome_counts(ws.ledger, ActionKind.SHOOT) == {}
 
     def test_without_a_pending_mark_the_resolver_is_inert(self, fake_env: FakeEnv) -> None:
         """No pending ground shot: combat receipts are left untouched."""
@@ -150,7 +151,7 @@ class TestGroundShotResolver:
         _resolve_pending_ground_shot(bot)
 
         assert ws.got_our_shot_response is True
-        assert outcome_counts(ws.ledger, "shoot") == {}
+        assert outcome_counts(ws.ledger, ActionKind.SHOOT) == {}
 
 
 def _clearance_decision() -> TickDecisionDict:

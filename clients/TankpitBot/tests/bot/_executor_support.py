@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.bot.states import BotState
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
@@ -53,7 +54,7 @@ def _make_bot(fake_env: FakeEnv) -> tuple[Bot, FakeCDPSession]:
     fake_cdp = FakeCDPSession()
     bot._cdp = fake_cdp
     bot._state_data = bot._state_data.copy()
-    bot._state_data["state"] = "IDLE"
+    bot._state_data["state"] = BotState.IDLE
     return bot, fake_cdp
 
 

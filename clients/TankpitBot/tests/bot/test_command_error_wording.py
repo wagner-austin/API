@@ -8,6 +8,7 @@ a collect's close is a receipt, not a rejection.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.states import ActionKind
 from tests._runtime_logging_support import capture_runtime_events
 from tests.conftest import FakeEnv
 
@@ -37,7 +38,7 @@ class TestCommandErrorWording:
         from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_TANK_FULL
 
         with capture_runtime_events() as records:
-            _emit_command_error_sync("collect", 40, 50, SUPERVISOR_ERROR_TANK_FULL)
+            _emit_command_error_sync(ActionKind.COLLECT, 40, 50, SUPERVISOR_ERROR_TANK_FULL)
 
         messages = [record.getMessage() for record in records]
         assert [m for m in messages if "closed by server receipt" in m] != []
@@ -54,7 +55,7 @@ class TestCommandErrorWording:
         from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_CANT_GO
 
         with capture_runtime_events() as records:
-            _emit_command_error_sync("collect", 40, 50, SUPERVISOR_ERROR_CANT_GO)
+            _emit_command_error_sync(ActionKind.COLLECT, 40, 50, SUPERVISOR_ERROR_CANT_GO)
 
         messages = [record.getMessage() for record in records]
         assert [m for m in messages if "rejected by server" in m] != []

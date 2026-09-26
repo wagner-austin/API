@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.combat_feedback import CombatFeedback
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
@@ -39,7 +40,7 @@ class TestBotTickOnce:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         # last_scan_ms=1, scan_cooldown=5000, now will be >> 5001 → cooldown elapsed
         _tick_once(bot)
         # Fuel < 500, no containers, scan cooldown elapsed → radar
@@ -62,7 +63,7 @@ class TestBotTickOnce:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         from tankpit_bot.bot.ai.types import AIStateDict
 
         # Set recent scan so radar cooldown blocks → forces walk to edge
@@ -88,12 +89,12 @@ class TestBotTickOnce:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
+        bot._state_data = _sba(bot._state_data, BotState.MOVING, ActionKind.MOVE, 15, 10)
 
         _tick_once(bot)
 
         assert fake_cdp._sent_methods == []
-        assert bot.get_state() == "MOVING"
+        assert bot.get_state() is BotState.MOVING
 
     def test_tick_once_waits_for_in_flight_teleport(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while a teleport is still resolving."""
@@ -110,12 +111,12 @@ class TestBotTickOnce:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = _sba(bot._state_data, "TELEPORTING", "teleport", 196, 86)
+        bot._state_data = _sba(bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 196, 86)
 
         _tick_once(bot)
 
         assert fake_cdp._sent_methods == []
-        assert bot.get_state() == "TELEPORTING"
+        assert bot.get_state() is BotState.TELEPORTING
 
     def test_tick_once_waits_for_in_flight_collection(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while pickup movement is still resolving."""
@@ -137,12 +138,12 @@ class TestBotTickOnce:
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 205, 80)
+        bot._state_data = _sba(bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 205, 80)
 
         _tick_once(bot)
 
         assert fake_cdp._sent_methods == []
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_tick_once_waits_for_pending_shot_feedback(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while the last shot outcome is still pending."""
@@ -170,7 +171,7 @@ class TestBotTickOnce:
         _tick_once(bot)
 
         assert fake_cdp._sent_methods == []
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_tick_once_untracked_shoot_dispatches_and_persists(
         self,
@@ -216,7 +217,7 @@ class TestBotTickOnce:
         bot._cdp = fake_cdp
         bot._magic = "test_magic"
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         original_state = AIStateDict(**bot._ai_state)
         dispatched_state = AIStateDict(
             **{
@@ -316,7 +317,7 @@ class TestBotTickOnce:
         bot._cdp = fake_cdp
         bot._magic = "test_magic"
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         original_state = AIStateDict(**bot._ai_state)
         failed_state = AIStateDict(
             **{
@@ -415,7 +416,7 @@ class TestBotTickOnce:
             "Runtime.addBinding",
             "Runtime.evaluate",
         ]
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
     def test_tick_once_critical_equipment_preempts_combat(
         self,
@@ -468,7 +469,7 @@ class TestBotTickOnce:
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._state_data["state"] = BotState.IDLE
         from tankpit_bot.bot.ai.types import AIStateDict
 
         bot._ai_state = AIStateDict(
@@ -485,7 +486,7 @@ class TestBotTickOnce:
         # dual=3 < dual_break_threshold=4 → critical equipment preempts combat
         assert fake_cdp._sent_methods[0] == "Runtime.evaluate"
         assert "Input.dispatchKeyEvent" not in fake_cdp._sent_methods
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
     def test_tick_once_replans_with_regular_radar_when_pending_shot_target_was_killed(
         self,
@@ -522,4 +523,4 @@ class TestBotTickOnce:
             "Runtime.addBinding",
             "Runtime.evaluate",
         ]
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING

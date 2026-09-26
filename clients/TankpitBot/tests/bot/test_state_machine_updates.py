@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.states import ActionKind, BotState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     mark_teleport_landed,
@@ -33,10 +34,12 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(196, 85)
         _sm_update_fuel(ws, 582)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 196, 86
+        )
         mark_teleport_landed(ws)
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_update_state_teleport_landing_mismatch_marks_failed_target(
         self,
@@ -53,13 +56,15 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(196, 85)
         _sm_update_fuel(ws, 582)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 196, 86
+        )
 
         mark_teleport_landed(ws)
         bot._update_state_from_world()
 
         now = get_current_time_ms()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
         assert ws.is_move_target_failed(196, 86, now) is True
 
     def test_low_fuel_does_not_stomp_teleporting(
@@ -76,10 +81,12 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(50, 50)
         _sm_update_fuel(ws, 100)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 60, 70)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 60, 70
+        )
         bot._state_data["fuel_threshold"] = 200
         bot._update_state_from_world()
-        assert bot.get_state() == "TELEPORTING"
+        assert bot.get_state() is BotState.TELEPORTING
 
     def test_low_fuel_does_not_stomp_a_completed_walk(
         self,
@@ -110,12 +117,14 @@ class TestBotStateUpdateDetail:
         bot._update_state_from_world()
         # Target equals the tank's current tile, so the walk completes
         # on this tick and transitions to IDLE.
-        bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 196, 85)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.MOVING, ActionKind.MOVE, 196, 85
+        )
         bot._state_data["fuel_threshold"] = 200
 
         bot._update_state_from_world()
 
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_low_fuel_does_not_stomp_a_completed_scan(
         self,
@@ -136,13 +145,15 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(196, 85)
         _sm_update_fuel(ws, 100)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 196, 85)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.SCANNING, ActionKind.SCAN, 196, 85
+        )
         bot._state_data["fuel_threshold"] = 200
         ws.mark_radar_scan_complete()
 
         bot._update_state_from_world()
 
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_low_fuel_does_not_stomp_a_completed_collection(
         self,
@@ -163,12 +174,14 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(196, 85)
         _sm_update_fuel(ws, 100)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 196, 85)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 196, 85
+        )
         bot._state_data["fuel_threshold"] = 200
 
         bot._update_state_from_world()
 
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
 
     def test_low_fuel_does_not_stomp_collecting(
         self,
@@ -186,10 +199,12 @@ class TestBotStateUpdateDetail:
         _sm_update_fuel(ws, 100)
         update_world_state_from_radar(ws, [RadarContainerDict(x=55, y=55, volume=500)], [], [])
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 55, 55)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.COLLECTING, ActionKind.COLLECT, 55, 55
+        )
         bot._state_data["fuel_threshold"] = 200
         bot._update_state_from_world()
-        assert bot.get_state() == "COLLECTING"
+        assert bot.get_state() is BotState.COLLECTING
 
     def test_low_fuel_does_not_stomp_scanning(
         self,
@@ -205,10 +220,10 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(50, 50)
         _sm_update_fuel(ws, 100)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
+        bot._state_data = _set_bot_action(bot._state_data, BotState.SCANNING, ActionKind.SCAN, 0, 0)
         bot._state_data["fuel_threshold"] = 200
         bot._update_state_from_world()
-        assert bot.get_state() == "SCANNING"
+        assert bot.get_state() is BotState.SCANNING
 
     def test_teleport_completes_before_low_fuel_checked(
         self,
@@ -224,8 +239,10 @@ class TestBotStateUpdateDetail:
         ws.update_world_state_from_position(50, 50)
         _sm_update_fuel(ws, 100)
         bot._update_state_from_world()
-        bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 50, 50)
+        bot._state_data = _set_bot_action(
+            bot._state_data, BotState.TELEPORTING, ActionKind.TELEPORT, 50, 50
+        )
         bot._state_data["fuel_threshold"] = 200
         mark_teleport_landed(ws)
         bot._update_state_from_world()
-        assert bot.get_state() == "IDLE"
+        assert bot.get_state() is BotState.IDLE
