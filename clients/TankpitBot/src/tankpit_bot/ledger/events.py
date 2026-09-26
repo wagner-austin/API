@@ -9,29 +9,27 @@ the vocabulary, which is constant and belongs to no session.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
-ActionKind = Literal["scan", "move", "teleport", "collect", "map_open", "shoot", "scope"]
-"""The seven bot action kinds the ledger records.
 
-Deliberately narrower than :data:`tankpit_bot.bot.states.ActionKind`,
-which adds the ``"none"`` in-flight sentinel. The ledger records what
-the bot DID; "none" is a lifecycle placeholder, not an action.
-"""
+class ActionKind(StrEnum):
+    """The seven bot action kinds the ledger records.
 
-ACTION_KINDS: tuple[ActionKind, ...] = (
-    "scan",
-    "move",
-    "teleport",
-    "collect",
-    "map_open",
-    "shoot",
-    "scope",
-)
-"""All action kinds, for iteration and validation messages."""
+    Deliberately narrower than :class:`tankpit_bot.bot.states.ActionKind`,
+    which adds the ``NONE`` in-flight sentinel. The ledger records what
+    the bot DID; "none" is a lifecycle placeholder, not an action.
+    Declaration order is the order the ledger's per-kind tables iterate.
+    """
+
+    SCAN = "scan"
+    MOVE = "move"
+    TELEPORT = "teleport"
+    COLLECT = "collect"
+    MAP_OPEN = "map_open"
+    SHOOT = "shoot"
+    SCOPE = "scope"
 
 
 __all__ = [
-    "ACTION_KINDS",
     "ActionKind",
 ]

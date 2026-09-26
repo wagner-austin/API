@@ -197,7 +197,7 @@ def verify_outcome_invariant(ledger: LedgerService) -> dict[str, int]:
         LedgerInvariantError,
         orphan_decision_ids=", ".join(str(event_id) for event_id in orphans),
     )
-    return {str(kind): event_id for kind, event_id in pending.items()}
+    return {kind.value: event_id for kind, event_id in pending.items()}
 
 
 __all__ = [

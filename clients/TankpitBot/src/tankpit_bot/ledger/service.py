@@ -14,7 +14,7 @@ fuel, damage, and ammo books.
 
 from __future__ import annotations
 
-from tankpit_bot.ledger.events import ACTION_KINDS, ActionKind
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.records import (
     ActionOutcomeRecordDict,
     DecisionRecordDict,
@@ -51,15 +51,15 @@ class LedgerService:
         """Start an empty ledger for one session."""
         self.event_counter: int = 0
         self.rings: dict[ActionKind, list[ActionOutcomeRecordDict]] = {
-            kind: [] for kind in ACTION_KINDS
+            kind: [] for kind in ActionKind
         }
         self.decisions: dict[int, DecisionRecordDict] = {}
         self.transitions: list[ModeTransitionRecordDict] = []
-        self.attempt_counters: dict[ActionKind, int] = dict.fromkeys(ACTION_KINDS, 0)
+        self.attempt_counters: dict[ActionKind, int] = dict.fromkeys(ActionKind, 0)
         self.pending_decisions: dict[ActionKind, int] = {}
         self.resolved_decision_ids: set[int] = set()
         self.pending_teleport: PendingTeleportDispatchDict | None = None
-        self.zero_dispatch_streaks: dict[ActionKind, int] = dict.fromkeys(ACTION_KINDS, 0)
+        self.zero_dispatch_streaks: dict[ActionKind, int] = dict.fromkeys(ActionKind, 0)
         self.dispatched_decision_ids: set[int] = set()
 
     def next_event_id(self) -> int:
