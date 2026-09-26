@@ -19,6 +19,7 @@ from ..types import (
     SampledIntParams,
     SampledStringParams,
     TrialResult,
+    TrialState,
     XGBoostSearchSpace,
 )
 from . import _hooks
@@ -191,7 +192,7 @@ class OptunaXGBoostOptimizer:
                 "float_params": float_params,
                 "string_params": string_params,
                 "value": val_auc,
-                "state": "complete",
+                "state": TrialState.COMPLETE,
                 "duration_seconds": trial_duration,
             }
 

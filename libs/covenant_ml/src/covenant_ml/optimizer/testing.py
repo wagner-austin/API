@@ -37,7 +37,7 @@ class FakeHyperparameterOptimizer:
 
     def __init__(
         self,
-        name: OptimizerStrategyName = "optuna_tpe",
+        name: OptimizerStrategyName = OptimizerStrategyName.OPTUNA_TPE,
         capabilities: OptimizerStrategyCapabilities | None = None,
         result: OptimizationSummary | None = None,
     ) -> None:
@@ -183,7 +183,7 @@ class FakeTrialCallback:
 
 
 def make_fake_optimizer(
-    name: OptimizerStrategyName = "optuna_tpe",
+    name: OptimizerStrategyName = OptimizerStrategyName.OPTUNA_TPE,
     best_value: float = 0.85,
 ) -> FakeHyperparameterOptimizer:
     """Create a FakeHyperparameterOptimizer with specified settings.
@@ -245,10 +245,10 @@ def make_test_optimizer_registry() -> OptimizerStrategyRegistry:
     registry = OptimizerStrategyRegistry()
 
     def create_fake_optuna() -> HyperparameterOptimizerProtocol:
-        return make_fake_optimizer("optuna_tpe")
+        return make_fake_optimizer(OptimizerStrategyName.OPTUNA_TPE)
 
     registry.register(
-        "optuna_tpe",
+        OptimizerStrategyName.OPTUNA_TPE,
         OptimizerStrategyRegistration(create_fake_optuna),
     )
 
@@ -259,10 +259,12 @@ def make_test_optimizer_registry() -> OptimizerStrategyRegistry:
             is_deterministic=True,
             requires_bounds=True,
         )
-        return FakeHyperparameterOptimizer(name="random_search", capabilities=caps)
+        return FakeHyperparameterOptimizer(
+            name=OptimizerStrategyName.RANDOM_SEARCH, capabilities=caps
+        )
 
     registry.register(
-        "random_search",
+        OptimizerStrategyName.RANDOM_SEARCH,
         OptimizerStrategyRegistration(create_fake_random),
     )
 
@@ -273,10 +275,12 @@ def make_test_optimizer_registry() -> OptimizerStrategyRegistry:
             is_deterministic=True,
             requires_bounds=True,
         )
-        return FakeHyperparameterOptimizer(name="grid_search", capabilities=caps)
+        return FakeHyperparameterOptimizer(
+            name=OptimizerStrategyName.GRID_SEARCH, capabilities=caps
+        )
 
     registry.register(
-        "grid_search",
+        OptimizerStrategyName.GRID_SEARCH,
         OptimizerStrategyRegistration(create_fake_grid),
     )
 

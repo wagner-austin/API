@@ -17,6 +17,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
     TrialResult,
+    TrialState,
     XGBoostSearchSpace,
 )
 from tests.optimizer._protocol_fixtures import (
@@ -54,7 +55,7 @@ def test_trial_callback_protocol_implementation() -> None:
         "float_params": float_params,
         "string_params": string_params,
         "value": 0.85,
-        "state": "complete",
+        "state": TrialState.COMPLETE,
         "duration_seconds": 1.5,
     }
 

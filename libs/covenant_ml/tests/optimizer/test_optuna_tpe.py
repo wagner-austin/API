@@ -15,6 +15,7 @@ from covenant_ml.optimizer.strategies.optuna_tpe import (
     OptunaTpeOptimizer,
     create_optuna_tpe_optimizer,
 )
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from covenant_ml.optimizer.types import OptimizationConfig
 from tests.optimizer._objective_fixtures import (
     dummy_objective,
@@ -42,7 +43,7 @@ class TestOptunaTpeOptimizer:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         optimizer = OptunaTpeOptimizer()
-        assert optimizer.strategy_name() == "optuna_tpe"
+        assert optimizer.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -118,7 +119,7 @@ class TestOptunaTpeFactory:
     def test_factory_creates_optimizer(self) -> None:
         """Factory creates optimizer."""
         optimizer = create_optuna_tpe_optimizer()
-        assert optimizer.strategy_name() == "optuna_tpe"
+        assert optimizer.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
 
 
 class TestOptunaTpeWithMLP:

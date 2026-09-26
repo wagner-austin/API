@@ -83,7 +83,7 @@ class IterativeRefinementFineTuning:
         Returns:
             The literal string 'iterative_refinement'.
         """
-        return "iterative_refinement"
+        return FineTuningStrategyName.ITERATIVE_REFINEMENT
 
     def capabilities(self) -> FineTuningCapabilities:
         """Return the capabilities of this strategy.
@@ -232,11 +232,11 @@ class IterativeRefinementFineTuning:
             # Map iteration to stage name
             stage_name: FineTuningStage
             if iteration == 0:
-                stage_name = "exploration"
+                stage_name = FineTuningStage.EXPLORATION
             elif iteration == self._max_iterations - 1:
-                stage_name = "final"
+                stage_name = FineTuningStage.FINAL
             else:
-                stage_name = "refinement"
+                stage_name = FineTuningStage.REFINEMENT
 
             stage_result = StageResult(
                 stage_name=stage_name,

@@ -6,6 +6,7 @@ Public test utilities exported for consumers to use.
 from __future__ import annotations
 
 from .types import (
+    CalibrationMethod,
     CalibratorConfig,
     IsotonicParams,
     IsotonicState,
@@ -28,7 +29,7 @@ def make_isotonic_config(
         CalibratorConfig for isotonic regression.
     """
     return {
-        "method": "isotonic",
+        "method": CalibrationMethod.ISOTONIC,
         "clip_proba": clip_proba,
         "eps": eps,
     }
@@ -48,7 +49,7 @@ def make_platt_config(
         CalibratorConfig for Platt scaling.
     """
     return {
-        "method": "platt",
+        "method": CalibrationMethod.PLATT,
         "clip_proba": clip_proba,
         "eps": eps,
     }
@@ -72,7 +73,7 @@ def make_isotonic_state(
         IsotonicState for testing.
     """
     config: CalibratorConfig = {
-        "method": "isotonic",
+        "method": CalibrationMethod.ISOTONIC,
         "clip_proba": clip_proba,
         "eps": eps,
     }
@@ -107,7 +108,7 @@ def make_platt_state(
         PlattState for testing.
     """
     config: CalibratorConfig = {
-        "method": "platt",
+        "method": CalibrationMethod.PLATT,
         "clip_proba": clip_proba,
         "eps": eps,
     }

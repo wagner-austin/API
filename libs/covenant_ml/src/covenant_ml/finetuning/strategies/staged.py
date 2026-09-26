@@ -56,7 +56,7 @@ class StagedFineTuning:
         Returns:
             The literal string 'staged'.
         """
-        return "staged"
+        return FineTuningStrategyName.STAGED
 
     def capabilities(self) -> FineTuningCapabilities:
         """Return the capabilities of this strategy.

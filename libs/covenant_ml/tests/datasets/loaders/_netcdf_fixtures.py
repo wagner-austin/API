@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.datasets.types_temporal import (
+    SeasonDefinition,
     TemporalFeatureConfig,
 )
 
@@ -110,7 +111,7 @@ def _make_config(compute_ar1: bool = True) -> TemporalFeatureConfig:
         n_fourier_harmonics=3,
         hot_cutoff_percentile=95.0,
         cold_cutoff_percentile=5.0,
-        season="warm",
+        season=SeasonDefinition.WARM,
         season_months=(6, 7, 8),
         compute_ar1=compute_ar1,
     )

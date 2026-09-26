@@ -18,7 +18,7 @@ from covenant_ml.optimizer.strategies import (
     GridTuple,
 )
 from covenant_ml.optimizer.strategies import _hooks as strategy_hooks
-from covenant_ml.optimizer.types import OptimizationConfig, SearchSpace, TrialResult
+from covenant_ml.optimizer.types import OptimizationConfig, SearchSpace, TrialResult, TrialState
 from tests.optimizer._objective_fixtures import (
     dummy_objective,
     slow_objective,
@@ -196,7 +196,7 @@ class TestGridSearchCallback:
 
         assert len(callback_results) == 5
         for result in callback_results:
-            assert result["state"] == "complete"
+            assert result["state"] is TrialState.COMPLETE
             assert result["value"] > 0
 
 

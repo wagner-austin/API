@@ -17,6 +17,7 @@ from covenant_ml.optimizer.strategies import (
     GridSearchOptimizer,
     create_grid_search_optimizer,
 )
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from tests.optimizer._objective_fixtures import (
     dummy_objective,
     lightgbm_dart_no_params_objective,
@@ -48,7 +49,7 @@ class TestGridSearchOptimizer:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         optimizer = GridSearchOptimizer()
-        assert optimizer.strategy_name() == "grid_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.GRID_SEARCH
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -141,7 +142,7 @@ class TestGridSearchFactory:
     def test_factory_creates_optimizer(self) -> None:
         """Factory creates optimizer."""
         optimizer = create_grid_search_optimizer()
-        assert optimizer.strategy_name() == "grid_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.GRID_SEARCH
 
     def test_factory_default_grid_points(self) -> None:
         """Factory creates optimizer with default grid points."""

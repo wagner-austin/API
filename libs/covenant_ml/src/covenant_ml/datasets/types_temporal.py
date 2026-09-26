@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from platform_core.json_utils import JSONValue
 
@@ -20,19 +20,6 @@ from covenant_ml.datasets._json_fields import (
     _require_str_field,
     _require_str_tuple,
 )
-
-HeatMetricName = Literal[
-    "seasonal_max",
-    "seasonal_min",
-    "cum_excess_hot",
-    "avg_excess_hot",
-    "ndays_excess_hot",
-    "cum_excess_cold",
-    "avg_excess_cold",
-    "ndays_excess_cold",
-    "ar1",
-]
-
 
 HEAT_METRIC_NAMES: tuple[str, ...] = (
     "seasonal_max",
@@ -164,7 +151,7 @@ DEFAULT_TEMPORAL_FEATURE_CONFIG: TemporalFeatureConfig = TemporalFeatureConfig(
     n_fourier_harmonics=5,
     hot_cutoff_percentile=95.0,
     cold_cutoff_percentile=5.0,
-    season="warm",
+    season=SeasonDefinition.WARM,
     season_months=(6, 7, 8),
     compute_ar1=True,
 )
@@ -414,8 +401,8 @@ __all__ = [
     "DEFAULT_TEMPORAL_FEATURE_CONFIG",
     "HEAT_METRIC_NAMES",
     "HEAT_METRIC_NAMES_NO_AR1",
-    "HeatMetricName",
     "HeatMetricResult",
+    "SeasonDefinition",
     "SeasonalCycleCoefficients",
     "TailThresholds",
     "TemporalFeatureConfig",

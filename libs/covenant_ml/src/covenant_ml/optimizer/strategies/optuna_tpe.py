@@ -24,6 +24,7 @@ from ..types import (
     OptimizationSummary,
     SearchSpace,
     TrialResult,
+    TrialState,
 )
 from . import _hooks
 from ._hooks import (
@@ -69,7 +70,7 @@ class OptunaTpeOptimizer:
         Returns:
             The literal string 'optuna_tpe'.
         """
-        return "optuna_tpe"
+        return OptimizerStrategyName.OPTUNA_TPE
 
     def capabilities(self) -> OptimizerStrategyCapabilities:
         """Return the capabilities of this strategy.
@@ -168,7 +169,7 @@ class OptunaTpeOptimizer:
                 "float_params": float_params,
                 "string_params": string_params,
                 "value": val_auc,
-                "state": "complete",
+                "state": TrialState.COMPLETE,
                 "duration_seconds": trial_duration,
             }
 

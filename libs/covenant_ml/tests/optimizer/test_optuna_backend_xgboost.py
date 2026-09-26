@@ -21,6 +21,7 @@ from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledStringParams,
     TrialResult,
+    TrialState,
     XGBoostSearchSpace,
 )
 from tests.optimizer._fake_optuna import (
@@ -258,7 +259,7 @@ def test_xgboost_optimizer_with_callback() -> None:
         assert len(callbacks) == 3
         for i, result in enumerate(callbacks):
             assert result["trial_number"] == i
-            assert result["state"] == "complete"
+            assert result["state"] is TrialState.COMPLETE
     finally:
         _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 

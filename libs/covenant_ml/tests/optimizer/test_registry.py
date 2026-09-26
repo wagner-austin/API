@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from covenant_ml.optimizer import (
+    OptimizerStrategyName,
     OptimizerStrategyRegistration,
     OptimizerStrategyRegistry,
     default_optimizer_registry,
@@ -40,10 +41,10 @@ class TestOptimizerStrategyRegistry:
             return RandomSearchOptimizer()
 
         registration = OptimizerStrategyRegistration(factory)
-        registry.register("random_search", registration)
+        registry.register(OptimizerStrategyName.RANDOM_SEARCH, registration)
 
-        optimizer = registry.get("random_search")
-        assert optimizer.strategy_name() == "random_search"
+        optimizer = registry.get(OptimizerStrategyName.RANDOM_SEARCH)
+        assert optimizer.strategy_name() is OptimizerStrategyName.RANDOM_SEARCH
 
     def test_list_strategies(self) -> None:
         """List returns all registered strategy names."""
@@ -53,12 +54,12 @@ class TestOptimizerStrategyRegistry:
             return RandomSearchOptimizer()
 
         registration = OptimizerStrategyRegistration(factory)
-        registry.register("random_search", registration)
-        registry.register("grid_search", registration)
+        registry.register(OptimizerStrategyName.RANDOM_SEARCH, registration)
+        registry.register(OptimizerStrategyName.GRID_SEARCH, registration)
 
         strategies = registry.list_strategies()
-        assert "random_search" in strategies
-        assert "grid_search" in strategies
+        assert OptimizerStrategyName.RANDOM_SEARCH in strategies
+        assert OptimizerStrategyName.GRID_SEARCH in strategies
         assert len(strategies) == 2
 
     def test_duplicate_registration_raises(self) -> None:
@@ -69,10 +70,10 @@ class TestOptimizerStrategyRegistry:
             return RandomSearchOptimizer()
 
         registration = OptimizerStrategyRegistration(factory)
-        registry.register("random_search", registration)
+        registry.register(OptimizerStrategyName.RANDOM_SEARCH, registration)
 
         with pytest.raises(ValueError, match="already registered"):
-            registry.register("random_search", registration)
+            registry.register(OptimizerStrategyName.RANDOM_SEARCH, registration)
 
     def test_has_strategy_returns_true_when_registered(self) -> None:
         """has_strategy returns True for registered strategies."""
@@ -82,14 +83,14 @@ class TestOptimizerStrategyRegistry:
             return RandomSearchOptimizer()
 
         registration = OptimizerStrategyRegistration(factory)
-        registry.register("random_search", registration)
+        registry.register(OptimizerStrategyName.RANDOM_SEARCH, registration)
 
-        assert registry.has_strategy("random_search") is True
+        assert registry.has_strategy(OptimizerStrategyName.RANDOM_SEARCH) is True
 
     def test_has_strategy_returns_false_when_not_registered(self) -> None:
         """has_strategy returns False for unregistered strategies."""
         registry = OptimizerStrategyRegistry()
-        assert registry.has_strategy("random_search") is False
+        assert registry.has_strategy(OptimizerStrategyName.RANDOM_SEARCH) is False
 
     def test_get_capabilities_returns_strategy_capabilities(self) -> None:
         """get_capabilities returns the strategy's capabilities."""
@@ -99,9 +100,9 @@ class TestOptimizerStrategyRegistry:
             return RandomSearchOptimizer()
 
         registration = OptimizerStrategyRegistration(factory)
-        registry.register("random_search", registration)
+        registry.register(OptimizerStrategyName.RANDOM_SEARCH, registration)
 
-        caps = registry.get_capabilities("random_search")
+        caps = registry.get_capabilities(OptimizerStrategyName.RANDOM_SEARCH)
         assert caps["supports_pruning"] is False
         assert caps["supports_parallel"] is True
         assert caps["is_deterministic"] is True
@@ -163,30 +164,30 @@ class TestDefaultOptimizerRegistry:
         registry = default_optimizer_registry()
         strategies = registry.list_strategies()
 
-        assert "random_search" in strategies
-        assert "grid_search" in strategies
-        assert "optuna_tpe" in strategies
+        assert OptimizerStrategyName.RANDOM_SEARCH in strategies
+        assert OptimizerStrategyName.GRID_SEARCH in strategies
+        assert OptimizerStrategyName.OPTUNA_TPE in strategies
 
     def test_random_search_works(self) -> None:
         """Random search from registry works correctly."""
         registry = default_optimizer_registry()
-        optimizer = registry.get("random_search")
+        optimizer = registry.get(OptimizerStrategyName.RANDOM_SEARCH)
 
-        assert optimizer.strategy_name() == "random_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.RANDOM_SEARCH
 
     def test_grid_search_works(self) -> None:
         """Grid search from registry works correctly."""
         registry = default_optimizer_registry()
-        optimizer = registry.get("grid_search")
+        optimizer = registry.get(OptimizerStrategyName.GRID_SEARCH)
 
-        assert optimizer.strategy_name() == "grid_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.GRID_SEARCH
 
     def test_optuna_tpe_works(self) -> None:
         """Optuna TPE from registry works correctly."""
         registry = default_optimizer_registry()
-        optimizer = registry.get("optuna_tpe")
+        optimizer = registry.get(OptimizerStrategyName.OPTUNA_TPE)
 
-        assert optimizer.strategy_name() == "optuna_tpe"
+        assert optimizer.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
 
     def test_each_call_returns_fresh_registry(self) -> None:
         """Each call to default_optimizer_registry returns a new instance."""
@@ -200,7 +201,7 @@ class TestDefaultOptimizerRegistry:
         """Each get call returns a new optimizer instance."""
         registry = default_optimizer_registry()
 
-        optimizer1 = registry.get("random_search")
-        optimizer2 = registry.get("random_search")
+        optimizer1 = registry.get(OptimizerStrategyName.RANDOM_SEARCH)
+        optimizer2 = registry.get(OptimizerStrategyName.RANDOM_SEARCH)
 
         assert optimizer1 is not optimizer2

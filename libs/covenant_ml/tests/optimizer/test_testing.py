@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from covenant_ml.optimizer.testing import (
     FakeHyperparameterOptimizer,
     make_fake_optimizer,
@@ -23,6 +24,7 @@ from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
     SampledStringParams,
+    TrialState,
     XGBoostSearchSpace,
 )
 
@@ -100,12 +102,12 @@ class TestFakeHyperparameterOptimizer:
     def test_default_strategy_name(self) -> None:
         """Default strategy name is optuna_tpe."""
         optimizer = FakeHyperparameterOptimizer()
-        assert optimizer.strategy_name() == "optuna_tpe"
+        assert optimizer.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
 
     def test_custom_strategy_name(self) -> None:
         """Can set custom strategy name."""
-        optimizer = FakeHyperparameterOptimizer(name="grid_search")
-        assert optimizer.strategy_name() == "grid_search"
+        optimizer = FakeHyperparameterOptimizer(name=OptimizerStrategyName.GRID_SEARCH)
+        assert optimizer.strategy_name() is OptimizerStrategyName.GRID_SEARCH
 
     def test_default_capabilities(self) -> None:
         """Default capabilities are correct."""
@@ -196,14 +198,14 @@ class TestMakeFakeOptimizer:
     def test_default_factory(self) -> None:
         """Factory creates optimizer with defaults."""
         optimizer = make_fake_optimizer()
-        assert optimizer.strategy_name() == "optuna_tpe"
+        assert optimizer.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
         caps = optimizer.capabilities()
         assert caps["is_deterministic"] is False
 
     def test_factory_with_custom_name(self) -> None:
         """Factory creates optimizer with custom name."""
-        optimizer = make_fake_optimizer(name="optuna_tpe")
-        assert optimizer.strategy_name() == "optuna_tpe"
+        optimizer = make_fake_optimizer(name=OptimizerStrategyName.OPTUNA_TPE)
+        assert optimizer.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
 
     def test_factory_with_custom_value(self) -> None:
         """Factory creates optimizer with custom best value."""
@@ -238,24 +240,24 @@ class TestMakeTestOptimizerRegistry:
         registry = make_test_optimizer_registry()
         strategies = registry.list_strategies()
 
-        assert "random_search" in strategies
-        assert "grid_search" in strategies
-        assert "optuna_tpe" in strategies
+        assert OptimizerStrategyName.RANDOM_SEARCH in strategies
+        assert OptimizerStrategyName.GRID_SEARCH in strategies
+        assert OptimizerStrategyName.OPTUNA_TPE in strategies
 
     def test_strategies_are_fake(self) -> None:
         """All strategies are FakeHyperparameterOptimizer instances."""
         registry = make_test_optimizer_registry()
 
-        optimizer = registry.get("random_search")
-        assert optimizer.strategy_name() == "random_search"
+        optimizer = registry.get(OptimizerStrategyName.RANDOM_SEARCH)
+        assert optimizer.strategy_name() is OptimizerStrategyName.RANDOM_SEARCH
 
-        optimizer2 = registry.get("optuna_tpe")
-        assert optimizer2.strategy_name() == "optuna_tpe"
+        optimizer2 = registry.get(OptimizerStrategyName.OPTUNA_TPE)
+        assert optimizer2.strategy_name() is OptimizerStrategyName.OPTUNA_TPE
 
     def test_strategies_work(self) -> None:
         """Fake strategies produce valid results."""
         registry = make_test_optimizer_registry()
-        optimizer = registry.get("random_search")
+        optimizer = registry.get(OptimizerStrategyName.RANDOM_SEARCH)
 
         x = _make_features(100, 10)
         y = _make_labels(100)
@@ -277,9 +279,9 @@ class TestMakeTestOptimizerRegistry:
     def test_grid_search_strategy(self) -> None:
         """Grid search strategy is accessible and works."""
         registry = make_test_optimizer_registry()
-        optimizer = registry.get("grid_search")
+        optimizer = registry.get(OptimizerStrategyName.GRID_SEARCH)
 
-        assert optimizer.strategy_name() == "grid_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.GRID_SEARCH
         caps = optimizer.capabilities()
         assert caps["is_deterministic"] is True
 
@@ -423,7 +425,7 @@ class TestFakeTrialCallback:
             float_params=SampledFloatParams(learning_rate=0.1),
             string_params=SampledStringParams(),
             duration_seconds=1.0,
-            state="complete",
+            state=TrialState.COMPLETE,
         )
 
         callback(result)

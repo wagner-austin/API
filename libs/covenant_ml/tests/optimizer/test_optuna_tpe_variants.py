@@ -14,6 +14,7 @@ from covenant_ml.optimizer.strategies import _hooks as _tpe_hooks
 from covenant_ml.optimizer.strategies.optuna_tpe import (
     OptunaTpeOptimizer,
 )
+from covenant_ml.optimizer.types import TrialState
 from tests.optimizer._objective_fixtures import (
     dummy_objective,
     lightgbm_dart_objective,
@@ -323,7 +324,7 @@ class TestOptunaTpeWithTrialCallback:
 
             assert len(callback_results) == 3
             for result in callback_results:
-                assert result["state"] == "complete"
+                assert result["state"] is TrialState.COMPLETE
                 assert result["value"] > 0
         finally:
             _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories

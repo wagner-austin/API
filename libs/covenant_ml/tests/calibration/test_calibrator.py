@@ -11,6 +11,7 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.calibration import (
+    CalibrationMethod,
     Calibrator,
     create_isotonic_calibrator,
     create_platt_calibrator,
@@ -97,7 +98,7 @@ def _make_calibration_data(
 def test_create_isotonic_calibrator() -> None:
     """create_isotonic_calibrator creates Calibrator with isotonic config."""
     calibrator = create_isotonic_calibrator()
-    assert calibrator.config["method"] == "isotonic"
+    assert calibrator.config["method"] is CalibrationMethod.ISOTONIC
     assert calibrator.config["clip_proba"] is True
     assert calibrator.config["eps"] == 1e-10
 
@@ -153,7 +154,7 @@ def test_isotonic_calibrator_transform() -> None:
 
     result = calibrator.transform(y_prob)
 
-    assert result["method"] == "isotonic"
+    assert result["method"] is CalibrationMethod.ISOTONIC
     assert result["raw_proba"].shape == y_prob.shape
     assert result["calibrated_proba"].shape == y_prob.shape
 
@@ -205,11 +206,11 @@ def test_isotonic_calibrator_from_state() -> None:
     restored = Calibrator.from_state(state)
 
     assert restored.is_fitted is True
-    assert restored.config["method"] == "isotonic"
+    assert restored.config["method"] is CalibrationMethod.ISOTONIC
 
     # Transform should work
     result = restored.transform(y_prob)
-    assert result["method"] == "isotonic"
+    assert result["method"] is CalibrationMethod.ISOTONIC
 
 
 def test_isotonic_calibrator_from_testing_state() -> None:
@@ -224,7 +225,7 @@ def test_isotonic_calibrator_from_testing_state() -> None:
     assert calibrator.is_fitted is True
     y_prob = _float_array(0.1, 0.4, 0.8)
     result = calibrator.transform(y_prob)
-    assert result["method"] == "isotonic"
+    assert result["method"] is CalibrationMethod.ISOTONIC
 
 
 # =============================================================================
@@ -235,7 +236,7 @@ def test_isotonic_calibrator_from_testing_state() -> None:
 def test_create_platt_calibrator() -> None:
     """create_platt_calibrator creates Calibrator with platt config."""
     calibrator = create_platt_calibrator()
-    assert calibrator.config["method"] == "platt"
+    assert calibrator.config["method"] is CalibrationMethod.PLATT
     assert calibrator.config["clip_proba"] is True
 
 
@@ -282,7 +283,7 @@ def test_platt_calibrator_transform() -> None:
 
     result = calibrator.transform(y_prob)
 
-    assert result["method"] == "platt"
+    assert result["method"] is CalibrationMethod.PLATT
     assert result["raw_proba"].shape == y_prob.shape
     assert result["calibrated_proba"].shape == y_prob.shape
 
@@ -326,11 +327,11 @@ def test_platt_calibrator_from_state() -> None:
     restored = Calibrator.from_state(state)
 
     assert restored.is_fitted is True
-    assert restored.config["method"] == "platt"
+    assert restored.config["method"] is CalibrationMethod.PLATT
 
     # Transform should work
     result = restored.transform(y_prob)
-    assert result["method"] == "platt"
+    assert result["method"] is CalibrationMethod.PLATT
 
 
 def test_platt_calibrator_from_testing_state() -> None:
@@ -342,7 +343,7 @@ def test_platt_calibrator_from_testing_state() -> None:
     assert calibrator.is_fitted is True
     y_prob = _float_array(0.1, 0.4, 0.8)
     result = calibrator.transform(y_prob)
-    assert result["method"] == "platt"
+    assert result["method"] is CalibrationMethod.PLATT
 
 
 # =============================================================================
@@ -355,7 +356,7 @@ def test_calibrator_direct_instantiation_isotonic() -> None:
     config = make_isotonic_config()
     calibrator = Calibrator(config)
 
-    assert calibrator.config["method"] == "isotonic"
+    assert calibrator.config["method"] is CalibrationMethod.ISOTONIC
     assert calibrator.is_fitted is False
 
 
@@ -364,7 +365,7 @@ def test_calibrator_direct_instantiation_platt() -> None:
     config = make_platt_config()
     calibrator = Calibrator(config)
 
-    assert calibrator.config["method"] == "platt"
+    assert calibrator.config["method"] is CalibrationMethod.PLATT
     assert calibrator.is_fitted is False
 
 
@@ -382,7 +383,7 @@ def test_isotonic_calibrator_without_clipping() -> None:
     assert result["state"]["config"]["clip_proba"] is False
 
     transform_result = calibrator.transform(y_prob)
-    assert transform_result["method"] == "isotonic"
+    assert transform_result["method"] is CalibrationMethod.ISOTONIC
 
 
 def test_platt_calibrator_without_clipping() -> None:
@@ -394,7 +395,7 @@ def test_platt_calibrator_without_clipping() -> None:
     assert result["state"]["config"]["clip_proba"] is False
 
     transform_result = calibrator.transform(y_prob)
-    assert transform_result["method"] == "platt"
+    assert transform_result["method"] is CalibrationMethod.PLATT
 
 
 # =============================================================================

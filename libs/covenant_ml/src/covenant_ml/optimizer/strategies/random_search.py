@@ -37,6 +37,7 @@ from ..types import (
     SampledStringParams,
     SearchSpace,
     TrialResult,
+    TrialState,
     XGBoostSearchSpace,
 )
 
@@ -244,7 +245,7 @@ class RandomSearchOptimizer:
         Returns:
             The literal string 'random_search'.
         """
-        return "random_search"
+        return OptimizerStrategyName.RANDOM_SEARCH
 
     def capabilities(self) -> OptimizerStrategyCapabilities:
         """Return the capabilities of this strategy.
@@ -352,7 +353,7 @@ class RandomSearchOptimizer:
                 "float_params": float_params,
                 "string_params": string_params,
                 "value": val_auc,
-                "state": "complete",
+                "state": TrialState.COMPLETE,
                 "duration_seconds": trial_duration,
             }
 

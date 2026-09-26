@@ -29,6 +29,7 @@ from covenant_ml.ensemble.regression_optimizer import (
 )
 from covenant_ml.ensemble.regression_testing import make_regression_oof_data
 from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleMetric,
     RegressionEnsembleOOFData,
 )
 from covenant_ml.ensemble.types import ModelOOFPredictions
@@ -319,7 +320,9 @@ class TestComputeRegressionEnsembleScore:
         pred_matrix[1, 1] = 4.0
         labels = _float_array((1.5, 3.0))
 
-        score = _compute_regression_ensemble_score(weights, pred_matrix, labels, "neg_rmse")
+        score = _compute_regression_ensemble_score(
+            weights, pred_matrix, labels, RegressionEnsembleMetric.NEG_RMSE
+        )
         assert score >= 0.0  # RMSE is always non-negative
 
     def test_neg_mae_metric(self) -> None:
@@ -332,7 +335,9 @@ class TestComputeRegressionEnsembleScore:
         pred_matrix[1, 1] = 4.0
         labels = _float_array((1.5, 3.0))
 
-        score = _compute_regression_ensemble_score(weights, pred_matrix, labels, "neg_mae")
+        score = _compute_regression_ensemble_score(
+            weights, pred_matrix, labels, RegressionEnsembleMetric.NEG_MAE
+        )
         assert score >= 0.0  # MAE is always non-negative
 
     def test_r_squared_metric(self) -> None:
@@ -344,17 +349,10 @@ class TestComputeRegressionEnsembleScore:
         pred_matrix[0, 2] = 3.0
         labels = _float_array((1.0, 2.0, 3.0))
 
-        score = _compute_regression_ensemble_score(weights, pred_matrix, labels, "r_squared")
+        score = _compute_regression_ensemble_score(
+            weights, pred_matrix, labels, RegressionEnsembleMetric.R_SQUARED
+        )
         assert abs(score - 1.0) < 1e-10  # Perfect R²
-
-    def test_unknown_metric_raises(self) -> None:
-        """Unknown metric raises ValueError."""
-        weights = _float_array((0.5, 0.5))
-        pred_matrix: NDArray[np.float64] = np.zeros((2, 2), dtype=np.float64)
-        labels = _float_array((1.0, 2.0))
-
-        with pytest.raises(ValueError, match="Unknown metric"):
-            _compute_regression_ensemble_score(weights, pred_matrix, labels, "unknown")
 
 
 class TestObjectiveFunction:
@@ -370,7 +368,9 @@ class TestObjectiveFunction:
         pred_matrix[1, 1] = 4.0
         labels = _float_array((1.5, 3.0))
 
-        result = _objective_function(weights, pred_matrix, labels, "neg_rmse")
+        result = _objective_function(
+            weights, pred_matrix, labels, RegressionEnsembleMetric.NEG_RMSE
+        )
         # RMSE is positive; minimize RMSE
         assert result >= 0.0
 
@@ -383,15 +383,8 @@ class TestObjectiveFunction:
         pred_matrix[0, 2] = 3.0
         labels = _float_array((1.0, 2.0, 3.0))
 
-        result = _objective_function(weights, pred_matrix, labels, "r_squared")
+        result = _objective_function(
+            weights, pred_matrix, labels, RegressionEnsembleMetric.R_SQUARED
+        )
         # Perfect R² = 1.0, so objective = -1.0
         assert abs(result - (-1.0)) < 1e-10
-
-    def test_unknown_metric_raises(self) -> None:
-        """Unknown metric raises ValueError."""
-        weights = _float_array((0.5, 0.5))
-        pred_matrix: NDArray[np.float64] = np.zeros((2, 2), dtype=np.float64)
-        labels = _float_array((1.0, 2.0))
-
-        with pytest.raises(ValueError, match="Unknown metric"):
-            _objective_function(weights, pred_matrix, labels, "bad_metric")

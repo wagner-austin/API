@@ -12,13 +12,19 @@ Preprocessing handles:
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
-# Imputation strategy literals
-ImputationStrategy = Literal["median", "mean", "zero"]
+
+class ImputationStrategy(StrEnum):
+    """How a missing value in a feature column is filled."""
+
+    MEDIAN = "median"
+    MEAN = "mean"
+    ZERO = "zero"
 
 
 class OutlierBounds(TypedDict, total=True):
@@ -110,7 +116,7 @@ DEFAULT_SPECIAL_CODES: frozenset[float] = frozenset(
 DEFAULT_OUTLIER_PERCENTILES: tuple[float, float] = (1.0, 99.0)
 
 # Default imputation strategy
-DEFAULT_IMPUTATION_STRATEGY: ImputationStrategy = "median"
+DEFAULT_IMPUTATION_STRATEGY: ImputationStrategy = ImputationStrategy.MEDIAN
 
 
 __all__ = [

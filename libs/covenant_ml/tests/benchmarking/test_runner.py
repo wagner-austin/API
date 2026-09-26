@@ -29,6 +29,7 @@ from covenant_ml.benchmarking.types import (
     BenchmarkConfig,
     BenchmarkModelName,
     DatasetInfo,
+    TimingEstimator,
 )
 
 #: A stated configuration, so every manifest these tests build carries the
@@ -301,7 +302,10 @@ def test_power_throttling_is_disabled_once_per_run(
     the earliest measurements in a different regime from the rest.
     """
     run_benchmark(
-        [RecordingTrainer("cleargbm"), RecordingTrainer("lightgbm")],
+        [
+            RecordingTrainer(BenchmarkModelName.CLEARGBM),
+            RecordingTrainer(BenchmarkModelName.LIGHTGBM),
+        ],
         constant_split,
         [42, 43, 44],
         make_config(repeats=1, warmups=0),
@@ -318,7 +322,10 @@ def test_a_refused_opt_out_aborts_the_run(stepping_clock: SteppingClock) -> None
     try:
         with pytest.raises(RuntimeError, match=ERR_POWER_THROTTLING):
             run_benchmark(
-                [RecordingTrainer("cleargbm"), RecordingTrainer("lightgbm")],
+                [
+                    RecordingTrainer(BenchmarkModelName.CLEARGBM),
+                    RecordingTrainer(BenchmarkModelName.LIGHTGBM),
+                ],
                 constant_split,
                 [42],
                 make_config(repeats=1, warmups=0),
@@ -335,13 +342,13 @@ def test_no_fit_runs_before_the_opt_out(stepping_clock: SteppingClock) -> None:
     A run that fitted first and opted out afterwards would already have
     produced measurements in the wrong regime.
     """
-    trainer = RecordingTrainer("cleargbm")
+    trainer = RecordingTrainer(BenchmarkModelName.CLEARGBM)
     previous = _test_hooks.power_throttling_opt_out
     _test_hooks.power_throttling_opt_out = FailingOptOut()
     try:
         with pytest.raises(RuntimeError, match=ERR_POWER_THROTTLING):
             run_benchmark(
-                [trainer, RecordingTrainer("lightgbm")],
+                [trainer, RecordingTrainer(BenchmarkModelName.LIGHTGBM)],
                 constant_split,
                 [42],
                 make_config(repeats=1, warmups=0),
@@ -354,7 +361,7 @@ def test_no_fit_runs_before_the_opt_out(stepping_clock: SteppingClock) -> None:
 
 
 def test_warmup_fits_run_but_are_not_timed(stepping_clock: SteppingClock) -> None:
-    trainer = RecordingTrainer("cleargbm")
+    trainer = RecordingTrainer(BenchmarkModelName.CLEARGBM)
     result = measure_trainer(trainer, make_split(), 42, make_config(repeats=3, warmups=2), 0)
 
     # 2 warmups + 3 timed fits.
@@ -368,7 +375,7 @@ def test_warmup_fits_run_but_are_not_timed(stepping_clock: SteppingClock) -> Non
 def test_each_timed_fit_is_bracketed_by_two_readings() -> None:
     previous = _test_hooks.monotonic_clock
     _test_hooks.monotonic_clock = ScriptedClock([0.0, 1.0, 10.0, 13.0])
-    trainer = RecordingTrainer("cleargbm")
+    trainer = RecordingTrainer(BenchmarkModelName.CLEARGBM)
     result = measure_trainer(trainer, make_split(), 1, make_config(repeats=2, warmups=0), 0)
     _test_hooks.monotonic_clock = previous
 
@@ -377,23 +384,23 @@ def test_each_timed_fit_is_bracketed_by_two_readings() -> None:
 
 
 def test_result_carries_model_seed_and_order(stepping_clock: SteppingClock) -> None:
-    trainer = RecordingTrainer("lightgbm", mean_leaves=31.0)
+    trainer = RecordingTrainer(BenchmarkModelName.LIGHTGBM, mean_leaves=31.0)
     result = measure_trainer(trainer, make_split(), 44, make_config(), position=1)
 
-    assert result["model"] == "lightgbm"
+    assert result["model"] is BenchmarkModelName.LIGHTGBM
     assert result["seed"] == 44
     assert result["position"] == 1
     assert result["mean_leaves"] == 31.0
 
 
 def test_every_fit_uses_the_requested_seed(stepping_clock: SteppingClock) -> None:
-    trainer = RecordingTrainer("cleargbm")
+    trainer = RecordingTrainer(BenchmarkModelName.CLEARGBM)
     measure_trainer(trainer, make_split(), 99, make_config(repeats=2, warmups=1), 0)
     assert trainer.fit_seeds == [99, 99, 99]
 
 
 def test_zero_repeats_raises(stepping_clock: SteppingClock) -> None:
-    trainer = RecordingTrainer("cleargbm")
+    trainer = RecordingTrainer(BenchmarkModelName.CLEARGBM)
     with pytest.raises(ValueError, match=ERR_INVALID_REPEATS):
         measure_trainer(trainer, make_split(), 1, make_config(repeats=0), 0)
 
@@ -403,7 +410,10 @@ def test_run_benchmark_alternates_which_model_goes_first(
 ) -> None:
     """Whichever model runs first gets the coolest CPU, so order must rotate."""
     manifest = run_benchmark(
-        [RecordingTrainer("cleargbm"), RecordingTrainer("lightgbm")],
+        [
+            RecordingTrainer(BenchmarkModelName.CLEARGBM),
+            RecordingTrainer(BenchmarkModelName.LIGHTGBM),
+        ],
         constant_split,
         [42, 43, 44],
         make_config(repeats=1, warmups=0),
@@ -428,9 +438,9 @@ def test_run_benchmark_rotates_three_arms_through_every_slot(
     """
     manifest = run_benchmark(
         [
-            RecordingTrainer("cleargbm"),
-            RecordingTrainer("cleargbm@leaf_wise"),
-            RecordingTrainer("lightgbm"),
+            RecordingTrainer(BenchmarkModelName.CLEARGBM),
+            RecordingTrainer(BenchmarkModelName.CLEARGBM_LEAF_WISE),
+            RecordingTrainer(BenchmarkModelName.LIGHTGBM),
         ],
         constant_split,
         [42, 43, 44],
@@ -451,7 +461,7 @@ def test_run_benchmark_rotates_three_arms_through_every_slot(
 def test_run_benchmark_requires_at_least_two_arms(stepping_clock: SteppingClock) -> None:
     with pytest.raises(ValueError, match=ERR_TOO_FEW_TRAINERS):
         run_benchmark(
-            [RecordingTrainer("cleargbm")],
+            [RecordingTrainer(BenchmarkModelName.CLEARGBM)],
             constant_split,
             [42],
             make_config(repeats=1, warmups=0),
@@ -467,9 +477,9 @@ def test_run_benchmark_rejects_two_arms_sharing_a_name(
     with pytest.raises(ValueError, match=ERR_DUPLICATE_TRAINER):
         run_benchmark(
             [
-                RecordingTrainer("cleargbm"),
-                RecordingTrainer("cleargbm"),
-                RecordingTrainer("lightgbm"),
+                RecordingTrainer(BenchmarkModelName.CLEARGBM),
+                RecordingTrainer(BenchmarkModelName.CLEARGBM),
+                RecordingTrainer(BenchmarkModelName.LIGHTGBM),
             ],
             constant_split,
             [42],
@@ -483,7 +493,10 @@ def test_run_benchmark_records_both_models_at_every_seed(
     stepping_clock: SteppingClock,
 ) -> None:
     manifest = run_benchmark(
-        [RecordingTrainer("cleargbm"), RecordingTrainer("lightgbm")],
+        [
+            RecordingTrainer(BenchmarkModelName.CLEARGBM),
+            RecordingTrainer(BenchmarkModelName.LIGHTGBM),
+        ],
         constant_split,
         [42, 43],
         make_config(repeats=1, warmups=0),
@@ -494,7 +507,7 @@ def test_run_benchmark_records_both_models_at_every_seed(
     assert len(manifest["results"]) == 4
     assert manifest["seeds"] == [42, 43]
     assert manifest["schema_version"] == MANIFEST_SCHEMA_VERSION
-    assert manifest["estimator"] == "median"
+    assert manifest["estimator"] is TimingEstimator.MEDIAN
 
 
 def test_run_benchmark_passes_each_seed_to_the_split_factory(
@@ -507,7 +520,10 @@ def test_run_benchmark_passes_each_seed_to_the_split_factory(
         return make_split()
 
     run_benchmark(
-        [RecordingTrainer("cleargbm"), RecordingTrainer("lightgbm")],
+        [
+            RecordingTrainer(BenchmarkModelName.CLEARGBM),
+            RecordingTrainer(BenchmarkModelName.LIGHTGBM),
+        ],
         build_split,
         [7, 8],
         make_config(repeats=1, warmups=0),
@@ -520,7 +536,10 @@ def test_run_benchmark_passes_each_seed_to_the_split_factory(
 def test_no_seeds_raises(stepping_clock: SteppingClock) -> None:
     with pytest.raises(ValueError, match=ERR_NO_SEEDS):
         run_benchmark(
-            [RecordingTrainer("cleargbm"), RecordingTrainer("lightgbm")],
+            [
+                RecordingTrainer(BenchmarkModelName.CLEARGBM),
+                RecordingTrainer(BenchmarkModelName.LIGHTGBM),
+            ],
             constant_split,
             [],
             make_config(),

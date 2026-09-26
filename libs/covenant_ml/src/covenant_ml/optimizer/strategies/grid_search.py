@@ -38,6 +38,7 @@ from ..types import (
     SampledStringParams,
     SearchSpace,
     TrialResult,
+    TrialState,
     XGBoostSearchSpace,
 )
 from . import _hooks
@@ -383,7 +384,7 @@ class GridSearchOptimizer:
         Returns:
             The literal string 'grid_search'.
         """
-        return "grid_search"
+        return OptimizerStrategyName.GRID_SEARCH
 
     def capabilities(self) -> OptimizerStrategyCapabilities:
         """Return the capabilities of this strategy.
@@ -498,7 +499,7 @@ class GridSearchOptimizer:
                 "float_params": float_params,
                 "string_params": string_params,
                 "value": val_auc,
-                "state": "complete",
+                "state": TrialState.COMPLETE,
                 "duration_seconds": trial_duration,
             }
 

@@ -16,6 +16,7 @@ import pytest
 
 from covenant_ml.preprocessing import (
     AutoPreprocessor,
+    ImputationStrategy,
     create_auto_preprocessor,
 )
 from tests.preprocessing._pipeline_fixtures import (
@@ -157,7 +158,7 @@ class TestCreateAutoPreprocessor:
         """Creates AutoPreprocessor with custom settings."""
         preprocessor = create_auto_preprocessor(
             outlier_percentiles=(5.0, 95.0),
-            imputation_strategy="mean",
+            imputation_strategy=ImputationStrategy.MEAN,
             special_codes=frozenset({42.0}),
         )
 

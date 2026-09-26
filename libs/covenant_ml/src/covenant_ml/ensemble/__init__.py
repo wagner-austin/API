@@ -36,6 +36,7 @@ from covenant_ml.ensemble.regression_optimizer import (
     validate_regression_oof_data,
 )
 from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleMetric,
     RegressionEnsembleOOFData,
     RegressionOptimizationConfig,
     RegressionOptimizationResult,
@@ -66,6 +67,7 @@ __all__ = [
     "ModelOOFPredictions",
     "OptimizationConfig",
     "OptimizationResult",
+    "RegressionEnsembleMetric",
     "RegressionEnsembleOOFData",
     "RegressionOptimizationConfig",
     "RegressionOptimizationResult",

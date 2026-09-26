@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from covenant_ml.datasets.types_temporal import (
     SeasonalCycleCoefficients,
+    SeasonDefinition,
     TailThresholds,
     TemporalFeatureConfig,
     TemporalFeatureState,
@@ -17,7 +18,7 @@ def _make_test_state() -> TemporalFeatureState:
             n_fourier_harmonics=2,
             hot_cutoff_percentile=95.0,
             cold_cutoff_percentile=5.0,
-            season="warm",
+            season=SeasonDefinition.WARM,
             season_months=(6, 7, 8),
             compute_ar1=True,
         ),

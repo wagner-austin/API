@@ -20,6 +20,7 @@ from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledStringParams,
     TrialResult,
+    TrialState,
 )
 from tests.optimizer._fake_optuna import (
     FakeTrial,
@@ -314,7 +315,7 @@ def test_lightgbm_optimizer_with_trial_callback() -> None:
         )
         assert len(callbacks) == 3
         for result in callbacks:
-            assert result["state"] == "complete"
+            assert result["state"] is TrialState.COMPLETE
     finally:
         _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 

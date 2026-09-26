@@ -14,13 +14,14 @@ Key components:
 
 Example:
     >>> from covenant_ml.validation import (
+    ...     CVStrategyName,
     ...     run_cross_validation,
     ...     compute_oof_metrics,
     ...     default_cv_registry,
     ... )
     >>> # Using registry for pluggable strategies
     >>> registry = default_cv_registry()
-    >>> splitter = registry.get("stratified_kfold")
+    >>> splitter = registry.get(CVStrategyName.STRATIFIED_KFOLD)
     >>> splits = splitter.split(y, n_folds=5, random_state=42)
     >>> # Or use direct functions
     >>> cv_result = run_cross_validation(x, y, n_folds=5, random_state=42, trainer=fn)

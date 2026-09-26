@@ -22,7 +22,7 @@ from covenant_ml.finetuning.strategies import (
     create_warm_start_finetuning,
 )
 from covenant_ml.finetuning.testing import FakeFineTuningStrategy
-from covenant_ml.finetuning.types import FineTuningConfig, StageConfig
+from covenant_ml.finetuning.types import FineTuningConfig, FineTuningStage, StageConfig
 from covenant_ml.optimizer.types import (
     FloatRangeSpec,
     IntRangeSpec,
@@ -69,7 +69,7 @@ def _make_config() -> FineTuningConfig:
     return FineTuningConfig(
         stages=(
             StageConfig(
-                stage_name="exploration",
+                stage_name=FineTuningStage.EXPLORATION,
                 n_trials=3,
                 search_radius=1.0,
                 use_previous_best=False,
@@ -146,7 +146,7 @@ class TestProtocolCompliance:
 
         # Methods should work correctly
         name: FineTuningStrategyName = strategy.strategy_name()
-        assert name in ("staged", "warm_start", "iterative_refinement")
+        assert name is FineTuningStrategyName.STAGED
 
         caps = strategy.capabilities()
         assert caps["supports_warm_start"] is True
@@ -156,7 +156,7 @@ class TestProtocolCompliance:
         strategy: FineTuningStrategyProtocol = create_staged_finetuning()
 
         name = strategy.strategy_name()
-        assert name == "staged"
+        assert name is FineTuningStrategyName.STAGED
 
         caps = strategy.capabilities()
         assert caps["supports_staged"] is True
@@ -166,7 +166,7 @@ class TestProtocolCompliance:
         strategy: FineTuningStrategyProtocol = create_warm_start_finetuning()
 
         name = strategy.strategy_name()
-        assert name == "warm_start"
+        assert name is FineTuningStrategyName.WARM_START
 
         caps = strategy.capabilities()
         assert caps["supports_warm_start"] is True
@@ -176,7 +176,7 @@ class TestProtocolCompliance:
         strategy: FineTuningStrategyProtocol = create_iterative_refinement_finetuning()
 
         name = strategy.strategy_name()
-        assert name == "iterative_refinement"
+        assert name is FineTuningStrategyName.ITERATIVE_REFINEMENT
 
         caps = strategy.capabilities()
         assert caps["supports_early_stop"] is True
@@ -193,19 +193,19 @@ class TestFactoryProtocol:
     def test_staged_factory_returns_protocol(self) -> None:
         """Staged factory returns protocol-compliant instance."""
         strategy: FineTuningStrategyProtocol = create_staged_finetuning()
-        assert strategy.strategy_name() == "staged"
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
         assert strategy.capabilities()["supports_staged"] is True
 
     def test_warm_start_factory_returns_protocol(self) -> None:
         """Warm start factory returns protocol-compliant instance."""
         strategy: FineTuningStrategyProtocol = create_warm_start_finetuning()
-        assert strategy.strategy_name() == "warm_start"
+        assert strategy.strategy_name() is FineTuningStrategyName.WARM_START
         assert strategy.capabilities()["supports_warm_start"] is True
 
     def test_iterative_factory_returns_protocol(self) -> None:
         """Iterative factory returns protocol-compliant instance."""
         strategy: FineTuningStrategyProtocol = create_iterative_refinement_finetuning()
-        assert strategy.strategy_name() == "iterative_refinement"
+        assert strategy.strategy_name() is FineTuningStrategyName.ITERATIVE_REFINEMENT
         assert strategy.capabilities()["supports_early_stop"] is True
 
 
@@ -215,25 +215,25 @@ class TestFactoryProtocol:
 
 
 class TestFineTuningStrategyName:
-    """Tests for FineTuningStrategyName literal type."""
+    """Tests for the FineTuningStrategyName enum."""
 
     def test_staged_returns_valid_name(self) -> None:
         """Staged strategy returns valid name."""
         strategy: FineTuningStrategyProtocol = create_staged_finetuning()
         name: FineTuningStrategyName = strategy.strategy_name()
-        assert name == "staged"
+        assert name is FineTuningStrategyName.STAGED
 
     def test_warm_start_returns_valid_name(self) -> None:
         """Warm start strategy returns valid name."""
         strategy: FineTuningStrategyProtocol = create_warm_start_finetuning()
         name: FineTuningStrategyName = strategy.strategy_name()
-        assert name == "warm_start"
+        assert name is FineTuningStrategyName.WARM_START
 
     def test_iterative_returns_valid_name(self) -> None:
         """Iterative strategy returns valid name."""
         strategy: FineTuningStrategyProtocol = create_iterative_refinement_finetuning()
         name: FineTuningStrategyName = strategy.strategy_name()
-        assert name == "iterative_refinement"
+        assert name is FineTuningStrategyName.ITERATIVE_REFINEMENT
 
 
 # =============================================================================

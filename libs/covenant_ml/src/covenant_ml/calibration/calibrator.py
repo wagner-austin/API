@@ -136,7 +136,7 @@ class Calibrator:
         state: CalibratorState
         calibrated: NDArray[np.float64]
 
-        if method == "isotonic":
+        if method is CalibrationMethod.ISOTONIC:
             iso_state, calibrated = self._fit_isotonic(y_true, y_prob)
             state = iso_state
         else:
@@ -287,7 +287,7 @@ class Calibrator:
             y_prob = _clip_probabilities(y_prob, eps)
 
         calibrated: NDArray[np.float64]
-        if method == "isotonic":
+        if method is CalibrationMethod.ISOTONIC:
             if self._iso_model is None:
                 raise RuntimeError("Isotonic model not initialized")
             raw_pred: NDArray[np.float64] = self._iso_model.predict(y_prob)
@@ -369,7 +369,7 @@ def create_isotonic_calibrator(
         Calibrator configured for isotonic regression.
     """
     config: CalibratorConfig = {
-        "method": "isotonic",
+        "method": CalibrationMethod.ISOTONIC,
         "clip_proba": clip_proba,
         "eps": eps,
     }
@@ -390,7 +390,7 @@ def create_platt_calibrator(
         Calibrator configured for Platt scaling.
     """
     config: CalibratorConfig = {
-        "method": "platt",
+        "method": CalibrationMethod.PLATT,
         "clip_proba": clip_proba,
         "eps": eps,
     }

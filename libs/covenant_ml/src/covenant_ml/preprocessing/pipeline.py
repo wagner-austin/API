@@ -184,11 +184,11 @@ def compute_imputation_values(
         # Compute imputation value
         if len(valid_values) == 0:
             impute_value = 0.0
-        elif strategy == "median":
+        elif strategy is ImputationStrategy.MEDIAN:
             impute_value = _safe_median(valid_values)
-        elif strategy == "mean":
+        elif strategy is ImputationStrategy.MEAN:
             impute_value = _safe_mean(valid_values)
-        else:  # "zero"
+        else:  # ImputationStrategy.ZERO
             impute_value = 0.0
 
         specs.append(

@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 
-SeasonDefinition = Literal["warm", "cold", "full_year"]
+
+class SeasonDefinition(StrEnum):
+    """Which part of the year a temporal feature extraction analyses."""
+
+    WARM = "warm"
+    COLD = "cold"
+    FULL_YEAR = "full_year"
 
 
 def _require_positive_int(value: JSONValue, field: str) -> int:
@@ -74,18 +81,15 @@ def _require_season(value: JSONValue, field: str) -> SeasonDefinition:
         field: Field name for error message.
 
     Returns:
-        Validated SeasonDefinition literal.
+        The SeasonDefinition member carrying the value.
 
     Raises:
         ValueError: If value is not a valid season.
     """
-    if not isinstance(value, str) or value not in ("warm", "cold", "full_year"):
+    season = find_member(value, SeasonDefinition) if isinstance(value, str) else None
+    if season is None:
         raise ValueError(f"{field} must be 'warm', 'cold', or 'full_year'")
-    if value == "warm":
-        return "warm"
-    if value == "cold":
-        return "cold"
-    return "full_year"
+    return season
 
 
 def _require_month_tuple(value: JSONValue, field: str) -> tuple[int, ...]:

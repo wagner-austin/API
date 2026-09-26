@@ -6,7 +6,8 @@ Defines the FineTuningStrategy interface that implementations must satisfy.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from enum import StrEnum
+from typing import Protocol, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,11 +20,13 @@ from .types import FineTuningConfig, FineTuningResult, WarmStartConfig
 # Strategy Names and Capabilities
 # =============================================================================
 
-FineTuningStrategyName = Literal[
-    "staged",
-    "warm_start",
-    "iterative_refinement",
-]
+
+class FineTuningStrategyName(StrEnum):
+    """The registered fine-tuning strategies, by their registry name."""
+
+    STAGED = "staged"
+    WARM_START = "warm_start"
+    ITERATIVE_REFINEMENT = "iterative_refinement"
 
 
 class FineTuningCapabilities(TypedDict, total=True):

@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.finetuning.protocol import FineTuningStrategyName
 from covenant_ml.finetuning.strategies import (
     create_iterative_refinement_finetuning,
 )
@@ -21,6 +22,7 @@ from covenant_ml.finetuning.strategies.staged import StagedFineTuning
 from covenant_ml.finetuning.strategies.warm_start import WarmStartFineTuning
 from covenant_ml.finetuning.types import (
     FineTuningConfig,
+    FineTuningStage,
     StageConfig,
     WarmStartConfig,
 )
@@ -46,7 +48,7 @@ class TestIterativeRefinementFineTuning:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         strategy = IterativeRefinementFineTuning()
-        assert strategy.strategy_name() == "iterative_refinement"
+        assert strategy.strategy_name() is FineTuningStrategyName.ITERATIVE_REFINEMENT
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -89,7 +91,7 @@ class TestIterativeRefinementFineTuning:
         config = FineTuningConfig(
             stages=(
                 StageConfig(
-                    stage_name="exploration",
+                    stage_name=FineTuningStage.EXPLORATION,
                     n_trials=3,
                     search_radius=1.0,
                     use_previous_best=False,
@@ -250,14 +252,14 @@ class TestIterativeRefinementFineTuning:
         )
 
         # First iteration should be exploration
-        assert result["stage_results"][0]["stage_name"] == "exploration"
+        assert result["stage_results"][0]["stage_name"] is FineTuningStage.EXPLORATION
         # Last iteration should be final
-        assert result["stage_results"][-1]["stage_name"] == "final"
+        assert result["stage_results"][-1]["stage_name"] is FineTuningStage.FINAL
 
     def test_factory_function(self) -> None:
         """Factory function creates correct strategy."""
         strategy = create_iterative_refinement_finetuning()
-        assert strategy.strategy_name() == "iterative_refinement"
+        assert strategy.strategy_name() is FineTuningStrategyName.ITERATIVE_REFINEMENT
         caps = strategy.capabilities()
         assert caps["supports_early_stop"] is True
 

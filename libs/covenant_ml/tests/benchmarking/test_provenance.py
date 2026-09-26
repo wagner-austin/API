@@ -41,6 +41,7 @@ from covenant_ml.benchmarking.types import (
     BenchmarkManifest,
     BenchmarkModelName,
     SeedResult,
+    TimingEstimator,
 )
 
 _DIGEST = "sha256:" + "ab" * 32
@@ -114,8 +115,8 @@ def _two_arms(canonical_s: float = 8.0) -> list[SeedResult]:
         Both records.
     """
     return [
-        _result("cleargbm", canonical_s, 31.0),
-        _result("lightgbm", 4.0, 31.0),
+        _result(BenchmarkModelName.CLEARGBM, canonical_s, 31.0),
+        _result(BenchmarkModelName.LIGHTGBM, 4.0, 31.0),
     ]
 
 
@@ -130,7 +131,7 @@ def make_manifest(results: list[SeedResult]) -> BenchmarkManifest:
     """
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
-        "estimator": "median",
+        "estimator": TimingEstimator.MEDIAN,
         "config": {
             "n_estimators": 200,
             "max_depth": 6,

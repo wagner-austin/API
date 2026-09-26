@@ -147,21 +147,23 @@ def default_cv_registry() -> CVSplitterRegistry:
 
     # Stratified K-Fold
     create_stratified_kfold: CVSplitterFactory = strategies_mod.create_stratified_kfold_splitter
-    reg.register("stratified_kfold", CVSplitterRegistration(create_stratified_kfold))
+    reg.register(CVStrategyName.STRATIFIED_KFOLD, CVSplitterRegistration(create_stratified_kfold))
 
     # Group Stratified K-Fold
     create_group_stratified: CVSplitterFactory = (
         strategies_mod.create_group_stratified_kfold_splitter
     )
-    reg.register("group_stratified_kfold", CVSplitterRegistration(create_group_stratified))
+    reg.register(
+        CVStrategyName.GROUP_STRATIFIED_KFOLD, CVSplitterRegistration(create_group_stratified)
+    )
 
     # Shuffle Split
     create_shuffle_split: CVSplitterFactory = strategies_mod.create_shuffle_split_splitter
-    reg.register("shuffle_split", CVSplitterRegistration(create_shuffle_split))
+    reg.register(CVStrategyName.SHUFFLE_SPLIT, CVSplitterRegistration(create_shuffle_split))
 
     # Time Series Split
     create_time_series: CVSplitterFactory = strategies_mod.create_time_series_splitter
-    reg.register("time_series", CVSplitterRegistration(create_time_series))
+    reg.register(CVStrategyName.TIME_SERIES, CVSplitterRegistration(create_time_series))
 
     return reg
 

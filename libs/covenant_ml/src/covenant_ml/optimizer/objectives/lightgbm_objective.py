@@ -132,16 +132,16 @@ def _resolve_lightgbm_device(
     actual_platform = platform if platform is not None else sys.platform
 
     if device is RequestedDevice.AUTO:
-        return "cpu"
+        return LightGBMDevice.CPU
     if device is RequestedDevice.CUDA and actual_platform == "win32":
         _log.info(
             "LightGBM CUDA not supported on Windows, using OpenCL GPU instead",
-            extra={"requested_device": device, "resolved_device": "gpu"},
+            extra={"requested_device": device, "resolved_device": LightGBMDevice.GPU},
         )
-        return "gpu"
+        return LightGBMDevice.GPU
     if device is RequestedDevice.CUDA:
-        return "cuda"
-    return "cpu"
+        return LightGBMDevice.CUDA
+    return LightGBMDevice.CPU
 
 
 # =============================================================================

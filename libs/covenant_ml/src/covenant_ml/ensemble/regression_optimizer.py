@@ -21,6 +21,7 @@ from covenant_ml.ensemble._hooks import (
     _OptionsDict,
 )
 from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleMetric,
     RegressionEnsembleOOFData,
     RegressionOptimizationConfig,
     RegressionOptimizationResult,
@@ -196,7 +197,7 @@ def _compute_regression_ensemble_score(
     weights: NDArray[np.float64],
     pred_matrix: NDArray[np.float64],
     labels: NDArray[np.float64],
-    metric: str,
+    metric: RegressionEnsembleMetric,
 ) -> float:
     """Compute regression score for given weights on the natural scale.
 
@@ -207,28 +208,25 @@ def _compute_regression_ensemble_score(
         weights: Model weights, shape (n_models,).
         pred_matrix: Prediction matrix, shape (n_models, n_samples).
         labels: True continuous labels, shape (n_samples,).
-        metric: Metric name (neg_rmse, neg_mae, r_squared).
+        metric: The metric to score.
 
     Returns:
         Metric value on natural scale.
     """
     preds = _compute_weighted_preds(weights, pred_matrix)
 
-    if metric == "neg_rmse":
+    if metric is RegressionEnsembleMetric.NEG_RMSE:
         return compute_rmse(labels, preds)
-    if metric == "neg_mae":
+    if metric is RegressionEnsembleMetric.NEG_MAE:
         return compute_mae(labels, preds)
-    if metric == "r_squared":
-        return compute_r_squared(labels, preds)
-
-    raise ValueError(f"Unknown metric: {metric}")
+    return compute_r_squared(labels, preds)
 
 
 def _objective_function(
     weights: NDArray[np.float64],
     pred_matrix: NDArray[np.float64],
     labels: NDArray[np.float64],
-    metric: str,
+    metric: RegressionEnsembleMetric,
 ) -> float:
     """Objective function for minimization.
 
@@ -239,21 +237,18 @@ def _objective_function(
         weights: Model weights, shape (n_models,).
         pred_matrix: Prediction matrix, shape (n_models, n_samples).
         labels: True continuous labels, shape (n_samples,).
-        metric: Metric name.
+        metric: The metric to optimize.
 
     Returns:
         Value to minimize.
     """
-    if metric == "neg_rmse":
+    if metric is RegressionEnsembleMetric.NEG_RMSE:
         preds = _compute_weighted_preds(weights, pred_matrix)
         return compute_rmse(labels, preds)
-    if metric == "neg_mae":
+    if metric is RegressionEnsembleMetric.NEG_MAE:
         preds = _compute_weighted_preds(weights, pred_matrix)
         return compute_mae(labels, preds)
-    if metric == "r_squared":
-        return _compute_neg_r_squared(weights, pred_matrix, labels)
-
-    raise ValueError(f"Unknown metric: {metric}")
+    return _compute_neg_r_squared(weights, pred_matrix, labels)
 
 
 # =============================================================================

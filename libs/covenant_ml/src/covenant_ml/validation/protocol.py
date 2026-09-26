@@ -6,7 +6,8 @@ Defines the CVSplitter interface that implementations must satisfy.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from enum import StrEnum
+from typing import Protocol, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -17,12 +18,14 @@ from .types import CVSplitInfo
 # Strategy Names and Capabilities
 # =============================================================================
 
-CVStrategyName = Literal[
-    "stratified_kfold",
-    "group_stratified_kfold",
-    "shuffle_split",
-    "time_series",
-]
+
+class CVStrategyName(StrEnum):
+    """The registered cross-validation strategies, by registry name."""
+
+    STRATIFIED_KFOLD = "stratified_kfold"
+    GROUP_STRATIFIED_KFOLD = "group_stratified_kfold"
+    SHUFFLE_SPLIT = "shuffle_split"
+    TIME_SERIES = "time_series"
 
 
 class CVStrategyCapabilities(TypedDict, total=True):

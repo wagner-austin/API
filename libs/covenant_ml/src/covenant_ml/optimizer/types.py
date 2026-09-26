@@ -6,6 +6,7 @@ Defines search space configurations, trial results, and optimization summaries.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 # =============================================================================
@@ -15,9 +16,17 @@ from typing import Literal, TypedDict
 # The user-facing device request is platform_ml's RequestedDevice, re-exported
 # by covenant_ml.types; only LightGBM's own device words are declared here.
 
-# LightGBM-specific device parameter
-# Note: "cuda" is Linux-only; "gpu" uses OpenCL and works on all platforms
-LightGBMDevice = Literal["cpu", "gpu", "cuda"]
+
+class LightGBMDevice(StrEnum):
+    """LightGBM's own ``device`` parameter words.
+
+    ``CUDA`` is Linux-only; ``GPU`` uses OpenCL and works on all platforms.
+    """
+
+    CPU = "cpu"
+    GPU = "gpu"
+    CUDA = "cuda"
+
 
 # =============================================================================
 # Parameter Specification Types
@@ -318,7 +327,14 @@ SearchSpace = (
 # Trial State and Results
 # =============================================================================
 
-TrialState = Literal["complete", "pruned", "failed", "running"]
+
+class TrialState(StrEnum):
+    """Where one optimization trial ended up."""
+
+    COMPLETE = "complete"
+    PRUNED = "pruned"
+    FAILED = "failed"
+    RUNNING = "running"
 
 
 class TrialResult(TypedDict, total=True):

@@ -331,12 +331,12 @@ class ClearGbmTrainer:
         """Name recorded for this trainer's results.
 
         Returns:
-            ``"cleargbm"`` for the baseline arm, ``"cleargbm@leaf_wise"`` for
-            the leaf-wise variant.
+            CLEARGBM for the baseline arm, CLEARGBM_LEAF_WISE for the
+            leaf-wise variant.
         """
         if self._growth_strategy is GrowthStrategy.LEAF_WISE:
-            return "cleargbm@leaf_wise"
-        return "cleargbm"
+            return BenchmarkModelName.CLEARGBM_LEAF_WISE
+        return BenchmarkModelName.CLEARGBM
 
     def fit(self, split: DataSplit, seed: int) -> TrainedModelProto:
         """Fit ClearGBM on the split's training partition.
@@ -460,9 +460,9 @@ class XgBoostTrainer:
         """Name recorded for this trainer's results.
 
         Returns:
-            The literal ``"xgboost"``.
+            BenchmarkModelName.XGBOOST.
         """
-        return "xgboost"
+        return BenchmarkModelName.XGBOOST
 
     def fit(self, split: DataSplit, seed: int) -> TrainedModelProto:
         """Fit XGBoost on the split's training partition.
@@ -512,9 +512,9 @@ class LightGbmTrainer:
         """Name recorded for this trainer's results.
 
         Returns:
-            The literal ``"lightgbm"``.
+            BenchmarkModelName.LIGHTGBM.
         """
-        return "lightgbm"
+        return BenchmarkModelName.LIGHTGBM
 
     def fit(self, split: DataSplit, seed: int) -> TrainedModelProto:
         """Fit LightGBM on the split's training partition.

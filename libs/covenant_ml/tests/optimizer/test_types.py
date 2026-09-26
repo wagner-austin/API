@@ -17,6 +17,7 @@ from covenant_ml.optimizer.types import (
     SampledStringParams,
     SearchSpace,
     TrialResult,
+    TrialState,
     XGBoostSearchSpace,
 )
 
@@ -193,12 +194,12 @@ def test_trial_result_construction() -> None:
         "float_params": float_params,
         "string_params": string_params,
         "value": 0.85,
-        "state": "complete",
+        "state": TrialState.COMPLETE,
         "duration_seconds": 1.5,
     }
     assert result["trial_number"] == 0
     assert result["value"] == 0.85
-    assert result["state"] == "complete"
+    assert result["state"] is TrialState.COMPLETE
     assert result["int_params"]["max_depth"] == 5
 
 
@@ -210,10 +211,10 @@ def test_trial_result_complete_state() -> None:
         "float_params": {"learning_rate": 0.1},
         "string_params": {},
         "value": 0.5,
-        "state": "complete",
+        "state": TrialState.COMPLETE,
         "duration_seconds": 1.0,
     }
-    assert result["state"] == "complete"
+    assert result["state"] is TrialState.COMPLETE
 
 
 def test_trial_result_pruned_state() -> None:
@@ -224,10 +225,10 @@ def test_trial_result_pruned_state() -> None:
         "float_params": {"learning_rate": 0.1},
         "string_params": {},
         "value": 0.4,
-        "state": "pruned",
+        "state": TrialState.PRUNED,
         "duration_seconds": 0.5,
     }
-    assert result["state"] == "pruned"
+    assert result["state"] is TrialState.PRUNED
 
 
 def test_trial_result_failed_state() -> None:
@@ -238,10 +239,10 @@ def test_trial_result_failed_state() -> None:
         "float_params": {"learning_rate": 0.1},
         "string_params": {},
         "value": 0.0,
-        "state": "failed",
+        "state": TrialState.FAILED,
         "duration_seconds": 0.1,
     }
-    assert result["state"] == "failed"
+    assert result["state"] is TrialState.FAILED
 
 
 def test_trial_result_running_state() -> None:
@@ -252,10 +253,10 @@ def test_trial_result_running_state() -> None:
         "float_params": {"learning_rate": 0.1},
         "string_params": {},
         "value": 0.0,
-        "state": "running",
+        "state": TrialState.RUNNING,
         "duration_seconds": 0.0,
     }
-    assert result["state"] == "running"
+    assert result["state"] is TrialState.RUNNING
 
 
 def test_optimization_summary_construction() -> None:

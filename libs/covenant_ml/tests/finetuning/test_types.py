@@ -14,6 +14,7 @@ from __future__ import annotations
 from covenant_ml.finetuning.types import (
     FineTuningConfig,
     FineTuningResult,
+    FineTuningStage,
     StageConfig,
     StageResult,
     WarmStartConfig,
@@ -60,13 +61,13 @@ class TestStageConfig:
     def test_create_exploration_stage(self) -> None:
         """Can create exploration stage config."""
         config = StageConfig(
-            stage_name="exploration",
+            stage_name=FineTuningStage.EXPLORATION,
             n_trials=50,
             search_radius=1.0,
             use_previous_best=False,
         )
 
-        assert config["stage_name"] == "exploration"
+        assert config["stage_name"] is FineTuningStage.EXPLORATION
         assert config["n_trials"] == 50
         assert config["search_radius"] == 1.0
         assert config["use_previous_best"] is False
@@ -74,25 +75,25 @@ class TestStageConfig:
     def test_create_refinement_stage(self) -> None:
         """Can create refinement stage config."""
         config = StageConfig(
-            stage_name="refinement",
+            stage_name=FineTuningStage.REFINEMENT,
             n_trials=30,
             search_radius=0.5,
             use_previous_best=True,
         )
 
-        assert config["stage_name"] == "refinement"
+        assert config["stage_name"] is FineTuningStage.REFINEMENT
         assert config["use_previous_best"] is True
 
     def test_create_final_stage(self) -> None:
         """Can create final stage config."""
         config = StageConfig(
-            stage_name="final",
+            stage_name=FineTuningStage.FINAL,
             n_trials=20,
             search_radius=0.25,
             use_previous_best=True,
         )
 
-        assert config["stage_name"] == "final"
+        assert config["stage_name"] is FineTuningStage.FINAL
 
 
 # =============================================================================
@@ -107,13 +108,13 @@ class TestFineTuningConfig:
         """Can create fine-tuning config with stages."""
         stages = (
             StageConfig(
-                stage_name="exploration",
+                stage_name=FineTuningStage.EXPLORATION,
                 n_trials=50,
                 search_radius=1.0,
                 use_previous_best=False,
             ),
             StageConfig(
-                stage_name="refinement",
+                stage_name=FineTuningStage.REFINEMENT,
                 n_trials=30,
                 search_radius=0.5,
                 use_previous_best=True,
@@ -145,13 +146,13 @@ class TestStageResult:
         """Can create stage result."""
         summary = _make_optimization_summary()
         result = StageResult(
-            stage_name="exploration",
+            stage_name=FineTuningStage.EXPLORATION,
             optimization_summary=summary,
             improvement_over_previous=0.0,
             cumulative_trials=10,
         )
 
-        assert result["stage_name"] == "exploration"
+        assert result["stage_name"] is FineTuningStage.EXPLORATION
         assert result["optimization_summary"]["best_value"] == 0.85
         assert result["improvement_over_previous"] == 0.0
         assert result["cumulative_trials"] == 10
@@ -169,7 +170,7 @@ class TestFineTuningResult:
         """Can create complete fine-tuning result."""
         summary = _make_optimization_summary()
         stage_result = StageResult(
-            stage_name="exploration",
+            stage_name=FineTuningStage.EXPLORATION,
             optimization_summary=summary,
             improvement_over_previous=0.0,
             cumulative_trials=10,
@@ -197,7 +198,7 @@ class TestFineTuningResult:
         """Result correctly indicates early stopping."""
         summary = _make_optimization_summary()
         stage_result = StageResult(
-            stage_name="exploration",
+            stage_name=FineTuningStage.EXPLORATION,
             optimization_summary=summary,
             improvement_over_previous=0.0001,
             cumulative_trials=10,
@@ -250,30 +251,32 @@ class TestMakeDefaultStageConfig:
 
     def test_exploration_stage_defaults(self) -> None:
         """Exploration stage uses correct defaults."""
-        config = make_default_stage_config("exploration")
+        config = make_default_stage_config(FineTuningStage.EXPLORATION)
 
-        assert config["stage_name"] == "exploration"
+        assert config["stage_name"] is FineTuningStage.EXPLORATION
         assert config["n_trials"] == 50
         assert config["search_radius"] == 0.5
         assert config["use_previous_best"] is False
 
     def test_refinement_stage_defaults(self) -> None:
         """Refinement stage uses correct defaults."""
-        config = make_default_stage_config("refinement")
+        config = make_default_stage_config(FineTuningStage.REFINEMENT)
 
-        assert config["stage_name"] == "refinement"
+        assert config["stage_name"] is FineTuningStage.REFINEMENT
         assert config["use_previous_best"] is True
 
     def test_final_stage_defaults(self) -> None:
         """Final stage uses correct defaults."""
-        config = make_default_stage_config("final")
+        config = make_default_stage_config(FineTuningStage.FINAL)
 
-        assert config["stage_name"] == "final"
+        assert config["stage_name"] is FineTuningStage.FINAL
         assert config["use_previous_best"] is True
 
     def test_custom_parameters(self) -> None:
         """Can override default parameters."""
-        config = make_default_stage_config("exploration", n_trials=100, search_radius=0.8)
+        config = make_default_stage_config(
+            FineTuningStage.EXPLORATION, n_trials=100, search_radius=0.8
+        )
 
         assert config["n_trials"] == 100
         assert config["search_radius"] == 0.8
@@ -287,9 +290,9 @@ class TestMakeDefaultFineTuningConfig:
         config = make_default_finetuning_config()
 
         assert len(config["stages"]) == 3
-        assert config["stages"][0]["stage_name"] == "exploration"
-        assert config["stages"][1]["stage_name"] == "refinement"
-        assert config["stages"][2]["stage_name"] == "final"
+        assert config["stages"][0]["stage_name"] is FineTuningStage.EXPLORATION
+        assert config["stages"][1]["stage_name"] is FineTuningStage.REFINEMENT
+        assert config["stages"][2]["stage_name"] is FineTuningStage.FINAL
         assert config["random_state"] == 42
         assert config["early_stop_threshold"] == 0.001
 

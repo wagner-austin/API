@@ -12,6 +12,7 @@ Key components:
 
 Usage:
     from covenant_ml.finetuning import (
+        FineTuningStrategyName,
         default_finetuning_registry,
         make_default_finetuning_config,
         make_warm_start_config,
@@ -19,7 +20,7 @@ Usage:
 
     # Get fine-tuning strategy from registry
     registry = default_finetuning_registry()
-    strategy = registry.get("staged")
+    strategy = registry.get(FineTuningStrategyName.STAGED)
 
     # Create configuration
     config = make_default_finetuning_config(

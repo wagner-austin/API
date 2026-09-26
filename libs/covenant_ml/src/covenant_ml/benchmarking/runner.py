@@ -41,6 +41,7 @@ from .types import (
     BenchmarkManifest,
     DatasetInfo,
     SeedResult,
+    TimingEstimator,
 )
 
 
@@ -176,7 +177,7 @@ def run_benchmark(
 
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
-        "estimator": "median",
+        "estimator": TimingEstimator.MEDIAN,
         "config": config,
         "dataset": dataset,
         "seeds": list(seeds),

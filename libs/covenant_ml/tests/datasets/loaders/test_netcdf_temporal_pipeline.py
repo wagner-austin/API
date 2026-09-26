@@ -24,6 +24,7 @@ from covenant_ml.datasets.loaders._netcdf_temporal import (
 )
 from covenant_ml.datasets.testing import create_synthetic_daily_timeseries
 from covenant_ml.datasets.types_temporal import (
+    SeasonDefinition,
     TailThresholds,
     TemporalFeatureConfig,
 )
@@ -54,7 +55,7 @@ class TestSeasonRestrictionInFit:
             n_fourier_harmonics=3,
             hot_cutoff_percentile=95.0,
             cold_cutoff_percentile=5.0,
-            season="warm",
+            season=SeasonDefinition.WARM,
             season_months=(6, 7, 8),
             compute_ar1=False,
         )
@@ -62,7 +63,7 @@ class TestSeasonRestrictionInFit:
             n_fourier_harmonics=3,
             hot_cutoff_percentile=95.0,
             cold_cutoff_percentile=5.0,
-            season="cold",
+            season=SeasonDefinition.COLD,
             season_months=(12, 1, 2),
             compute_ar1=False,
         )
@@ -100,7 +101,7 @@ class TestSeasonRestrictionInFit:
             n_fourier_harmonics=3,
             hot_cutoff_percentile=95.0,
             cold_cutoff_percentile=5.0,
-            season="cold",
+            season=SeasonDefinition.COLD,
             season_months=(12, 1, 2),
             compute_ar1=False,
         )

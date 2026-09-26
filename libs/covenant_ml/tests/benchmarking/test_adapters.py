@@ -16,7 +16,7 @@ from covenant_ml.benchmarking.adapters import (
     XgBoostTrainer,
 )
 from covenant_ml.benchmarking.protocols import DataSplit
-from covenant_ml.benchmarking.types import BenchmarkConfig
+from covenant_ml.benchmarking.types import BenchmarkConfig, BenchmarkModelName
 
 
 def make_config(max_depth: int = 3, num_leaves: int = 7) -> BenchmarkConfig:
@@ -69,7 +69,7 @@ def make_learnable_split(n_rows: int = 400) -> DataSplit:
 
 def test_cleargbm_trainer_reports_its_name() -> None:
     trainer = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.DEPTH_WISE)
-    assert trainer.model_name == "cleargbm"
+    assert trainer.model_name is BenchmarkModelName.CLEARGBM
 
 
 def test_cleargbm_leaf_wise_arm_reports_a_distinct_name() -> None:
@@ -79,15 +79,15 @@ def test_cleargbm_leaf_wise_arm_reports_a_distinct_name() -> None:
     would merge into one series and silently average two growth policies.
     """
     trainer = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.LEAF_WISE)
-    assert trainer.model_name == "cleargbm@leaf_wise"
+    assert trainer.model_name is BenchmarkModelName.CLEARGBM_LEAF_WISE
 
 
 def test_lightgbm_trainer_reports_its_name() -> None:
-    assert LightGbmTrainer(make_config()).model_name == "lightgbm"
+    assert LightGbmTrainer(make_config()).model_name is BenchmarkModelName.LIGHTGBM
 
 
 def test_xgboost_trainer_reports_its_name() -> None:
-    assert XgBoostTrainer(make_config()).model_name == "xgboost"
+    assert XgBoostTrainer(make_config()).model_name is BenchmarkModelName.XGBOOST
 
 
 def test_xgboost_grows_depth_wise_like_the_cleargbm_baseline() -> None:

@@ -20,6 +20,7 @@ from ..types import (
     SampledIntParams,
     SampledStringParams,
     TrialResult,
+    TrialState,
 )
 from . import _hooks
 from ._protocols import OptunaPrunerProtocol, OptunaTrialProtocol
@@ -199,7 +200,7 @@ class OptunaLightGBMOptimizer:
                 "float_params": float_params,
                 "string_params": string_params,
                 "value": val_auc,
-                "state": "complete",
+                "state": TrialState.COMPLETE,
                 "duration_seconds": trial_duration,
             }
 

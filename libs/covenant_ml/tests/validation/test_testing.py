@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.validation import CVStrategyName
 from covenant_ml.validation.testing import (
     FakeCVSplitter,
     make_binary_labels,
@@ -45,12 +46,12 @@ class TestFakeCVSplitter:
     def test_default_strategy_name(self) -> None:
         """Default strategy name is stratified_kfold."""
         splitter = FakeCVSplitter()
-        assert splitter.strategy_name() == "stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.STRATIFIED_KFOLD
 
     def test_custom_strategy_name(self) -> None:
         """Can set custom strategy name using valid Literal."""
-        splitter = FakeCVSplitter(name="time_series")
-        assert splitter.strategy_name() == "time_series"
+        splitter = FakeCVSplitter(name=CVStrategyName.TIME_SERIES)
+        assert splitter.strategy_name() is CVStrategyName.TIME_SERIES
 
     def test_default_capabilities(self) -> None:
         """Default capabilities are correct."""
@@ -137,14 +138,14 @@ class TestMakeFakeCVSplitter:
     def test_default_factory(self) -> None:
         """Factory creates splitter with defaults."""
         splitter = make_fake_cv_splitter()
-        assert splitter.strategy_name() == "stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.STRATIFIED_KFOLD
         caps = splitter.capabilities()
         assert caps["preserves_class_ratio"] is True
 
     def test_factory_with_custom_name(self) -> None:
         """Factory creates splitter with custom name."""
-        splitter = make_fake_cv_splitter(name="time_series")
-        assert splitter.strategy_name() == "time_series"
+        splitter = make_fake_cv_splitter(name=CVStrategyName.TIME_SERIES)
+        assert splitter.strategy_name() is CVStrategyName.TIME_SERIES
 
     def test_factory_creates_working_splitter(self) -> None:
         """Factory creates splitter that works with split."""
@@ -167,25 +168,25 @@ class TestMakeTestCVRegistry:
         registry = make_test_cv_registry()
         strategies = registry.list_strategies()
 
-        assert "stratified_kfold" in strategies
-        assert "group_stratified_kfold" in strategies
-        assert "shuffle_split" in strategies
-        assert "time_series" in strategies
+        assert CVStrategyName.STRATIFIED_KFOLD in strategies
+        assert CVStrategyName.GROUP_STRATIFIED_KFOLD in strategies
+        assert CVStrategyName.SHUFFLE_SPLIT in strategies
+        assert CVStrategyName.TIME_SERIES in strategies
 
     def test_strategies_are_fake(self) -> None:
         """All strategies are FakeCVSplitter instances."""
         registry = make_test_cv_registry()
 
-        splitter = registry.get("stratified_kfold")
-        assert splitter.strategy_name() == "stratified_kfold"
+        splitter = registry.get(CVStrategyName.STRATIFIED_KFOLD)
+        assert splitter.strategy_name() is CVStrategyName.STRATIFIED_KFOLD
 
-        splitter2 = registry.get("time_series")
-        assert splitter2.strategy_name() == "time_series"
+        splitter2 = registry.get(CVStrategyName.TIME_SERIES)
+        assert splitter2.strategy_name() is CVStrategyName.TIME_SERIES
 
     def test_strategies_work(self) -> None:
         """Fake strategies produce valid results."""
         registry = make_test_cv_registry()
-        splitter = registry.get("stratified_kfold")
+        splitter = registry.get(CVStrategyName.STRATIFIED_KFOLD)
 
         y = _make_labels(100)
         split_info = splitter.split(y, n_folds=5, random_state=42)
@@ -196,18 +197,18 @@ class TestMakeTestCVRegistry:
     def test_group_stratified_strategy(self) -> None:
         """Group stratified strategy is accessible and works."""
         registry = make_test_cv_registry()
-        splitter = registry.get("group_stratified_kfold")
+        splitter = registry.get(CVStrategyName.GROUP_STRATIFIED_KFOLD)
 
-        assert splitter.strategy_name() == "group_stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.GROUP_STRATIFIED_KFOLD
         caps = splitter.capabilities()
         assert caps["supports_groups"] is True
 
     def test_shuffle_split_strategy(self) -> None:
         """Shuffle split strategy is accessible and works."""
         registry = make_test_cv_registry()
-        splitter = registry.get("shuffle_split")
+        splitter = registry.get(CVStrategyName.SHUFFLE_SPLIT)
 
-        assert splitter.strategy_name() == "shuffle_split"
+        assert splitter.strategy_name() is CVStrategyName.SHUFFLE_SPLIT
         caps = splitter.capabilities()
         assert caps["preserves_class_ratio"] is True
 

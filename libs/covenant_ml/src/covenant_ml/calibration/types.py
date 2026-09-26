@@ -5,12 +5,18 @@ Strict typing only. No Any, casts, or stubs.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 
-# Calibration method types
-CalibrationMethod = Literal["isotonic", "platt"]
+
+class CalibrationMethod(StrEnum):
+    """How a calibrator maps raw probabilities to calibrated ones."""
+
+    ISOTONIC = "isotonic"
+    PLATT = "platt"
 
 
 class CalibratorConfig(TypedDict, total=True):
@@ -207,14 +213,13 @@ def decode_calibrator_state(data: dict[str, JSONValue]) -> CalibratorState:
     method = _require_str(data.get("method"), "method")
 
     config_raw = _require_dict(data.get("config"), "config")
-    config_method_raw = config_raw.get("method")
-    config_method = _require_str(config_method_raw, "config.method")
-
-    if config_method not in ("isotonic", "platt"):
-        raise ValueError(f"Invalid config.method: {config_method}")
+    config_method_raw = _require_str(config_raw.get("method"), "config.method")
+    config_method = find_member(config_method_raw, CalibrationMethod)
+    if config_method is None:
+        raise ValueError(f"Invalid config.method: {config_method_raw}")
 
     config: CalibratorConfig = {
-        "method": "isotonic" if config_method == "isotonic" else "platt",
+        "method": config_method,
         "clip_proba": _require_bool(config_raw.get("clip_proba"), "config.clip_proba"),
         "eps": _require_float(config_raw.get("eps"), "config.eps"),
     }

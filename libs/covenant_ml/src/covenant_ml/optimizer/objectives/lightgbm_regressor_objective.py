@@ -28,6 +28,7 @@ from covenant_ml.features import (
     get_feature_config_for_preset,
 )
 from covenant_ml.metrics_regression import compute_rmse
+from covenant_ml.optimizer.objectives.lightgbm_objective import _resolve_lightgbm_device
 from covenant_ml.optimizer.types import (
     LightGBMDevice,
     SampledFloatParams,
@@ -110,37 +111,6 @@ def _get_lgb_dataset_and_train() -> tuple[
     train_fn: _LGBTrainFunc = lgb_module.train
     early_stopping: _EarlyStoppingFactory = lgb_module.early_stopping
     return dataset_cls, train_fn, early_stopping
-
-
-def _resolve_lightgbm_device(
-    device: RequestedDevice,
-    *,
-    platform: str | None = None,
-) -> LightGBMDevice:
-    """Resolve user device request to LightGBM-compatible device parameter.
-
-    Args:
-        device: User-requested device ("cpu", "cuda", or "auto").
-        platform: Override for sys.platform (for testing). If None, uses sys.platform.
-
-    Returns:
-        LightGBM device parameter ("cpu", "gpu", or "cuda").
-    """
-    import sys
-
-    actual_platform = platform if platform is not None else sys.platform
-
-    if device is RequestedDevice.AUTO:
-        return "cpu"
-    if device is RequestedDevice.CUDA and actual_platform == "win32":
-        _log.info(
-            "LightGBM CUDA not supported on Windows, using OpenCL GPU instead",
-            extra={"requested_device": device, "resolved_device": "gpu"},
-        )
-        return "gpu"
-    if device is RequestedDevice.CUDA:
-        return "cuda"
-    return "cpu"
 
 
 # =============================================================================

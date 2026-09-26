@@ -17,6 +17,7 @@ from numpy.typing import NDArray
 
 from covenant_ml.preprocessing import (
     ImputationSpec,
+    ImputationStrategy,
     OutlierBounds,
     SpecialCodeSpec,
     apply_zscore,
@@ -140,7 +141,7 @@ class TestComputeImputationValues:
         col0 = _arr(1.0, 2.0, 3.0, 4.0, 5.0)
         col1 = _arr(10.0, 20.0, 30.0, 40.0, 50.0)
         x = _stack_cols(col0, col1)
-        specs = compute_imputation_values(x, special_codes=(), strategy="median")
+        specs = compute_imputation_values(x, special_codes=(), strategy=ImputationStrategy.MEDIAN)
 
         assert len(specs) == 2
         assert specs[0]["impute_value"] == pytest.approx(3.0)  # median of 1-5
@@ -151,7 +152,7 @@ class TestComputeImputationValues:
         col0 = _arr(1.0, 2.0, 3.0, 4.0, 5.0)
         col1 = _arr(10.0, 20.0, 30.0, 40.0, 50.0)
         x = _stack_cols(col0, col1)
-        specs = compute_imputation_values(x, special_codes=(), strategy="mean")
+        specs = compute_imputation_values(x, special_codes=(), strategy=ImputationStrategy.MEAN)
 
         assert specs[0]["impute_value"] == pytest.approx(3.0)  # mean of 1-5
         assert specs[1]["impute_value"] == pytest.approx(30.0)  # mean of 10-50
@@ -159,7 +160,7 @@ class TestComputeImputationValues:
     def test_zero_strategy(self) -> None:
         """Zero strategy always returns 0.0."""
         x = _make_simple_data()
-        specs = compute_imputation_values(x, special_codes=(), strategy="zero")
+        specs = compute_imputation_values(x, special_codes=(), strategy=ImputationStrategy.ZERO)
 
         assert all(s["impute_value"] == 0.0 for s in specs)
 
@@ -167,7 +168,7 @@ class TestComputeImputationValues:
         """Special codes are excluded from imputation computation."""
         x = _col(1.0, 2.0, 3.0, 96.0, 98.0)
         special_codes = (SpecialCodeSpec(feature_idx=0, codes=(96.0, 98.0)),)
-        specs = compute_imputation_values(x, special_codes, strategy="median")
+        specs = compute_imputation_values(x, special_codes, strategy=ImputationStrategy.MEDIAN)
 
         # Median of [1, 2, 3] = 2.0 (96, 98 excluded)
         assert specs[0]["impute_value"] == pytest.approx(2.0)
@@ -175,7 +176,7 @@ class TestComputeImputationValues:
     def test_excludes_nan(self) -> None:
         """NaN values are excluded from imputation computation."""
         x = _col(1.0, 2.0, 3.0, np.nan, np.nan)
-        specs = compute_imputation_values(x, special_codes=(), strategy="median")
+        specs = compute_imputation_values(x, special_codes=(), strategy=ImputationStrategy.MEDIAN)
 
         # Median of [1, 2, 3] = 2.0
         assert specs[0]["impute_value"] == pytest.approx(2.0)
@@ -183,7 +184,7 @@ class TestComputeImputationValues:
     def test_all_nan_returns_zero(self) -> None:
         """All-NaN column returns imputation value of 0.0."""
         x = _col(np.nan, np.nan, np.nan)
-        specs = compute_imputation_values(x, special_codes=(), strategy="median")
+        specs = compute_imputation_values(x, special_codes=(), strategy=ImputationStrategy.MEDIAN)
 
         # No valid values → 0.0
         assert specs[0]["impute_value"] == pytest.approx(0.0)
@@ -191,7 +192,7 @@ class TestComputeImputationValues:
     def test_all_nan_mean_returns_zero(self) -> None:
         """All-NaN column with mean strategy returns 0.0."""
         x = _col(np.nan, np.nan, np.nan)
-        specs = compute_imputation_values(x, special_codes=(), strategy="mean")
+        specs = compute_imputation_values(x, special_codes=(), strategy=ImputationStrategy.MEAN)
 
         # No valid values → 0.0
         assert specs[0]["impute_value"] == pytest.approx(0.0)

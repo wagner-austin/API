@@ -10,12 +10,21 @@ All types are immutable TypedDicts with strict typing.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble.types import EnsembleWeights, ModelOOFPredictions
+
+
+class RegressionEnsembleMetric(StrEnum):
+    """The metric a regression ensemble's weights are optimized against."""
+
+    NEG_RMSE = "neg_rmse"
+    NEG_MAE = "neg_mae"
+    R_SQUARED = "r_squared"
 
 
 class RegressionEnsembleOOFData(TypedDict):
@@ -45,7 +54,7 @@ class RegressionOptimizationConfig(TypedDict):
         random_state: Random seed for reproducibility.
     """
 
-    metric: Literal["neg_rmse", "neg_mae", "r_squared"]
+    metric: RegressionEnsembleMetric
     method: Literal["SLSQP", "trust-constr"]
     max_iterations: int
     tolerance: float
@@ -82,7 +91,7 @@ def make_default_regression_optimization_config(
         Default RegressionOptimizationConfig with neg_rmse metric and SLSQP.
     """
     return RegressionOptimizationConfig(
-        metric="neg_rmse",
+        metric=RegressionEnsembleMetric.NEG_RMSE,
         method="SLSQP",
         max_iterations=1000,
         tolerance=1e-8,
@@ -91,6 +100,7 @@ def make_default_regression_optimization_config(
 
 
 __all__ = [
+    "RegressionEnsembleMetric",
     "RegressionEnsembleOOFData",
     "RegressionOptimizationConfig",
     "RegressionOptimizationResult",

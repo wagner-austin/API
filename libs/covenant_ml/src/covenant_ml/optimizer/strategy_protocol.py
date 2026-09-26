@@ -6,7 +6,8 @@ Defines a unified HyperparameterOptimizer interface that implementations must sa
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from enum import StrEnum
+from typing import Protocol, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,11 +23,13 @@ from .types import (
 # Strategy Names and Capabilities
 # =============================================================================
 
-OptimizerStrategyName = Literal[
-    "optuna_tpe",
-    "random_search",
-    "grid_search",
-]
+
+class OptimizerStrategyName(StrEnum):
+    """The registered hyperparameter optimizer strategies, by registry name."""
+
+    OPTUNA_TPE = "optuna_tpe"
+    RANDOM_SEARCH = "random_search"
+    GRID_SEARCH = "grid_search"
 
 
 class OptimizerStrategyCapabilities(TypedDict, total=True):

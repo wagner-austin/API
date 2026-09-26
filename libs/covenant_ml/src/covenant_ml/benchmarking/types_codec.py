@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from platform_core.comparability import decode_run_fingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 
 from covenant_ml.benchmarking.types import (
     BENCHMARK_MODEL_NAMES,
@@ -201,11 +202,9 @@ def _require_model_name(value: JSONValue, field: str) -> BenchmarkModelName:
         ValueError: If the value is not one of :data:`BENCHMARK_MODEL_NAMES`.
     """
     name = _require_str(value, field)
-    # Driven off the literal's own members rather than a hand-written chain,
-    # so adding an arm cannot leave this validator a version behind.
-    for candidate in BENCHMARK_MODEL_NAMES:
-        if name == candidate:
-            return candidate
+    model = find_member(name, BenchmarkModelName)
+    if model is not None:
+        return model
     accepted = ", ".join(f"'{candidate}'" for candidate in BENCHMARK_MODEL_NAMES)
     raise ValueError(
         f"[{ERR_UNKNOWN_MODEL}] Field '{field}' must be one of {accepted}, got '{name}'"
@@ -226,8 +225,9 @@ def _require_estimator(value: JSONValue, field: str) -> TimingEstimator:
         ValueError: If the value is not ``"median"``.
     """
     name = _require_str(value, field)
-    if name == "median":
-        return "median"
+    estimator = find_member(name, TimingEstimator)
+    if estimator is not None:
+        return estimator
     raise ValueError(f"[{ERR_UNKNOWN_ESTIMATOR}] Field '{field}' must be 'median', got '{name}'")
 
 

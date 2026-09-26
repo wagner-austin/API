@@ -24,7 +24,7 @@ class FakeCVSplitter:
 
     def __init__(
         self,
-        name: CVStrategyName = "stratified_kfold",
+        name: CVStrategyName = CVStrategyName.STRATIFIED_KFOLD,
         capabilities: CVStrategyCapabilities | None = None,
         splits: tuple[CVSplit, ...] | None = None,
     ) -> None:
@@ -132,7 +132,7 @@ class FakeCVSplitter:
 
 
 def make_fake_cv_splitter(
-    name: CVStrategyName = "stratified_kfold",
+    name: CVStrategyName = CVStrategyName.STRATIFIED_KFOLD,
     preserves_class_ratio: bool = True,
     supports_groups: bool = False,
 ) -> FakeCVSplitter:
@@ -252,28 +252,28 @@ def make_test_cv_registry() -> CVSplitterRegistry:
 
     # Register fake stratified_kfold
     def create_fake_stratified() -> CVSplitterProtocol:
-        return make_fake_cv_splitter("stratified_kfold")
+        return make_fake_cv_splitter(CVStrategyName.STRATIFIED_KFOLD)
 
     registry.register(
-        "stratified_kfold",
+        CVStrategyName.STRATIFIED_KFOLD,
         CVSplitterRegistration(create_fake_stratified),
     )
 
     # Register fake group_stratified_kfold
     def create_fake_group_stratified() -> CVSplitterProtocol:
-        return make_fake_cv_splitter("group_stratified_kfold", supports_groups=True)
+        return make_fake_cv_splitter(CVStrategyName.GROUP_STRATIFIED_KFOLD, supports_groups=True)
 
     registry.register(
-        "group_stratified_kfold",
+        CVStrategyName.GROUP_STRATIFIED_KFOLD,
         CVSplitterRegistration(create_fake_group_stratified),
     )
 
     # Register fake shuffle_split
     def create_fake_shuffle() -> CVSplitterProtocol:
-        return make_fake_cv_splitter("shuffle_split")
+        return make_fake_cv_splitter(CVStrategyName.SHUFFLE_SPLIT)
 
     registry.register(
-        "shuffle_split",
+        CVStrategyName.SHUFFLE_SPLIT,
         CVSplitterRegistration(create_fake_shuffle),
     )
 
@@ -285,10 +285,10 @@ def make_test_cv_registry() -> CVSplitterRegistry:
             supports_temporal=True,
             supports_shuffle=False,
         )
-        return FakeCVSplitter(name="time_series", capabilities=caps)
+        return FakeCVSplitter(name=CVStrategyName.TIME_SERIES, capabilities=caps)
 
     registry.register(
-        "time_series",
+        CVStrategyName.TIME_SERIES,
         CVSplitterRegistration(create_fake_time_series),
     )
 

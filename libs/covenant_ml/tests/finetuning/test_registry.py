@@ -13,6 +13,7 @@ import pytest
 from covenant_ml.finetuning import (
     FineTuningRegistration,
     FineTuningRegistry,
+    FineTuningStrategyName,
     default_finetuning_registry,
 )
 from covenant_ml.finetuning.testing import FakeFineTuningStrategy
@@ -74,30 +75,30 @@ class TestFineTuningRegistry:
         registry = FineTuningRegistry()
 
         def factory() -> FakeFineTuningStrategy:
-            return FakeFineTuningStrategy(name="staged")
+            return FakeFineTuningStrategy(name=FineTuningStrategyName.STAGED)
 
         registration = FineTuningRegistration(factory)
-        registry.register("staged", registration)
+        registry.register(FineTuningStrategyName.STAGED, registration)
 
-        strategy = registry.get("staged")
-        assert strategy.strategy_name() == "staged"
+        strategy = registry.get(FineTuningStrategyName.STAGED)
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
 
     def test_list_strategies(self) -> None:
         """List returns all registered strategy names."""
         registry = FineTuningRegistry()
 
         def factory_staged() -> FakeFineTuningStrategy:
-            return FakeFineTuningStrategy(name="staged")
+            return FakeFineTuningStrategy(name=FineTuningStrategyName.STAGED)
 
         def factory_warm() -> FakeFineTuningStrategy:
-            return FakeFineTuningStrategy(name="warm_start")
+            return FakeFineTuningStrategy(name=FineTuningStrategyName.WARM_START)
 
-        registry.register("staged", FineTuningRegistration(factory_staged))
-        registry.register("warm_start", FineTuningRegistration(factory_warm))
+        registry.register(FineTuningStrategyName.STAGED, FineTuningRegistration(factory_staged))
+        registry.register(FineTuningStrategyName.WARM_START, FineTuningRegistration(factory_warm))
 
         strategies = registry.list_strategies()
-        assert "staged" in strategies
-        assert "warm_start" in strategies
+        assert FineTuningStrategyName.STAGED in strategies
+        assert FineTuningStrategyName.WARM_START in strategies
         assert len(strategies) == 2
 
     def test_get_unknown_strategy_raises(self) -> None:
@@ -105,7 +106,7 @@ class TestFineTuningRegistry:
         registry = FineTuningRegistry()
 
         with pytest.raises(KeyError):
-            registry.get("staged")
+            registry.get(FineTuningStrategyName.STAGED)
 
     def test_get_capabilities(self) -> None:
         """Can retrieve capabilities for a strategy."""
@@ -114,9 +115,9 @@ class TestFineTuningRegistry:
         def factory() -> FakeFineTuningStrategy:
             return FakeFineTuningStrategy()
 
-        registry.register("staged", FineTuningRegistration(factory))
+        registry.register(FineTuningStrategyName.STAGED, FineTuningRegistration(factory))
 
-        caps = registry.get_capabilities("staged")
+        caps = registry.get_capabilities(FineTuningStrategyName.STAGED)
         assert caps["supports_warm_start"] is True
         assert caps["supports_staged"] is True
 
@@ -127,11 +128,11 @@ class TestFineTuningRegistry:
         def factory() -> FakeFineTuningStrategy:
             return FakeFineTuningStrategy()
 
-        registry.register("staged", FineTuningRegistration(factory))
+        registry.register(FineTuningStrategyName.STAGED, FineTuningRegistration(factory))
 
-        assert registry.has_strategy("staged") is True
+        assert registry.has_strategy(FineTuningStrategyName.STAGED) is True
         # Check for a valid name that wasn't registered
-        assert registry.has_strategy("warm_start") is False
+        assert registry.has_strategy(FineTuningStrategyName.WARM_START) is False
 
 
 # =============================================================================
@@ -147,34 +148,34 @@ class TestDefaultFineTuningRegistry:
         registry = default_finetuning_registry()
         strategies = registry.list_strategies()
 
-        assert "staged" in strategies
-        assert "warm_start" in strategies
-        assert "iterative_refinement" in strategies
+        assert FineTuningStrategyName.STAGED in strategies
+        assert FineTuningStrategyName.WARM_START in strategies
+        assert FineTuningStrategyName.ITERATIVE_REFINEMENT in strategies
 
     def test_staged_works(self) -> None:
         """Staged strategy from registry works."""
         registry = default_finetuning_registry()
-        strategy = registry.get("staged")
+        strategy = registry.get(FineTuningStrategyName.STAGED)
 
-        assert strategy.strategy_name() == "staged"
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
         caps = strategy.capabilities()
         assert caps["supports_staged"] is True
 
     def test_warm_start_works(self) -> None:
         """Warm start strategy from registry works."""
         registry = default_finetuning_registry()
-        strategy = registry.get("warm_start")
+        strategy = registry.get(FineTuningStrategyName.WARM_START)
 
-        assert strategy.strategy_name() == "warm_start"
+        assert strategy.strategy_name() is FineTuningStrategyName.WARM_START
         caps = strategy.capabilities()
         assert caps["supports_warm_start"] is True
 
     def test_iterative_refinement_works(self) -> None:
         """Iterative refinement strategy from registry works."""
         registry = default_finetuning_registry()
-        strategy = registry.get("iterative_refinement")
+        strategy = registry.get(FineTuningStrategyName.ITERATIVE_REFINEMENT)
 
-        assert strategy.strategy_name() == "iterative_refinement"
+        assert strategy.strategy_name() is FineTuningStrategyName.ITERATIVE_REFINEMENT
         caps = strategy.capabilities()
         assert caps["supports_early_stop"] is True
 
@@ -189,7 +190,7 @@ class TestDefaultFineTuningRegistry:
         """Each get call returns a new strategy instance."""
         registry = default_finetuning_registry()
 
-        strategy1 = registry.get("staged")
-        strategy2 = registry.get("staged")
+        strategy1 = registry.get(FineTuningStrategyName.STAGED)
+        strategy2 = registry.get(FineTuningStrategyName.STAGED)
 
         assert strategy1 is not strategy2

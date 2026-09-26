@@ -20,6 +20,7 @@ from ..space_narrowing import narrow_search_space
 from ..types import (
     FineTuningConfig,
     FineTuningResult,
+    FineTuningStage,
     StageResult,
     WarmStartConfig,
 )
@@ -46,7 +47,7 @@ class WarmStartFineTuning:
         Returns:
             The literal string 'warm_start'.
         """
-        return "warm_start"
+        return FineTuningStrategyName.WARM_START
 
     def capabilities(self) -> FineTuningCapabilities:
         """Return the capabilities of this strategy.
@@ -151,7 +152,7 @@ class WarmStartFineTuning:
             improvement = (summary["best_value"] - prior_best) / abs(prior_best)
 
         stage_result = StageResult(
-            stage_name="refinement",
+            stage_name=FineTuningStage.REFINEMENT,
             optimization_summary=summary,
             improvement_over_previous=improvement,
             cumulative_trials=summary["n_trials_complete"],

@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleMetric,
     RegressionEnsembleOOFData,
     RegressionOptimizationConfig,
     RegressionOptimizationResult,
@@ -137,14 +138,14 @@ class TestRegressionOptimizationConfig:
     def test_create_neg_rmse_config(self) -> None:
         """Can create config with neg_rmse metric."""
         config = RegressionOptimizationConfig(
-            metric="neg_rmse",
+            metric=RegressionEnsembleMetric.NEG_RMSE,
             method="SLSQP",
             max_iterations=100,
             tolerance=1e-6,
             random_state=42,
         )
 
-        assert config["metric"] == "neg_rmse"
+        assert config["metric"] is RegressionEnsembleMetric.NEG_RMSE
         assert config["method"] == "SLSQP"
         assert config["max_iterations"] == 100
         assert config["tolerance"] == 1e-6
@@ -153,26 +154,26 @@ class TestRegressionOptimizationConfig:
     def test_create_neg_mae_config(self) -> None:
         """Can create config with neg_mae metric."""
         config = RegressionOptimizationConfig(
-            metric="neg_mae",
+            metric=RegressionEnsembleMetric.NEG_MAE,
             method="SLSQP",
             max_iterations=500,
             tolerance=1e-8,
             random_state=0,
         )
 
-        assert config["metric"] == "neg_mae"
+        assert config["metric"] is RegressionEnsembleMetric.NEG_MAE
 
     def test_create_r_squared_config(self) -> None:
         """Can create config with r_squared metric."""
         config = RegressionOptimizationConfig(
-            metric="r_squared",
+            metric=RegressionEnsembleMetric.R_SQUARED,
             method="trust-constr",
             max_iterations=200,
             tolerance=1e-7,
             random_state=99,
         )
 
-        assert config["metric"] == "r_squared"
+        assert config["metric"] is RegressionEnsembleMetric.R_SQUARED
         assert config["method"] == "trust-constr"
 
 
@@ -239,7 +240,7 @@ class TestMakeDefaultRegressionOptimizationConfig:
         """Default config uses neg_rmse metric and SLSQP."""
         config = make_default_regression_optimization_config()
 
-        assert config["metric"] == "neg_rmse"
+        assert config["metric"] is RegressionEnsembleMetric.NEG_RMSE
         assert config["method"] == "SLSQP"
         assert config["max_iterations"] == 1000
         assert config["tolerance"] == 1e-8
@@ -251,5 +252,5 @@ class TestMakeDefaultRegressionOptimizationConfig:
 
         assert config["random_state"] == 123
         # Other defaults unchanged
-        assert config["metric"] == "neg_rmse"
+        assert config["metric"] is RegressionEnsembleMetric.NEG_RMSE
         assert config["method"] == "SLSQP"

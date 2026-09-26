@@ -21,6 +21,7 @@ from covenant_ml.benchmarking.types import (
     BenchmarkManifest,
     BenchmarkModelName,
     SeedResult,
+    TimingEstimator,
 )
 
 #: A stated configuration, so every manifest these tests build carries the
@@ -86,7 +87,7 @@ def make_manifest(results: list[SeedResult]) -> BenchmarkManifest:
     """
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
-        "estimator": "median",
+        "estimator": TimingEstimator.MEDIAN,
         "config": {
             "n_estimators": 200,
             "max_depth": 6,
@@ -109,39 +110,43 @@ def make_manifest(results: list[SeedResult]) -> BenchmarkManifest:
 
 def test_model_summary_averages_across_seeds() -> None:
     results = [
-        make_result("cleargbm", 42, 1.0, 50.0),
-        make_result("cleargbm", 43, 3.0, 60.0),
+        make_result(BenchmarkModelName.CLEARGBM, 42, 1.0, 50.0),
+        make_result(BenchmarkModelName.CLEARGBM, 43, 3.0, 60.0),
     ]
-    summary = summarize_model(results, "cleargbm")
+    summary = summarize_model(results, BenchmarkModelName.CLEARGBM)
     assert summary.mean_fit_s == 2.0
     assert summary.mean_leaves == 55.0
 
 
 def test_single_seed_has_zero_standard_deviation() -> None:
-    summary = summarize_model([make_result("cleargbm", 42, 1.0, 50.0)], "cleargbm")
+    summary = summarize_model(
+        [make_result(BenchmarkModelName.CLEARGBM, 42, 1.0, 50.0)], BenchmarkModelName.CLEARGBM
+    )
     assert summary.stdev_fit_s == 0.0
 
 
 def test_multiple_seeds_report_a_standard_deviation() -> None:
     results = [
-        make_result("cleargbm", 42, 1.0, 50.0),
-        make_result("cleargbm", 43, 3.0, 50.0),
+        make_result(BenchmarkModelName.CLEARGBM, 42, 1.0, 50.0),
+        make_result(BenchmarkModelName.CLEARGBM, 43, 3.0, 50.0),
     ]
-    summary = summarize_model(results, "cleargbm")
+    summary = summarize_model(results, BenchmarkModelName.CLEARGBM)
     assert summary.stdev_fit_s > 0.0
 
 
 def test_missing_model_raises() -> None:
     with pytest.raises(ValueError, match=ERR_NO_RESULTS):
-        summarize_model([make_result("cleargbm", 42, 1.0, 50.0)], "lightgbm")
+        summarize_model(
+            [make_result(BenchmarkModelName.CLEARGBM, 42, 1.0, 50.0)], BenchmarkModelName.LIGHTGBM
+        )
 
 
 def test_normalized_ratio_divides_out_the_tree_size_difference() -> None:
     """Twice the work at twice the time is parity per unit of work."""
     manifest = make_manifest(
         [
-            make_result("cleargbm", 42, 2.0, 60.0),
-            make_result("lightgbm", 42, 1.0, 30.0),
+            make_result(BenchmarkModelName.CLEARGBM, 42, 2.0, 60.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 42, 1.0, 30.0),
         ]
     )
     gap = summarize_gap(manifest)
@@ -153,8 +158,8 @@ def test_normalized_ratio_divides_out_the_tree_size_difference() -> None:
 def test_normalized_ratio_exposes_a_real_per_leaf_deficit() -> None:
     manifest = make_manifest(
         [
-            make_result("cleargbm", 42, 3.0, 60.0),
-            make_result("lightgbm", 42, 1.0, 30.0),
+            make_result(BenchmarkModelName.CLEARGBM, 42, 3.0, 60.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 42, 1.0, 30.0),
         ]
     )
     gap = summarize_gap(manifest)
@@ -163,7 +168,7 @@ def test_normalized_ratio_exposes_a_real_per_leaf_deficit() -> None:
 
 
 def test_seed_line_shows_the_full_spread() -> None:
-    line = render_seed_line(make_result("cleargbm", 42, 1.5, 57.9))
+    line = render_seed_line(make_result(BenchmarkModelName.CLEARGBM, 42, 1.5, 57.9))
     assert "cleargbm" in line
     assert "seed=42" in line
     assert "leaves=57.90" in line
@@ -174,8 +179,8 @@ def test_seed_line_shows_the_full_spread() -> None:
 def test_report_contains_both_models_and_all_three_ratios() -> None:
     manifest = make_manifest(
         [
-            make_result("cleargbm", 42, 2.0, 60.0),
-            make_result("lightgbm", 42, 1.0, 30.0),
+            make_result(BenchmarkModelName.CLEARGBM, 42, 2.0, 60.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 42, 1.0, 30.0),
         ]
     )
     report = render_report(manifest)
@@ -190,8 +195,8 @@ def test_report_contains_both_models_and_all_three_ratios() -> None:
 def test_report_records_the_dataset_and_config() -> None:
     manifest = make_manifest(
         [
-            make_result("cleargbm", 42, 2.0, 60.0),
-            make_result("lightgbm", 42, 1.0, 30.0),
+            make_result(BenchmarkModelName.CLEARGBM, 42, 2.0, 60.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 42, 1.0, 30.0),
         ]
     )
     report = render_report(manifest)
@@ -204,10 +209,10 @@ def test_every_model_is_listed_once_across_many_seeds() -> None:
     """Each arm gets one aggregate however many seeds it was measured at."""
     manifest = make_manifest(
         [
-            make_result("cleargbm", 42, 2.0, 60.0),
-            make_result("lightgbm", 42, 1.0, 30.0),
-            make_result("cleargbm", 43, 2.2, 62.0),
-            make_result("lightgbm", 43, 1.1, 31.0),
+            make_result(BenchmarkModelName.CLEARGBM, 42, 2.0, 60.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 42, 1.0, 30.0),
+            make_result(BenchmarkModelName.CLEARGBM, 43, 2.2, 62.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 43, 1.1, 31.0),
         ]
     )
     summaries = summarize_every_model(manifest)
@@ -222,9 +227,9 @@ def test_a_variant_arm_reaches_the_summary_block() -> None:
     the summary, which reads as though it had never been measured."""
     manifest = make_manifest(
         [
-            make_result("cleargbm", 42, 2.0, 60.0),
-            make_result("cleargbm@leaf_wise", 42, 1.5, 31.0),
-            make_result("lightgbm", 42, 1.0, 30.0),
+            make_result(BenchmarkModelName.CLEARGBM, 42, 2.0, 60.0),
+            make_result(BenchmarkModelName.CLEARGBM_LEAF_WISE, 42, 1.5, 31.0),
+            make_result(BenchmarkModelName.LIGHTGBM, 42, 1.0, 30.0),
         ]
     )
     summaries = summarize_every_model(manifest)

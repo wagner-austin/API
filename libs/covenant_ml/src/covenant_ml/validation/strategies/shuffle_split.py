@@ -169,7 +169,7 @@ class ShuffleSplitSplitter:
         Returns:
             The literal string 'shuffle_split'.
         """
-        return "shuffle_split"
+        return CVStrategyName.SHUFFLE_SPLIT
 
     def capabilities(self) -> CVStrategyCapabilities:
         """Return the capabilities of this strategy.

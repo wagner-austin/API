@@ -6,7 +6,8 @@ Defines configuration types for fine-tuning workflows.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from ..optimizer.types import (
     OptimizationSummary,
@@ -19,7 +20,13 @@ from ..optimizer.types import (
 # Fine-Tuning Stage Types
 # =============================================================================
 
-FineTuningStage = Literal["exploration", "refinement", "final"]
+
+class FineTuningStage(StrEnum):
+    """The stage of a fine-tuning run a configuration or result belongs to."""
+
+    EXPLORATION = "exploration"
+    REFINEMENT = "refinement"
+    FINAL = "final"
 
 
 class StageConfig(TypedDict, total=True):
@@ -144,7 +151,7 @@ def make_default_stage_config(
         stage_name=stage_name,
         n_trials=n_trials,
         search_radius=search_radius,
-        use_previous_best=stage_name != "exploration",
+        use_previous_best=stage_name is not FineTuningStage.EXPLORATION,
     )
 
 
@@ -173,19 +180,19 @@ def make_default_finetuning_config(
     return FineTuningConfig(
         stages=(
             StageConfig(
-                stage_name="exploration",
+                stage_name=FineTuningStage.EXPLORATION,
                 n_trials=exploration_trials,
                 search_radius=1.0,
                 use_previous_best=False,
             ),
             StageConfig(
-                stage_name="refinement",
+                stage_name=FineTuningStage.REFINEMENT,
                 n_trials=refinement_trials,
                 search_radius=0.5,
                 use_previous_best=True,
             ),
             StageConfig(
-                stage_name="final",
+                stage_name=FineTuningStage.FINAL,
                 n_trials=final_trials,
                 search_radius=0.25,
                 use_previous_best=True,

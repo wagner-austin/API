@@ -23,6 +23,7 @@ from covenant_ml.benchmarking.provenance import BENCHMARK_EXPERIMENT
 from covenant_ml.benchmarking.types import (
     MANIFEST_SCHEMA_VERSION,
     BenchmarkManifest,
+    TimingEstimator,
 )
 from covenant_ml.benchmarking.types_codec import decode_benchmark_manifest
 
@@ -176,7 +177,7 @@ def test_run_writes_a_decodable_manifest(tmp_path: Path) -> None:
 
     manifest = read_manifest(out_path)
     assert manifest["schema_version"] == MANIFEST_SCHEMA_VERSION
-    assert manifest["estimator"] == "median"
+    assert manifest["estimator"] is TimingEstimator.MEDIAN
     assert manifest["seeds"] == [42]
     assert len(manifest["results"]) == 3
 

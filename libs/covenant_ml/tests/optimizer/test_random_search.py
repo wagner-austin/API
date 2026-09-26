@@ -15,6 +15,7 @@ from covenant_ml.optimizer.strategies import (
     RandomSearchOptimizer,
     create_random_search_optimizer,
 )
+from covenant_ml.optimizer.strategy_protocol import OptimizerStrategyName
 from covenant_ml.optimizer.types import OptimizationConfig
 from tests.optimizer._objective_fixtures import (
     dummy_objective,
@@ -56,7 +57,7 @@ class TestRandomSearchOptimizer:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         optimizer = RandomSearchOptimizer()
-        assert optimizer.strategy_name() == "random_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.RANDOM_SEARCH
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -145,7 +146,7 @@ class TestRandomSearchFactory:
     def test_factory_creates_optimizer(self) -> None:
         """Factory creates optimizer."""
         optimizer = create_random_search_optimizer()
-        assert optimizer.strategy_name() == "random_search"
+        assert optimizer.strategy_name() is OptimizerStrategyName.RANDOM_SEARCH
 
 
 # =============================================================================

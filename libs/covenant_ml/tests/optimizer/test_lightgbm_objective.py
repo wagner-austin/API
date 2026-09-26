@@ -14,7 +14,7 @@ from covenant_ml.optimizer.objectives.lightgbm_objective import (
     _resolve_lightgbm_device,
     create_lightgbm_objective,
 )
-from covenant_ml.optimizer.types import SampledIntParams
+from covenant_ml.optimizer.types import LightGBMDevice, SampledIntParams
 from tests.optimizer._lightgbm_objective_fixtures import (
     _make_default_float_params,
     _make_default_int_params,
@@ -387,31 +387,31 @@ def test_n_features_property_reflects_engineering() -> None:
 def test_resolve_lightgbm_device_auto_returns_cpu() -> None:
     """_resolve_lightgbm_device returns 'cpu' for 'auto' device."""
     result = _resolve_lightgbm_device(RequestedDevice.AUTO)
-    assert result == "cpu"
+    assert result is LightGBMDevice.CPU
 
 
 def test_resolve_lightgbm_device_cpu_returns_cpu() -> None:
     """_resolve_lightgbm_device returns 'cpu' for 'cpu' device."""
     result = _resolve_lightgbm_device(RequestedDevice.CPU)
-    assert result == "cpu"
+    assert result is LightGBMDevice.CPU
 
 
 def test_resolve_lightgbm_device_cuda_on_windows_returns_gpu() -> None:
     """_resolve_lightgbm_device returns 'gpu' for 'cuda' on Windows platform."""
     result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="win32")
-    assert result == "gpu"
+    assert result is LightGBMDevice.GPU
 
 
 def test_resolve_lightgbm_device_cuda_on_linux_returns_cuda() -> None:
     """_resolve_lightgbm_device returns 'cuda' for 'cuda' on Linux platform."""
     result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="linux")
-    assert result == "cuda"
+    assert result is LightGBMDevice.CUDA
 
 
 def test_resolve_lightgbm_device_cuda_on_darwin_returns_cuda() -> None:
     """_resolve_lightgbm_device returns 'cuda' for 'cuda' on macOS platform."""
     result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="darwin")
-    assert result == "cuda"
+    assert result is LightGBMDevice.CUDA
 
 
 def test_resolve_lightgbm_device_returns_valid_type_for_all_inputs() -> None:

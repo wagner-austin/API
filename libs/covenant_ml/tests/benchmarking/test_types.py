@@ -24,9 +24,11 @@ from covenant_ml.benchmarking.types import (
     MANIFEST_SCHEMA_VERSION,
     BenchmarkConfig,
     BenchmarkManifest,
+    BenchmarkModelName,
     DatasetInfo,
     QualityMetrics,
     SeedResult,
+    TimingEstimator,
     TimingSummary,
 )
 from covenant_ml.benchmarking.types_codec import (
@@ -134,7 +136,7 @@ def make_seed_result() -> SeedResult:
         A populated seed result.
     """
     return {
-        "model": "cleargbm",
+        "model": BenchmarkModelName.CLEARGBM,
         "seed": 42,
         "position": 0,
         "timing": make_timing(),
@@ -150,7 +152,7 @@ def make_manifest() -> BenchmarkManifest:
         A populated manifest.
     """
     second: SeedResult = {
-        "model": "lightgbm",
+        "model": BenchmarkModelName.LIGHTGBM,
         "seed": 42,
         "position": 1,
         "timing": make_timing(),
@@ -159,7 +161,7 @@ def make_manifest() -> BenchmarkManifest:
     }
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
-        "estimator": "median",
+        "estimator": TimingEstimator.MEDIAN,
         "config": make_config(),
         "dataset": make_dataset_info(),
         "seeds": [42],
@@ -253,19 +255,19 @@ def test_require_int_list_reports_element_index() -> None:
 
 
 def test_require_model_name_accepts_every_enumerated_arm() -> None:
-    """Driven off the literal's own members, so adding an arm cannot leave
+    """Driven off the enum's own members, so adding an arm cannot leave
     this validator a version behind."""
-    for name in BENCHMARK_MODEL_NAMES:
-        assert _require_model_name(name, "f") == name
+    for name in BenchmarkModelName:
+        assert _require_model_name(name.value, "f") is name
 
 
 def test_require_model_name_enumerates_the_arms_it_admits() -> None:
-    assert BENCHMARK_MODEL_NAMES == (
+    assert [str(m) for m in BENCHMARK_MODEL_NAMES] == [
         "cleargbm",
         "cleargbm@leaf_wise",
         "lightgbm",
         "xgboost",
-    )
+    ]
 
 
 def test_require_model_name_rejects_unknown() -> None:
@@ -276,7 +278,7 @@ def test_require_model_name_rejects_unknown() -> None:
 
 
 def test_require_estimator_accepts_median() -> None:
-    assert _require_estimator("median", "f") == "median"
+    assert _require_estimator("median", "f") is TimingEstimator.MEDIAN
 
 
 def test_require_estimator_rejects_minimum() -> None:

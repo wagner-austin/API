@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from covenant_ml.finetuning.protocol import FineTuningCapabilities
+from covenant_ml.finetuning.protocol import FineTuningCapabilities, FineTuningStrategyName
 from covenant_ml.finetuning.testing import (
     FakeFineTuningStrategy,
     make_fake_finetuning_strategy,
@@ -20,6 +20,7 @@ from covenant_ml.finetuning.testing import (
 from covenant_ml.finetuning.types import (
     FineTuningConfig,
     FineTuningResult,
+    FineTuningStage,
     StageConfig,
     StageResult,
 )
@@ -70,7 +71,7 @@ def _make_config() -> FineTuningConfig:
     return FineTuningConfig(
         stages=(
             StageConfig(
-                stage_name="exploration",
+                stage_name=FineTuningStage.EXPLORATION,
                 n_trials=5,
                 search_radius=1.0,
                 use_previous_best=False,
@@ -109,12 +110,12 @@ class TestFakeFineTuningStrategy:
     def test_default_strategy_name(self) -> None:
         """Default strategy name is staged."""
         strategy = FakeFineTuningStrategy()
-        assert strategy.strategy_name() == "staged"
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
 
     def test_custom_strategy_name(self) -> None:
         """Can set custom strategy name."""
-        strategy = FakeFineTuningStrategy(name="warm_start")
-        assert strategy.strategy_name() == "warm_start"
+        strategy = FakeFineTuningStrategy(name=FineTuningStrategyName.WARM_START)
+        assert strategy.strategy_name() is FineTuningStrategyName.WARM_START
 
     def test_default_capabilities(self) -> None:
         """Default capabilities are correct."""
@@ -164,7 +165,7 @@ class TestFakeFineTuningStrategy:
     def test_custom_result(self) -> None:
         """Can provide custom result."""
         stage_result = StageResult(
-            stage_name="exploration",
+            stage_name=FineTuningStage.EXPLORATION,
             optimization_summary=OptimizationSummary(
                 best_trial_number=0,
                 best_value=0.99,
@@ -253,14 +254,14 @@ class TestMakeFakeFineTuningStrategy:
     def test_default_factory(self) -> None:
         """Factory creates strategy with defaults."""
         strategy = make_fake_finetuning_strategy()
-        assert strategy.strategy_name() == "staged"
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
         caps = strategy.capabilities()
         assert caps["supports_staged"] is True
 
     def test_factory_with_custom_name(self) -> None:
         """Factory creates strategy with custom name."""
-        strategy = make_fake_finetuning_strategy(name="iterative_refinement")
-        assert strategy.strategy_name() == "iterative_refinement"
+        strategy = make_fake_finetuning_strategy(name=FineTuningStrategyName.ITERATIVE_REFINEMENT)
+        assert strategy.strategy_name() is FineTuningStrategyName.ITERATIVE_REFINEMENT
 
     def test_factory_with_custom_value(self) -> None:
         """Factory creates strategy with custom best value."""
@@ -295,33 +296,33 @@ class TestMakeTestFineTuningRegistry:
         registry = make_test_finetuning_registry()
         strategies = registry.list_strategies()
 
-        assert "staged" in strategies
-        assert "warm_start" in strategies
-        assert "iterative_refinement" in strategies
+        assert FineTuningStrategyName.STAGED in strategies
+        assert FineTuningStrategyName.WARM_START in strategies
+        assert FineTuningStrategyName.ITERATIVE_REFINEMENT in strategies
 
     def test_strategies_are_fake(self) -> None:
         """All strategies are FakeFineTuningStrategy instances."""
         registry = make_test_finetuning_registry()
 
-        strategy = registry.get("staged")
-        assert strategy.strategy_name() == "staged"
+        strategy = registry.get(FineTuningStrategyName.STAGED)
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
 
-        strategy2 = registry.get("warm_start")
-        assert strategy2.strategy_name() == "warm_start"
+        strategy2 = registry.get(FineTuningStrategyName.WARM_START)
+        assert strategy2.strategy_name() is FineTuningStrategyName.WARM_START
 
     def test_iterative_refinement_strategy(self) -> None:
         """Iterative refinement strategy is accessible and works."""
         registry = make_test_finetuning_registry()
-        strategy = registry.get("iterative_refinement")
+        strategy = registry.get(FineTuningStrategyName.ITERATIVE_REFINEMENT)
 
-        assert strategy.strategy_name() == "iterative_refinement"
+        assert strategy.strategy_name() is FineTuningStrategyName.ITERATIVE_REFINEMENT
         caps = strategy.capabilities()
         assert caps["supports_staged"] is True
 
     def test_strategies_work(self) -> None:
         """Fake strategies produce valid results."""
         registry = make_test_finetuning_registry()
-        strategy = registry.get("staged")
+        strategy = registry.get(FineTuningStrategyName.STAGED)
 
         x = _make_features(100, 10)
         y = _make_labels(100)

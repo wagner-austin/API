@@ -15,7 +15,6 @@ from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.objectives.lightgbm_regressor_objective import (
     LightGBMRegressorObjective,
     _get_lgb_dataset_and_train,
-    _resolve_lightgbm_device,
     create_lightgbm_regressor_objective,
 )
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
@@ -107,35 +106,6 @@ def test_get_lgb_dataset_and_train_returns_valid_types() -> None:
     # Verify early stopping factory
     cb = early_stopping(stopping_rounds=5, verbose=False)
     assert cb.stopping_rounds == 5
-
-
-# =============================================================================
-# Tests: Device Resolution
-# =============================================================================
-
-
-def test_resolve_device_auto() -> None:
-    """'auto' resolves to 'cpu'."""
-    result = _resolve_lightgbm_device(RequestedDevice.AUTO)
-    assert result == "cpu"
-
-
-def test_resolve_device_cpu() -> None:
-    """'cpu' resolves to 'cpu'."""
-    result = _resolve_lightgbm_device(RequestedDevice.CPU)
-    assert result == "cpu"
-
-
-def test_resolve_device_cuda_on_linux() -> None:
-    """'cuda' stays 'cuda' on non-Windows."""
-    result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="linux")
-    assert result == "cuda"
-
-
-def test_resolve_device_cuda_on_windows() -> None:
-    """'cuda' resolves to 'gpu' (OpenCL) on Windows."""
-    result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="win32")
-    assert result == "gpu"
 
 
 # =============================================================================

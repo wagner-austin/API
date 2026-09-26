@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from covenant_ml.finetuning.protocol import FineTuningStrategyName
 from covenant_ml.finetuning.strategies import (
     create_staged_finetuning,
     create_warm_start_finetuning,
@@ -20,6 +21,7 @@ from covenant_ml.finetuning.strategies.staged import StagedFineTuning
 from covenant_ml.finetuning.strategies.warm_start import WarmStartFineTuning
 from covenant_ml.finetuning.types import (
     FineTuningConfig,
+    FineTuningStage,
     StageConfig,
     make_warm_start_config,
 )
@@ -39,7 +41,7 @@ class TestStagedFineTuning:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         strategy = StagedFineTuning()
-        assert strategy.strategy_name() == "staged"
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -70,8 +72,8 @@ class TestStagedFineTuning:
 
         assert result["stages_completed"] == 2
         assert len(result["stage_results"]) == 2
-        assert result["stage_results"][0]["stage_name"] == "exploration"
-        assert result["stage_results"][1]["stage_name"] == "refinement"
+        assert result["stage_results"][0]["stage_name"] is FineTuningStage.EXPLORATION
+        assert result["stage_results"][1]["stage_name"] is FineTuningStage.REFINEMENT
 
     def test_fine_tune_returns_best_params(self) -> None:
         """fine_tune returns best parameters."""
@@ -128,7 +130,7 @@ class TestStagedFineTuning:
         config = FineTuningConfig(
             stages=(
                 StageConfig(
-                    stage_name="exploration",
+                    stage_name=FineTuningStage.EXPLORATION,
                     n_trials=100,
                     search_radius=1.0,
                     use_previous_best=False,
@@ -161,13 +163,13 @@ class TestStagedFineTuning:
         config = FineTuningConfig(
             stages=(
                 StageConfig(
-                    stage_name="exploration",
+                    stage_name=FineTuningStage.EXPLORATION,
                     n_trials=5,
                     search_radius=1.0,
                     use_previous_best=False,
                 ),
                 StageConfig(
-                    stage_name="refinement",
+                    stage_name=FineTuningStage.REFINEMENT,
                     n_trials=5,
                     search_radius=0.5,
                     use_previous_best=True,
@@ -193,7 +195,7 @@ class TestStagedFineTuning:
     def test_factory_function(self) -> None:
         """Factory function creates correct strategy."""
         strategy = create_staged_finetuning()
-        assert strategy.strategy_name() == "staged"
+        assert strategy.strategy_name() is FineTuningStrategyName.STAGED
         caps = strategy.capabilities()
         assert caps["supports_staged"] is True
 
@@ -204,7 +206,7 @@ class TestWarmStartFineTuning:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         strategy = WarmStartFineTuning()
-        assert strategy.strategy_name() == "warm_start"
+        assert strategy.strategy_name() is FineTuningStrategyName.WARM_START
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -288,6 +290,6 @@ class TestWarmStartFineTuning:
     def test_factory_function(self) -> None:
         """Factory function creates correct strategy."""
         strategy = create_warm_start_finetuning()
-        assert strategy.strategy_name() == "warm_start"
+        assert strategy.strategy_name() is FineTuningStrategyName.WARM_START
         caps = strategy.capabilities()
         assert caps["supports_warm_start"] is True

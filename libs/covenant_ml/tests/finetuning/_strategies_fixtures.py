@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 
 from covenant_ml.finetuning.types import (
     FineTuningConfig,
+    FineTuningStage,
     StageConfig,
 )
 from covenant_ml.optimizer.types import (
@@ -54,7 +55,7 @@ def _make_finetuning_config(n_stages: int = 2, trials_per_stage: int = 3) -> Fin
     if n_stages >= 1:
         stages.append(
             StageConfig(
-                stage_name="exploration",
+                stage_name=FineTuningStage.EXPLORATION,
                 n_trials=trials_per_stage,
                 search_radius=1.0,
                 use_previous_best=False,
@@ -64,7 +65,7 @@ def _make_finetuning_config(n_stages: int = 2, trials_per_stage: int = 3) -> Fin
     if n_stages >= 2:
         stages.append(
             StageConfig(
-                stage_name="refinement",
+                stage_name=FineTuningStage.REFINEMENT,
                 n_trials=trials_per_stage,
                 search_radius=0.5,
                 use_previous_best=True,
@@ -74,7 +75,7 @@ def _make_finetuning_config(n_stages: int = 2, trials_per_stage: int = 3) -> Fin
     if n_stages >= 3:
         stages.append(
             StageConfig(
-                stage_name="final",
+                stage_name=FineTuningStage.FINAL,
                 n_trials=trials_per_stage,
                 search_radius=0.25,
                 use_previous_best=True,

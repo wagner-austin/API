@@ -30,7 +30,7 @@ class StratifiedKFoldSplitter:
         Returns:
             The literal string 'stratified_kfold'.
         """
-        return "stratified_kfold"
+        return CVStrategyName.STRATIFIED_KFOLD
 
     def capabilities(self) -> CVStrategyCapabilities:
         """Return the capabilities of this strategy.

@@ -10,7 +10,7 @@ from covenant_ml.optimizer.optuna_backend import (
     create_cleargbm_optimizer,
 )
 from covenant_ml.optimizer.search_spaces import make_cleargbm_default_space
-from covenant_ml.optimizer.types import TrialResult
+from covenant_ml.optimizer.types import TrialResult, TrialState
 from tests.optimizer._fake_optuna import (
     get_fake_optuna_factories,
     make_optuna_config,
@@ -146,7 +146,7 @@ def test_cleargbm_optimizer_with_trial_callback() -> None:
         )
         assert len(callbacks) == 3
         for result in callbacks:
-            assert result["state"] == "complete"
+            assert result["state"] is TrialState.COMPLETE
     finally:
         _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 

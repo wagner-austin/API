@@ -5,6 +5,7 @@ Tests the public test utility functions exported for consumers.
 
 from __future__ import annotations
 
+from covenant_ml.calibration import CalibrationMethod
 from covenant_ml.calibration.testing import (
     make_isotonic_config,
     make_isotonic_state,
@@ -21,7 +22,7 @@ def test_make_isotonic_config_defaults() -> None:
     """make_isotonic_config creates config with defaults."""
     config = make_isotonic_config()
 
-    assert config["method"] == "isotonic"
+    assert config["method"] is CalibrationMethod.ISOTONIC
     assert config["clip_proba"] is True
     assert config["eps"] == 1e-10
 
@@ -44,7 +45,7 @@ def test_make_platt_config_defaults() -> None:
     """make_platt_config creates config with defaults."""
     config = make_platt_config()
 
-    assert config["method"] == "platt"
+    assert config["method"] is CalibrationMethod.PLATT
     assert config["clip_proba"] is True
     assert config["eps"] == 1e-10
 
@@ -73,7 +74,7 @@ def test_make_isotonic_state_defaults() -> None:
     state = make_isotonic_state()
 
     assert state["method"] == "isotonic"
-    assert state["config"]["method"] == "isotonic"
+    assert state["config"]["method"] is CalibrationMethod.ISOTONIC
     assert state["config"]["clip_proba"] is True
     assert state["config"]["eps"] == 1e-10
     assert state["params"]["X_thresholds"] == [0.0, 0.5, 1.0]
@@ -104,7 +105,7 @@ def test_make_platt_state_defaults() -> None:
     state = make_platt_state()
 
     assert state["method"] == "platt"
-    assert state["config"]["method"] == "platt"
+    assert state["config"]["method"] is CalibrationMethod.PLATT
     assert state["config"]["clip_proba"] is True
     assert state["config"]["eps"] == 1e-10
     assert state["params"]["A"] == 1.0

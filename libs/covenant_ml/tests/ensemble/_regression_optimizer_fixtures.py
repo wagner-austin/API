@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleMetric,
     RegressionOptimizationConfig,
 )
 from covenant_ml.ensemble.types import ModelOOFPredictions
-
-_RegressionMetric = Literal["neg_rmse", "neg_mae", "r_squared"]
 
 
 def _float_array(values: tuple[float, ...]) -> NDArray[np.float64]:
@@ -50,7 +47,7 @@ def _make_model_predictions(
 
 
 def _make_test_config(
-    metric: _RegressionMetric = "neg_rmse",
+    metric: RegressionEnsembleMetric = RegressionEnsembleMetric.NEG_RMSE,
 ) -> RegressionOptimizationConfig:
     """Create test optimization config."""
     return RegressionOptimizationConfig(

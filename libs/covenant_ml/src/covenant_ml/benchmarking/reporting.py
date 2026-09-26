@@ -85,7 +85,7 @@ def summarize_model(results: list[SeedResult], model: BenchmarkModelName) -> Mod
     Raises:
         ValueError: If the manifest holds no record for this model.
     """
-    selected = [result for result in results if result["model"] == model]
+    selected = [result for result in results if result["model"] is model]
     if len(selected) == 0:
         raise ValueError(f"[{ERR_NO_RESULTS}] Manifest holds no results for model '{model}'")
 
@@ -112,8 +112,8 @@ def summarize_gap(manifest: BenchmarkManifest) -> GapSummary:
     Raises:
         ValueError: If the manifest holds no record for either model.
     """
-    cleargbm = summarize_model(manifest["results"], "cleargbm")
-    lightgbm = summarize_model(manifest["results"], "lightgbm")
+    cleargbm = summarize_model(manifest["results"], BenchmarkModelName.CLEARGBM)
+    lightgbm = summarize_model(manifest["results"], BenchmarkModelName.LIGHTGBM)
     raw_ratio = cleargbm.mean_fit_s / lightgbm.mean_fit_s
     leaf_ratio = cleargbm.mean_leaves / lightgbm.mean_leaves
     return GapSummary(

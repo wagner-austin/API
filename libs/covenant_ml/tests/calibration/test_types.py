@@ -14,6 +14,7 @@ from covenant_ml.calibration import (
 )
 from covenant_ml.calibration.testing import make_isotonic_state, make_platt_state
 from covenant_ml.calibration.types import (
+    CalibrationMethod,
     CalibratorConfig,
     IsotonicParams,
     IsotonicState,
@@ -42,7 +43,7 @@ def test_encode_decode_isotonic_state() -> None:
     decoded = decode_calibrator_state(encoded)
 
     assert decoded["method"] == "isotonic"
-    assert decoded["config"]["method"] == "isotonic"
+    assert decoded["config"]["method"] is CalibrationMethod.ISOTONIC
     assert decoded["config"]["clip_proba"] is True
     assert decoded["params"]["X_thresholds"] == [0.0, 0.25, 0.5, 0.75, 1.0]
     assert decoded["params"]["y_values"] == [0.1, 0.3, 0.5, 0.7, 0.9]
@@ -56,7 +57,7 @@ def test_encode_decode_platt_state() -> None:
     decoded = decode_calibrator_state(encoded)
 
     assert decoded["method"] == "platt"
-    assert decoded["config"]["method"] == "platt"
+    assert decoded["config"]["method"] is CalibrationMethod.PLATT
     assert decoded["params"]["A"] == 2.5
     assert decoded["params"]["B"] == -1.0
 
@@ -106,7 +107,7 @@ def test_encode_isotonic_state_structure() -> None:
     # Verify structure by decoding (round-trip validates structure)
     decoded = decode_calibrator_state(encoded)
     assert decoded["method"] == "isotonic"
-    assert decoded["config"]["method"] == "isotonic"
+    assert decoded["config"]["method"] is CalibrationMethod.ISOTONIC
     assert decoded["params"]["X_thresholds"] == [0.0, 0.5, 1.0]
 
 
@@ -118,7 +119,7 @@ def test_encode_platt_state_structure() -> None:
     # Verify structure by decoding (round-trip validates structure)
     decoded = decode_calibrator_state(encoded)
     assert decoded["method"] == "platt"
-    assert decoded["config"]["method"] == "platt"
+    assert decoded["config"]["method"] is CalibrationMethod.PLATT
     assert decoded["params"]["A"] == 1.0
 
 
@@ -355,21 +356,21 @@ def test_require_dict_invalid() -> None:
 def test_calibrator_config_isotonic() -> None:
     """CalibratorConfig works for isotonic method."""
     config: CalibratorConfig = {
-        "method": "isotonic",
+        "method": CalibrationMethod.ISOTONIC,
         "clip_proba": True,
         "eps": 1e-10,
     }
-    assert config["method"] == "isotonic"
+    assert config["method"] is CalibrationMethod.ISOTONIC
 
 
 def test_calibrator_config_platt() -> None:
     """CalibratorConfig works for platt method."""
     config: CalibratorConfig = {
-        "method": "platt",
+        "method": CalibrationMethod.PLATT,
         "clip_proba": False,
         "eps": 1e-8,
     }
-    assert config["method"] == "platt"
+    assert config["method"] is CalibrationMethod.PLATT
 
 
 def test_isotonic_params() -> None:
@@ -397,7 +398,7 @@ def test_isotonic_state() -> None:
     state: IsotonicState = {
         "method": "isotonic",
         "config": {
-            "method": "isotonic",
+            "method": CalibrationMethod.ISOTONIC,
             "clip_proba": True,
             "eps": 1e-10,
         },
@@ -414,7 +415,7 @@ def test_platt_state() -> None:
     state: PlattState = {
         "method": "platt",
         "config": {
-            "method": "platt",
+            "method": CalibrationMethod.PLATT,
             "clip_proba": True,
             "eps": 1e-10,
         },

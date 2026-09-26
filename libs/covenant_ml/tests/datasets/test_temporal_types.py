@@ -17,6 +17,7 @@ from covenant_ml.datasets.types_temporal import (
     HEAT_METRIC_NAMES,
     HeatMetricResult,
     SeasonalCycleCoefficients,
+    SeasonDefinition,
     TailThresholds,
     TemporalFeatureConfig,
     TemporalFeatureState,
@@ -34,12 +35,12 @@ class TestTypedDictStructure:
             "n_fourier_harmonics": 5,
             "hot_cutoff_percentile": 95.0,
             "cold_cutoff_percentile": 5.0,
-            "season": "warm",
+            "season": SeasonDefinition.WARM,
             "season_months": (6, 7, 8),
             "compute_ar1": True,
         }
         assert config["n_fourier_harmonics"] == 5
-        assert config["season"] == "warm"
+        assert config["season"] is SeasonDefinition.WARM
 
     def test_seasonal_cycle_coefficients_multi_location(self) -> None:
         """SeasonalCycleCoefficients stores per-location coefficients."""
@@ -112,7 +113,7 @@ class TestDefaultConfig:
         assert DEFAULT_TEMPORAL_FEATURE_CONFIG["n_fourier_harmonics"] == 5
         assert DEFAULT_TEMPORAL_FEATURE_CONFIG["hot_cutoff_percentile"] == 95.0
         assert DEFAULT_TEMPORAL_FEATURE_CONFIG["cold_cutoff_percentile"] == 5.0
-        assert DEFAULT_TEMPORAL_FEATURE_CONFIG["season"] == "warm"
+        assert DEFAULT_TEMPORAL_FEATURE_CONFIG["season"] is SeasonDefinition.WARM
         assert DEFAULT_TEMPORAL_FEATURE_CONFIG["season_months"] == (6, 7, 8)
         assert DEFAULT_TEMPORAL_FEATURE_CONFIG["compute_ar1"] is True
 
@@ -134,21 +135,34 @@ class TestRequireTemporalFeatureConfig:
         config = require_temporal_feature_config(data, "test")
 
         assert config["n_fourier_harmonics"] == 5
-        assert config["season"] == "warm"
+        assert config["season"] is SeasonDefinition.WARM
 
     def test_all_seasons(self) -> None:
-        """Accepts all season values."""
-        for season in ("warm", "cold", "full_year"):
+        """Accepts every season, decoding each word to its member."""
+        for season in SeasonDefinition:
             data: dict[str, JSONValue] = {
                 "n_fourier_harmonics": 3,
                 "hot_cutoff_percentile": 90.0,
                 "cold_cutoff_percentile": 10.0,
-                "season": season,
+                "season": season.value,
                 "season_months": [1],
                 "compute_ar1": False,
             }
             config = require_temporal_feature_config(data, "test")
-            assert config["season"] == season
+            assert config["season"] is season
+
+    def test_non_string_season(self) -> None:
+        """Raises on a season that is not a string at all."""
+        data: dict[str, JSONValue] = {
+            "n_fourier_harmonics": 3,
+            "hot_cutoff_percentile": 90.0,
+            "cold_cutoff_percentile": 10.0,
+            "season": 1,
+            "season_months": [1],
+            "compute_ar1": False,
+        }
+        with pytest.raises(ValueError, match="must be 'warm', 'cold', or 'full_year'"):
+            require_temporal_feature_config(data, "test")
 
     def test_invalid_harmonics(self) -> None:
         """Raises on non-positive harmonics."""

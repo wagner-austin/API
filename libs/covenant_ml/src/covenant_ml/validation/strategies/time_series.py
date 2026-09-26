@@ -188,7 +188,7 @@ class TimeSeriesSplitter:
         Returns:
             The literal string 'time_series'.
         """
-        return "time_series"
+        return CVStrategyName.TIME_SERIES
 
     def capabilities(self) -> CVStrategyCapabilities:
         """Return the capabilities of this strategy.

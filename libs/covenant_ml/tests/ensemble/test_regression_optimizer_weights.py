@@ -26,6 +26,7 @@ from covenant_ml.ensemble.regression_optimizer import (
 )
 from covenant_ml.ensemble.regression_testing import make_regression_oof_data
 from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleMetric,
     RegressionEnsembleOOFData,
 )
 from covenant_ml.ensemble.testing import fake_minimize
@@ -47,7 +48,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
             (1.2, 2.3, 3.1),
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -75,7 +76,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
             (1.2, 2.3, 3.1),
         )
-        config = _make_test_config("neg_mae")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_MAE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -90,7 +91,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
             (1.2, 2.3, 3.1),
         )
-        config = _make_test_config("r_squared")
+        config = _make_test_config(RegressionEnsembleMetric.R_SQUARED)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -117,7 +118,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("good_model", m1_preds), ("worse_model", m2_preds)),
             labels_tuple,
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -143,7 +144,7 @@ class TestOptimizeRegressionEnsembleWeights:
             ),
             (1.2, 2.3, 3.1),
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -166,7 +167,7 @@ class TestOptimizeRegressionEnsembleWeights:
             n_samples=2,
             n_models=1,
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         with pytest.raises(ValueError, match="at least 2 models"):
             optimize_regression_ensemble_weights(oof_data, config)
@@ -179,7 +180,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
             (1.2, 2.3, 3.1),
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -213,7 +214,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("m1", (1.0, 2.0)), ("m2", (1.5, 2.5))),
             (1.2, 2.3),
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 
@@ -229,7 +230,7 @@ class TestOptimizeRegressionEnsembleWeights:
             (("m1", (1.0, 2.0)), ("m2", (1.5, 2.5))),
             (1.2, 2.3),
         )
-        config = _make_test_config("neg_rmse")
+        config = _make_test_config(RegressionEnsembleMetric.NEG_RMSE)
 
         result = optimize_regression_ensemble_weights(oof_data, config)
 

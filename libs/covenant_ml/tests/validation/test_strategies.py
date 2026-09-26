@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from covenant_ml.validation import CVStrategyName
 from covenant_ml.validation.strategies import (
     GroupStratifiedKFoldSplitter,
     ShuffleSplitSplitter,
@@ -58,7 +59,7 @@ class TestStratifiedKFoldSplitter:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         splitter = StratifiedKFoldSplitter()
-        assert splitter.strategy_name() == "stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.STRATIFIED_KFOLD
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -99,7 +100,7 @@ class TestStratifiedKFoldSplitter:
     def test_factory_function(self) -> None:
         """Factory function creates correct splitter."""
         splitter = create_stratified_kfold_splitter()
-        assert splitter.strategy_name() == "stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.STRATIFIED_KFOLD
         caps = splitter.capabilities()
         assert caps["preserves_class_ratio"] is True
 
@@ -115,7 +116,7 @@ class TestGroupStratifiedKFoldSplitter:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         splitter = GroupStratifiedKFoldSplitter()
-        assert splitter.strategy_name() == "group_stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.GROUP_STRATIFIED_KFOLD
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -171,7 +172,7 @@ class TestGroupStratifiedKFoldSplitter:
     def test_factory_function(self) -> None:
         """Factory function creates correct splitter."""
         splitter = create_group_stratified_kfold_splitter()
-        assert splitter.strategy_name() == "group_stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.GROUP_STRATIFIED_KFOLD
         caps = splitter.capabilities()
         assert caps["supports_groups"] is True
 
@@ -195,7 +196,7 @@ class TestShuffleSplitSplitter:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         splitter = ShuffleSplitSplitter()
-        assert splitter.strategy_name() == "shuffle_split"
+        assert splitter.strategy_name() is CVStrategyName.SHUFFLE_SPLIT
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -243,7 +244,7 @@ class TestShuffleSplitSplitter:
     def test_factory_function(self) -> None:
         """Factory function creates correct splitter."""
         splitter = create_shuffle_split_splitter()
-        assert splitter.strategy_name() == "shuffle_split"
+        assert splitter.strategy_name() is CVStrategyName.SHUFFLE_SPLIT
         caps = splitter.capabilities()
         assert caps["supports_shuffle"] is True
 
@@ -305,7 +306,7 @@ class TestTimeSeriesSplitter:
     def test_strategy_name(self) -> None:
         """Strategy name is correct."""
         splitter = TimeSeriesSplitter()
-        assert splitter.strategy_name() == "time_series"
+        assert splitter.strategy_name() is CVStrategyName.TIME_SERIES
 
     def test_capabilities(self) -> None:
         """Capabilities are correctly reported."""
@@ -355,7 +356,7 @@ class TestTimeSeriesSplitter:
     def test_factory_function(self) -> None:
         """Factory function creates correct splitter."""
         splitter = create_time_series_splitter()
-        assert splitter.strategy_name() == "time_series"
+        assert splitter.strategy_name() is CVStrategyName.TIME_SERIES
         caps = splitter.capabilities()
         assert caps["supports_temporal"] is True
 

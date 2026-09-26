@@ -140,17 +140,19 @@ def default_finetuning_registry() -> FineTuningRegistry:
 
     # Staged fine-tuning
     create_staged: FineTuningStrategyFactory = strategies_mod.create_staged_finetuning
-    reg.register("staged", FineTuningRegistration(create_staged))
+    reg.register(FineTuningStrategyName.STAGED, FineTuningRegistration(create_staged))
 
     # Warm-start fine-tuning
     create_warm_start: FineTuningStrategyFactory = strategies_mod.create_warm_start_finetuning
-    reg.register("warm_start", FineTuningRegistration(create_warm_start))
+    reg.register(FineTuningStrategyName.WARM_START, FineTuningRegistration(create_warm_start))
 
     # Iterative refinement
     create_iterative: FineTuningStrategyFactory = (
         strategies_mod.create_iterative_refinement_finetuning
     )
-    reg.register("iterative_refinement", FineTuningRegistration(create_iterative))
+    reg.register(
+        FineTuningStrategyName.ITERATIVE_REFINEMENT, FineTuningRegistration(create_iterative)
+    )
 
     return reg
 

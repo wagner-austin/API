@@ -11,7 +11,8 @@ Decoding never softens a malformed document: the first invalid field raises
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict, get_args
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.comparability import RunFingerprint
 
@@ -60,15 +61,24 @@ ERR_POWER_TARGET_REFUSED = "CVML-BENCH-022"
 #: is precisely the defect the field exists to end.
 MANIFEST_SCHEMA_VERSION = 3
 
+
 #: The arms this benchmark can compare.
 #:
 #: A closed literal, not an open string: an arm name is what a manifest is read
 #: by, so a typo must fail at the boundary rather than silently produce a
 #: fourth, nameless series. Variant arms are spelled ``<model>@<variant>``.
-BenchmarkModelName = Literal["cleargbm", "cleargbm@leaf_wise", "lightgbm", "xgboost"]
+class BenchmarkModelName(StrEnum):
+    """An arm a benchmark measures."""
 
-#: Every accepted :data:`BenchmarkModelName`, for validation and iteration.
-BENCHMARK_MODEL_NAMES: tuple[BenchmarkModelName, ...] = get_args(BenchmarkModelName)
+    CLEARGBM = "cleargbm"
+    CLEARGBM_LEAF_WISE = "cleargbm@leaf_wise"
+    LIGHTGBM = "lightgbm"
+    XGBOOST = "xgboost"
+
+
+#: Every accepted :class:`BenchmarkModelName`, in declaration order.
+BENCHMARK_MODEL_NAMES: tuple[BenchmarkModelName, ...] = tuple(BenchmarkModelName)
+
 
 #: The statistic taken as each seed's canonical fit time.
 #:
@@ -77,7 +87,10 @@ BENCHMARK_MODEL_NAMES: tuple[BenchmarkModelName, ...] = get_args(BenchmarkModelN
 #: a different power regime rather than noise, so a minimum reports a
 #: cold-start outlier as though it were the steady state that sustained
 #: training actually experiences.
-TimingEstimator = Literal["median"]
+class TimingEstimator(StrEnum):
+    """The statistic taken as each seed's canonical fit time."""
+
+    MEDIAN = "median"
 
 
 class TimingSummary(TypedDict, total=True):

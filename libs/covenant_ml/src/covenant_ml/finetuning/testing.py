@@ -26,6 +26,7 @@ from .registry import FineTuningRegistration, FineTuningRegistry
 from .types import (
     FineTuningConfig,
     FineTuningResult,
+    FineTuningStage,
     StageResult,
     WarmStartConfig,
 )
@@ -39,7 +40,7 @@ class FakeFineTuningStrategy:
 
     def __init__(
         self,
-        name: FineTuningStrategyName = "staged",
+        name: FineTuningStrategyName = FineTuningStrategyName.STAGED,
         capabilities: FineTuningCapabilities | None = None,
         result: FineTuningResult | None = None,
     ) -> None:
@@ -95,7 +96,7 @@ class FakeFineTuningStrategy:
 
         # Generate simple result
         stage_result = StageResult(
-            stage_name="exploration",
+            stage_name=FineTuningStage.EXPLORATION,
             optimization_summary=OptimizationSummary(
                 best_trial_number=0,
                 best_value=0.85,
@@ -126,7 +127,7 @@ class FakeFineTuningStrategy:
 
 
 def make_fake_finetuning_strategy(
-    name: FineTuningStrategyName = "staged",
+    name: FineTuningStrategyName = FineTuningStrategyName.STAGED,
     best_value: float = 0.85,
 ) -> FakeFineTuningStrategy:
     """Create a FakeFineTuningStrategy with specified settings.
@@ -139,7 +140,7 @@ def make_fake_finetuning_strategy(
         A configured FakeFineTuningStrategy instance.
     """
     stage_result = StageResult(
-        stage_name="exploration",
+        stage_name=FineTuningStage.EXPLORATION,
         optimization_summary=OptimizationSummary(
             best_trial_number=0,
             best_value=best_value,
@@ -180,10 +181,10 @@ def make_test_finetuning_registry() -> FineTuningRegistry:
     registry = FineTuningRegistry()
 
     def create_fake_staged() -> FineTuningStrategyProtocol:
-        return make_fake_finetuning_strategy("staged")
+        return make_fake_finetuning_strategy(FineTuningStrategyName.STAGED)
 
     registry.register(
-        "staged",
+        FineTuningStrategyName.STAGED,
         FineTuningRegistration(create_fake_staged),
     )
 
@@ -194,18 +195,18 @@ def make_test_finetuning_registry() -> FineTuningRegistry:
             supports_early_stop=False,
             preserves_prior_params=True,
         )
-        return FakeFineTuningStrategy(name="warm_start", capabilities=caps)
+        return FakeFineTuningStrategy(name=FineTuningStrategyName.WARM_START, capabilities=caps)
 
     registry.register(
-        "warm_start",
+        FineTuningStrategyName.WARM_START,
         FineTuningRegistration(create_fake_warm_start),
     )
 
     def create_fake_iterative() -> FineTuningStrategyProtocol:
-        return make_fake_finetuning_strategy("iterative_refinement")
+        return make_fake_finetuning_strategy(FineTuningStrategyName.ITERATIVE_REFINEMENT)
 
     registry.register(
-        "iterative_refinement",
+        FineTuningStrategyName.ITERATIVE_REFINEMENT,
         FineTuningRegistration(create_fake_iterative),
     )
 

@@ -17,6 +17,7 @@ from numpy.typing import NDArray
 from covenant_ml.validation import (
     CVSplitterRegistration,
     CVSplitterRegistry,
+    CVStrategyName,
     default_cv_registry,
 )
 from covenant_ml.validation.strategies import StratifiedKFoldSplitter
@@ -55,10 +56,10 @@ class TestCVSplitterRegistry:
             return StratifiedKFoldSplitter()
 
         registration = CVSplitterRegistration(factory)
-        registry.register("stratified_kfold", registration)
+        registry.register(CVStrategyName.STRATIFIED_KFOLD, registration)
 
-        splitter = registry.get("stratified_kfold")
-        assert splitter.strategy_name() == "stratified_kfold"
+        splitter = registry.get(CVStrategyName.STRATIFIED_KFOLD)
+        assert splitter.strategy_name() is CVStrategyName.STRATIFIED_KFOLD
 
     def test_list_strategies(self) -> None:
         """List returns all registered strategy names."""
@@ -68,12 +69,12 @@ class TestCVSplitterRegistry:
             return StratifiedKFoldSplitter()
 
         registration = CVSplitterRegistration(factory)
-        registry.register("stratified_kfold", registration)
-        registry.register("shuffle_split", registration)
+        registry.register(CVStrategyName.STRATIFIED_KFOLD, registration)
+        registry.register(CVStrategyName.SHUFFLE_SPLIT, registration)
 
         strategies = registry.list_strategies()
-        assert "stratified_kfold" in strategies
-        assert "shuffle_split" in strategies
+        assert CVStrategyName.STRATIFIED_KFOLD in strategies
+        assert CVStrategyName.SHUFFLE_SPLIT in strategies
         assert len(strategies) == 2
 
     def test_duplicate_registration_raises(self) -> None:
@@ -84,10 +85,10 @@ class TestCVSplitterRegistry:
             return StratifiedKFoldSplitter()
 
         registration = CVSplitterRegistration(factory)
-        registry.register("stratified_kfold", registration)
+        registry.register(CVStrategyName.STRATIFIED_KFOLD, registration)
 
         with pytest.raises(ValueError, match="already registered"):
-            registry.register("stratified_kfold", registration)
+            registry.register(CVStrategyName.STRATIFIED_KFOLD, registration)
 
     def test_has_strategy_returns_true_when_registered(self) -> None:
         """has_strategy returns True for registered strategies."""
@@ -97,14 +98,14 @@ class TestCVSplitterRegistry:
             return StratifiedKFoldSplitter()
 
         registration = CVSplitterRegistration(factory)
-        registry.register("stratified_kfold", registration)
+        registry.register(CVStrategyName.STRATIFIED_KFOLD, registration)
 
-        assert registry.has_strategy("stratified_kfold") is True
+        assert registry.has_strategy(CVStrategyName.STRATIFIED_KFOLD) is True
 
     def test_has_strategy_returns_false_when_not_registered(self) -> None:
         """has_strategy returns False for unregistered strategies."""
         registry = CVSplitterRegistry()
-        assert registry.has_strategy("stratified_kfold") is False
+        assert registry.has_strategy(CVStrategyName.STRATIFIED_KFOLD) is False
 
     def test_get_capabilities_returns_strategy_capabilities(self) -> None:
         """get_capabilities returns the strategy's capabilities."""
@@ -114,9 +115,9 @@ class TestCVSplitterRegistry:
             return StratifiedKFoldSplitter()
 
         registration = CVSplitterRegistration(factory)
-        registry.register("stratified_kfold", registration)
+        registry.register(CVStrategyName.STRATIFIED_KFOLD, registration)
 
-        caps = registry.get_capabilities("stratified_kfold")
+        caps = registry.get_capabilities(CVStrategyName.STRATIFIED_KFOLD)
         assert caps["preserves_class_ratio"] is True
         assert caps["supports_groups"] is False
         assert caps["supports_temporal"] is False
@@ -178,15 +179,15 @@ class TestDefaultCVRegistry:
         registry = default_cv_registry()
         strategies = registry.list_strategies()
 
-        assert "stratified_kfold" in strategies
-        assert "group_stratified_kfold" in strategies
-        assert "shuffle_split" in strategies
-        assert "time_series" in strategies
+        assert CVStrategyName.STRATIFIED_KFOLD in strategies
+        assert CVStrategyName.GROUP_STRATIFIED_KFOLD in strategies
+        assert CVStrategyName.SHUFFLE_SPLIT in strategies
+        assert CVStrategyName.TIME_SERIES in strategies
 
     def test_stratified_kfold_works(self) -> None:
         """Stratified kfold from registry works correctly."""
         registry = default_cv_registry()
-        splitter = registry.get("stratified_kfold")
+        splitter = registry.get(CVStrategyName.STRATIFIED_KFOLD)
 
         y = _make_labels(50, 50)
         split_info = splitter.split(y, n_folds=5, random_state=42)
@@ -197,23 +198,23 @@ class TestDefaultCVRegistry:
     def test_group_stratified_kfold_works(self) -> None:
         """Group stratified kfold from registry works correctly."""
         registry = default_cv_registry()
-        splitter = registry.get("group_stratified_kfold")
+        splitter = registry.get(CVStrategyName.GROUP_STRATIFIED_KFOLD)
 
-        assert splitter.strategy_name() == "group_stratified_kfold"
+        assert splitter.strategy_name() is CVStrategyName.GROUP_STRATIFIED_KFOLD
 
     def test_shuffle_split_works(self) -> None:
         """Shuffle split from registry works correctly."""
         registry = default_cv_registry()
-        splitter = registry.get("shuffle_split")
+        splitter = registry.get(CVStrategyName.SHUFFLE_SPLIT)
 
-        assert splitter.strategy_name() == "shuffle_split"
+        assert splitter.strategy_name() is CVStrategyName.SHUFFLE_SPLIT
 
     def test_time_series_works(self) -> None:
         """Time series from registry works correctly."""
         registry = default_cv_registry()
-        splitter = registry.get("time_series")
+        splitter = registry.get(CVStrategyName.TIME_SERIES)
 
-        assert splitter.strategy_name() == "time_series"
+        assert splitter.strategy_name() is CVStrategyName.TIME_SERIES
 
     def test_each_call_returns_fresh_registry(self) -> None:
         """Each call to default_cv_registry returns a new instance."""
@@ -227,7 +228,7 @@ class TestDefaultCVRegistry:
         """Each get call returns a new splitter instance."""
         registry = default_cv_registry()
 
-        splitter1 = registry.get("stratified_kfold")
-        splitter2 = registry.get("stratified_kfold")
+        splitter1 = registry.get(CVStrategyName.STRATIFIED_KFOLD)
+        splitter2 = registry.get(CVStrategyName.STRATIFIED_KFOLD)
 
         assert splitter1 is not splitter2

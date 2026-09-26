@@ -145,15 +145,19 @@ def default_optimizer_registry() -> OptimizerStrategyRegistry:
 
     # Optuna TPE
     create_optuna_tpe: OptimizerStrategyFactory = strategies_mod.create_optuna_tpe_optimizer
-    reg.register("optuna_tpe", OptimizerStrategyRegistration(create_optuna_tpe))
+    reg.register(OptimizerStrategyName.OPTUNA_TPE, OptimizerStrategyRegistration(create_optuna_tpe))
 
     # Random Search
     create_random_search: OptimizerStrategyFactory = strategies_mod.create_random_search_optimizer
-    reg.register("random_search", OptimizerStrategyRegistration(create_random_search))
+    reg.register(
+        OptimizerStrategyName.RANDOM_SEARCH, OptimizerStrategyRegistration(create_random_search)
+    )
 
     # Grid Search
     create_grid_search: OptimizerStrategyFactory = strategies_mod.create_grid_search_optimizer
-    reg.register("grid_search", OptimizerStrategyRegistration(create_grid_search))
+    reg.register(
+        OptimizerStrategyName.GRID_SEARCH, OptimizerStrategyRegistration(create_grid_search)
+    )
 
     return reg
 
