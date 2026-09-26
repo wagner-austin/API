@@ -22,6 +22,7 @@ from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseOverlapDict,
 )
 from tankpit_bot.bot.command_service import CommandService
+from tankpit_bot.bot.states import BotState
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.session_base import SessionBase
 from tankpit_bot.sniffer.world_service import WorldService
@@ -246,13 +247,13 @@ class ProbeBase(SessionBase):
         """
         return self.world.get_world_state()
 
-    def get_state(self) -> str:
+    def get_state(self) -> BotState:
         """Get current probe state.
 
         Returns:
-            Always "IDLE" — probes do not use the Bot HFSM.
+            Always ``BotState.IDLE`` — probes do not use the Bot HFSM.
         """
-        return "IDLE"
+        return BotState.IDLE
 
     def _update_state_from_world(self) -> None:
         """Update state from world data. No-op for probes."""

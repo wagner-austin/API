@@ -7,6 +7,7 @@ from typing import Literal, Protocol
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.bot.states import BotState
 from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
@@ -81,11 +82,11 @@ class BufferedWorldStateProviderProtocol(
 class StartupStateDriverProtocol(Protocol):
     """Minimal startup-state driver for a live action probe bot."""
 
-    def get_state(self) -> str:
-        """Return the current state-machine state name.
+    def get_state(self) -> BotState:
+        """Return the current state-machine state.
 
         Returns:
-            Current state name.
+            Current state.
         """
         ...
 
@@ -238,11 +239,13 @@ def advance_startup_state(bot: StartupStateDriverProtocol) -> None:
         ActionLabSessionError: If the bot remains in a bootstrap state after
             the expected startup transitions.
     """
-    while bot.get_state() in ("INITIALIZING", "WAITING_FOR_POSITION"):
+    while bot.get_state() in (BotState.INITIALIZING, BotState.WAITING_FOR_POSITION):
         previous_state = bot.get_state()
         bot._update_state_from_world()
-        if bot.get_state() == previous_state:
-            raise ActionLabSessionError(f"startup state did not advance from {previous_state}")
+        if bot.get_state() is previous_state:
+            raise ActionLabSessionError(
+                f"startup state did not advance from {previous_state.value}"
+            )
 
 
 __all__ = [
