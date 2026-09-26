@@ -56,7 +56,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
 from tankpit_bot.physics.costs import teleport_cost
@@ -447,7 +447,7 @@ def _decide_hunt_acquire_fresh(
         if relay is not None:
             return relay
         raise SessionExitError(
-            "no_viable_targets",
+            SessionExitReason.NO_VIABLE_TARGETS,
             f"fresh map snapshot ({map_age_ms}ms old) has no affordable enemy "
             f"and no relay dot at ({ctx.self_state['x']},{ctx.self_state['y']}) "
             f"fuel={ctx.fuel}",

@@ -40,7 +40,7 @@ from tankpit_bot.bot.ai.resource_search import (
 )
 from tankpit_bot.bot.ai.threat_primitives import WIRE_PRESENCE_TTL_MS
 from tankpit_bot.bot.ai.types import AIStateDict
-from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_hold_command, make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
@@ -140,7 +140,7 @@ def exhausted_collect_outcome(
             )
             return None
         raise SessionExitError(
-            "no_productive_collect",
+            SessionExitReason.NO_PRODUCTIVE_COLLECT,
             f"COLLECT owner produced no decision at "
             f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel} "
             f"dual={ctx.inventory['dual_shots']['count']} "
@@ -192,7 +192,7 @@ def exhausted_collect_outcome(
         )
 
     raise SessionExitError(
-        "out_of_fuel",
+        SessionExitReason.OUT_OF_FUEL,
         f"COLLECT owner produced no decision at "
         f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
         f"forager exhausted, no affordable search hop, no walkable "
