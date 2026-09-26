@@ -31,6 +31,7 @@ from platform_core.oauth import (
 from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
+    TokenType,
     decode_oauth_token_response,
 )
 
@@ -149,7 +150,7 @@ def exchange_code_for_tokens(
         access_token=token_response["access_token"],
         refresh_token=refresh_token,
         expires_at=expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 
@@ -216,7 +217,7 @@ def refresh_access_token(
         access_token=token_response["access_token"],
         refresh_token=refresh_token,  # Keep original refresh token
         expires_at=expires_at,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 

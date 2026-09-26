@@ -6,6 +6,7 @@ import pytest
 from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
+    TokenType,
 )
 
 from platform_calendar.fakes import (
@@ -95,7 +96,7 @@ class TestMakeFakeTokens:
             access_token="access",
             refresh_token="refresh",
             expires_at=1735200000,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
         hook = make_fake_tokens(tokens)
         result = hook()

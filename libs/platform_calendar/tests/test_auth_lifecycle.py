@@ -6,7 +6,7 @@ import pytest
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.json_utils import dump_json_str
 from platform_core.oauth import generate_code_challenge, generate_code_verifier
-from platform_core.oauth_types import OAuthCredentials, OAuthTokens
+from platform_core.oauth_types import OAuthCredentials, OAuthTokens, TokenType
 
 from platform_calendar.auth import (
     authorize,
@@ -38,7 +38,7 @@ class TestIsTokenExpired:
             access_token="access",
             refresh_token="refresh",
             expires_at=1735200000 + 3600,  # Expires in 1 hour
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         assert is_token_expired(tokens) is False
@@ -50,7 +50,7 @@ class TestIsTokenExpired:
             access_token="access",
             refresh_token="refresh",
             expires_at=1735200000 - 100,  # Expired 100 seconds ago
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         assert is_token_expired(tokens) is True
@@ -62,7 +62,7 @@ class TestIsTokenExpired:
             access_token="access",
             refresh_token="refresh",
             expires_at=1735200000 + 30,  # Expires in 30 seconds
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         # Default buffer is 60 seconds
@@ -75,7 +75,7 @@ class TestIsTokenExpired:
             access_token="access",
             refresh_token="refresh",
             expires_at=1735200000 + 30,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         # With smaller buffer, not expired
@@ -90,7 +90,7 @@ class TestGetValidTokens:
             access_token="access",
             refresh_token="refresh",
             expires_at=1735200000 + 3600,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         creds = OAuthCredentials(
@@ -109,7 +109,7 @@ class TestGetValidTokens:
             access_token="old_access",
             refresh_token="refresh",
             expires_at=1735200000 - 100,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         token_response = {
@@ -277,7 +277,7 @@ class TestLoadOrAuthorize:
             access_token="cached_access",
             refresh_token="cached_refresh",
             expires_at=1735200000 + 3600,  # Valid for 1 hour
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         creds = OAuthCredentials(
@@ -299,7 +299,7 @@ class TestLoadOrAuthorize:
             access_token="old_access",
             refresh_token="old_refresh",
             expires_at=1735200000 - 100,  # Expired
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         token_response = {
@@ -372,7 +372,7 @@ class TestLoadOrAuthorize:
             access_token="old_access",
             refresh_token="old_refresh",
             expires_at=1735200000 - 100,  # Expired
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
         # First call will fail (refresh), second will succeed (authorize)

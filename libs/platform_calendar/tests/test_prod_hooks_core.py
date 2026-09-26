@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from platform_core.config import config_test_hooks
 from platform_core.errors import AppError, CalendarErrorCode
-from platform_core.oauth_types import OAuthTokens
+from platform_core.oauth_types import OAuthTokens, TokenType
 
 from platform_calendar._prod_hooks import (
     _prod_console_output,
@@ -189,7 +189,7 @@ class TestProdSaveTokens:
             access_token="test_access",
             refresh_token="test_refresh",
             expires_at=1735200000,
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
         tokens_file = tmp_path / "subdir" / "tokens.json"
         _prod_save_tokens(tokens, str(tokens_file))

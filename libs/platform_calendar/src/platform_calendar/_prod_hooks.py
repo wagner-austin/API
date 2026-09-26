@@ -17,6 +17,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
+    TokenType,
 )
 from rich.console import Console
 
@@ -148,7 +149,7 @@ def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
             access_token=env_access_token,
             refresh_token=env_refresh_token,
             expires_at=int(env_expires_at),
-            token_type="Bearer",
+            token_type=TokenType.BEARER,
         )
 
     # No env vars set - read from file

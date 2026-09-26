@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str
-from platform_core.oauth_types import OAuthTokens
+from platform_core.oauth_types import OAuthTokens, TokenType
 
 from platform_calendar.client import google_calendar_client
 from platform_calendar.fakes import (
@@ -23,7 +23,7 @@ def _test_tokens() -> OAuthTokens:
         access_token="test_access_token",
         refresh_token="test_refresh_token",
         expires_at=9999999999,
-        token_type="Bearer",
+        token_type=TokenType.BEARER,
     )
 
 
