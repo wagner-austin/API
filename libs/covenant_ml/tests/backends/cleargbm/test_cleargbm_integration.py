@@ -22,6 +22,7 @@ from covenant_ml.backends.cleargbm.config_resolution import (
     _is_cleargbm_config,
 )
 from covenant_ml.types import (
+    BackendName,
     MLPConfig,
     OptimizerName,
     TrainConfig,
@@ -188,7 +189,7 @@ def test_cleargbm_prepared_model_property(tmp_path: Path) -> None:
 def test_create_cleargbm_backend_returns_correct_name() -> None:
     """create_cleargbm_backend returns backend with correct name."""
     backend = create_cleargbm_backend()
-    assert backend.backend_name() == "cleargbm"
+    assert backend.backend_name() is BackendName.CLEARGBM
 
 
 def test_cleargbm_capabilities_structure() -> None:
@@ -203,7 +204,7 @@ def test_cleargbm_capabilities_structure() -> None:
 def test_cleargbm_backend_name() -> None:
     """ClearGBMBackend.backend_name returns 'cleargbm'."""
     backend = create_cleargbm_backend()
-    assert backend.backend_name() == "cleargbm"
+    assert backend.backend_name() is BackendName.CLEARGBM
 
 
 def test_cleargbm_backend_capabilities() -> None:

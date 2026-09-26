@@ -74,7 +74,7 @@ def default_registry() -> ClassifierRegistry:
         fromlist=["create_xgboost_backend"],
     )
     create_xgboost_backend: BackendFactory = xgb_mod.create_xgboost_backend
-    reg.register("xgboost", BackendRegistration(create_xgboost_backend))
+    reg.register(BackendName.XGBOOST, BackendRegistration(create_xgboost_backend))
 
     # LightGBM backend
     lgbm_pkg = __import__(
@@ -82,7 +82,7 @@ def default_registry() -> ClassifierRegistry:
         fromlist=["create_lightgbm_backend"],
     )
     create_lightgbm_backend: BackendFactory = lgbm_pkg.create_lightgbm_backend
-    reg.register("lightgbm", BackendRegistration(create_lightgbm_backend))
+    reg.register(BackendName.LIGHTGBM, BackendRegistration(create_lightgbm_backend))
 
     # ClearGBM backend
     cgbm_pkg = __import__(
@@ -90,7 +90,7 @@ def default_registry() -> ClassifierRegistry:
         fromlist=["create_cleargbm_backend"],
     )
     create_cleargbm_backend: BackendFactory = cgbm_pkg.create_cleargbm_backend
-    reg.register("cleargbm", BackendRegistration(create_cleargbm_backend))
+    reg.register(BackendName.CLEARGBM, BackendRegistration(create_cleargbm_backend))
 
     # Logistic Regression backend
     logreg_pkg = __import__(
@@ -98,7 +98,7 @@ def default_registry() -> ClassifierRegistry:
         fromlist=["create_logreg_backend"],
     )
     create_logreg_backend: BackendFactory = logreg_pkg.create_logreg_backend
-    reg.register("logreg", BackendRegistration(create_logreg_backend))
+    reg.register(BackendName.LOGREG, BackendRegistration(create_logreg_backend))
 
     # Random Forest backend
     rf_pkg = __import__(
@@ -106,7 +106,7 @@ def default_registry() -> ClassifierRegistry:
         fromlist=["create_random_forest_backend"],
     )
     create_random_forest_backend: BackendFactory = rf_pkg.create_random_forest_backend
-    reg.register("random_forest", BackendRegistration(create_random_forest_backend))
+    reg.register(BackendName.RANDOM_FOREST, BackendRegistration(create_random_forest_backend))
 
     return reg
 

@@ -255,10 +255,10 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
             factory=_create_regression_permutation_factory(),
             compatible_backends=frozenset(
                 [
-                    "xgboost_reg",
-                    "lightgbm_reg",
-                    "mlp_reg",
-                    "lstm_reg",
+                    RegressorBackendName.XGBOOST_REG,
+                    RegressorBackendName.LIGHTGBM_REG,
+                    RegressorBackendName.MLP_REG,
+                    RegressorBackendName.LSTM_REG,
                 ]
             ),
             requires_gradients=False,
@@ -270,7 +270,9 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
         ExplainerName.GRADIENT,
         RegressionExplainerRegistration(
             factory=_create_regression_gradient_factory(),
-            compatible_backends=frozenset(["mlp_reg", "lstm_reg"]),
+            compatible_backends=frozenset(
+                [RegressorBackendName.MLP_REG, RegressorBackendName.LSTM_REG]
+            ),
             requires_gradients=True,
         ),
     )
@@ -280,7 +282,9 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
         ExplainerName.INTEGRATED_GRADIENTS,
         RegressionExplainerRegistration(
             factory=_create_regression_integrated_gradients_factory(),
-            compatible_backends=frozenset(["mlp_reg", "lstm_reg"]),
+            compatible_backends=frozenset(
+                [RegressorBackendName.MLP_REG, RegressorBackendName.LSTM_REG]
+            ),
             requires_gradients=True,
         ),
     )
@@ -290,7 +294,9 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
         ExplainerName.SHAP_TREE,
         RegressionExplainerRegistration(
             factory=_create_regression_shap_tree_factory(),
-            compatible_backends=frozenset(["xgboost_reg", "lightgbm_reg"]),
+            compatible_backends=frozenset(
+                [RegressorBackendName.XGBOOST_REG, RegressorBackendName.LIGHTGBM_REG]
+            ),
             requires_gradients=False,
         ),
     )

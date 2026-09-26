@@ -5,6 +5,7 @@ Strict typing only. No Any, casts, or stubs.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, NotRequired, Protocol, TypedDict
 
 import numpy as np
@@ -14,8 +15,18 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision, Reso
 
 from covenant_ml.types_logreg import LogRegPenalty, LogRegSolver
 
+
 # Pluggable backend naming - all supported classifier backends
-BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm", "logreg", "random_forest"]
+class BackendName(StrEnum):
+    """Every classifier backend the registry can build, by registry name."""
+
+    XGBOOST = "xgboost"
+    MLP = "mlp"
+    LSTM = "lstm"
+    LIGHTGBM = "lightgbm"
+    CLEARGBM = "cleargbm"
+    LOGREG = "logreg"
+    RANDOM_FOREST = "random_forest"
 
 
 class TrainConfigRequired(TypedDict, total=True):

@@ -56,7 +56,7 @@ class XGBoostBackend(ClassifierBackend):
     """Backend that wraps covenant_ml.trainer XGBoost implementation."""
 
     def backend_name(self) -> BackendName:
-        return "xgboost"
+        return BackendName.XGBOOST
 
     def capabilities(self) -> BackendCapabilities:
         return XGBOOST_CAPABILITIES

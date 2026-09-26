@@ -236,7 +236,7 @@ class LightGBMBackend(ClassifierBackend):
     """LightGBM backend for tabular binary classification."""
 
     def backend_name(self) -> BackendName:
-        return "lightgbm"
+        return BackendName.LIGHTGBM
 
     def capabilities(self) -> BackendCapabilities:
         return LIGHTGBM_CAPABILITIES

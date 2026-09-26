@@ -265,9 +265,7 @@ def default_explainer_registry() -> ExplainerRegistry:
         ExplainerName.PERMUTATION,
         ExplainerRegistration(
             factory=_create_permutation_factory(),
-            compatible_backends=frozenset(
-                ["xgboost", "lightgbm", "mlp", "lstm", "cleargbm", "logreg", "random_forest"]
-            ),
+            compatible_backends=frozenset(BackendName),
             requires_gradients=False,
         ),
     )
@@ -277,7 +275,7 @@ def default_explainer_registry() -> ExplainerRegistry:
         ExplainerName.GRADIENT,
         ExplainerRegistration(
             factory=_create_gradient_factory(),
-            compatible_backends=frozenset(["mlp", "lstm"]),
+            compatible_backends=frozenset([BackendName.MLP, BackendName.LSTM]),
             requires_gradients=True,
         ),
     )
@@ -287,7 +285,7 @@ def default_explainer_registry() -> ExplainerRegistry:
         ExplainerName.INTEGRATED_GRADIENTS,
         ExplainerRegistration(
             factory=_create_integrated_gradients_factory(),
-            compatible_backends=frozenset(["mlp", "lstm"]),
+            compatible_backends=frozenset([BackendName.MLP, BackendName.LSTM]),
             requires_gradients=True,
         ),
     )
@@ -300,7 +298,14 @@ def default_explainer_registry() -> ExplainerRegistry:
         ExplainerName.SHAP_TREE,
         ExplainerRegistration(
             factory=_create_shap_tree_factory(),
-            compatible_backends=frozenset(["xgboost", "lightgbm", "cleargbm", "random_forest"]),
+            compatible_backends=frozenset(
+                [
+                    BackendName.XGBOOST,
+                    BackendName.LIGHTGBM,
+                    BackendName.CLEARGBM,
+                    BackendName.RANDOM_FOREST,
+                ]
+            ),
             requires_gradients=False,
         ),
     )

@@ -9,25 +9,26 @@ PyTorch backends (mlp, lstm) live in covenant_nn.
 from __future__ import annotations
 
 from covenant_ml.backends import default_registry
+from covenant_ml.types import BackendName
 
 
 def test_default_registry_lists_backends() -> None:
     """Default registry exposes tree-based and sklearn backends."""
     reg = default_registry()
     names = reg.list_backends()
-    assert "xgboost" in names
-    assert "lightgbm" in names
-    assert "cleargbm" in names
-    assert "logreg" in names
-    assert "random_forest" in names
-    assert "mlp" not in names
-    assert "lstm" not in names
+    assert BackendName.XGBOOST in names
+    assert BackendName.LIGHTGBM in names
+    assert BackendName.CLEARGBM in names
+    assert BackendName.LOGREG in names
+    assert BackendName.RANDOM_FOREST in names
+    assert BackendName.MLP not in names
+    assert BackendName.LSTM not in names
 
 
 def test_capabilities_present_for_each_backend() -> None:
     """Capabilities are cached and include required keys."""
     reg = default_registry()
-    for name in ("xgboost", "lightgbm"):
+    for name in (BackendName.XGBOOST, BackendName.LIGHTGBM):
         caps = reg.get_capabilities(name)
         assert caps["supports_train"] is True
         assert caps["supports_early_stopping"] in (True, False)
@@ -38,10 +39,10 @@ def test_capabilities_present_for_each_backend() -> None:
 def test_registry_get_returns_backend_instance() -> None:
     """Get method returns a backend instance with correct name."""
     reg = default_registry()
-    xgb = reg.get("xgboost")
-    assert xgb.backend_name() == "xgboost"
-    lgbm = reg.get("lightgbm")
-    assert lgbm.backend_name() == "lightgbm"
+    xgb = reg.get(BackendName.XGBOOST)
+    assert xgb.backend_name() is BackendName.XGBOOST
+    lgbm = reg.get(BackendName.LIGHTGBM)
+    assert lgbm.backend_name() is BackendName.LIGHTGBM
 
 
 def test_backend_registration_factory_returns_callable() -> None:
@@ -53,7 +54,7 @@ def test_backend_registration_factory_returns_callable() -> None:
     factory = registration.factory()
     assert callable(factory)
     backend = factory()
-    assert backend.backend_name() == "xgboost"
+    assert backend.backend_name() is BackendName.XGBOOST
 
 
 def test_capabilities_caching() -> None:

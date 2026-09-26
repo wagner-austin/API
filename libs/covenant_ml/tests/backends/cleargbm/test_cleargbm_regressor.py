@@ -23,7 +23,7 @@ from covenant_ml.backends.cleargbm.regressor import (
 )
 from covenant_ml.backends.regressor_protocol import RegressorBackend
 from covenant_ml.backends.regressor_registry import default_regressor_registry
-from covenant_ml.types_regression import RegressionTrainProgress
+from covenant_ml.types_regression import RegressionTrainProgress, RegressorBackendName
 
 from ._cleargbm_fixtures import _make_cleargbm_config, _require_importances
 
@@ -43,7 +43,7 @@ def _make_regression_data(
 def test_create_cleargbm_regressor_backend_returns_backend() -> None:
     """Factory returns a RegressorBackend instance."""
     backend: RegressorBackend = create_cleargbm_regressor_backend()
-    assert backend.backend_name() == "cleargbm_reg"
+    assert backend.backend_name() is RegressorBackendName.CLEARGBM_REG
 
 
 def test_cleargbm_regressor_capabilities() -> None:
@@ -298,10 +298,10 @@ def test_default_regressor_registry_has_cleargbm() -> None:
     """Default regressor registry includes cleargbm_reg with json format."""
     reg = default_regressor_registry()
     names = reg.list_backends()
-    assert "cleargbm_reg" in names
+    assert RegressorBackendName.CLEARGBM_REG in names
 
-    caps = reg.get_capabilities("cleargbm_reg")
+    caps = reg.get_capabilities(RegressorBackendName.CLEARGBM_REG)
     assert caps["model_format"] == "json"
 
-    backend = reg.get("cleargbm_reg")
-    assert backend.backend_name() == "cleargbm_reg"
+    backend = reg.get(RegressorBackendName.CLEARGBM_REG)
+    assert backend.backend_name() is RegressorBackendName.CLEARGBM_REG

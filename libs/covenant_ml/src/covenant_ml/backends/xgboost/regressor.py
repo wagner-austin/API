@@ -94,7 +94,7 @@ class XGBoostRegressorBackend:
         Returns:
             The backend name literal 'xgboost_reg'.
         """
-        return "xgboost_reg"
+        return RegressorBackendName.XGBOOST_REG
 
     def capabilities(self) -> BackendCapabilities:
         """Return capability flags for this backend.

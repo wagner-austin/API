@@ -291,7 +291,7 @@ class LogRegBackend(ClassifierBackend):
         Returns:
             Literal "logreg" backend name.
         """
-        return "logreg"
+        return BackendName.LOGREG
 
     def capabilities(self) -> BackendCapabilities:
         """Return backend capabilities.

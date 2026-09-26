@@ -17,6 +17,7 @@ from covenant_ml.backends.lightgbm.backend import _resolve_device
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.explainers.adapters import try_extract_native_tree_model
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     LightGBMConfig,
     MLPConfig,
@@ -434,7 +435,7 @@ def test_lightgbm_capabilities() -> None:
 def test_lightgbm_backend_name() -> None:
     """LightGBMBackend.backend_name returns 'lightgbm'."""
     backend = create_lightgbm_backend()
-    assert backend.backend_name() == "lightgbm"
+    assert backend.backend_name() is BackendName.LIGHTGBM
 
 
 def test_lightgbm_backend_capabilities() -> None:

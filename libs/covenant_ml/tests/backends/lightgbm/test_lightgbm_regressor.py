@@ -28,6 +28,7 @@ from covenant_ml.types import (
 from covenant_ml.types_regression import (
     RegressionTrainOutcome,
     RegressionTrainProgress,
+    RegressorBackendName,
     RegressorTrainConfig,
 )
 
@@ -107,13 +108,13 @@ def _invoke_lightgbm_regressor_train(
 def test_create_lightgbm_regressor_backend_returns_backend() -> None:
     """Factory returns a RegressorBackend instance."""
     backend: RegressorBackend = create_lightgbm_regressor_backend()
-    assert backend.backend_name() == "lightgbm_reg"
+    assert backend.backend_name() is RegressorBackendName.LIGHTGBM_REG
 
 
 def test_lightgbm_regressor_backend_name() -> None:
     """Backend returns correct name literal."""
     backend = LightGBMRegressorBackend()
-    assert backend.backend_name() == "lightgbm_reg"
+    assert backend.backend_name() is RegressorBackendName.LIGHTGBM_REG
 
 
 def test_lightgbm_regressor_capabilities() -> None:
@@ -520,13 +521,13 @@ def test_default_regressor_registry_has_lightgbm() -> None:
     """Default regressor registry includes lightgbm_reg."""
     reg = default_regressor_registry()
     names = reg.list_backends()
-    assert "lightgbm_reg" in names
+    assert RegressorBackendName.LIGHTGBM_REG in names
 
 
 def test_default_regressor_registry_lightgbm_capabilities() -> None:
     """Registry returns correct capabilities for lightgbm_reg."""
     reg = default_regressor_registry()
-    caps = reg.get_capabilities("lightgbm_reg")
+    caps = reg.get_capabilities(RegressorBackendName.LIGHTGBM_REG)
     assert caps["supports_train"] is True
     assert caps["model_format"] == "txt"
 
@@ -534,8 +535,8 @@ def test_default_regressor_registry_lightgbm_capabilities() -> None:
 def test_default_regressor_registry_get_lightgbm() -> None:
     """Registry get() returns working lightgbm_reg backend."""
     reg = default_regressor_registry()
-    backend = reg.get("lightgbm_reg")
-    assert backend.backend_name() == "lightgbm_reg"
+    backend = reg.get(RegressorBackendName.LIGHTGBM_REG)
+    assert backend.backend_name() is RegressorBackendName.LIGHTGBM_REG
 
 
 # =============================================================================

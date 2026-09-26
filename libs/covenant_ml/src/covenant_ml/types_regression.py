@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from enum import StrEnum
+from typing import Protocol, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -125,7 +126,14 @@ class XGBRegressorFactory(Protocol):
         ...
 
 
-RegressorBackendName = Literal["xgboost_reg", "lightgbm_reg", "cleargbm_reg", "mlp_reg", "lstm_reg"]
+class RegressorBackendName(StrEnum):
+    """Every regressor backend the regressor registry can build, by registry name."""
+
+    XGBOOST_REG = "xgboost_reg"
+    LIGHTGBM_REG = "lightgbm_reg"
+    CLEARGBM_REG = "cleargbm_reg"
+    MLP_REG = "mlp_reg"
+    LSTM_REG = "lstm_reg"
 
 
 class RegressionMetrics(TypedDict, total=True):

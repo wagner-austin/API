@@ -22,7 +22,7 @@ from covenant_ml.backends.xgboost.regressor import (
     create_xgboost_regressor_backend,
 )
 from covenant_ml.testing import make_train_config
-from covenant_ml.types_regression import RegressionTrainProgress
+from covenant_ml.types_regression import RegressionTrainProgress, RegressorBackendName
 
 
 def _make_regression_data(
@@ -51,13 +51,13 @@ def _make_regression_data(
 def test_create_xgboost_regressor_backend_returns_backend() -> None:
     """Factory returns a RegressorBackend instance."""
     backend: RegressorBackend = create_xgboost_regressor_backend()
-    assert backend.backend_name() == "xgboost_reg"
+    assert backend.backend_name() is RegressorBackendName.XGBOOST_REG
 
 
 def test_xgboost_regressor_backend_name() -> None:
     """Backend returns correct name literal."""
     backend = XGBoostRegressorBackend()
-    assert backend.backend_name() == "xgboost_reg"
+    assert backend.backend_name() is RegressorBackendName.XGBOOST_REG
 
 
 def test_xgboost_regressor_capabilities() -> None:
@@ -346,13 +346,13 @@ def test_default_regressor_registry_has_xgboost() -> None:
     reg = default_regressor_registry()
     names = reg.list_backends()
 
-    assert "xgboost_reg" in names
+    assert RegressorBackendName.XGBOOST_REG in names
 
 
 def test_default_regressor_registry_xgboost_capabilities() -> None:
     """Registry returns correct capabilities for xgboost_reg."""
     reg = default_regressor_registry()
-    caps = reg.get_capabilities("xgboost_reg")
+    caps = reg.get_capabilities(RegressorBackendName.XGBOOST_REG)
 
     assert caps["supports_train"] is True
     assert caps["model_format"] == "ubj"
@@ -361,6 +361,6 @@ def test_default_regressor_registry_xgboost_capabilities() -> None:
 def test_default_regressor_registry_get_xgboost() -> None:
     """Registry get() returns working xgboost_reg backend."""
     reg = default_regressor_registry()
-    backend = reg.get("xgboost_reg")
+    backend = reg.get(RegressorBackendName.XGBOOST_REG)
 
-    assert backend.backend_name() == "xgboost_reg"
+    assert backend.backend_name() is RegressorBackendName.XGBOOST_REG

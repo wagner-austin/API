@@ -326,18 +326,14 @@ def test_protocols_are_callable() -> None:
 
 
 def test_regressor_backend_name_values() -> None:
-    """RegressorBackendName accepts all four regressor backends."""
-    names: list[RegressorBackendName] = [
+    """RegressorBackendName carries every regressor registry word, in order."""
+    assert [str(name) for name in RegressorBackendName] == [
         "xgboost_reg",
         "lightgbm_reg",
+        "cleargbm_reg",
         "mlp_reg",
         "lstm_reg",
     ]
-    assert len(names) == 4
-    assert "xgboost_reg" in names
-    assert "lightgbm_reg" in names
-    assert "mlp_reg" in names
-    assert "lstm_reg" in names
 
 
 def test_regression_metrics_has_all_fields() -> None:

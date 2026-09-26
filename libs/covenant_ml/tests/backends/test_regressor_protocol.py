@@ -62,7 +62,7 @@ class _FakeRegressorBackend:
     """Fake regressor backend for protocol conformance testing."""
 
     def backend_name(self) -> RegressorBackendName:
-        return "xgboost_reg"
+        return RegressorBackendName.XGBOOST_REG
 
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
@@ -203,7 +203,7 @@ def test_prepared_regressor_predict_values() -> None:
 def test_regressor_backend_name() -> None:
     """RegressorBackend.backend_name returns valid literal."""
     backend: RegressorBackend = _FakeRegressorBackend()
-    assert backend.backend_name() == "xgboost_reg"
+    assert backend.backend_name() is RegressorBackendName.XGBOOST_REG
 
 
 def test_regressor_backend_capabilities() -> None:

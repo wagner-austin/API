@@ -216,7 +216,7 @@ class ClearGBMBackend(ClassifierBackend):
         Returns:
             Backend name literal.
         """
-        return "cleargbm"
+        return BackendName.CLEARGBM
 
     def capabilities(self) -> BackendCapabilities:
         """Return backend capabilities.

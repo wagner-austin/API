@@ -87,7 +87,13 @@ def _default_space(backend_name: BackendName) -> SearchSpace:
     return default_registry().get(backend_name).get_default_search_space()
 
 
-_REGISTERED: list[BackendName] = ["xgboost", "lightgbm", "cleargbm", "logreg", "random_forest"]
+_REGISTERED: list[BackendName] = [
+    BackendName.XGBOOST,
+    BackendName.LIGHTGBM,
+    BackendName.CLEARGBM,
+    BackendName.LOGREG,
+    BackendName.RANDOM_FOREST,
+]
 
 
 class TestGuardsAreMutuallyExclusive:
@@ -105,13 +111,13 @@ class TestGuardsAreMutuallyExclusive:
         matches = [
             name
             for name, guard in (
-                ("xgboost", is_xgboost_search_space),
-                ("lightgbm", is_lightgbm_search_space),
-                ("cleargbm", is_cleargbm_search_space),
-                ("logreg", is_logreg_search_space),
-                ("random_forest", is_random_forest_search_space),
-                ("mlp", is_mlp_search_space),
-                ("lstm", is_lstm_search_space),
+                (BackendName.XGBOOST, is_xgboost_search_space),
+                (BackendName.LIGHTGBM, is_lightgbm_search_space),
+                (BackendName.CLEARGBM, is_cleargbm_search_space),
+                (BackendName.LOGREG, is_logreg_search_space),
+                (BackendName.RANDOM_FOREST, is_random_forest_search_space),
+                (BackendName.MLP, is_mlp_search_space),
+                (BackendName.LSTM, is_lstm_search_space),
             )
             if guard(space)
         ]
@@ -120,14 +126,14 @@ class TestGuardsAreMutuallyExclusive:
 
     def test_random_forest_is_not_xgboost(self) -> None:
         """The specific collision that broke RandomForest optimization."""
-        space = _default_space("random_forest")
+        space = _default_space(BackendName.RANDOM_FOREST)
 
         assert "max_depth" in space
         assert not is_xgboost_search_space(space)
 
     def test_cleargbm_is_not_xgboost(self) -> None:
         """ClearGBM carries max_depth too, and was misrouted the same way."""
-        space = _default_space("cleargbm")
+        space = _default_space(BackendName.CLEARGBM)
 
         assert "max_depth" in space
         assert not is_xgboost_search_space(space)
@@ -166,13 +172,13 @@ class TestSamplingRoundTrip:
         path — and the first end-to-end run silently tuned without it.
         This pins the layer that actually runs.
         """
-        space = _default_space("cleargbm")
+        space = _default_space(BackendName.CLEARGBM)
         int_params, _, _ = _sample_params(_RecordingTrial(), space)
         assert int_params.get("min_data_in_bin_denom") in (1, 256, 64, 16, 4)
 
     def test_random_forest_samples_no_learning_rate(self) -> None:
         """RandomForest is not boosted; demanding a learning rate is the bug."""
-        space = _default_space("random_forest")
+        space = _default_space(BackendName.RANDOM_FOREST)
 
         _, float_params, _ = _sample_params(_RecordingTrial(), space)
 
@@ -180,7 +186,7 @@ class TestSamplingRoundTrip:
 
     def test_logreg_samples_its_own_params(self) -> None:
         """LogReg reaches its own sampler rather than a bare assert."""
-        space = _default_space("logreg")
+        space = _default_space(BackendName.LOGREG)
 
         int_params, float_params, _ = _sample_params(_RecordingTrial(), space)
 

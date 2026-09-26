@@ -19,6 +19,7 @@ from covenant_ml.backends.logreg import (
 )
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     LogRegConfig,
     LogRegPenalty,
@@ -377,7 +378,7 @@ def test_logreg_capabilities() -> None:
 def test_logreg_backend_name() -> None:
     """LogRegBackend.backend_name returns 'logreg'."""
     backend = create_logreg_backend()
-    assert backend.backend_name() == "logreg"
+    assert backend.backend_name() is BackendName.LOGREG
 
 
 def test_logreg_backend_capabilities() -> None:
@@ -390,7 +391,7 @@ def test_logreg_backend_capabilities() -> None:
 def test_logreg_backend_class_instantiation() -> None:
     """LogRegBackend can be instantiated directly."""
     backend = LogRegBackend()
-    assert backend.backend_name() == "logreg"
+    assert backend.backend_name() is BackendName.LOGREG
 
 
 # =============================================================================

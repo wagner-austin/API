@@ -220,7 +220,7 @@ class LightGBMRegressorBackend:
         Returns:
             The backend name literal 'lightgbm_reg'.
         """
-        return "lightgbm_reg"
+        return RegressorBackendName.LIGHTGBM_REG
 
     def capabilities(self) -> BackendCapabilities:
         """Return capability flags for this backend.

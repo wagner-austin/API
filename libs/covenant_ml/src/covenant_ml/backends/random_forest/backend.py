@@ -286,7 +286,7 @@ class RandomForestBackend(ClassifierBackend):
         Returns:
             Literal "random_forest" backend name.
         """
-        return "random_forest"
+        return BackendName.RANDOM_FOREST
 
     def capabilities(self) -> BackendCapabilities:
         """Return backend capabilities.

@@ -47,7 +47,7 @@ def _make_zero_metrics() -> RegressionMetrics:
 
 class _FakeRegressorBackend:
     def backend_name(self) -> RegressorBackendName:
-        return "xgboost_reg"
+        return RegressorBackendName.XGBOOST_REG
 
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
@@ -146,50 +146,58 @@ def test_default_regressor_registry_has_xgboost_reg() -> None:
     """Default regressor registry includes xgboost_reg."""
     reg = default_regressor_registry()
     names = reg.list_backends()
-    assert "xgboost_reg" in names
+    assert RegressorBackendName.XGBOOST_REG in names
 
 
 def test_default_regressor_registry_has_lightgbm_reg() -> None:
     """Default regressor registry includes lightgbm_reg."""
     reg = default_regressor_registry()
     names = reg.list_backends()
-    assert "lightgbm_reg" in names
+    assert RegressorBackendName.LIGHTGBM_REG in names
 
 
 def test_registry_register_and_list() -> None:
     """Registered backends appear in list_backends."""
     reg = RegressorRegistry()
-    reg.register("xgboost_reg", RegressorBackendRegistration(_create_fake_backend))
+    reg.register(
+        RegressorBackendName.XGBOOST_REG, RegressorBackendRegistration(_create_fake_backend)
+    )
 
     names = reg.list_backends()
-    assert names == ["xgboost_reg"]
+    assert names == [RegressorBackendName.XGBOOST_REG]
 
 
 def test_registry_register_multiple() -> None:
     """Multiple backends register and list in sorted order."""
     reg = RegressorRegistry()
-    reg.register("xgboost_reg", RegressorBackendRegistration(_create_fake_backend))
-    reg.register("mlp_reg", RegressorBackendRegistration(_create_fake_backend))
+    reg.register(
+        RegressorBackendName.XGBOOST_REG, RegressorBackendRegistration(_create_fake_backend)
+    )
+    reg.register(RegressorBackendName.MLP_REG, RegressorBackendRegistration(_create_fake_backend))
 
     names = reg.list_backends()
-    assert names == ["mlp_reg", "xgboost_reg"]
+    assert names == [RegressorBackendName.MLP_REG, RegressorBackendName.XGBOOST_REG]
 
 
 def test_registry_get_returns_backend() -> None:
     """get() returns a working backend instance."""
     reg = RegressorRegistry()
-    reg.register("xgboost_reg", RegressorBackendRegistration(_create_fake_backend))
+    reg.register(
+        RegressorBackendName.XGBOOST_REG, RegressorBackendRegistration(_create_fake_backend)
+    )
 
-    backend = reg.get("xgboost_reg")
-    assert backend.backend_name() == "xgboost_reg"
+    backend = reg.get(RegressorBackendName.XGBOOST_REG)
+    assert backend.backend_name() is RegressorBackendName.XGBOOST_REG
 
 
 def test_registry_get_capabilities() -> None:
     """get_capabilities returns BackendCapabilities."""
     reg = RegressorRegistry()
-    reg.register("xgboost_reg", RegressorBackendRegistration(_create_fake_backend))
+    reg.register(
+        RegressorBackendName.XGBOOST_REG, RegressorBackendRegistration(_create_fake_backend)
+    )
 
-    caps = reg.get_capabilities("xgboost_reg")
+    caps = reg.get_capabilities(RegressorBackendName.XGBOOST_REG)
     assert caps["supports_train"] is True
     assert caps["model_format"] == "ubj"
 
@@ -200,7 +208,7 @@ def test_registration_factory_returns_callable() -> None:
     factory = registration.factory()
     assert callable(factory)
     backend = factory()
-    assert backend.backend_name() == "xgboost_reg"
+    assert backend.backend_name() is RegressorBackendName.XGBOOST_REG
 
 
 def test_registration_capabilities_caching() -> None:
@@ -230,7 +238,7 @@ def test_registry_get_raises_on_missing_backend() -> None:
 
     reg = RegressorRegistry()
     with pytest.raises(KeyError):
-        reg.get("xgboost_reg")
+        reg.get(RegressorBackendName.XGBOOST_REG)
 
 
 def test_registry_get_capabilities_raises_on_missing() -> None:
@@ -239,4 +247,4 @@ def test_registry_get_capabilities_raises_on_missing() -> None:
 
     reg = RegressorRegistry()
     with pytest.raises(KeyError):
-        reg.get_capabilities("mlp_reg")
+        reg.get_capabilities(RegressorBackendName.MLP_REG)

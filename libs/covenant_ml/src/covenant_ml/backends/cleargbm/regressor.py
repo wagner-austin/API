@@ -127,7 +127,7 @@ class ClearGBMRegressorBackend:
         Returns:
             The backend name literal 'cleargbm_reg'.
         """
-        return "cleargbm_reg"
+        return RegressorBackendName.CLEARGBM_REG
 
     def capabilities(self) -> BackendCapabilities:
         """Return capability flags for this backend.

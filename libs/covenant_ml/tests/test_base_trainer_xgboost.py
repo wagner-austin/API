@@ -14,6 +14,7 @@ from platform_ml import RequestedDevice
 from covenant_ml.backends.registry import default_registry
 from covenant_ml.base_trainer import BaseTabularTrainer
 from covenant_ml.types import (
+    BackendName,
     TrainConfig,
     TrainOutcome,
     TrainProgress,
@@ -62,7 +63,7 @@ def test_base_trainer_with_xgboost(tmp_path: Path) -> None:
     }
 
     outcome: TrainOutcome = trainer.train(
-        backend="xgboost",
+        backend=BackendName.XGBOOST,
         x_features=x,
         y_labels=y,
         feature_names=names,
@@ -117,7 +118,7 @@ def test_base_trainer_xgboost_with_progress_callback(tmp_path: Path) -> None:
     }
 
     outcome: TrainOutcome = trainer.train(
-        backend="xgboost",
+        backend=BackendName.XGBOOST,
         x_features=x,
         y_labels=y,
         feature_names=names,

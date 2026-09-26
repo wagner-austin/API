@@ -269,7 +269,9 @@ class TestRegressionExplainerRegistration:
 
         reg = RegressionExplainerRegistration(
             factory=_factory,
-            compatible_backends=frozenset(["mlp_reg", "lstm_reg"]),
+            compatible_backends=frozenset(
+                [RegressorBackendName.MLP_REG, RegressorBackendName.LSTM_REG]
+            ),
             requires_gradients=True,
         )
         assert reg.factory() is _factory
@@ -280,7 +282,9 @@ class TestRegressionExplainerRegistration:
         def _factory() -> RegressionFeatureExplainer:
             return _RegressionGradientAdapter(multiply_by_input=True, absolute_value=True)
 
-        backends: frozenset[RegressorBackendName] = frozenset(["mlp_reg", "lstm_reg"])
+        backends: frozenset[RegressorBackendName] = frozenset(
+            [RegressorBackendName.MLP_REG, RegressorBackendName.LSTM_REG]
+        )
         reg = RegressionExplainerRegistration(
             factory=_factory,
             compatible_backends=backends,
@@ -296,7 +300,7 @@ class TestRegressionExplainerRegistration:
 
         reg = RegressionExplainerRegistration(
             factory=_factory,
-            compatible_backends=frozenset(["mlp_reg"]),
+            compatible_backends=frozenset([RegressorBackendName.MLP_REG]),
             requires_gradients=True,
         )
         assert reg.requires_gradients() is True
@@ -316,7 +320,7 @@ class TestRegressionExplainerRegistry:
             ExplainerName.GRADIENT,
             RegressionExplainerRegistration(
                 factory=_factory,
-                compatible_backends=frozenset(["mlp_reg"]),
+                compatible_backends=frozenset([RegressorBackendName.MLP_REG]),
                 requires_gradients=True,
             ),
         )
@@ -328,12 +332,12 @@ class TestRegressionExplainerRegistry:
         """List compatible explainers for a given backend."""
         registry = default_regression_explainer_registry()
 
-        xgb_compatible = registry.list_compatible_explainers("xgboost_reg")
+        xgb_compatible = registry.list_compatible_explainers(RegressorBackendName.XGBOOST_REG)
         assert ExplainerName.PERMUTATION in xgb_compatible
         assert ExplainerName.SHAP_TREE in xgb_compatible
         assert ExplainerName.GRADIENT not in xgb_compatible
 
-        mlp_compatible = registry.list_compatible_explainers("mlp_reg")
+        mlp_compatible = registry.list_compatible_explainers(RegressorBackendName.MLP_REG)
         assert ExplainerName.PERMUTATION in mlp_compatible
         assert ExplainerName.GRADIENT in mlp_compatible
         assert ExplainerName.INTEGRATED_GRADIENTS in mlp_compatible
@@ -354,17 +358,25 @@ class TestRegressionExplainerRegistry:
     def test_is_compatible_true(self) -> None:
         """is_compatible returns True for compatible pair."""
         registry = default_regression_explainer_registry()
-        assert registry.is_compatible(ExplainerName.PERMUTATION, "xgboost_reg") is True
+        assert (
+            registry.is_compatible(ExplainerName.PERMUTATION, RegressorBackendName.XGBOOST_REG)
+            is True
+        )
 
     def test_is_compatible_false(self) -> None:
         """is_compatible returns False for incompatible pair."""
         registry = default_regression_explainer_registry()
-        assert registry.is_compatible(ExplainerName.SHAP_TREE, "mlp_reg") is False
+        assert (
+            registry.is_compatible(ExplainerName.SHAP_TREE, RegressorBackendName.MLP_REG) is False
+        )
 
     def test_is_compatible_unknown_explainer(self) -> None:
         """is_compatible returns False for unregistered explainer."""
         registry = RegressionExplainerRegistry()
-        assert registry.is_compatible(ExplainerName.PERMUTATION, "xgboost_reg") is False
+        assert (
+            registry.is_compatible(ExplainerName.PERMUTATION, RegressorBackendName.XGBOOST_REG)
+            is False
+        )
 
 
 class TestDefaultRegressionExplainerRegistry:
@@ -382,13 +394,13 @@ class TestDefaultRegressionExplainerRegistry:
     def test_lightgbm_reg_compatible(self) -> None:
         """LightGBM regressor has permutation + shap_tree."""
         registry = default_regression_explainer_registry()
-        compatible = registry.list_compatible_explainers("lightgbm_reg")
+        compatible = registry.list_compatible_explainers(RegressorBackendName.LIGHTGBM_REG)
         assert sorted(compatible) == [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE]
 
     def test_lstm_reg_compatible(self) -> None:
         """LSTM regressor has gradient + IG + permutation."""
         registry = default_regression_explainer_registry()
-        compatible = registry.list_compatible_explainers("lstm_reg")
+        compatible = registry.list_compatible_explainers(RegressorBackendName.LSTM_REG)
         assert sorted(compatible) == [
             ExplainerName.GRADIENT,
             ExplainerName.INTEGRATED_GRADIENTS,

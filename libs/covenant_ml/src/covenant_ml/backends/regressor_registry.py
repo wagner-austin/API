@@ -121,15 +121,15 @@ def default_regressor_registry() -> RegressorRegistry:
 
     reg = RegressorRegistry()
     reg.register(
-        "xgboost_reg",
+        RegressorBackendName.XGBOOST_REG,
         RegressorBackendRegistration(create_xgboost_regressor_backend),
     )
     reg.register(
-        "lightgbm_reg",
+        RegressorBackendName.LIGHTGBM_REG,
         RegressorBackendRegistration(create_lightgbm_regressor_backend),
     )
     reg.register(
-        "cleargbm_reg",
+        RegressorBackendName.CLEARGBM_REG,
         RegressorBackendRegistration(create_cleargbm_regressor_backend),
     )
     return reg
