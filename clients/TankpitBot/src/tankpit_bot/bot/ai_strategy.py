@@ -37,6 +37,7 @@ from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+from tankpit_bot.types.constants import TankLiveness
 from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
 
 
@@ -47,7 +48,7 @@ def decide(
     inventory: InventoryState,
     timestamp_ms: int,
     terrain: TerrainMapProtocol | None,
-    combat_feedback: CombatFeedback = "",
+    combat_feedback: CombatFeedback = CombatFeedback.NONE,
     *,
     ws: WorldService,
 ) -> TickDecisionDict:
@@ -243,7 +244,7 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
         finishing_kill = (
             ctx.mode == "HUNT"
             and target is not None
-            and target["liveness"] == "alive"
+            and target["liveness"] is TankLiveness.ALIVE
             and not should_exit_hunt(ctx)
         )
         if finishing_kill:

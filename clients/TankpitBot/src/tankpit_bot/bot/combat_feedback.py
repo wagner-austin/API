@@ -20,9 +20,16 @@ name only.)
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
-CombatFeedback = Literal["hit", "miss", "rejected", ""]
+
+class CombatFeedback(StrEnum):
+    """What the last shot's wire feedback said; ``NONE`` when there is none yet."""
+
+    HIT = "hit"
+    MISS = "miss"
+    REJECTED = "rejected"
+    NONE = ""
 
 
 __all__ = [

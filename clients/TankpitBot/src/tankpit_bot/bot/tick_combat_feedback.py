@@ -261,12 +261,12 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         bot: Bot instance.
 
     Returns:
-        "hit", "miss", or "" when feedback is indeterminate.
+        HIT, MISS, REJECTED, or NONE when feedback is indeterminate.
     """
     target_id = bot._ai_state["last_shot_target_id"]
     target_name = bot._ai_state["last_shot_target_name"]
     if target_id == -1:
-        return ""
+        return CombatFeedback.NONE
     got_hit = check_and_clear_combat_hit(bot.world)
     victim_id = check_and_clear_last_shot_victim_id(bot.world)
     got_response = check_and_clear_our_shot_response(bot.world)
@@ -293,7 +293,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         )
         resolve_dealt(bot.world.damage_book, victim_id, target_name, target_id)
         _inc_hit()
-        return "hit"
+        return CombatFeedback.HIT
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
         emit_shoot_hit(
             bot.world.ledger,
@@ -318,7 +318,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
                 "last_shot_target_name": "",
             }
         )
-        return "hit"
+        return CombatFeedback.HIT
     if ammo_hit:
         # Reconciliation channel: the per-shot ``weapon`` byte is the
         # primary consumption signal (handled above via got_hit), but
@@ -337,7 +337,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         )
         resolve_dealt(bot.world.damage_book, victim_id, target_name, target_id)
         _inc_hit()
-        return "hit"
+        return CombatFeedback.HIT
     if got_response:
         return _classify_confirmed_miss(bot, target_id, target_name, duration_ms)
     if peek_command_error(bot.world) in _SHOT_REJECTING_COMMAND_ERRORS:
@@ -357,8 +357,8 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         )
         if error_code == SUPERVISOR_ERROR_FRIENDLY_FIRE:
             _disprove_target_by_friendly_fire(bot, target_id, target_name)
-        return "rejected"
-    return ""
+        return CombatFeedback.REJECTED
+    return CombatFeedback.NONE
 
 
 def _classify_confirmed_miss(
@@ -382,7 +382,7 @@ def _classify_confirmed_miss(
         duration_ms: Dispatch-to-feedback wall-clock ms.
 
     Returns:
-        The literal ``"miss"``.
+        ``CombatFeedback.MISS``.
     """
     emit_shoot_miss(
         bot.world.ledger,
@@ -395,7 +395,7 @@ def _classify_confirmed_miss(
     )
     if target_id != bot._ai_state["combat_target_id"]:
         _block_missed_divert_target(bot, target_id, target_name)
-    return "miss"
+    return CombatFeedback.MISS
 
 
 def _block_missed_divert_target(bot: Bot, target_id: int, target_name: str) -> None:
