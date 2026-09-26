@@ -19,7 +19,7 @@ from tankpit_bot.facts.provenance import (
 )
 from tankpit_bot.facts.source import FactSource
 
-DEFAULT_SELF_FACT_SOURCE: FactSource = "wire_0x3D_movement"
+DEFAULT_SELF_FACT_SOURCE: FactSource = FactSource.WIRE_0X3D_MOVEMENT
 """Synthetic default channel for direct ``make_self_state`` calls.
 
 0x3D MovementResponse is the canonical self-position message. The

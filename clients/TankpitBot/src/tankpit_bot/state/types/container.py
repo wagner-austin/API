@@ -28,12 +28,12 @@ from tankpit_bot.facts.source import FactSource
 from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 _FACT_SOURCE_BY_REFRESH_KIND: dict[ContainerRefreshKind, FactSource] = {
-    ContainerRefreshKind.RADAR_RESPONSE: "wire_0x4F_radar_response",
-    ContainerRefreshKind.RADAR_CACHE_REFRESH: "wire_0x43_cache_update",
-    ContainerRefreshKind.RADAR_KNOWN_RESOURCES: "wire_0x4F_radar_response",
-    ContainerRefreshKind.VIEWPORT_PATCH: "wire_0x5A_viewport_patch",
-    ContainerRefreshKind.WORLD_STATE: "wire_0x4C_map_data",
-    ContainerRefreshKind.FLEET_REPORT: "fleet_report",
+    ContainerRefreshKind.RADAR_RESPONSE: FactSource.WIRE_0X4F_RADAR_RESPONSE,
+    ContainerRefreshKind.RADAR_CACHE_REFRESH: FactSource.WIRE_0X43_CACHE_UPDATE,
+    ContainerRefreshKind.RADAR_KNOWN_RESOURCES: FactSource.WIRE_0X4F_RADAR_RESPONSE,
+    ContainerRefreshKind.VIEWPORT_PATCH: FactSource.WIRE_0X5A_VIEWPORT_PATCH,
+    ContainerRefreshKind.WORLD_STATE: FactSource.WIRE_0X4C_MAP_DATA,
+    ContainerRefreshKind.FLEET_REPORT: FactSource.FLEET_REPORT,
 }
 
 

@@ -24,7 +24,7 @@ from tankpit_bot.facts.provenance import (
 )
 from tankpit_bot.facts.source import FactSource
 
-DEFAULT_TERRAIN_FACT_SOURCE: FactSource = "wire_0x5A_viewport_patch"
+DEFAULT_TERRAIN_FACT_SOURCE: FactSource = FactSource.WIRE_0X5A_VIEWPORT_PATCH
 """Default terrain channel: the 0x5A patch grid carries per-tile terrain."""
 
 

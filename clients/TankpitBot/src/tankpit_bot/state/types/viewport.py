@@ -20,7 +20,7 @@ from tankpit_bot.facts.provenance import (
 )
 from tankpit_bot.facts.source import FactSource
 
-VIEWPORT_FACT_SOURCE: FactSource = "wire_0x5A_viewport_patch"
+VIEWPORT_FACT_SOURCE: FactSource = FactSource.WIRE_0X5A_VIEWPORT_PATCH
 """The one channel that sets the viewport (0x5A ViewportUpdate)."""
 
 

@@ -117,9 +117,9 @@ def has_real_coordinates(tank: TankStateDict) -> bool:
 
 
 _DEFAULT_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
-    EntitySource.VIEWPORT: "wire_0x28_tank_entry",
-    EntitySource.RADAR: "wire_0x48_enemy_detect",
-    EntitySource.WORLD_STATE: "wire_0x4C_map_data",
+    EntitySource.VIEWPORT: FactSource.WIRE_0X28_TANK_ENTRY,
+    EntitySource.RADAR: FactSource.WIRE_0X48_ENEMY_DETECT,
+    EntitySource.WORLD_STATE: FactSource.WIRE_0X4C_MAP_DATA,
 }
 
 

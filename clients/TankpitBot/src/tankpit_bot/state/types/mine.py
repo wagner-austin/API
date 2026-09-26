@@ -22,9 +22,9 @@ from tankpit_bot.facts.source import FactSource
 from tankpit_bot.types.constants import EntitySource
 
 _MINE_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
-    EntitySource.VIEWPORT: "wire_0x5A_viewport_patch",
-    EntitySource.RADAR: "wire_0x4F_radar_response",
-    EntitySource.WORLD_STATE: "wire_0x4C_map_data",
+    EntitySource.VIEWPORT: FactSource.WIRE_0X5A_VIEWPORT_PATCH,
+    EntitySource.RADAR: FactSource.WIRE_0X4F_RADAR_RESPONSE,
+    EntitySource.WORLD_STATE: FactSource.WIRE_0X4C_MAP_DATA,
 }
 
 
