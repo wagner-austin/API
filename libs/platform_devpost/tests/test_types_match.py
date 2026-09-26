@@ -9,6 +9,7 @@ from platform_devpost.types import (
     DisplayedLocation,
     Hackathon,
     HackathonMatch,
+    HackathonState,
     InterestFilter,
     decode_filter,
     decode_match,
@@ -29,7 +30,7 @@ class TestHackathonMatch:
             thumbnail_url="https://example.com/img.jpg",
             organization_name="Org",
             displayed_location=DisplayedLocation(icon="x", location="x"),
-            open_state="open",
+            open_state=HackathonState.OPEN,
             time_left_to_submission="1 day",
             submission_period_dates="Jan 1-2",
             themes=(),
@@ -202,7 +203,7 @@ class TestInterestFilter:
         f = InterestFilter(
             include_themes=("AI", "ML"),
             exclude_themes=("Blockchain",),
-            states=("open", "upcoming"),
+            states=(HackathonState.OPEN, HackathonState.UPCOMING),
             featured_only=True,
         )
         assert f.include_themes == ("AI", "ML")
@@ -230,7 +231,8 @@ class TestInterestFilter:
         }
         f = decode_filter(data)
         assert f.include_themes == ("Gaming", "VR")
-        assert f.states == ("open",)
+        assert f.states == (HackathonState.OPEN,)
+        assert f.states[0] is HackathonState.OPEN
         assert f.featured_only is True
 
     def test_decode_filter_null_states(self) -> None:
@@ -253,7 +255,7 @@ class TestInterestFilter:
             "featured_only": False,
         }
         f = decode_filter(data)
-        assert f.states == ("open", "upcoming", "ended", "submissions")
+        assert f.states == tuple(HackathonState)
 
     def test_decode_filter_invalid_state(self) -> None:
         """Test decode_filter raises on invalid state."""
@@ -263,7 +265,11 @@ class TestInterestFilter:
             "states": ["invalid_state"],
             "featured_only": False,
         }
-        with pytest.raises(JSONTypeError, match="must be a valid state"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"Invalid states\[0\] 'invalid_state': must be one of 'open', 'upcoming', "
+            r"'ended', 'submissions'",
+        ):
             decode_filter(data)
 
     def test_decode_filter_invalid_states_type(self) -> None:

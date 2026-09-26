@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
-    require_str,
 )
+from platform_core.members import as_member
 
-HackathonState = Literal["open", "upcoming", "ended", "submissions"]
+
+class HackathonState(StrEnum):
+    """Where a Devpost hackathon is in its calendar, as Devpost's API spells it."""
+
+    OPEN = "open"
+    UPCOMING = "upcoming"
+    ENDED = "ended"
+    SUBMISSIONS = "submissions"
 
 
 # -----------------------------------------------------------------------------
@@ -37,31 +44,6 @@ def _require_dict_value(value: JSONValue, context: str) -> JSONObject:
     return value
 
 
-def _require_state(obj: JSONObject, key: str) -> HackathonState:
-    """Extract and validate HackathonState from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Field key.
-
-    Returns:
-        Validated HackathonState.
-
-    Raises:
-        JSONTypeError: If field is missing or not a valid state.
-    """
-    value = require_str(obj, key)
-    if value == "open":
-        return "open"
-    if value == "upcoming":
-        return "upcoming"
-    if value == "ended":
-        return "ended"
-    if value == "submissions":
-        return "submissions"
-    raise JSONTypeError(f"Field '{key}' must be a valid state, got '{value}'")
-
-
 def _require_state_value(value: JSONValue, context: str) -> HackathonState:
     """Require value to be a valid HackathonState.
 
@@ -70,19 +52,11 @@ def _require_state_value(value: JSONValue, context: str) -> HackathonState:
         context: Context for error message.
 
     Returns:
-        Validated HackathonState.
+        The member whose value is ``value``.
 
     Raises:
-        JSONTypeError: If value is not a valid state.
+        JSONTypeError: If value is not a string, or names no state.
     """
     if not isinstance(value, str):
         raise JSONTypeError(f"{context} must be a string, got {type(value).__name__}")
-    if value == "open":
-        return "open"
-    if value == "upcoming":
-        return "upcoming"
-    if value == "ended":
-        return "ended"
-    if value == "submissions":
-        return "submissions"
-    raise JSONTypeError(f"{context} must be a valid state, got '{value}'")
+    return as_member(value, context, HackathonState)

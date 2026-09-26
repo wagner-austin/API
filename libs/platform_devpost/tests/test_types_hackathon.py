@@ -8,6 +8,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 from platform_devpost.types import (
     DisplayedLocation,
     Hackathon,
+    HackathonState,
     Theme,
     decode_hackathon,
     encode_hackathon,
@@ -26,7 +27,7 @@ class TestHackathon:
             thumbnail_url="https://example.com/thumb.jpg",
             organization_name="TechCorp",
             displayed_location=DisplayedLocation(icon="globe", location="Online"),
-            open_state="open",
+            open_state=HackathonState.OPEN,
             time_left_to_submission="3 days left",
             submission_period_dates="Jan 1 - Jan 31, 2025",
             themes=(Theme(id=1, name="AI/ML"), Theme(id=2, name="Data Science")),
@@ -78,7 +79,7 @@ class TestHackathon:
         }
         h = decode_hackathon(data)
         assert h.id == 999
-        assert h.open_state == "upcoming"
+        assert h.open_state is HackathonState.UPCOMING
         assert h.invite_only is True
         assert len(h.themes) == 1
 
@@ -109,7 +110,11 @@ class TestHackathon:
             "winners_announced": False,
             "invite_only": False,
         }
-        with pytest.raises(JSONTypeError, match="must be a valid state"):
+        with pytest.raises(
+            JSONTypeError,
+            match="Invalid open_state 'invalid_state': must be one of 'open', 'upcoming', "
+            "'ended', 'submissions'",
+        ):
             decode_hackathon(data)
 
     def test_decode_hackathon_invalid_location_type(self) -> None:
@@ -158,8 +163,7 @@ class TestHackathon:
 
     def test_all_hackathon_states(self) -> None:
         """Test all valid hackathon states."""
-        states = ["open", "upcoming", "ended", "submissions"]
-        for state in states:
+        for state in HackathonState:
             data: JSONObject = {
                 "id": 1,
                 "title": "Test",
@@ -167,7 +171,7 @@ class TestHackathon:
                 "thumbnail_url": "https://example.com/img.jpg",
                 "organization_name": "Org",
                 "displayed_location": {"icon": "x", "location": "x"},
-                "open_state": state,
+                "open_state": state.value,
                 "time_left_to_submission": "1 day",
                 "submission_period_dates": "Jan 1-2",
                 "themes": [],
@@ -178,4 +182,4 @@ class TestHackathon:
                 "invite_only": False,
             }
             h = decode_hackathon(data)
-            assert h.open_state == state
+            assert h.open_state is state

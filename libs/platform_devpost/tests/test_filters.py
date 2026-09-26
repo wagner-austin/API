@@ -10,7 +10,7 @@ from platform_devpost.types import DisplayedLocation, Hackathon, HackathonState,
 def _make_hackathon_with_themes(
     hackathon_id: int,
     themes: tuple[Theme, ...],
-    state: HackathonState = "open",
+    state: HackathonState = HackathonState.OPEN,
     featured: bool = False,
 ) -> Hackathon:
     """Create a hackathon with specific themes for testing."""
@@ -77,11 +77,11 @@ class TestFilterHackathons:
 
     def test_state_filter(self) -> None:
         """Test states filter hackathons by state."""
-        h1 = make_fake_hackathon(id=1, open_state="open")
-        h2 = make_fake_hackathon(id=2, open_state="ended")
-        h3 = make_fake_hackathon(id=3, open_state="upcoming")
+        h1 = make_fake_hackathon(id=1, open_state=HackathonState.OPEN)
+        h2 = make_fake_hackathon(id=2, open_state=HackathonState.ENDED)
+        h3 = make_fake_hackathon(id=3, open_state=HackathonState.UPCOMING)
 
-        interests = make_interest_filter(states=("open", "upcoming"))
+        interests = make_interest_filter(states=(HackathonState.OPEN, HackathonState.UPCOMING))
         result = filter_hackathons((h1, h2, h3), interests)
 
         assert len(result) == 2
@@ -105,13 +105,13 @@ class TestFilterHackathons:
         """Test multiple filters applied together."""
         ai_theme = make_fake_theme(id=1, name="AI")
 
-        h1 = _make_hackathon_with_themes(1, (ai_theme,), state="open", featured=True)
-        h2 = _make_hackathon_with_themes(2, (ai_theme,), state="ended", featured=True)
-        h3 = _make_hackathon_with_themes(3, (), state="open", featured=True)
+        h1 = _make_hackathon_with_themes(1, (ai_theme,), state=HackathonState.OPEN, featured=True)
+        h2 = _make_hackathon_with_themes(2, (ai_theme,), state=HackathonState.ENDED, featured=True)
+        h3 = _make_hackathon_with_themes(3, (), state=HackathonState.OPEN, featured=True)
 
         interests = make_interest_filter(
             include_themes=("AI",),
-            states=("open",),
+            states=(HackathonState.OPEN,),
             featured_only=True,
         )
         result = filter_hackathons((h1, h2, h3), interests)
@@ -127,8 +127,8 @@ class TestFilterHackathons:
 
     def test_no_matches_returns_empty(self) -> None:
         """Test filter with no matches returns empty."""
-        h1 = make_fake_hackathon(id=1, open_state="ended")
-        interests = make_interest_filter(states=("open",))
+        h1 = make_fake_hackathon(id=1, open_state=HackathonState.ENDED)
+        interests = make_interest_filter(states=(HackathonState.OPEN,))
 
         result = filter_hackathons((h1,), interests)
         assert len(result) == 0

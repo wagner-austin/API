@@ -19,7 +19,7 @@ from platform_devpost.testing import (
     make_fake_theme,
     make_interest_filter,
 )
-from platform_devpost.types import CodebaseProfile
+from platform_devpost.types import CodebaseProfile, HackathonState
 
 
 class TestFindMonorepoRoot:
@@ -84,13 +84,13 @@ class TestFindHackathons:
         services_dir = tmp_path / "services"
         services_dir.mkdir()
 
-        h1 = make_fake_hackathon(id=1, open_state="open")
-        h2 = make_fake_hackathon(id=2, open_state="ended")
+        h1 = make_fake_hackathon(id=1, open_state=HackathonState.OPEN)
+        h2 = make_fake_hackathon(id=2, open_state=HackathonState.ENDED)
         fake_client = FakeDevpostClient(hackathons=(h1, h2))
         hooks.devpost_client = lambda: fake_client
         hooks.profile_scanner = lambda root: make_fake_profile()
 
-        interests = make_interest_filter(states=("open",))
+        interests = make_interest_filter(states=(HackathonState.OPEN,))
         result = find_hackathons(interests=interests, root=tmp_path)
 
         assert len(result) == 1

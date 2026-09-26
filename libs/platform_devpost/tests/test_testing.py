@@ -14,6 +14,7 @@ from platform_devpost.testing import (
     make_interest_filter,
     reset_hooks,
 )
+from platform_devpost.types import HackathonState
 
 
 class TestHooksContainer:
@@ -142,11 +143,11 @@ class TestFakeDevpostClient:
 
     def test_list_with_state(self) -> None:
         """Test list_hackathons with state filter."""
-        h1 = make_fake_hackathon(id=1, open_state="open")
-        h2 = make_fake_hackathon(id=2, open_state="ended")
+        h1 = make_fake_hackathon(id=1, open_state=HackathonState.OPEN)
+        h2 = make_fake_hackathon(id=2, open_state=HackathonState.ENDED)
         client = FakeDevpostClient(hackathons=(h1, h2))
 
-        result = client.list_hackathons(state="open")
+        result = client.list_hackathons(state=HackathonState.OPEN)
         assert len(result) == 1
         assert result[0].id == 1
 
@@ -189,7 +190,7 @@ class TestFakeDevpostClient:
     def test_list_calls_recorded(self) -> None:
         """Test that list calls are recorded."""
         client = FakeDevpostClient()
-        client.list_hackathons(search="test", state="open")
+        client.list_hackathons(search="test", state=HackathonState.OPEN)
         client.list_hackathons()
 
         assert len(client._list_calls) == 2
@@ -248,7 +249,7 @@ class TestMakeFakeHackathon:
         h = make_fake_hackathon(
             id=42,
             title="AI Challenge",
-            open_state="upcoming",
+            open_state=HackathonState.UPCOMING,
             featured=True,
         )
         assert h.id == 42
@@ -325,7 +326,7 @@ class TestMakeInterestFilter:
         f = make_interest_filter(
             include_themes=("AI",),
             exclude_themes=("Finance",),
-            states=("open",),
+            states=(HackathonState.OPEN,),
             featured_only=True,
         )
         assert f.include_themes == ("AI",)
