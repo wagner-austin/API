@@ -105,6 +105,22 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         ),
         "cwd": "..\\lock-wake",
     },
+    # fleet-health-wake (MCPs board task ebc80a03): the fleet audit's health
+    # journal -> board. The audit (MCPs-FleetAudit-20min) appends one line
+    # per run whose outcome changed, the note already rendered; this row
+    # posts the unread ones as one note, unaddressed. Standing task id:
+    # FLEET_HEALTH_WAKE_TASK_ID in runs/env.ps1.
+    {
+        "name": "fleet-health-wake",
+        "args": (
+            "poetry",
+            "run",
+            "fleet-health-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\fleet-mcp\\state\\health-events.jsonl",
+        ),
+        "cwd": "..\\fleet-health-wake",
+    },
 )
 
 

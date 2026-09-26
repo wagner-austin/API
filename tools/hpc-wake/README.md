@@ -113,6 +113,7 @@ scheduled tasks — the random-task count goes down, not up.
 | hpc-wake | hpc3 slurm ledger | `f6b04193` | ledger `submitter` |
 | ci-wake | GitHub Actions + push enrolment | `c5593c56` | enrolment `agent` |
 | lock-wake | fleet-lock journal | `5d86be8d` | journal `agent` |
+| fleet-health-wake | MCPs fleet audit's health journal | `88b20894` | none: a fleet change has no actor to tag |
 
 Every publisher batches per tick (a 103-job Slurm batch or a 126-line
 lock-journal backlog is ONE post) and mentions only whoever acted — the
