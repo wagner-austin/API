@@ -16,6 +16,7 @@ from platform_ml.explainers.integrated_gradients import (
     _validate_inputs,
 )
 from platform_ml.explainers.protocol import GradientModelProtocol
+from platform_ml.explainers.types import ComputationalCost
 
 from .array_helpers import assert_close, get_float, make_float64_2d
 
@@ -127,7 +128,7 @@ def test_integrated_gradients_capabilities_values() -> None:
     """Verify INTEGRATED_GRADIENTS_CAPABILITIES has correct values."""
     assert INTEGRATED_GRADIENTS_CAPABILITIES["requires_gradients"] is True
     assert INTEGRATED_GRADIENTS_CAPABILITIES["requires_background_data"] is True
-    assert INTEGRATED_GRADIENTS_CAPABILITIES["computational_cost"] == "high"
+    assert INTEGRATED_GRADIENTS_CAPABILITIES["computational_cost"] is ComputationalCost.HIGH
 
 
 def test_validate_inputs_matching_dimensions() -> None:

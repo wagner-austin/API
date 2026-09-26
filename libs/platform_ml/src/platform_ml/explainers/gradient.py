@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 from .protocol import GradientModelProtocol
 from .ranking import rank_importances
 from .types import (
+    ComputationalCost,
     ExplainerCapabilities,
     ExplainerName,
     FeatureImportanceScore,
@@ -30,7 +31,7 @@ from .types import (
 GRADIENT_CAPABILITIES: ExplainerCapabilities = {
     "requires_gradients": True,
     "requires_background_data": False,
-    "computational_cost": "low",
+    "computational_cost": ComputationalCost.LOW,
 }
 
 
@@ -137,7 +138,7 @@ class GradientExplainer:
         Returns:
             Literal "gradient".
         """
-        return "gradient"
+        return ExplainerName.GRADIENT
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return explainer capabilities.

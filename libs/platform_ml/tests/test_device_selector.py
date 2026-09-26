@@ -11,6 +11,10 @@ import pytest
 
 from platform_ml import torch_types
 from platform_ml.device_selector import (
+    RequestedDevice,
+    RequestedPrecision,
+    ResolvedDevice,
+    ResolvedPrecision,
     recommended_batch_size,
     resolve_device,
     resolve_precision,
@@ -19,44 +23,52 @@ from platform_ml.testing import FakeTorchModule
 from platform_ml.torch_types import _TorchModuleProtocol
 
 
+def test_requested_device_words_are_the_resolved_words_plus_auto() -> None:
+    """A request names every concrete device by the same word, plus 'auto'."""
+    resolved = [device.value for device in ResolvedDevice]
+    assert [device.value for device in RequestedDevice] == [*resolved, "auto"]
+
+
+def test_requested_precision_words_are_the_resolved_words_plus_auto() -> None:
+    """A request names every concrete precision by the same word, plus 'auto'."""
+    resolved = [precision.value for precision in ResolvedPrecision]
+    assert [precision.value for precision in RequestedPrecision] == [*resolved, "auto"]
+
+
 def test_resolve_device_cpu_passthrough() -> None:
-    """Test that explicitly requested 'cpu' device is returned as-is."""
-    result = resolve_device("cpu")
-    assert result == "cpu"
+    """Test that explicitly requested CPU is returned as-is."""
+    assert resolve_device(RequestedDevice.CPU) is ResolvedDevice.CPU
 
 
 def test_resolve_device_cuda_passthrough() -> None:
-    """Test that explicitly requested 'cuda' device is returned as-is."""
-    result = resolve_device("cuda")
-    assert result == "cuda"
+    """Test that explicitly requested CUDA is returned as-is."""
+    assert resolve_device(RequestedDevice.CUDA) is ResolvedDevice.CUDA
 
 
 def test_resolve_device_auto_with_cuda_available() -> None:
-    """Test that 'auto' resolves to 'cuda' when CUDA is available."""
+    """Test that AUTO resolves to CUDA when CUDA is available."""
     fake_torch = FakeTorchModule(cuda_available=True)
 
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
     torch_types._import_torch = _fake_import
-    result = resolve_device("auto")
-    assert result == "cuda"
+    assert resolve_device(RequestedDevice.AUTO) is ResolvedDevice.CUDA
 
 
 def test_resolve_device_auto_with_cuda_unavailable() -> None:
-    """Test that 'auto' resolves to 'cpu' when CUDA is unavailable."""
+    """Test that AUTO resolves to CPU when CUDA is unavailable."""
     fake_torch = FakeTorchModule(cuda_available=False)
 
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
     torch_types._import_torch = _fake_import
-    result = resolve_device("auto")
-    assert result == "cpu"
+    assert resolve_device(RequestedDevice.AUTO) is ResolvedDevice.CPU
 
 
 def test_resolve_device_auto_uses_hook() -> None:
-    """Test that 'auto' resolution uses the hook, not torch directly.
+    """Test that AUTO resolution uses the hook, not torch directly.
 
     This verifies the hook is actually called, enabling test isolation.
     """
@@ -69,7 +81,7 @@ def test_resolve_device_auto_uses_hook() -> None:
         return fake_torch
 
     torch_types._import_torch = _fake_import
-    resolve_device("auto")
+    resolve_device(RequestedDevice.AUTO)
     assert fake_cuda.is_available_call_count == 1, "Hook should have been called exactly once"
 
 
@@ -78,46 +90,46 @@ def test_resolve_device_auto_uses_hook() -> None:
 # =============================================================================
 
 
-def test_resolve_precision_fp32_on_cuda() -> None:
-    """fp32 is allowed on any device."""
-    assert resolve_precision("fp32", "cuda") == "fp32"
-
-
-def test_resolve_precision_fp32_on_cpu() -> None:
-    """fp32 is allowed on any device."""
-    assert resolve_precision("fp32", "cpu") == "fp32"
+def test_resolve_precision_fp32_on_any_device() -> None:
+    """FP32 is allowed on every device."""
+    for device in ResolvedDevice:
+        assert resolve_precision(RequestedPrecision.FP32, device) is ResolvedPrecision.FP32
 
 
 def test_resolve_precision_fp16_on_cuda() -> None:
-    """fp16 is allowed on cuda."""
-    assert resolve_precision("fp16", "cuda") == "fp16"
+    """FP16 is allowed on CUDA."""
+    resolved = resolve_precision(RequestedPrecision.FP16, ResolvedDevice.CUDA)
+    assert resolved is ResolvedPrecision.FP16
 
 
 def test_resolve_precision_fp16_on_cpu_raises() -> None:
-    """fp16 is NOT allowed on cpu - should raise RuntimeError."""
-    with pytest.raises(RuntimeError, match=r"fp16.*not supported on CPU"):
-        resolve_precision("fp16", "cpu")
+    """FP16 is NOT allowed on CPU - should raise RuntimeError."""
+    with pytest.raises(RuntimeError, match=r"^fp16 precision is not supported on CPU$"):
+        resolve_precision(RequestedPrecision.FP16, ResolvedDevice.CPU)
 
 
 def test_resolve_precision_bf16_on_cuda() -> None:
-    """bf16 is allowed on cuda."""
-    assert resolve_precision("bf16", "cuda") == "bf16"
+    """BF16 is allowed on CUDA."""
+    resolved = resolve_precision(RequestedPrecision.BF16, ResolvedDevice.CUDA)
+    assert resolved is ResolvedPrecision.BF16
 
 
 def test_resolve_precision_bf16_on_cpu_raises() -> None:
-    """bf16 is NOT allowed on cpu - should raise RuntimeError."""
-    with pytest.raises(RuntimeError, match=r"bf16.*not supported on CPU"):
-        resolve_precision("bf16", "cpu")
+    """BF16 is NOT allowed on CPU - should raise RuntimeError."""
+    with pytest.raises(RuntimeError, match=r"^bf16 precision is not supported on CPU$"):
+        resolve_precision(RequestedPrecision.BF16, ResolvedDevice.CPU)
 
 
 def test_resolve_precision_auto_on_cuda() -> None:
-    """auto resolves to fp16 on cuda."""
-    assert resolve_precision("auto", "cuda") == "fp16"
+    """AUTO resolves to FP16 on CUDA."""
+    resolved = resolve_precision(RequestedPrecision.AUTO, ResolvedDevice.CUDA)
+    assert resolved is ResolvedPrecision.FP16
 
 
 def test_resolve_precision_auto_on_cpu() -> None:
-    """auto resolves to fp32 on cpu."""
-    assert resolve_precision("auto", "cpu") == "fp32"
+    """AUTO resolves to FP32 on CPU."""
+    resolved = resolve_precision(RequestedPrecision.AUTO, ResolvedDevice.CPU)
+    assert resolved is ResolvedPrecision.FP32
 
 
 # =============================================================================
@@ -127,20 +139,20 @@ def test_resolve_precision_auto_on_cpu() -> None:
 
 def test_recommended_batch_size_bumps_on_cuda_small_batch() -> None:
     """Small batch sizes (<= 4) get bumped to 8 on CUDA."""
-    assert recommended_batch_size(4, "cuda") == 8
-    assert recommended_batch_size(2, "cuda") == 8
-    assert recommended_batch_size(1, "cuda") == 8
+    assert recommended_batch_size(4, ResolvedDevice.CUDA) == 8
+    assert recommended_batch_size(2, ResolvedDevice.CUDA) == 8
+    assert recommended_batch_size(1, ResolvedDevice.CUDA) == 8
 
 
 def test_recommended_batch_size_preserves_on_cuda_large_batch() -> None:
     """Larger batch sizes (> 4) are preserved on CUDA."""
-    assert recommended_batch_size(8, "cuda") == 8
-    assert recommended_batch_size(16, "cuda") == 16
-    assert recommended_batch_size(32, "cuda") == 32
+    assert recommended_batch_size(8, ResolvedDevice.CUDA) == 8
+    assert recommended_batch_size(16, ResolvedDevice.CUDA) == 16
+    assert recommended_batch_size(32, ResolvedDevice.CUDA) == 32
 
 
 def test_recommended_batch_size_preserves_on_cpu() -> None:
     """All batch sizes are preserved on CPU."""
-    assert recommended_batch_size(4, "cpu") == 4
-    assert recommended_batch_size(8, "cpu") == 8
-    assert recommended_batch_size(1, "cpu") == 1
+    assert recommended_batch_size(4, ResolvedDevice.CPU) == 4
+    assert recommended_batch_size(8, ResolvedDevice.CPU) == 8
+    assert recommended_batch_size(1, ResolvedDevice.CPU) == 1

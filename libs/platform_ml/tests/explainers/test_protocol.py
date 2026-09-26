@@ -18,6 +18,7 @@ from platform_ml.explainers.protocol import (
     RegressorPredictorProtocol,
 )
 from platform_ml.explainers.types import (
+    ComputationalCost,
     ExplainerCapabilities,
     ExplainerName,
     FeatureImportanceScore,
@@ -92,9 +93,9 @@ class SimpleExplainer:
         """Return explainer name.
 
         Returns:
-            Literal "permutation".
+            ExplainerName.PERMUTATION.
         """
-        return "permutation"
+        return ExplainerName.PERMUTATION
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return explainer capabilities.
@@ -105,7 +106,7 @@ class SimpleExplainer:
         caps: ExplainerCapabilities = {
             "requires_gradients": False,
             "requires_background_data": False,
-            "computational_cost": "low",
+            "computational_cost": ComputationalCost.LOW,
         }
         return caps
 
@@ -194,12 +195,12 @@ def test_feature_explainer_protocol_conformance() -> None:
     """Verify SimpleExplainer conforms to FeatureExplainer protocol."""
     explainer: FeatureExplainer = SimpleExplainer()
 
-    assert explainer.explainer_name() == "permutation"
+    assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
     caps = explainer.capabilities()
     assert caps["requires_gradients"] is False
     assert caps["requires_background_data"] is False
-    assert caps["computational_cost"] == "low"
+    assert caps["computational_cost"] is ComputationalCost.LOW
 
 
 def test_feature_explainer_compute_importance() -> None:
@@ -295,9 +296,9 @@ class SimpleRegressionExplainer:
         """Return explainer name.
 
         Returns:
-            Literal "permutation".
+            ExplainerName.PERMUTATION.
         """
-        return "permutation"
+        return ExplainerName.PERMUTATION
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return explainer capabilities.
@@ -308,7 +309,7 @@ class SimpleRegressionExplainer:
         caps: ExplainerCapabilities = {
             "requires_gradients": False,
             "requires_background_data": False,
-            "computational_cost": "low",
+            "computational_cost": ComputationalCost.LOW,
         }
         return caps
 
@@ -379,12 +380,12 @@ def test_regression_feature_explainer_conformance() -> None:
     """Verify SimpleRegressionExplainer conforms to RegressionFeatureExplainer."""
     explainer: RegressionFeatureExplainer = SimpleRegressionExplainer()
 
-    assert explainer.explainer_name() == "permutation"
+    assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
     caps = explainer.capabilities()
     assert caps["requires_gradients"] is False
     assert caps["requires_background_data"] is False
-    assert caps["computational_cost"] == "low"
+    assert caps["computational_cost"] is ComputationalCost.LOW
 
 
 def test_regression_feature_explainer_compute_importance() -> None:

@@ -6,15 +6,27 @@ No Any, cast, or type: ignore allowed.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal
 
 from typing_extensions import TypedDict
 
-ExplainerName = Literal["permutation", "gradient", "integrated_gradients", "shap_tree"]
-"""Supported explainer names."""
 
-ComputationalCost = Literal["low", "medium", "high"]
-"""Computational cost category for an explainer."""
+class ExplainerName(StrEnum):
+    """Supported explainer names."""
+
+    PERMUTATION = "permutation"
+    GRADIENT = "gradient"
+    INTEGRATED_GRADIENTS = "integrated_gradients"
+    SHAP_TREE = "shap_tree"
+
+
+class ComputationalCost(StrEnum):
+    """Computational cost category for an explainer."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 class ExplainerCapabilities(TypedDict, total=True):

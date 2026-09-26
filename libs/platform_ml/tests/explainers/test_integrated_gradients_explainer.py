@@ -10,7 +10,11 @@ from platform_ml.explainers.integrated_gradients import (
     create_integrated_gradients_explainer,
 )
 from platform_ml.explainers.protocol import GradientModelProtocol
-from platform_ml.explainers.types import IntegratedGradientsConfig
+from platform_ml.explainers.types import (
+    ComputationalCost,
+    ExplainerName,
+    IntegratedGradientsConfig,
+)
 from tests.explainers.test_integrated_gradients_internals import (
     ConstantGradientModel,
     LinearGradientModel,
@@ -43,7 +47,7 @@ def test_integrated_gradients_explainer_name() -> None:
     config: IntegratedGradientsConfig = {"n_steps": 50, "baseline_mode": "zeros"}
     explainer = IntegratedGradientsExplainer(config)
 
-    assert explainer.explainer_name() == "integrated_gradients"
+    assert explainer.explainer_name() is ExplainerName.INTEGRATED_GRADIENTS
 
 
 def test_integrated_gradients_explainer_capabilities() -> None:
@@ -55,7 +59,7 @@ def test_integrated_gradients_explainer_capabilities() -> None:
 
     assert caps["requires_gradients"] is True
     assert caps["requires_background_data"] is True
-    assert caps["computational_cost"] == "high"
+    assert caps["computational_cost"] is ComputationalCost.HIGH
 
 
 def test_integrated_gradients_explainer_validates_input() -> None:
@@ -155,7 +159,7 @@ def test_create_integrated_gradients_explainer_returns_configured_instance() -> 
 
     assert explainer._n_steps == 25
     assert explainer._baseline_mode == "mean"
-    assert explainer.explainer_name() == "integrated_gradients"
+    assert explainer.explainer_name() is ExplainerName.INTEGRATED_GRADIENTS
     assert explainer.capabilities()["requires_gradients"] is True
 
 

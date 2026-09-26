@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 
 from .protocol import PredictorProtocol
 from .types import (
+    ComputationalCost,
     ExplainerCapabilities,
     ExplainerName,
     FeatureImportanceScore,
@@ -30,7 +31,7 @@ from .types import (
 PERMUTATION_CAPABILITIES: ExplainerCapabilities = {
     "requires_gradients": False,
     "requires_background_data": False,
-    "computational_cost": "medium",
+    "computational_cost": ComputationalCost.MEDIUM,
 }
 
 
@@ -210,7 +211,7 @@ class PermutationExplainer:
         Returns:
             Literal "permutation".
         """
-        return "permutation"
+        return ExplainerName.PERMUTATION
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return explainer capabilities.

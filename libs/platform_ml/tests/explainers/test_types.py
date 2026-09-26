@@ -17,40 +17,19 @@ from platform_ml.explainers.types import (
 )
 
 
-def test_explainer_name_permutation() -> None:
-    """Verify ExplainerName accepts 'permutation'."""
-    name: ExplainerName = "permutation"
-    assert name == "permutation"
+def test_explainer_names_are_the_registry_words() -> None:
+    """Each explainer's name is the word the explainer registries key it by."""
+    assert [name.value for name in ExplainerName] == [
+        "permutation",
+        "gradient",
+        "integrated_gradients",
+        "shap_tree",
+    ]
 
 
-def test_explainer_name_gradient() -> None:
-    """Verify ExplainerName accepts 'gradient'."""
-    name: ExplainerName = "gradient"
-    assert name == "gradient"
-
-
-def test_explainer_name_integrated_gradients() -> None:
-    """Verify ExplainerName accepts 'integrated_gradients'."""
-    name: ExplainerName = "integrated_gradients"
-    assert name == "integrated_gradients"
-
-
-def test_computational_cost_low() -> None:
-    """Verify ComputationalCost accepts 'low'."""
-    cost: ComputationalCost = "low"
-    assert cost == "low"
-
-
-def test_computational_cost_medium() -> None:
-    """Verify ComputationalCost accepts 'medium'."""
-    cost: ComputationalCost = "medium"
-    assert cost == "medium"
-
-
-def test_computational_cost_high() -> None:
-    """Verify ComputationalCost accepts 'high'."""
-    cost: ComputationalCost = "high"
-    assert cost == "high"
+def test_computational_costs_are_ordered_cheapest_first() -> None:
+    """The cost categories and their wire words, cheapest first."""
+    assert [cost.value for cost in ComputationalCost] == ["low", "medium", "high"]
 
 
 def test_explainer_capabilities_creation() -> None:
@@ -58,11 +37,11 @@ def test_explainer_capabilities_creation() -> None:
     caps: ExplainerCapabilities = {
         "requires_gradients": True,
         "requires_background_data": False,
-        "computational_cost": "high",
+        "computational_cost": ComputationalCost.HIGH,
     }
     assert caps["requires_gradients"] is True
     assert caps["requires_background_data"] is False
-    assert caps["computational_cost"] == "high"
+    assert caps["computational_cost"] is ComputationalCost.HIGH
 
 
 def test_feature_importance_score_creation() -> None:

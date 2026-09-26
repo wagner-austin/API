@@ -22,7 +22,7 @@ from platform_ml.explainers.permutation import (
     create_permutation_explainer,
 )
 from platform_ml.explainers.protocol import PredictorProtocol
-from platform_ml.explainers.types import PermutationConfig
+from platform_ml.explainers.types import ComputationalCost, ExplainerName, PermutationConfig
 
 from .array_helpers import get_float, make_float64_2d
 
@@ -100,7 +100,7 @@ def test_permutation_capabilities_values() -> None:
     """Verify PERMUTATION_CAPABILITIES has correct values."""
     assert PERMUTATION_CAPABILITIES["requires_gradients"] is False
     assert PERMUTATION_CAPABILITIES["requires_background_data"] is False
-    assert PERMUTATION_CAPABILITIES["computational_cost"] == "medium"
+    assert PERMUTATION_CAPABILITIES["computational_cost"] is ComputationalCost.MEDIUM
 
 
 def test_validate_inputs_matching_dimensions() -> None:
@@ -309,7 +309,7 @@ def test_permutation_explainer_name() -> None:
     config: PermutationConfig = {"n_repeats": 5, "random_state": 0}
     explainer = PermutationExplainer(config)
 
-    assert explainer.explainer_name() == "permutation"
+    assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
 
 def test_permutation_explainer_capabilities() -> None:
@@ -321,7 +321,7 @@ def test_permutation_explainer_capabilities() -> None:
 
     assert caps["requires_gradients"] is False
     assert caps["requires_background_data"] is False
-    assert caps["computational_cost"] == "medium"
+    assert caps["computational_cost"] is ComputationalCost.MEDIUM
 
 
 def test_permutation_explainer_compute_importance_validates_input() -> None:
@@ -418,7 +418,7 @@ def test_create_permutation_explainer_returns_configured_instance() -> None:
 
     assert explainer._n_repeats == 8
     assert explainer._random_state == 77
-    assert explainer.explainer_name() == "permutation"
+    assert explainer.explainer_name() is ExplainerName.PERMUTATION
     assert explainer.capabilities()["requires_gradients"] is False
 
 

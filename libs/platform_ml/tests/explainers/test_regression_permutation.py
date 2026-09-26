@@ -22,7 +22,7 @@ from platform_ml.explainers.regression_permutation import (
     _validate_inputs,
     create_regression_permutation_explainer,
 )
-from platform_ml.explainers.types import PermutationConfig
+from platform_ml.explainers.types import ComputationalCost, ExplainerName, PermutationConfig
 
 from .array_helpers import get_float, make_float64_2d
 
@@ -153,14 +153,14 @@ def test_regression_permutation_capabilities() -> None:
     """Check regression permutation capabilities constants."""
     assert REGRESSION_PERMUTATION_CAPABILITIES["requires_gradients"] is False
     assert REGRESSION_PERMUTATION_CAPABILITIES["requires_background_data"] is False
-    assert REGRESSION_PERMUTATION_CAPABILITIES["computational_cost"] == "medium"
+    assert REGRESSION_PERMUTATION_CAPABILITIES["computational_cost"] is ComputationalCost.MEDIUM
 
 
 def test_explainer_name() -> None:
     """Explainer name returns 'permutation'."""
     config: PermutationConfig = {"n_repeats": 3, "random_state": 42}
     explainer = RegressionPermutationExplainer(config)
-    assert explainer.explainer_name() == "permutation"
+    assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
 
 def test_explainer_capabilities() -> None:
@@ -232,7 +232,7 @@ def test_create_factory() -> None:
     """Factory function creates configured explainer."""
     config: PermutationConfig = {"n_repeats": 7, "random_state": 99}
     explainer = create_regression_permutation_explainer(config)
-    assert explainer.explainer_name() == "permutation"
+    assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
 
 def test_deterministic_with_same_seed() -> None:

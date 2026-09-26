@@ -20,7 +20,7 @@ from platform_ml.explainers.gradient import (
     create_gradient_explainer,
 )
 from platform_ml.explainers.protocol import GradientModelProtocol
-from platform_ml.explainers.types import GradientConfig
+from platform_ml.explainers.types import ComputationalCost, ExplainerName, GradientConfig
 
 from .array_helpers import assert_close, get_float, make_float64_2d
 
@@ -152,7 +152,7 @@ def test_gradient_capabilities_values() -> None:
     """Verify GRADIENT_CAPABILITIES has correct values."""
     assert GRADIENT_CAPABILITIES["requires_gradients"] is True
     assert GRADIENT_CAPABILITIES["requires_background_data"] is False
-    assert GRADIENT_CAPABILITIES["computational_cost"] == "low"
+    assert GRADIENT_CAPABILITIES["computational_cost"] is ComputationalCost.LOW
 
 
 def test_validate_inputs_matching_dimensions() -> None:
@@ -323,7 +323,7 @@ def test_gradient_explainer_name() -> None:
     config: GradientConfig = {"multiply_by_input": False, "absolute_value": True}
     explainer = GradientExplainer(config)
 
-    assert explainer.explainer_name() == "gradient"
+    assert explainer.explainer_name() is ExplainerName.GRADIENT
 
 
 def test_gradient_explainer_capabilities() -> None:
@@ -335,7 +335,7 @@ def test_gradient_explainer_capabilities() -> None:
 
     assert caps["requires_gradients"] is True
     assert caps["requires_background_data"] is False
-    assert caps["computational_cost"] == "low"
+    assert caps["computational_cost"] is ComputationalCost.LOW
 
 
 def test_gradient_explainer_compute_importance_validates_input() -> None:
@@ -429,7 +429,7 @@ def test_create_gradient_explainer_returns_configured_instance() -> None:
 
     assert explainer._multiply_by_input is True
     assert explainer._absolute_value is True
-    assert explainer.explainer_name() == "gradient"
+    assert explainer.explainer_name() is ExplainerName.GRADIENT
     assert explainer.capabilities()["requires_gradients"] is True
 
 
