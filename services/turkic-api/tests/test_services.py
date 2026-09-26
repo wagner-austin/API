@@ -10,6 +10,7 @@ from platform_workers.testing import FakeRedis
 from turkic_api.api.models import JobCreate
 from turkic_api.api.services import JobService
 from turkic_api.api.types import JSONValue, RQJobLike, RQRetryLike
+from turkic_api.core.models import Language, Source
 
 
 class _QueueStub:
@@ -41,8 +42,8 @@ def test_job_service_create_job_enqueues_and_sets_metadata() -> None:
     service = JobService(redis=r, logger=get_logger(__name__), queue=q)
     job: JobCreate = {
         "user_id": 42,
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "script": None,
         "max_sentences": 5,
         "transliterate": True,

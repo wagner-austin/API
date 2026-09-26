@@ -15,6 +15,7 @@ from tests.conftest import make_probs
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.jobs import process_corpus_impl
+from turkic_api.core.models import Language, Source
 
 
 class _FakeDataBankClient:
@@ -82,8 +83,8 @@ def test_process_corpus_impl_creates_file_and_updates_status(tmp_path: Path) -> 
 
     params: JobParams = {
         "user_id": 42,
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "script": None,
         "max_sentences": 10,
         "transliterate": True,

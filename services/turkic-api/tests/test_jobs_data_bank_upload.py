@@ -19,7 +19,7 @@ from tests.conftest import make_probs
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.jobs import process_corpus_impl
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Source
 
 
 class FakeCorpusService:
@@ -107,8 +107,8 @@ def test_upload_success_records_file_id(tmp_path: Path) -> None:
         "jid1",
         {
             "user_id": 42,
-            "source": "oscar",
-            "language": "kk",
+            "source": Source.OSCAR,
+            "language": Language.KK,
             "script": None,
             "max_sentences": 1,
             "transliterate": True,
@@ -182,8 +182,8 @@ def test_upload_failure_breaks_job(tmp_path: Path, error_msg: str) -> None:
             "jid2",
             {
                 "user_id": 42,
-                "source": "oscar",
-                "language": "kk",
+                "source": Source.OSCAR,
+                "language": Language.KK,
                 "script": None,
                 "max_sentences": 1,
                 "transliterate": True,
@@ -227,8 +227,8 @@ def test_upload_missing_file_id_raises(tmp_path: Path) -> None:
             "jid3",
             {
                 "user_id": 42,
-                "source": "oscar",
-                "language": "kk",
+                "source": Source.OSCAR,
+                "language": Language.KK,
                 "script": None,
                 "max_sentences": 1,
                 "transliterate": True,
@@ -261,8 +261,8 @@ def test_upload_config_missing_marks_job_failed(tmp_path: Path) -> None:
             "jid_cfg",
             {
                 "user_id": 42,
-                "source": "oscar",
-                "language": "kk",
+                "source": Source.OSCAR,
+                "language": Language.KK,
                 "script": None,
                 "max_sentences": 1,
                 "transliterate": True,

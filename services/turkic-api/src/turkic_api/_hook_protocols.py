@@ -23,10 +23,9 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.data_bank_client import HeadInfo
 from platform_core.data_bank_protocol import FileUploadResponse
-from platform_core.json_utils import JSONValue
 from platform_workers.rq_harness import WorkerConfig
 
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import ProcessSpec, Script
 
 
 class WorkerRunnerProtocol(Protocol):
@@ -110,7 +109,7 @@ class EnsureCorpusProtocol(Protocol):
         self,
         spec: ProcessSpec,
         data_dir: str,
-        script: str | None = None,
+        script: Script | None = None,
         *,
         langid_model: LangIdModelProtocol | None = None,
     ) -> Path:
@@ -141,7 +140,7 @@ class BuildLangScriptFilterProtocol(Protocol):
         self,
         *,
         target_lang: str,
-        script: str | None,
+        script: Script | None,
         threshold: float,
         model: LangIdModelProtocol,
     ) -> Callable[[str], bool]:
@@ -285,40 +284,12 @@ class WikipediaRequestsGetProtocol(Protocol):
         ...
 
 
-class DecodeRequiredLiteralProtocol(Protocol):
-    """Protocol for _decode_required_literal function."""
-
-    def __call__(
-        self,
-        val: JSONValue,
-        field: str,
-        allowed: frozenset[str],
-    ) -> str:
-        """Decode and validate a required literal value."""
-        ...
-
-
-class DecodeOptionalLiteralProtocol(Protocol):
-    """Protocol for _decode_optional_literal function."""
-
-    def __call__(
-        self,
-        val: JSONValue,
-        field: str,
-        allowed: frozenset[str],
-    ) -> str | None:
-        """Decode and validate an optional literal value."""
-        ...
-
-
 __all__ = [
     "BuildLangScriptFilterProtocol",
     "DataBankDownloaderFactoryProtocol",
     "DataBankDownloaderProtocol",
     "DataBankUploaderFactoryProtocol",
     "DataBankUploaderProtocol",
-    "DecodeOptionalLiteralProtocol",
-    "DecodeRequiredLiteralProtocol",
     "EnsureCorpusProtocol",
     "LangIdDownloadProtocol",
     "LangIdEnsureModelPathProtocol",

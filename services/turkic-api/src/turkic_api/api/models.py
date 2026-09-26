@@ -7,58 +7,25 @@ No Pydantic, no TYPE_CHECKING pattern - single source of truth.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, NotRequired
+from typing import Literal
 
 from platform_core import job_types
 from platform_core.errors import AppError
 from platform_core.errors import ErrorCode as PlatformErrorCode
-from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, load_json_bytes, load_json_str
 from platform_core.members import as_member
 from typing_extensions import TypedDict
 
-from .types import JsonDict
+from ..core.models import Language, Script, Source
 from .validators import (
     _decode_bool,
     _decode_float_range,
     _decode_int_range,
+    _decode_optional_literal,
+    _decode_required_literal,
     _decode_str,
     _load_json_dict,
 )
-
-
-def _hook_decode_required_literal(
-    val: JSONValue,
-    field: str,
-    allowed: frozenset[str],
-) -> str:
-    """Decode required literal using hook for test injection."""
-    from turkic_api import _test_hooks
-
-    return _test_hooks.decode_required_literal(val, field, allowed)
-
-
-def _hook_decode_optional_literal(
-    val: JSONValue,
-    field: str,
-    allowed: frozenset[str],
-) -> str | None:
-    """Decode optional literal using hook for test injection."""
-    from turkic_api import _test_hooks
-
-    return _test_hooks.decode_optional_literal(val, field, allowed)
-
-
-# Type aliases for literals
-Script = Literal["Latn", "Cyrl", "Arab"]
-Source = Literal["oscar", "wikipedia", "culturax"]
-Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"]
-ErrorCode = Literal[
-    "INVALID_REQUEST",
-    "JOB_NOT_FOUND",
-    "JOB_FAILED",
-    "RATE_LIMIT_EXCEEDED",
-    "INTERNAL_ERROR",
-]
 
 # TypedDict models
 
@@ -100,102 +67,23 @@ class JobStatus(TypedDict):
     error: str | None
 
 
-class ErrorResponse(TypedDict):
-    """Error response."""
-
-    error: str
-    code: ErrorCode
-    details: NotRequired[JsonDict]
-    timestamp: datetime
-
-
-# Parse functions with explicit validation
-
-_SOURCE_VALUES = frozenset({"oscar", "wikipedia", "culturax"})
-_LANGUAGE_VALUES = frozenset({"kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"})
-_SCRIPT_VALUES = frozenset({"Latn", "Cyrl", "Arab"})
-_SCRIPT_MAP: dict[str, Script] = {"Latn": "Latn", "Cyrl": "Cyrl", "Arab": "Arab"}
-_LANGUAGE_MAP: dict[str, Language] = {
-    "kk": "kk",
-    "ky": "ky",
-    "uz": "uz",
-    "tr": "tr",
-    "ug": "ug",
-    "fi": "fi",
-    "az": "az",
-    "en": "en",
-    "ru": "ru",
-}
-
-
-def _get_source_map() -> dict[str, str]:
-    """Get source map from hooks for test injection."""
-    from turkic_api import _test_hooks
-
-    return _test_hooks.source_map
-
-
-def _get_language_map() -> dict[str, str]:
-    """Get language map from hooks for test injection."""
-    from turkic_api import _test_hooks
-
-    return _test_hooks.language_map
+# Parse functions with explicit validation. The hook refuses a word outside
+# the enum's values with the API's own 400, so as_member only narrows.
 
 
 def _decode_source_literal(val: JSONValue) -> Source:
-    decoded = _hook_decode_required_literal(val, "source", _SOURCE_VALUES)
-    source_val = _get_source_map().get(decoded)
-    if source_val is None:
-        raise AppError(
-            code=PlatformErrorCode.INVALID_INPUT,
-            message="Invalid source",
-            http_status=400,
-        )
-    # Narrow to Source literal
-    if source_val == "oscar":
-        return "oscar"
-    if source_val == "wikipedia":
-        return "wikipedia"
-    if source_val == "culturax":
-        return "culturax"
-    raise AppError(
-        code=PlatformErrorCode.INVALID_INPUT,
-        message="Invalid source",
-        http_status=400,
-    )
+    decoded = _decode_required_literal(val, "source", frozenset(Source))
+    return as_member(decoded, "source", Source)
 
 
 def _decode_language_literal(val: JSONValue) -> Language:
-    decoded = _hook_decode_required_literal(val, "language", _LANGUAGE_VALUES)
-    lang_val = _get_language_map().get(decoded)
-    if lang_val is None:
-        raise AppError(
-            code=PlatformErrorCode.INVALID_INPUT,
-            message="Invalid language",
-            http_status=400,
-        )
-    # Narrow to Language literal using map
-    result = _LANGUAGE_MAP.get(lang_val)
-    if result is None:
-        raise AppError(
-            code=PlatformErrorCode.INVALID_INPUT,
-            message="Invalid language",
-            http_status=400,
-        )
-    return result
+    decoded = _decode_required_literal(val, "language", frozenset(Language))
+    return as_member(decoded, "language", Language)
 
 
 def _decode_script_literal(val: JSONValue) -> Script | None:
-    if val is None:
-        return None
-    _hook_decode_optional_literal(val, "script", _SCRIPT_VALUES)
-    if val == "Latn":
-        return "Latn"
-    if val == "Cyrl":
-        return "Cyrl"
-    if val == "Arab":
-        return "Arab"
-    return None
+    decoded = _decode_optional_literal(val, "script", frozenset(Script))
+    return None if decoded is None else as_member(decoded, "script", Script)
 
 
 def _decode_job_create_from_unknown(payload: JSONValue) -> JobCreate:
@@ -220,12 +108,7 @@ def _decode_job_create_from_unknown(payload: JSONValue) -> JobCreate:
     language_raw: JSONValue = d.get("language")
     language = _decode_language_literal(language_raw)
 
-    script_raw: JSONValue = d.get("script")
-    if script_raw is None:
-        script: Script | None = None
-    else:
-        _hook_decode_optional_literal(script_raw, "script", _SCRIPT_VALUES)
-        script = _SCRIPT_MAP.get(script_raw if isinstance(script_raw, str) else "")
+    script = _decode_script_literal(d.get("script"))
 
     max_raw: JSONValue = d.get("max_sentences")
     max_sentences = _decode_int_range(
@@ -263,20 +146,20 @@ def _decode_job_create_from_unknown(payload: JSONValue) -> JobCreate:
     }
 
 
-def parse_job_create(payload: JsonDict) -> JobCreate:
-    """Parse and validate JobCreate from request body (public API)."""
-    converted: dict[str, JSONValue] = {}
-    for k, v in payload.items():
-        if v is None or isinstance(v, (str, int, float, bool)):
-            converted[k] = v
-        else:
-            # v must be a list given JsonDict type constraints
-            items: list[JSONValue] = [
-                item for item in v if item is None or isinstance(item, (str, int, float, bool))
-            ]
-            converted[k] = items
-    converted_payload: JSONValue = converted
-    return _decode_job_create_from_unknown(converted_payload)
+def parse_job_create(body: bytes) -> JobCreate:
+    """Parse and validate JobCreate from the raw request body (public API).
+
+    Args:
+        body: The request body exactly as received, UTF-8 encoded JSON.
+
+    Returns:
+        The validated job request.
+
+    Raises:
+        InvalidJsonError: When the body is not JSON.
+        AppError: When the JSON is not an object or a field fails validation.
+    """
+    return _decode_job_create_from_unknown(load_json_bytes(body))
 
 
 # JSON parsing helpers for tests
@@ -352,14 +235,9 @@ def parse_job_status_json(s: str) -> JobStatus:
 
 
 __all__ = [
-    "ErrorCode",
-    "ErrorResponse",
     "JobCreate",
     "JobResponse",
     "JobStatus",
-    "Language",
-    "Script",
-    "Source",
     "parse_job_create",
     "parse_job_response_json",
     "parse_job_status_json",

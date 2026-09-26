@@ -1,11 +1,38 @@
 from __future__ import annotations
 
-from typing import Literal, TypeGuard
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
-Source = Literal["oscar", "wikipedia", "culturax"]
-Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"]
+
+class Source(StrEnum):
+    """A corpus a job reads from, as requests and queue payloads spell it."""
+
+    OSCAR = "oscar"
+    WIKIPEDIA = "wikipedia"
+    CULTURAX = "culturax"
+
+
+class Language(StrEnum):
+    """An ISO 639-1 language code a job extracts sentences in."""
+
+    KK = "kk"
+    KY = "ky"
+    UZ = "uz"
+    TR = "tr"
+    UG = "ug"
+    FI = "fi"
+    AZ = "az"
+    EN = "en"
+    RU = "ru"
+
+
+class Script(StrEnum):
+    """An ISO 15924 script a job may restrict its sentences to."""
+
+    LATN = "Latn"
+    CYRL = "Cyrl"
+    ARAB = "Arab"
 
 
 class ProcessSpec(TypedDict):
@@ -14,11 +41,3 @@ class ProcessSpec(TypedDict):
     max_sentences: int
     transliterate: bool
     confidence_threshold: float
-
-
-def is_source(value: str) -> TypeGuard[Source]:
-    return value in ("oscar", "wikipedia", "culturax")
-
-
-def is_language(value: str) -> TypeGuard[Language]:
-    return value in ("kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru")

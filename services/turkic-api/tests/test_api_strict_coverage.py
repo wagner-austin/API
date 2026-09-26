@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONTypeError, dump_json_str
+from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
 
 from turkic_api.api import models
 from turkic_api.api.jobs import _decode_job_params
 from turkic_api.api.main import _to_json_simple
-from turkic_api.api.types import JsonDict, JSONValue
+from turkic_api.api.types import JSONValue
 from turkic_api.core.corpus import CorpusService, LocalCorpusService
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Script, Source
 
 
 def test_to_json_simple_supports_primitives_and_datetime() -> None:
@@ -40,7 +40,7 @@ def test_decode_job_params_branches() -> None:
             "confidence_threshold": 0.4,
         }
     )
-    assert good["script"] == "Latn"
+    assert good["script"] is Script.LATN
 
     blank = _decode_job_params(
         {
@@ -92,7 +92,7 @@ def test_decode_job_params_branches() -> None:
 
 def test_models_parse_job_create_and_json_helpers() -> None:
     now = datetime.now(UTC).replace(microsecond=0)
-    base_payload: JsonDict = {
+    base_payload: dict[str, JSONValue] = {
         "user_id": 42,
         "source": "oscar",
         "language": "kk",
@@ -101,17 +101,21 @@ def test_models_parse_job_create_and_json_helpers() -> None:
         "transliterate": True,
         "confidence_threshold": 0.5,
     }
-    parsed = models.parse_job_create(base_payload)
-    assert parsed["language"] == "kk"
+    parsed = models.parse_job_create(dump_json_str(base_payload).encode("utf-8"))
+    assert parsed["language"] is Language.KK
 
-    defaults = models.parse_job_create({"user_id": 42, "source": "wikipedia", "language": "uz"})
+    defaults = models.parse_job_create(b'{"user_id": 42, "source": "wikipedia", "language": "uz"}')
     assert defaults["max_sentences"] == 1000
     assert defaults["transliterate"] is True
     assert defaults["confidence_threshold"] == 0.95
 
     http_exc_type: type[Exception] = AppError
     with pytest.raises(http_exc_type, match="source is required"):
-        models.parse_job_create({"user_id": 42, "language": "kk"})
+        models.parse_job_create(b'{"user_id": 42, "language": "kk"}')
+    with pytest.raises(AppError, match="Invalid request body"):
+        models.parse_job_create(b"[1, 2]")
+    with pytest.raises(InvalidJsonError, match="Invalid JSON payload"):
+        models.parse_job_create(b"{not json")
 
     job_resp_data: dict[str, str | int] = {
         "job_id": "1",
@@ -156,18 +160,6 @@ def test_models_literal_and_conversion_paths() -> None:
         decoded_job = models._decode_job_create_from_unknown(payload)
         assert decoded_job["script"] == script
 
-    payload2: JsonDict = {
-        "user_id": 42,
-        "source": "oscar",
-        "language": "kk",
-        "script": "Latn",
-        "max_sentences": 3,
-        "transliterate": True,
-        "confidence_threshold": 0.3,
-    }
-    parsed2 = models.parse_job_create(payload2)
-    assert parsed2["max_sentences"] == 3
-
     ts = datetime.now(UTC).isoformat()
     for status in ("queued", "processing", "completed", "failed"):
         response_payload = {"job_id": "x", "user_id": 42, "status": status, "created_at": ts}
@@ -207,8 +199,8 @@ def test_models_literal_and_conversion_paths() -> None:
 def test_corpus_service_base_raises() -> None:
     svc = CorpusService()
     spec: ProcessSpec = {
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "max_sentences": 1,
         "transliterate": True,
         "confidence_threshold": 0.0,
@@ -226,8 +218,8 @@ def test_local_corpus_service_stream_and_errors(tmp_path: Path) -> None:
 
     svc = LocalCorpusService(str(data_dir))
     spec: ProcessSpec = {
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "max_sentences": 2,
         "transliterate": True,
         "confidence_threshold": 0.0,

@@ -7,10 +7,7 @@ from typing import Protocol
 from platform_core.json_utils import JSONValue
 from platform_workers.rq_harness import RQJobLike, RQRetryLike
 
-__all__ = ["JSONValue", "JsonDict", "LoggerProtocol", "RQJobLike", "RQRetryLike"]
-
-# Public JSON type for API boundaries - non-recursive, one-level deep
-JsonDict = dict[str, str | int | float | bool | list[str | int | float | bool | None] | None]
+__all__ = ["JSONValue", "LoggerProtocol", "RQJobLike", "RQRetryLike"]
 
 
 class LoggerProtocol(Protocol):

@@ -16,7 +16,7 @@ from turkic_api.api.config import Settings
 from turkic_api.api.job_store import TurkicJobStore
 from turkic_api.api.jobs import _result_stream
 from turkic_api.core.corpus import LocalCorpusService
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Source
 
 
 class FakeJobContext(JobContext):
@@ -77,8 +77,8 @@ def test_result_stream_publishes_progress(tmp_path: Path) -> None:
     _test_hooks.to_ipa = lambda text, _lang: f"{text}-ipa"
 
     spec: ProcessSpec = {
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "max_sentences": 100,
         "transliterate": True,
         "confidence_threshold": 0.0,
@@ -113,8 +113,8 @@ def test_local_corpus_service_handles_empty_file(tmp_path: Path) -> None:
 
     svc = LocalCorpusService(str(tmp_path))
     spec: ProcessSpec = {
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "max_sentences": 10,
         "transliterate": False,
         "confidence_threshold": 0.0,

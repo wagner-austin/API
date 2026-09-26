@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from platform_core.errors import AppError, ErrorCode
 from platform_workers.redis import RedisStrProto
@@ -18,7 +18,7 @@ from ..provider_context import (
 )
 from ..services import JobService
 from ..streaming import stream_data_bank_file
-from ..types import JsonDict, LoggerProtocol
+from ..types import LoggerProtocol
 
 
 def _to_hash_redis(r: RedisStrProto) -> RedisStrProto:
@@ -44,13 +44,13 @@ def build_router() -> APIRouter:
     router = APIRouter()
 
     async def create_job_endpoint(
-        payload: JsonDict,
+        request: Request,
         redis: Annotated[RedisStrProto, Depends(get_redis_from_context)],
         logger: Annotated[LoggerProtocol, Depends(get_logger_from_context)],
         queue: Annotated[QueueProtocol, Depends(get_queue_from_context)],
         settings: Annotated[Settings, Depends(get_settings_from_context)],
     ) -> JSONResponse:
-        job = parse_job_create(payload)
+        job = parse_job_create(await request.body())
         service = _create_service(redis=redis, logger=logger, queue=queue, settings=settings)
         result = await service.create_job(job)
         serialized: dict[str, str | int | float | bool | None] = {

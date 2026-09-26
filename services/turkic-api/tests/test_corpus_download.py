@@ -25,7 +25,7 @@ from turkic_api.core.corpus_download import (
     stream_oscar,
     stream_wikipedia_xml,
 )
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Script, Source
 
 
 def _gen_lines(lines: list[str]) -> Generator[str, None, None]:
@@ -51,8 +51,8 @@ def test_ensure_corpus_file_writes_and_is_idempotent(tmp_path: Path) -> None:
     _test_hooks.stream_oscar_hook = _oscar_stub
     try:
         spec = ProcessSpec(
-            source="oscar",
-            language="kk",
+            source=Source.OSCAR,
+            language=Language.KK,
             max_sentences=2,
             transliterate=True,
             confidence_threshold=0.0,
@@ -77,8 +77,8 @@ def test_ensure_corpus_file_zero_written_raises(tmp_path: Path) -> None:
     _test_hooks.stream_wikipedia_xml_hook = _wiki_stub
     try:
         spec = ProcessSpec(
-            source="wikipedia",
-            language="kk",
+            source=Source.WIKIPEDIA,
+            language=Language.KK,
             max_sentences=10,
             transliterate=True,
             confidence_threshold=0.0,
@@ -112,8 +112,8 @@ def test_ensure_corpus_file_zero_written_logs_unlink_failure(
 
     try:
         spec = ProcessSpec(
-            source="wikipedia",
-            language="kk",
+            source=Source.WIKIPEDIA,
+            language=Language.KK,
             max_sentences=10,
             transliterate=True,
             confidence_threshold=0.0,
@@ -233,8 +233,8 @@ def test_ensure_corpus_file_applies_lang_filter(tmp_path: Path) -> None:
 
     try:
         spec = ProcessSpec(
-            source="oscar",
-            language="kk",
+            source=Source.OSCAR,
+            language=Language.KK,
             max_sentences=10,
             transliterate=True,
             confidence_threshold=0.9,
@@ -267,22 +267,17 @@ def test_ensure_corpus_file_applies_script_filter(tmp_path: Path) -> None:
 
     try:
         spec = ProcessSpec(
-            source="oscar",
-            language="kk",
+            source=Source.OSCAR,
+            language=Language.KK,
             max_sentences=10,
             transliterate=True,
             confidence_threshold=0.0,
         )
-        path = ensure_corpus_file(spec, str(tmp_path), script="Latn", langid_model=_Model())
+        path = ensure_corpus_file(spec, str(tmp_path), script=Script.LATN, langid_model=_Model())
         assert path.exists()
         assert path.read_text(encoding="utf-8").splitlines() == ["LATN world", "LATN again"]
     finally:
         _test_hooks.stream_oscar_hook = orig
-
-
-def test_stream_for_source_invalid_raises() -> None:
-    with pytest.raises(ValueError, match="Unsupported corpus source"):
-        _stream_for_source("news", "kk")
 
 
 def test_stream_culturax_uses_datasets() -> None:
@@ -314,7 +309,7 @@ def test_stream_for_source_culturax() -> None:
 
     _test_hooks.stream_culturax_hook = _culturax_stub
     try:
-        gen = _stream_for_source("culturax", "kk")
+        gen = _stream_for_source(Source.CULTURAX, Language.KK)
         assert list(gen) == ["a", "b"]
     finally:
         _test_hooks.stream_culturax_hook = orig

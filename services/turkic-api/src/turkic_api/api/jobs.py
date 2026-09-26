@@ -10,6 +10,7 @@ from platform_core.job_events import ErrorKind, JobDomain, default_events_channe
 from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
+from platform_core.members import find_member
 from platform_core.queues import TURKIC_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
 from platform_workers.redis import RedisStrProto
@@ -19,7 +20,7 @@ from turkic_api import _test_hooks
 from turkic_api.api.config import Settings, load_settings
 from turkic_api.api.job_store import TurkicJobStore
 from turkic_api.api.types import LoggerProtocol
-from turkic_api.core.models import ProcessSpec, is_language, is_source
+from turkic_api.core.models import Language, ProcessSpec, Script, Source
 
 
 # TypedDicts for job processing
@@ -27,9 +28,9 @@ class JobParams(TypedDict):
     """Parameters for job processing from queue."""
 
     user_id: int
-    source: str
-    language: str
-    script: str | None
+    source: Source
+    language: Language
+    script: Script | None
     max_sentences: int
     transliterate: bool
     confidence_threshold: float
@@ -43,7 +44,7 @@ class JobResult(TypedDict):
     result: str
 
 
-def _parse_script_param(script_val: str | None) -> str | None:
+def _parse_script_param(script_val: str | None) -> Script | None:
     """Parse and validate the optional script filter parameter.
 
     Raises:
@@ -54,10 +55,10 @@ def _parse_script_param(script_val: str | None) -> str | None:
     s = script_val.strip()
     if not s:
         return None
-    norm = s[0:1].upper() + s[1:].lower()
-    if norm not in ("Latn", "Cyrl", "Arab"):
+    script = find_member(s[0:1].upper() + s[1:].lower(), Script)
+    if script is None:
         raise JSONTypeError("Invalid script; expected 'Latn', 'Cyrl', or 'Arab'")
-    return norm
+    return script
 
 
 def _decode_job_params(raw: dict[str, JSONValue]) -> JobParams:
@@ -90,13 +91,15 @@ def _decode_job_params(raw: dict[str, JSONValue]) -> JobParams:
         raise JSONTypeError("script must be a string or null")
     script = _parse_script_param(script_raw)
 
-    if not is_source(src_val.strip()) or not is_language(lang_val.strip()):
+    source = find_member(src_val.strip(), Source)
+    language = find_member(lang_val.strip(), Language)
+    if source is None or language is None:
         raise JSONTypeError("Invalid source or language in job parameters")
 
     return {
         "user_id": user_id_val,
-        "source": src_val.strip(),
-        "language": lang_val.strip(),
+        "source": source,
+        "language": language,
         "script": script,
         "max_sentences": max_val,
         "transliterate": translit_val,
@@ -142,8 +145,7 @@ def process_corpus_impl(
     ctx.publish_started()
 
     spec = _build_spec(params)
-    norm_script = _normalize_script(params["script"])
-    _ensure_corpus(spec, settings, norm_script)
+    _ensure_corpus(spec, settings, params["script"])
     body_stream = _result_stream(job_id, user_id, spec, settings, store, ctx, created_at)
     file_id, result_bytes = _upload_and_record(
         settings, logger, job_id, user_id, body_stream, store, ctx, created_at
@@ -155,7 +157,7 @@ def process_corpus_impl(
 def _ensure_corpus(
     spec: ProcessSpec,
     settings: Settings,
-    script: str | None,
+    script: Script | None,
 ) -> None:
     lang_model = None
     filtering_needed = spec["confidence_threshold"] > 0.0 or script is not None
@@ -204,24 +206,13 @@ def _result_stream(
 
 
 def _build_spec(params: JobParams) -> ProcessSpec:
-    src = params["source"]
-    lang = params["language"]
-    assert is_source(src), "Invalid source"
-    assert is_language(lang), "Invalid language"
     return ProcessSpec(
-        source=src,
-        language=lang,
+        source=params["source"],
+        language=params["language"],
         max_sentences=params["max_sentences"],
         transliterate=params["transliterate"],
         confidence_threshold=params["confidence_threshold"],
     )
-
-
-def _normalize_script(val: str | None) -> str | None:
-    if val is None:
-        return None
-    trimmed = val.strip()
-    return None if not trimmed else trimmed[0:1].upper() + trimmed[1:].lower()
 
 
 def _upload_and_record(

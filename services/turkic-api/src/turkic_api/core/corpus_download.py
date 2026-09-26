@@ -12,7 +12,7 @@ from platform_core.json_utils import JSONValue
 from typing_extensions import TypedDict
 
 from turkic_api.core.langid import LangIdModel, build_lang_script_filter
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Script, Source
 
 _XML_CHUNK_BYTES: Final[int] = 1 << 20
 """How much decompressed XML is fed to the parser at a time (1 MiB)."""
@@ -172,26 +172,25 @@ def _write_lines(dest: Path, lines: Generator[str, None, None], limit: int) -> i
     return count
 
 
-def _stream_for_source(source: str, language: str) -> Generator[str, None, None]:
+def _stream_for_source(source: Source, language: Language) -> Generator[str, None, None]:
     """Return a corpus stream generator for the given source.
 
     Uses hooks from _test_hooks to allow test injection.
     """
     from turkic_api import _test_hooks
 
-    if source == "oscar":
+    if source is Source.OSCAR:
         return _test_hooks.stream_oscar_hook(language)
-    if source == "culturax":
+    if source is Source.CULTURAX:
         return _test_hooks.stream_culturax_hook(language)
-    if source == "wikipedia":
-        return _test_hooks.stream_wikipedia_xml_hook(language)
-    raise ValueError(f"Unsupported corpus source: {source}")
+    assert source is Source.WIKIPEDIA
+    return _test_hooks.stream_wikipedia_xml_hook(language)
 
 
 def ensure_corpus_file(
     spec: ProcessSpec,
     data_dir: str,
-    script: str | None = None,
+    script: Script | None = None,
     *,
     langid_model: LangIdModel | None = None,
 ) -> Path:

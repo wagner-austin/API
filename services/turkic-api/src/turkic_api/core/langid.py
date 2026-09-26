@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from turkic_api import _test_hooks
+from turkic_api.core.models import Script
 
 
 def _parse_label(raw: str) -> tuple[str, str | None]:
@@ -112,21 +113,15 @@ def build_lang_filter(
 
 
 def build_lang_script_filter(
-    *, target_lang: str, script: str | None, threshold: float, model: LangIdModel
+    *, target_lang: str, script: Script | None, threshold: float, model: LangIdModel
 ) -> Callable[[str], bool]:
     """Return a predicate for language + optional script with probability threshold.
 
     If script is provided, the sentence must match both target_lang and script;
     otherwise only target_lang is enforced. Probability must be >= threshold.
+    The script arrives already canonical, because the job decoder turned the
+    request's text into a Script member.
     """
-    script_norm = script
-    if script_norm is not None:
-        # Normalize to canonical capitalization like "Latn", "Cyrl"
-        script_norm = script_norm.strip()
-        if not script_norm:
-            script_norm = None
-        else:
-            script_norm = script_norm[0:1].upper() + script_norm[1:].lower()
 
     def _keep(text: str) -> bool:
         labels, probs = model.predict(text.replace("\n", " "), k=1)
@@ -135,7 +130,7 @@ def build_lang_script_filter(
         lang, script_pred = _parse_label(label)
         if lang != target_lang:
             return False
-        if script_norm is not None and script_pred != script_norm:
+        if script is not None and script_pred != script:
             return False
         return prob >= threshold
 

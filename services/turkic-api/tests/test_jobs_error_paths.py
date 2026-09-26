@@ -19,10 +19,9 @@ from turkic_api.api.jobs import (
     JobParams,
     _decode_job_params,
     _get_redis_client,
-    _normalize_script,
     process_corpus_impl,
 )
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Script, Source
 
 
 class FakeDataBankClient:
@@ -146,8 +145,8 @@ def test_progress_updates_every_50(tmp_path: Path) -> None:
 
     params: JobParams = {
         "user_id": 42,
-        "source": "oscar",
-        "language": "kk",
+        "source": Source.OSCAR,
+        "language": Language.KK,
         "script": None,
         "max_sentences": 1000,
         "transliterate": True,
@@ -208,7 +207,7 @@ def test_valid_script_normalizes_and_passes() -> None:
             "script": "latn",
         }
     )
-    assert result["script"] == "Latn"
+    assert result["script"] is Script.LATN
 
 
 def test_blank_script_string_is_treated_as_none() -> None:
@@ -225,24 +224,6 @@ def test_blank_script_string_is_treated_as_none() -> None:
         }
     )
     assert result["script"] is None
-
-
-def test_normalize_script_with_value() -> None:
-    """Test _normalize_script with a valid script value."""
-    assert _normalize_script("latn") == "Latn"
-    assert _normalize_script("CYRL") == "Cyrl"
-    assert _normalize_script("ArAb") == "Arab"
-
-
-def test_normalize_script_with_whitespace_only() -> None:
-    """Test _normalize_script treats whitespace-only as None."""
-    assert _normalize_script("   ") is None
-    assert _normalize_script("\t\n") is None
-
-
-def test_normalize_script_with_none() -> None:
-    """Test _normalize_script returns None for None input."""
-    assert _normalize_script(None) is None
 
 
 def test_get_redis_client_returns_adapter() -> None:

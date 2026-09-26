@@ -30,8 +30,6 @@ from turkic_api._hook_defaults import (
     _default_build_lang_script_filter,
     _default_data_bank_downloader_factory,
     _default_data_bank_uploader_factory,
-    _default_decode_optional_literal,
-    _default_decode_required_literal,
     _default_ensure_corpus_file,
     _default_get_env,
     _default_langid_download,
@@ -55,8 +53,6 @@ from turkic_api._hook_protocols import (
     DataBankDownloaderProtocol,
     DataBankUploaderFactoryProtocol,
     DataBankUploaderProtocol,
-    DecodeOptionalLiteralProtocol,
-    DecodeRequiredLiteralProtocol,
     EnsureCorpusProtocol,
     LangIdDownloadProtocol,
     LangIdEnsureModelPathProtocol,
@@ -100,24 +96,6 @@ wikipedia_requests_get: WikipediaRequestsGetProtocol = _default_wikipedia_reques
 langid_download: LangIdDownloadProtocol = _default_langid_download
 langid_ensure_model_path: LangIdEnsureModelPathProtocol = _default_langid_ensure_model_path
 langid_get_fasttext_factory: LangIdFastTextFactoryProtocol = _default_langid_get_fasttext_factory
-decode_required_literal: DecodeRequiredLiteralProtocol = _default_decode_required_literal
-decode_optional_literal: DecodeOptionalLiteralProtocol = _default_decode_optional_literal
-source_map: dict[str, str] = {
-    "oscar": "oscar",
-    "wikipedia": "wikipedia",
-    "culturax": "culturax",
-}
-language_map: dict[str, str] = {
-    "kk": "kk",
-    "ky": "ky",
-    "uz": "uz",
-    "tr": "tr",
-    "ug": "ug",
-    "fi": "fi",
-    "az": "az",
-    "en": "en",
-    "ru": "ru",
-}
 
 
 __all__ = [
@@ -126,8 +104,6 @@ __all__ = [
     "DataBankDownloaderProtocol",
     "DataBankUploaderFactoryProtocol",
     "DataBankUploaderProtocol",
-    "DecodeOptionalLiteralProtocol",
-    "DecodeRequiredLiteralProtocol",
     "EnsureCorpusProtocol",
     "LangIdDownloadProtocol",
     "LangIdEnsureModelPathProtocol",
@@ -146,8 +122,6 @@ __all__ = [
     "_default_build_lang_script_filter",
     "_default_data_bank_downloader_factory",
     "_default_data_bank_uploader_factory",
-    "_default_decode_optional_literal",
-    "_default_decode_required_literal",
     "_default_ensure_corpus_file",
     "_default_get_env",
     "_default_langid_download",
@@ -167,20 +141,16 @@ __all__ = [
     "build_lang_script_filter",
     "data_bank_client_factory",
     "data_bank_downloader_factory",
-    "decode_optional_literal",
-    "decode_required_literal",
     "ensure_corpus_file",
     "get_env",
     "langid_download",
     "langid_ensure_model_path",
     "langid_get_fasttext_factory",
-    "language_map",
     "load_langid_model",
     "local_corpus_service_factory",
     "path_exists",
     "path_unlink",
     "redis_factory",
-    "source_map",
     "stream_culturax_hook",
     "stream_oscar_hook",
     "stream_wikipedia_xml_hook",

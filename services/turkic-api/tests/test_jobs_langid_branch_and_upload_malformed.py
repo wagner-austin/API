@@ -18,7 +18,7 @@ from tests.conftest import make_probs
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.jobs import process_corpus_impl
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import Language, ProcessSpec, Source
 
 
 class FakeCorpusService:
@@ -101,8 +101,8 @@ def test_langid_branch_and_malformed_file_id(tmp_path: Path) -> None:
             "jj",
             {
                 "user_id": 42,
-                "source": "oscar",
-                "language": "kk",
+                "source": Source.OSCAR,
+                "language": Language.KK,
                 "script": None,
                 "max_sentences": 1,
                 "transliterate": True,

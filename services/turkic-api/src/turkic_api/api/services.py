@@ -56,9 +56,9 @@ class JobService:
         # Enqueue background job via injected queue with a typed payload
         payload: dict[str, JSONValue] = {
             "user_id": user_id,
-            "source": job["source"],
-            "language": job["language"],
-            "script": job["script"] if job["script"] is not None else None,
+            "source": job["source"].value,
+            "language": job["language"].value,
+            "script": None if job["script"] is None else job["script"].value,
             "max_sentences": job["max_sentences"],
             "transliterate": job["transliterate"],
             "confidence_threshold": float(job["confidence_threshold"]),

@@ -19,7 +19,6 @@ from pathlib import Path
 import requests
 from platform_core.config import _optional_env_str
 from platform_core.data_bank_client import DataBankClient
-from platform_core.json_utils import JSONValue
 from platform_core.langid_models import langid_model_file
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
@@ -32,7 +31,7 @@ from turkic_api._hook_protocols import (
     RawStreamProtocol,
     WikipediaRequestsResponseProtocol,
 )
-from turkic_api.core.models import ProcessSpec
+from turkic_api.core.models import ProcessSpec, Script
 
 
 def _default_get_env(key: str) -> str | None:
@@ -70,7 +69,7 @@ def _default_data_bank_downloader_factory(
 def _default_ensure_corpus_file(
     spec: ProcessSpec,
     data_dir: str,
-    script: str | None = None,
+    script: Script | None = None,
     *,
     langid_model: LangIdModelProtocol | None = None,
 ) -> Path:
@@ -188,7 +187,7 @@ def _default_to_ipa(text: str, lang: str) -> str:
 def _default_build_lang_script_filter(
     *,
     target_lang: str,
-    script: str | None,
+    script: Script | None,
     threshold: float,
     model: LangIdModelProtocol,
 ) -> Callable[[str], bool]:
@@ -206,28 +205,6 @@ def _default_build_lang_script_filter(
     from turkic_api.core.langid import build_lang_script_filter as _build
 
     return _build(target_lang=target_lang, script=script, threshold=threshold, model=model)
-
-
-def _default_decode_required_literal(
-    val: JSONValue,
-    field: str,
-    allowed: frozenset[str],
-) -> str:
-    """Production implementation - uses real validator."""
-    from turkic_api.api.validators import _decode_required_literal as _decode
-
-    return _decode(val, field, allowed)
-
-
-def _default_decode_optional_literal(
-    val: JSONValue,
-    field: str,
-    allowed: frozenset[str],
-) -> str | None:
-    """Production implementation - uses real validator."""
-    from turkic_api.api.validators import _decode_optional_literal as _decode
-
-    return _decode(val, field, allowed)
 
 
 def _default_path_exists(path: Path) -> bool:
@@ -270,8 +247,6 @@ __all__ = [
     "_default_build_lang_script_filter",
     "_default_data_bank_downloader_factory",
     "_default_data_bank_uploader_factory",
-    "_default_decode_optional_literal",
-    "_default_decode_required_literal",
     "_default_ensure_corpus_file",
     "_default_get_env",
     "_default_langid_download",

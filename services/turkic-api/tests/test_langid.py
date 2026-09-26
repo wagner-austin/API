@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from tests.conftest import make_probs
 from turkic_api import _test_hooks
 from turkic_api.core import langid as lid
+from turkic_api.core.models import Script
 
 
 def test_build_lang_filter_with_threshold() -> None:
@@ -35,8 +36,9 @@ def test_build_lang_script_filter_match_and_mismatch() -> None:
             return (("__label__eng",), make_probs(0.99))
 
     model = _Model()
-    # Script normalized from lower-case
-    keep = lid.build_lang_script_filter(target_lang="kk", script="latn", threshold=0.5, model=model)
+    keep = lid.build_lang_script_filter(
+        target_lang="kk", script=Script.LATN, threshold=0.5, model=model
+    )
     assert keep("text latn") is True
     assert keep("text cyrl") is False  # script mismatch -> return False
     # Lang mismatch -> return False
@@ -44,17 +46,6 @@ def test_build_lang_script_filter_match_and_mismatch() -> None:
     # No script filter
     keep2 = lid.build_lang_script_filter(target_lang="kk", script=None, threshold=0.5, model=model)
     assert keep2("text latn") is True
-
-
-def test_build_lang_script_filter_blank_script_treated_as_none() -> None:
-    class _Model:
-        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
-            return (("__label__kaz_Latn",), make_probs(0.99))
-
-    model = _Model()
-    keep = lid.build_lang_script_filter(target_lang="kk", script="   ", threshold=0.5, model=model)
-    # Blank script should be treated as None (no script gating)
-    assert keep("anything") is True
 
 
 def test_get_fasttext_model_factory() -> None:

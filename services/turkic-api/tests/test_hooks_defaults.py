@@ -67,7 +67,7 @@ def test_default_local_corpus_factory(tmp_path: Path) -> None:
 
 def test_default_ensure_corpus_file_calls_real_impl(tmp_path: Path) -> None:
     """Test _default_ensure_corpus_file delegates to real implementation."""
-    from turkic_api.core.models import ProcessSpec
+    from turkic_api.core.models import Language, ProcessSpec, Source
 
     # Set up a fake stream hook to avoid network
     orig = _test_hooks.stream_oscar_hook
@@ -78,8 +78,8 @@ def test_default_ensure_corpus_file_calls_real_impl(tmp_path: Path) -> None:
     _test_hooks.stream_oscar_hook = _stub
 
     spec = ProcessSpec(
-        source="oscar",
-        language="kk",
+        source=Source.OSCAR,
+        language=Language.KK,
         max_sentences=1,
         transliterate=True,
         confidence_threshold=0.0,
@@ -234,27 +234,6 @@ def test_default_stream_hooks_delegate_to_real() -> None:
     assert callable(_test_hooks._default_stream_oscar)
     assert callable(_test_hooks._default_stream_wikipedia_xml)
     assert callable(_test_hooks._default_stream_culturax)
-
-
-def test_default_decode_required_literal() -> None:
-    """Test _default_decode_required_literal calls real validator."""
-    result = _test_hooks._default_decode_required_literal(
-        "oscar", "source", frozenset({"oscar", "wikipedia"})
-    )
-    assert result == "oscar"
-
-
-def test_default_decode_optional_literal() -> None:
-    """Test _default_decode_optional_literal calls real validator."""
-    result = _test_hooks._default_decode_optional_literal(
-        "Latn", "script", frozenset({"Latn", "Cyrl"})
-    )
-    assert result == "Latn"
-
-    result_none = _test_hooks._default_decode_optional_literal(
-        None, "script", frozenset({"Latn", "Cyrl"})
-    )
-    assert result_none is None
 
 
 def test_default_wikipedia_requests_get_adapter() -> None:

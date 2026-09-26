@@ -21,10 +21,9 @@ def get_settings() -> Settings:
     return load_settings()
 
 
-SettingsDep = Annotated[Settings, Depends(get_settings)]
-
-
-def get_redis(settings: SettingsDep) -> Generator[RedisStrProto, None, None]:
+def get_redis(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Generator[RedisStrProto, None, None]:
     """Dependency: typed Redis (strings) using URL from settings; closes on teardown."""
     client = _test_hooks.redis_factory(settings["redis_url"])
     try:
@@ -38,7 +37,7 @@ def get_request_logger() -> LoggerProtocol:
     return get_logger(__name__)
 
 
-def get_queue(settings: SettingsDep) -> QueueProtocol:
+def get_queue(settings: Annotated[Settings, Depends(get_settings)]) -> QueueProtocol:
     """Dependency: RQ queue bound to a dedicated binary Redis connection.
 
     Uses shared platform helpers and a fixed queue name from platform_core.
