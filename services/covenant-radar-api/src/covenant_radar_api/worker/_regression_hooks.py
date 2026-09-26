@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 import numpy as np
 from covenant_ml.backends.regressor_registry import (
@@ -36,7 +36,7 @@ from covenant_ml.explainers.regression_registry import (
     default_regression_explainer_registry,
 )
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import RequestedDevice, RequestedPrecision
+from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressionTrainProgress, RegressorBackendName
 from numpy.typing import NDArray
 
@@ -307,7 +307,7 @@ class _CreateMLPRegressorObjectiveProto(Protocol):
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,
-        optimizer_name: Literal["adamw", "adam", "sgd"] = ...,
+        optimizer_name: OptimizerName = ...,
         epoch_callback: Callable[[RegressionTrainProgress], None] | None = ...,
     ) -> ObjectiveWithFeatureCount: ...
 

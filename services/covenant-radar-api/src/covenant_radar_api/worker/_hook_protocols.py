@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 import numpy as np
 from covenant_ml.backends.registry import (
@@ -28,6 +28,7 @@ from covenant_ml.optimizer.types import (
 )
 from covenant_ml.types import (
     BackendName,
+    OptimizerName,
     PredictorProtocol,
     RequestedDevice,
     RequestedPrecision,
@@ -236,7 +237,7 @@ class _CreateMLPObjectiveProto(Protocol):
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,
-        optimizer_name: Literal["adamw", "adam", "sgd"] = ...,
+        optimizer_name: OptimizerName = ...,
         epoch_callback: Callable[[TrainProgress], None] | None = ...,
     ) -> ObjectiveWithFeatureCount: ...
 

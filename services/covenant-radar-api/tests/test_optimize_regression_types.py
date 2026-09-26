@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import RequestedDevice, RequestedPrecision
+from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
@@ -141,7 +141,7 @@ class TestRegressionParseResultEncode:
             early_stopping_rounds=10,
             n_jobs=-1,
             precision=RequestedPrecision.FP32,
-            nn_optimizer="adamw",
+            nn_optimizer=OptimizerName.ADAMW,
             n_epochs=50,
             early_stopping_patience=10,
             sequence_length=5,
@@ -165,7 +165,7 @@ class TestRegressionParseResultEncode:
             early_stopping_rounds=10,
             n_jobs=-1,
             precision=RequestedPrecision.FP32,
-            nn_optimizer="adamw",
+            nn_optimizer=OptimizerName.ADAMW,
             n_epochs=50,
             early_stopping_patience=10,
             sequence_length=5,
@@ -399,14 +399,14 @@ class TestRegressionParseResultDecode:
         raw = self._make_valid_raw()
         raw["nn_optimizer"] = "adam"
         result = decode_unified_regression_optimize_parse_result(raw)
-        assert result["nn_optimizer"] == "adam"
+        assert result["nn_optimizer"] is OptimizerName.ADAM
 
     def test_nn_optimizer_sgd_accepted(self) -> None:
         """sgd nn_optimizer is accepted."""
         raw = self._make_valid_raw()
         raw["nn_optimizer"] = "sgd"
         result = decode_unified_regression_optimize_parse_result(raw)
-        assert result["nn_optimizer"] == "sgd"
+        assert result["nn_optimizer"] is OptimizerName.SGD
 
     def test_missing_bidirectional_raises(self) -> None:
         """Raises JSONTypeError when bidirectional is missing."""

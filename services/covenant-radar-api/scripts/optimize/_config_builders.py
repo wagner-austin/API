@@ -14,6 +14,7 @@ from covenant_ml.types import (
     LogRegSolver,
     LSTMConfig,
     MLPConfig,
+    OptimizerName,
     RandomForestConfig,
     RequestedDevice,
     RequestedPrecision,
@@ -69,7 +70,7 @@ def _build_mlp_config(
     return MLPConfig(
         device=RequestedDevice.AUTO,
         precision=RequestedPrecision.FP32,
-        optimizer="adamw",
+        optimizer=OptimizerName.ADAMW,
         hidden_sizes=tuple(hidden_size for _ in range(n_layers)),
         learning_rate=float_params["learning_rate"],
         batch_size=int_params["batch_size"],

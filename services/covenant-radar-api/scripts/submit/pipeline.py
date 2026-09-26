@@ -25,6 +25,7 @@ from covenant_ml.types import (
     LightGBMConfig,
     LSTMConfig,
     MLPConfig,
+    OptimizerName,
     RequestedDevice,
     RequestedPrecision,
     TrainConfig,
@@ -253,7 +254,7 @@ def _build_mlp_config(config: SubmitConfig) -> MLPConfig:
     return MLPConfig(
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        optimizer="adamw",
+        optimizer=OptimizerName.ADAMW,
         hidden_sizes=(256, 128, 64),
         learning_rate=config["learning_rate"],
         batch_size=256,

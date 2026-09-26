@@ -10,10 +10,10 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import RequestedDevice, RequestedPrecision
+from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONObject,
@@ -25,6 +25,7 @@ from covenant_radar_api.worker.optimize_field_decoders import (
     _require_device,
     _require_feature_preset,
     _require_int,
+    _require_nn_optimizer,
     _require_precision,
     _require_str,
 )
@@ -33,32 +34,6 @@ from covenant_radar_api.worker.optimize_regression_results import _require_regre
 # =============================================================================
 # Shared Validation Helpers (private, regression-specific)
 # =============================================================================
-
-
-def _require_nn_optimizer(
-    raw: JSONObject,
-) -> Literal["adamw", "adam", "sgd"]:
-    """Extract and validate nn_optimizer from JSON object.
-
-    Args:
-        raw: JSON object.
-
-    Returns:
-        NN optimizer literal.
-
-    Raises:
-        JSONTypeError: If nn_optimizer field is invalid.
-    """
-    val = raw.get("nn_optimizer")
-    if val is None:
-        raise JSONTypeError("Missing required field 'nn_optimizer'")
-    if val == "adamw":
-        return "adamw"
-    if val == "adam":
-        return "adam"
-    if val == "sgd":
-        return "sgd"
-    raise JSONTypeError("Field 'nn_optimizer' must be one of: adamw, adam, sgd")
 
 
 def _require_bool(raw: JSONObject, key: str) -> bool:
@@ -123,7 +98,7 @@ class UnifiedRegressionOptimizeParseResult(TypedDict, total=True):
     early_stopping_rounds: int
     n_jobs: int
     precision: RequestedPrecision
-    nn_optimizer: Literal["adamw", "adam", "sgd"]
+    nn_optimizer: OptimizerName
     n_epochs: int
     early_stopping_patience: int
     sequence_length: int

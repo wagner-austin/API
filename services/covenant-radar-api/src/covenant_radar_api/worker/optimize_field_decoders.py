@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
+from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -129,14 +127,14 @@ def _require_precision(raw: JSONObject) -> RequestedPrecision:
     return precision
 
 
-def _require_nn_optimizer(raw: JSONObject) -> Literal["adamw", "adam", "sgd"]:
+def _require_nn_optimizer(raw: JSONObject) -> OptimizerName:
     """Extract and validate nn_optimizer from JSON object.
 
     Args:
         raw: JSON object.
 
     Returns:
-        NN optimizer literal.
+        The OptimizerName member the field names.
 
     Raises:
         JSONTypeError: If nn_optimizer field is invalid.
@@ -144,13 +142,10 @@ def _require_nn_optimizer(raw: JSONObject) -> Literal["adamw", "adam", "sgd"]:
     val = raw.get("nn_optimizer")
     if val is None:
         raise JSONTypeError("Missing required field 'nn_optimizer'")
-    if val == "adamw":
-        return "adamw"
-    if val == "adam":
-        return "adam"
-    if val == "sgd":
-        return "sgd"
-    raise JSONTypeError("Field 'nn_optimizer' must be one of: adamw, adam, sgd")
+    optimizer = find_member(val, OptimizerName) if isinstance(val, str) else None
+    if optimizer is None:
+        raise JSONTypeError("Field 'nn_optimizer' must be one of: adamw, adam, sgd")
+    return optimizer
 
 
 def _require_int(raw: JSONObject, key: str) -> int:

@@ -19,6 +19,7 @@ from covenant_ml.datasets import (
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.types import (
     BackendName,
+    OptimizerName,
 )
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -167,7 +168,7 @@ class TestParseOptimizeConfig:
         assert result["early_stopping_rounds"] == 10
         assert result["n_jobs"] == -1
         assert result["precision"] == "fp32"
-        assert result["nn_optimizer"] == "adamw"
+        assert result["nn_optimizer"] is OptimizerName.ADAMW
         assert result["n_epochs"] == 50
         assert result["early_stopping_patience"] == 10
         assert result["sequence_length"] == 5
@@ -204,7 +205,7 @@ class TestParseOptimizeConfig:
         assert result["early_stopping_rounds"] == 20
         assert result["n_jobs"] == 4
         assert result["precision"] == "fp16"
-        assert result["nn_optimizer"] == "adam"
+        assert result["nn_optimizer"] is OptimizerName.ADAM
         assert result["n_epochs"] == 100
         assert result["early_stopping_patience"] == 15
         assert result["sequence_length"] == 10

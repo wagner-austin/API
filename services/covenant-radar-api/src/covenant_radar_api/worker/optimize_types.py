@@ -12,7 +12,7 @@ from typing import Literal, Protocol, TypedDict
 
 from covenant_ml.datasets.types import LoadPhase
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
+from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -148,7 +148,7 @@ class UnifiedOptimizeParseResult(TypedDict, total=True):
     early_stopping_rounds: int
     n_jobs: int
     precision: RequestedPrecision
-    nn_optimizer: Literal["adamw", "adam", "sgd"]
+    nn_optimizer: OptimizerName
     n_epochs: int
     early_stopping_patience: int
     sequence_length: int

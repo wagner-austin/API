@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from covenant_ml.types import RequestedDevice, RequestedPrecision
+from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._hook_defaults import (
@@ -200,7 +200,7 @@ class TestRealObjectiveFactory:
             early_stopping_rounds=2,
             n_jobs=1,
             precision=RequestedPrecision.FP32,
-            nn_optimizer="adamw",
+            nn_optimizer=OptimizerName.ADAMW,
             n_epochs=2,
             early_stopping_patience=2,
             sequence_length=3,

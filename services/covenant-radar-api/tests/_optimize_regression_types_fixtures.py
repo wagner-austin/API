@@ -7,7 +7,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import RequestedDevice, RequestedPrecision
+from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 
 from covenant_radar_api.worker.optimize_regression_results import (
@@ -42,7 +42,7 @@ def _make_regression_parse_result(
         early_stopping_rounds=10,
         n_jobs=-1,
         precision=RequestedPrecision.FP32,
-        nn_optimizer="adamw",
+        nn_optimizer=OptimizerName.ADAMW,
         n_epochs=50,
         early_stopping_patience=10,
         sequence_length=5,

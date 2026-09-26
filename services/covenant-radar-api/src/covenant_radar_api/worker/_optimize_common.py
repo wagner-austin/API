@@ -17,7 +17,7 @@ from covenant_ml.datasets import LoadedDataset
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer import OptimizationConfig, make_default_optimization_config
-from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
+from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 from platform_core.members import find_member
 
@@ -47,29 +47,26 @@ def parse_precision(raw: JSONValue | None) -> RequestedPrecision:
     return precision
 
 
-def parse_nn_optimizer(raw: JSONValue | None) -> Literal["adamw", "adam", "sgd"]:
-    """Parse neural network optimizer, defaulting to 'adamw'.
+def parse_nn_optimizer(raw: JSONValue | None) -> OptimizerName:
+    """Parse neural network optimizer, defaulting to ADAMW.
 
     Args:
         raw: Raw JSON value.
 
     Returns:
-        NN optimizer literal.
+        The OptimizerName member the value names.
 
     Raises:
         JSONTypeError: If value is not a valid optimizer.
     """
     if raw is None:
-        return "adamw"
+        return OptimizerName.ADAMW
     if not isinstance(raw, str):
         raise JSONTypeError("optimizer must be a string")
-    if raw == "adamw":
-        return "adamw"
-    if raw == "adam":
-        return "adam"
-    if raw == "sgd":
-        return "sgd"
-    raise JSONTypeError("optimizer must be one of: adamw, adam, sgd")
+    optimizer = find_member(raw, OptimizerName)
+    if optimizer is None:
+        raise JSONTypeError("optimizer must be one of: adamw, adam, sgd")
+    return optimizer
 
 
 def parse_bidirectional(raw: JSONValue | None) -> bool:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.types import OptimizerName
 from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
 
 from covenant_radar_api.worker._train_external_parsers import (
@@ -156,7 +157,7 @@ class TestMLPConfig:
         if result["backend"] != "mlp":
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "fp16"
-        assert result["config"]["optimizer"] == "adam"
+        assert result["config"]["optimizer"] is OptimizerName.ADAM
 
     def test_precision_bf16(self) -> None:
         """Parse MLP config with bf16 precision."""
@@ -179,7 +180,7 @@ class TestMLPConfig:
         if result["backend"] != "mlp":
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "bf16"
-        assert result["config"]["optimizer"] == "sgd"
+        assert result["config"]["optimizer"] is OptimizerName.SGD
 
     def test_precision_auto(self) -> None:
         """Parse MLP config with auto precision."""

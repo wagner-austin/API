@@ -107,7 +107,7 @@ LightGBMConfig(
 ### XGBoost
 ```python
 TrainConfig(
-    device="cpu",
+    device=RequestedDevice.CPU,
     learning_rate=0.05,
     max_depth=-1,
     n_estimators=1000,
@@ -122,9 +122,9 @@ TrainConfig(
 ### MLP
 ```python
 MLPConfig(
-    device="cpu",
-    precision="fp32",
-    optimizer="adamw",
+    device=RequestedDevice.CPU,
+    precision=RequestedPrecision.FP32,
+    optimizer=OptimizerName.ADAMW,
     hidden_sizes=(256, 128, 64),
     learning_rate=0.001,
     batch_size=256,
@@ -137,8 +137,8 @@ MLPConfig(
 ### LSTM
 ```python
 LSTMConfig(
-    device="cpu",
-    precision="fp32",
+    device=RequestedDevice.CPU,
+    precision=RequestedPrecision.FP32,
     hidden_size=128,
     num_layers=2,
     dropout=0.3,

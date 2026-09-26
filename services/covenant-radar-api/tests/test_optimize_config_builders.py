@@ -15,7 +15,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import GrowthStrategy
+from covenant_ml.types import GrowthStrategy, OptimizerName
 from scripts.optimize._config_builders import (
     _build_cleargbm_config,
     _build_lightgbm_config,
@@ -69,7 +69,7 @@ class TestBuildMLPConfig:
         assert config["dropout"] == 0.2
         assert config["learning_rate"] == 0.001
         assert config["precision"] == "fp32"
-        assert config["optimizer"] == "adamw"
+        assert config["optimizer"] is OptimizerName.ADAMW
         assert config["n_epochs"] == 50
         assert config["early_stopping_patience"] == 10
 

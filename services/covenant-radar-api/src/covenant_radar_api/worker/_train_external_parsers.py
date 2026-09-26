@@ -15,6 +15,7 @@ from covenant_ml.types import (
     LogRegConfig,
     LSTMConfig,
     MLPConfig,
+    OptimizerName,
     RandomForestConfig,
     RequestedDevice,
     RequestedPrecision,
@@ -142,28 +143,25 @@ def _parse_xgboost_config(
 # =============================================================================
 
 
-def _parse_mlp_optimizer(
-    raw: JSONObject,
-) -> Literal["adamw", "adam", "sgd"]:
+def _parse_mlp_optimizer(raw: JSONObject) -> OptimizerName:
     """Parse and validate MLP optimizer field.
 
     Args:
         raw: JSON object containing optimizer field.
 
     Returns:
-        Optimizer literal.
+        The OptimizerName member the field names.
 
     Raises:
         JSONTypeError: If value is not a valid optimizer.
     """
     optimizer_val = raw.get("optimizer")
-    if optimizer_val == "adamw":
-        return "adamw"
-    if optimizer_val == "adam":
-        return "adam"
-    if optimizer_val == "sgd":
-        return "sgd"
-    raise JSONTypeError("optimizer must be adamw, adam, or sgd")
+    optimizer = (
+        find_member(optimizer_val, OptimizerName) if isinstance(optimizer_val, str) else None
+    )
+    if optimizer is None:
+        raise JSONTypeError("optimizer must be adamw, adam, or sgd")
+    return optimizer
 
 
 def _parse_mlp_hidden_sizes(raw: JSONObject) -> tuple[int, ...]:

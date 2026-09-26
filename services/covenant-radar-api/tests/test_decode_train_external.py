@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.types import OptimizerName
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode import (
@@ -85,7 +86,7 @@ class TestParseExternalTrainRequest:
         assert result["config"]["dropout"] == 0.2
         assert result["config"]["hidden_sizes"] == (64, 32)
         assert result["config"]["precision"] == "fp32"
-        assert result["config"]["optimizer"] == "adamw"
+        assert result["config"]["optimizer"] is OptimizerName.ADAMW
         assert result["config"]["random_state"] == 42
         assert result["config"]["early_stopping_patience"] == 10
         assert result["config"]["device"] == "auto"
@@ -112,7 +113,7 @@ class TestParseExternalTrainRequest:
         assert result["backend"] == "mlp"
         assert result["config"]["device"] == "cuda"
         assert result["config"]["precision"] == "fp16"
-        assert result["config"]["optimizer"] == "adam"
+        assert result["config"]["optimizer"] is OptimizerName.ADAM
         assert result["config"]["hidden_sizes"] == (128, 64, 32)
 
     def test_mlp_request_with_bf16_and_sgd(self) -> None:
@@ -136,7 +137,7 @@ class TestParseExternalTrainRequest:
         if result["backend"] != "mlp":
             raise AssertionError("Expected mlp backend")
         assert result["config"]["precision"] == "bf16"
-        assert result["config"]["optimizer"] == "sgd"
+        assert result["config"]["optimizer"] is OptimizerName.SGD
 
     def test_mlp_request_with_auto_precision(self) -> None:
         """Test parsing MLP request with auto precision."""

@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from covenant_ml.types import OptimizerName
 from platform_core.json_utils import (
     JSONTypeError,
     dump_json_str,
@@ -70,7 +71,7 @@ class TestParseRegressionOptimizeConfig:
         assert result["early_stopping_rounds"] == 10
         assert result["n_jobs"] == -1
         assert result["precision"] == "fp32"
-        assert result["nn_optimizer"] == "adamw"
+        assert result["nn_optimizer"] is OptimizerName.ADAMW
         assert result["n_epochs"] == 50
         assert result["early_stopping_patience"] == 10
         assert result["sequence_length"] == 5
@@ -107,7 +108,7 @@ class TestParseRegressionOptimizeConfig:
         assert result["early_stopping_rounds"] == 20
         assert result["n_jobs"] == 4
         assert result["precision"] == "fp16"
-        assert result["nn_optimizer"] == "adam"
+        assert result["nn_optimizer"] is OptimizerName.ADAM
         assert result["n_epochs"] == 100
         assert result["early_stopping_patience"] == 20
         assert result["sequence_length"] == 10
@@ -121,10 +122,10 @@ class TestParseRegressionOptimizeConfig:
         'optimizer'. Because parse_nn_optimizer defaults None to 'adamw', a
         client-supplied optimizer was silently discarded with no error.
         """
-        for wire_value in ("adam", "sgd"):
-            config_json = _make_config_json(backend="mlp_reg", optimizer=wire_value)
+        for member in (OptimizerName.ADAM, OptimizerName.SGD):
+            config_json = _make_config_json(backend="mlp_reg", optimizer=member.value)
             result = _parse_regression_optimize_config(config_json)
-            assert result["nn_optimizer"] == wire_value
+            assert result["nn_optimizer"] is member
 
     def test_all_four_backends_accepted(self) -> None:
         """All 4 regressor backends are accepted."""

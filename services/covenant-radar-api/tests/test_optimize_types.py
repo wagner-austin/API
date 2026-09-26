@@ -13,7 +13,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
+from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from covenant_radar_api.worker.optimize_types import (
@@ -99,12 +99,12 @@ class TestUnifiedOptimizeParseResultEncodeDecode:
 
     def test_encode_all_nn_optimizers(self) -> None:
         """All nn_optimizer values encode and decode correctly."""
-        for opt in ("adamw", "adam", "sgd"):
+        for opt in OptimizerName:
             original = _make_parse_result()
             updated = UnifiedOptimizeParseResult(**{**original, "nn_optimizer": opt})
             encoded = encode_unified_optimize_parse_result(updated)
             decoded = decode_unified_optimize_parse_result(encoded)
-            assert decoded["nn_optimizer"] == opt
+            assert decoded["nn_optimizer"] is opt
 
     def test_encode_bidirectional_true(self) -> None:
         """bidirectional=True round-trips correctly."""

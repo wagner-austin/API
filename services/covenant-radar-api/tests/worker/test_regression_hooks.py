@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from covenant_ml.types import RequestedDevice, RequestedPrecision
+from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 
@@ -152,7 +152,7 @@ class TestRegressorObjectiveFactoryHook:
             early_stopping_rounds=2,
             n_jobs=1,
             precision=RequestedPrecision.FP32,
-            nn_optimizer="adamw",
+            nn_optimizer=OptimizerName.ADAMW,
             n_epochs=5,
             early_stopping_patience=2,
             sequence_length=3,
