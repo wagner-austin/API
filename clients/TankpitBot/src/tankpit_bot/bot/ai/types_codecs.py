@@ -31,14 +31,8 @@ from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     PathStepDict,
 )
-from tankpit_bot.fleetshare.codecs import require_engagement_doctrine, require_fleet_role
-from tankpit_bot.types.modes import (
-    AI_MODES,
-    AIMode,
-    is_valid_ai_mode_state,
-    require_ai_mode,
-    require_ai_mode_state,
-)
+from tankpit_bot.fleetshare.types import EngagementDoctrine, FleetRole
+from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
 
 # =========================================================================
 # BehaviorScoreDict codecs
@@ -241,8 +235,8 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "priority_target_name": config["priority_target_name"],
         "human_target_min_rank": config["human_target_min_rank"],
         "human_target_max_rank": config["human_target_max_rank"],
-        "role": config["role"],
-        "doctrine": config["doctrine"],
+        "role": config["role"].value,
+        "doctrine": config["doctrine"].value,
     }
 
 
@@ -303,8 +297,8 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         priority_target_name=require_str(data, "priority_target_name"),
         human_target_min_rank=require_int(data, "human_target_min_rank"),
         human_target_max_rank=require_int(data, "human_target_max_rank"),
-        role=require_fleet_role(data, "role"),
-        doctrine=require_engagement_doctrine(data, "doctrine"),
+        role=require_member(data, "role", FleetRole),
+        doctrine=require_member(data, "doctrine", EngagementDoctrine),
     )
 
 
@@ -324,11 +318,11 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
     """
     killed: JSONValue = dict(state["killed_tank_ids"])
     manual_mode = state["manual_mode"]
-    manual_value: JSONValue = manual_mode if manual_mode is not None else None
+    manual_value: JSONValue = manual_mode.value if manual_mode is not None else None
     return {
         "config": encode_ai_config(state["config"]),
-        "mode": state["mode"],
-        "mode_state": state["mode_state"],
+        "mode": state["mode"].value,
+        "mode_state": state["mode_state"].value,
         "mode_started_ms": state["mode_started_ms"],
         "last_scan_ms": state["last_scan_ms"],
         "last_shoot_ms": state["last_shoot_ms"],
@@ -388,20 +382,15 @@ def _decode_manual_mode(data: JSONObject) -> AIMode | None:
     Raises:
         KeyError: If the field is absent — every valid AIStateDict
             carries ``manual_mode`` since 2026-07-11.
-        ValueError: If the value is a string outside :data:`AI_MODES`.
         JSONTypeError: If the value is present but neither ``None`` nor
-            a string.
+            a string, or is a string outside :class:`AIMode`.
     """
     if "manual_mode" not in data:
         raise KeyError("manual_mode")
     raw = data["manual_mode"]
     if raw is None:
         return None
-    validated = require_str(data, "manual_mode")
-    for mode in AI_MODES:
-        if validated == mode:
-            return mode
-    raise ValueError(f"manual_mode must be one of {AI_MODES} or null, got {validated!r}")
+    return require_member(data, "manual_mode", AIMode)
 
 
 def _decode_killed_tank_ids(data: JSONObject) -> dict[str, int]:
@@ -483,10 +472,10 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
     config_raw = data.get("config")
     if not isinstance(config_raw, dict):
         raise ValueError("config must be an object")
-    mode = require_ai_mode(data, "mode")
-    mode_state = require_ai_mode_state(data, "mode_state")
+    mode = require_member(data, "mode", AIMode)
+    mode_state = require_member(data, "mode_state", AIModeState)
     if not is_valid_ai_mode_state(mode, mode_state):
-        raise ValueError(f"mode_state {mode_state!r} is invalid for mode {mode!r}")
+        raise ValueError(f"mode_state {mode_state.value!r} is invalid for mode {mode.value!r}")
     return AIStateDict(
         config=decode_ai_config(config_raw),
         mode=mode,

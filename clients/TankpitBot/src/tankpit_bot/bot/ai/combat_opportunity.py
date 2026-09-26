@@ -32,6 +32,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_shoot_command
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
@@ -284,7 +285,7 @@ def collect_return_fire(ctx: DecideCtx, base_state: AIStateDict) -> TickDecision
         The return-fire decision, or ``None`` when no confirmed recent
         attacker has a legal immediate shot or the survival bars veto.
     """
-    if ctx.config["role"] == "gatherer":
+    if ctx.config["role"] is FleetRole.GATHERER:
         return None
     if base_state["break_escape_until_fuel"] > 0:
         # A holding break latch means the tick BELONGS to the escape

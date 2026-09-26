@@ -42,6 +42,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+from tankpit_bot.types.modes import AIModeState
 
 
 def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
@@ -54,7 +55,7 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
         Mode-owned hunt decision.
     """
     ctx = release_break_latch(ctx)
-    if ctx.mode_state == "CONFIRM_KILL":
+    if ctx.mode_state is AIModeState.CONFIRM_KILL:
         return _decide_hunt_confirm_kill(ctx)
     escape = continue_break_escape(ctx)
     if escape is not None:
@@ -62,13 +63,13 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
     broken = assess_locked_engagement(ctx)
     if broken is not None:
         return broken
-    if ctx.mode_state == "SCAN_ON_LANDING":
+    if ctx.mode_state is AIModeState.SCAN_ON_LANDING:
         return _decide_hunt_scan_on_landing(ctx)
-    if ctx.mode_state == "ENGAGE":
+    if ctx.mode_state is AIModeState.ENGAGE:
         return _decide_hunt_engage(ctx)
-    if ctx.mode_state == "CLOSE":
+    if ctx.mode_state is AIModeState.CLOSE:
         return _decide_hunt_close(ctx)
-    if ctx.mode_state == "REFRESH":
+    if ctx.mode_state is AIModeState.REFRESH:
         return _decide_hunt_refresh(ctx)
     return decide_hunt_acquire(ctx)
 

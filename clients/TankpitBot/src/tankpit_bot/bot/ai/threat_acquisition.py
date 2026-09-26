@@ -57,13 +57,13 @@ def _doctrine_rejection_reason(
         (swarm, nobody engaged yet and the war-ready quorum is not
         standing), or ``None`` when the doctrine permits.
     """
-    if doctrine == "passive":
+    if doctrine is EngagementDoctrine.PASSIVE:
         return "doctrine_passive"
     sibling_engaged = tank["tank_id"] in ws.fleet_engaged_target_ids
-    if doctrine == "duelist":
+    if doctrine is EngagementDoctrine.DUELIST:
         return "duel_claimed" if sibling_engaged else None
     if (
-        doctrine == "swarm"
+        doctrine is EngagementDoctrine.SWARM
         and not sibling_engaged
         and 1 + ws.fleet_war_ready_count < SWARM_MUSTER_QUORUM
     ):
@@ -191,7 +191,7 @@ def find_acquisition_target(
     priority_target_name: str = "",
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
-    doctrine: EngagementDoctrine = "skirmish",
+    doctrine: EngagementDoctrine = EngagementDoctrine.SKIRMISH,
 ) -> EnemyThreatDict | None:
     """Pick the highest-priority map-fresh enemy the bot can afford.
 
@@ -310,7 +310,7 @@ def stale_human_exists(
     engagement_reserve_fuel: int,
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
-    doctrine: EngagementDoctrine = "skirmish",
+    doctrine: EngagementDoctrine = EngagementDoctrine.SKIRMISH,
 ) -> bool:
     """Return whether a pursuit-worthy human exists with STALE map data.
 
@@ -381,7 +381,7 @@ def find_relay_travel_targets(
     priority_target_name: str = "",
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
-    doctrine: EngagementDoctrine = "skirmish",
+    doctrine: EngagementDoctrine = EngagementDoctrine.SKIRMISH,
 ) -> list[EnemyThreatDict]:
     """Rank every map-fresh enemy that fails ONLY the affordability gate.
 

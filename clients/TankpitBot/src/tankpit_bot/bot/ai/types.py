@@ -108,7 +108,7 @@ class AIConfigDict(TypedDict):
             :data:`~tankpit_bot.fleetshare.types.EngagementDoctrine` —
             how it times human engagements (operator order
             2026-09-01). Wired from ``TANKPIT_DOCTRINE``; default
-            ``"skirmish"`` is the pre-doctrine behavior.
+            ``EngagementDoctrine.SKIRMISH`` is the pre-doctrine behavior.
     """
 
     fuel_low_threshold: int
@@ -159,8 +159,8 @@ def make_default_ai_config() -> AIConfigDict:
         priority_target_name="",
         human_target_min_rank=1,
         human_target_max_rank=8,
-        role="fighter",
-        doctrine="skirmish",
+        role=FleetRole.FIGHTER,
+        doctrine=EngagementDoctrine.SKIRMISH,
     )
 
 
@@ -453,8 +453,8 @@ def make_initial_ai_state(
     """
     return AIStateDict(
         config=config if config is not None else make_default_ai_config(),
-        mode="UNSET",
-        mode_state="",
+        mode=AIMode.UNSET,
+        mode_state=AIModeState.NONE,
         mode_started_ms=0,
         last_scan_ms=1,  # Non-zero so radar doesn't auto-fire on first tick
         last_shoot_ms=0,

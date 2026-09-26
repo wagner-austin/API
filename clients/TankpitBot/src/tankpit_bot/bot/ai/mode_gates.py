@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.tactics import (
 )
 from tankpit_bot.bot.ai.threat_primitives import human_combat_consented
 from tankpit_bot.bot.config import resolve_weapon_resume_slack
+from tankpit_bot.fleetshare.types import EngagementDoctrine, FleetRole
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.types.constants import TankLiveness
@@ -312,9 +313,9 @@ def _war_floor_applies(ctx: DecideCtx) -> bool:
         True when the relaxed bar serves a fight this bot may enter.
     """
     doctrine = ctx.config["doctrine"]
-    if doctrine == "skirmish":
+    if doctrine is EngagementDoctrine.SKIRMISH:
         return True
-    if doctrine != "swarm":
+    if doctrine is not EngagementDoctrine.SWARM:
         return False
     if any(
         human_id in ctx.ws.fleet_engaged_target_ids for human_id in _live_consented_human_ids(ctx)
@@ -355,7 +356,7 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
         minus the configured slack and extra radars are at least
         ``combat_radar_min(rank)``.
     """
-    if ctx.config["role"] == "gatherer":
+    if ctx.config["role"] is FleetRole.GATHERER:
         # The doctrinal backstop of the router's role gate
         # ([[fleet-coordination]]): a gatherer's ticks NEVER permit
         # hunting, whatever its inventory says — every yield-to-hunt

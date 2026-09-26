@@ -29,8 +29,8 @@ def clear_ai_mode(ai_state: AIStateDict) -> AIStateDict:
     return AIStateDict(
         **{
             **ai_state,
-            "mode": "UNSET",
-            "mode_state": "",
+            "mode": AIMode.UNSET,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 0,
         }
     )
@@ -59,8 +59,8 @@ def set_ai_mode(
     if not is_valid_ai_mode_state(mode, mode_state):
         raise ValueError(f"Invalid AI mode/state pair: {mode}/{mode_state}")
     started_ms = 0
-    if mode != "UNSET":
-        started_ms = ai_state["mode_started_ms"] if ai_state["mode"] == mode else timestamp_ms
+    if mode is not AIMode.UNSET:
+        started_ms = ai_state["mode_started_ms"] if ai_state["mode"] is mode else timestamp_ms
     return AIStateDict(
         **{
             **ai_state,
@@ -280,9 +280,11 @@ def make_hold_decision(
         Tick decision that dispatches nothing, keeps the tank armed,
         and stamps ``UNSET`` ownership onto the returned AI state.
     """
-    started_ms = timestamp_ms if ai_state["mode"] != "UNSET" else ai_state["mode_started_ms"]
+    started_ms = (
+        timestamp_ms if ai_state["mode"] is not AIMode.UNSET else ai_state["mode_started_ms"]
+    )
     desired = compute_desired_equipment(
-        "UNSET",
+        AIMode.UNSET,
         fuel,
         dual_shots_count=inventory["dual_shots"]["count"],
         homing_shots_count=inventory["homing_shots"]["count"],
@@ -299,8 +301,8 @@ def make_hold_decision(
         updated_ai_state=AIStateDict(
             **{
                 **ai_state,
-                "mode": "UNSET",
-                "mode_state": "",
+                "mode": AIMode.UNSET,
+                "mode_state": AIModeState.NONE,
                 "mode_started_ms": started_ms,
             }
         ),
@@ -320,23 +322,23 @@ def derive_hunt_mode_state(decision: TickDecisionDict) -> AIModeState:
     command_type = decision["command"]["cmd_type"]
     reason = decision["behavior"]["reason_kind"]
     has_locked_target = decision["updated_ai_state"]["combat_target_id"] != -1
-    if reason == "confirm_kill":
-        return "CONFIRM_KILL"
-    if reason == "scan_on_landing":
-        return "SCAN_ON_LANDING"
+    if reason is ReasonKind.CONFIRM_KILL:
+        return AIModeState.CONFIRM_KILL
+    if reason is ReasonKind.SCAN_ON_LANDING:
+        return AIModeState.SCAN_ON_LANDING
     if command_type == "shoot":
-        return "ENGAGE"
+        return AIModeState.ENGAGE
     if command_type in ("teleport", "move"):
         if has_locked_target:
-            return "CLOSE"
-        return "ACQUIRE"
+            return AIModeState.CLOSE
+        return AIModeState.ACQUIRE
     if command_type in ("map_open", "radar"):
-        if reason == "find_enemies":
-            return "ACQUIRE"
+        if reason is ReasonKind.FIND_ENEMIES:
+            return AIModeState.ACQUIRE
         if has_locked_target:
-            return "REFRESH"
-        return "ACQUIRE"
-    return "ACQUIRE"
+            return AIModeState.REFRESH
+        return AIModeState.ACQUIRE
+    return AIModeState.ACQUIRE
 
 
 def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
@@ -351,30 +353,30 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
     reason = decision["behavior"]["reason_kind"]
     command_type = decision["command"]["cmd_type"]
     if reason in (
-        "forage_radar",
-        "forage_sweep",
-        "scan_on_landing",
-        "desync_rescan",
-        "quad_sweep_shift",
-        "quad_sweep_radar",
+        ReasonKind.FORAGE_RADAR,
+        ReasonKind.FORAGE_SWEEP,
+        ReasonKind.SCAN_ON_LANDING,
+        ReasonKind.DESYNC_RESCAN,
+        ReasonKind.QUAD_SWEEP_SHIFT,
+        ReasonKind.QUAD_SWEEP_RADAR,
     ):
-        return "SENSE"
+        return AIModeState.SENSE
     if reason in (
-        "search_collect_local",
-        "ferry_scope_scout",
-        "gatherer_hold",
-        "forage_frontier_walk",
-        "forage_frontier_pan",
+        ReasonKind.SEARCH_COLLECT_LOCAL,
+        ReasonKind.FERRY_SCOPE_SCOUT,
+        ReasonKind.GATHERER_HOLD,
+        ReasonKind.FORAGE_FRONTIER_WALK,
+        ReasonKind.FORAGE_FRONTIER_PAN,
     ):
         # The free viewport pan is a SEARCH beat: the tick looks at
         # water it cannot yet believe in, exactly like a local search
         # looks at ground ([[viewport-shift-protocol]] scope scout).
         # The gatherer's exhausted hold is the same beat between
         # searches -- waiting one window for the world to change.
-        return "SEARCH"
+        return AIModeState.SEARCH
     if command_type in ("pickup_fuel", "pickup_equipment"):
-        return "PICKUP"
-    return "APPROACH"
+        return AIModeState.PICKUP
+    return AIModeState.APPROACH
 
 
 __all__ = [

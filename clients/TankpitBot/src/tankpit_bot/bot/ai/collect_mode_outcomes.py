@@ -44,6 +44,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_hold_command, make_radar_command
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -110,7 +111,7 @@ def exhausted_collect_outcome(
         SessionExitError: When the session has no productive action.
     """
     if ctx.fuel > ctx.fuel_low_floor:
-        if ctx.config["role"] == "gatherer":
+        if ctx.config["role"] is FleetRole.GATHERER:
             # A gatherer CANNOT hunt by role, not by shortage
             # ([[fleet-coordination]]) -- an exhausted cascade is
             # "done here", never "marooned". Hold one window as a
