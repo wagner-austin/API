@@ -14,7 +14,6 @@ from covenant_radar_api.worker._optimize_common import (
     optional_int,
     parse_backend_name,
     parse_device,
-    parse_feature_preset,
 )
 
 
@@ -46,40 +45,6 @@ class TestParseDevice:
         """Non-string input raises JSONTypeError."""
         with pytest.raises(JSONTypeError, match="device must be a string"):
             parse_device(123)
-
-
-class TestParseFeaturePreset:
-    """Tests for parse_feature_preset function."""
-
-    def test_parse_feature_preset_defaults_to_none(self) -> None:
-        """None input returns 'none'."""
-        assert parse_feature_preset(None) == "none"
-
-    def test_parse_feature_preset_accepts_none(self) -> None:
-        """'none' is accepted."""
-        assert parse_feature_preset("none") == "none"
-
-    def test_parse_feature_preset_accepts_log_only(self) -> None:
-        """'log_only' is accepted."""
-        assert parse_feature_preset("log_only") == "log_only"
-
-    def test_parse_feature_preset_accepts_ratios_only(self) -> None:
-        """'ratios_only' is accepted."""
-        assert parse_feature_preset("ratios_only") == "ratios_only"
-
-    def test_parse_feature_preset_accepts_full(self) -> None:
-        """'full' is accepted."""
-        assert parse_feature_preset("full") == "full"
-
-    def test_parse_feature_preset_rejects_invalid_string(self) -> None:
-        """Invalid feature_preset string raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="feature_preset must be one of"):
-            parse_feature_preset("invalid")
-
-    def test_parse_feature_preset_rejects_non_string(self) -> None:
-        """Non-string input raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
-            parse_feature_preset(123)
 
 
 class TestParseBackendName:

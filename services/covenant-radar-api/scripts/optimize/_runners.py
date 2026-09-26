@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from covenant_ml.benchmarking.provenance import benchmark_fingerprint
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from platform_core.config import _test_hooks as config_env
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
@@ -29,7 +30,7 @@ from scripts.optimize._formatters import (
     format_loading_progress,
     format_trial_progress,
 )
-from scripts.optimize.cli import DatasetName, FeaturePreset
+from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import (
     OptimizationHistory,
     UnifiedHistoryEntry,

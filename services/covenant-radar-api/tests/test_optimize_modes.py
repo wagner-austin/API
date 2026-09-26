@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize._formatters import format_loading_progress
-from scripts.optimize.cli import DatasetName, FeaturePreset
+from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import UnifiedHistoryEntry
 from scripts.optimize.modes import (
     _print_multi_dataset_summary,
@@ -36,7 +37,7 @@ def _make_optimization_result(
         dataset=dataset,
         n_samples=n_samples,
         n_features=n_features,
-        feature_preset="full",
+        feature_preset=FeaturePreset.FULL,
         n_trials_complete=50,
         n_trials_pruned=5,
         n_trials_failed=0,
@@ -204,10 +205,10 @@ class TestPrintPresetComparisonSummary:
     def test_executes_with_all_presets(self) -> None:
         """Test function executes with all four presets."""
         results: list[tuple[FeaturePreset, float, int, float]] = [
-            ("none", 0.80, 50, 30.0),
-            ("log_only", 0.90, 60, 35.0),
-            ("ratios_only", 0.85, 70, 40.0),
-            ("full", 0.88, 100, 50.0),
+            (FeaturePreset.NONE, 0.80, 50, 30.0),
+            (FeaturePreset.LOG_ONLY, 0.90, 60, 35.0),
+            (FeaturePreset.RATIOS_ONLY, 0.85, 70, 40.0),
+            (FeaturePreset.FULL, 0.88, 100, 50.0),
         ]
 
         _print_preset_comparison_summary(results)
@@ -215,10 +216,10 @@ class TestPrintPresetComparisonSummary:
     def test_executes_with_tied_aucs(self) -> None:
         """Test function executes with tied AUC values."""
         results: list[tuple[FeaturePreset, float, int, float]] = [
-            ("none", 0.85, 50, 30.0),
-            ("log_only", 0.85, 60, 35.0),
-            ("ratios_only", 0.85, 70, 40.0),
-            ("full", 0.85, 100, 50.0),
+            (FeaturePreset.NONE, 0.85, 50, 30.0),
+            (FeaturePreset.LOG_ONLY, 0.85, 60, 35.0),
+            (FeaturePreset.RATIOS_ONLY, 0.85, 70, 40.0),
+            (FeaturePreset.FULL, 0.85, 100, 50.0),
         ]
 
         _print_preset_comparison_summary(results)

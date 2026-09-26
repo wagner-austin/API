@@ -23,8 +23,8 @@ from covenant_radar_api.api.decode_regression import (
     _optional_int,
     _parse_body_as_dict,
     _parse_device,
-    _parse_optimize_feature_preset,
 )
+from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 
 DatasetName = Literal["taiwan", "us", "polish"]
 
@@ -201,7 +201,7 @@ def parse_optimize_request(body: bytes) -> UnifiedOptimizeApiParseResult:
         timeout_seconds = timeout_raw
 
     device = _parse_device(raw.get("device"))
-    feature_preset = _parse_optimize_feature_preset(raw.get("feature_preset"))
+    feature_preset = parse_feature_preset(raw.get("feature_preset"))
     random_state = _optional_int(raw, "random_state", 42)
 
     return UnifiedOptimizeApiParseResult(

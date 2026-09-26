@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
@@ -37,7 +38,7 @@ def _make_regression_parse_result(
         n_trials=50,
         timeout_seconds=None,
         device=RequestedDevice.CPU,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         random_state=42,
         early_stopping_rounds=10,
         n_jobs=-1,
@@ -67,7 +68,7 @@ def _make_regression_optimization_result(
         dataset="us_bankruptcy",
         n_samples=1000,
         n_features=18,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_trials_complete=50,
         n_trials_pruned=5,
         n_trials_failed=0,

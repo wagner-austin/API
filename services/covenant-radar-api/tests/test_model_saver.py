@@ -22,6 +22,7 @@ from covenant_ml.backends.registry import (
     ClassifierRegistry,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetRegistry, LoadedDataset
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName, TrainOutcome
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import LogLevel
@@ -271,7 +272,7 @@ class TestSaveBestModel:
         save_result: SaveModelResult = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -304,7 +305,7 @@ class TestSaveBestModel:
         save_result: SaveModelResult = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -331,7 +332,7 @@ class TestSaveBestModel:
         save_result: SaveModelResult = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -349,7 +350,7 @@ class TestSaveBestModel:
         save_result = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -378,7 +379,7 @@ class TestSaveBestModel:
         save_result = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -400,7 +401,7 @@ class TestSaveBestModel:
         save_result = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -440,7 +441,7 @@ class TestSaveBestModel:
             save_result = save_best_model(
                 result=result,
                 dataset=dataset,
-                feature_preset="full",
+                feature_preset=FeaturePreset.FULL,
                 project_root=tmp_path,
             )
 
@@ -492,7 +493,7 @@ class TestSaveBestModel:
             save_result = save_best_model(
                 result=result,
                 dataset="taiwan",
-                feature_preset="full",
+                feature_preset=FeaturePreset.FULL,
                 project_root=tmp_path,
             )
 
@@ -518,7 +519,7 @@ class TestSaveBestModel:
         save_result = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 

@@ -8,6 +8,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from platform_core.json_utils import require_float, require_int, require_str
 from platform_core.rich_logging import (
@@ -23,7 +24,7 @@ from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_string_params,
 )
 from scripts._test_hooks import UnifiedOptimizationResult
-from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName, FeaturePreset
+from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName
 from scripts.optimize.history import UnifiedHistoryEntry
 
 # =============================================================================

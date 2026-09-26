@@ -7,7 +7,7 @@ All encode/decode/require functions are round-trip tested.
 from __future__ import annotations
 
 import pytest
-from covenant_ml.features import FeaturePreset
+from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
@@ -104,8 +104,7 @@ class TestRegressionParseResultEncode:
 
     def test_round_trip_all_feature_presets(self) -> None:
         """Round-trip works for all feature presets."""
-        presets: list[FeaturePreset] = ["none", "log_only", "ratios_only", "full"]
-        for preset in presets:
+        for preset in NON_TEMPORAL_FEATURE_PRESETS:
             original = _make_regression_parse_result()
             original_with_preset = UnifiedRegressionOptimizeParseResult(
                 backend=original["backend"],
@@ -136,7 +135,7 @@ class TestRegressionParseResultEncode:
             n_trials=50,
             timeout_seconds=None,
             device=RequestedDevice.CUDA,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             random_state=42,
             early_stopping_rounds=10,
             n_jobs=-1,
@@ -160,7 +159,7 @@ class TestRegressionParseResultEncode:
             n_trials=50,
             timeout_seconds=None,
             device=RequestedDevice.AUTO,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             random_state=42,
             early_stopping_rounds=10,
             n_jobs=-1,

@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import OptimizerName
 from platform_core.json_utils import (
     JSONTypeError,
@@ -66,7 +67,7 @@ class TestParseRegressionOptimizeConfig:
         assert result["n_trials"] == 5
         assert result["timeout_seconds"] is None
         assert result["device"] == "auto"
-        assert result["feature_preset"] == "none"
+        assert result["feature_preset"] is FeaturePreset.NONE
         assert result["random_state"] == 42
         assert result["early_stopping_rounds"] == 10
         assert result["n_jobs"] == -1
@@ -103,7 +104,7 @@ class TestParseRegressionOptimizeConfig:
         assert result["n_trials"] == 50
         assert result["timeout_seconds"] == 3600
         assert result["device"] == "cuda"
-        assert result["feature_preset"] == "full"
+        assert result["feature_preset"] is FeaturePreset.FULL
         assert result["random_state"] == 123
         assert result["early_stopping_rounds"] == 20
         assert result["n_jobs"] == 4
@@ -186,7 +187,7 @@ class TestParseRegressionOptimizeConfig:
         """log_only feature preset is accepted."""
         config_json = _make_config_json(feature_preset="log_only")
         result = _parse_regression_optimize_config(config_json)
-        assert result["feature_preset"] == "log_only"
+        assert result["feature_preset"] is FeaturePreset.LOG_ONLY
 
 
 class TestReportRegressionPhase:

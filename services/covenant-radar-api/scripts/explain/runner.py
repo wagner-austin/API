@@ -170,8 +170,10 @@ def run_explanation(
         raise FileNotFoundError(f"Model file not found: {resolved_path}")
 
     # Load dataset with full feature engineering
-    # Using "full" preset to match training
-    x_features, y_labels, feature_names = _load_dataset_with_features(dataset, "full", external_dir)
+    # Using the FULL preset to match training
+    x_features, y_labels, feature_names = _load_dataset_with_features(
+        dataset, FeaturePreset.FULL, external_dir
+    )
 
     # Sample data (y is unused but needed for consistent sampling)
     x_sampled, _ = _sample_data(x_features, y_labels, n_samples, random_state=42)

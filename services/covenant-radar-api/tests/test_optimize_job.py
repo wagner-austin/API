@@ -17,6 +17,7 @@ from covenant_ml.datasets import (
     LoadedDataset,
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import (
     BackendName,
     OptimizerName,
@@ -163,7 +164,7 @@ class TestParseOptimizeConfig:
         assert result["n_trials"] == 10
         assert result["timeout_seconds"] is None
         assert result["device"] == "auto"
-        assert result["feature_preset"] == "none"
+        assert result["feature_preset"] is FeaturePreset.NONE
         assert result["random_state"] == 42
         assert result["early_stopping_rounds"] == 10
         assert result["n_jobs"] == -1
@@ -200,7 +201,7 @@ class TestParseOptimizeConfig:
         assert result["n_trials"] == 100
         assert result["timeout_seconds"] == 3600
         assert result["device"] == "cuda"
-        assert result["feature_preset"] == "full"
+        assert result["feature_preset"] is FeaturePreset.FULL
         assert result["random_state"] == 123
         assert result["early_stopping_rounds"] == 20
         assert result["n_jobs"] == 4

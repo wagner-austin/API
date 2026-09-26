@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 import scripts._test_hooks as _hooks
 from covenant_ml.explainers.types import ExplainerName
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 from platform_core.logging import LogLevel
@@ -388,7 +389,7 @@ class TestLoadDatasetWithFeatures:
         _hooks.dataset_loader = lambda config, external_dir: _make_fake_dataset()
 
         try:
-            x, y, names = _load_dataset_with_features("taiwan", "none", Path("/fake"))
+            x, y, names = _load_dataset_with_features("taiwan", FeaturePreset.NONE, Path("/fake"))
             assert int(x.shape[0]) == 200
             assert int(y.shape[0]) == 200
             # Verify feature names has expected count (10 original features)

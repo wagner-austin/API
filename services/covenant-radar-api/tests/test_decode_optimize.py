@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from covenant_ml.features import FeaturePreset
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.api.decode_ml import (
@@ -33,7 +34,7 @@ class TestParseOptimizeRequest:
         assert result["n_trials"] == 50
         assert result["timeout_seconds"] is None
         assert result["device"] == "auto"
-        assert result["feature_preset"] == "none"
+        assert result["feature_preset"] is FeaturePreset.NONE
         assert result["random_state"] == 42
 
     def test_valid_optimize_request_full(self) -> None:
@@ -54,7 +55,7 @@ class TestParseOptimizeRequest:
         assert result["n_trials"] == 100
         assert result["timeout_seconds"] == 3600
         assert result["device"] == "cuda"
-        assert result["feature_preset"] == "full"
+        assert result["feature_preset"] is FeaturePreset.FULL
         assert result["random_state"] == 123
 
     def test_valid_optimize_request_polish_dataset(self) -> None:
@@ -154,7 +155,7 @@ class TestParseOptimizeRequest:
         }"""
         result = parse_optimize_request(body)
 
-        assert result["feature_preset"] == "log_only"
+        assert result["feature_preset"] is FeaturePreset.LOG_ONLY
 
     def test_valid_feature_preset_ratios_only(self) -> None:
         """Test parsing optimize request with ratios_only feature preset."""
@@ -165,7 +166,7 @@ class TestParseOptimizeRequest:
         }"""
         result = parse_optimize_request(body)
 
-        assert result["feature_preset"] == "ratios_only"
+        assert result["feature_preset"] is FeaturePreset.RATIOS_ONLY
 
     def test_valid_feature_preset_none(self) -> None:
         """Test parsing optimize request with explicit none feature preset."""
@@ -176,7 +177,7 @@ class TestParseOptimizeRequest:
         }"""
         result = parse_optimize_request(body)
 
-        assert result["feature_preset"] == "none"
+        assert result["feature_preset"] is FeaturePreset.NONE
 
     def test_invalid_feature_preset_raises_json_type_error(self) -> None:
         """Test that invalid feature_preset raises JSONTypeError."""
@@ -317,7 +318,7 @@ class TestParseRegressionOptimizeRequest:
         assert result["n_trials"] == 50
         assert result["timeout_seconds"] is None
         assert result["device"] == "auto"
-        assert result["feature_preset"] == "none"
+        assert result["feature_preset"] is FeaturePreset.NONE
         assert result["random_state"] == 42
 
     def test_valid_request_full(self) -> None:
@@ -338,7 +339,7 @@ class TestParseRegressionOptimizeRequest:
         assert result["n_trials"] == 100
         assert result["timeout_seconds"] == 3600
         assert result["device"] == "cuda"
-        assert result["feature_preset"] == "full"
+        assert result["feature_preset"] is FeaturePreset.FULL
         assert result["random_state"] == 123
 
     def test_xgboost_reg_backend(self) -> None:
@@ -455,7 +456,7 @@ class TestParseRegressionOptimizeRequest:
             "feature_preset": "log_only"
         }"""
         result = parse_regression_optimize_request(body)
-        assert result["feature_preset"] == "log_only"
+        assert result["feature_preset"] is FeaturePreset.LOG_ONLY
 
     def test_feature_preset_ratios_only(self) -> None:
         """Test parsing with ratios_only feature preset."""
@@ -465,7 +466,7 @@ class TestParseRegressionOptimizeRequest:
             "feature_preset": "ratios_only"
         }"""
         result = parse_regression_optimize_request(body)
-        assert result["feature_preset"] == "ratios_only"
+        assert result["feature_preset"] is FeaturePreset.RATIOS_ONLY
 
     def test_invalid_feature_preset_raises(self) -> None:
         """Test that invalid feature_preset raises JSONTypeError."""

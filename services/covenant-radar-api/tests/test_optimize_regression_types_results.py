@@ -7,6 +7,7 @@ All encode/decode/require functions are round-trip tested.
 from __future__ import annotations
 
 import pytest
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
@@ -73,7 +74,7 @@ class TestRegressionOptimizationResultEncode:
             dataset="us_bankruptcy",
             n_samples=500,
             n_features=10,
-            feature_preset="log_only",
+            feature_preset=FeaturePreset.LOG_ONLY,
             n_trials_complete=25,
             n_trials_pruned=2,
             n_trials_failed=1,
@@ -103,7 +104,7 @@ class TestRegressionOptimizationResultEncode:
             dataset="us_bankruptcy",
             n_samples=500,
             n_features=10,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             n_trials_complete=25,
             n_trials_pruned=0,
             n_trials_failed=0,
@@ -134,7 +135,7 @@ class TestRegressionOptimizationResultEncode:
             dataset="us_bankruptcy",
             n_samples=500,
             n_features=10,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             n_trials_complete=25,
             n_trials_pruned=0,
             n_trials_failed=0,
@@ -164,7 +165,7 @@ class TestRegressionOptimizationResultEncode:
             dataset="us_bankruptcy",
             n_samples=500,
             n_features=10,
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             n_trials_complete=25,
             n_trials_pruned=0,
             n_trials_failed=0,
@@ -197,7 +198,7 @@ class TestRegressionOptimizationResultEncode:
             dataset="us_bankruptcy",
             n_samples=100,
             n_features=5,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             n_trials_complete=10,
             n_trials_pruned=0,
             n_trials_failed=0,

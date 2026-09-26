@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from platform_core.json_utils import JSONValue, dump_json_str
 
@@ -21,7 +22,7 @@ from scripts._test_hooks import (
     UnifiedOptimizationResult,
     get_project_root,
 )
-from scripts.optimize.cli import DatasetName, FeaturePreset
+from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import UnifiedHistoryEntry
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal, Protocol, TypedDict
 
 from covenant_ml.datasets.types import LoadPhase
-from covenant_ml.features import FeaturePreset
+from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
@@ -17,6 +17,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
 )
+from platform_core.members import find_member
 
 from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_float_params,
@@ -87,7 +88,7 @@ def _require_feature_preset(raw: JSONObject) -> FeaturePreset:
         raw: JSON object.
 
     Returns:
-        FeaturePreset literal.
+        The FeaturePreset member the field names; TEMPORAL is refused.
 
     Raises:
         JSONTypeError: If feature_preset field is invalid.
@@ -95,15 +96,12 @@ def _require_feature_preset(raw: JSONObject) -> FeaturePreset:
     val = raw.get("feature_preset")
     if val is None:
         raise JSONTypeError("Missing required field 'feature_preset'")
-    if val == "none":
-        return "none"
-    if val == "log_only":
-        return "log_only"
-    if val == "ratios_only":
-        return "ratios_only"
-    if val == "full":
-        return "full"
-    raise JSONTypeError("Field 'feature_preset' must be one of: none, log_only, ratios_only, full")
+    preset = find_member(val, FeaturePreset) if isinstance(val, str) else None
+    if preset is None or preset not in NON_TEMPORAL_FEATURE_PRESETS:
+        raise JSONTypeError(
+            "Field 'feature_preset' must be one of: none, log_only, ratios_only, full"
+        )
+    return preset
 
 
 class UnifiedRegressionOptimizationResult(TypedDict, total=True):

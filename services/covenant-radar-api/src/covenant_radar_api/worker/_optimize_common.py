@@ -15,7 +15,6 @@ from typing import Literal
 
 from covenant_ml.datasets import LoadedDataset
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
-from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer import OptimizationConfig, make_default_optimization_config
 from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
@@ -133,33 +132,6 @@ def parse_device(raw: JSONValue | None) -> RequestedDevice:
     if device is None:
         raise ValueError("device must be one of: cpu, cuda, auto")
     return device
-
-
-def parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
-    """Parse feature preset, defaulting to 'none'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        FeaturePreset literal.
-
-    Raises:
-        JSONTypeError: If value is invalid.
-    """
-    if raw is None:
-        return "none"
-    if not isinstance(raw, str):
-        raise JSONTypeError("feature_preset must be a string")
-    if raw == "none":
-        return "none"
-    if raw == "log_only":
-        return "log_only"
-    if raw == "ratios_only":
-        return "ratios_only"
-    if raw == "full":
-        return "full"
-    raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
 
 
 def get_dataset_type(dataset: str) -> DatasetType:

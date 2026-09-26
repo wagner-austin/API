@@ -35,7 +35,6 @@ from covenant_radar_api.worker._optimize_common import (
     parse_backend_name,
     parse_bidirectional,
     parse_device,
-    parse_feature_preset,
     parse_nn_optimizer,
     parse_precision,
     save_optimization_results,
@@ -45,6 +44,7 @@ from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_int_params,
     encode_sampled_string_params,
 )
+from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 from covenant_radar_api.worker.optimize_types import (
     LoadingProgressCallbackProtocol,
     LoadingProgressInfo,

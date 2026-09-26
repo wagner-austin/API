@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from covenant_ml.features import FeaturePreset
+from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
+    JSONValue,
 )
 from platform_core.members import find_member
 
@@ -83,7 +84,7 @@ def _require_feature_preset(raw: JSONObject) -> FeaturePreset:
         raw: JSON object.
 
     Returns:
-        FeaturePreset literal.
+        The FeaturePreset member the field names.
 
     Raises:
         JSONTypeError: If feature_preset field is invalid.
@@ -91,19 +92,38 @@ def _require_feature_preset(raw: JSONObject) -> FeaturePreset:
     val = raw.get("feature_preset")
     if val is None:
         raise JSONTypeError("Missing required field 'feature_preset'")
-    if val == "none":
-        return "none"
-    if val == "log_only":
-        return "log_only"
-    if val == "ratios_only":
-        return "ratios_only"
-    if val == "full":
-        return "full"
-    if val == "temporal":
-        return "temporal"
+    preset = find_member(val, FeaturePreset) if isinstance(val, str) else None
+    if preset is not None:
+        return preset
     raise JSONTypeError(
         "Field 'feature_preset' must be one of: none, log_only, ratios_only, full, temporal"
     )
+
+
+def parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
+    """Parse an optional non-temporal feature preset, defaulting to NONE.
+
+    The one reader of the feature_preset field of an optimize request, for
+    both the API edge and the optimize jobs.
+
+    Args:
+        raw: Raw JSON value, or None when the field was omitted.
+
+    Returns:
+        The FeaturePreset member the value names.
+
+    Raises:
+        JSONTypeError: If value is not a string, or names no member of
+            NON_TEMPORAL_FEATURE_PRESETS.
+    """
+    if raw is None:
+        return FeaturePreset.NONE
+    if not isinstance(raw, str):
+        raise JSONTypeError("feature_preset must be a string")
+    preset = find_member(raw, FeaturePreset)
+    if preset is None or preset not in NON_TEMPORAL_FEATURE_PRESETS:
+        raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
+    return preset
 
 
 def _require_precision(raw: JSONObject) -> RequestedPrecision:

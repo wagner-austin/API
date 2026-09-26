@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
@@ -34,7 +35,7 @@ def _make_parse_result(
         n_trials=50,
         timeout_seconds=3600,
         device=RequestedDevice.AUTO,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         random_state=42,
         early_stopping_rounds=10,
         n_jobs=-1,
@@ -64,7 +65,7 @@ def _make_optimization_result(
         dataset="taiwan",
         n_samples=6819,
         n_features=95,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_trials_complete=50,
         n_trials_pruned=3,
         n_trials_failed=1,

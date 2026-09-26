@@ -7,12 +7,12 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 import pytest
+from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from scripts.optimize.cli import (
     ALL_BACKENDS,
     ALL_STANDARD_DATASETS,
     ALL_TIMESERIES_DATASETS,
     PRESET_DESCRIPTIONS,
-    FeaturePreset,
     OptimizeArgs,
     _handle_flag,
     _parse_backends,
@@ -33,7 +33,7 @@ class TestOptimizeArgs:
         assert args.backends == ("xgboost",)
         assert args.dataset == "taiwan"
         assert args.n_trials == 300
-        assert args.feature_preset == "full"
+        assert args.feature_preset is FeaturePreset.FULL
         assert args.device == "cuda"
         assert args.timeout is None
         assert args.compare_presets is False
@@ -46,10 +46,8 @@ class TestPresetDescriptions:
 
     def test_all_presets_have_descriptions(self) -> None:
         """Verify all presets have descriptions."""
-        presets: list[FeaturePreset] = ["none", "log_only", "ratios_only", "full"]
-        for preset in presets:
-            assert preset in PRESET_DESCRIPTIONS
-            description: str = PRESET_DESCRIPTIONS[preset]
+        assert set(PRESET_DESCRIPTIONS) == NON_TEMPORAL_FEATURE_PRESETS
+        for description in PRESET_DESCRIPTIONS.values():
             # Description should contain meaningful content about features
             assert "features" in description.lower() or "original" in description.lower()
 
@@ -196,25 +194,16 @@ class TestIsTimeseriesDataset:
 class TestParsePreset:
     """Tests for _parse_preset function."""
 
-    def test_parse_none(self) -> None:
-        """Test parsing none preset."""
-        result: str = _parse_preset("none")
-        assert result == "none"
+    def test_every_non_temporal_word_parses_to_its_member(self) -> None:
+        """Each admitted preset word becomes the member that carries it."""
+        for preset in NON_TEMPORAL_FEATURE_PRESETS:
+            assert _parse_preset(preset.value) is preset
 
-    def test_parse_log_only(self) -> None:
-        """Test parsing log_only preset."""
-        result: str = _parse_preset("log_only")
-        assert result == "log_only"
-
-    def test_parse_ratios_only(self) -> None:
-        """Test parsing ratios_only preset."""
-        result: str = _parse_preset("ratios_only")
-        assert result == "ratios_only"
-
-    def test_parse_full(self) -> None:
-        """Test parsing full preset."""
-        result: str = _parse_preset("full")
-        assert result == "full"
+    def test_parse_temporal_raises_system_exit(self) -> None:
+        """TEMPORAL is a member the CLI does not admit."""
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_preset("temporal")
+        assert exc_info.value.code == 1
 
     def test_parse_invalid_raises_system_exit(self) -> None:
         """Test parsing invalid preset raises SystemExit."""
@@ -297,7 +286,7 @@ class TestParseArgs:
         args: OptimizeArgs = parse_args([])
         assert args.dataset == "taiwan"
         assert args.n_trials == 300
-        assert args.feature_preset == "full"
+        assert args.feature_preset is FeaturePreset.FULL
 
     def test_backend_short(self) -> None:
         """Test -b sets backends."""
@@ -342,12 +331,12 @@ class TestParseArgs:
     def test_feature_preset_short(self) -> None:
         """Test -f sets feature_preset."""
         args: OptimizeArgs = parse_args(["-f", "none"])
-        assert args.feature_preset == "none"
+        assert args.feature_preset is FeaturePreset.NONE
 
     def test_feature_preset_long(self) -> None:
         """Test --feature-preset sets feature_preset."""
         args: OptimizeArgs = parse_args(["--feature-preset", "log_only"])
-        assert args.feature_preset == "log_only"
+        assert args.feature_preset is FeaturePreset.LOG_ONLY
 
     def test_device(self) -> None:
         """Test --device sets device."""
@@ -396,7 +385,7 @@ class TestParseArgs:
         )
         assert args.dataset == "us"
         assert args.n_trials == 50
-        assert args.feature_preset == "none"
+        assert args.feature_preset is FeaturePreset.NONE
         assert args.verbose is True
         assert args.device == "cpu"
 

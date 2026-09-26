@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from platform_core.rich_logging import (
     create_rich_panel,
@@ -21,7 +22,7 @@ from scripts.optimize._runners import (
     _run_backend_with_progress,
     run_single_with_progress,
 )
-from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName, FeaturePreset
+from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName
 from scripts.optimize.display import print_result
 from scripts.optimize.history import OptimizationHistory
 from scripts.optimize.model_saver import save_best_model
@@ -56,7 +57,12 @@ def compare_presets(
         project_root = get_project_root()
 
     console = get_rich_console()
-    presets: list[FeaturePreset] = ["none", "log_only", "ratios_only", "full"]
+    presets: list[FeaturePreset] = [
+        FeaturePreset.NONE,
+        FeaturePreset.LOG_ONLY,
+        FeaturePreset.RATIOS_ONLY,
+        FeaturePreset.FULL,
+    ]
     # Results: list of (backend, preset, auc, n_features, elapsed)
     results: list[tuple[BackendName, FeaturePreset, float, int, float]] = []
 

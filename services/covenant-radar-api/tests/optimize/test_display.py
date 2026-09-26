@@ -6,6 +6,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
@@ -104,7 +105,7 @@ class TestPrintConfig:
 
     def test_prints_without_error(self) -> None:
         """Test print_config runs without error."""
-        print_config("xgboost", "taiwan", 50, "full", "cuda")
+        print_config("xgboost", "taiwan", 50, FeaturePreset.FULL, "cuda")
 
 
 class TestPrintResult:
@@ -127,7 +128,7 @@ class TestPrintResultNotNewBest:
             backend="xgboost",
             timestamp="2024-01-01T00:00:00Z",
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             n_trials=50,
             n_samples=1000,
             n_features=100,
@@ -149,7 +150,7 @@ class TestCreateHistoryComparisonTable:
             backend="xgboost",
             timestamp="2024-06-15T10:00:00Z",
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             n_trials=50,
             n_samples=1000,
             n_features=100,

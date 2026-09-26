@@ -22,6 +22,7 @@ from covenant_ml.backends.registry import (
     ClassifierRegistry,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetRegistry, LoadedDataset
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     SampledFloatParams,
     SampledIntParams,
@@ -160,7 +161,7 @@ def _make_result_for_backend(
         dataset="taiwan",
         n_samples=1000,
         n_features=50,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_trials_complete=10,
         n_trials_pruned=0,
         n_trials_failed=0,
@@ -292,7 +293,7 @@ class TestSaveModelResultTypedDict:
         save_result = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 
@@ -320,7 +321,7 @@ class TestSaveModelResultTypedDict:
         save_result = save_best_model(
             result=result,
             dataset="taiwan",
-            feature_preset="full",
+            feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
 

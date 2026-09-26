@@ -12,6 +12,7 @@ from shutil import copyfile
 
 import scripts._test_hooks as _hooks
 from covenant_ml.datasets import TimeSeriesDatasetConfig
+from covenant_ml.features import FeaturePreset
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
     LoadingProgressInfo,
@@ -207,7 +208,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "xgboost", "taiwan", 5, "full", "cpu", None, save_model=False
+                "xgboost", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "xgboost"
             assert len(loading_callback_calls) == 1
@@ -246,7 +247,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "mlp", "taiwan", 5, "full", "cpu", None, save_model=False
+                "mlp", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "mlp"
             assert len(loading_callback_calls) == 1
@@ -285,7 +286,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lightgbm", "taiwan", 5, "full", "cpu", None, save_model=False
+                "lightgbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "lightgbm"
             assert len(loading_callback_calls) == 1
@@ -324,7 +325,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lstm", "taiwan", 5, "full", "cpu", None, save_model=False
+                "lstm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "lstm"
             assert len(loading_callback_calls) == 1
@@ -363,7 +364,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "cleargbm", "taiwan", 5, "full", "cpu", None, save_model=False
+                "cleargbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "cleargbm"
             assert len(loading_callback_calls) == 1

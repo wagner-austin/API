@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import OptimizerName, RequestedDevice, RequestedPrecision
 from numpy.typing import NDArray
 
@@ -195,7 +196,7 @@ class TestRealObjectiveFactory:
             n_trials=1,
             timeout_seconds=None,
             device=RequestedDevice.CPU,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             random_state=42,
             early_stopping_rounds=2,
             n_jobs=1,

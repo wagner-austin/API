@@ -33,7 +33,6 @@ from covenant_radar_api.worker._optimize_common import (
     optional_int,
     parse_bidirectional,
     parse_device,
-    parse_feature_preset,
     parse_nn_optimizer,
     parse_precision,
     save_optimization_results,
@@ -48,6 +47,7 @@ from covenant_radar_api.worker._optimize_regression_common import (
     parse_regression_dataset_name,
     parse_regressor_backend_name,
 )
+from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 from covenant_radar_api.worker.optimize_regression_results import (
     RegressionLoadingProgressCallbackProtocol,
     RegressionLoadingProgressInfo,

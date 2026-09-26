@@ -16,12 +16,13 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
+from covenant_ml.features import FeaturePreset
 from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.environment_record import PackageVersion, host_record
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 from platform_core.run_record import compare_run_records, decode_run_record
-from scripts.optimize.cli import DatasetName, FeaturePreset
+from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import OptimizationHistory, UnifiedHistoryEntry
 from scripts.optimize.run_records import (
     OPTIMIZATION_EXPERIMENT,
@@ -62,7 +63,7 @@ def _make_fingerprint(numpy_version: str = "2.3.5") -> RunFingerprint:
 def _make_entry(
     backend: str = "cleargbm",
     dataset: DatasetName = "taiwan",
-    feature_preset: FeaturePreset = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_val_auc: float = 0.78,
     duration_seconds: float = 12.5,
     n_trials: int = 40,

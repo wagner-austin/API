@@ -14,11 +14,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Literal
 
+from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from covenant_ml.types import BackendName
+from platform_core.members import find_member
 from platform_core.rich_logging import get_rich_console
 
 # Type aliases for standard datasets
-FeaturePreset = Literal["none", "log_only", "ratios_only", "full"]
 StandardDatasetName = Literal["taiwan", "us", "polish", "kaggle_give_me_credit"]
 
 # Time-series dataset names (AMEX default prediction, future stock datasets)
@@ -53,11 +54,11 @@ def is_timeseries_dataset(dataset: DatasetName) -> bool:
 
 
 # Feature preset descriptions
-PRESET_DESCRIPTIONS: dict[str, str] = {
-    "none": "Original features only",
-    "log_only": "Original + log transforms",
-    "ratios_only": "Original + pairwise ratios (capped at 500)",
-    "full": "Original + log + ratios + products (max ~800 features)",
+PRESET_DESCRIPTIONS: dict[FeaturePreset, str] = {
+    FeaturePreset.NONE: "Original features only",
+    FeaturePreset.LOG_ONLY: "Original + log transforms",
+    FeaturePreset.RATIOS_ONLY: "Original + pairwise ratios (capped at 500)",
+    FeaturePreset.FULL: "Original + log + ratios + products (max ~800 features)",
 }
 
 # Backend descriptions for help text
@@ -102,7 +103,7 @@ class OptimizeArgs:
         self.backends = ("xgboost",)
         self.dataset = "taiwan"
         self.n_trials = 300
-        self.feature_preset = "full"
+        self.feature_preset = FeaturePreset.FULL
         self.device = "cuda"
         self.timeout = None
         self.compare_presets = False
@@ -263,20 +264,15 @@ def _parse_preset(val: str) -> FeaturePreset:
         val (str): Feature preset string from CLI.
 
     Returns:
-        FeaturePreset: Validated feature preset literal.
+        FeaturePreset: The member the value names; TEMPORAL is refused.
 
     Raises:
         SystemExit: If preset is invalid.
     """
+    preset = find_member(val, FeaturePreset)
+    if preset is not None and preset in NON_TEMPORAL_FEATURE_PRESETS:
+        return preset
     console = get_rich_console()
-    if val == "none":
-        return "none"
-    if val == "log_only":
-        return "log_only"
-    if val == "ratios_only":
-        return "ratios_only"
-    if val == "full":
-        return "full"
     console.print(f"[red]Invalid preset: {val}. Must be none, log_only, ratios_only, full.[/red]")
     raise SystemExit(1)
 

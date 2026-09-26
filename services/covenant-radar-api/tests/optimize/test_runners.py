@@ -13,6 +13,7 @@ from pathlib import Path
 import scripts._test_hooks as _hooks
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.datasets import DatasetRegistry
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
@@ -130,7 +131,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "xgboost", "taiwan", 5, "full", "cpu", None, save_model=False
+                "xgboost", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "xgboost"
@@ -163,7 +164,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "mlp", "taiwan", 5, "full", "cpu", None, save_model=False
+                "mlp", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "mlp"
@@ -198,7 +199,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lightgbm", "taiwan", 5, "full", "cpu", None, save_model=False
+                "lightgbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "lightgbm"
@@ -232,7 +233,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lstm", "taiwan", 5, "full", "cpu", None, save_model=False
+                "lstm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "lstm"
@@ -275,7 +276,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "cleargbm", "taiwan", 5, "full", "cpu", None, save_model=False
+                "cleargbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "cleargbm"
@@ -320,7 +321,14 @@ class TestRunSingleWithProgress:
             (tmp_path / "models").mkdir(parents=True, exist_ok=True)
 
             result = run_single_with_progress(
-                "xgboost", "taiwan", 5, "full", "cpu", None, save_model=True, project_root=tmp_path
+                "xgboost",
+                "taiwan",
+                5,
+                FeaturePreset.FULL,
+                "cpu",
+                None,
+                save_model=True,
+                project_root=tmp_path,
             )
 
             assert result["backend"] == "xgboost"

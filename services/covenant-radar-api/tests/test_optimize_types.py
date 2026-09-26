@@ -80,13 +80,12 @@ class TestUnifiedOptimizeParseResultEncodeDecode:
 
     def test_encode_all_feature_presets(self) -> None:
         """All feature preset values encode and decode correctly."""
-        presets: tuple[FeaturePreset, ...] = ("none", "log_only", "ratios_only", "full", "temporal")
-        for preset in presets:
+        for preset in FeaturePreset:
             original = _make_parse_result()
             updated = UnifiedOptimizeParseResult(**{**original, "feature_preset": preset})
             encoded = encode_unified_optimize_parse_result(updated)
             decoded = decode_unified_optimize_parse_result(encoded)
-            assert decoded["feature_preset"] == preset
+            assert decoded["feature_preset"] is preset
 
     def test_encode_all_precisions(self) -> None:
         """All precision values encode and decode correctly."""
@@ -235,7 +234,7 @@ class TestUnifiedOptimizationResultEncodeDecode:
             dataset="us",
             n_samples=1000,
             n_features=50,
-            feature_preset="log_only",
+            feature_preset=FeaturePreset.LOG_ONLY,
             n_trials_complete=20,
             n_trials_pruned=0,
             n_trials_failed=0,

@@ -11,6 +11,7 @@ from covenant_ml.backends.protocol import (
     PreparedClassifier,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, LoadedDataset
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     FloatRangeSpec,
     IntRangeSpec,
@@ -381,7 +382,7 @@ def _make_fake_optimization_result(
         dataset=dataset,
         n_samples=1000,
         n_features=100,
-        feature_preset="full",
+        feature_preset=FeaturePreset.FULL,
         n_trials_complete=10,
         n_trials_pruned=2,
         n_trials_failed=0,

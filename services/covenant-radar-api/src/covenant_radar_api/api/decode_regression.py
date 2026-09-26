@@ -19,32 +19,7 @@ from platform_core.json_utils import (
 )
 from platform_core.members import find_member, require_member
 
-
-def _parse_optimize_feature_preset(raw: JSONValue | None) -> FeaturePreset:
-    """Parse feature preset for optimization, defaulting to 'none'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        FeaturePreset literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid preset.
-    """
-    if raw is None:
-        return "none"
-    if not isinstance(raw, str):
-        raise JSONTypeError("feature_preset must be a string")
-    if raw == "none":
-        return "none"
-    if raw == "log_only":
-        return "log_only"
-    if raw == "ratios_only":
-        return "ratios_only"
-    if raw == "full":
-        return "full"
-    raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
+from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 
 
 def _parse_device(raw: JSONValue | None) -> RequestedDevice:
@@ -194,7 +169,7 @@ def parse_regression_optimize_request(body: bytes) -> RegressionOptimizeApiParse
         timeout_seconds = timeout_raw
 
     device = _parse_device(raw.get("device"))
-    feature_preset = _parse_optimize_feature_preset(raw.get("feature_preset"))
+    feature_preset = parse_feature_preset(raw.get("feature_preset"))
     random_state = _optional_int(raw, "random_state", 42)
 
     return RegressionOptimizeApiParseResult(

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import pytest
@@ -17,6 +16,7 @@ from covenant_ml.backends.protocol import (
     PreparedClassifier,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, LoadedDataset
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import (
     FloatRangeSpec,
     IntRangeSpec,
@@ -39,9 +39,6 @@ from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 
 from covenant_radar_api.worker.optimize_types import UnifiedOptimizationResult
-
-FeaturePresetLiteral = Literal["none", "log_only", "ratios_only", "full"]
-
 
 # =============================================================================
 # Autouse Fixtures
@@ -89,7 +86,7 @@ def _isolate_project_root(tmp_path: Path) -> Generator[None, None, None]:
 def make_fake_result(
     backend: BackendName = "xgboost",
     dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
     n_features: int = 100,
     best_int_params: SampledIntParams | None = None,
@@ -145,7 +142,7 @@ def make_fake_result(
 
 def make_fake_xgboost_result(
     dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
 ) -> UnifiedOptimizationResult:
     """Create a fake XGBoost optimization result for testing.
@@ -176,7 +173,7 @@ def make_fake_xgboost_result(
 
 def make_fake_mlp_result(
     dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
 ) -> UnifiedOptimizationResult:
     """Create a fake MLP optimization result for testing.
@@ -201,7 +198,7 @@ def make_fake_mlp_result(
 
 def make_fake_lightgbm_result(
     dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
 ) -> UnifiedOptimizationResult:
     """Create a fake LightGBM optimization result for testing.
@@ -234,7 +231,7 @@ def make_fake_lightgbm_result(
 
 def make_fake_lstm_result(
     dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
 ) -> UnifiedOptimizationResult:
     """Create a fake LSTM optimization result for testing.
@@ -259,7 +256,7 @@ def make_fake_lstm_result(
 
 def make_fake_cleargbm_result(
     dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
+    feature_preset: FeaturePreset = FeaturePreset.FULL,
     best_value: float = 0.85,
 ) -> UnifiedOptimizationResult:
     """Create a fake ClearGBM optimization result for testing.
@@ -478,7 +475,6 @@ def make_fake_loaded_dataset() -> LoadedDataset:
 __all__ = [
     "FakePreparedClassifier",
     "FakeSaveModelBackend",
-    "FeaturePresetLiteral",
     "make_fake_cleargbm_result",
     "make_fake_dataset_config",
     "make_fake_lightgbm_result",

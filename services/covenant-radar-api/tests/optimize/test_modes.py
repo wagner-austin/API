@@ -11,6 +11,7 @@ from pathlib import Path
 import scripts._test_hooks as _hooks
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.datasets import DatasetRegistry
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
@@ -102,17 +103,23 @@ class TestComparePresets:
                 callback_calls += 1
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
-                return make_fake_result(feature_preset="none", best_value=0.75, n_features=20)
+                return make_fake_result(
+                    feature_preset=FeaturePreset.NONE, best_value=0.75, n_features=20
+                )
             if "log_only" in config_json:
                 presets_called.append("log_only")
-                return make_fake_result(feature_preset="log_only", best_value=0.80, n_features=40)
+                return make_fake_result(
+                    feature_preset=FeaturePreset.LOG_ONLY, best_value=0.80, n_features=40
+                )
             if "ratios_only" in config_json:
                 presets_called.append("ratios_only")
                 return make_fake_result(
-                    feature_preset="ratios_only", best_value=0.82, n_features=500
+                    feature_preset=FeaturePreset.RATIOS_ONLY, best_value=0.82, n_features=500
                 )
             presets_called.append("full")
-            return make_fake_result(feature_preset="full", best_value=0.85, n_features=800)
+            return make_fake_result(
+                feature_preset=FeaturePreset.FULL, best_value=0.85, n_features=800
+            )
 
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
@@ -287,17 +294,23 @@ class TestComparePresets:
             _ = phase_callback
             if "none" in config_json and "log_only" not in config_json:
                 presets_called.append("none")
-                return make_fake_result(feature_preset="none", best_value=0.75, n_features=20)
+                return make_fake_result(
+                    feature_preset=FeaturePreset.NONE, best_value=0.75, n_features=20
+                )
             if "log_only" in config_json:
                 presets_called.append("log_only")
-                return make_fake_result(feature_preset="log_only", best_value=0.80, n_features=40)
+                return make_fake_result(
+                    feature_preset=FeaturePreset.LOG_ONLY, best_value=0.80, n_features=40
+                )
             if "ratios_only" in config_json:
                 presets_called.append("ratios_only")
                 return make_fake_result(
-                    feature_preset="ratios_only", best_value=0.82, n_features=500
+                    feature_preset=FeaturePreset.RATIOS_ONLY, best_value=0.82, n_features=500
                 )
             presets_called.append("full")
-            return make_fake_result(feature_preset="full", best_value=0.85, n_features=800)
+            return make_fake_result(
+                feature_preset=FeaturePreset.FULL, best_value=0.85, n_features=800
+            )
 
         _hooks.optimization_runner = fake_runner
         _hooks.backend_registry_factory = lambda: fake_registry
@@ -361,7 +374,7 @@ class TestRunAllDatasets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            run_all_datasets("xgboost", 10, "full", "cpu", None, save_model=False)
+            run_all_datasets("xgboost", 10, FeaturePreset.FULL, "cpu", None, save_model=False)
             assert len(datasets_called) == 3
             assert "taiwan" in datasets_called
             assert "us" in datasets_called
@@ -403,7 +416,7 @@ class TestRunMultipleBackends:
                 ("lightgbm", "xgboost"),
                 "taiwan",
                 5,
-                "full",
+                FeaturePreset.FULL,
                 "cpu",
                 None,
                 save_model=False,
@@ -438,7 +451,7 @@ class TestRunMultipleBackends:
                 ("xgboost",),
                 "taiwan",
                 5,
-                "full",
+                FeaturePreset.FULL,
                 "cpu",
                 None,
                 save_model=False,
@@ -478,7 +491,7 @@ class TestRunMultipleBackends:
                 ("xgboost", "lightgbm", "mlp", "lstm"),
                 "taiwan",
                 5,
-                "full",
+                FeaturePreset.FULL,
                 "cpu",
                 None,
                 save_model=False,
@@ -516,7 +529,7 @@ class TestRunMultipleBackends:
                 ("xgboost",),
                 "taiwan",
                 5,
-                "full",
+                FeaturePreset.FULL,
                 "cpu",
                 None,
                 save_model=False,

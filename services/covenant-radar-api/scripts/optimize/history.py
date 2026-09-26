@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from platform_core.comparability import (
     RunFingerprint,
@@ -33,7 +34,7 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from scripts._test_hooks import UnifiedOptimizationResult
-from scripts.optimize.cli import DatasetName, FeaturePreset
+from scripts.optimize.cli import DatasetName
 
 logger = get_logger(__name__)
 
