@@ -28,7 +28,7 @@ from typing import Final
 
 import pytest
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, encode_node_config
+from fleet.contracts.node import NodeConfig, NodePlatform, encode_node_config
 from fleet.contracts.project import ProjectConfig, encode_project_config
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, dump_json_str
@@ -86,7 +86,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             "lavender": encode_node_config(
                 NodeConfig(
                     host="lavender",
-                    platform="windows",
+                    platform=NodePlatform.WINDOWS,
                     stage_root="C:/fleet/stage",
                     logical_cores=16,
                     ram_gb=32.0,
