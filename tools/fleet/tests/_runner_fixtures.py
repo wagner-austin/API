@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONValue
 
-from fleet.contracts.runner_base import DiskCeiling, HostBase, PinnedDownload
+from fleet.contracts.runner_base import DiskCeiling, HostBase, MachineVariable, PinnedDownload
 from fleet.core import _test_hooks
 from tests.conftest import ok
 
@@ -20,7 +20,8 @@ def a_base() -> HostBase:
 
     Returns:
         The base: two features, the pinned WSL release and image, docker in
-        the packages, one machine PATH entry, RemoteSigned, and a 150 GB
+        the packages, one machine PATH entry, POETRY_CACHE_DIR as its one
+        machine variable, RemoteSigned, and a 150 GB
         ceiling over a 46 GB baseline.
     """
     return HostBase(
@@ -39,6 +40,11 @@ def a_base() -> HostBase:
         distro_dir="C:/wsl/Ubuntu",
         apt_packages=["build-essential", "docker.io"],
         machine_path_entries=["C:\\Program Files (x86)\\GnuWin32\\bin"],
+        machine_environment=[
+            MachineVariable(
+                name="POETRY_CACHE_DIR", value="C:\\fleet\\poetry", reason="out of System32"
+            )
+        ],
         execution_policy="RemoteSigned",
         disk=DiskCeiling(ceiling_gb=150, baseline_gb=46, baseline_measured="2026-09-26"),
     )
@@ -67,6 +73,9 @@ def base_json() -> dict[str, JSONValue]:
         "distro_dir": "C:/wsl/Ubuntu",
         "apt_packages": ["build-essential", "docker.io"],
         "machine_path_entries": ["C:\\Program Files (x86)\\GnuWin32\\bin"],
+        "machine_environment": [
+            {"name": "POETRY_CACHE_DIR", "value": "C:\\fleet\\poetry", "reason": "out of System32"}
+        ],
         "execution_policy": "RemoteSigned",
         "disk": {"ceiling_gb": 150, "baseline_gb": 46, "baseline_measured": "2026-09-26"},
     }

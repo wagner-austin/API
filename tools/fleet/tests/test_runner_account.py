@@ -176,7 +176,10 @@ class TestConvergenceRunsForReal:
 #: The audit's other host-level reads, answered as a laid host answers them.
 _AUDIT_FAKES = """function wsl { $global:LASTEXITCODE = 0; return @('Used', '  46G') }
 function Get-ExecutionPolicy { param([string]$Scope) return 'RemoteSigned' }
-function Get-ItemProperty { param([string]$LiteralPath) [pscustomobject]@{ LongPathsEnabled = 1 } }
+function Get-ItemProperty {
+    param([string]$LiteralPath)
+    [pscustomobject]@{ LongPathsEnabled = 1; POETRY_CACHE_DIR = 'C:\\fleet\\poetry' }
+}
 function git { return 'true' }
 function Get-Service {
     param([string]$Name, [string]$ErrorAction)
@@ -251,6 +254,7 @@ class TestTheAccountRowRunsForReal:
             "CHECK disk:/:ceiling-150gb:baseline-46gb@2026-09-26 OK",
             "CHECK execution-policy:LocalMachine:RemoteSigned OK",
             f"CHECK {runner_audit.LONG_PATHS_CHECK_ID} OK",
+            "CHECK machine-env:POETRY_CACHE_DIR OK",
             f"CHECK service:windows:{_SERVICE} OK",
             "CHECK workdir:wagner-austin/MCPs:windows:lavender OK",
             f"CHECK account:windows:{_SERVICE}:LocalSystem {verdict}",

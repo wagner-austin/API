@@ -78,12 +78,14 @@ def _clean_transcript(name: str) -> str:
 
     Returns:
         The OK lines: the disk, policy and long-paths rows every host
-        reports, then the one install's two.
+        reports, the fixture base's one machine variable, then the one
+        install's two.
     """
     return (
         "CHECK disk:/:ceiling-150gb:baseline-46gb@2026-09-26 OK\n"
         "CHECK execution-policy:LocalMachine:RemoteSigned OK\n"
         "CHECK long-paths:win32-and-git OK\n"
+        "CHECK machine-env:POETRY_CACHE_DIR OK\n"
         f"CHECK service:wsl:actions.runner.wagner-austin-API.{name}-wsl.service OK\n"
         f"CHECK workdir:wagner-austin/API:wsl:{name}-wsl OK\n"
     )

@@ -99,11 +99,17 @@ function Start-Process {{
 function Get-ExecutionPolicy {{ param([string]$Scope) $script:Policy }}
 function Get-ItemProperty {{
     param([string]$LiteralPath)
+    if ($LiteralPath -like '*\\Session Manager\\Environment') {{
+        return [pscustomobject]$script:MachineEnv
+    }}
     [pscustomobject]@{{ LongPathsEnabled = $script:LongPaths }}
 }}
 function Set-ItemProperty {{
     param([string]$LiteralPath, [string]$Name, [string]$Value, [string]$Type)
-    if ($Name -eq 'LongPathsEnabled') {{ $script:LongPaths = [int]$Value }}
+    if ($LiteralPath -like '*\\Session Manager\\Environment') {{
+        $script:MachineEnv[$Name] = $Value
+    }}
+    elseif ($Name -eq 'LongPathsEnabled') {{ $script:LongPaths = [int]$Value }}
     else {{ $script:Policy = $Value }}
 }}
 function git {{
@@ -182,6 +188,7 @@ $script:MsiExit = 3010
 $script:Policy = 'Restricted'
 $script:LongPaths = 0
 $script:GitLongPaths = ''
+$script:MachineEnv = @{}
 """
 
 _LAID = """$script:Features = @{ 'VirtualMachinePlatform' = 'Enabled'; \
@@ -192,6 +199,7 @@ $script:MsiExit = 0
 $script:Policy = 'RemoteSigned'
 $script:LongPaths = 1
 $script:GitLongPaths = 'true'
+$script:MachineEnv = @{ 'POETRY_CACHE_DIR' = 'C:\\fleet\\poetry' }
 """
 
 
@@ -207,9 +215,26 @@ class TestTheWindowsBaseRunsForReal:
             "set the LocalMachine execution policy to RemoteSigned",
             "enabled Win32 long paths",
             "set git core.longpaths for the system",
+            "set the machine variable POETRY_CACHE_DIR to C:\\fleet\\poetry",
             runner_base_render.REBOOT_MARKER,
         ]
         assert not (tmp_path / "wsl.2.7.14.0.x64.msi").exists()
+
+    @pytest.mark.parametrize(
+        "held", ["@{}", "@{ 'POETRY_CACHE_DIR' = 'C:\\Users\\x\\AppData\\Local\\pypoetry' }"]
+    )
+    def test_a_machine_variable_alone_asks_for_the_restart_services_need(
+        self, tmp_path: pathlib.Path, held: str
+    ) -> None:
+        """Absent or holding another value, the variable is written, and the
+        reboot is requested even when nothing else changed: a service reads
+        the environment the service manager built at boot."""
+        prelude = _LAID.replace("@{ 'POETRY_CACHE_DIR' = 'C:\\fleet\\poetry' }", held)
+        script = runner_base_render.render_windows_base_script(_host(tmp_path))
+        assert _lines(_run(tmp_path, prelude, script)) == [
+            "set the machine variable POETRY_CACHE_DIR to C:\\fleet\\poetry",
+            runner_base_render.REBOOT_MARKER,
+        ]
 
     def test_a_laid_host_changes_nothing_and_asks_for_nothing(self, tmp_path: pathlib.Path) -> None:
         script = runner_base_render.render_windows_base_script(_host(tmp_path))

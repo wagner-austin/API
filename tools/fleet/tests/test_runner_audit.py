@@ -94,6 +94,7 @@ def _host(
 _DISK_ID = "disk:/:ceiling-150gb:baseline-46gb@2026-09-26"
 _POLICY_ID = "execution-policy:LocalMachine:RemoteSigned"
 _LONG_ID = runner_audit.LONG_PATHS_CHECK_ID
+_ENV_ID = "machine-env:POETRY_CACHE_DIR"
 
 
 def _clean_transcript(spec: HostRunnerSpec) -> str:
@@ -122,6 +123,7 @@ class TestExpectedChecks:
             _DISK_ID,
             _POLICY_ID,
             _LONG_ID,
+            _ENV_ID,
             "gpu:wagner-austin/API:wsl:lavender-wsl",
             "timer:ci-clean.timer",
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
@@ -145,6 +147,7 @@ class TestExpectedChecks:
             _DISK_ID,
             _POLICY_ID,
             _LONG_ID,
+            _ENV_ID,
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
             "workdir:wagner-austin/API:wsl:lavender-wsl",
         ]
@@ -192,18 +195,18 @@ class TestParseAuditTranscript:
     def test_a_clean_transcript_scores_every_check_ok(self) -> None:
         spec = _host()
         findings = runner_audit.parse_audit_transcript(spec, _clean_transcript(spec))
-        assert [finding["ok"] for finding in findings] == [True] * 13
+        assert [finding["ok"] for finding in findings] == [True] * 14
         assert findings[0]["reason"].startswith("the scheduled task")
 
     def test_a_drift_line_carries_its_detail_and_reason(self) -> None:
         spec = _host()
         lines = _clean_transcript(spec).splitlines()
-        lines[5] = (
+        lines[6] = (
             "CHECK gpu:wagner-austin/API:wsl:lavender-wsl DRIFT "
             "nvidia-smi on the runner PATH said: "
         )
         findings = runner_audit.parse_audit_transcript(spec, "\n".join(lines))
-        drifted = findings[5]
+        drifted = findings[6]
         assert drifted["ok"] is False
         assert drifted["detail"] == "nvidia-smi on the runner PATH said: "
         assert drifted["reason"] == "runner jobs on this host digest a real GPU"
@@ -211,7 +214,7 @@ class TestParseAuditTranscript:
     def test_blank_lines_are_not_checks(self) -> None:
         spec = _host()
         transcript = "\n\n" + _clean_transcript(spec) + "\n"
-        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 13
+        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 14
 
     def test_a_non_check_line_is_unparsable(self) -> None:
         spec = _host()
@@ -301,7 +304,10 @@ FAKE_WSL = """function wsl {
 function Get-ExecutionPolicy { param([string]$Scope) return $script:Policy }
 function Get-ItemProperty {
     param([string]$LiteralPath)
-    [pscustomobject]@{ LongPathsEnabled = $script:LongPaths }
+    [pscustomobject]@{
+        LongPathsEnabled = $script:LongPaths
+        POETRY_CACHE_DIR = 'C:\\fleet\\poetry'
+    }
 }
 function git { return $script:GitLongPaths }
 """
@@ -400,6 +406,7 @@ class TestTheRenderedAuditRunsForReal:
             f"CHECK {_DISK_ID} OK",
             f"CHECK {_POLICY_ID} OK",
             f"CHECK {_LONG_ID} OK",
+            f"CHECK {_ENV_ID} OK",
             "CHECK asset:/opt/corvis/rw-game/game-lib.jar DRIFT test -e exited 1",
             "CHECK sha256:/opt/corvis/rw-game/game-lib.jar DRIFT sha256sum said: ",
         ]
@@ -413,6 +420,7 @@ class TestTheRenderedAuditRunsForReal:
             f"CHECK {_DISK_ID} OK",
             f"CHECK {_POLICY_ID} OK",
             f"CHECK {_LONG_ID} OK",
+            f"CHECK {_ENV_ID} OK",
             "CHECK asset:/opt/corvis/rw-game/game-lib.jar OK",
             "CHECK sha256:/opt/corvis/rw-game/game-lib.jar OK",
         ]
@@ -438,6 +446,7 @@ class TestTheRenderedAuditRunsForReal:
             f"CHECK {_DISK_ID} OK",
             f"CHECK {_POLICY_ID} OK",
             f"CHECK {_LONG_ID} OK",
+            f"CHECK {_ENV_ID} OK",
             f"CHECK gpu:wagner-austin/API:wsl:lavender-wsl {expected}",
             "CHECK service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service OK",
             "CHECK workdir:wagner-austin/API:wsl:lavender-wsl OK",
@@ -477,7 +486,12 @@ class TestTheRenderedAuditRunsForReal:
         lines = _run_audit(
             tmp_path, spec, test_exit=0, sha_lines="@()", gpu_lines="@()", df_lines=df_lines
         )
-        assert lines == [expected, f"CHECK {_POLICY_ID} OK", f"CHECK {_LONG_ID} OK"]
+        assert lines == [
+            expected,
+            f"CHECK {_POLICY_ID} OK",
+            f"CHECK {_LONG_ID} OK",
+            f"CHECK {_ENV_ID} OK",
+        ]
 
     def test_a_restricted_host_drifts_on_the_policy_row(self, tmp_path: pathlib.Path) -> None:
         spec = _host(
@@ -495,6 +509,7 @@ class TestTheRenderedAuditRunsForReal:
             f"CHECK {_DISK_ID} OK",
             f"CHECK {_POLICY_ID} DRIFT Get-ExecutionPolicy -Scope LocalMachine said: Restricted",
             f"CHECK {_LONG_ID} OK",
+            f"CHECK {_ENV_ID} OK",
         ]
 
     def test_a_host_without_long_paths_drifts_naming_both_settings(
@@ -517,4 +532,5 @@ class TestTheRenderedAuditRunsForReal:
             f"CHECK {_DISK_ID} OK",
             f"CHECK {_POLICY_ID} OK",
             f"CHECK {_LONG_ID} DRIFT LongPathsEnabled=0 git core.longpaths=",
+            f"CHECK {_ENV_ID} OK",
         ]

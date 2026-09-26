@@ -6,8 +6,10 @@ import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from fleet.contracts.runner_base import (
+    MachineVariable,
     decode_disk_ceiling,
     decode_host_base,
+    decode_machine_variable,
     decode_pinned_download,
     encode_host_base,
 )
@@ -98,6 +100,79 @@ class TestHostBase:
         del raw["rootfs"]
         with pytest.raises(JSONTypeError, match="rootfs"):
             decode_host_base(raw)
+
+
+def _variable(**overrides: JSONValue) -> dict[str, JSONValue]:
+    """A valid raw machine variable.
+
+    Args:
+        overrides: Field values replacing the valid defaults.
+
+    Returns:
+        The raw mapping.
+    """
+    raw: dict[str, JSONValue] = {
+        "name": "POETRY_CACHE_DIR",
+        "value": "C:\\fleet\\poetry",
+        "reason": "out of System32",
+    }
+    raw.update(overrides)
+    return raw
+
+
+class TestMachineVariable:
+    """decode_machine_variable's contract, and the list's distinct names."""
+
+    def test_a_valid_variable_decodes(self) -> None:
+        assert decode_machine_variable(_variable()) == MachineVariable(
+            name="POETRY_CACHE_DIR", value="C:\\fleet\\poetry", reason="out of System32"
+        )
+
+    def test_a_non_object_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_machine_variable("POETRY_CACHE_DIR")
+        assert str(refused.value) == "machine variable must be a JSON object, got str"
+
+    @pytest.mark.parametrize("name", ["", "9LIVES", "HAS SPACE", "A-B", "X=Y"])
+    def test_a_name_that_is_not_a_plain_identifier_is_refused(self, name: str) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_machine_variable(_variable(name=name))
+        assert str(refused.value) == (
+            f"a machine variable's name must be a plain identifier, got {name!r}"
+        )
+
+    @pytest.mark.parametrize("name", ["Path", "PATH", "path"])
+    def test_path_is_refused_because_it_has_its_own_field(self, name: str) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_machine_variable(_variable(name=name))
+        assert str(refused.value) == (
+            "the machine PATH is machine_path_entries, not a machine variable"
+        )
+
+    @pytest.mark.parametrize("field", ["value", "reason"])
+    def test_an_empty_value_or_reason_is_refused(self, field: str) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_machine_variable(_variable(**{field: ""}))
+        assert str(refused.value) == (
+            "machine variable POETRY_CACHE_DIR needs a non-empty value and reason"
+        )
+
+    def test_a_name_declared_twice_in_any_case_is_refused(self) -> None:
+        raw = _base(machine_environment=[_variable(), _variable(name="poetry_cache_dir")])
+        with pytest.raises(JSONTypeError) as refused:
+            decode_host_base(raw)
+        assert str(refused.value) == (
+            "machine_environment declares a name twice: ['poetry_cache_dir', 'poetry_cache_dir']"
+        )
+
+    def test_a_base_without_the_field_is_refused(self) -> None:
+        raw = _base()
+        del raw["machine_environment"]
+        with pytest.raises(JSONTypeError, match="machine_environment"):
+            decode_host_base(raw)
+
+    def test_no_variables_is_a_valid_base(self) -> None:
+        assert decode_host_base(_base(machine_environment=[]))["machine_environment"] == []
 
 
 class TestPinnedDownload:
