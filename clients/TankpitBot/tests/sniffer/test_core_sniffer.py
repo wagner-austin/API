@@ -150,7 +150,7 @@ class TestWebSocketSnifferMethods:
 
     def test_process_game_log_entry_stores_entry(self) -> None:
         """Test _process_game_log_entry stores entries with timestamp."""
-        from tankpit_bot.browser import GameLogEntry
+        from tankpit_bot.browser import GameLogEntry, LogCategory
 
         # Create sniffer with minimal init - we'll call methods directly
         # Using object.__new__ to avoid full __init__
@@ -163,7 +163,7 @@ class TestWebSocketSnifferMethods:
         sniffer._live_decode = False
         sniffer._autosave_paths = ()
 
-        entry = GameLogEntry(text="Player destroyed Enemy", category="combat")
+        entry = GameLogEntry(text="Player destroyed Enemy", category=LogCategory.COMBAT)
 
         # Call the method directly
         sniffer._process_game_log_entry(entry)
@@ -184,7 +184,7 @@ class TestWebSocketSnifferMethods:
         them. The tracker is initialized via ``_init_combat_tracker``
         (sniffer-only plumbing as of 2026-06-19).
         """
-        from tankpit_bot.browser import GameLogEntry
+        from tankpit_bot.browser import GameLogEntry, LogCategory
 
         ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
@@ -197,7 +197,7 @@ class TestWebSocketSnifferMethods:
         sniffer._init_combat_tracker()
 
         sniffer._process_game_log_entry(
-            GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
+            GameLogEntry(text="You hit Tank123 for 50 damage", category=LogCategory.COMBAT)
         )
 
         if sniffer._combat_tracker is None:
@@ -215,7 +215,7 @@ class TestWebSocketSnifferMethods:
         recorded and logged by the parent path, but no tracker
         interaction occurs.
         """
-        from tankpit_bot.browser import GameLogEntry
+        from tankpit_bot.browser import GameLogEntry, LogCategory
 
         ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
@@ -227,7 +227,7 @@ class TestWebSocketSnifferMethods:
         sniffer._autosave_paths = ()
 
         sniffer._process_game_log_entry(
-            GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
+            GameLogEntry(text="You hit Tank123 for 50 damage", category=LogCategory.COMBAT)
         )
 
         assert sniffer._combat_tracker is None
@@ -246,7 +246,7 @@ class TestWebSocketSnifferMethods:
         when ``CombatTracker.process_log_line`` returns ``None`` the
         sniffer must not call ``log_event``.
         """
-        from tankpit_bot.browser import GameLogEntry
+        from tankpit_bot.browser import GameLogEntry, LogCategory
 
         ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
@@ -259,7 +259,7 @@ class TestWebSocketSnifferMethods:
         sniffer._init_combat_tracker()
 
         sniffer._process_game_log_entry(
-            GameLogEntry(text="some unparseable combat noise xyz", category="combat")
+            GameLogEntry(text="some unparseable combat noise xyz", category=LogCategory.COMBAT)
         )
 
         if sniffer._combat_tracker is None:
@@ -473,7 +473,7 @@ class TestWebSocketSnifferMethods:
 
     def test_process_game_log_entry_autosaves_game_log(self, fake_fs: FakeFileSystem) -> None:
         """Autosaves updated game log entries during capture."""
-        from tankpit_bot.browser import GameLogEntry
+        from tankpit_bot.browser import GameLogEntry, LogCategory
 
         ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
@@ -494,7 +494,7 @@ class TestWebSocketSnifferMethods:
         sniffer._magic = None
         sniffer._static_key = None
 
-        sniffer._process_game_log_entry(GameLogEntry(text="Zoom in", category="action"))
+        sniffer._process_game_log_entry(GameLogEntry(text="Zoom in", category=LogCategory.ACTION))
 
         saved_session = decode_capture_session(
             narrow_json_to_dict(load_json_str(fake_fs.read_text(Path("capture_session.json"))))

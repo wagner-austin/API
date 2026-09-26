@@ -293,7 +293,7 @@ class TestDisplacementEvidence:
         at origin, charge ~0) read as impossible under-spends -- 65
         teleport windows, gaps matching their displacement receipts.
         """
-        from tankpit_bot.ledger.fuel_book import record_fuel_entry
+        from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
         from tankpit_bot.physics.costs import teleport_cost
 
         ws = WorldService()
@@ -304,7 +304,7 @@ class TestDisplacementEvidence:
             message_index=0,
             sent_window="(none)",
         )
-        record_fuel_entry(book=ws.fuel_book, kind="teleport", lo=-446, hi=-374)
+        record_fuel_entry(book=ws.fuel_book, kind=FuelEntryKind.TELEPORT, lo=-446, hi=-374)
         _seed_self_at(ws, 230, 10)
 
         _dispatch_landed_and_capture(ws)
