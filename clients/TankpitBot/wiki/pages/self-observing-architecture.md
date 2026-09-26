@@ -538,22 +538,22 @@ so the shapes had to live somewhere neither imports.[^guard]
     },
     {
       "id": "fuel-book-fuel-entry-kinds",
-      "code": "tankpit_bot.ledger.fuel_book:FUEL_ENTRY_KINDS",
-      "members": [
-        "shot_single",
-        "shot_dual",
-        "shot_missile",
-        "shot_homing",
-        "homing_carry",
-        "walk",
-        "radar",
-        "mine_press",
-        "teleport",
-        "pickup",
-        "enemy_hit",
-        "detonation",
-        "boundary_strand"
-      ],
+      "code": "tankpit_bot.ledger.fuel_book:FuelEntryKind",
+      "members": {
+        "SHOT_SINGLE": "shot_single",
+        "SHOT_DUAL": "shot_dual",
+        "SHOT_MISSILE": "shot_missile",
+        "SHOT_HOMING": "shot_homing",
+        "HOMING_CARRY": "homing_carry",
+        "WALK": "walk",
+        "RADAR": "radar",
+        "MINE_PRESS": "mine_press",
+        "TELEPORT": "teleport",
+        "PICKUP": "pickup",
+        "ENEMY_HIT": "enemy_hit",
+        "DETONATION": "detonation",
+        "BOUNDARY_STRAND": "boundary_strand"
+      },
       "means": "every predicted fuel effect the fuel book can record"
     },
     {
@@ -606,11 +606,6 @@ so the shapes had to live somewhere neither imports.[^guard]
         "lo"
       ],
       "means": "One predicted fuel effect with its feasibility interval."
-    },
-    {
-      "id": "fuel-book-fuelentrykind",
-      "code": "tankpit_bot.ledger.fuel_book:FuelEntryKind",
-      "law": "FuelEntryKind."
     },
     {
       "id": "fuel-book-fuelkindtotaldict",
