@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_mode_outcomes import _hop_escapes_attacker
 from tankpit_bot.bot.ai.context import make_decision
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -47,11 +48,11 @@ def _teleport_decision(state: AIStateDict, tx: int, ty: int) -> TickDecisionDict
     """
     return make_decision(
         make_teleport_command(tx, ty),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         925,
         tx,
         ty,
-        "fuel_hop",
+        ReasonKind.FUEL_HOP,
         state,
         [],
     )
@@ -100,11 +101,11 @@ def test_non_teleport_decisions_pass_through() -> None:
     state = _locked_state()
     decision = make_decision(
         make_pickup_fuel_command(101, 100),
-        "COLLECT",
+        BehaviorMode.COLLECT,
         925,
         101,
         100,
-        "fuel_locked",
+        ReasonKind.FUEL_LOCKED,
         state,
         [],
     )

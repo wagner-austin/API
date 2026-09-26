@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.ai.types import AIStateDict
 from tests.bot.ai._resource_search_fixtures import _ctx
 from tests.bot.ai._support import (
@@ -25,9 +26,9 @@ class TestMakeResourceSearchHop:
         """The nearest atlas dot wins when several qualify."""
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=((150, 100), (130, 100), (100, 160))),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -41,9 +42,9 @@ class TestMakeResourceSearchHop:
         """A dot on the bot's own tile is not a hop destination."""
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=((100, 100), (130, 100))),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -73,9 +74,9 @@ class TestMakeResourceSearchHop:
         )
         decision = make_resource_search_hop(
             _ctx(terrain=terrain, map_fuel_dots=((130, 100), (160, 100))),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -92,9 +93,9 @@ class TestMakeResourceSearchHop:
                 map_fuel_dots=((130, 100), (160, 100)),
                 scanned_viewport_origins=[(122, 92)],
             ),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -120,9 +121,9 @@ class TestMakeResourceSearchHop:
 
         decision = make_resource_search_hop(
             ctx,
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -141,9 +142,9 @@ class TestMakeResourceSearchHop:
 
         decision = make_resource_search_hop(
             ctx,
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -157,9 +158,9 @@ class TestMakeResourceSearchHop:
         terrain = InMemoryTerrainMap(terrain_data={(130, 100): "W"})
         decision = make_resource_search_hop(
             _ctx(terrain=terrain, map_fuel_dots=((130, 100), (160, 100))),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -180,9 +181,9 @@ class TestMakeResourceSearchHop:
         terrain = InMemoryTerrainMap(terrain_data={(125, 95): "W"})
         decision = make_resource_search_hop(
             _ctx(terrain=terrain, map_fuel_dots=((130, 100), (100, 160))),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -205,9 +206,9 @@ class TestMakeResourceSearchHop:
                 terrain=InMemoryTerrainMap(),
                 map_fuel_dots=((100, 40), (100, 160), (103, 162), (98, 165)),
             ),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -229,9 +230,9 @@ class TestMakeResourceSearchHop:
                 map_fuel_dots=((100, 130), (100, 252)),
                 self_y=191,
             ),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -245,9 +246,9 @@ class TestMakeResourceSearchHop:
         """Fuel below every dot's teleport cost returns None."""
         decision = make_resource_search_hop(
             _ctx(fuel=80, map_fuel_dots=((130, 100), (160, 100))),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         assert decision is None
@@ -259,9 +260,9 @@ class TestMakeResourceSearchHop:
                 map_fuel_dots=((130, 100),),
                 scanned_viewport_origins=[(122, 92)],
             ),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         assert decision is None
@@ -274,9 +275,9 @@ class TestMakeResourceSearchHop:
         """
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=()),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -295,9 +296,9 @@ class TestMakeResourceSearchHop:
         )
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=(), ai_state=ai_state),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         assert decision is None
@@ -312,9 +313,9 @@ class TestMakeResourceSearchHop:
         )
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=(), ai_state=ai_state),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -333,9 +334,9 @@ class TestMakeResourceSearchHop:
         )
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=((130, 100),)),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
             ai_state=base,
         )
 
@@ -349,9 +350,9 @@ class TestMakeResourceSearchHop:
         """Without a terrain map, passability and cleanliness degrade to 1.0."""
         decision = make_resource_search_hop(
             _ctx(terrain=None, map_fuel_dots=((130, 100),)),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:
@@ -364,9 +365,9 @@ class TestMakeResourceSearchHop:
         """Omitting ``ai_state`` uses the context's base state for clearing."""
         decision = make_resource_search_hop(
             _ctx(map_fuel_dots=((130, 100),)),
-            mode="COLLECT",
+            mode=BehaviorMode.COLLECT,
             score=900,
-            reason="search_collect_local",
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         )
 
         if decision is None:

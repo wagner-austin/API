@@ -20,7 +20,7 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_exit_collect,
     should_exit_hunt,
 )
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -186,7 +186,7 @@ def test_derive_hunt_mode_state_map_open_without_lock_acquires() -> None:
     """A non-find_enemies map open with no locked target derives ACQUIRE."""
     acquiring = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 800, 0, 0, "dot_relay"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 0, 0, ReasonKind.DOT_RELAY),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -202,7 +202,7 @@ def test_derive_hunt_mode_state_maps_unlocked_map_open_to_acquire() -> None:
     """
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 800, 0, 0, "find_enemies"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 0, 0, ReasonKind.FIND_ENEMIES),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -214,7 +214,7 @@ def test_derive_hunt_mode_state_maps_locked_walk_to_close() -> None:
     """A combat walk toward a locked target is a CLOSE transition."""
     decision = make_tick_decision(
         command=make_move_command(103, 100),
-        behavior=make_behavior_score("HUNT", 800, 103, 100, "find_target"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 103, 100, ReasonKind.FIND_TARGET),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),

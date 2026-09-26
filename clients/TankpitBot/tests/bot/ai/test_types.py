@@ -10,7 +10,8 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.bot.ai.scoring_types import (
-    BEHAVIOR_MODES,
+    BehaviorMode,
+    ReasonKind,
     make_behavior_score,
 )
 from tankpit_bot.bot.ai.types import (
@@ -202,13 +203,14 @@ class TestAIState:
 
 
 class TestBehaviorModes:
-    """Tests for BEHAVIOR_MODES constant."""
+    """Tests for the BehaviorMode vocabulary."""
 
-    def test_all_modes_present(self) -> None:
-        """Behavior modes are defined."""
-        assert len(BEHAVIOR_MODES) == 2
-        assert "HUNT" in BEHAVIOR_MODES
-        assert "COLLECT" in BEHAVIOR_MODES
+    def test_members_are_hunt_and_collect(self) -> None:
+        """The two behaviour modes carry their upper-case wire words."""
+        assert [(mode.name, mode.value) for mode in BehaviorMode] == [
+            ("HUNT", "HUNT"),
+            ("COLLECT", "COLLECT"),
+        ]
 
 
 class TestBehaviorScore:
@@ -216,25 +218,39 @@ class TestBehaviorScore:
 
     def test_make_behavior_score(self) -> None:
         """Factory creates correct BehaviorScoreDict."""
-        score = make_behavior_score("HUNT", 800, 100, 150, "find_target")
-        assert score["mode"] == "HUNT"
+        score = make_behavior_score(BehaviorMode.HUNT, 800, 100, 150, ReasonKind.FIND_TARGET)
+        assert score["mode"] is BehaviorMode.HUNT
         assert score["score"] == 800
         assert score["target_x"] == 100
         assert score["target_y"] == 150
-        assert score["reason_kind"] == "find_target"
+        assert score["reason_kind"] is ReasonKind.FIND_TARGET
         assert score["reason_context"] == {}
 
     def test_encode_decode_roundtrip(self) -> None:
         """Encode then decode produces identical BehaviorScoreDict."""
-        original = make_behavior_score("COLLECT", 600, 50, 75, "fuel_collect")
+        original = make_behavior_score(BehaviorMode.COLLECT, 600, 50, 75, ReasonKind.FUEL_COLLECT)
         encoded = encode_behavior_score(original)
+        assert encoded["mode"] == "COLLECT"
+        assert encoded["reason_kind"] == "fuel_collect"
         decoded = decode_behavior_score(encoded)
         assert decoded == original
+
+    @pytest.mark.parametrize("kind", list(ReasonKind))
+    def test_every_reason_kind_round_trips(self, kind: ReasonKind) -> None:
+        """Every reason the arbitrator can cite decodes, hunt_refuel included."""
+        original = make_behavior_score(BehaviorMode.HUNT, 800, 1, 2, kind)
+        decoded = decode_behavior_score(encode_behavior_score(original))
+        assert decoded["reason_kind"] is kind
 
     def test_roundtrip_with_reason_context(self) -> None:
         """A reason context map survives encode/decode."""
         original = make_behavior_score(
-            "HUNT", 800, 100, 150, "shoot_target", reason_context={"target_name": "orange-3"}
+            BehaviorMode.HUNT,
+            800,
+            100,
+            150,
+            ReasonKind.SHOOT_TARGET,
+            reason_context={"target_name": "orange-3"},
         )
         decoded = decode_behavior_score(encode_behavior_score(original))
         assert decoded == original
@@ -250,7 +266,7 @@ class TestBehaviorScore:
             "reason_kind": "vibes",
             "reason_context": {},
         }
-        with pytest.raises(JSONTypeError, match="reason_kind must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid reason_kind 'vibes'"):
             decode_behavior_score(data)
 
     def test_decode_invalid_reason_context_value_raises(self) -> None:
@@ -276,7 +292,7 @@ class TestBehaviorScore:
             "target_y": 0,
             "reason": "test",
         }
-        with pytest.raises(ValueError, match="must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid mode 'INVALID'"):
             decode_behavior_score(data)
 
     def test_decode_missing_field_raises(self) -> None:

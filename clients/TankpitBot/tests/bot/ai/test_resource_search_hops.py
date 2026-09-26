@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
@@ -112,7 +113,7 @@ class TestHarvestMemoryVeto:
         ctx = self._ctx_with_beliefs(container_volume=0, container_ts=100000, now_ms=100000)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         assert decision is None
@@ -122,7 +123,7 @@ class TestHarvestMemoryVeto:
         ctx = self._ctx_with_beliefs(container_volume=40, container_ts=100000, now_ms=100000)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -142,7 +143,7 @@ class TestHarvestMemoryVeto:
         )
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -172,7 +173,7 @@ class TestSettledKnowledge:
         )
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         assert decision is None
@@ -184,7 +185,7 @@ class TestSettledKnowledge:
         )
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         assert decision is None
@@ -201,7 +202,7 @@ class TestSettledKnowledge:
         )
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         assert decision is None
@@ -245,7 +246,7 @@ class TestPreHuntTopOffBias:
         ctx = self._ctx_with_enemy(hunt_ready=True)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -259,7 +260,7 @@ class TestPreHuntTopOffBias:
         ctx = self._ctx_with_enemy(hunt_ready=False)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -280,7 +281,7 @@ class TestPreHuntTopOffBias:
         ctx = self._ctx_with_enemy(hunt_ready=False, fuel=1200)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -431,7 +432,7 @@ class TestBarrenScanVeto:
         ctx = self._ctx_with_swept_landing(scan_age_ms=200000, human_seen_ms=1000000)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         assert decision is None
@@ -447,7 +448,7 @@ class TestBarrenScanVeto:
         )
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -465,7 +466,7 @@ class TestBarrenScanVeto:
         ctx = self._ctx_with_swept_landing(scan_age_ms=200000, hole=True, human_seen_ms=1000000)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -486,7 +487,7 @@ class TestBarrenScanVeto:
         )
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+            ctx, mode=BehaviorMode.COLLECT, score=500, reason=ReasonKind.SEARCH_COLLECT_LOCAL
         )
 
         if decision is None:
@@ -523,7 +524,11 @@ class TestSearchHopReleasesHeldLocks:
         locked = set_resource_target(ctx.ai_state, "fuel", 104, 100)
 
         decision = make_resource_search_hop(
-            ctx, mode="COLLECT", score=500, reason="search_collect_local", ai_state=locked
+            ctx,
+            mode=BehaviorMode.COLLECT,
+            score=500,
+            reason=ReasonKind.SEARCH_COLLECT_LOCAL,
+            ai_state=locked,
         )
 
         if decision is None:

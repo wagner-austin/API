@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_enter_collect,
     should_exit_collect,
 )
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
@@ -198,7 +199,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -215,7 +216,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=900,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -249,7 +250,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         assert decision is None
@@ -272,7 +273,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -297,7 +298,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -317,7 +318,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -350,7 +351,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         assert decision is None
@@ -369,7 +370,7 @@ class TestFrontierWalk:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -392,7 +393,7 @@ class TestFrontierWalk:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         assert decision is None
@@ -406,7 +407,7 @@ class TestFrontierWalk:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         assert decision is None
@@ -449,7 +450,7 @@ class TestFrontierPan:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -470,7 +471,7 @@ class TestFrontierPan:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -487,7 +488,7 @@ class TestFrontierPan:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT",
+            behavior_mode=BehaviorMode.COLLECT,
         )
 
         if decision is None:
@@ -509,7 +510,7 @@ class TestForagePreservesHeldLocks:
         ctx = _ctx(radars=0)
         locked = set_resource_target(ctx.ai_state, "fuel", 104, 100)
 
-        decision = plan_forage_search(ctx, locked, score=925, behavior_mode="COLLECT")
+        decision = plan_forage_search(ctx, locked, score=925, behavior_mode=BehaviorMode.COLLECT)
 
         if decision is None:
             raise AssertionError("expected a forage radar decision")

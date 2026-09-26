@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -85,7 +85,7 @@ def _make_decision(
     state = ai_state if ai_state is not None else make_initial_ai_state()
     return make_tick_decision(
         command=command,
-        behavior=make_behavior_score("HUNT", 100, 0, 0, "manual_hold"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 100, 0, 0, ReasonKind.MANUAL_HOLD),
         updated_ai_state=state,
         desired_equipment=[],
         secondary_command=secondary_command,

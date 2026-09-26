@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.greeting import attach_human_greeting
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -84,7 +84,7 @@ def _decision(
     secondary = make_radar_command() if with_secondary else None
     return make_tick_decision(
         command=make_teleport_command(119, 100),
-        behavior=make_behavior_score("HUNT", 800, 119, 100, "teleport_target"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 119, 100, ReasonKind.TELEPORT_TARGET),
         updated_ai_state=ai_state,
         desired_equipment=[2, 5],
         secondary_command=secondary,

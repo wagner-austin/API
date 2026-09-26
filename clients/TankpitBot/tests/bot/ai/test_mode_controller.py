@@ -20,7 +20,7 @@ from tankpit_bot.bot.ai.mode_controller import (
     resolve_owner_from_manual,
     set_ai_mode,
 )
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -109,7 +109,7 @@ def test_clear_mode_on_decision_clears_updated_ai_state_mode() -> None:
     )
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 0, 0, 0, "find_enemies"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 0, 0, 0, ReasonKind.FIND_ENEMIES),
         updated_ai_state=state,
         desired_equipment=[1, 2],
     )
@@ -126,7 +126,7 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
     """Decision rewriting can attach durable mode ownership."""
     decision = make_tick_decision(
         command=make_move_command(110, 100),
-        behavior=make_behavior_score("HUNT", 800, 110, 100, "teleport_target"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 110, 100, ReasonKind.TELEPORT_TARGET),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -142,7 +142,7 @@ def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> Non
     """HUNT substates are derived from concrete combat commands."""
     closing = make_tick_decision(
         command=make_teleport_command(110, 100),
-        behavior=make_behavior_score("HUNT", 800, 110, 100, "teleport_target"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 110, 100, ReasonKind.TELEPORT_TARGET),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -153,7 +153,7 @@ def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> Non
     )
     engaging = make_tick_decision(
         command=make_shoot_command(110, 100, 42),
-        behavior=make_behavior_score("HUNT", 800, 110, 100, "shoot_target"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 110, 100, ReasonKind.SHOOT_TARGET),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -179,7 +179,9 @@ def test_derive_hunt_mode_state_keeps_non_combat_teleport_in_acquire() -> None:
     """
     decision = make_tick_decision(
         command=make_teleport_command(110, 100),
-        behavior=make_behavior_score("HUNT", 0, 110, 100, "search_collect_local"),
+        behavior=make_behavior_score(
+            BehaviorMode.HUNT, 0, 110, 100, ReasonKind.SEARCH_COLLECT_LOCAL
+        ),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -196,7 +198,7 @@ def test_derive_hunt_mode_state_uses_acquire_for_delegated_fuel_pickup() -> None
     """
     decision = make_tick_decision(
         command=make_pickup_fuel_command(110, 100),
-        behavior=make_behavior_score("COLLECT", 900, 110, 100, "fuel_collect"),
+        behavior=make_behavior_score(BehaviorMode.COLLECT, 900, 110, 100, ReasonKind.FUEL_COLLECT),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -208,7 +210,7 @@ def test_derive_hunt_mode_state_uses_refresh_for_map_refresh() -> None:
     """Map refresh with a locked target maps to REFRESH."""
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 800, 0, 0, "find_target"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 0, 0, ReasonKind.FIND_TARGET),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -225,7 +227,7 @@ def test_derive_hunt_mode_state_uses_acquire_for_generic_enemy_search() -> None:
     """Generic enemy search remains HUNT acquire, not refresh."""
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 0, 0, 0, "find_enemies"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 0, 0, 0, ReasonKind.FIND_ENEMIES),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -242,7 +244,7 @@ def test_derive_hunt_mode_state_maps_confirm_kill_reason() -> None:
     """Confirm-kill behavior reasons map to the explicit HUNT confirmation state."""
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 800, 0, 0, "confirm_kill"),
+        behavior=make_behavior_score(BehaviorMode.HUNT, 800, 0, 0, ReasonKind.CONFIRM_KILL),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -254,25 +256,27 @@ def test_derive_collect_mode_state_maps_sense_search_and_pickup() -> None:
     """Equipment recovery substates are derived from concrete command intent."""
     sense = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("COLLECT", 925, 0, 0, "forage_radar"),
+        behavior=make_behavior_score(BehaviorMode.COLLECT, 925, 0, 0, ReasonKind.FORAGE_RADAR),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     search = make_tick_decision(
         command=make_move_command(130, 100),
         behavior=make_behavior_score(
-            "COLLECT",
+            BehaviorMode.COLLECT,
             925,
             130,
             100,
-            "search_collect_local",
+            ReasonKind.SEARCH_COLLECT_LOCAL,
         ),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     pickup = make_tick_decision(
         command=make_pickup_equipment_command(102, 101),
-        behavior=make_behavior_score("COLLECT", 925, 102, 101, "equipment_restock"),
+        behavior=make_behavior_score(
+            BehaviorMode.COLLECT, 925, 102, 101, ReasonKind.EQUIPMENT_RESTOCK
+        ),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -286,7 +290,9 @@ def test_derive_collect_mode_state_uses_approach_for_nonpickup_targeting() -> No
     """Equipment movement toward a known target maps to APPROACH."""
     decision = make_tick_decision(
         command=make_move_command(108, 107),
-        behavior=make_behavior_score("COLLECT", 925, 108, 107, "equipment_restock"),
+        behavior=make_behavior_score(
+            BehaviorMode.COLLECT, 925, 108, 107, ReasonKind.EQUIPMENT_RESTOCK
+        ),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -298,25 +304,27 @@ def test_derive_collect_mode_state_maps_sense_search_pickup_and_approach() -> No
     """Fuel recovery substates are derived from concrete command intent."""
     sense = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("COLLECT", 900, 0, 0, "forage_radar"),
+        behavior=make_behavior_score(BehaviorMode.COLLECT, 900, 0, 0, ReasonKind.FORAGE_RADAR),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     search = make_tick_decision(
         command=make_move_command(130, 100),
-        behavior=make_behavior_score("COLLECT", 900, 130, 100, "search_collect_local"),
+        behavior=make_behavior_score(
+            BehaviorMode.COLLECT, 900, 130, 100, ReasonKind.SEARCH_COLLECT_LOCAL
+        ),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     pickup = make_tick_decision(
         command=make_pickup_fuel_command(102, 101),
-        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel_locked"),
+        behavior=make_behavior_score(BehaviorMode.COLLECT, 900, 102, 101, ReasonKind.FUEL_LOCKED),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     approach = make_tick_decision(
         command=make_move_command(102, 101),
-        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel_locked"),
+        behavior=make_behavior_score(BehaviorMode.COLLECT, 900, 102, 101, ReasonKind.FUEL_LOCKED),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
