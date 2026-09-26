@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 import pytest
 from platform_core.json_utils import JSONTypeError
 
@@ -14,7 +12,6 @@ from tankpit_bot.action_lab.action_trace_types import (
     FuelDecisionBasisDict,
     FuelDecisionCandidateDict,
     decode_action_phase_cycle,
-    decode_action_phase_name,
     decode_action_phase_overlap,
     decode_fuel_decision_basis,
     decode_fuel_decision_candidate,
@@ -23,9 +20,10 @@ from tankpit_bot.action_lab.action_trace_types import (
     encode_fuel_decision_basis,
     encode_fuel_decision_candidate,
 )
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 
-def _sample_cycle(phase: ActionPhaseName = "teleport") -> ActionPhaseCycleDict:
+def _sample_cycle(phase: ActionPhaseName = ActionPhaseName.TELEPORT) -> ActionPhaseCycleDict:
     """Build a sample action phase cycle."""
     return ActionPhaseCycleDict(phase=phase, cycle_id=3, started_ms=1200)
 
@@ -33,20 +31,19 @@ def _sample_cycle(phase: ActionPhaseName = "teleport") -> ActionPhaseCycleDict:
 def _sample_overlap() -> ActionPhaseOverlapDict:
     """Build a sample action phase overlap."""
     return ActionPhaseOverlapDict(
-        active_phase="radar",
+        active_phase=ActionPhaseName.RADAR,
         active_cycle_id=2,
         active_started_ms=1400,
-        next_phase="move",
+        next_phase=ActionPhaseName.MOVE,
         next_cycle_id=3,
         next_started_ms=1500,
     )
 
 
 def _sample_candidate(
-    source: ActionPhaseName | None = None,
+    source: EntitySource = EntitySource.VIEWPORT,
 ) -> FuelDecisionCandidateDict:
     """Build a sample fuel decision candidate."""
-    resolved_source = "viewport" if source is None else _candidate_source_from_phase(source)
     return FuelDecisionCandidateDict(
         x=140,
         y=109,
@@ -55,24 +52,11 @@ def _sample_candidate(
         selected=True,
         actionable=False,
         reason="stale",
-        source=resolved_source,
-        refresh_kind="radar_cache_refresh",
+        source=source,
+        refresh_kind=ContainerRefreshKind.RADAR_CACHE_REFRESH,
         refresh_timestamp_ms=4200,
         age_ms=9500,
     )
-
-
-def _candidate_source_from_phase(
-    phase: ActionPhaseName,
-) -> Literal["viewport", "radar", "world_state"]:
-    """Map a phase test variant to one supported entity source."""
-    if phase == "teleport":
-        return "viewport"
-    if phase == "radar":
-        return "radar"
-    if phase == "move":
-        return "world_state"
-    return "viewport"
 
 
 def _sample_basis() -> FuelDecisionBasisDict:
@@ -90,22 +74,22 @@ def _sample_basis() -> FuelDecisionBasisDict:
     )
 
 
-@pytest.mark.parametrize("phase", ["teleport", "radar", "move", "pickup"])
-def test_decode_action_phase_name_accepts_all_supported_values(phase: ActionPhaseName) -> None:
-    """Action phase decode accepts every supported phase."""
-    assert decode_action_phase_name({"phase": phase}, "phase") == phase
+@pytest.mark.parametrize("phase", list(ActionPhaseName))
+def test_action_phase_cycle_round_trip_for_every_phase(phase: ActionPhaseName) -> None:
+    """Action phase cycles encode and decode cleanly for every phase."""
+    cycle = _sample_cycle(phase)
+    decoded = decode_action_phase_cycle(encode_action_phase_cycle(cycle))
+    assert decoded == cycle
+    assert decoded["phase"] is phase
 
 
-def test_decode_action_phase_name_rejects_invalid_value() -> None:
-    """Action phase decode rejects unsupported values."""
-    with pytest.raises(JSONTypeError, match="invalid action phase"):
-        decode_action_phase_name({"phase": "bad"}, "phase")
+def test_decode_action_phase_cycle_rejects_invalid_phase() -> None:
+    """Action phase cycle decode names the unsupported phase word."""
+    encoded = encode_action_phase_cycle(_sample_cycle())
+    encoded["phase"] = "bad"
 
-
-def test_action_phase_cycle_round_trip() -> None:
-    """Action phase cycles encode and decode cleanly."""
-    cycle = _sample_cycle("pickup")
-    assert decode_action_phase_cycle(encode_action_phase_cycle(cycle)) == cycle
+    with pytest.raises(JSONTypeError, match="Invalid phase 'bad'"):
+        decode_action_phase_cycle(encoded)
 
 
 def test_action_phase_overlap_round_trip() -> None:
@@ -114,10 +98,10 @@ def test_action_phase_overlap_round_trip() -> None:
     assert decode_action_phase_overlap(encode_action_phase_overlap(overlap)) == overlap
 
 
-@pytest.mark.parametrize("phase", ["teleport", "radar", "move"])
-def test_fuel_decision_candidate_round_trip_for_all_sources(phase: ActionPhaseName) -> None:
+@pytest.mark.parametrize("source", list(EntitySource))
+def test_fuel_decision_candidate_round_trip_for_all_sources(source: EntitySource) -> None:
     """Fuel decision candidates preserve all supported entity sources."""
-    candidate = _sample_candidate(phase)
+    candidate = _sample_candidate(source)
     assert decode_fuel_decision_candidate(encode_fuel_decision_candidate(candidate)) == candidate
 
 
@@ -126,7 +110,7 @@ def test_decode_fuel_decision_candidate_rejects_invalid_source() -> None:
     encoded = encode_fuel_decision_candidate(_sample_candidate())
     encoded["source"] = "bad"
 
-    with pytest.raises(JSONTypeError, match="invalid entity source"):
+    with pytest.raises(JSONTypeError, match="Invalid source 'bad'"):
         decode_fuel_decision_candidate(encoded)
 
 

@@ -31,7 +31,7 @@ from tankpit_bot._test_hooks import (
     CDPSessionProtocol,
 )
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.teleport import TeleportProbeError
 from tankpit_bot.action_lab.teleport_attempt import (
@@ -197,7 +197,9 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
         )
         return TrackedTeleportAttempt(
             message_start_index=0,
-            teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=3, started_ms=2000),
+            teleport_cycle=ActionPhaseCycleDict(
+                phase=ActionPhaseName.TELEPORT, cycle_id=3, started_ms=2000
+            ),
             acquisition_started_ms=2000,
             acquisition_sync_timestamp_ms=2200,
             page_snapshots=[],

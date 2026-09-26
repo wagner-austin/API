@@ -12,7 +12,7 @@ from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab import teleport_phase
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
@@ -256,7 +256,9 @@ def test_run_tracked_teleport_command_waits_and_resets_state() -> None:
             page,
             probe,
             target,
-            teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=4, started_ms=1300),
+            teleport_cycle=ActionPhaseCycleDict(
+                phase=ActionPhaseName.TELEPORT, cycle_id=4, started_ms=1300
+            ),
             message_start_index=3,
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
@@ -279,7 +281,9 @@ def test_run_tracked_teleport_command_waits_and_resets_state() -> None:
     assert started_ms == 1400
     assert result["teleport_started_ms"] == 1400
     assert probe.teleports == [(147, 110)]
-    assert probe.end_cycles == [ActionPhaseCycleDict(phase="teleport", cycle_id=4, started_ms=1300)]
+    assert probe.end_cycles == [
+        ActionPhaseCycleDict(phase=ActionPhaseName.TELEPORT, cycle_id=4, started_ms=1300)
+    ]
     assert probe.reset_idle_calls == 1
     assert capture_calls == ["before_teleport"]
     assert wait_calls == [1400]
@@ -305,7 +309,9 @@ def test_run_tracked_teleport_command_raises_on_dispatch_failure() -> None:
                 page,
                 probe,
                 target,
-                teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=7, started_ms=1900),
+                teleport_cycle=ActionPhaseCycleDict(
+                    phase=ActionPhaseName.TELEPORT, cycle_id=7, started_ms=1900
+                ),
                 message_start_index=0,
                 map_open_started_ms=1800,
                 map_sync_timestamp_ms=1850,
@@ -322,7 +328,9 @@ def test_run_tracked_teleport_command_raises_on_dispatch_failure() -> None:
         action_hooks.get_current_time_ms = original_clock
 
     assert probe.teleports == [(147, 110)]
-    assert probe.end_cycles == [ActionPhaseCycleDict(phase="teleport", cycle_id=7, started_ms=1900)]
+    assert probe.end_cycles == [
+        ActionPhaseCycleDict(phase=ActionPhaseName.TELEPORT, cycle_id=7, started_ms=1900)
+    ]
     assert probe.reset_idle_calls == 0
 
 

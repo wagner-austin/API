@@ -42,6 +42,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseName
 from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
@@ -317,7 +318,7 @@ def _resolve_with_tracked_reposition(
             unexpected_result_message,
             reset_to_idle_before_start,
         )
-        cycle = probe._start_action_phase("teleport", attempt_label=attempt_label)
+        cycle = probe._start_action_phase(ActionPhaseName.TELEPORT, attempt_label=attempt_label)
         teleport_result = (
             None
             if reposition_teleport_status is None

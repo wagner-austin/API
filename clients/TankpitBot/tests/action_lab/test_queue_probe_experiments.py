@@ -27,6 +27,7 @@ from tankpit_bot.action_lab.queue_experiments import (
     run_shoot_then_shoot_experiment,
     run_single_experiment,
 )
+from tankpit_bot.action_lab.queue_probe_types import QueueExperimentKind
 
 
 class TestRunShootThenPickup:
@@ -40,7 +41,7 @@ class TestRunShootThenPickup:
         )
         probe = _setup_probe(worlds, clock)
         result = run_shoot_then_pickup_experiment(probe, timeout_ms=5000)
-        assert result["kind"] == "shoot_then_pickup"
+        assert result["kind"] is QueueExperimentKind.SHOOT_THEN_PICKUP
         assert result["status"] == "both_processed"
         assert result["primary"]["label"] == "shoot"
         assert result["secondary"]["label"] == "pickup_fuel"
@@ -77,7 +78,7 @@ class TestRunShootThenShoot:
         )
         probe = _setup_probe(worlds, clock)
         result = run_shoot_then_shoot_experiment(probe, timeout_ms=5000)
-        assert result["kind"] == "shoot_then_shoot"
+        assert result["kind"] is QueueExperimentKind.SHOOT_THEN_SHOOT
         assert result["status"] == "both_processed"
         assert result["primary"]["label"] == "shoot_1"
         assert result["secondary"]["label"] == "shoot_2"
@@ -113,7 +114,7 @@ class TestRunMoveThenPickup:
         )
         probe = _setup_probe(worlds, clock)
         result = run_move_then_pickup_experiment(probe, timeout_ms=5000)
-        assert result["kind"] == "move_then_pickup"
+        assert result["kind"] is QueueExperimentKind.MOVE_THEN_PICKUP
         assert result["status"] == "both_processed"
 
     def test_second_dropped_when_fuel_unchanged(self) -> None:
@@ -146,8 +147,10 @@ class TestRunSingleExperiment:
             ]
         )
         probe = _setup_probe(worlds, clock)
-        result = run_single_experiment(probe, "shoot_then_pickup", timeout_ms=5000)
-        assert result["kind"] == "shoot_then_pickup"
+        result = run_single_experiment(
+            probe, QueueExperimentKind.SHOOT_THEN_PICKUP, timeout_ms=5000
+        )
+        assert result["kind"] is QueueExperimentKind.SHOOT_THEN_PICKUP
 
     def test_dispatches_shoot_then_shoot(self) -> None:
         clock = ReplayClock(1000)
@@ -159,8 +162,8 @@ class TestRunSingleExperiment:
             ]
         )
         probe = _setup_probe(worlds, clock)
-        result = run_single_experiment(probe, "shoot_then_shoot", timeout_ms=5000)
-        assert result["kind"] == "shoot_then_shoot"
+        result = run_single_experiment(probe, QueueExperimentKind.SHOOT_THEN_SHOOT, timeout_ms=5000)
+        assert result["kind"] is QueueExperimentKind.SHOOT_THEN_SHOOT
 
     def test_dispatches_move_then_pickup(self) -> None:
         clock = ReplayClock(1000)
@@ -171,8 +174,8 @@ class TestRunSingleExperiment:
             ]
         )
         probe = _setup_probe(worlds, clock)
-        result = run_single_experiment(probe, "move_then_pickup", timeout_ms=5000)
-        assert result["kind"] == "move_then_pickup"
+        result = run_single_experiment(probe, QueueExperimentKind.MOVE_THEN_PICKUP, timeout_ms=5000)
+        assert result["kind"] is QueueExperimentKind.MOVE_THEN_PICKUP
 
 
 class TestShootThenPickupErrorBranches:

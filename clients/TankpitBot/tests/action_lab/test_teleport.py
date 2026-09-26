@@ -30,7 +30,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.teleport import (
     TeleportProbe,
 )
@@ -277,7 +277,9 @@ def test_probe_single_target_rejects_missing_teleport_result_after_acquisition()
         )
         return TrackedTeleportAttempt(
             message_start_index=0,
-            teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=1, started_ms=1000),
+            teleport_cycle=ActionPhaseCycleDict(
+                phase=ActionPhaseName.TELEPORT, cycle_id=1, started_ms=1000
+            ),
             acquisition_started_ms=1000,
             acquisition_sync_timestamp_ms=1200,
             page_snapshots=[],

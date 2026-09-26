@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseCycleDict,
+    ActionPhaseName,
     ActionPhaseOverlapDict,
 )
 from tankpit_bot.action_lab.types import (
@@ -155,24 +156,17 @@ class _PickupProbe:
 
     def _start_action_phase(
         self,
-        phase: str,
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
         _ = attempt_label
         self._cycle_id += 1
-        if phase == "move":
-            named: ActionPhaseCycleDict = ActionPhaseCycleDict(
-                phase="move",
-                cycle_id=self._cycle_id,
-                started_ms=self._clock(),
-            )
-        else:
-            named = ActionPhaseCycleDict(
-                phase="pickup",
-                cycle_id=self._cycle_id,
-                started_ms=self._clock(),
-            )
+        named = ActionPhaseCycleDict(
+            phase=phase,
+            cycle_id=self._cycle_id,
+            started_ms=self._clock(),
+        )
         self._cycles.append(named)
         return named
 

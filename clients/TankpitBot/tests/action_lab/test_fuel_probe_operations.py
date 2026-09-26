@@ -12,7 +12,7 @@ from tests.action_lab._replay_page import (
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.fuel_probe_attempt_contracts import RunTrackedPickupPhaseProtocol
 from tankpit_bot.action_lab.fuel_probe_operations import (
     build_attempt_result_for_probe,
@@ -347,8 +347,8 @@ def test_run_pickup_attempt_for_probe_uses_injected_phase_runner() -> None:
                 compute_timeout,
             )
             return (
-                ActionPhaseCycleDict(phase="move", cycle_id=11, started_ms=1000),
-                ActionPhaseCycleDict(phase="pickup", cycle_id=12, started_ms=1100),
+                ActionPhaseCycleDict(phase=ActionPhaseName.MOVE, cycle_id=11, started_ms=1000),
+                ActionPhaseCycleDict(phase=ActionPhaseName.PICKUP, cycle_id=12, started_ms=1100),
                 1200,
                 "picked_up_fuel",
                 1300,

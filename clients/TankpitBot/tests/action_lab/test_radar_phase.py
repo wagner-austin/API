@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Literal
 
 import pytest
 from tests.action_lab._replay_page import ReplayClock
@@ -13,7 +12,7 @@ from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import radar_phase
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -66,10 +65,13 @@ class _Probe:
         """Return the configured radar dispatch outcome."""
         return self._radar_result
 
-    def _start_action_phase(self, phase: str, *, attempt_label: str) -> ActionPhaseCycleDict:
-        """Start one typed phase cycle."""
+    def _start_action_phase(
+        self, phase: ActionPhaseName, *, attempt_label: str
+    ) -> ActionPhaseCycleDict:
+        """Start one typed phase cycle; the radar helper only ever starts radar."""
+        assert phase is ActionPhaseName.RADAR
         cycle = ActionPhaseCycleDict(
-            phase=_require_radar_phase_name(phase),
+            phase=phase,
             cycle_id=len(self._cycles) + 1,
             started_ms=1100,
         )
@@ -84,13 +86,6 @@ class _Probe:
     def _reset_probe_state_to_idle(self) -> None:
         """Record one idle reset."""
         self.reset_count += 1
-
-
-def _require_radar_phase_name(phase: str) -> Literal["radar"]:
-    """Return the only valid radar phase name."""
-    if phase != "radar":
-        raise AssertionError(f"unexpected phase {phase}")
-    return "radar"
 
 
 @pytest.fixture(autouse=True)
@@ -161,7 +156,9 @@ def test_run_tracked_radar_phase_waits_for_sync() -> None:
     )
 
     assert drain_calls == ["drain"]
-    assert radar_cycle == ActionPhaseCycleDict(phase="radar", cycle_id=1, started_ms=1100)
+    assert radar_cycle == ActionPhaseCycleDict(
+        phase=ActionPhaseName.RADAR, cycle_id=1, started_ms=1100
+    )
     assert radar_started_ms == 1200
     assert radar_sync_timestamp_ms == 1650
     assert probe._ended == [radar_cycle]
@@ -198,5 +195,7 @@ def test_run_tracked_radar_phase_raises_on_dispatch_failure() -> None:
             dispatch_failure_error=RuntimeError,
         )
 
-    assert probe._ended == [ActionPhaseCycleDict(phase="radar", cycle_id=1, started_ms=1100)]
+    assert probe._ended == [
+        ActionPhaseCycleDict(phase=ActionPhaseName.RADAR, cycle_id=1, started_ms=1100)
+    ]
     assert probe.reset_count == 0

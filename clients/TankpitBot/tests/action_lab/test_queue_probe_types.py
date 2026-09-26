@@ -7,6 +7,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.action_lab.queue_probe_types import (
     QueueCommandTimingDict,
+    QueueExperimentKind,
     QueueExperimentResultDict,
     QueueProbeSessionDict,
     decode_queue_command_timing,
@@ -48,7 +49,7 @@ def _make_timing(
 
 def _make_experiment() -> QueueExperimentResultDict:
     return QueueExperimentResultDict(
-        kind="shoot_then_pickup",
+        kind=QueueExperimentKind.SHOOT_THEN_PICKUP,
         status="both_processed",
         primary=_make_timing(label="shoot", sent_ms=100, ack_ms=200),
         secondary=_make_timing(label="pickup_fuel", sent_ms=105, ack_ms=210),
@@ -103,7 +104,7 @@ class TestQueueExperimentResult:
         exp = _make_experiment()
         encoded = encode_queue_experiment_result(exp)
         encoded["kind"] = "invalid_kind"
-        with pytest.raises(JSONTypeError, match="invalid experiment kind"):
+        with pytest.raises(JSONTypeError, match="Invalid kind 'invalid_kind'"):
             decode_queue_experiment_result(encoded)
 
     def test_decode_invalid_status_raises(self) -> None:
@@ -132,14 +133,14 @@ class TestQueueExperimentResult:
         encoded = encode_queue_experiment_result(exp)
         encoded["kind"] = "shoot_then_shoot"
         decoded = decode_queue_experiment_result(encoded)
-        assert decoded["kind"] == "shoot_then_shoot"
+        assert decoded["kind"] is QueueExperimentKind.SHOOT_THEN_SHOOT
 
     def test_move_then_pickup_kind_roundtrip(self) -> None:
         exp = _make_experiment()
         encoded = encode_queue_experiment_result(exp)
         encoded["kind"] = "move_then_pickup"
         decoded = decode_queue_experiment_result(encoded)
-        assert decoded["kind"] == "move_then_pickup"
+        assert decoded["kind"] is QueueExperimentKind.MOVE_THEN_PICKUP
 
     def test_second_dropped_status_roundtrip(self) -> None:
         exp = _make_experiment()

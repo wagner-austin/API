@@ -21,7 +21,7 @@ from tests.action_lab._teleport_seams import teleport_attempt_module
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.teleport_attempt import run_tracked_teleport_attempt
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterProtocol,
@@ -164,7 +164,7 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         teleport_attempt_module.run_tracked_teleport_command = original_teleport
 
     assert expected_probe.reset_idle_calls == 1
-    assert expected_probe.started_cycles == [("teleport", "target")]
+    assert expected_probe.started_cycles == [(ActionPhaseName.TELEPORT, "target")]
     assert dispatch_calls == ["acquire"]
     assert teleport_calls == [1]
     assert attempt.message_start_index == 1

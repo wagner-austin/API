@@ -38,6 +38,7 @@ from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
+from tankpit_bot.types.constants import TankLiveness
 
 _SnapshotPhase = Literal[
     "before_map_open",
@@ -90,7 +91,7 @@ def _make_our_belief() -> OurTankBeliefDict:
         present=True,
         x=99,
         y=100,
-        liveness="alive",
+        liveness=TankLiveness.ALIVE,
         last_wire_seen_ms=10_000,
         last_position_update_ms=9_500,
         wire_age_ms=500,

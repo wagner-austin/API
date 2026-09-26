@@ -7,7 +7,7 @@ from typing import Literal
 import pytest
 from platform_core.json_utils import JSONTypeError
 
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseName, ActionPhaseOverlapDict
 from tankpit_bot.action_lab.equipment_probe_types import (
     EquipmentProbeAttemptResultDict,
     EquipmentProbeSessionDict,
@@ -153,10 +153,10 @@ def test_equipment_probe_attempt_round_trip_with_phase_overlap() -> None:
     attempt = _attempt()
     attempt["phase_overlaps"] = [
         ActionPhaseOverlapDict(
-            active_phase="radar",
+            active_phase=ActionPhaseName.RADAR,
             active_cycle_id=2,
             active_started_ms=1500,
-            next_phase="move",
+            next_phase=ActionPhaseName.MOVE,
             next_cycle_id=3,
             next_started_ms=1700,
         )

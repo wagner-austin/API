@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 import pytest
 from tests.action_lab._replay_page import ReplayClock
@@ -12,7 +11,7 @@ from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import pickup_phase
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage
@@ -77,10 +76,13 @@ class _Probe:
         self._move_calls.append((x, y))
         return self._move_result
 
-    def _start_action_phase(self, phase: str, *, attempt_label: str) -> ActionPhaseCycleDict:
-        """Start one typed phase cycle."""
+    def _start_action_phase(
+        self, phase: ActionPhaseName, *, attempt_label: str
+    ) -> ActionPhaseCycleDict:
+        """Start one typed phase cycle; the pickup helper starts only move and pickup."""
+        assert phase in (ActionPhaseName.MOVE, ActionPhaseName.PICKUP)
         cycle = ActionPhaseCycleDict(
-            phase=_require_pickup_phase_name(phase),
+            phase=phase,
             cycle_id=len(self._cycles) + 1,
             started_ms=1300,
         )
@@ -95,15 +97,6 @@ class _Probe:
     def _reset_probe_state_to_idle(self) -> None:
         """Record one idle reset."""
         self.reset_count += 1
-
-
-def _require_pickup_phase_name(phase: str) -> Literal["move", "pickup"]:
-    """Return a valid move-or-pickup phase name."""
-    if phase == "move":
-        return "move"
-    if phase == "pickup":
-        return "pickup"
-    raise AssertionError(f"unexpected phase {phase}")
 
 
 def _make_world(x: int, y: int, fuel: int) -> WorldStateDict:
@@ -237,8 +230,12 @@ def test_run_tracked_pickup_phase_returns_immediate_pickup_without_move() -> Non
         )
     )
 
-    assert move_cycle == ActionPhaseCycleDict(phase="move", cycle_id=1, started_ms=1300)
-    assert pickup_cycle == ActionPhaseCycleDict(phase="pickup", cycle_id=2, started_ms=1300)
+    assert move_cycle == ActionPhaseCycleDict(
+        phase=ActionPhaseName.MOVE, cycle_id=1, started_ms=1300
+    )
+    assert pickup_cycle == ActionPhaseCycleDict(
+        phase=ActionPhaseName.PICKUP, cycle_id=2, started_ms=1300
+    )
     assert pickup_started_ms == 1500
     assert status == "picked_up_fuel"
     assert completion_ms == 1500
@@ -277,8 +274,12 @@ def test_run_tracked_pickup_phase_dispatches_move_and_waits_for_pickup() -> None
         )
     )
 
-    assert move_cycle == ActionPhaseCycleDict(phase="move", cycle_id=1, started_ms=1300)
-    assert pickup_cycle == ActionPhaseCycleDict(phase="pickup", cycle_id=2, started_ms=1300)
+    assert move_cycle == ActionPhaseCycleDict(
+        phase=ActionPhaseName.MOVE, cycle_id=1, started_ms=1300
+    )
+    assert pickup_cycle == ActionPhaseCycleDict(
+        phase=ActionPhaseName.PICKUP, cycle_id=2, started_ms=1300
+    )
     assert pickup_started_ms == 2000
     assert status == "picked_up_fuel"
     assert completion_ms == 2100
@@ -315,7 +316,7 @@ def test_run_tracked_pickup_phase_raises_on_move_dispatch_failure() -> None:
 
     assert probe._move_calls == [(101, 100)]
     assert probe._ended == [
-        ActionPhaseCycleDict(phase="move", cycle_id=1, started_ms=1300),
-        ActionPhaseCycleDict(phase="pickup", cycle_id=2, started_ms=1300),
+        ActionPhaseCycleDict(phase=ActionPhaseName.MOVE, cycle_id=1, started_ms=1300),
+        ActionPhaseCycleDict(phase=ActionPhaseName.PICKUP, cycle_id=2, started_ms=1300),
     ]
     assert probe.reset_count == 0

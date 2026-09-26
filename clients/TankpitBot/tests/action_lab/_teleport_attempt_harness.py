@@ -8,7 +8,7 @@ from typing_extensions import Unpack
 
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterKwargs,
     TeleportOutcomeWaiterProtocol,
@@ -42,7 +42,7 @@ class _Probe:
                 ws_url="wss://example.test/ws/",
             )
         ]
-        self.started_cycles: list[tuple[str, str]] = []
+        self.started_cycles: list[tuple[ActionPhaseName, str]] = []
         self.reset_idle_calls = 0
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
@@ -77,13 +77,13 @@ class _Probe:
 
     def _start_action_phase(
         self,
-        phase: Literal["teleport"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
-        """Return one started teleport phase."""
+        """Return one started phase cycle, recording which phase was asked for."""
         self.started_cycles.append((phase, attempt_label))
-        return ActionPhaseCycleDict(phase="teleport", cycle_id=7, started_ms=1200)
+        return ActionPhaseCycleDict(phase=phase, cycle_id=7, started_ms=1200)
 
 
 class _Page:

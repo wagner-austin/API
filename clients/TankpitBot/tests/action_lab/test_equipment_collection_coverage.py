@@ -35,6 +35,7 @@ from tankpit_bot.action_lab import (
 )
 from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseCycleDict,
+    ActionPhaseName,
     ActionPhaseOverlapDict,
 )
 from tankpit_bot.action_lab.equipment_collection_phase import (
@@ -92,7 +93,7 @@ def test_collection_propagates_terminal_result() -> None:
         """Fake radar that always succeeds."""
         return (
             ActionPhaseCycleDict(
-                phase="radar",
+                phase=ActionPhaseName.RADAR,
                 cycle_id=99,
                 started_ms=1300,
             ),
@@ -168,7 +169,7 @@ def test_collection_impossible_missing_target() -> None:
         dispatch_failure_message: str = "",
     ) -> tuple[ActionPhaseCycleDict, int, int | None]:
         return (
-            ActionPhaseCycleDict(phase="radar", cycle_id=99, started_ms=1300),
+            ActionPhaseCycleDict(phase=ActionPhaseName.RADAR, cycle_id=99, started_ms=1300),
             1300,
             1400,
         )

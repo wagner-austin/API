@@ -12,6 +12,7 @@ from tankpit_bot.action_lab.action_trace import (
     format_fuel_decision_candidates,
     log_phase_overlaps,
 )
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseName
 from tankpit_bot.state import (
     WorldStateDict,
     make_container_state,
@@ -19,6 +20,7 @@ from tankpit_bot.state import (
     make_self_state,
 )
 from tankpit_bot.state.types import make_viewport_state
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 
 class _FlatTerrain:
@@ -82,9 +84,9 @@ def test_action_cycle_tracker_begin_and_end_phase() -> None:
     """Cycle tracker starts and ends one phase cleanly."""
     tracker = ActionCycleTracker()
 
-    cycle, overlaps = tracker.begin_phase("teleport", started_ms=1000)
+    cycle, overlaps = tracker.begin_phase(ActionPhaseName.TELEPORT, started_ms=1000)
 
-    assert cycle["phase"] == "teleport"
+    assert cycle["phase"] is ActionPhaseName.TELEPORT
     assert cycle["cycle_id"] == 1
     assert overlaps == []
 
@@ -108,8 +110,8 @@ def test_action_cycle_tracker_reports_overlap_and_emits_diagnostic(
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
     tracker = ActionCycleTracker()
-    tracker.begin_phase("radar", started_ms=1200)
-    _, overlaps = tracker.begin_phase("move", started_ms=1300)
+    tracker.begin_phase(ActionPhaseName.RADAR, started_ms=1200)
+    _, overlaps = tracker.begin_phase(ActionPhaseName.MOVE, started_ms=1300)
 
     log_phase_overlaps(overlaps, attempt_label="attempt-2")
 
@@ -141,14 +143,14 @@ def test_action_cycle_tracker_rejects_ending_inactive_phase() -> None:
     tracker = ActionCycleTracker()
 
     with pytest.raises(ValueError, match="is not active"):
-        tracker.end_phase({"phase": "pickup", "cycle_id": 1, "started_ms": 1000})
+        tracker.end_phase({"phase": ActionPhaseName.PICKUP, "cycle_id": 1, "started_ms": 1000})
 
 
 def test_action_cycle_tracker_rejects_cycle_mismatch() -> None:
     """Cycle tracker rejects ending a stale cycle after the phase restarted."""
     tracker = ActionCycleTracker()
-    first_cycle, _ = tracker.begin_phase("teleport", started_ms=1000)
-    tracker.begin_phase("teleport", started_ms=1100)
+    first_cycle, _ = tracker.begin_phase(ActionPhaseName.TELEPORT, started_ms=1000)
+    tracker.begin_phase(ActionPhaseName.TELEPORT, started_ms=1100)
 
     with pytest.raises(ValueError, match="active cycle mismatch"):
         tracker.end_phase(first_cycle)
@@ -157,10 +159,10 @@ def test_action_cycle_tracker_rejects_cycle_mismatch() -> None:
 def test_action_cycle_tracker_reset_restarts_cycle_numbers() -> None:
     """Cycle tracker reset clears active state and restarts counters."""
     tracker = ActionCycleTracker()
-    tracker.begin_phase("move", started_ms=1000)
+    tracker.begin_phase(ActionPhaseName.MOVE, started_ms=1000)
 
     tracker.reset()
-    cycle, overlaps = tracker.begin_phase("move", started_ms=1200)
+    cycle, overlaps = tracker.begin_phase(ActionPhaseName.MOVE, started_ms=1200)
 
     assert cycle["cycle_id"] == 1
     assert overlaps == []
@@ -179,8 +181,8 @@ def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -
         109,
         True,
         380,
-        source="radar",
-        refresh_kind="radar_response",
+        source=EntitySource.RADAR,
+        refresh_kind=ContainerRefreshKind.RADAR_RESPONSE,
         timestamp_ms=39_000,
         failed_pickups=1,
     )
@@ -189,8 +191,8 @@ def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -
         102,
         True,
         255,
-        source="radar",
-        refresh_kind="radar_cache_refresh",
+        source=EntitySource.RADAR,
+        refresh_kind=ContainerRefreshKind.RADAR_CACHE_REFRESH,
         timestamp_ms=5_000,
         failed_pickups=0,
     )

@@ -10,6 +10,7 @@ from typing_extensions import Unpack
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseCycleDict,
+    ActionPhaseName,
     ActionPhaseOverlapDict,
 )
 from tankpit_bot.action_lab.equipment_probe_types import (
@@ -190,7 +191,7 @@ class _Probe:
 
     def _start_action_phase(
         self,
-        phase: Literal["teleport", "radar", "move", "pickup"],
+        phase: ActionPhaseName,
         *,
         attempt_label: str,
     ) -> ActionPhaseCycleDict:
@@ -461,7 +462,7 @@ def _yes_repo(
     return True
 
 
-_CYCLE = ActionPhaseCycleDict(phase="teleport", cycle_id=1, started_ms=1000)
+_CYCLE = ActionPhaseCycleDict(phase=ActionPhaseName.TELEPORT, cycle_id=1, started_ms=1000)
 
 
 def _make_tracked(

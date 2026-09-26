@@ -67,7 +67,7 @@ class TestFormatQueueProbeSummary:
             startup_timing=timing,
             experiments=[
                 QueueExperimentResultDict(
-                    kind="shoot_then_pickup",
+                    kind=QueueExperimentKind.SHOOT_THEN_PICKUP,
                     status="both_processed",
                     primary=QueueCommandTimingDict(
                         label="shoot", sent_ms=100, ack_ms=200, elapsed_ms=100
@@ -128,7 +128,7 @@ class TestExecuteProbeIntegration:
         action_hooks.wait_for_initial_self_state = _wait_for_initial_self_state_spawn
         action_hooks.advance_startup_state = _advance_startup_state_stub
 
-        experiment_results = [_make_experiment_result("shoot_then_pickup")]
+        experiment_results = [_make_experiment_result(QueueExperimentKind.SHOOT_THEN_PICKUP)]
 
         def _fake_run_single(
             probe: QueueExperimentProbeProtocol,
@@ -144,12 +144,12 @@ class TestExecuteProbeIntegration:
         session = harness.execute_probe(
             initial_sync_timeout_ms=5000,
             experiment_timeout_ms=3000,
-            experiment_kinds=["shoot_then_pickup"],
+            experiment_kinds=[QueueExperimentKind.SHOOT_THEN_PICKUP],
         )
         assert session["spawn_x"] == 101
         assert session["spawn_y"] == 102
         assert len(session["experiments"]) == 1
-        assert session["experiments"][0]["kind"] == "shoot_then_pickup"
+        assert session["experiments"][0]["kind"] is QueueExperimentKind.SHOOT_THEN_PICKUP
         assert session["experiment_timeout_ms"] == 3000
         assert harness._page is None
         assert harness._cdp is None
@@ -163,7 +163,7 @@ class TestExecuteProbeIntegration:
             harness.execute_probe(
                 initial_sync_timeout_ms=5000,
                 experiment_timeout_ms=3000,
-                experiment_kinds=["shoot_then_pickup"],
+                experiment_kinds=[QueueExperimentKind.SHOOT_THEN_PICKUP],
             )
 
 
@@ -174,7 +174,7 @@ class TestQueueProbeValidation:
             probe.execute_probe(
                 initial_sync_timeout_ms=10000,
                 experiment_timeout_ms=0,
-                experiment_kinds=["shoot_then_pickup"],
+                experiment_kinds=[QueueExperimentKind.SHOOT_THEN_PICKUP],
             )
 
     def test_empty_kinds_raises(self) -> None:
