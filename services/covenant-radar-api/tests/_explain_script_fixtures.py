@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 import numpy as np
 from covenant_ml.datasets import (
     DatasetConfig,
@@ -28,7 +26,7 @@ from scripts.explain.runner import (
     ExplainRunResult,
 )
 
-DatasetNameLiteral = Literal["taiwan", "us", "polish"]
+from covenant_radar_api.dataset_names import DatasetName
 
 
 def _make_fake_feature_importances(n_features: int = 10) -> list[FeatureImportanceScore]:
@@ -60,7 +58,7 @@ def _make_fake_explain_result(
 
 def _make_fake_run_result(
     backend: BackendName = "xgboost",
-    dataset: DatasetNameLiteral = "taiwan",
+    dataset: DatasetName = DatasetName.TAIWAN,
     explainer: ExplainerName = ExplainerName.PERMUTATION,
 ) -> ExplainRunResult:
     """Create a fake ExplainRunResult for testing."""

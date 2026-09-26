@@ -33,8 +33,8 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
+from covenant_radar_api.dataset_names import DatasetName
 from scripts._test_hooks import UnifiedOptimizationResult
-from scripts.optimize.cli import DatasetName
 
 logger = get_logger(__name__)
 

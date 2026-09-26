@@ -21,6 +21,8 @@ from scripts.optimize.runner import (
     run_backend,
 )
 
+from covenant_radar_api.dataset_names import DatasetName
+
 from .conftest import make_fake_result
 
 
@@ -83,7 +85,7 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("xgboost", "taiwan", 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend("xgboost", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None)
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -102,7 +104,7 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("mlp", "taiwan", 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend("mlp", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None)
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -118,7 +120,9 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("lightgbm", "taiwan", 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend(
+                "lightgbm", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+            )
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -134,7 +138,7 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("lstm", "taiwan", 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend("lstm", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None)
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -150,7 +154,9 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result = run_backend("cleargbm", "taiwan", 10, FeaturePreset.FULL, "cpu", None)
+            result = run_backend(
+                "cleargbm", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", None
+            )
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
@@ -166,7 +172,7 @@ class TestRunBackend:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            run_backend("xgboost", "taiwan", 10, FeaturePreset.FULL, "cpu", 60)
+            run_backend("xgboost", DatasetName.TAIWAN, 10, FeaturePreset.FULL, "cpu", 60)
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
             assert "timeout_seconds" in config_json

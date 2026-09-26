@@ -26,6 +26,8 @@ from scripts.optimize.modes import (
     run_multiple_backends,
 )
 
+from covenant_radar_api.dataset_names import DatasetName
+
 from .conftest import (
     FakeSaveModelBackend,
     make_fake_cleargbm_result,
@@ -124,7 +126,7 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("xgboost",), "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("xgboost",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
             assert "none" in presets_called
             assert "log_only" in presets_called
@@ -162,7 +164,7 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("mlp",), "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("mlp",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -194,7 +196,7 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("lightgbm",), "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("lightgbm",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -227,7 +229,7 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("lstm",), "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("lstm",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -260,7 +262,7 @@ class TestComparePresets:
         original = _hooks.optimization_runner
         _hooks.optimization_runner = fake_runner
         try:
-            compare_presets(("cleargbm",), "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("cleargbm",), DatasetName.TAIWAN, 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.optimization_runner = original
@@ -322,7 +324,13 @@ class TestComparePresets:
             (tmp_path / "models").mkdir(parents=True, exist_ok=True)
 
             compare_presets(
-                ("xgboost",), "taiwan", 5, "cpu", None, save_model=True, project_root=tmp_path
+                ("xgboost",),
+                DatasetName.TAIWAN,
+                5,
+                "cpu",
+                None,
+                save_model=True,
+                project_root=tmp_path,
             )
 
             assert len(presets_called) == 4
@@ -414,7 +422,7 @@ class TestRunMultipleBackends:
         try:
             run_multiple_backends(
                 ("lightgbm", "xgboost"),
-                "taiwan",
+                DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
                 "cpu",
@@ -449,7 +457,7 @@ class TestRunMultipleBackends:
         try:
             run_multiple_backends(
                 ("xgboost",),
-                "taiwan",
+                DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
                 "cpu",
@@ -489,7 +497,7 @@ class TestRunMultipleBackends:
         try:
             run_multiple_backends(
                 ("xgboost", "lightgbm", "mlp", "lstm"),
-                "taiwan",
+                DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
                 "cpu",
@@ -527,7 +535,7 @@ class TestRunMultipleBackends:
         try:
             run_multiple_backends(
                 ("xgboost",),
-                "taiwan",
+                DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
                 "cpu",

@@ -15,6 +15,7 @@ from covenant_ml.types import BackendName
 from platform_core.json_utils import JSONValue, dump_json_str
 
 import scripts._test_hooks as _hooks
+from covenant_radar_api.dataset_names import DatasetName
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
     PhaseProgressCallbackProtocol,
@@ -22,7 +23,6 @@ from scripts._test_hooks import (
     UnifiedOptimizationResult,
     get_project_root,
 )
-from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import UnifiedHistoryEntry
 
 

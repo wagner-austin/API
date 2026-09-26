@@ -17,7 +17,8 @@ from platform_core.rich_logging import (
     get_rich_console,
 )
 
-from scripts.explain.cli import EXPLAINER_DESCRIPTIONS, DatasetName
+from covenant_radar_api.dataset_names import DatasetName
+from scripts.explain.cli import EXPLAINER_DESCRIPTIONS
 from scripts.explain.runner import ExplainRunResult
 
 # =============================================================================

@@ -22,6 +22,8 @@ from scripts._test_hooks import (
 )
 from scripts.optimize._runners import run_single_with_progress
 
+from covenant_radar_api.dataset_names import DatasetName
+
 from .conftest import (
     make_fake_cleargbm_result,
     make_fake_lightgbm_result,
@@ -208,7 +210,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "xgboost", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "xgboost", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "xgboost"
             assert len(loading_callback_calls) == 1
@@ -247,7 +249,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "mlp", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "mlp", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "mlp"
             assert len(loading_callback_calls) == 1
@@ -286,7 +288,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lightgbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "lightgbm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "lightgbm"
             assert len(loading_callback_calls) == 1
@@ -325,7 +327,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lstm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "lstm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "lstm"
             assert len(loading_callback_calls) == 1
@@ -364,7 +366,7 @@ class TestLoadingProgressCallbacks:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "cleargbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "cleargbm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert result["backend"] == "cleargbm"
             assert len(loading_callback_calls) == 1

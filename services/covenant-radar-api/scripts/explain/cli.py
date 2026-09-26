@@ -9,15 +9,13 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Literal
 
 from covenant_ml.explainers.types import ExplainerName
 from covenant_ml.types import BackendName
 from platform_core.members import find_member
 from platform_core.rich_logging import get_rich_console
 
-# Type aliases
-DatasetName = Literal["taiwan", "us", "polish"]
+from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
 
 # Explainer descriptions for help text
 EXPLAINER_DESCRIPTIONS: dict[ExplainerName, str] = {
@@ -62,7 +60,7 @@ class ExplainArgs:
     def __init__(self) -> None:
         """Initialize with defaults."""
         self.backend = "xgboost"
-        self.dataset = "taiwan"
+        self.dataset = DatasetName.TAIWAN
         self.explainer = ExplainerName.PERMUTATION
         self.model_path = None
         self.n_samples = 1000
@@ -135,18 +133,15 @@ def _parse_dataset(val: str) -> DatasetName:
         val: Dataset name string from CLI.
 
     Returns:
-        Validated dataset name literal.
+        One of the three bundled bankruptcy datasets.
 
     Raises:
         SystemExit: If dataset name is invalid.
     """
+    member = find_member(val, DatasetName)
+    if member is not None and member in BANKRUPTCY_DATASETS:
+        return member
     console = get_rich_console()
-    if val == "taiwan":
-        return "taiwan"
-    if val == "us":
-        return "us"
-    if val == "polish":
-        return "polish"
     console.print(f"[red]Invalid dataset: {val}. Must be taiwan, us, or polish.[/red]")
     raise SystemExit(1)
 
@@ -267,7 +262,6 @@ def parse_args(argv: Sequence[str]) -> ExplainArgs:
 __all__ = [
     "BACKEND_EXPLAINERS",
     "EXPLAINER_DESCRIPTIONS",
-    "DatasetName",
     "ExplainArgs",
     "parse_args",
     "print_help",

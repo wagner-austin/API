@@ -9,13 +9,14 @@ from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize._formatters import format_loading_progress
-from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import UnifiedHistoryEntry
 from scripts.optimize.modes import (
     _print_multi_dataset_summary,
     _print_preset_comparison_summary,
 )
 from scripts.optimize.runner import RunResult
+
+from covenant_radar_api.dataset_names import DatasetName
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +26,7 @@ def setup_logging() -> None:
 
 
 def _make_optimization_result(
-    dataset: DatasetName = "taiwan",
+    dataset: DatasetName = DatasetName.TAIWAN,
     best_value: float = 0.85,
     n_samples: int = 1000,
     n_features: int = 100,
@@ -82,7 +83,7 @@ class TestPrintMultiDatasetSummary:
 
     def test_executes_with_no_history(self) -> None:
         """Test function executes when all_time_best is None (NEW path)."""
-        result = _make_optimization_result(dataset="taiwan", best_value=0.85)
+        result = _make_optimization_result(dataset=DatasetName.TAIWAN, best_value=0.85)
         run_result: RunResult = RunResult(
             backend="xgboost",
             result=result,
@@ -92,14 +93,14 @@ class TestPrintMultiDatasetSummary:
             is_new_best=True,
         )
 
-        dataset_name: DatasetName = "taiwan"
+        dataset_name: DatasetName = DatasetName.TAIWAN
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
         _print_multi_dataset_summary(results)
 
     def test_executes_with_positive_delta(self) -> None:
         """Test function executes with positive delta (improvement)."""
-        result = _make_optimization_result(dataset="taiwan", best_value=0.90)
+        result = _make_optimization_result(dataset=DatasetName.TAIWAN, best_value=0.90)
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
@@ -111,14 +112,14 @@ class TestPrintMultiDatasetSummary:
             is_new_best=True,
         )
 
-        dataset_name: DatasetName = "taiwan"
+        dataset_name: DatasetName = DatasetName.TAIWAN
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
         _print_multi_dataset_summary(results)
 
     def test_executes_with_negative_delta(self) -> None:
         """Test function executes with negative delta (regression)."""
-        result = _make_optimization_result(dataset="taiwan", best_value=0.80)
+        result = _make_optimization_result(dataset=DatasetName.TAIWAN, best_value=0.80)
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
@@ -130,14 +131,14 @@ class TestPrintMultiDatasetSummary:
             is_new_best=False,
         )
 
-        dataset_name: DatasetName = "taiwan"
+        dataset_name: DatasetName = DatasetName.TAIWAN
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
         _print_multi_dataset_summary(results)
 
     def test_executes_with_neutral_delta(self) -> None:
         """Test function executes with neutral delta (no significant change)."""
-        result = _make_optimization_result(dataset="taiwan", best_value=0.8501)
+        result = _make_optimization_result(dataset=DatasetName.TAIWAN, best_value=0.8501)
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
@@ -149,20 +150,20 @@ class TestPrintMultiDatasetSummary:
             is_new_best=False,
         )
 
-        dataset_name: DatasetName = "taiwan"
+        dataset_name: DatasetName = DatasetName.TAIWAN
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
         _print_multi_dataset_summary(results)
 
     def test_executes_with_multiple_datasets(self) -> None:
         """Test function executes with multiple datasets."""
-        result_taiwan = _make_optimization_result(dataset="taiwan", best_value=0.85)
-        result_us = _make_optimization_result(dataset="us", best_value=0.90)
-        result_polish = _make_optimization_result(dataset="polish", best_value=0.88)
+        result_taiwan = _make_optimization_result(dataset=DatasetName.TAIWAN, best_value=0.85)
+        result_us = _make_optimization_result(dataset=DatasetName.US, best_value=0.90)
+        result_polish = _make_optimization_result(dataset=DatasetName.POLISH, best_value=0.88)
 
         results: list[tuple[DatasetName, RunResult]] = [
             (
-                "taiwan",
+                DatasetName.TAIWAN,
                 RunResult(
                     backend="xgboost",
                     result=result_taiwan,
@@ -173,7 +174,7 @@ class TestPrintMultiDatasetSummary:
                 ),
             ),
             (
-                "us",
+                DatasetName.US,
                 RunResult(
                     backend="xgboost",
                     result=result_us,
@@ -184,7 +185,7 @@ class TestPrintMultiDatasetSummary:
                 ),
             ),
             (
-                "polish",
+                DatasetName.POLISH,
                 RunResult(
                     backend="xgboost",
                     result=result_polish,

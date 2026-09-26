@@ -39,6 +39,7 @@ from scripts.optimize.model_saver import (
     save_best_model,
 )
 
+from covenant_radar_api.dataset_names import DatasetName
 from covenant_radar_api.worker.optimize_result_types import (
     UnifiedOptimizationResult,
 )
@@ -292,7 +293,7 @@ class TestSaveModelResultTypedDict:
 
         save_result = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -320,7 +321,7 @@ class TestSaveModelResultTypedDict:
 
         save_result = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )

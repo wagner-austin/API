@@ -19,6 +19,7 @@ from platform_core.rich_logging import setup_rich_logging
 from platform_ml.explainers.protocol import FeatureExplainer, PredictorProtocol
 from scripts.explain import main
 
+from covenant_radar_api.dataset_names import DatasetName
 from tests._explain_script_fixtures import (
     FakeExplainer,
     FakePredictor,
@@ -141,7 +142,7 @@ class TestRunExplanation:
         with pytest.raises(FileNotFoundError):
             run_explanation(
                 backend="xgboost",
-                dataset="taiwan",
+                dataset=DatasetName.TAIWAN,
                 explainer=ExplainerName.PERMUTATION,
                 model_path="/nonexistent/model.ubj",
                 n_samples=100,
@@ -184,7 +185,7 @@ class TestRunExplanation:
             with pytest.raises(ValueError) as exc_info:
                 run_explanation(
                     backend="xgboost",
-                    dataset="taiwan",
+                    dataset=DatasetName.TAIWAN,
                     explainer=ExplainerName.GRADIENT,
                     model_path=temp_path,
                     n_samples=100,
@@ -239,7 +240,7 @@ class TestRunExplanation:
             try:
                 result = run_explanation(
                     backend="xgboost",
-                    dataset="taiwan",
+                    dataset=DatasetName.TAIWAN,
                     explainer=ExplainerName.PERMUTATION,
                     model_path=temp_path,
                     n_samples=50,
@@ -273,7 +274,7 @@ class TestRunExplanation:
         with pytest.raises(FileNotFoundError) as exc_info:
             run_explanation(
                 backend="lstm",
-                dataset="polish",
+                dataset=DatasetName.POLISH,
                 explainer=ExplainerName.PERMUTATION,
                 model_path=None,  # Use default
                 n_samples=100,

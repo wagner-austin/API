@@ -22,6 +22,8 @@ from scripts.optimize.display import (
 )
 from scripts.optimize.history import UnifiedHistoryEntry
 
+from covenant_radar_api.dataset_names import DatasetName
+
 from .conftest import (
     make_fake_cleargbm_result,
     make_fake_lightgbm_result,
@@ -105,7 +107,7 @@ class TestPrintConfig:
 
     def test_prints_without_error(self) -> None:
         """Test print_config runs without error."""
-        print_config("xgboost", "taiwan", 50, FeaturePreset.FULL, "cuda")
+        print_config("xgboost", DatasetName.TAIWAN, 50, FeaturePreset.FULL, "cuda")
 
 
 class TestPrintResult:

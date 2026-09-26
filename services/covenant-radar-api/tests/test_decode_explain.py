@@ -13,6 +13,7 @@ from covenant_radar_api.api.decode_regression import (
     parse_regression_explain_request,
     parse_regression_predict_request,
 )
+from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
 
 
 class TestParseExplainRequest:
@@ -31,7 +32,7 @@ class TestParseExplainRequest:
         }"""
         result = parse_explain_request(body)
 
-        assert result["dataset"] == "taiwan"
+        assert result["dataset"] is DatasetName.TAIWAN
         assert result["backend"] == "xgboost"
         assert result["model_path"] == "/models/xgboost.ubj"
         assert result["explainer"] is ExplainerName.PERMUTATION
@@ -49,7 +50,7 @@ class TestParseExplainRequest:
         }"""
         result = parse_explain_request(body)
 
-        assert result["dataset"] == "us"
+        assert result["dataset"] is DatasetName.US
         assert result["backend"] == "mlp"
         assert result["model_path"] == "/models/mlp.pt"
         assert result["explainer"] is ExplainerName.GRADIENT
@@ -105,9 +106,8 @@ class TestParseExplainRequest:
             assert result["backend"] == backend
 
     def test_all_valid_datasets(self) -> None:
-        """Test parsing with all valid dataset types."""
-        datasets = ["taiwan", "us", "polish"]
-        for dataset in datasets:
+        """Each bundled bankruptcy dataset decodes to its member."""
+        for dataset in BANKRUPTCY_DATASETS:
             body = f'''{{
                 "dataset": "{dataset}",
                 "backend": "xgboost",
@@ -115,7 +115,7 @@ class TestParseExplainRequest:
                 "explainer": "permutation"
             }}'''.encode()
             result = parse_explain_request(body)
-            assert result["dataset"] == dataset
+            assert result["dataset"] is dataset
 
     def test_missing_dataset_raises_json_type_error(self) -> None:
         """Test that missing dataset raises JSONTypeError."""
@@ -167,6 +167,20 @@ class TestParseExplainRequest:
         }"""
         with pytest.raises(ValueError, match="dataset must be one of"):
             parse_explain_request(body)
+
+    def test_known_dataset_outside_the_bankruptcy_set_raises(self) -> None:
+        """A registry dataset the API does not serve is refused by name."""
+        body = b"""{
+            "dataset": "kaggle_amex_default",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(ValueError) as exc_info:
+            parse_explain_request(body)
+        assert str(exc_info.value) == (
+            "dataset must be one of: taiwan, us, polish (got kaggle_amex_default)"
+        )
 
     def test_invalid_backend_raises_json_type_error(self) -> None:
         """Test that invalid backend raises JSONTypeError."""

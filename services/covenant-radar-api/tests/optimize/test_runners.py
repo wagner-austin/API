@@ -26,6 +26,8 @@ from scripts._test_hooks import (
 )
 from scripts.optimize._runners import run_single_with_progress
 
+from covenant_radar_api.dataset_names import DatasetName
+
 from .conftest import (
     FakeSaveModelBackend,
     make_fake_cleargbm_result,
@@ -131,7 +133,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "xgboost", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "xgboost", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "xgboost"
@@ -164,7 +166,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "mlp", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "mlp", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "mlp"
@@ -199,7 +201,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lightgbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "lightgbm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "lightgbm"
@@ -233,7 +235,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "lstm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "lstm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "lstm"
@@ -276,7 +278,7 @@ class TestRunSingleWithProgress:
         _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
-                "cleargbm", "taiwan", 5, FeaturePreset.FULL, "cpu", None, save_model=False
+                "cleargbm", DatasetName.TAIWAN, 5, FeaturePreset.FULL, "cpu", None, save_model=False
             )
             assert call_count == 1
             assert result["backend"] == "cleargbm"
@@ -322,7 +324,7 @@ class TestRunSingleWithProgress:
 
             result = run_single_with_progress(
                 "xgboost",
-                "taiwan",
+                DatasetName.TAIWAN,
                 5,
                 FeaturePreset.FULL,
                 "cpu",

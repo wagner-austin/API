@@ -12,45 +12,16 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Literal
 
 from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from covenant_ml.types import BackendName
 from platform_core.members import find_member
 from platform_core.rich_logging import get_rich_console
 
-# Type aliases for standard datasets
-StandardDatasetName = Literal["taiwan", "us", "polish", "kaggle_give_me_credit"]
-
-# Time-series dataset names (AMEX default prediction, future stock datasets)
-TimeSeriesDatasetName = Literal["kaggle_amex_default"]
-
-# Combined dataset name type - all supported datasets
-DatasetName = StandardDatasetName | TimeSeriesDatasetName
-
-# All known dataset names for validation
-ALL_STANDARD_DATASETS: tuple[StandardDatasetName, ...] = (
-    "taiwan",
-    "us",
-    "polish",
-    "kaggle_give_me_credit",
-)
-ALL_TIMESERIES_DATASETS: tuple[TimeSeriesDatasetName, ...] = ("kaggle_amex_default",)
+from covenant_radar_api.dataset_names import DatasetName
 
 # All backend names for "all" option
 ALL_BACKENDS: tuple[BackendName, ...] = ("xgboost", "lightgbm", "mlp", "lstm", "cleargbm")
-
-
-def is_timeseries_dataset(dataset: DatasetName) -> bool:
-    """Check if a dataset is a time-series dataset.
-
-    Args:
-        dataset: Dataset name to check.
-
-    Returns:
-        True if time-series dataset, False if standard dataset.
-    """
-    return dataset in ALL_TIMESERIES_DATASETS
 
 
 # Feature preset descriptions
@@ -101,7 +72,7 @@ class OptimizeArgs:
     def __init__(self) -> None:
         """Initialize with defaults."""
         self.backends = ("xgboost",)
-        self.dataset = "taiwan"
+        self.dataset = DatasetName.TAIWAN
         self.n_trials = 300
         self.feature_preset = FeaturePreset.FULL
         self.device = "cuda"
@@ -230,29 +201,16 @@ def _parse_dataset(val: str) -> DatasetName:
         val (str): Dataset name string from CLI.
 
     Returns:
-        DatasetName: Validated dataset name literal.
+        DatasetName: The named dataset member.
 
     Raises:
         SystemExit: If dataset name is invalid.
     """
+    member = find_member(val, DatasetName)
+    if member is not None:
+        return member
     console = get_rich_console()
-
-    # Standard datasets
-    if val == "taiwan":
-        return "taiwan"
-    if val == "us":
-        return "us"
-    if val == "polish":
-        return "polish"
-    if val == "kaggle_give_me_credit":
-        return "kaggle_give_me_credit"
-
-    # Time-series datasets
-    if val == "kaggle_amex_default":
-        return "kaggle_amex_default"
-
-    # Invalid - show all valid options
-    all_datasets = ", ".join(ALL_STANDARD_DATASETS + ALL_TIMESERIES_DATASETS)
+    all_datasets = ", ".join(DatasetName)
     console.print(f"[red]Invalid dataset: {val}. Must be one of: {all_datasets}[/red]")
     raise SystemExit(1)
 

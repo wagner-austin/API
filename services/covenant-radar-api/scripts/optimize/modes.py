@@ -18,11 +18,12 @@ from platform_core.rich_logging import (
     get_rich_console,
 )
 
+from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
 from scripts.optimize._runners import (
     _run_backend_with_progress,
     run_single_with_progress,
 )
-from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName
+from scripts.optimize.cli import PRESET_DESCRIPTIONS
 from scripts.optimize.display import print_result
 from scripts.optimize.history import OptimizationHistory
 from scripts.optimize.model_saver import save_best_model
@@ -270,14 +271,14 @@ def run_all_datasets(
         save_model: If True, save the best model for each dataset if it improves.
     """
     console = get_rich_console()
-    datasets: list[DatasetName] = ["taiwan", "us", "polish"]
     all_results: list[tuple[DatasetName, RunResult]] = []
 
     _print_multi_dataset_config(backend, n_trials, feature_preset, device)
 
-    for i, dataset in enumerate(datasets):
+    total = len(BANKRUPTCY_DATASETS)
+    for i, dataset in enumerate(BANKRUPTCY_DATASETS):
         console.print(
-            f"[bold white on blue] Dataset {i + 1}/3: {dataset.upper()} [/bold white on blue]"
+            f"[bold white on blue] Dataset {i + 1}/{total}: {dataset.upper()} [/bold white on blue]"
         )
 
         run_result = run_single_with_progress(

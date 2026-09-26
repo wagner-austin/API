@@ -18,13 +18,14 @@ from platform_core.rich_logging import (
     get_rich_console,
 )
 
+from covenant_radar_api.dataset_names import DatasetName
 from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_float_params,
     encode_sampled_int_params,
     encode_sampled_string_params,
 )
 from scripts._test_hooks import UnifiedOptimizationResult
-from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName
+from scripts.optimize.cli import PRESET_DESCRIPTIONS
 from scripts.optimize.history import UnifiedHistoryEntry
 
 # =============================================================================

@@ -23,7 +23,7 @@ from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 
 import scripts._test_hooks as _hooks
-from scripts.explain.cli import DatasetName
+from covenant_radar_api.dataset_names import DatasetName
 
 # Model extensions for each backend
 MODEL_EXTENSIONS: dict[BackendName, str] = {

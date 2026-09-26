@@ -31,6 +31,7 @@ from platform_core.logging import get_logger
 from platform_core.rich_logging import get_rich_console
 
 import scripts._test_hooks as _hooks
+from covenant_radar_api.dataset_names import DatasetName
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize._config_builders import (
     _build_cleargbm_config,
@@ -41,7 +42,6 @@ from scripts.optimize._config_builders import (
     _build_random_forest_config,
     _build_xgboost_config,
 )
-from scripts.optimize.cli import DatasetName
 
 _log = get_logger(__name__)
 

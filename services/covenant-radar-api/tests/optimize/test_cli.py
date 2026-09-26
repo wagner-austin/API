@@ -10,8 +10,6 @@ import pytest
 from covenant_ml.features import NON_TEMPORAL_FEATURE_PRESETS, FeaturePreset
 from scripts.optimize.cli import (
     ALL_BACKENDS,
-    ALL_STANDARD_DATASETS,
-    ALL_TIMESERIES_DATASETS,
     PRESET_DESCRIPTIONS,
     OptimizeArgs,
     _handle_flag,
@@ -19,9 +17,10 @@ from scripts.optimize.cli import (
     _parse_dataset,
     _parse_preset,
     _parse_single_backend,
-    is_timeseries_dataset,
     parse_args,
 )
+
+from covenant_radar_api.dataset_names import DatasetName
 
 
 class TestOptimizeArgs:
@@ -31,7 +30,7 @@ class TestOptimizeArgs:
         """Test OptimizeArgs has correct defaults."""
         args = OptimizeArgs()
         assert args.backends == ("xgboost",)
-        assert args.dataset == "taiwan"
+        assert args.dataset is DatasetName.TAIWAN
         assert args.n_trials == 300
         assert args.feature_preset is FeaturePreset.FULL
         assert args.device == "cuda"
@@ -137,58 +136,16 @@ class TestParseBackends:
 class TestParseDataset:
     """Tests for _parse_dataset function."""
 
-    def test_parse_taiwan(self) -> None:
-        """Test parsing taiwan dataset."""
-        result: str = _parse_dataset("taiwan")
-        assert result == "taiwan"
-
-    def test_parse_us(self) -> None:
-        """Test parsing us dataset."""
-        result: str = _parse_dataset("us")
-        assert result == "us"
-
-    def test_parse_polish(self) -> None:
-        """Test parsing polish dataset."""
-        result: str = _parse_dataset("polish")
-        assert result == "polish"
-
-    def test_parse_kaggle_give_me_credit(self) -> None:
-        """Test parsing kaggle_give_me_credit dataset."""
-        result: str = _parse_dataset("kaggle_give_me_credit")
-        assert result == "kaggle_give_me_credit"
-
-    def test_parse_kaggle_amex_default_timeseries(self) -> None:
-        """Test parsing kaggle_amex_default time-series dataset."""
-        result: str = _parse_dataset("kaggle_amex_default")
-        assert result == "kaggle_amex_default"
+    def test_every_dataset_word_parses_to_its_member(self) -> None:
+        """The optimize script admits every dataset, time-series included."""
+        for dataset in DatasetName:
+            assert _parse_dataset(dataset.value) is dataset
 
     def test_parse_invalid_raises_system_exit(self) -> None:
         """Test parsing invalid dataset raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
             _parse_dataset("invalid")
         assert exc_info.value.code == 1
-
-
-class TestIsTimeseriesDataset:
-    """Tests for is_timeseries_dataset function."""
-
-    def test_standard_datasets_return_false(self) -> None:
-        """Test standard datasets return False."""
-        for dataset in ALL_STANDARD_DATASETS:
-            assert is_timeseries_dataset(dataset) is False
-
-    def test_timeseries_datasets_return_true(self) -> None:
-        """Test time-series datasets return True."""
-        for dataset in ALL_TIMESERIES_DATASETS:
-            assert is_timeseries_dataset(dataset) is True
-
-    def test_kaggle_amex_default_is_timeseries(self) -> None:
-        """Test kaggle_amex_default is a time-series dataset."""
-        assert is_timeseries_dataset("kaggle_amex_default") is True
-
-    def test_taiwan_is_not_timeseries(self) -> None:
-        """Test taiwan is not a time-series dataset."""
-        assert is_timeseries_dataset("taiwan") is False
 
 
 class TestParsePreset:
@@ -284,7 +241,7 @@ class TestParseArgs:
     def test_empty_args_uses_defaults(self) -> None:
         """Test empty args uses defaults."""
         args: OptimizeArgs = parse_args([])
-        assert args.dataset == "taiwan"
+        assert args.dataset is DatasetName.TAIWAN
         assert args.n_trials == 300
         assert args.feature_preset is FeaturePreset.FULL
 
@@ -311,12 +268,12 @@ class TestParseArgs:
     def test_dataset_short(self) -> None:
         """Test -d sets dataset."""
         args: OptimizeArgs = parse_args(["-d", "us"])
-        assert args.dataset == "us"
+        assert args.dataset is DatasetName.US
 
     def test_dataset_long(self) -> None:
         """Test --dataset sets dataset."""
         args: OptimizeArgs = parse_args(["--dataset", "polish"])
-        assert args.dataset == "polish"
+        assert args.dataset is DatasetName.POLISH
 
     def test_n_trials_short(self) -> None:
         """Test -n sets n_trials."""
@@ -383,7 +340,7 @@ class TestParseArgs:
         args: OptimizeArgs = parse_args(
             ["-d", "us", "-n", "50", "-f", "none", "-v", "--device", "cpu"]
         )
-        assert args.dataset == "us"
+        assert args.dataset is DatasetName.US
         assert args.n_trials == 50
         assert args.feature_preset is FeaturePreset.NONE
         assert args.verbose is True
@@ -392,4 +349,4 @@ class TestParseArgs:
     def test_unknown_args_ignored(self) -> None:
         """Test unknown args are ignored."""
         args: OptimizeArgs = parse_args(["--unknown", "value", "-x"])
-        assert args.dataset == "taiwan"  # default
+        assert args.dataset is DatasetName.TAIWAN  # default

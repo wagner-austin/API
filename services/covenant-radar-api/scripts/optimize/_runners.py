@@ -18,6 +18,7 @@ from platform_core.config import _test_hooks as config_env
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.rich_logging import RichProgressProtocol, create_rich_progress, get_rich_console
 
+from covenant_radar_api.dataset_names import DatasetName
 from scripts._test_hooks import (
     LoadingProgressInfo,
     PhaseProgressInfo,
@@ -30,7 +31,6 @@ from scripts.optimize._formatters import (
     format_loading_progress,
     format_trial_progress,
 )
-from scripts.optimize.cli import DatasetName
 from scripts.optimize.history import (
     OptimizationHistory,
     UnifiedHistoryEntry,

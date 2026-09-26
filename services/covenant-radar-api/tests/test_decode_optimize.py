@@ -12,6 +12,7 @@ from covenant_radar_api.api.decode_ml import (
 from covenant_radar_api.api.decode_regression import (
     parse_regression_optimize_request,
 )
+from covenant_radar_api.dataset_names import DatasetName
 
 
 class TestParseOptimizeRequest:
@@ -30,7 +31,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["backend"] == "xgboost"
-        assert result["dataset"] == "taiwan"
+        assert result["dataset"] is DatasetName.TAIWAN
         assert result["n_trials"] == 50
         assert result["timeout_seconds"] is None
         assert result["device"] == "auto"
@@ -51,7 +52,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["backend"] == "xgboost"
-        assert result["dataset"] == "us"
+        assert result["dataset"] is DatasetName.US
         assert result["n_trials"] == 100
         assert result["timeout_seconds"] == 3600
         assert result["device"] == "cuda"
@@ -66,7 +67,7 @@ class TestParseOptimizeRequest:
         }"""
         result = parse_optimize_request(body)
 
-        assert result["dataset"] == "polish"
+        assert result["dataset"] is DatasetName.POLISH
         assert result["n_trials"] == 25
 
     def test_valid_optimize_request_cpu_device(self) -> None:
@@ -209,7 +210,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["backend"] == "xgboost"
-        assert result["dataset"] == "taiwan"
+        assert result["dataset"] is DatasetName.TAIWAN
         assert result["n_trials"] == 50
 
     def test_all_seven_backends_accepted(self) -> None:
@@ -260,7 +261,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["backend"] == "mlp"
-        assert result["dataset"] == "taiwan"
+        assert result["dataset"] is DatasetName.TAIWAN
         assert result["n_trials"] == 50
         # Backend-specific fields are NOT in the API parse result
         assert "precision" not in result
@@ -278,7 +279,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["backend"] == "lstm"
-        assert result["dataset"] == "us"
+        assert result["dataset"] is DatasetName.US
         assert result["n_trials"] == 50
         assert "sequence_length" not in result
         assert "bidirectional" not in result
@@ -294,7 +295,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["backend"] == "lightgbm"
-        assert result["dataset"] == "polish"
+        assert result["dataset"] is DatasetName.POLISH
         assert "early_stopping_rounds" not in result
 
 

@@ -27,7 +27,6 @@ from covenant_ml.types import BackendName, TrainOutcome
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
-from scripts.optimize.cli import DatasetName
 from scripts.optimize.model_saver import (
     MODEL_EXTENSIONS,
     SaveModelResult,
@@ -36,6 +35,7 @@ from scripts.optimize.model_saver import (
     should_save_model,
 )
 
+from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
 from tests._model_saver_fixtures import (
     FakeClassifierBackend,
     _make_fake_dataset_config,
@@ -271,7 +271,7 @@ class TestSaveBestModel:
 
         save_result: SaveModelResult = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -304,7 +304,7 @@ class TestSaveBestModel:
 
         save_result: SaveModelResult = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -331,7 +331,7 @@ class TestSaveBestModel:
 
         save_result: SaveModelResult = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -349,7 +349,7 @@ class TestSaveBestModel:
 
         save_result = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -378,7 +378,7 @@ class TestSaveBestModel:
 
         save_result = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -400,7 +400,7 @@ class TestSaveBestModel:
 
         save_result = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )
@@ -433,9 +433,7 @@ class TestSaveBestModel:
         hooks_context: None,
     ) -> None:
         """Test saving works for all supported datasets."""
-        datasets: list[DatasetName] = ["taiwan", "us", "polish"]
-
-        for dataset in datasets:
+        for dataset in BANKRUPTCY_DATASETS:
             result = _make_fake_optimization_result(dataset=dataset)
 
             save_result = save_best_model(
@@ -492,7 +490,7 @@ class TestSaveBestModel:
 
             save_result = save_best_model(
                 result=result,
-                dataset="taiwan",
+                dataset=DatasetName.TAIWAN,
                 feature_preset=FeaturePreset.FULL,
                 project_root=tmp_path,
             )
@@ -518,7 +516,7 @@ class TestSaveBestModel:
 
         save_result = save_best_model(
             result=result,
-            dataset="taiwan",
+            dataset=DatasetName.TAIWAN,
             feature_preset=FeaturePreset.FULL,
             project_root=tmp_path,
         )

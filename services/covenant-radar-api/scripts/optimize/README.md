@@ -119,11 +119,7 @@ Backend-specific runners with Rich progress bar integration:
 Argument parsing with strict types. Defines:
 - `BackendName` - Literal type for ML backends (`xgboost`, `mlp`, `lightgbm`, `lstm`)
 - `ALL_BACKENDS` - Tuple of all backend names for iteration
-- `StandardDatasetName` - Literal type for standard datasets (`taiwan`, `us`, `polish`)
-- `TimeSeriesDatasetName` - Literal type for time-series datasets (`kaggle_amex_default`)
-- `DatasetName` - Union of standard and time-series dataset names
-- `FeaturePreset` - Literal type for feature presets
-- `is_timeseries_dataset()` - Check if dataset is time-series type
+- `PRESET_DESCRIPTIONS` - Help text for each `FeaturePreset` the CLI admits
 - `OptimizeArgs` - Parsed argument container with `backends` tuple
 - `parse_args()` - Main parser function with multi-backend support
 

@@ -44,6 +44,7 @@ from scripts.explain.runner import (
     get_project_root,
 )
 
+from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
 from tests._explain_script_fixtures import (
     _make_fake_dataset,
     _make_fake_dataset_registry,
@@ -64,7 +65,7 @@ class TestParseArgs:
         """Empty args should use default values."""
         args = parse_args([])
         assert args.backend == "xgboost"
-        assert args.dataset == "taiwan"
+        assert args.dataset is DatasetName.TAIWAN
         assert args.explainer is ExplainerName.PERMUTATION
         assert args.n_samples == 1000
         assert args.target_class == 1
@@ -86,7 +87,7 @@ class TestParseArgs:
     def test_parse_dataset_short_flag(self) -> None:
         """Dataset can be set with -d flag."""
         args = parse_args(["-d", "us"])
-        assert args.dataset == "us"
+        assert args.dataset is DatasetName.US
 
     def test_parse_explainer_short_flag(self) -> None:
         """Explainer can be set with -e flag."""
@@ -140,15 +141,20 @@ class TestParseDataset:
     """Tests for _parse_dataset function."""
 
     def test_valid_datasets(self) -> None:
-        """All valid datasets are accepted."""
-        assert _parse_dataset("taiwan") == "taiwan"
-        assert _parse_dataset("us") == "us"
-        assert _parse_dataset("polish") == "polish"
+        """Each bundled bankruptcy dataset parses to its member."""
+        for dataset in BANKRUPTCY_DATASETS:
+            assert _parse_dataset(dataset.value) is dataset
 
     def test_invalid_dataset_exits(self) -> None:
         """Invalid dataset raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
             _parse_dataset("invalid")
+        assert exc_info.value.code == 1
+
+    def test_known_dataset_outside_the_bankruptcy_set_exits(self) -> None:
+        """A dataset only the optimize script admits is refused here."""
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_dataset(DatasetName.KAGGLE_AMEX_DEFAULT.value)
         assert exc_info.value.code == 1
 
 
@@ -300,11 +306,11 @@ class TestPrintConfig:
 
     def test_print_config_executes(self) -> None:
         """print_config executes without error."""
-        print_config("xgboost", "taiwan", ExplainerName.PERMUTATION, 1000, None)
+        print_config("xgboost", DatasetName.TAIWAN, ExplainerName.PERMUTATION, 1000, None)
 
     def test_print_config_with_model_path(self) -> None:
         """print_config with custom model path executes."""
-        print_config("mlp", "us", ExplainerName.GRADIENT, 500, "/custom/path.pt")
+        print_config("mlp", DatasetName.US, ExplainerName.GRADIENT, 500, "/custom/path.pt")
 
 
 class TestPrintResult:
@@ -341,17 +347,17 @@ class TestGetDefaultModelPath:
 
     def test_xgboost_path(self) -> None:
         """XGBoost model path has .ubj extension."""
-        path = _get_default_model_path("xgboost", "taiwan")
+        path = _get_default_model_path("xgboost", DatasetName.TAIWAN)
         assert path.name == "taiwan_xgboost_best.ubj"
 
     def test_mlp_path(self) -> None:
         """MLP model path has .pt extension."""
-        path = _get_default_model_path("mlp", "us")
+        path = _get_default_model_path("mlp", DatasetName.US)
         assert path.name == "us_mlp_best.pt"
 
     def test_lightgbm_path(self) -> None:
         """LightGBM model path has .txt extension."""
-        path = _get_default_model_path("lightgbm", "polish")
+        path = _get_default_model_path("lightgbm", DatasetName.POLISH)
         assert path.name == "polish_lightgbm_best.txt"
 
 
@@ -389,7 +395,9 @@ class TestLoadDatasetWithFeatures:
         _hooks.dataset_loader = lambda config, external_dir: _make_fake_dataset()
 
         try:
-            x, y, names = _load_dataset_with_features("taiwan", FeaturePreset.NONE, Path("/fake"))
+            x, y, names = _load_dataset_with_features(
+                DatasetName.TAIWAN, FeaturePreset.NONE, Path("/fake")
+            )
             assert int(x.shape[0]) == 200
             assert int(y.shape[0]) == 200
             # Verify feature names has expected count (10 original features)
@@ -426,7 +434,7 @@ class TestExplainArgs:
         """ExplainArgs has correct defaults."""
         args = ExplainArgs()
         assert args.backend == "xgboost"
-        assert args.dataset == "taiwan"
+        assert args.dataset is DatasetName.TAIWAN
         assert args.explainer is ExplainerName.PERMUTATION
         assert args.model_path is None
         assert args.n_samples == 1000
@@ -444,7 +452,7 @@ class TestParseArgsUnknownArgument:
         args = parse_args(["--unknown-flag"])
         # Should have default values since unknown arg was skipped
         assert args.backend == "xgboost"
-        assert args.dataset == "taiwan"
+        assert args.dataset is DatasetName.TAIWAN
 
     def test_unknown_argument_with_known_args(self) -> None:
         """Unknown arguments don't affect known arguments."""

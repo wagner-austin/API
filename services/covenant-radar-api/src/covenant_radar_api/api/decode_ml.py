@@ -17,16 +17,15 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
-from platform_core.members import require_member
+from platform_core.members import find_member, require_member
 
 from covenant_radar_api.api.decode_regression import (
     _optional_int,
     _parse_body_as_dict,
     _parse_device,
 )
+from covenant_radar_api.dataset_names import BANKRUPTCY_DATASETS, DatasetName
 from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
-
-DatasetName = Literal["taiwan", "us", "polish"]
 
 
 def _optional_float(data: JSONObject, key: str, default: float) -> float:
@@ -46,20 +45,18 @@ def _parse_dataset_name(raw: JSONObject) -> DatasetName:
         raw: JSON object containing the dataset field.
 
     Returns:
-        Validated DatasetName literal.
+        One of the three bundled bankruptcy datasets.
 
     Raises:
         JSONTypeError: If dataset field is missing.
-        ValueError: If dataset is not a valid name.
+        ValueError: If dataset is not a bundled bankruptcy dataset.
     """
     dataset = require_str(raw, "dataset")
-    if dataset == "taiwan":
-        return "taiwan"
-    if dataset == "us":
-        return "us"
-    if dataset == "polish":
-        return "polish"
-    raise ValueError(f"dataset must be one of: taiwan, us, polish (got {dataset})")
+    member = find_member(dataset, DatasetName)
+    if member is None or member not in BANKRUPTCY_DATASETS:
+        admitted = ", ".join(BANKRUPTCY_DATASETS)
+        raise ValueError(f"dataset must be one of: {admitted} (got {dataset})")
+    return member
 
 
 class OptimizeRequest(TypedDict, total=True):
