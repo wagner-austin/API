@@ -25,7 +25,6 @@ from tankpit_bot.fleetshare.report import (
 )
 from tankpit_bot.fleetshare.role import resolve_fleet_role
 from tankpit_bot.fleetshare.types import (
-    FLEET_ROLES,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
     FleetReportDict,
@@ -37,7 +36,6 @@ __all__ = [
     "ENEMY_SIGHTING_TTL_MS",
     "FLEET_REPORT_FILENAME",
     "FLEET_REPORT_TTL_MS",
-    "FLEET_ROLES",
     "ContainerClaimDict",
     "FleetContainerSightingDict",
     "FleetEnemySightingDict",

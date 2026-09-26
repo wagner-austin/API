@@ -12,57 +12,46 @@ manager process required. Codecs live in
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from typing_extensions import TypedDict
 
-FleetRole = Literal[
-    "fighter",
-    "gatherer",
-]
-"""What a fleet bot does with its ticks.
 
-``fighter`` runs the full HUNT/COLLECT doctrine. ``gatherer`` never
-enters HUNT: it lives in the COLLECT cascade — scan, sweep, hop —
-roaming the map and publishing what it finds for the fighters of its
-color.
-"""
+class FleetRole(StrEnum):
+    """What a fleet bot does with its ticks.
 
+    ``FIGHTER`` runs the full HUNT/COLLECT doctrine. ``GATHERER`` never
+    enters HUNT: it lives in the COLLECT cascade — scan, sweep, hop —
+    roaming the map and publishing what it finds for the fighters of its
+    color.
+    """
 
-FLEET_ROLES: tuple[FleetRole, ...] = (
-    "fighter",
-    "gatherer",
-)
+    FIGHTER = "fighter"
+    GATHERER = "gatherer"
 
 
-EngagementDoctrine = Literal[
-    "skirmish",
-    "swarm",
-    "duelist",
-    "passive",
-]
-"""How a bot times its human engagements (operator order 2026-09-01:
-"will we have pluggable strategies that we can swap in per bot or per
-group of bots at a whim?"). A doctrine is DATA selecting between
-existing tested gates — never loaded code.
+class EngagementDoctrine(StrEnum):
+    """How a bot times its human engagements.
 
-``skirmish`` is today's behavior: the wartime readiness floor and
-focus fire, each bot joining as soon as its own bars clear.
-``swarm`` adds the muster: engage a consented human immediately when
-a sibling is already fighting it, otherwise keep farming until the
-war-ready quorum stands and strike together — the serial trickle's
-fix. ``duelist`` engages only when NO sibling holds the human (first
-come duels, the rest keep farming). ``passive`` never initiates
-against humans; consent-based return fire is untouched.
-"""
+    Operator order 2026-09-01: "will we have pluggable strategies that
+    we can swap in per bot or per group of bots at a whim?". A doctrine
+    is DATA selecting between existing tested gates — never loaded code.
 
+    ``SKIRMISH`` is today's behavior: the wartime readiness floor and
+    focus fire, each bot joining as soon as its own bars clear.
+    ``SWARM`` adds the muster: engage a consented human immediately when
+    a sibling is already fighting it, otherwise keep farming until the
+    war-ready quorum stands and strike together — the serial trickle's
+    fix. ``DUELIST`` engages only when NO sibling holds the human (first
+    come duels, the rest keep farming). ``PASSIVE`` never initiates
+    against humans; consent-based return fire is untouched. Declaration
+    order is the spawn menu's order, and the first member is the default.
+    """
 
-ENGAGEMENT_DOCTRINES: tuple[EngagementDoctrine, ...] = (
-    "skirmish",
-    "swarm",
-    "duelist",
-    "passive",
-)
+    SKIRMISH = "skirmish"
+    SWARM = "swarm"
+    DUELIST = "duelist"
+    PASSIVE = "passive"
 
 
 class FleetEnemySightingDict(TypedDict):
@@ -270,8 +259,6 @@ class FleetReportDict(TypedDict):
 
 
 __all__ = [
-    "ENGAGEMENT_DOCTRINES",
-    "FLEET_ROLES",
     "EngagementDoctrine",
     "FleetContainerRemovalDict",
     "FleetContainerSightingDict",

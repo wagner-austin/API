@@ -17,11 +17,9 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
 from tankpit_bot.fleetshare.types import (
-    ENGAGEMENT_DOCTRINES,
-    FLEET_ROLES,
-    EngagementDoctrine,
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
@@ -30,46 +28,6 @@ from tankpit_bot.fleetshare.types import (
     FleetRole,
     FleetScannedTileDict,
 )
-
-
-def require_fleet_role(data: JSONObject, key: str) -> FleetRole:
-    """Validate and extract a fleet role from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        The validated role.
-
-    Raises:
-        JSONTypeError: If the value is not a known fleet role.
-    """
-    raw = require_str(data, key)
-    for role in FLEET_ROLES:
-        if raw == role:
-            return role
-    raise JSONTypeError(f"{key} must be one of {FLEET_ROLES}, got {raw!r}")
-
-
-def require_engagement_doctrine(data: JSONObject, key: str) -> EngagementDoctrine:
-    """Decode a required engagement-doctrine field.
-
-    Args:
-        data: JSON object holding the field.
-        key: Field name.
-
-    Returns:
-        The validated doctrine.
-
-    Raises:
-        JSONTypeError: If the field is absent or not a known doctrine.
-    """
-    raw = require_str(data, key)
-    for doctrine in ENGAGEMENT_DOCTRINES:
-        if raw == doctrine:
-            return doctrine
-    raise JSONTypeError(f"{key} must be one of {ENGAGEMENT_DOCTRINES}, got {raw!r}")
 
 
 def encode_fleet_enemy_sighting(sighting: FleetEnemySightingDict) -> JSONObject:
@@ -296,7 +254,7 @@ def encode_fleet_report(report: FleetReportDict) -> JSONObject:
         "team": report["team"],
         "room": report["room"],
         "tank_id": report["tank_id"],
-        "role": report["role"],
+        "role": report["role"].value,
         "x": report["x"],
         "y": report["y"],
         "engaged_target_id": report["engaged_target_id"],
@@ -360,7 +318,7 @@ def decode_fleet_report(data: JSONValue) -> FleetReportDict:
         team=require_int(data, "team"),
         room=require_str(data, "room"),
         tank_id=require_int(data, "tank_id"),
-        role=require_fleet_role(data, "role"),
+        role=require_member(data, "role", FleetRole),
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         engaged_target_id=require_int(data, "engaged_target_id"),
@@ -394,6 +352,4 @@ __all__ = [
     "encode_fleet_mine_sighting",
     "encode_fleet_report",
     "encode_fleet_scanned_tile",
-    "require_engagement_doctrine",
-    "require_fleet_role",
 ]
