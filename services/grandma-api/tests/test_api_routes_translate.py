@@ -7,7 +7,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_stt import VerboseResponse, VerboseSegment
 
 from grandma_api.api.main import create_app
-from grandma_api.config import GrandmaApiSettings
+from grandma_api.config import GrandmaApiSettings, LogFormat, LogLevel
 
 from .conftest import generate_test_wav, make_test_container, set_fake_env
 
@@ -18,8 +18,8 @@ def _make_test_settings() -> GrandmaApiSettings:
         openai_api_key="sk-test",
         api_token="test-token",
         port=8080,
-        log_level="INFO",
-        log_format="json",
+        log_level=LogLevel.INFO,
+        log_format=LogFormat.JSON,
     )
 
 

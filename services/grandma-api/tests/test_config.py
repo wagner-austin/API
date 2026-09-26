@@ -7,6 +7,8 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from grandma_api.config import (
     GrandmaApiSettings,
+    LogFormat,
+    LogLevel,
     decode_grandma_api_settings,
     encode_grandma_api_settings,
     load_settings,
@@ -22,8 +24,8 @@ def test_encode_grandma_api_settings() -> None:
         openai_api_key="sk-test",
         api_token="secret",
         port=8080,
-        log_level="INFO",
-        log_format="json",
+        log_level=LogLevel.INFO,
+        log_format=LogFormat.JSON,
     )
     encoded = encode_grandma_api_settings(settings)
     assert encoded["openai_api_key"] == "sk-test"

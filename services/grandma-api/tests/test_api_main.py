@@ -7,7 +7,7 @@ from typing import Protocol
 from fastapi.testclient import TestClient
 
 from grandma_api.api.main import create_app
-from grandma_api.config import GrandmaApiSettings
+from grandma_api.config import GrandmaApiSettings, LogFormat, LogLevel
 from grandma_api.core.container import ServiceContainer
 
 from .conftest import make_test_container, set_fake_env
@@ -25,8 +25,8 @@ def _make_test_settings() -> GrandmaApiSettings:
         openai_api_key="sk-test",
         api_token="test-token",
         port=8080,
-        log_level="INFO",
-        log_format="json",
+        log_level=LogLevel.INFO,
+        log_format=LogFormat.JSON,
     )
 
 
@@ -92,8 +92,8 @@ def test_create_app_with_text_format() -> None:
         openai_api_key="sk-test",
         api_token="test-token",
         port=8080,
-        log_level="DEBUG",
-        log_format="text",
+        log_level=LogLevel.DEBUG,
+        log_format=LogFormat.TEXT,
     )
     container, _, _, _ = make_test_container(settings)
     app = create_app(settings, container=container)

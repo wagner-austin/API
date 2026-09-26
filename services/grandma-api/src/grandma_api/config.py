@@ -117,8 +117,8 @@ def load_settings() -> GrandmaApiSettings:
     openai_api_key = _require_env_str("OPENAI_API_KEY")
     api_token = _require_env_str("API_TOKEN")
     port = _parse_int("PORT", 8080)
-    log_level = _parse_log_level("LOG_LEVEL", "INFO")
-    log_format = _parse_log_format("LOG_FORMAT", "json")
+    log_level = _parse_log_level("LOG_LEVEL", LogLevel.INFO)
+    log_format = _parse_log_format("LOG_FORMAT", LogFormat.JSON)
 
     return GrandmaApiSettings(
         openai_api_key=openai_api_key,

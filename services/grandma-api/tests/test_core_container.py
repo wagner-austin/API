@@ -9,7 +9,7 @@ from platform_stt._test_hooks import OpenAIClientProtocol
 from platform_stt.types import BinaryFileProtocol, RawVerboseDict
 from platform_translate.types import TranslatorConfig
 
-from grandma_api.config import GrandmaApiSettings
+from grandma_api.config import GrandmaApiSettings, LogFormat, LogLevel
 from grandma_api.core.container import (
     ServiceContainer,
     _default_langid_detector_factory,
@@ -127,8 +127,8 @@ def test_get_langid_detector_returns_detector() -> None:
         openai_api_key="sk-test",
         api_token="test-token",
         port=8080,
-        log_level="INFO",
-        log_format="json",
+        log_level=LogLevel.INFO,
+        log_format=LogFormat.JSON,
     )
     expected_result = SpokenLanguageResult(
         language="es",
