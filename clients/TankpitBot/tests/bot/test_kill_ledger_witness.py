@@ -14,7 +14,7 @@ import logging as stdlib_logging
 
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
-from tankpit_bot.browser.dom_scraper import GameLogEntry
+from tankpit_bot.browser.dom_scraper import GameLogEntry, LogCategory
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import mark_tank_killed
 from tankpit_bot.state.types import WorldStateDict, make_self_state, make_tank_state
@@ -116,7 +116,7 @@ def test_own_kill_of_an_unregistered_victim_reports_rank_unknown(fake_env: FakeE
 
 def _feed(bot: Bot, lines: list[str]) -> list[stdlib_logging.LogRecord]:
     """Run one witness poll over the given DOM lines, capturing events."""
-    entries = [GameLogEntry(text=line, category="other") for line in lines]
+    entries = [GameLogEntry(text=line, category=LogCategory.OTHER) for line in lines]
     with capture_runtime_events() as records:
         bot._record_game_log_witness(entries)
     return records

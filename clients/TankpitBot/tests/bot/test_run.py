@@ -330,7 +330,7 @@ class TestBotRunMethod:
         """Polled game-log entries land in the witness list with timestamps."""
         from tankpit_bot import _test_hooks
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.browser.dom_scraper import GameLogEntry
+        from tankpit_bot.browser.dom_scraper import GameLogEntry, LogCategory
         from tankpit_bot.types import GameLogEntryWithTimestamp
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -339,8 +339,10 @@ class TestBotRunMethod:
         try:
             bot._record_game_log_witness(
                 [
-                    GameLogEntry(text="purple-8 has been deactivated by you", category="combat"),
-                    GameLogEntry(text="Empty container", category="other"),
+                    GameLogEntry(
+                        text="purple-8 has been deactivated by you", category=LogCategory.COMBAT
+                    ),
+                    GameLogEntry(text="Empty container", category=LogCategory.OTHER),
                 ]
             )
             bot._record_game_log_witness([])
@@ -354,9 +356,7 @@ class TestBotRunMethod:
                 category="combat",
             ),
             GameLogEntryWithTimestamp(
-                timestamp_ms=1234567,
-                text="Empty container",
-                category="other",
+                timestamp_ms=1234567, text="Empty container", category="other"
             ),
         ]
 

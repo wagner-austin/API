@@ -120,6 +120,8 @@ def _fail_tick_once_with_browser_closed(bot: Bot) -> None:
 def _fail_tick_once_with_session_exit(bot: Bot) -> None:
     """Drop-in ``_tick_once`` that simulates a decision-owner exit request."""
     _ = bot
-    from tankpit_bot.bot.session_exit import SessionExitError
+    from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 
-    raise SessionExitError("no_viable_targets", "fresh map snapshot has no affordable enemy")
+    raise SessionExitError(
+        SessionExitReason.NO_VIABLE_TARGETS, "fresh map snapshot has no affordable enemy"
+    )
