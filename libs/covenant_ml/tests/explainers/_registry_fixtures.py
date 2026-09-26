@@ -131,7 +131,7 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         PreparedClassifier wrapping a ClearGBM native model.
     """
     from cleargbm.ensemble import train_gradient_boosting
-    from cleargbm.types import GradientBoostingConfig
+    from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 
     from covenant_ml.backends.cleargbm.backend import _ClearGBMPrepared
 
@@ -164,9 +164,9 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         reg_lambda=1.0,
         n_jobs=1,
         early_stopping_rounds=10,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="binary_log_loss",
+        objective=Objective.BINARY_LOG_LOSS,
         scale_pos_weight=1.0,
     )
 

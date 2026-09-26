@@ -27,7 +27,7 @@ from cleargbm.ensemble import (
 from cleargbm.ensemble import (
     train_gradient_boosting_regression,
 )
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, Objective
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
@@ -239,7 +239,7 @@ class ClearGBMRegressorBackend:
             early_stopping_rounds=cfg["early_stopping_rounds"],
             growth_strategy=cfg["growth_strategy"],
             num_leaves=cfg["num_leaves"],
-            objective="squared_error",
+            objective=Objective.SQUARED_ERROR,
             scale_pos_weight=None,
         )
 

@@ -6,6 +6,7 @@ Uses real cleargbm library for integration testing. No mocks.
 from __future__ import annotations
 
 import numpy as np
+from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
 
 from covenant_ml.optimizer.objectives.cleargbm_objective import (
@@ -464,7 +465,7 @@ class TestBuildTrialConfig:
             early_stopping_rounds=5,
         )
         assert config["scale_pos_weight"] == 3.0
-        assert config["growth_strategy"] == "depth_wise"
+        assert config["growth_strategy"] is GrowthStrategy.DEPTH_WISE
         assert config["num_leaves"] is None
         assert config["max_features"] is None
         assert config["colsample_bytree"] is None

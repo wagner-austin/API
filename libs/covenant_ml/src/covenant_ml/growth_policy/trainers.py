@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 from cleargbm.ensemble import train_gradient_boosting
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 
 from ..benchmarking.adapters import ClearGbmTrainedModel, LightGbmTrainedModel
@@ -241,9 +241,9 @@ class ClearGbmAnchorTrainer:
             "reg_lambda": self._config["reg_lambda"],
             "n_jobs": self._config["n_jobs"],
             "early_stopping_rounds": None,
-            "growth_strategy": "depth_wise",
+            "growth_strategy": GrowthStrategy.DEPTH_WISE,
             "num_leaves": None,
-            "objective": "binary_log_loss",
+            "objective": Objective.BINARY_LOG_LOSS,
             "scale_pos_weight": 1.0,
         }
         feature_count = int(split.x_train.shape[1])

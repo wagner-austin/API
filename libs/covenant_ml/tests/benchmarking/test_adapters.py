@@ -7,6 +7,7 @@ models on small data rather than substituting a double for any of them.
 from __future__ import annotations
 
 import numpy as np
+from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
 
 from covenant_ml.benchmarking.adapters import (
@@ -67,7 +68,7 @@ def make_learnable_split(n_rows: int = 400) -> DataSplit:
 
 
 def test_cleargbm_trainer_reports_its_name() -> None:
-    trainer = ClearGbmTrainer(make_config(), growth_strategy="depth_wise")
+    trainer = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.DEPTH_WISE)
     assert trainer.model_name == "cleargbm"
 
 
@@ -77,7 +78,7 @@ def test_cleargbm_leaf_wise_arm_reports_a_distinct_name() -> None:
     A manifest groups records by arm name, so two arms answering "cleargbm"
     would merge into one series and silently average two growth policies.
     """
-    trainer = ClearGbmTrainer(make_config(), growth_strategy="leaf_wise")
+    trainer = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.LEAF_WISE)
     assert trainer.model_name == "cleargbm@leaf_wise"
 
 
@@ -114,7 +115,9 @@ def test_xgboost_predicts_a_probability_per_row() -> None:
 
 def test_cleargbm_predicts_a_probability_per_row() -> None:
     split = make_learnable_split()
-    fitted = ClearGbmTrainer(make_config(), growth_strategy="depth_wise").fit(split, seed=42)
+    fitted = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.DEPTH_WISE).fit(
+        split, seed=42
+    )
     proba = fitted.predict_positive_proba(split.x_test)
 
     assert len(proba) == len(split.y_test)
@@ -134,7 +137,9 @@ def test_lightgbm_predicts_a_probability_per_row() -> None:
 
 def test_cleargbm_reports_a_positive_leaf_count() -> None:
     split = make_learnable_split()
-    fitted = ClearGbmTrainer(make_config(), growth_strategy="depth_wise").fit(split, seed=42)
+    fitted = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.DEPTH_WISE).fit(
+        split, seed=42
+    )
     assert fitted.mean_leaves() > 1.0
 
 
@@ -154,7 +159,7 @@ def test_cleargbm_grows_depth_wise_beyond_the_leaf_cap() -> None:
     split = make_learnable_split()
     config = make_config(max_depth=4, num_leaves=3)
 
-    cleargbm = ClearGbmTrainer(config, growth_strategy="depth_wise")
+    cleargbm = ClearGbmTrainer(config, growth_strategy=GrowthStrategy.DEPTH_WISE)
     cleargbm_leaves = cleargbm.fit(split, seed=42).mean_leaves()
     lightgbm_leaves = LightGbmTrainer(config).fit(split, seed=42).mean_leaves()
 
@@ -164,7 +169,7 @@ def test_cleargbm_grows_depth_wise_beyond_the_leaf_cap() -> None:
 
 def test_cleargbm_is_deterministic_for_a_seed() -> None:
     split = make_learnable_split()
-    trainer = ClearGbmTrainer(make_config(), growth_strategy="depth_wise")
+    trainer = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.DEPTH_WISE)
     first = trainer.fit(split, seed=42).predict_positive_proba(split.x_test)
     second = trainer.fit(split, seed=42).predict_positive_proba(split.x_test)
     assert np.array_equal(first, second)
@@ -182,8 +187,8 @@ def test_both_learners_beat_chance_on_separable_data() -> None:
     split = make_learnable_split()
     config = make_config()
     arms = (
-        ClearGbmTrainer(config, growth_strategy="depth_wise"),
-        ClearGbmTrainer(config, growth_strategy="leaf_wise"),
+        ClearGbmTrainer(config, growth_strategy=GrowthStrategy.DEPTH_WISE),
+        ClearGbmTrainer(config, growth_strategy=GrowthStrategy.LEAF_WISE),
         LightGbmTrainer(config),
         XgBoostTrainer(config),
     )
@@ -200,8 +205,12 @@ def test_both_learners_beat_chance_on_separable_data() -> None:
 
 def test_cleargbm_respects_a_deeper_max_depth() -> None:
     split = make_learnable_split()
-    shallow_trainer = ClearGbmTrainer(make_config(max_depth=2), growth_strategy="depth_wise")
-    deep_trainer = ClearGbmTrainer(make_config(max_depth=4), growth_strategy="depth_wise")
+    shallow_trainer = ClearGbmTrainer(
+        make_config(max_depth=2), growth_strategy=GrowthStrategy.DEPTH_WISE
+    )
+    deep_trainer = ClearGbmTrainer(
+        make_config(max_depth=4), growth_strategy=GrowthStrategy.DEPTH_WISE
+    )
     shallow = shallow_trainer.fit(split, seed=1).mean_leaves()
     deep = deep_trainer.fit(split, seed=1).mean_leaves()
     assert deep > shallow
@@ -217,8 +226,8 @@ def test_probabilities_are_finite() -> None:
     split = make_learnable_split()
     config = make_config()
     arms = (
-        ClearGbmTrainer(config, growth_strategy="depth_wise"),
-        ClearGbmTrainer(config, growth_strategy="leaf_wise"),
+        ClearGbmTrainer(config, growth_strategy=GrowthStrategy.DEPTH_WISE),
+        ClearGbmTrainer(config, growth_strategy=GrowthStrategy.LEAF_WISE),
         LightGbmTrainer(config),
         XgBoostTrainer(config),
     )
@@ -230,7 +239,9 @@ def test_probabilities_are_finite() -> None:
 
 def test_cleargbm_scores_rows_it_was_not_trained_on() -> None:
     split = make_learnable_split()
-    fitted = ClearGbmTrainer(make_config(), growth_strategy="depth_wise").fit(split, seed=42)
+    fitted = ClearGbmTrainer(make_config(), growth_strategy=GrowthStrategy.DEPTH_WISE).fit(
+        split, seed=42
+    )
     held_out: NDArray[np.float64] = split.x_test[:10]
     proba = fitted.predict_positive_proba(held_out)
     assert len(proba) == 10

@@ -23,7 +23,7 @@ from cleargbm.ensemble import (
     predict_proba,
     train_gradient_boosting,
 )
-from cleargbm.types import GradientBoostingConfig, GrowthStrategy
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 from platform_core.json_utils import JSONValue
 
@@ -334,7 +334,7 @@ class ClearGbmTrainer:
             ``"cleargbm"`` for the baseline arm, ``"cleargbm@leaf_wise"`` for
             the leaf-wise variant.
         """
-        if self._growth_strategy == "leaf_wise":
+        if self._growth_strategy is GrowthStrategy.LEAF_WISE:
             return "cleargbm@leaf_wise"
         return "cleargbm"
 
@@ -348,7 +348,7 @@ class ClearGbmTrainer:
         Returns:
             The fitted model.
         """
-        leaf_wise = self._growth_strategy == "leaf_wise"
+        leaf_wise = self._growth_strategy is GrowthStrategy.LEAF_WISE
         config: GradientBoostingConfig = {
             "n_estimators": self._config["n_estimators"],
             "max_depth": self._config["max_depth"],
@@ -376,7 +376,7 @@ class ClearGbmTrainer:
             # The same shared `num_leaves` that binds LightGBM's leaf-wise
             # growth, so the two leaf-wise arms are held to one budget.
             "num_leaves": self._config["num_leaves"] if leaf_wise else None,
-            "objective": "binary_log_loss",
+            "objective": Objective.BINARY_LOG_LOSS,
             # Unweighted, matching the LightGBM/XGBoost benchmark arms which
             # set no class weight — and keeping this arm bit-identical to
             # every manifest recorded before the weighting axis existed.

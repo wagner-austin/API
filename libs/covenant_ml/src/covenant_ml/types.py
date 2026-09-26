@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Literal, NotRequired, Protocol, TypedDict
 
 import numpy as np
+from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
 
 RequestedDevice = Literal["cpu", "cuda", "auto"]
@@ -333,9 +334,6 @@ class LightGBMConfig(TypedDict, total=True):
     early_stopping_rounds: int
 
 
-ClearGBMGrowthStrategy = Literal["depth_wise", "leaf_wise"]
-
-
 class ClearGBMConfig(TypedDict, total=True):
     """Configuration for ClearGBM backend training.
 
@@ -402,7 +400,7 @@ class ClearGBMConfig(TypedDict, total=True):
     reg_alpha: float
     reg_lambda: float
     n_jobs: int
-    growth_strategy: ClearGBMGrowthStrategy
+    growth_strategy: GrowthStrategy
     num_leaves: int | None
     train_ratio: float
     val_ratio: float
@@ -547,6 +545,7 @@ __all__ = [
     "DMatrixProtocol",
     "EvalMetrics",
     "FeatureImportance",
+    "GrowthStrategy",
     "LSTMConfig",
     "LSTMPrecision",
     "LightGBMConfig",

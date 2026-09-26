@@ -17,7 +17,7 @@ import gc
 import numpy as np
 from cleargbm.ensemble import predict_proba as cgbm_predict_proba
 from cleargbm.ensemble import train_gradient_boosting
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
@@ -131,9 +131,9 @@ def _build_trial_config(
         reg_lambda=0.0,
         n_jobs=1,  # Sequential for stability
         early_stopping_rounds=early_stopping_rounds,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="binary_log_loss",
+        objective=Objective.BINARY_LOG_LOSS,
         scale_pos_weight=_compute_class_weight(y_train),
     )
 

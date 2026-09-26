@@ -21,6 +21,7 @@ from covenant_ml.backends.cleargbm.config_resolution import (
 from covenant_ml.backends.protocol import PreparedClassifier
 from covenant_ml.types import (
     ClearGBMConfig,
+    GrowthStrategy,
 )
 from tests.backends.cleargbm._cleargbm_fixtures import (
     _invoke_cleargbm_train,
@@ -225,7 +226,7 @@ def test_cleargbm_backend_us_bankruptcy_full_pipeline(tmp_path: Path) -> None:
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,
         "n_jobs": 1,
-        "growth_strategy": "depth_wise",
+        "growth_strategy": GrowthStrategy.DEPTH_WISE,
         "num_leaves": None,
     }
 

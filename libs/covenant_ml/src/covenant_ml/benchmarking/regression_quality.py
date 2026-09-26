@@ -23,7 +23,7 @@ from typing import Protocol, TypedDict
 
 import numpy as np
 from cleargbm.ensemble import predict_raw, train_gradient_boosting_regression
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
@@ -358,9 +358,9 @@ def _cleargbm_config(
         reg_lambda=1.0,
         n_jobs=1,
         early_stopping_rounds=config["early_stopping_rounds"],
-        growth_strategy="leaf_wise" if leaf_wise else "depth_wise",
+        growth_strategy=GrowthStrategy.LEAF_WISE if leaf_wise else GrowthStrategy.DEPTH_WISE,
         num_leaves=config["num_leaves"] if leaf_wise else None,
-        objective="squared_error",
+        objective=Objective.SQUARED_ERROR,
         scale_pos_weight=None,
     )
 

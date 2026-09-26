@@ -19,7 +19,7 @@ from typing import Protocol, TypedDict
 import numpy as np
 from cleargbm.ensemble import predict_raw
 from cleargbm.ensemble_ranking import train_gradient_boosting_ranking
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
@@ -317,9 +317,9 @@ def _cleargbm_config(config: RankingBenchConfig, seed: int) -> GradientBoostingC
         reg_lambda=0.0,
         n_jobs=1,
         early_stopping_rounds=None,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="lambdarank",
+        objective=Objective.LAMBDARANK,
         scale_pos_weight=None,
     )
 

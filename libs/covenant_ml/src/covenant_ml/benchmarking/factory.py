@@ -8,6 +8,7 @@ strategy is a change here and nowhere else.
 from __future__ import annotations
 
 import numpy as np
+from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
 
 from .adapters import ClearGbmTrainer, LightGbmTrainer, XgBoostTrainer
@@ -114,7 +115,7 @@ def make_baseline_trainers(config: BenchmarkConfig) -> tuple[TrainerProto, ...]:
         The ClearGBM depth-wise baseline, LightGBM and XGBoost, in that order.
     """
     return (
-        ClearGbmTrainer(config, growth_strategy="depth_wise"),
+        ClearGbmTrainer(config, growth_strategy=GrowthStrategy.DEPTH_WISE),
         LightGbmTrainer(config),
         XgBoostTrainer(config),
     )
@@ -137,7 +138,7 @@ def make_trainers(config: BenchmarkConfig) -> tuple[TrainerProto, ...]:
         remaining reference arms.
     """
     baseline, *references = make_baseline_trainers(config)
-    variant = ClearGbmTrainer(config, growth_strategy="leaf_wise")
+    variant = ClearGbmTrainer(config, growth_strategy=GrowthStrategy.LEAF_WISE)
     return (baseline, variant, *references)
 
 

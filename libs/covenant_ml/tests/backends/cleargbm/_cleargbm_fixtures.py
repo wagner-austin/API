@@ -12,6 +12,7 @@ from covenant_ml.types import (
     ClassifierTrainConfig,
     ClearGBMConfig,
     FeatureImportance,
+    GrowthStrategy,
     TrainOutcome,
 )
 
@@ -79,7 +80,7 @@ def _make_cleargbm_config(
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,
         "n_jobs": 1,
-        "growth_strategy": "depth_wise",
+        "growth_strategy": GrowthStrategy.DEPTH_WISE,
         "num_leaves": None,
     }
 

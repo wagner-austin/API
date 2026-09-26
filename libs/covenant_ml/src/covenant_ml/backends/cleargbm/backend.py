@@ -21,7 +21,7 @@ from cleargbm.ensemble import (
 from cleargbm.ensemble import (
     train_gradient_boosting,
 )
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, Objective
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
@@ -331,7 +331,7 @@ class ClearGBMBackend(ClassifierBackend):
             early_stopping_rounds=cfg["early_stopping_rounds"],
             growth_strategy=cfg["growth_strategy"],
             num_leaves=cfg["num_leaves"],
-            objective="binary_log_loss",
+            objective=Objective.BINARY_LOG_LOSS,
             # The auto-computed class weight, actually applied. Until
             # 2026-08-22 this value was computed, logged and reported in the
             # outcome while the core had no weighting mechanism at all —

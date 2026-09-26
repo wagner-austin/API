@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 from platform_core.json_utils import JSONValue
 
@@ -87,9 +87,9 @@ def _train_native_binary_model(
         "reg_lambda": 0.0,
         "n_jobs": 1,
         "early_stopping_rounds": None,
-        "growth_strategy": "depth_wise",
+        "growth_strategy": GrowthStrategy.DEPTH_WISE,
         "num_leaves": None,
-        "objective": "binary_log_loss",
+        "objective": Objective.BINARY_LOG_LOSS,
         "scale_pos_weight": 1.0,
     }
     native_model = train_gradient_boosting(
@@ -279,9 +279,9 @@ class TestDecodeRefusesMulticlass:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
-            "growth_strategy": "depth_wise",
+            "growth_strategy": GrowthStrategy.DEPTH_WISE,
             "num_leaves": None,
-            "objective": "multiclass_softmax",
+            "objective": Objective.MULTICLASS_SOFTMAX,
             "scale_pos_weight": None,
         }
         native_model = train_gradient_boosting_multiclass(

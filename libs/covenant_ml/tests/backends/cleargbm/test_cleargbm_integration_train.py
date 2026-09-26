@@ -25,6 +25,7 @@ from covenant_ml.backends.cleargbm.config_resolution import (
     _resolve_monotonic_constraints,
 )
 from covenant_ml.types import (
+    GrowthStrategy,
     MLPConfig,
     TrainConfig,
     TrainProgress,
@@ -322,7 +323,7 @@ def test_cleargbm_backend_train_leaf_wise(tmp_path: Path) -> None:
     x, y, names = _make_synthetic_dataset()
 
     config = _make_cleargbm_config(n_estimators=5)
-    config["growth_strategy"] = "leaf_wise"
+    config["growth_strategy"] = GrowthStrategy.LEAF_WISE
     config["num_leaves"] = 8
 
     outcome = _invoke_cleargbm_train(backend, x, y, names, config, tmp_path)

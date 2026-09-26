@@ -21,7 +21,7 @@ from cleargbm.ensemble_multiclass import (
     predict_proba_multiclass,
     train_gradient_boosting_multiclass,
 )
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 from numpy.typing import NDArray
 from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
@@ -271,9 +271,9 @@ def _cleargbm_config(config: MulticlassBenchConfig, seed: int) -> GradientBoosti
         reg_lambda=0.0,
         n_jobs=1,
         early_stopping_rounds=None,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="multiclass_softmax",
+        objective=Objective.MULTICLASS_SOFTMAX,
         scale_pos_weight=None,
     )
 

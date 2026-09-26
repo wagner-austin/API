@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Literal, Protocol
 
 import numpy as np
-from cleargbm.types import DecisionTree, GradientBoostingConfig, GradientBoostingModel, TreeNode
+from cleargbm.types import (
+    DecisionTree,
+    GradientBoostingConfig,
+    GradientBoostingModel,
+    GrowthStrategy,
+    Objective,
+    TreeNode,
+)
 from numpy.typing import NDArray
 
 
@@ -79,9 +86,9 @@ def _make_config() -> GradientBoostingConfig:
         reg_lambda=1.0,
         n_jobs=1,
         early_stopping_rounds=10,
-        growth_strategy="depth_wise",
+        growth_strategy=GrowthStrategy.DEPTH_WISE,
         num_leaves=None,
-        objective="binary_log_loss",
+        objective=Objective.BINARY_LOG_LOSS,
         scale_pos_weight=1.0,
     )
     return config
