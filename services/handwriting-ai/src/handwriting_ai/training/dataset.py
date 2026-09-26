@@ -7,6 +7,7 @@ from typing import Literal, Protocol, TypedDict
 
 import torch
 from PIL import Image
+from platform_ml import RequestedDevice, RequestedPrecision
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 
@@ -142,8 +143,8 @@ def _rebuild_preprocess_dataset(base: MNISTLike, knobs: _AugmentKnobs) -> Prepro
         "lr": 1e-3,
         "weight_decay": 0.01,
         "seed": 42,
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optim": "adamw",
         "scheduler": "none",
         "step_size": 10,

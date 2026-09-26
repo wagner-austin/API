@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 import torch
+from platform_ml import ResolvedPrecision
 
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols import LoggerInstanceProtocol
@@ -109,7 +110,7 @@ def test_train_epoch_raises_on_memory_guard() -> None:
             model,
             loader,
             torch.device("cpu"),
-            "fp32",
+            ResolvedPrecision.FP32,
             opt,
             ep=1,
             ep_total=1,

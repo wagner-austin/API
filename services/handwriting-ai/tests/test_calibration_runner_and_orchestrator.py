@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 from platform_core.logging import get_logger
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import CalibrationRunnerResultDict
@@ -64,8 +65,8 @@ def _mk_ds(n: int = 32, *, sleep_s: float = 0.0, fail: bool = False) -> Preproce
         "lr": 1e-3,
         "weight_decay": 0.01,
         "seed": 42,
-        "device": "cpu",
-        "precision": "auto",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.AUTO,
         "optim": "adamw",
         "scheduler": "none",
         "step_size": 10,

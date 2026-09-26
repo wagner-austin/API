@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from platform_ml import RequestedDevice, RequestedPrecision
+
 import handwriting_ai.training.mnist_train as mt
 from handwriting_ai.training.resources import ResourceLimits
 from handwriting_ai.training.safety import get_memory_guard_config
@@ -17,8 +19,8 @@ def _cfg() -> mt.TrainConfig:
         "lr": 1e-3,
         "weight_decay": 1e-2,
         "seed": 0,
-        "device": "cpu",
-        "precision": "auto",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.AUTO,
         "optim": "adamw",
         "scheduler": "none",
         "step_size": 1,

@@ -6,46 +6,42 @@ and unavailable, using the shared platform_ml device selector.
 
 from __future__ import annotations
 
-from platform_ml import resolve_device
+from platform_ml import RequestedDevice, ResolvedDevice, resolve_device
 from platform_ml import torch_types as platform_ml_torch_types
 from platform_ml.testing import FakeCudaModule, FakeTorchModule
 from platform_ml.torch_types import _TorchModuleProtocol
 
 
 def test_resolve_device_auto_with_cuda_available() -> None:
-    """When CUDA is available, 'auto' resolves to 'cuda'."""
+    """When CUDA is available, AUTO resolves to CUDA."""
     fake_torch = FakeTorchModule(cuda_available=True)
 
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
     platform_ml_torch_types._import_torch = _fake_import
-    result = resolve_device("auto")
-    assert result == "cuda"
+    assert resolve_device(RequestedDevice.AUTO) is ResolvedDevice.CUDA
 
 
 def test_resolve_device_auto_with_cuda_unavailable() -> None:
-    """When CUDA is unavailable, 'auto' resolves to 'cpu'."""
+    """When CUDA is unavailable, AUTO resolves to CPU."""
     fake_torch = FakeTorchModule(cuda_available=False)
 
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
     platform_ml_torch_types._import_torch = _fake_import
-    result = resolve_device("auto")
-    assert result == "cpu"
+    assert resolve_device(RequestedDevice.AUTO) is ResolvedDevice.CPU
 
 
 def test_resolve_device_explicit_cpu() -> None:
-    """Explicit 'cpu' is returned as-is without checking CUDA."""
-    result = resolve_device("cpu")
-    assert result == "cpu"
+    """Explicit CPU is returned as-is without checking CUDA."""
+    assert resolve_device(RequestedDevice.CPU) is ResolvedDevice.CPU
 
 
 def test_resolve_device_explicit_cuda() -> None:
-    """Explicit 'cuda' is returned as-is without checking CUDA availability."""
-    result = resolve_device("cuda")
-    assert result == "cuda"
+    """Explicit CUDA is returned as-is without checking CUDA availability."""
+    assert resolve_device(RequestedDevice.CUDA) is ResolvedDevice.CUDA
 
 
 def test_resolve_device_uses_platform_ml_hook() -> None:
@@ -57,5 +53,5 @@ def test_resolve_device_uses_platform_ml_hook() -> None:
         return fake_torch
 
     platform_ml_torch_types._import_torch = _fake_import
-    resolve_device("auto")
+    resolve_device(RequestedDevice.AUTO)
     assert fake_cuda.is_available_call_count == 1

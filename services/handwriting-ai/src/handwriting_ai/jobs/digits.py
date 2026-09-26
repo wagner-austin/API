@@ -20,6 +20,7 @@ from platform_core.job_events import ErrorKind, JobDomain, default_events_channe
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import DIGITS_QUEUE as _DIGITS_QUEUE
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_workers.job_context import JobContext
 from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import get_current_job
@@ -76,8 +77,8 @@ def _build_cfg(payload: DigitsTrainJobV1) -> TrainConfig:
         "lr": float(payload["lr"]),
         "weight_decay": 1e-2,
         "seed": payload["seed"],
-        "device": "auto",
-        "precision": "auto",
+        "device": RequestedDevice.AUTO,
+        "precision": RequestedPrecision.AUTO,
         "optim": "adamw",
         "scheduler": "cosine",
         "step_size": 10,

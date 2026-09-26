@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 import pytest
 import torch
 from PIL import Image
+from platform_ml import RequestedDevice, ResolvedPrecision
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer as TorchOptimizer
@@ -64,7 +65,7 @@ def _cfg(tmp: Path) -> TrainConfig:
         lr=1e-3,
         weight_decay=1e-2,
         seed=123,
-        device="cpu",
+        device=RequestedDevice.CPU,
         optim="adamw",
         scheduler="none",
         step_size=1,
@@ -120,7 +121,7 @@ def test_build_model_and_evaluate_smoke() -> None:
         lr=1e-3,
         weight_decay=1e-2,
         seed=0,
-        device="cpu",
+        device=RequestedDevice.CPU,
         optim="adamw",
         scheduler="none",
         step_size=1,
@@ -155,7 +156,7 @@ def test_make_loaders_and_train_epoch_augment(tmp_path: Path) -> None:
         model,
         train_loader,
         torch.device("cpu"),
-        "fp32",
+        ResolvedPrecision.FP32,
         opt,
         ep=1,
         ep_total=1,
@@ -236,7 +237,7 @@ def test_train_interrupt_saves_artifact(tmp_path: Path, write_mnist_raw: MnistRa
         model: Module,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
-        precision: Literal["fp32", "fp16", "bf16"],
+        precision: ResolvedPrecision,
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,

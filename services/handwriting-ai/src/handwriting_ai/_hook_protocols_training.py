@@ -6,10 +6,11 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 from types import TracebackType
-from typing import Literal, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 import torch
 from PIL.Image import Image as PILImage
+from platform_ml import ResolvedPrecision
 from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 
@@ -375,7 +376,7 @@ class TrainEpochProtocol(Protocol):
         model: TorchModule,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
-        precision: Literal["fp32", "fp16", "bf16"],
+        precision: ResolvedPrecision,
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
@@ -482,7 +483,7 @@ class GetAutocastContextProtocol(Protocol):
     """Protocol for get_autocast_context function."""
 
     def __call__(
-        self, precision: Literal["fp32", "fp16", "bf16"], device: torch.device
+        self, precision: ResolvedPrecision, device: torch.device
     ) -> AbstractContextManager[None]: ...
 
 

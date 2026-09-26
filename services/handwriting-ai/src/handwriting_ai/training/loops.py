@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Protocol
 
 import torch
 import torch.nn.functional as functional
+from platform_ml import ResolvedPrecision
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
@@ -89,7 +90,7 @@ def train_epoch(
     model: Module,
     train_loader: _BatchLoader,
     device: torch.device,
-    precision: Literal["fp32", "fp16", "bf16"],
+    precision: ResolvedPrecision,
     optimizer: Optimizer,
     *,
     ep: int,
@@ -106,7 +107,7 @@ def train_epoch(
     batch: tuple[Tensor, Tensor]
 
     # Precision setup: fp16 on CUDA uses GradScaler, bf16 and fp32 do not
-    use_fp16_scaler = precision == "fp16" and device.type == "cuda"
+    use_fp16_scaler = precision is ResolvedPrecision.FP16 and device.type == "cuda"
     autocast_ctx = _test_hooks.get_autocast_context(precision, device)
     scaler = _test_hooks.create_grad_scaler() if use_fp16_scaler else None
 

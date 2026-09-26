@@ -12,6 +12,7 @@ from platform_core.digits_metrics_events import (
 )
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.testing import make_fake_env
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
@@ -110,8 +111,8 @@ def test_process_train_job_happy_path_raises_on_artifact_upload(
                 "batch_size": int(cfg["batch_size"]),
                 "lr": float(cfg["lr"]),
                 "seed": int(cfg["seed"]),
-                "device": "cpu",
-                "precision": "fp32",
+                "device": ResolvedDevice.CPU,
+                "precision": ResolvedPrecision.FP32,
                 "optim": str(cfg["optim"]),
                 "scheduler": str(cfg["scheduler"]),
                 "augment": bool(cfg["augment"]),

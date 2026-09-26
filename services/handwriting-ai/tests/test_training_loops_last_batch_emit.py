@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import overload
 
 import torch
+from platform_ml import ResolvedPrecision
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
@@ -77,7 +78,7 @@ def test_train_epoch_emits_last_batch() -> None:
         model=model,
         train_loader=data,
         device=device,
-        precision="fp32",
+        precision=ResolvedPrecision.FP32,
         optimizer=opt,
         ep=1,
         ep_total=1,

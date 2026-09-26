@@ -7,6 +7,7 @@ from typing import Protocol
 
 import torch
 from PIL import Image
+from platform_ml import RequestedDevice
 from torch.utils.data import Dataset
 
 from handwriting_ai import _test_hooks
@@ -38,7 +39,7 @@ def _cfg(tmp: Path) -> TrainConfig:
         lr=1e-3,
         weight_decay=1e-2,
         seed=123,
-        device="cpu",
+        device=RequestedDevice.CPU,
         optim="adamw",
         scheduler="none",
         step_size=1,

@@ -13,6 +13,7 @@ from platform_core.config.handwriting_ai import (
     Settings,
 )
 from platform_core.testing import make_fake_env
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 import handwriting_ai.jobs.digits as dj
 from handwriting_ai import _test_hooks
@@ -63,8 +64,8 @@ def _training_with_artifacts(cfg: TrainConfig) -> TrainingResult:
         "batch_size": int(cfg["batch_size"]),
         "lr": float(cfg["lr"]),
         "seed": int(cfg["seed"]),
-        "device": "cpu",
-        "precision": "fp32",
+        "device": ResolvedDevice.CPU,
+        "precision": ResolvedPrecision.FP32,
         "optim": str(cfg["optim"]),
         "scheduler": str(cfg["scheduler"]),
         "augment": bool(cfg["augment"]),

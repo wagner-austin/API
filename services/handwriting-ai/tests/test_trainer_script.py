@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 from PIL import Image
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.mnist_train import MNISTLike, TrainConfig
@@ -41,8 +42,8 @@ def test_preprocess_dataset_shapes() -> None:
         lr=1e-3,
         weight_decay=1e-2,
         seed=0,
-        device="cpu",
-        precision="auto",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.AUTO,
         optim="adamw",
         scheduler="none",
         step_size=1,

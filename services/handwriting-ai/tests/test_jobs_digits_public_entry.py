@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import MappingProxyType
 
 import pytest
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 import handwriting_ai.jobs.digits as dj
 from handwriting_ai import _test_hooks
@@ -28,8 +29,8 @@ def test_process_train_job_invokes_decoder_with_dict() -> None:
                 "batch_size": 1,
                 "lr": 0.01,
                 "seed": 1,
-                "device": "cpu",
-                "precision": "fp32",
+                "device": ResolvedDevice.CPU,
+                "precision": ResolvedPrecision.FP32,
                 "optim": "adamw",
                 "scheduler": "none",
                 "augment": False,

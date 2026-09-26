@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 import torch.autograd
 from PIL import Image
+from platform_ml import ResolvedPrecision
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 
@@ -96,7 +97,7 @@ def test_train_epoch_smoke_with_fake_data() -> None:
         model,
         loader,
         device,
-        "fp32",
+        ResolvedPrecision.FP32,
         optimizer,
         ep=1,
         ep_total=1,

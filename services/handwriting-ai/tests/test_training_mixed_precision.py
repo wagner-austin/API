@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+from platform_ml import ResolvedPrecision
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
 
@@ -165,7 +166,7 @@ class TestAutocastContextDefault:
     """The production hook that names the forward pass's context."""
 
     def test_fp32_gets_a_context_that_does_nothing(self) -> None:
-        ctx = _default_get_autocast_context("fp32", torch.device("cpu"))
+        ctx = _default_get_autocast_context(ResolvedPrecision.FP32, torch.device("cpu"))
         body_ran = False
         with ctx:
             body_ran = True
@@ -178,14 +179,14 @@ class TestAutocastContextDefault:
         autocast off CUDA warns rather than raising -- which is what lets
         this default be covered without a card in the machine.
         """
-        ctx = _default_get_autocast_context("fp16", torch.device("cuda"))
+        ctx = _default_get_autocast_context(ResolvedPrecision.FP16, torch.device("cuda"))
         body_ran = False
         with ctx:
             body_ran = True
         assert body_ran
 
     def test_bf16_builds_an_enterable_autocast(self) -> None:
-        ctx = _default_get_autocast_context("bf16", torch.device("cuda"))
+        ctx = _default_get_autocast_context(ResolvedPrecision.BF16, torch.device("cuda"))
         body_ran = False
         with ctx:
             body_ran = True

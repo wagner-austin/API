@@ -14,11 +14,11 @@ when the loaders were never built.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 import pytest
 import torch
 from PIL import Image
+from platform_ml import RequestedDevice, ResolvedPrecision
 from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import Dataset
@@ -96,7 +96,7 @@ def _cfg(tmp: Path) -> TrainConfig:
         epochs=1,
         batch_size=2,
         seed=0,
-        device="cpu",
+        device=RequestedDevice.CPU,
         calibrate=True,
         calibration_samples=1,
     )
@@ -144,7 +144,7 @@ def _bind_train_epoch(outcome: float | None) -> None:
         model: TorchModule,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
-        precision: Literal["fp32", "fp16", "bf16"],
+        precision: ResolvedPrecision,
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,

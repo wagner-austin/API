@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Literal
 
 import torch
 from PIL.Image import Image as PILImage
+from platform_ml import ResolvedPrecision
 from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 
@@ -236,7 +236,7 @@ def _default_train_epoch(
     model: TorchModule,
     train_loader: BatchLoaderProtocol,
     device: torch.device,
-    precision: Literal["fp32", "fp16", "bf16"],
+    precision: ResolvedPrecision,
     optimizer: TorchOptimizer,
     ep: int,
     ep_total: int,
@@ -296,7 +296,7 @@ def _default_get_training_progress_module() -> TrainingProgressModuleProtocol | 
 
 
 def _default_get_autocast_context(
-    precision: Literal["fp32", "fp16", "bf16"], device: torch.device
+    precision: ResolvedPrecision, device: torch.device
 ) -> AbstractContextManager[None]:
     """Production implementation - get autocast context based on precision and device.
 
@@ -313,12 +313,12 @@ def _default_get_autocast_context(
     """
     from contextlib import nullcontext as _nullcontext
 
-    if precision == "fp32":
+    if precision is ResolvedPrecision.FP32:
         return _nullcontext()
     # fp16/bf16 requires CUDA - resolve_precision enforces this upstream
     # Get autocast from torch.amp (PyTorch 2.0+ API)
     torch_amp = __import__("torch.amp", fromlist=["autocast"])
-    dtype = torch.float16 if precision == "fp16" else torch.bfloat16
+    dtype = torch.float16 if precision is ResolvedPrecision.FP16 else torch.bfloat16
     ctx: AbstractContextManager[None] = torch_amp.autocast(device_type=device.type, dtype=dtype)
     return ctx
 

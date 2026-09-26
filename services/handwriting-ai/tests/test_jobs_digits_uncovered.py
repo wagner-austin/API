@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONValue
+from platform_ml import ResolvedDevice, ResolvedPrecision
 from platform_workers.redis import RedisStrProto
 
 from handwriting_ai import _test_hooks
@@ -93,8 +94,8 @@ def _quick_training(cfg: TrainConfig) -> TrainingResult:
             "batch_size": int(cfg["batch_size"]),
             "lr": float(cfg["lr"]),
             "seed": int(cfg["seed"]),
-            "device": "cpu",
-            "precision": "fp32",
+            "device": ResolvedDevice.CPU,
+            "precision": ResolvedPrecision.FP32,
             "optim": str(cfg["optim"]),
             "scheduler": str(cfg["scheduler"]),
             "augment": bool(cfg["augment"]),

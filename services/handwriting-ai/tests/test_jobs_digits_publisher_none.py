@@ -4,6 +4,7 @@ import secrets
 from datetime import UTC, datetime
 
 import pytest
+from platform_ml import ResolvedDevice, ResolvedPrecision
 
 import handwriting_ai.jobs.digits as dj
 from handwriting_ai import _test_hooks
@@ -47,8 +48,8 @@ def _quick_training(cfg: TrainConfig) -> TrainingResult:
             "batch_size": int(cfg["batch_size"]),
             "lr": float(cfg["lr"]),
             "seed": int(cfg["seed"]),
-            "device": "cpu",
-            "precision": "fp32",
+            "device": ResolvedDevice.CPU,
+            "precision": ResolvedPrecision.FP32,
             "optim": str(cfg["optim"]),
             "scheduler": str(cfg["scheduler"]),
             "augment": bool(cfg["augment"]),

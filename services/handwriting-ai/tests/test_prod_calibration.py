@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
+from platform_ml import RequestedDevice
 
 from handwriting_ai.training.mnist_train import train_with_config
 from handwriting_ai.training.train_config import default_train_config
@@ -66,7 +67,7 @@ if __name__ == "__main__":
             lr=1e-3,
             weight_decay=1e-2,
             seed=42,
-            device="cpu",
+            device=RequestedDevice.CPU,
             optim="adamw",
             scheduler="none",
             step_size=1,

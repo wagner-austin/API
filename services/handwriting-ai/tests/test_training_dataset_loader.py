@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from platform_ml import RequestedDevice, RequestedPrecision
 from torch.utils.data import Dataset
 
 from handwriting_ai.training.dataset import (
@@ -34,8 +35,8 @@ def _train_cfg(tmp: Path) -> TrainConfig:
         "lr": 1e-3,
         "weight_decay": 1e-2,
         "seed": 0,
-        "device": "cpu",
-        "precision": "auto",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.AUTO,
         "optim": "adamw",
         "scheduler": "none",
         "step_size": 1,
