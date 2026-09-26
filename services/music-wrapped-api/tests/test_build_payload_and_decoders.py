@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
+from platform_music.models import ServiceName
 from platform_workers.testing import FakeRedis
 
 from music_wrapped_api import _test_hooks
@@ -24,7 +25,7 @@ def test_build_payload_spotify_token_and_full() -> None:
         "credentials": {"token_id": "tk"},
     }
     out_tok = build_payload_for_service(doc_tok, redis_url="redis://ignored")
-    assert out_tok["service"] == "spotify" and out_tok["credentials"] is not None
+    assert out_tok["service"] is ServiceName.SPOTIFY and out_tok["credentials"] is not None
 
     # Full path
     doc_full: dict[str, JSONValue] = {
@@ -33,7 +34,7 @@ def test_build_payload_spotify_token_and_full() -> None:
         "credentials": {"access_token": "at2", "refresh_token": "rt2", "expires_in": 3600},
     }
     out_full = build_payload_for_service(doc_full, redis_url="redis://ignored")
-    assert out_full["service"] == "spotify"
+    assert out_full["service"] is ServiceName.SPOTIFY
     fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
@@ -49,7 +50,7 @@ def test_build_payload_apple_token_and_full() -> None:
         "credentials": {"token_id": "atk"},
     }
     out_tok = build_payload_for_service(doc_tok, redis_url="redis://ignored")
-    assert out_tok["service"] == "apple_music"
+    assert out_tok["service"] is ServiceName.APPLE_MUSIC
 
     # Full path
     doc_full: dict[str, JSONValue] = {
@@ -58,7 +59,7 @@ def test_build_payload_apple_token_and_full() -> None:
         "credentials": {"developer_token": "d2", "music_user_token": "u2"},
     }
     out_full = build_payload_for_service(doc_full, redis_url="redis://ignored")
-    assert out_full["service"] == "apple_music"
+    assert out_full["service"] is ServiceName.APPLE_MUSIC
     fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
@@ -74,7 +75,7 @@ def test_build_payload_youtube_token_and_full() -> None:
         "credentials": {"token_id": "ytk"},
     }
     out_tok = build_payload_for_service(doc_tok, redis_url="redis://ignored")
-    assert out_tok["service"] == "youtube_music"
+    assert out_tok["service"] is ServiceName.YOUTUBE_MUSIC
 
     # Full path
     doc_full: dict[str, JSONValue] = {
@@ -83,7 +84,7 @@ def test_build_payload_youtube_token_and_full() -> None:
         "credentials": {"sapisid": "sid2", "cookies": "c=d"},
     }
     out_full = build_payload_for_service(doc_full, redis_url="redis://ignored")
-    assert out_full["service"] == "youtube_music"
+    assert out_full["service"] is ServiceName.YOUTUBE_MUSIC
     fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
@@ -102,7 +103,7 @@ def test_decode_generate_any_variants() -> None:
     out_sp_tok = decode_generate_any(
         {"year": 2024, "service": "spotify", "credentials": {"token_id": "t"}}
     )
-    assert out_sp_tok["service"] == "spotify"
+    assert out_sp_tok["service"] is ServiceName.SPOTIFY
     out_sp_full = decode_generate_any(
         {
             "year": 2024,
@@ -110,12 +111,12 @@ def test_decode_generate_any_variants() -> None:
             "credentials": {"access_token": "a", "refresh_token": "r", "expires_in": 10},
         }
     )
-    assert out_sp_full["service"] == "spotify"
+    assert out_sp_full["service"] is ServiceName.SPOTIFY
 
     out_ap_tok = decode_generate_any(
         {"year": 2024, "service": "apple_music", "credentials": {"token_id": "t"}}
     )
-    assert out_ap_tok["service"] == "apple_music"
+    assert out_ap_tok["service"] is ServiceName.APPLE_MUSIC
     out_ap_full = decode_generate_any(
         {
             "year": 2024,
@@ -123,12 +124,12 @@ def test_decode_generate_any_variants() -> None:
             "credentials": {"developer_token": "d", "music_user_token": "u"},
         }
     )
-    assert out_ap_full["service"] == "apple_music"
+    assert out_ap_full["service"] is ServiceName.APPLE_MUSIC
 
     out_yt_tok = decode_generate_any(
         {"year": 2024, "service": "youtube_music", "credentials": {"token_id": "t"}}
     )
-    assert out_yt_tok["service"] == "youtube_music"
+    assert out_yt_tok["service"] is ServiceName.YOUTUBE_MUSIC
     out_yt_full = decode_generate_any(
         {
             "year": 2024,
@@ -136,7 +137,7 @@ def test_decode_generate_any_variants() -> None:
             "credentials": {"sapisid": "s", "cookies": "c=1"},
         }
     )
-    assert out_yt_full["service"] == "youtube_music"
+    assert out_yt_full["service"] is ServiceName.YOUTUBE_MUSIC
 
     with pytest.raises(AppError):
         decode_generate_any({"year": 2024, "service": "unknown", "credentials": {}})
@@ -145,7 +146,7 @@ def test_decode_generate_any_variants() -> None:
     out_lf_sess = decode_generate_any(
         {"year": 2024, "service": "lastfm", "credentials": {"session_key": "s"}}
     )
-    assert out_lf_sess["service"] == "lastfm"
+    assert out_lf_sess["service"] is ServiceName.LASTFM
     out_lf_full = decode_generate_any(
         {
             "year": 2024,
@@ -153,7 +154,7 @@ def test_decode_generate_any_variants() -> None:
             "credentials": {"api_key": "k", "api_secret": "s", "session_key": "t"},
         }
     )
-    assert out_lf_full["service"] == "lastfm"
+    assert out_lf_full["service"] is ServiceName.LASTFM
 
     # Early validation errors in decode_generate_any
     with pytest.raises(AppError):

@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 from platform_core.queues import MUSIC_WRAPPED_QUEUE
 from platform_music.jobs import LastFmCredentials
+from platform_music.models import ServiceName
 
 from music_wrapped_api import _test_hooks
 
@@ -55,7 +57,7 @@ def _payload_lastfm(req_l: GenerateRequest, *, redis_url: str) -> dict[str, JSON
     return {
         "type": "music_wrapped.generate.v1",
         "year": req_l["year"],
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -82,7 +84,7 @@ def _payload_spotify_token(req_sp: SpotifyGenerateToken, *, redis_url: str) -> d
     return {
         "type": "music_wrapped.generate.v1",
         "year": int(req_sp["year"]),
-        "service": "spotify",
+        "service": ServiceName.SPOTIFY,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -100,7 +102,7 @@ def _payload_spotify_full(req_sf: SpotifyGenerateFull, *, redis_url: str) -> dic
     return {
         "type": "music_wrapped.generate.v1",
         "year": int(req_sf["year"]),
-        "service": "spotify",
+        "service": ServiceName.SPOTIFY,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -126,7 +128,7 @@ def _payload_apple_token(req_ap: AppleGenerateToken, *, redis_url: str) -> dict[
     return {
         "type": "music_wrapped.generate.v1",
         "year": int(req_ap["year"]),
-        "service": "apple_music",
+        "service": ServiceName.APPLE_MUSIC,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -143,7 +145,7 @@ def _payload_apple_full(req_af: AppleGenerateFull, *, redis_url: str) -> dict[st
     return {
         "type": "music_wrapped.generate.v1",
         "year": int(req_af["year"]),
-        "service": "apple_music",
+        "service": ServiceName.APPLE_MUSIC,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -166,7 +168,7 @@ def _payload_youtube_token(req_yt: YouTubeGenerateToken, *, redis_url: str) -> d
     return {
         "type": "music_wrapped.generate.v1",
         "year": int(req_yt["year"]),
-        "service": "youtube_music",
+        "service": ServiceName.YOUTUBE_MUSIC,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -180,7 +182,7 @@ def _payload_youtube_full(req_yf: YouTubeGenerateFull, *, redis_url: str) -> dic
     return {
         "type": "music_wrapped.generate.v1",
         "year": int(req_yf["year"]),
-        "service": "youtube_music",
+        "service": ServiceName.YOUTUBE_MUSIC,
         "credentials": creds_json,
         "user_id": 0,
         "redis_url": redis_url,
@@ -200,7 +202,7 @@ def _build_spotify_payload(doc: dict[str, JSONValue], *, redis_url: str) -> dict
     if isinstance(cred, dict) and "token_id" in cred and isinstance(cred["token_id"], str):
         req_tok: SpotifyGenerateToken = {
             "year": _doc_year(doc),
-            "service": "spotify",
+            "service": ServiceName.SPOTIFY,
             "credentials": {"token_id": cred["token_id"]},
         }
         return _payload_spotify_token(req_tok, redis_url=redis_url)
@@ -216,7 +218,7 @@ def _build_spotify_payload(doc: dict[str, JSONValue], *, redis_url: str) -> dict
             )
         req_full: SpotifyGenerateFull = {
             "year": _doc_year(doc),
-            "service": "spotify",
+            "service": ServiceName.SPOTIFY,
             "credentials": {"access_token": at, "refresh_token": rt, "expires_in": ex},
         }
         return _payload_spotify_full(req_full, redis_url=redis_url)
@@ -228,7 +230,7 @@ def _build_apple_payload(doc: dict[str, JSONValue], *, redis_url: str) -> dict[s
     if isinstance(cred, dict) and "token_id" in cred and isinstance(cred["token_id"], str):
         req_ap: AppleGenerateToken = {
             "year": _doc_year(doc),
-            "service": "apple_music",
+            "service": ServiceName.APPLE_MUSIC,
             "credentials": {"token_id": cred["token_id"]},
         }
         return _payload_apple_token(req_ap, redis_url=redis_url)
@@ -243,7 +245,7 @@ def _build_apple_payload(doc: dict[str, JSONValue], *, redis_url: str) -> dict[s
             )
         req_af: AppleGenerateFull = {
             "year": _doc_year(doc),
-            "service": "apple_music",
+            "service": ServiceName.APPLE_MUSIC,
             "credentials": {"music_user_token": mus, "developer_token": dev},
         }
         return _payload_apple_full(req_af, redis_url=redis_url)
@@ -255,7 +257,7 @@ def _build_youtube_payload(doc: dict[str, JSONValue], *, redis_url: str) -> dict
     if isinstance(cred, dict) and "token_id" in cred and isinstance(cred["token_id"], str):
         req_yt: YouTubeGenerateToken = {
             "year": _doc_year(doc),
-            "service": "youtube_music",
+            "service": ServiceName.YOUTUBE_MUSIC,
             "credentials": {"token_id": cred["token_id"]},
         }
         return _payload_youtube_token(req_yt, redis_url=redis_url)
@@ -270,7 +272,7 @@ def _build_youtube_payload(doc: dict[str, JSONValue], *, redis_url: str) -> dict
             )
         req_yf: YouTubeGenerateFull = {
             "year": _doc_year(doc),
-            "service": "youtube_music",
+            "service": ServiceName.YOUTUBE_MUSIC,
             "credentials": {"sapisid": sid, "cookies": ck},
         }
         return _payload_youtube_full(req_yf, redis_url=redis_url)
@@ -287,16 +289,17 @@ def build_payload_for_service(doc: JSONValue, *, redis_url: str) -> dict[str, JS
     svc_val = doc.get("service")
     if not isinstance(svc_val, str):
         raise AppError(code=ErrorCode.INVALID_INPUT, message="service required", http_status=400)
-    svc = svc_val
-    if svc == "lastfm":
+    svc = find_member(svc_val, ServiceName)
+    if svc is None:
+        raise AppError(code=ErrorCode.INVALID_INPUT, message="unsupported service", http_status=400)
+    if svc is ServiceName.LASTFM:
         return _payload_lastfm(decode_wrapped_generate(doc), redis_url=redis_url)
-    if svc == "spotify":
+    if svc is ServiceName.SPOTIFY:
         return _build_spotify_payload(doc, redis_url=redis_url)
-    if svc == "apple_music":
+    if svc is ServiceName.APPLE_MUSIC:
         return _build_apple_payload(doc, redis_url=redis_url)
-    if svc == "youtube_music":
-        return _build_youtube_payload(doc, redis_url=redis_url)
-    raise AppError(code=ErrorCode.INVALID_INPUT, message="unsupported service", http_status=400)
+    # Every other member is narrowed away above, so svc is YOUTUBE_MUSIC here.
+    return _build_youtube_payload(doc, redis_url=redis_url)
 
 
 __all__ = ["build_payload_for_service"]

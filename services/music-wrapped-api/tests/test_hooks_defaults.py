@@ -397,9 +397,10 @@ def test_default_build_renderer_creates_renderer() -> None:
     renderer = _test_hooks._default_build_renderer()
     # Actually call render_wrapped to verify it works
     from platform_music import WrappedResult
+    from platform_music.models import ServiceName
 
     result: WrappedResult = {
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
         "year": 2024,
         "generated_at": "2024-12-10T00:00:00Z",
         "total_scrobbles": 1000,

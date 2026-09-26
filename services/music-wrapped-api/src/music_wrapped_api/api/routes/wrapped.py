@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Request, UploadFile
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue, load_json_bytes
 from platform_core.queues import MUSIC_WRAPPED_QUEUE
+from platform_music.models import ServiceName
 from starlette.datastructures import FormData
 from starlette.responses import Response
 
@@ -299,7 +300,7 @@ def _wrapped_result_schema() -> dict[str, JSONValue]:
         "properties": {
             "service": {
                 "type": "string",
-                "enum": ["lastfm", "spotify", "apple_music", "youtube_music"],
+                "enum": [service.value for service in ServiceName],
             },
             "year": {"type": "integer"},
             "generated_at": {"type": "string"},

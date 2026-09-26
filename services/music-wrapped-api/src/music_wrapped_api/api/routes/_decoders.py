@@ -4,12 +4,14 @@ from typing import Literal, TypedDict, TypeGuard
 
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue
+from platform_core.members import find_member
 from platform_music.jobs import (
     AppleMusicCredentials,
     LastFmCredentials,
     SpotifyCredentials,
     YouTubeMusicCredentials,
 )
+from platform_music.models import ServiceName
 
 
 class _LastFmCredsFull(TypedDict):
@@ -27,7 +29,7 @@ class _LastFmCredsSessionOnly(TypedDict):
 
 class GenerateRequest(TypedDict):
     year: int
-    service: Literal["lastfm"]
+    service: Literal[ServiceName.LASTFM]
     credentials: _LastFmCredsFull | _LastFmCredsSessionOnly
 
 
@@ -50,7 +52,7 @@ def decode_wrapped_generate(doc: JSONValue) -> GenerateRequest:
         raise AppError(code=ErrorCode.INVALID_INPUT, message="year must be int", http_status=400)
 
     service_val = doc.get("service")
-    if service_val != "lastfm":
+    if service_val != ServiceName.LASTFM:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message="service must be 'lastfm'",
@@ -99,7 +101,7 @@ def decode_wrapped_generate(doc: JSONValue) -> GenerateRequest:
         creds = {"session_key": session_key_val}
     out: GenerateRequest = {
         "year": int(year_val),
-        "service": "lastfm",
+        "service": ServiceName.LASTFM,
         "credentials": creds,
     }
     return out
@@ -123,37 +125,37 @@ class _TokenRef(TypedDict):
 
 class SpotifyGenerateToken(TypedDict):
     year: int
-    service: Literal["spotify"]
+    service: Literal[ServiceName.SPOTIFY]
     credentials: _TokenRef
 
 
 class SpotifyGenerateFull(TypedDict):
     year: int
-    service: Literal["spotify"]
+    service: Literal[ServiceName.SPOTIFY]
     credentials: SpotifyCredentials
 
 
 class AppleGenerateToken(TypedDict):
     year: int
-    service: Literal["apple_music"]
+    service: Literal[ServiceName.APPLE_MUSIC]
     credentials: _TokenRef
 
 
 class AppleGenerateFull(TypedDict):
     year: int
-    service: Literal["apple_music"]
+    service: Literal[ServiceName.APPLE_MUSIC]
     credentials: AppleMusicCredentials
 
 
 class YouTubeGenerateToken(TypedDict):
     year: int
-    service: Literal["youtube_music"]
+    service: Literal[ServiceName.YOUTUBE_MUSIC]
     credentials: _TokenRef
 
 
 class YouTubeGenerateFull(TypedDict):
     year: int
-    service: Literal["youtube_music"]
+    service: Literal[ServiceName.YOUTUBE_MUSIC]
     credentials: YouTubeMusicCredentials
 
 
@@ -193,29 +195,31 @@ def decode_generate_any(
     year_val = doc.get("year")
     if not isinstance(year_val, int):
         raise AppError(code=ErrorCode.INVALID_INPUT, message="year must be int", http_status=400)
-    svc = doc.get("service")
-    if svc == "lastfm":
+    svc_val = doc.get("service")
+    svc = find_member(svc_val, ServiceName) if isinstance(svc_val, str) else None
+    if svc is None:
+        raise AppError(code=ErrorCode.INVALID_INPUT, message="unsupported service", http_status=400)
+    if svc is ServiceName.LASTFM:
         return decode_wrapped_generate(doc)
     creds_val = doc.get("credentials")
-    if svc == "spotify":
+    if svc is ServiceName.SPOTIFY:
         if isinstance(creds_val, dict) and "token_id" in creds_val:
             ref = _decode_token_ref(creds_val)
-            return {"year": int(year_val), "service": "spotify", "credentials": ref}
+            return {"year": int(year_val), "service": svc, "credentials": ref}
         full = decode_spotify_credentials(creds_val)
-        return {"year": int(year_val), "service": "spotify", "credentials": full}
-    if svc == "apple_music":
+        return {"year": int(year_val), "service": svc, "credentials": full}
+    if svc is ServiceName.APPLE_MUSIC:
         if isinstance(creds_val, dict) and "token_id" in creds_val:
             ref2 = _decode_token_ref(creds_val)
-            return {"year": int(year_val), "service": "apple_music", "credentials": ref2}
+            return {"year": int(year_val), "service": svc, "credentials": ref2}
         full2 = decode_apple_credentials(creds_val)
-        return {"year": int(year_val), "service": "apple_music", "credentials": full2}
-    if svc == "youtube_music":
-        if isinstance(creds_val, dict) and "token_id" in creds_val:
-            ref3 = _decode_token_ref(creds_val)
-            return {"year": int(year_val), "service": "youtube_music", "credentials": ref3}
-        full3 = decode_youtube_credentials(creds_val)
-        return {"year": int(year_val), "service": "youtube_music", "credentials": full3}
-    raise AppError(code=ErrorCode.INVALID_INPUT, message="unsupported service", http_status=400)
+        return {"year": int(year_val), "service": svc, "credentials": full2}
+    # Every other member is narrowed away above, so svc is YOUTUBE_MUSIC here.
+    if isinstance(creds_val, dict) and "token_id" in creds_val:
+        ref3 = _decode_token_ref(creds_val)
+        return {"year": int(year_val), "service": svc, "credentials": ref3}
+    full3 = decode_youtube_credentials(creds_val)
+    return {"year": int(year_val), "service": svc, "credentials": full3}
 
 
 def to_full_lastfm_credentials(
