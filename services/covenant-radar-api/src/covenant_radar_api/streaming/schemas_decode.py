@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import find_member
 from platform_core.risk_tiers import as_risk_tier
 
 from covenant_radar_api.streaming.schemas import (
@@ -34,16 +35,15 @@ def _parse_alert_type(raw: str) -> AlertType:
         raw: Raw string value.
 
     Returns:
-        Validated AlertType literal.
+        The named alert type.
 
     Raises:
         JSONTypeError: If value is not valid.
     """
-    if raw == "breach":
-        return "breach"
-    if raw == "high_risk":
-        return "high_risk"
-    raise JSONTypeError(f"Invalid alert type '{raw}'")
+    alert_type = find_member(raw, AlertType)
+    if alert_type is None:
+        raise JSONTypeError(f"Invalid alert type '{raw}'")
+    return alert_type
 
 
 def _parse_alert_severity(raw: str) -> AlertSeverity:
@@ -53,16 +53,15 @@ def _parse_alert_severity(raw: str) -> AlertSeverity:
         raw: Raw string value.
 
     Returns:
-        Validated AlertSeverity literal.
+        The named alert severity.
 
     Raises:
         JSONTypeError: If value is not valid.
     """
-    if raw == "warning":
-        return "warning"
-    if raw == "critical":
-        return "critical"
-    raise JSONTypeError(f"Invalid alert severity '{raw}'")
+    severity = find_member(raw, AlertSeverity)
+    if severity is None:
+        raise JSONTypeError(f"Invalid alert severity '{raw}'")
+    return severity
 
 
 # =============================================================================

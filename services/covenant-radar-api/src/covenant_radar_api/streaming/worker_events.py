@@ -182,11 +182,11 @@ def _determine_alert_severity(risk_probability: float) -> AlertSeverity:
         risk_probability: ML-predicted probability.
 
     Returns:
-        AlertSeverity literal.
+        CRITICAL at 0.90 and above, WARNING below.
     """
     if risk_probability >= 0.90:
-        return "critical"
-    return "warning"
+        return AlertSeverity.CRITICAL
+    return AlertSeverity.WARNING
 
 
 def _determine_alert_type(
@@ -198,11 +198,11 @@ def _determine_alert_type(
         evaluation_status: Deterministic evaluation result.
 
     Returns:
-        AlertType literal.
+        BREACH for a breached evaluation, HIGH_RISK otherwise.
     """
     if evaluation_status == "BREACH":
-        return "breach"
-    return "high_risk"
+        return AlertType.BREACH
+    return AlertType.HIGH_RISK
 
 
 def _generate_alert_message(

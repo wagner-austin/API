@@ -5,6 +5,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from covenant_radar_api.streaming.schemas import AlertSeverity, AlertType
 from covenant_radar_api.streaming.worker_events import (
     _count_breaches,
     _current_iso_timestamp,
@@ -113,15 +114,15 @@ class TestDetermineAlertSeverity:
 
     def test_critical_at_90_percent(self) -> None:
         """Returns critical at 90% or above."""
-        assert _determine_alert_severity(0.90) == "critical"
-        assert _determine_alert_severity(0.95) == "critical"
-        assert _determine_alert_severity(1.0) == "critical"
+        assert _determine_alert_severity(0.90) is AlertSeverity.CRITICAL
+        assert _determine_alert_severity(0.95) is AlertSeverity.CRITICAL
+        assert _determine_alert_severity(1.0) is AlertSeverity.CRITICAL
 
     def test_warning_below_90_percent(self) -> None:
         """Returns warning below 90%."""
-        assert _determine_alert_severity(0.89) == "warning"
-        assert _determine_alert_severity(0.80) == "warning"
-        assert _determine_alert_severity(0.50) == "warning"
+        assert _determine_alert_severity(0.89) is AlertSeverity.WARNING
+        assert _determine_alert_severity(0.80) is AlertSeverity.WARNING
+        assert _determine_alert_severity(0.50) is AlertSeverity.WARNING
 
 
 class TestDetermineAlertType:
@@ -129,12 +130,12 @@ class TestDetermineAlertType:
 
     def test_breach_for_breach_status(self) -> None:
         """Returns breach for BREACH status."""
-        assert _determine_alert_type("BREACH") == "breach"
+        assert _determine_alert_type("BREACH") is AlertType.BREACH
 
     def test_high_risk_for_other_status(self) -> None:
         """Returns high_risk for non-BREACH status."""
-        assert _determine_alert_type("OK") == "high_risk"
-        assert _determine_alert_type("WARNING") == "high_risk"
+        assert _determine_alert_type("OK") is AlertType.HIGH_RISK
+        assert _determine_alert_type("WARNING") is AlertType.HIGH_RISK
 
 
 class TestGenerateAlertMessage:

@@ -22,6 +22,8 @@ from covenant_radar_api.streaming.producer import (
     create_streaming_producer,
 )
 from covenant_radar_api.streaming.schemas import (
+    AlertSeverity,
+    AlertType,
     make_alert_event,
     make_measurement_event,
     make_prediction_event,
@@ -157,8 +159,8 @@ class TestStreamingProducer:
         event = make_alert_event(
             event_id="alert-789",
             deal_id="deal-xyz",
-            alert_type="high_risk",
-            severity="critical",
+            alert_type=AlertType.HIGH_RISK,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.92,
             gemini_summary="High risk detected for deal.",
             triggered_at="2024-04-01T10:05:00Z",
@@ -245,8 +247,8 @@ class TestStreamingProducer:
         event = make_alert_event(
             event_id="alert-888",
             deal_id="deal-ghi",
-            alert_type="breach",
-            severity="warning",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.WARNING,
             risk_probability=0.45,
             gemini_summary="Covenant breach detected.",
             triggered_at="2024-04-01T12:00:00Z",

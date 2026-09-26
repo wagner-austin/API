@@ -12,7 +12,6 @@ from .domain import (
 )
 from .features import WeatherFeatureExtractor
 from .schemas import (
-    WeatherEventType,
     WeatherEventV1,
     decode_weather_event,
     encode_weather_event,
@@ -26,7 +25,6 @@ __all__ = [
     "WEATHER_INPUT_TOPIC",
     "WEATHER_PREDICTION_TOPIC",
     "WeatherDomain",
-    "WeatherEventType",
     "WeatherEventV1",
     "WeatherFeatureExtractor",
     "decode_weather_event",

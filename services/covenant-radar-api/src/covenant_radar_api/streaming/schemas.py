@@ -13,6 +13,7 @@ Strict typing: no Any, no casts, no type: ignore.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from platform_core.json_utils import (
@@ -20,33 +21,28 @@ from platform_core.json_utils import (
 )
 
 # =============================================================================
-# Event Type Discriminators
+# Shared Vocabularies
 # =============================================================================
 
-
-KafkaEventType = Literal[
-    "covenant.measurement.v1",
-    "covenant.prediction.v1",
-    "covenant.alert.v1",
-]
-
-MeasurementEventType = Literal["covenant.measurement.v1"]
-
-PredictionEventType = Literal["covenant.prediction.v1"]
-
-AlertEventType = Literal["covenant.alert.v1"]
-
-# =============================================================================
-# Shared Type Aliases
-# =============================================================================
-
-# The tier names are declared once in platform_core.risk_tiers; annotations
-# spell the Literal inline and the risk-tier guard holds them to that tuple.
+# Each event's "type" discriminator is spelled inline on its TypedDict field,
+# where mypy narrows a union of events on it. The tier names are declared once
+# in platform_core.risk_tiers; annotations spell the Literal inline and the
+# risk-tier guard holds them to that tuple.
 
 
-AlertType = Literal["breach", "high_risk"]
+class AlertType(StrEnum):
+    """What raised an alert."""
 
-AlertSeverity = Literal["warning", "critical"]
+    BREACH = "breach"
+    HIGH_RISK = "high_risk"
+
+
+class AlertSeverity(StrEnum):
+    """How urgent an alert is."""
+
+    WARNING = "warning"
+    CRITICAL = "critical"
+
 
 # =============================================================================
 # Input Event: MeasurementEventV1
@@ -70,7 +66,7 @@ class MeasurementEventV1(TypedDict):
         timestamp: ISO datetime when event was emitted.
     """
 
-    type: MeasurementEventType
+    type: Literal["covenant.measurement.v1"]
     event_id: str
     deal_id: str
     period_start: str
@@ -108,7 +104,7 @@ class PredictionEventV1(TypedDict):
         processed_at: ISO datetime when processing completed.
     """
 
-    type: PredictionEventType
+    type: Literal["covenant.prediction.v1"]
     event_id: str
     deal_id: str
     period_start: str
@@ -146,7 +142,7 @@ class AlertEventV1(TypedDict):
         triggered_at: ISO datetime when alert was triggered.
     """
 
-    type: AlertEventType
+    type: Literal["covenant.alert.v1"]
     event_id: str
     deal_id: str
     alert_type: AlertType
@@ -156,15 +152,14 @@ class AlertEventV1(TypedDict):
     triggered_at: str
 
 
-DlqEventType = Literal["covenant.dlq.v1"]
+class DlqReason(StrEnum):
+    """Why a message could not be processed.
 
-# Why a message could not be processed. Specific rather than one generic
-# "error", so a consumer of the dead-letter topic can triage without parsing
-# free text.
-DlqReason = Literal[
-    "undecodable_payload",
-    "unknown_deal",
-]
+    Specific rather than one generic "error", so a consumer of the
+    dead-letter topic can triage without parsing free text.
+    """
+
+    UNDECODABLE_PAYLOAD = "undecodable_payload"
 
 
 class DlqEventV1(TypedDict):
@@ -188,7 +183,7 @@ class DlqEventV1(TypedDict):
         failed_at: ISO datetime when the failure was recorded.
     """
 
-    type: DlqEventType
+    type: Literal["covenant.dlq.v1"]
     event_id: str
     reason: DlqReason
     detail: str
@@ -442,18 +437,13 @@ def encode_kafka_event(event: KafkaEventV1) -> str:
 
 
 __all__ = [
-    "AlertEventType",
     "AlertEventV1",
     "AlertSeverity",
     "AlertType",
-    "DlqEventType",
     "DlqEventV1",
     "DlqReason",
-    "KafkaEventType",
     "KafkaEventV1",
-    "MeasurementEventType",
     "MeasurementEventV1",
-    "PredictionEventType",
     "PredictionEventV1",
     "encode_alert_event",
     "encode_dlq_event",

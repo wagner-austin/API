@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
+from covenant_radar_api.streaming.schemas import AlertSeverity, AlertType
+
 from . import _test_hooks
 
 
@@ -96,8 +98,8 @@ class MetricsClient:
     def increment_alert_triggered(
         self,
         deal_id: str,
-        severity: Literal["warning", "critical"],
-        alert_type: Literal["breach", "high_risk"],
+        severity: AlertSeverity,
+        alert_type: AlertType,
     ) -> None:
         """Record an alert triggered event.
 

@@ -7,7 +7,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from covenant_radar_api.streaming.schemas import encode_measurement_event
+from covenant_radar_api.streaming.schemas import AlertSeverity, AlertType, encode_measurement_event
 
 from ._test_worker_fixtures import (
     REQUIRED_METRICS,
@@ -189,7 +189,7 @@ class TestStreamingWorkerProcessing:
         if alert is None:
             raise AssertionError("Expected alert to be generated")
         assert alert["deal_id"] == "deal-001"
-        assert alert["alert_type"] == "breach"
+        assert alert["alert_type"] is AlertType.BREACH
 
     def test_process_generates_alert_on_high_risk(self) -> None:
         """Generates alert when risk exceeds threshold."""
@@ -224,8 +224,8 @@ class TestStreamingWorkerProcessing:
         alert = result["alert"]
         if alert is None:
             raise AssertionError("Expected alert due to high risk")
-        assert alert["alert_type"] == "high_risk"
-        assert alert["severity"] == "critical"  # 0.95 >= 0.90
+        assert alert["alert_type"] is AlertType.HIGH_RISK
+        assert alert["severity"] is AlertSeverity.CRITICAL  # 0.95 >= 0.90
 
 
 class TestStreamingWorkerDataLoading:

@@ -29,6 +29,7 @@ from ._hook_protocols import TopicPartitionOffset
 from .consumer import ConsumedMeasurement, StreamingConsumer, UndecodableMessage
 from .producer import StreamingProducer
 from .schemas import (
+    DlqReason,
     make_dlq_event,
 )
 
@@ -164,7 +165,7 @@ class _StreamingWorkerBuffers:
         self._producer.produce_dlq(
             make_dlq_event(
                 event_id=_generate_event_id(),
-                reason="undecodable_payload",
+                reason=DlqReason.UNDECODABLE_PAYLOAD,
                 detail=message["reason"],
                 source_topic=topic,
                 source_partition=partition,

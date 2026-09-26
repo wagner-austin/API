@@ -10,6 +10,8 @@ from platform_core.json_utils import (
 
 from covenant_radar_api.streaming.schemas import (
     AlertEventV1,
+    AlertSeverity,
+    AlertType,
     MeasurementEventV1,
     PredictionEventV1,
     encode_alert_event,
@@ -89,8 +91,8 @@ class TestMakeAlertEvent:
         event = make_alert_event(
             event_id="evt-alert",
             deal_id="deal-456",
-            alert_type="high_risk",
-            severity="critical",
+            alert_type=AlertType.HIGH_RISK,
+            severity=AlertSeverity.CRITICAL,
             risk_probability=0.92,
             gemini_summary="High risk detected for deal-456.",
             triggered_at="2024-04-01T12:00:00Z",
@@ -99,8 +101,8 @@ class TestMakeAlertEvent:
         assert event["type"] == "covenant.alert.v1"
         assert event["event_id"] == "evt-alert"
         assert event["deal_id"] == "deal-456"
-        assert event["alert_type"] == "high_risk"
-        assert event["severity"] == "critical"
+        assert event["alert_type"] is AlertType.HIGH_RISK
+        assert event["severity"] is AlertSeverity.CRITICAL
         assert event["risk_probability"] == 0.92
         assert event["gemini_summary"] == "High risk detected for deal-456."
 
@@ -166,8 +168,8 @@ class TestEncodeAlertEvent:
             "type": "covenant.alert.v1",
             "event_id": "evt-alert",
             "deal_id": "deal-456",
-            "alert_type": "breach",
-            "severity": "warning",
+            "alert_type": AlertType.BREACH,
+            "severity": AlertSeverity.WARNING,
             "risk_probability": 0.75,
             "gemini_summary": "Covenant breach detected.",
             "triggered_at": "2024-04-01T12:00:00Z",

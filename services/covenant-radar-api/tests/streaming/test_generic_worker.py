@@ -7,6 +7,7 @@ from typing import TypeVar
 import covenant_radar_api.streaming._test_hooks_generic_worker as _hooks
 from covenant_radar_api.domains.base_schemas import (
     BaseAlertEventV1,
+    BaseAlertSeverity,
     BasePredictionEventV1,
 )
 from covenant_radar_api.streaming.generic_worker import (
@@ -124,23 +125,23 @@ class TestClassifySeverity:
 
     def test_critical_at_0_9(self) -> None:
         """Prediction >= 0.9 is critical."""
-        assert _classify_severity(0.9, 0.8) == "critical"
+        assert _classify_severity(0.9, 0.8) is BaseAlertSeverity.CRITICAL
 
     def test_critical_above_0_9(self) -> None:
         """Prediction > 0.9 is critical."""
-        assert _classify_severity(0.95, 0.8) == "critical"
+        assert _classify_severity(0.95, 0.8) is BaseAlertSeverity.CRITICAL
 
     def test_warning_at_threshold(self) -> None:
         """Prediction at threshold is warning."""
-        assert _classify_severity(0.8, 0.8) == "warning"
+        assert _classify_severity(0.8, 0.8) is BaseAlertSeverity.WARNING
 
     def test_warning_between_threshold_and_critical(self) -> None:
         """Prediction between threshold and 0.9 is warning."""
-        assert _classify_severity(0.85, 0.8) == "warning"
+        assert _classify_severity(0.85, 0.8) is BaseAlertSeverity.WARNING
 
     def test_info_below_threshold(self) -> None:
         """Prediction below threshold is info."""
-        assert _classify_severity(0.5, 0.8) == "info"
+        assert _classify_severity(0.5, 0.8) is BaseAlertSeverity.INFO
 
 
 class TestBuildAlertPrompt:
@@ -268,7 +269,7 @@ class TestProcessEvent:
         result: GenericProcessingResult = worker.process_event(payload)
 
         alert: BaseAlertEventV1 = _require(result["alert"])
-        assert alert["severity"] == "critical"
+        assert alert["severity"] is BaseAlertSeverity.CRITICAL
 
     def test_alert_severity_warning(self) -> None:
         """Prediction >= threshold but < 0.9 produces warning severity."""
@@ -281,7 +282,7 @@ class TestProcessEvent:
         result: GenericProcessingResult = worker.process_event(payload)
 
         alert: BaseAlertEventV1 = _require(result["alert"])
-        assert alert["severity"] == "warning"
+        assert alert["severity"] is BaseAlertSeverity.WARNING
 
     def test_alert_calls_text_generator(self) -> None:
         """Alert generation calls text_generator.generate_text."""

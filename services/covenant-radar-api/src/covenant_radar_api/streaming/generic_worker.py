@@ -140,13 +140,13 @@ def _classify_severity(
         alert_threshold: Domain alert threshold.
 
     Returns:
-        BaseAlertSeverity literal.
+        CRITICAL at 0.9 and above, WARNING at the threshold, INFO below.
     """
     if prediction_value >= 0.9:
-        return "critical"
+        return BaseAlertSeverity.CRITICAL
     if prediction_value >= alert_threshold:
-        return "warning"
-    return "info"
+        return BaseAlertSeverity.WARNING
+    return BaseAlertSeverity.INFO
 
 
 def _build_alert_prompt(context: dict[str, str]) -> str:

@@ -12,7 +12,6 @@ from .domain import (
 )
 from .features import ESPORTS_FEATURE_NAMES, EsportsFeatureExtractor
 from .schemas import (
-    MatchEventType,
     MatchEventV1,
     decode_match_event,
     encode_match_event,
@@ -28,7 +27,6 @@ __all__ = [
     "ESPORTS_PREDICTION_TOPIC",
     "EsportsDomain",
     "EsportsFeatureExtractor",
-    "MatchEventType",
     "MatchEventV1",
     "decode_match_event",
     "encode_match_event",

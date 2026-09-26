@@ -14,7 +14,8 @@ Strict typing: no Any, no casts, no type: ignore.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONTypeError,
@@ -25,12 +26,20 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import find_member
 
 # =============================================================================
-# Shared Type Aliases
+# Shared Vocabularies
 # =============================================================================
 
-BaseAlertSeverity = Literal["info", "warning", "critical"]
+
+class BaseAlertSeverity(StrEnum):
+    """How urgent a domain alert is."""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
 
 # =============================================================================
 # Input Event: BaseInputEventV1
@@ -268,7 +277,7 @@ def encode_base_alert_event(event: BaseAlertEventV1) -> str:
 
 
 # =============================================================================
-# Literal Type Parsers
+# Vocabulary Parsers
 # =============================================================================
 
 
@@ -279,18 +288,15 @@ def _parse_base_alert_severity(raw: str) -> BaseAlertSeverity:
         raw: Raw string value.
 
     Returns:
-        Validated BaseAlertSeverity literal.
+        The named severity.
 
     Raises:
         JSONTypeError: If value is not a valid severity.
     """
-    if raw == "info":
-        return "info"
-    if raw == "warning":
-        return "warning"
-    if raw == "critical":
-        return "critical"
-    raise JSONTypeError(f"Invalid base alert severity '{raw}'")
+    severity = find_member(raw, BaseAlertSeverity)
+    if severity is None:
+        raise JSONTypeError(f"Invalid base alert severity '{raw}'")
+    return severity
 
 
 # =============================================================================

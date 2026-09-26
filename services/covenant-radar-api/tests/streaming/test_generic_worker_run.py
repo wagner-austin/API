@@ -5,6 +5,7 @@ from __future__ import annotations
 import covenant_radar_api.streaming._test_hooks_generic_worker as _hooks
 from covenant_radar_api.domains.base_schemas import (
     BaseAlertEventV1,
+    BaseAlertSeverity,
     BasePredictionEventV1,
     decode_base_alert_event,
     decode_base_prediction_event,
@@ -94,7 +95,7 @@ class TestRunOnce:
         alert_msg = producer.messages[1]
         decoded: BaseAlertEventV1 = decode_base_alert_event(alert_msg.value.decode("utf-8"))
         assert decoded["entity_id"] == "entity-xyz"
-        assert decoded["severity"] == "critical"
+        assert decoded["severity"] is BaseAlertSeverity.CRITICAL
 
     def test_message_key_is_entity_id(self) -> None:
         """Producer message key is entity_id bytes."""

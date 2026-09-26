@@ -24,12 +24,6 @@ from platform_core.json_utils import (
 )
 
 # =============================================================================
-# Event Type Discriminator
-# =============================================================================
-
-WeatherEventType = Literal["weather.observation.v1"]
-
-# =============================================================================
 # Input Event: WeatherEventV1
 # =============================================================================
 
@@ -50,7 +44,7 @@ class WeatherEventV1(TypedDict):
         timestamp: ISO datetime when observation was recorded.
     """
 
-    type: WeatherEventType
+    type: Literal["weather.observation.v1"]
     event_id: str
     station_id: str
     day_of_year: int
@@ -115,14 +109,14 @@ def encode_weather_event(event: WeatherEventV1) -> str:
 # =============================================================================
 
 
-def _parse_weather_event_type(raw: str) -> WeatherEventType:
+def _parse_weather_event_type(raw: str) -> Literal["weather.observation.v1"]:
     """Parse weather event type from string.
 
     Args:
         raw: Raw string value.
 
     Returns:
-        Validated WeatherEventType literal.
+        The weather observation discriminator.
 
     Raises:
         JSONTypeError: If value is not valid.
@@ -163,7 +157,6 @@ def decode_weather_event(payload: str) -> WeatherEventV1:
 
 
 __all__ = [
-    "WeatherEventType",
     "WeatherEventV1",
     "decode_weather_event",
     "encode_weather_event",

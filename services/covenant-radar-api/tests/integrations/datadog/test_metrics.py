@@ -16,6 +16,7 @@ from covenant_radar_api.integrations.datadog.metrics import (
     create_metrics_client,
     make_default_metrics_config,
 )
+from covenant_radar_api.streaming.schemas import AlertSeverity, AlertType
 
 from .conftest import FakeMetricsSink
 
@@ -110,7 +111,7 @@ class TestMetricsClientCounters:
         config: MetricsConfig = {"host": "localhost", "port": 8125, "namespace": "covenant"}
         client = create_metrics_client(config)
 
-        client.increment_alert_triggered("deal-456", "critical", "breach")
+        client.increment_alert_triggered("deal-456", AlertSeverity.CRITICAL, AlertType.BREACH)
 
         assert len(created_sinks[0].calls) == 1
         call = created_sinks[0].calls[0]
@@ -137,7 +138,7 @@ class TestMetricsClientCounters:
         config: MetricsConfig = {"host": "localhost", "port": 8125, "namespace": "covenant"}
         client = create_metrics_client(config)
 
-        client.increment_alert_triggered("deal-789", "warning", "high_risk")
+        client.increment_alert_triggered("deal-789", AlertSeverity.WARNING, AlertType.HIGH_RISK)
 
         call = created_sinks[0].calls[0]
         assert call["tags"] == (

@@ -9,6 +9,8 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.streaming.schemas import (
+    AlertSeverity,
+    AlertType,
     make_alert_event,
     make_measurement_event,
     make_prediction_event,
@@ -241,8 +243,8 @@ class TestDecodeAlertEvent:
         event = decode_alert_event(payload)
 
         assert event["type"] == "covenant.alert.v1"
-        assert event["alert_type"] == "high_risk"
-        assert event["severity"] == "critical"
+        assert event["alert_type"] is AlertType.HIGH_RISK
+        assert event["severity"] is AlertSeverity.CRITICAL
 
     def test_wrong_type_raises(self) -> None:
         """Raise error for wrong event type."""
@@ -441,8 +443,8 @@ class TestTypeGuards:
         event = make_alert_event(
             event_id="e1",
             deal_id="d1",
-            alert_type="breach",
-            severity="warning",
+            alert_type=AlertType.BREACH,
+            severity=AlertSeverity.WARNING,
             risk_probability=0.8,
             gemini_summary="Test.",
             triggered_at="2024-04-01T12:00:00Z",

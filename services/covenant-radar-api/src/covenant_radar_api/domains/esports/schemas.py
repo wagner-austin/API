@@ -24,12 +24,6 @@ from platform_core.json_utils import (
 )
 
 # =============================================================================
-# Event Type Discriminator
-# =============================================================================
-
-MatchEventType = Literal["esports.match_state.v1"]
-
-# =============================================================================
 # Input Event: MatchEventV1
 # =============================================================================
 
@@ -61,7 +55,7 @@ class MatchEventV1(TypedDict):
         timestamp: ISO datetime when the snapshot was taken.
     """
 
-    type: MatchEventType
+    type: Literal["esports.match_state.v1"]
     event_id: str
     match_id: str
     game_number: int
@@ -166,14 +160,14 @@ def encode_match_event(event: MatchEventV1) -> str:
 # =============================================================================
 
 
-def _parse_match_event_type(raw: str) -> MatchEventType:
+def _parse_match_event_type(raw: str) -> Literal["esports.match_state.v1"]:
     """Parse the match event type discriminator.
 
     Args:
         raw: Raw string value.
 
     Returns:
-        Validated MatchEventType literal.
+        The match state discriminator.
 
     Raises:
         JSONTypeError: If the value is not the match state discriminator.
@@ -226,7 +220,6 @@ def decode_match_event(payload: str) -> MatchEventV1:
 
 
 __all__ = [
-    "MatchEventType",
     "MatchEventV1",
     "decode_match_event",
     "encode_match_event",

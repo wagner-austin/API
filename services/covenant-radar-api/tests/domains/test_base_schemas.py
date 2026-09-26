@@ -7,6 +7,7 @@ from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_
 
 from covenant_radar_api.domains.base_schemas import (
     BaseAlertEventV1,
+    BaseAlertSeverity,
     BaseInputEventV1,
     BasePredictionEventV1,
     _parse_base_alert_severity,
@@ -119,7 +120,7 @@ class TestMakeBaseAlertEvent:
             event_id="alert-001",
             entity_id="station-beta",
             alert_type="high_temperature",
-            severity="info",
+            severity=BaseAlertSeverity.INFO,
             prediction_value=0.65,
             gemini_summary="Mild temperature anomaly detected.",
             triggered_at="2025-06-21T14:00:02Z",
@@ -129,7 +130,7 @@ class TestMakeBaseAlertEvent:
         assert event["event_id"] == "alert-001"
         assert event["entity_id"] == "station-beta"
         assert event["alert_type"] == "high_temperature"
-        assert event["severity"] == "info"
+        assert event["severity"] is BaseAlertSeverity.INFO
         assert event["prediction_value"] == 0.65
         assert event["gemini_summary"] == "Mild temperature anomaly detected."
         assert event["triggered_at"] == "2025-06-21T14:00:02Z"
@@ -141,13 +142,13 @@ class TestMakeBaseAlertEvent:
             event_id="alert-002",
             entity_id="deal-xyz",
             alert_type="high_risk",
-            severity="warning",
+            severity=BaseAlertSeverity.WARNING,
             prediction_value=0.82,
             gemini_summary="Deal risk elevated.",
             triggered_at="2025-06-21T14:00:03Z",
         )
 
-        assert event["severity"] == "warning"
+        assert event["severity"] is BaseAlertSeverity.WARNING
 
     def test_creates_critical_alert(self) -> None:
         """Create alert event with critical severity."""
@@ -156,13 +157,13 @@ class TestMakeBaseAlertEvent:
             event_id="alert-003",
             entity_id="region-9",
             alert_type="wildfire_imminent",
-            severity="critical",
+            severity=BaseAlertSeverity.CRITICAL,
             prediction_value=0.95,
             gemini_summary="Critical fire risk detected.",
             triggered_at="2025-06-21T14:00:04Z",
         )
 
-        assert event["severity"] == "critical"
+        assert event["severity"] is BaseAlertSeverity.CRITICAL
 
 
 # =============================================================================
@@ -253,7 +254,7 @@ class TestEncodeBaseAlertEvent:
             event_id="alert-100",
             entity_id="entity-300",
             alert_type="threshold_exceeded",
-            severity="warning",
+            severity=BaseAlertSeverity.WARNING,
             prediction_value=0.88,
             gemini_summary="Alert summary text.",
             triggered_at="2025-07-19T12:00:02Z",
@@ -399,7 +400,7 @@ class TestDecodeBaseAlertEvent:
             "event_id": "alert-200",
             "entity_id": "entity-xyz",
             "alert_type": "high_risk",
-            "severity": "critical",
+            "severity": BaseAlertSeverity.CRITICAL,
             "prediction_value": 0.92,
             "gemini_summary": "Critical risk detected.",
             "triggered_at": "2025-03-31T10:00:02Z",
@@ -412,7 +413,7 @@ class TestDecodeBaseAlertEvent:
         assert event["event_id"] == "alert-200"
         assert event["entity_id"] == "entity-xyz"
         assert event["alert_type"] == "high_risk"
-        assert event["severity"] == "critical"
+        assert event["severity"] is BaseAlertSeverity.CRITICAL
         assert event["prediction_value"] == 0.92
         assert event["gemini_summary"] == "Critical risk detected."
         assert event["triggered_at"] == "2025-03-31T10:00:02Z"
@@ -472,17 +473,10 @@ class TestDecodeBaseAlertEvent:
 class TestParseBaseAlertSeverity:
     """Tests for _parse_base_alert_severity."""
 
-    def test_parses_info(self) -> None:
-        """Parse 'info' severity."""
-        assert _parse_base_alert_severity("info") == "info"
-
-    def test_parses_warning(self) -> None:
-        """Parse 'warning' severity."""
-        assert _parse_base_alert_severity("warning") == "warning"
-
-    def test_parses_critical(self) -> None:
-        """Parse 'critical' severity."""
-        assert _parse_base_alert_severity("critical") == "critical"
+    def test_parses_every_severity_to_its_member(self) -> None:
+        """Each severity word parses to the member that carries it."""
+        for severity in BaseAlertSeverity:
+            assert _parse_base_alert_severity(severity.value) is severity
 
     def test_invalid_raises(self) -> None:
         """Raises JSONTypeError for invalid severity string."""
