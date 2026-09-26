@@ -121,8 +121,10 @@ inverted.
 
 **Since MCPs board task fd5cabfa the queue has two lanes and two kinds of
 runner** (the section after this one). `fleet-agent` is the HUB lane's: it
-claims `build-bases` and the four session verbs, runs each on the hub and
-closes it in the same tick. The make targets are the NODE lane's, claimed
+claims `build-bases` and the five session verbs (restart, revive,
+graceful and hard kill, and since MCPs mig 564 `compact-session`, which
+runs `session-audit compact` and leaves the session running), runs each on
+the hub and closes it in the same tick. The make targets are the NODE lane's, claimed
 by one `fleet-node-agent` per enabled node. A `fleet-agent` tick is
 therefore two passes, in this order:
 
