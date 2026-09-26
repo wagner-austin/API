@@ -19,9 +19,10 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import require_member
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
-from tankpit_bot.types.literals import SentFrameOrigin, require_sent_frame_origin
+from tankpit_bot.types.literals import SentFrameOrigin
 
 log = get_logger(__name__)
 
@@ -110,7 +111,7 @@ def _pop_sent_frame_metadata(cdp: CDPSessionProtocol) -> SentFrameMetadata | Non
         return None
     metadata_obj = require_dict({"metadata": raw_value}, "metadata")
     return SentFrameMetadata(
-        origin=require_sent_frame_origin(metadata_obj, "origin"),
+        origin=require_member(metadata_obj, "origin", SentFrameOrigin),
         label=optional_str(metadata_obj, "label") or "",
         stack=optional_str(metadata_obj, "stack") or "",
     )

@@ -19,6 +19,7 @@ from tankpit_bot.browser.cdp_utils import send_websocket_bytes
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -187,7 +188,7 @@ class SessionBase:
         Args:
             message: The captured message.
         """
-        if message["direction"] == "received":
+        if message["direction"] is MessageDirection.RECEIVED:
             self._cdp_message_buffer.append(message["payload"])
 
     def _on_magic_captured(self, magic: str) -> None:

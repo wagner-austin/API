@@ -46,6 +46,7 @@ from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol.decoders.text import try_decode_plaintext_ack
 from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.types.message import CapturedMessage
 
 log = get_logger(__name__)
@@ -118,7 +119,7 @@ def _read_autoscroll_ack(messages: list[CapturedMessage], start_index: int) -> b
     """
     latest: bool | None = None
     for captured in messages[start_index:]:
-        if captured["direction"] != "received":
+        if captured["direction"] is not MessageDirection.RECEIVED:
             continue
         for body in split_payload_frames(captured["payload"]):
             ack = try_decode_plaintext_ack(body)

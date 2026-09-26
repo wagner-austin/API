@@ -163,7 +163,7 @@ class CDPService:
         Args:
             params: CDP event parameters.
         """
-        self._record_frame(params, "received")
+        self._record_frame(params, MessageDirection.RECEIVED)
 
     def _on_websocket_frame_sent(self, params: JSONObject) -> None:
         """Handle Network.webSocketFrameSent CDP event.
@@ -171,7 +171,7 @@ class CDPService:
         Args:
             params: CDP event parameters.
         """
-        self._record_frame(params, "sent")
+        self._record_frame(params, MessageDirection.SENT)
 
     def _record_frame(self, params: JSONObject, direction: MessageDirection) -> None:
         """Record a WebSocket frame.
@@ -191,7 +191,7 @@ class CDPService:
             payload=payload,
             ws_url=ws_url,
         )
-        if direction == "sent" and self.cdp is not None:
+        if direction is MessageDirection.SENT and self.cdp is not None:
             metadata = _pop_sent_frame_metadata(self.cdp)
             if metadata is not None:
                 message["sent_origin"] = metadata["origin"]
@@ -211,7 +211,7 @@ class CDPService:
         if self._on_message_captured is not None:
             self._on_message_captured(message)
 
-        if message["direction"] == "sent" and self.magic is None:
+        if message["direction"] is MessageDirection.SENT and self.magic is None:
             payload = message["payload"]
             if not _is_valid_base64(payload):
                 return
