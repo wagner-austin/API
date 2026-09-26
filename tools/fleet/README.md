@@ -126,8 +126,9 @@ key), because nothing can reach a stock install before that, and it lays, in
 order:
 
 1. the **Windows base**: the optional features WSL needs, the pinned WSL
-   release (MSI, SHA-256 checked), the LocalMachine execution policy, the
-   machine PATH and `.wslconfig`; then the **reboot** Windows asks for,
+   release (MSI, SHA-256 checked), the LocalMachine execution policy, Win32
+   and git long paths, the machine PATH and `.wslconfig`; then the
+   **reboot** Windows asks for,
    waited out by comparing boot instants, never by a sleep;
 2. the **distro**, imported from the pinned image when it is not registered;
 3. **`/etc/wsl.conf`** (systemd as PID 1), restarting the distro when it
@@ -152,7 +153,9 @@ nothing: an install whose `.runner` exists is not configured twice.
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
 | ci-clean script, service and timer | Rendered from `runner_render` and installed by provision.sh |
 | The distro itself | Imported from the pinned image |
-| Windows PATH, execution policy, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1 |
+| Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1 |
+| Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned |
+| Each Windows runner's Python tool cache | Seeded by provision.ps1 from the NuGet CPython package, with pip's `Scripts` entry points written from its bundled wheel |
 | The licensed game tree (`manual` asset) | The one exception: no script may fetch it. The rebuild prints it as `PLACE BY HAND`, and the audit fails until it is placed |
 
 **The disk ceiling.** The audit fails a host whose distro root uses more than
