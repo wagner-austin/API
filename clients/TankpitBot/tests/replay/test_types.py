@@ -17,6 +17,7 @@ from tankpit_bot.replay.types import (
     encode_replay_session_result,
     encode_replay_tick_trace,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 
 
 def _sample_threat() -> EnemyThreatDict:
@@ -46,8 +47,8 @@ def _sample_trace() -> ReplayTickTraceDict:
         behavior_mode="HUNT",
         behavior_score=900,
         behavior_reason="find_enemies",
-        ai_mode="HUNT",
-        ai_mode_state="ACQUIRE",
+        ai_mode=AIMode.HUNT,
+        ai_mode_state=AIModeState.ACQUIRE,
         command_type="map_open",
         target_x=0,
         target_y=0,
@@ -117,8 +118,8 @@ class TestReplayTickTrace:
             behavior_mode="COLLECT",
             behavior_score=900,
             behavior_reason="fuel=700",
-            ai_mode="COLLECT",
-            ai_mode_state="PICKUP",
+            ai_mode=AIMode.COLLECT,
+            ai_mode_state=AIModeState.PICKUP,
             command_type="pickup_fuel",
             target_x=52,
             target_y=63,
@@ -141,8 +142,8 @@ class TestReplayTickTrace:
             behavior_mode="HUNT",
             behavior_score=950,
             behavior_reason="shoot_target",
-            ai_mode="HUNT",
-            ai_mode_state="ENGAGE",
+            ai_mode=AIMode.HUNT,
+            ai_mode_state=AIModeState.ENGAGE,
             command_type="shoot",
             target_x=101,
             target_y=100,
@@ -225,8 +226,8 @@ class TestReplaySessionResult:
                 behavior_mode="HUNT",
                 behavior_score=900,
                 behavior_reason="find_enemies",
-                ai_mode="HUNT",
-                ai_mode_state="REFRESH",
+                ai_mode=AIMode.HUNT,
+                ai_mode_state=AIModeState.REFRESH,
                 command_type="map_open",
                 target_x=0,
                 target_y=0,

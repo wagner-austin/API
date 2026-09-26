@@ -14,6 +14,7 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types import CaptureSession, encode_capture_session
 from tankpit_bot.types.literals import MessageDirection
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.conftest import FakeFileSystem
 
 
@@ -80,8 +81,8 @@ class TestFormatTraceLine:
             behavior_mode="HUNT",
             behavior_score=900,
             behavior_reason="find_enemies",
-            ai_mode="HUNT",
-            ai_mode_state="ACQUIRE",
+            ai_mode=AIMode.HUNT,
+            ai_mode_state=AIModeState.ACQUIRE,
             command_type="map_open",
             target_x=0,
             target_y=0,
@@ -142,8 +143,8 @@ class TestFormatTraceLine:
             behavior_mode="HUNT",
             behavior_score=950,
             behavior_reason="shoot_target",
-            ai_mode="HUNT",
-            ai_mode_state="ENGAGE",
+            ai_mode=AIMode.HUNT,
+            ai_mode_state=AIModeState.ENGAGE,
             command_type="shoot",
             target_x=51,
             target_y=60,
@@ -168,8 +169,8 @@ class TestFormatTraceLine:
             behavior_mode="COLLECT",
             behavior_score=900,
             behavior_reason="fuel_collect",
-            ai_mode="COLLECT",
-            ai_mode_state="PICKUP",
+            ai_mode=AIMode.COLLECT,
+            ai_mode_state=AIModeState.PICKUP,
             command_type="pickup_fuel",
             target_x=52,
             target_y=63,
@@ -194,8 +195,8 @@ class TestFormatTraceLine:
             behavior_mode="HUNT",
             behavior_score=0,
             behavior_reason="find_enemies",
-            ai_mode="UNSET",
-            ai_mode_state="",
+            ai_mode=AIMode.UNSET,
+            ai_mode_state=AIModeState.NONE,
             command_type="map_open",
             target_x=0,
             target_y=0,

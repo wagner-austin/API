@@ -36,6 +36,7 @@ from tankpit_bot.state.types import (
 )
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tankpit_bot.types.literals import MessageDirection
+from tankpit_bot.types.modes import AIMode, AIModeState
 
 
 def _make_session(
@@ -280,8 +281,8 @@ class TestBuildTrace:
         ai_state = AIStateDict(
             **{
                 **make_initial_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "combat_target_id": 42,
                 "resource_target_kind": "",
             },
