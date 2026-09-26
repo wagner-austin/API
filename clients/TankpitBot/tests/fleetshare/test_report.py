@@ -11,6 +11,7 @@ from tankpit_bot.fleetshare.report import (
     build_fleet_report,
     write_fleet_report,
 )
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
@@ -88,7 +89,7 @@ class TestBuildFleetReport:
             build_fleet_report(
                 ws,
                 instance="artax",
-                role="fighter",
+                role=FleetRole.FIGHTER,
                 war_ready=False,
                 engaged_target_id=-1,
                 forage_goal_x=-1,
@@ -107,7 +108,7 @@ class TestBuildFleetReport:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=506,
             forage_goal_x=-1,
@@ -165,7 +166,7 @@ class TestBuildFleetReport:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,
@@ -192,7 +193,7 @@ class TestBuildFleetReport:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="gatherer",
+            role=FleetRole.GATHERER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,
@@ -217,7 +218,7 @@ class TestWriteFleetReport:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,
@@ -258,7 +259,7 @@ class TestReportFreshnessBounds:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,
@@ -296,7 +297,7 @@ class TestReportFreshnessBounds:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,
@@ -322,7 +323,7 @@ class TestReportFreshnessBounds:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,
@@ -352,7 +353,7 @@ def test_no_selected_room_offers_nothing() -> None:
     report = build_fleet_report(
         ws,
         instance="a",
-        role="fighter",
+        role=FleetRole.FIGHTER,
         war_ready=False,
         engaged_target_id=-1,
         forage_goal_x=-1,
@@ -393,7 +394,7 @@ class TestMineRows:
         report = build_fleet_report(
             ws,
             instance="arterial",
-            role="fighter",
+            role=FleetRole.FIGHTER,
             war_ready=False,
             engaged_target_id=-1,
             forage_goal_x=-1,

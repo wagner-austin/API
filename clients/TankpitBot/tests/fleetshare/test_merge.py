@@ -21,6 +21,7 @@ from tankpit_bot.fleetshare.types import (
     FleetEnemySightingDict,
     FleetMineSightingDict,
     FleetReportDict,
+    FleetRole,
     FleetScannedTileDict,
 )
 from tankpit_bot.runtime_artifacts import bot_run_dir
@@ -61,7 +62,7 @@ def _report(
         team=team,
         room=room,
         tank_id=tank_id,
-        role="fighter",
+        role=FleetRole.FIGHTER,
         x=90,
         y=90,
         engaged_target_id=engaged_target_id,
