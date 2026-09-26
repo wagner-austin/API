@@ -70,7 +70,7 @@ class MLPObjective:
             epoch_callback: Optional callback for epoch-level progress updates.
         """
         # Apply feature engineering BEFORE storing
-        if feature_preset != "none":
+        if feature_preset is not FeaturePreset.NONE:
             config = get_feature_config_for_preset(feature_preset)
             engineered = engineer_features(x_features, feature_names, config)
             x_engineered = engineered["x"]

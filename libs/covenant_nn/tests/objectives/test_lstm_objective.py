@@ -5,6 +5,7 @@ Tests the LSTM hyperparameter optimization objective using real US bankruptcy da
 
 from __future__ import annotations
 
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from platform_ml import RequestedDevice, RequestedPrecision
 
@@ -26,7 +27,7 @@ def test_lstm_objective_returns_validation_auc() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_epochs=3,  # Small for fast test
         early_stopping_patience=2,
         sequence_length=4,
@@ -82,7 +83,7 @@ def test_lstm_objective_with_feature_engineering() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="log_only",  # Apply log transforms
+        feature_preset=FeaturePreset.LOG_ONLY,  # Apply log transforms
         n_epochs=3,
         early_stopping_patience=2,
         sequence_length=4,
@@ -137,7 +138,7 @@ def test_lstm_objective_class_direct_instantiation() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_epochs=2,
         early_stopping_patience=1,
         sequence_length=3,
@@ -190,7 +191,7 @@ def test_lstm_objective_with_bidirectional() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_epochs=2,
         early_stopping_patience=1,
         sequence_length=3,
@@ -244,7 +245,7 @@ def test_lstm_objective_with_multiple_layers() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_epochs=2,
         early_stopping_patience=1,
         sequence_length=3,
@@ -296,7 +297,7 @@ def test_lstm_objective_different_sequence_lengths() -> None:
             feature_names=names,
             device=RequestedDevice.CPU,
             precision=RequestedPrecision.FP32,
-            feature_preset="none",
+            feature_preset=FeaturePreset.NONE,
             n_epochs=2,
             early_stopping_patience=1,
             sequence_length=seq_len,

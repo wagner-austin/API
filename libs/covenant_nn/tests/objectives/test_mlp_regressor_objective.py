@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from numpy.typing import NDArray
 from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
@@ -49,7 +50,7 @@ def test_mlp_regressor_objective_returns_negative_rmse() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_epochs=3,
         early_stopping_patience=2,
     )
@@ -100,7 +101,7 @@ def test_mlp_regressor_objective_with_feature_engineering() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="log_only",
+        feature_preset=FeaturePreset.LOG_ONLY,
         n_epochs=3,
         early_stopping_patience=2,
     )
@@ -148,7 +149,7 @@ def test_mlp_regressor_objective_class_direct_instantiation() -> None:
         feature_names=names,
         device=RequestedDevice.CPU,
         precision=RequestedPrecision.FP32,
-        feature_preset="none",
+        feature_preset=FeaturePreset.NONE,
         n_epochs=2,
         early_stopping_patience=1,
         optimizer_name=OptimizerName.ADAM,
