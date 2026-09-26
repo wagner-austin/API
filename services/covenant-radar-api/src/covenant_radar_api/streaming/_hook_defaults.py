@@ -19,8 +19,6 @@ from covenant_radar_api.streaming._hook_protocols import (
 
 from .config import ConfluentConfig, ConsumerConfig, ProducerConfig
 
-KafkaConfigDict = dict[str, str | int | bool]
-
 
 def _get_confluent_kafka() -> ModuleType:
     """Get the confluent_kafka module.
@@ -69,7 +67,7 @@ class RealConsumedMessage:
         return self._message.offset()
 
 
-def _connection_config(confluent_config: ConfluentConfig) -> KafkaConfigDict:
+def _connection_config(confluent_config: ConfluentConfig) -> dict[str, str | int | bool]:
     """Build the connection and authentication keys shared by both clients.
 
     Under PLAINTEXT the sasl.* keys are omitted entirely rather than sent
@@ -83,7 +81,7 @@ def _connection_config(confluent_config: ConfluentConfig) -> KafkaConfigDict:
     Returns:
         Config keys common to the producer and consumer.
     """
-    config: KafkaConfigDict = {
+    config: dict[str, str | int | bool] = {
         "bootstrap.servers": confluent_config["bootstrap_servers"],
         "security.protocol": confluent_config["security_protocol"],
     }
@@ -111,7 +109,7 @@ class RealKafkaProducer:
             confluent_config: Confluent Cloud connection settings.
             producer_config: Producer-specific settings.
         """
-        config: KafkaConfigDict = _connection_config(confluent_config)
+        config: dict[str, str | int | bool] = _connection_config(confluent_config)
         config["acks"] = producer_config["acks"]
         config["retries"] = producer_config["retries"]
         config["linger.ms"] = producer_config["linger_ms"]
@@ -119,7 +117,7 @@ class RealKafkaProducer:
         config["compression.type"] = producer_config["compression_type"]
 
         confluent_kafka = _get_confluent_kafka()
-        producer_constructor: Callable[[KafkaConfigDict], RawKafkaProducerProtocol] = (
+        producer_constructor: Callable[[dict[str, str | int | bool]], RawKafkaProducerProtocol] = (
             confluent_kafka.Producer
         )
         self._producer: RawKafkaProducerProtocol = producer_constructor(config)
@@ -179,7 +177,7 @@ class RealKafkaConsumer:
             confluent_config: Confluent Cloud connection settings.
             consumer_config: Consumer-specific settings.
         """
-        config: KafkaConfigDict = _connection_config(confluent_config)
+        config: dict[str, str | int | bool] = _connection_config(confluent_config)
         config["group.id"] = consumer_config["group_id"]
         config["auto.offset.reset"] = consumer_config["auto_offset_reset"]
         config["enable.auto.commit"] = consumer_config["enable_auto_commit"]
@@ -188,7 +186,7 @@ class RealKafkaConsumer:
         config["heartbeat.interval.ms"] = consumer_config["heartbeat_interval_ms"]
 
         confluent_kafka = _get_confluent_kafka()
-        consumer_constructor: Callable[[KafkaConfigDict], RawKafkaConsumerProtocol] = (
+        consumer_constructor: Callable[[dict[str, str | int | bool]], RawKafkaConsumerProtocol] = (
             confluent_kafka.Consumer
         )
         self._consumer: RawKafkaConsumerProtocol = consumer_constructor(config)

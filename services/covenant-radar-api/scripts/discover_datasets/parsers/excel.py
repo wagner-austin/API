@@ -12,12 +12,6 @@ from typing import Protocol
 # Maximum rows to sample for analysis
 MAX_SAMPLE_ROWS = 1000
 
-# Type alias for Excel cell values
-ExcelCellValue = str | int | float | bool | None
-
-# Type alias for a row of Excel cell values
-ExcelRow = tuple[ExcelCellValue, ...]
-
 
 class WorksheetProtocol(Protocol):
     """Protocol for openpyxl Worksheet in read_only mode.
@@ -29,7 +23,7 @@ class WorksheetProtocol(Protocol):
         self,
         *,
         values_only: bool = False,
-    ) -> Generator[ExcelRow, None, None]:
+    ) -> Generator[tuple[str | int | float | bool | None, ...], None, None]:
         """Iterate over rows in the worksheet.
 
         Args:
@@ -221,8 +215,6 @@ def read_xls_header_and_sample(
 
 
 __all__ = [
-    "ExcelCellValue",
-    "ExcelRow",
     "LoadWorkbookProtocol",
     "OpenWorkbookProtocol",
     "WorkbookProtocol",
