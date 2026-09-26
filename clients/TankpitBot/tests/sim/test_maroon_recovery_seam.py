@@ -21,6 +21,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.ledger.ring import outcome_counts
+from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.session import deliver_batch
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim.seam import SEAM_CLIENT_ID, SeamClock, boot_seam
@@ -75,7 +76,7 @@ def test_marooned_tank_pans_and_walks_to_fuel_beyond_the_window() -> None:
     finally:
         _test_hooks.get_current_time_ms = original_clock
 
-    assert link.sent_commands.count("scope") >= 2, (
+    assert link.sent_commands.count(ClientCommandKind.SCOPE) >= 2, (
         f"the window-edge clamp never drew its pans: {link.sent_commands}"
     )
     scope_outcomes = outcome_counts(ws.ledger, "scope")

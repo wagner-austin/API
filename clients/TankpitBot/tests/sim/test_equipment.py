@@ -16,7 +16,7 @@ from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_INVENTORY_FULL
 from tankpit_bot.sim.combat import SLOT_DUAL, SLOT_HOMING, SLOT_RADAR
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.equipment import (
     RADAR_STACK,
     WEAPON_STACK,
@@ -97,7 +97,7 @@ def test_bare_tile_resolves_to_none() -> None:
 def _pickup_equipment(x: int, y: int) -> ClientCommandDict:
     """A decoded pickup_equipment click at (x, y)."""
     return ClientCommandDict(
-        kind="pickup_equipment",
+        kind=ClientCommandKind.PICKUP_EQUIPMENT,
         command=99,
         x=x,
         y=y,
@@ -154,7 +154,7 @@ def test_incidental_arrival_at_full_inventory_is_silent() -> None:
     world["equipment"][0] = SimEquipmentDict(x=12, y=10)
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     move = ClientCommandDict(
-        kind="move",
+        kind=ClientCommandKind.MOVE,
         command=112,
         x=12,
         y=10,
@@ -190,7 +190,7 @@ def test_teleport_landing_takes_fuel_but_never_equipment() -> None:
     world["tanks"][9]["fuel"] = 900
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     hop = ClientCommandDict(
-        kind="teleport",
+        kind=ClientCommandKind.TELEPORT,
         command=116,
         x=30,
         y=30,
@@ -217,7 +217,7 @@ def test_radar_reveals_equipment_with_the_wire_marker() -> None:
     world["equipment"][0] = SimEquipmentDict(x=14, y=12)
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     scan = ClientCommandDict(
-        kind="radar",
+        kind=ClientCommandKind.RADAR,
         command=102,
         x=0,
         y=0,
@@ -247,7 +247,7 @@ def test_radar_zero_kill_grants_the_mercy_bundle() -> None:
     world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 45)
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     shot = ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=115,
         x=12,
         y=10,
@@ -276,7 +276,7 @@ def test_kills_with_radar_stock_grant_nothing() -> None:
     world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 45)
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     shot = ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=115,
         x=12,
         y=10,
@@ -301,7 +301,7 @@ def test_enemy_killers_take_their_bundle_silently() -> None:
     world["tanks"][11]["counts"] = [25, 25, 25, 25, 0]
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     shot = ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=115,
         x=30,
         y=30,

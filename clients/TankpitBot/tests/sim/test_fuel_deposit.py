@@ -19,7 +19,11 @@ from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.physics.capacity import DEPOSIT_FLOOR
 from tankpit_bot.protocol.command_builders import build_deposit_fuel_command
 from tankpit_bot.protocol.types import BinaryMessage
-from tankpit_bot.sim.commands import ClientCommandDict, decode_client_command
+from tankpit_bot.sim.commands import (
+    ClientCommandDict,
+    ClientCommandKind,
+    decode_client_command,
+)
 from tankpit_bot.sim.fuel_deposit import resolve_fuel_deposit
 from tankpit_bot.sim.narrate import narrate_fuel_deposit
 from tankpit_bot.sim.server import SimServer
@@ -46,7 +50,7 @@ def _deposit(x: int, y: int, amount: int) -> ClientCommandDict:
         The typed command the tick processor routes.
     """
     return ClientCommandDict(
-        kind="deposit_fuel",
+        kind=ClientCommandKind.DEPOSIT_FUEL,
         command=68,
         x=x,
         y=y,

@@ -68,12 +68,12 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     world = _arena()
     walls = {(16, 10): "#"}
     server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
-    from tankpit_bot.sim.commands import ClientCommandDict
+    from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="move",
+            kind=ClientCommandKind.MOVE,
             command=112,
             x=16,
             y=10,
@@ -90,7 +90,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="teleport",
+            kind=ClientCommandKind.TELEPORT,
             command=116,
             x=40,
             y=40,
@@ -106,7 +106,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="move",
+            kind=ClientCommandKind.MOVE,
             command=112,
             x=20,
             y=14,
@@ -122,7 +122,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="pickup_fuel",
+            kind=ClientCommandKind.PICKUP_FUEL,
             command=100,
             x=20,
             y=10,
@@ -213,7 +213,7 @@ def test_revival_holds_while_alive_off_beat_or_sealed() -> None:
 
 def test_enemy_equipment_grant_resolves_silently() -> None:
     """Another tank's 0x67 must not leak — production reads it as SELF."""
-    from tankpit_bot.sim.commands import ClientCommandDict
+    from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
     from tankpit_bot.sim.world import SimEquipmentDict
 
     world = _arena()
@@ -223,7 +223,7 @@ def test_enemy_equipment_grant_resolves_silently() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="move",
+            kind=ClientCommandKind.MOVE,
             command=112,
             x=16,
             y=10,

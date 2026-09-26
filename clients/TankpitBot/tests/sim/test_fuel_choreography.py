@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from tankpit_bot.container.types import ContainerPickupDict
 from tankpit_bot.protocol.types import BinaryMessage, FuelGainDict
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.fuel_pickup import resolve_fuel_pickup
 from tankpit_bot.sim.narrate import narrate_fuel_pickup
 from tankpit_bot.sim.server import SimServer
@@ -22,7 +22,7 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 def _pickup(x: int, y: int) -> ClientCommandDict:
     return ClientCommandDict(
-        kind="pickup_fuel",
+        kind=ClientCommandKind.PICKUP_FUEL,
         command=100,
         x=x,
         y=y,

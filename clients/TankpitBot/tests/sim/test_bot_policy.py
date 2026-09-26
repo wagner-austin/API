@@ -15,7 +15,7 @@ from tankpit_bot.sim.bot_policy import (
     reactivate_practice_bot,
     teleport_off_threshold,
 )
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, SimServer
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -148,7 +148,7 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=CMD_SHOOT,
             x=101,
             y=100,
@@ -283,7 +283,7 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=CMD_SHOOT,
             x=101,
             y=100,
@@ -297,7 +297,7 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
     server.queue_command(
         510,
         ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=CMD_SHOOT,
             x=100,
             y=100,

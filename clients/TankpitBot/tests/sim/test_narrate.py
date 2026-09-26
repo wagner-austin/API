@@ -17,7 +17,7 @@ from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_INVENTORY_FULL
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.actions import process_mine_press, process_radar, process_teleport
 from tankpit_bot.sim.blocks import process_block_press
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.equipment import (
     EquipmentGrantDict,
     resolve_equipment_pickup,
@@ -66,7 +66,7 @@ def _kinds(messages: list[BinaryMessage]) -> list[int | str]:
 def _chat() -> ClientCommandDict:
     """A decoded chat command."""
     return ClientCommandDict(
-        kind="chat",
+        kind=ClientCommandKind.CHAT,
         command=77,
         x=1,
         y=2,
@@ -137,12 +137,12 @@ def test_equipment_grant_is_private_to_the_arriving_tank() -> None:
     granted = EquipmentGrantDict(kind="granted", gained=[7, 0, 0, 0, 0])
     assert resolve_equipment_pickup(world, ACTOR) == granted
 
-    actor_view = narrate_equipment_pickup(world, granted, ACTOR, "move", ACTOR)
+    actor_view = narrate_equipment_pickup(world, granted, ACTOR, ClientCommandKind.MOVE, ACTOR)
     assert _kinds(actor_view) == [0x67, 0x49, "container_pickup"]
     gain = actor_view[0]
     assert gain["msg_type"] == 0x67
     assert gain["gained"] == [7, 0, 0, 0, 0]
-    assert narrate_equipment_pickup(world, granted, ACTOR, "move", BYSTANDER) == []
+    assert narrate_equipment_pickup(world, granted, ACTOR, ClientCommandKind.MOVE, BYSTANDER) == []
 
 
 def test_a_full_inventory_refuses_only_an_explicit_click() -> None:
@@ -153,8 +153,10 @@ def test_a_full_inventory_refuses_only_an_explicit_click() -> None:
     refused = EquipmentGrantDict(kind="inventory_full", gained=[0, 0, 0, 0, 0])
     assert resolve_equipment_pickup(world, ACTOR) == refused
 
-    assert narrate_equipment_pickup(world, refused, ACTOR, "move", ACTOR) == []
-    clicked = narrate_equipment_pickup(world, refused, ACTOR, "pickup_equipment", ACTOR)
+    assert narrate_equipment_pickup(world, refused, ACTOR, ClientCommandKind.MOVE, ACTOR) == []
+    clicked = narrate_equipment_pickup(
+        world, refused, ACTOR, ClientCommandKind.PICKUP_EQUIPMENT, ACTOR
+    )
     assert _kinds(clicked) == [0x52]
     close = clicked[0]
     assert close["msg_type"] == 0x52

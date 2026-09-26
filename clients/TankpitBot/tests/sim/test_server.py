@@ -20,6 +20,7 @@ from tankpit_bot.protocol.constants import (
 )
 from tankpit_bot.sim.commands import (
     ClientCommandDict,
+    ClientCommandKind,
     SimError,
     decode_client_command,
 )
@@ -44,7 +45,7 @@ def test_unsupported_kind_and_unknown_tank_raise() -> None:
     """Out-of-scope kinds and unknown/dead tanks fail loudly at queue time."""
     server = _server()
     unknown = ClientCommandDict(
-        kind="other",
+        kind=ClientCommandKind.OTHER,
         command=90,
         x=0,
         y=0,

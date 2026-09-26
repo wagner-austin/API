@@ -10,7 +10,7 @@ per-tick authority over the policy. Split from ``test_ghost.py``
 from __future__ import annotations
 
 from tankpit_bot.protocol.types import BinaryMessage, ShootEventDict
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.ghost import GhostEventDict, GhostSpecDict
 from tankpit_bot.sim.practice_room import PracticeRoomDriver
 from tankpit_bot.sim.run_boot import _queue_round_opponents
@@ -25,7 +25,7 @@ _GHOST = 500
 def _shoot(x: int, y: int) -> ClientCommandDict:
     """A shoot command at one tile."""
     return ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=115,
         x=x,
         y=y,

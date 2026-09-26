@@ -20,7 +20,7 @@ from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.protocol.command_builders import build_move_command
 from tankpit_bot.protocol.types import BinaryMessage
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
 from tankpit_bot.sim.world import SimContainerDict, make_sim_tank, make_sim_world
@@ -163,7 +163,7 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     server.queue_command(
         _CLIENT,
         ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=115,
             x=107,
             y=100,

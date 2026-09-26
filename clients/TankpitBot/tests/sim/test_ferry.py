@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.sim.movement import (
+    Surface,
     _execute_walk,
     ferry_at,
     process_move,
@@ -162,7 +163,7 @@ def test_floating_container_picks_up_while_riding() -> None:
 
 def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
     """0x5A enumerates in-window ferries and reverts vacated tiles."""
-    from tankpit_bot.sim.commands import ClientCommandDict
+    from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
     from tankpit_bot.sim.server import SimServer
 
     world = _world(10, 10)
@@ -177,7 +178,7 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="move",
+            kind=ClientCommandKind.MOVE,
             command=112,
             x=11,
             y=10,
@@ -211,7 +212,7 @@ def test_truncation_carries_the_surface_across_unclassified_tiles() -> None:
     world = _world(10, 10)
     terrain = InMemoryTerrainMap(terrain_data={(11, 10): _ROCK})
     walked, x, y, reason = _execute_walk(
-        world, terrain, world["tanks"][9], "land", "ee", stop_on_contact=False
+        world, terrain, world["tanks"][9], Surface.LAND, "ee", stop_on_contact=False
     )
     assert walked == "ee"
     assert (x, y) == (12, 10)
@@ -220,7 +221,7 @@ def test_truncation_carries_the_surface_across_unclassified_tiles() -> None:
 
 def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     """Patches cover only the 18x18 grid; far tiles defer their revert."""
-    from tankpit_bot.sim.commands import ClientCommandDict
+    from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
     from tankpit_bot.sim.server import SimServer
 
     world = _world(10, 10)
@@ -231,7 +232,7 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="teleport",
+            kind=ClientCommandKind.TELEPORT,
             command=116,
             x=40,
             y=10,

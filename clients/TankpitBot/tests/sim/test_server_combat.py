@@ -6,7 +6,7 @@ from tankpit_bot.sim.combat import (
     SLOT_DUAL,
     SLOT_HOMING,
 )
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import (
     SimContainerDict,
@@ -231,7 +231,7 @@ def _id_shot(x: int, y: int, target_id: int) -> ClientCommandDict:
         The decoded command.
     """
     return ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=115,
         x=x,
         y=y,

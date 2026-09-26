@@ -104,7 +104,7 @@ def test_an_undemoted_client_never_promotes() -> None:
 def test_the_server_demotes_on_the_clients_own_deactivation() -> None:
     """The tick processor reads its own 0x41 and acts on it."""
     from tankpit_bot.sim.combat import SLOT_DUAL
-    from tankpit_bot.sim.commands import ClientCommandDict
+    from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
     from tankpit_bot.sim.server import SimServer
 
     world = _world()
@@ -115,7 +115,7 @@ def test_the_server_demotes_on_the_clients_own_deactivation() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=115,
             x=10,
             y=10,
@@ -138,7 +138,7 @@ def test_the_server_demotes_on_the_clients_own_deactivation() -> None:
 def test_another_tanks_deactivation_leaves_the_clients_rank_alone() -> None:
     """Only the CLIENT's own death demotes the client."""
     from tankpit_bot.sim.combat import SLOT_DUAL
-    from tankpit_bot.sim.commands import ClientCommandDict
+    from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
     from tankpit_bot.sim.server import SimServer
 
     world = _world()
@@ -148,7 +148,7 @@ def test_another_tanks_deactivation_leaves_the_clients_rank_alone() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=115,
             x=12,
             y=10,

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
+from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.session import deliver_batch
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim.seam import SEAM_ENEMY_ID, boot_seam
@@ -39,7 +40,7 @@ def test_adjacent_engage_presses_the_pin_once_over_the_wire() -> None:
         if error.reason != "no_viable_targets":
             raise
 
-    presses = link.sent_commands.count("mine")
+    presses = link.sent_commands.count(ClientCommandKind.MINE)
     assert presses == 1, f"expected exactly one pin press per engagement, got {presses}"
     # The press was billed at the flat 10 ([[mine-mechanics]]).
     press_entries = [e for e in ws.fuel_book["entries"] if e["kind"] == "mine_press"]
@@ -48,5 +49,5 @@ def test_adjacent_engage_presses_the_pin_once_over_the_wire() -> None:
     own_mines = [m for m in ws.world_state["mines"].values() if m["team"] == _CLIENT_TEAM]
     assert own_mines, "the 0x4B placement never landed in the bot's own mine registry"
     # The pin never displaced the fight: shots still went out.
-    assert link.sent_commands.count("shoot") >= 1
+    assert link.sent_commands.count(ClientCommandKind.SHOOT) >= 1
     assert str(SEAM_ENEMY_ID) in bot._ai_state["mine_pin_presses"]

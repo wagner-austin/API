@@ -16,6 +16,7 @@ from __future__ import annotations
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.ledger.ring import outcome_counts
+from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.sim.world import place_mine
 from tankpit_bot.state.types import make_mine_state
@@ -77,7 +78,7 @@ def test_clearance_shot_resolves_fired_over_the_seam() -> None:
         if error.reason not in ("no_productive_collect", "no_viable_targets"):
             raise
 
-    assert link.sent_commands.count("shoot") >= 1, (
+    assert link.sent_commands.count(ClientCommandKind.SHOOT) >= 1, (
         "the covered container never drew a clearance shot -- scenario setup bug"
     )
     shoot_outcomes = outcome_counts(ws.ledger, "shoot")

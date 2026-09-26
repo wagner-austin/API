@@ -9,6 +9,7 @@ from tankpit_bot.protocol.constants import (
 )
 from tankpit_bot.sim.commands import (
     ClientCommandDict,
+    ClientCommandKind,
 )
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import (
@@ -135,7 +136,7 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
     """A toggle press flips the slot server-side and reports all five."""
     server = _server()
     toggle = ClientCommandDict(
-        kind="toggle_equipment",
+        kind=ClientCommandKind.TOGGLE_EQUIPMENT,
         command=114,
         x=0,
         y=0,
@@ -153,7 +154,7 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
     assert toggled["enabled"] == [True, False, True, True, True]
     assert server.world["tanks"][9]["enabled"][1] is False
     out_of_range = ClientCommandDict(
-        kind="toggle_equipment",
+        kind=ClientCommandKind.TOGGLE_EQUIPMENT,
         command=114,
         x=0,
         y=0,
@@ -213,7 +214,7 @@ def test_chat_tick_echoes_the_0x4d_broadcast() -> None:
     """
     server = _server()
     chat = ClientCommandDict(
-        kind="chat",
+        kind=ClientCommandKind.CHAT,
         command=0x6D,
         x=10,
         y=10,
@@ -249,7 +250,7 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="pickup_fuel",
+            kind=ClientCommandKind.PICKUP_FUEL,
             command=100,
             x=12,
             y=10,
@@ -265,7 +266,7 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="pickup_fuel",
+            kind=ClientCommandKind.PICKUP_FUEL,
             command=100,
             x=12,
             y=10,
@@ -389,7 +390,7 @@ def test_only_map_open_is_answered_with_a_map_dump() -> None:
     assertions would pass against a server that never dumps at all.
     """
     scope_shift = ClientCommandDict(
-        kind="scope",
+        kind=ClientCommandKind.SCOPE,
         command=115,
         x=0,
         y=0,
@@ -400,7 +401,7 @@ def test_only_map_open_is_answered_with_a_map_dump() -> None:
         amount=0,
     )
     press = ClientCommandDict(
-        kind="block",
+        kind=ClientCommandKind.BLOCK,
         command=98,
         x=10,
         y=11,

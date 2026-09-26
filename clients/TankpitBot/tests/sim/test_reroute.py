@@ -19,7 +19,7 @@ from tankpit_bot.sim.combat import (
     WEAPON_SINGLE,
     process_shot,
 )
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -43,7 +43,7 @@ def _server(world: SimWorldDict) -> SimServer:
 def _teleport(x: int, y: int) -> ClientCommandDict:
     """A decoded teleport command to (x, y)."""
     return ClientCommandDict(
-        kind="teleport",
+        kind=ClientCommandKind.TELEPORT,
         command=116,
         x=x,
         y=y,
@@ -58,7 +58,7 @@ def _teleport(x: int, y: int) -> ClientCommandDict:
 def _id_shot(x: int, y: int, target_id: int) -> ClientCommandDict:
     """A decoded id-targeted shoot command clicked at (x, y)."""
     return ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=115,
         x=x,
         y=y,
@@ -143,7 +143,7 @@ def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
     server = _server(world)
     enemy_move = ClientCommandDict(
-        kind="move",
+        kind=ClientCommandKind.MOVE,
         command=112,
         x=15,
         y=12,

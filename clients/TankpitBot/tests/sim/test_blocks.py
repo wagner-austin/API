@@ -11,7 +11,7 @@ from tankpit_bot.sim.blocks import (
     process_block_press,
 )
 from tankpit_bot.sim.combat import WEAPON_SINGLE, process_shot
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.movement import process_move, tile_surface
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import (
@@ -156,7 +156,7 @@ def test_server_emits_0x42_0x4a_and_refreshed_viewport() -> None:
     world["tanks"][9]["carrying"] = True
     server = SimServer(world, _map_with_pond(), client_id=9)
     press = ClientCommandDict(
-        kind="block",
+        kind=ClientCommandKind.BLOCK,
         command=98,
         x=10,
         y=11,
@@ -195,7 +195,7 @@ def test_out_of_reach_press_answers_code_1_for_the_client_only() -> None:
     world["tanks"][11] = make_sim_tank(11, 1, 1, 20, 20, 500)
     server = SimServer(world, _map_with_pond(), client_id=9)
     far = ClientCommandDict(
-        kind="block",
+        kind=ClientCommandKind.BLOCK,
         command=98,
         x=30,
         y=30,
@@ -219,7 +219,7 @@ def test_towing_refuses_teleport_with_code_0() -> None:
     world["tanks"][9]["carrying"] = True
     server = SimServer(world, _map_with_pond(), client_id=9)
     hop = ClientCommandDict(
-        kind="teleport",
+        kind=ClientCommandKind.TELEPORT,
         command=116,
         x=40,
         y=40,
@@ -251,7 +251,7 @@ def test_enemy_block_actions_stay_per_recipient() -> None:
     world["tanks"][11]["carrying"] = True
     server = SimServer(world, _map_with_pond(), client_id=9)
     hop = ClientCommandDict(
-        kind="teleport",
+        kind=ClientCommandKind.TELEPORT,
         command=116,
         x=40,
         y=40,
@@ -265,7 +265,7 @@ def test_enemy_block_actions_stay_per_recipient() -> None:
     towed = server.advance_tick()
     assert [m for m in towed if m["msg_type"] == 0x52] == []
     drop = ClientCommandDict(
-        kind="block",
+        kind=ClientCommandKind.BLOCK,
         command=98,
         x=20,
         y=21,
@@ -345,7 +345,7 @@ def test_a_refused_press_builds_nothing_and_says_nothing_was_built() -> None:
     world["blocks"] = []
     server = SimServer(world, _map_with_pond(), client_id=9)
     far = ClientCommandDict(
-        kind="block",
+        kind=ClientCommandKind.BLOCK,
         command=98,
         x=30,
         y=30,
