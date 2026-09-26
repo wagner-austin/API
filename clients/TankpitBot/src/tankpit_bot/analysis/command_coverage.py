@@ -36,6 +36,7 @@ from tankpit_bot.protocol import commands as vocabulary
 from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sim.server import SUPPORTED_KINDS
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.wire.helpers import DecodeError
 
 
@@ -99,7 +100,10 @@ def analyze_command_coverage(directories: list[Path]) -> CommandCoverageDict:
                 continue
             sessions += 1
             for frame in result["frames"]:
-                if frame["direction"] != "sent" or frame["msg_type"] != COMMAND_PREFIX:
+                if (
+                    frame["direction"] is not MessageDirection.SENT
+                    or frame["msg_type"] != COMMAND_PREFIX
+                ):
                     continue
                 try:
                     command = decode_client_command(frame["body"])

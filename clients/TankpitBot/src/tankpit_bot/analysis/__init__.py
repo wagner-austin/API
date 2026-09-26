@@ -24,7 +24,6 @@ from tankpit_bot.analysis.scan import (
     scan_session,
 )
 from tankpit_bot.analysis.types import (
-    SESSION_SKIP_REASONS,
     DecodedFrameDict,
     ScannedSessionDict,
     SessionSkipReason,
@@ -34,11 +33,9 @@ from tankpit_bot.analysis.types import (
     encode_decoded_frame,
     encode_skipped_session,
     require_hex_bytes,
-    require_session_skip_reason,
 )
 
 __all__ = [
-    "SESSION_SKIP_REASONS",
     "DecodedFrameDict",
     "ScannedSessionDict",
     "SessionSkipReason",
@@ -50,7 +47,6 @@ __all__ = [
     "encode_skipped_session",
     "load_capture_session",
     "require_hex_bytes",
-    "require_session_skip_reason",
     "scan_archive",
     "scan_session",
 ]

@@ -19,6 +19,7 @@ read.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from platform_core.json_utils import (
@@ -27,27 +28,25 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 
-#: Why a capture session yielded no decodable frames. The vocabulary is
-#: closed: a new skip site means a new documented reason here, not an
-#: invented string, so ``skipped`` tallies stay comparable across runs.
-#: ``unframed_payload`` (added 2026-08-06 with the direction extension)
-#: marks a session whose payloads violate the framing contract —
-#: measured archive-wide: 2 of 62,095 sent payloads, both in the one
-#: pre-framing capture ``bot-20260331-230406``; 0 of 217,678 received.
-SessionSkipReason = Literal["no_magic", "unframed_payload"]
+from tankpit_bot.types.literals import MessageDirection
 
-#: Every value :data:`SessionSkipReason` admits, for validation and for
-#: exhaustive reporting by callers that tally skips.
-SESSION_SKIP_REASONS: tuple[SessionSkipReason, ...] = ("no_magic", "unframed_payload")
 
-#: Which side of the wire a frame travelled. Sent frames carry our own
-#: commands (the same XOR cipher covers both directions); received
-#: frames are the server's stream.
-FrameDirection = Literal["received", "sent"]
+class SessionSkipReason(StrEnum):
+    """Why a capture session yielded no decodable frames.
 
-#: Every value :data:`FrameDirection` admits.
-FRAME_DIRECTIONS: tuple[FrameDirection, ...] = ("received", "sent")
+    The vocabulary is closed: a new skip site means a new documented
+    reason here, not an invented string, so ``skipped`` tallies stay
+    comparable across runs. ``unframed_payload`` (added 2026-08-06 with
+    the direction extension) marks a session whose payloads violate the
+    framing contract -- measured archive-wide: 2 of 62,095 sent
+    payloads, both in the one pre-framing capture
+    ``bot-20260331-230406``; 0 of 217,678 received.
+    """
+
+    NO_MAGIC = "no_magic"
+    UNFRAMED_PAYLOAD = "unframed_payload"
 
 
 # The two scan results carry a ``kind`` tag discriminating them. It is
@@ -65,8 +64,7 @@ class SkippedSessionDict(TypedDict):
         kind: Always ``"skipped"`` — the tag that lets a consumer
             narrow a scan result without a cast.
         path: Filesystem path of the capture session file.
-        reason: Why the session yielded nothing, from
-            :data:`SESSION_SKIP_REASONS`.
+        reason: Why the session yielded nothing.
     """
 
     kind: Literal["skipped"]
@@ -81,9 +79,9 @@ class DecodedFrameDict(TypedDict):
         timestamp_ms: Capture time of the containing message, carried
             through so miners can correlate frames across channels
             without re-reading the session.
-        direction: Which side of the wire the frame travelled
-            (:data:`FRAME_DIRECTIONS`). Sent frames are our own
-            commands; received frames are the server stream.
+        direction: Which side of the wire the frame travelled. Sent
+            frames are our own commands; received frames are the
+            server stream.
         msg_type: First byte of the frame, before XOR decoding.
         raw: The frame exactly as captured on the wire, type byte
             included, untouched by the cipher. This is what the
@@ -98,7 +96,7 @@ class DecodedFrameDict(TypedDict):
     """
 
     timestamp_ms: int
-    direction: FrameDirection
+    direction: MessageDirection
     msg_type: int
     raw: bytes
     body: bytes
@@ -131,7 +129,11 @@ def encode_skipped_session(skipped: SkippedSessionDict) -> JSONObject:
         JSON-serializable object with ``kind``, ``path`` and
         ``reason``.
     """
-    return {"kind": skipped["kind"], "path": skipped["path"], "reason": skipped["reason"]}
+    return {
+        "kind": skipped["kind"],
+        "path": skipped["path"],
+        "reason": skipped["reason"].value,
+    }
 
 
 def decode_skipped_session(data: JSONObject) -> SkippedSessionDict:
@@ -145,36 +147,14 @@ def decode_skipped_session(data: JSONObject) -> SkippedSessionDict:
 
     Raises:
         JSONTypeError: If a field is missing, of the wrong type, if
-            ``reason`` is outside :data:`SESSION_SKIP_REASONS`, or if
+            ``reason`` is not a :class:`SessionSkipReason`, or if
             ``kind`` is not ``"skipped"``.
     """
     kind = require_str(data, "kind")
     if kind != "skipped":
         raise JSONTypeError(f"Expected a skipped scan result, got kind {kind!r}")
-    reason = require_session_skip_reason(require_str(data, "reason"))
+    reason = require_member(data, "reason", SessionSkipReason)
     return SkippedSessionDict(kind="skipped", path=require_str(data, "path"), reason=reason)
-
-
-def require_session_skip_reason(value: str) -> SessionSkipReason:
-    """Narrow a string to a :data:`SessionSkipReason`.
-
-    Args:
-        value: Candidate reason string.
-
-    Returns:
-        The same value, narrowed.
-
-    Raises:
-        JSONTypeError: If the value is not a known skip reason. The
-            message names both the offending value and the closed
-            vocabulary, so a caller can fix the input without reading
-            this module.
-    """
-    for reason in SESSION_SKIP_REASONS:
-        if value == reason:
-            return reason
-    known = ", ".join(SESSION_SKIP_REASONS)
-    raise JSONTypeError(f"unknown session skip reason '{value}'; known reasons: {known}")
 
 
 def encode_decoded_frame(frame: DecodedFrameDict) -> JSONObject:
@@ -192,7 +172,7 @@ def encode_decoded_frame(frame: DecodedFrameDict) -> JSONObject:
     """
     return {
         "timestamp_ms": frame["timestamp_ms"],
-        "direction": frame["direction"],
+        "direction": frame["direction"].value,
         "msg_type": frame["msg_type"],
         "raw": frame["raw"].hex(),
         "body": frame["body"].hex(),
@@ -209,36 +189,17 @@ def decode_decoded_frame(data: JSONObject) -> DecodedFrameDict:
         The validated frame.
 
     Raises:
-        JSONTypeError: If a field is missing, of the wrong type, or if
+        JSONTypeError: If a field is missing, of the wrong type, if
+            ``direction`` is not a :class:`MessageDirection`, or if
             ``raw`` or ``body`` is not valid hex.
     """
     return DecodedFrameDict(
         timestamp_ms=require_int(data, "timestamp_ms"),
-        direction=require_frame_direction(require_str(data, "direction")),
+        direction=require_member(data, "direction", MessageDirection),
         msg_type=require_int(data, "msg_type"),
         raw=require_hex_bytes(require_str(data, "raw")),
         body=require_hex_bytes(require_str(data, "body")),
     )
-
-
-def require_frame_direction(value: str) -> FrameDirection:
-    """Narrow a string to a :data:`FrameDirection`.
-
-    Args:
-        value: Candidate direction string.
-
-    Returns:
-        The same value, narrowed.
-
-    Raises:
-        JSONTypeError: If the value is not a known direction; the
-            message names the closed vocabulary.
-    """
-    for direction in FRAME_DIRECTIONS:
-        if value == direction:
-            return direction
-    known = ", ".join(FRAME_DIRECTIONS)
-    raise JSONTypeError(f"unknown frame direction '{value}'; known directions: {known}")
 
 
 def require_hex_bytes(value: str) -> bytes:
@@ -266,10 +227,7 @@ def require_hex_bytes(value: str) -> bytes:
 
 
 __all__ = [
-    "FRAME_DIRECTIONS",
-    "SESSION_SKIP_REASONS",
     "DecodedFrameDict",
-    "FrameDirection",
     "ScannedSessionDict",
     "SessionSkipReason",
     "SkippedSessionDict",
@@ -277,7 +235,5 @@ __all__ = [
     "decode_skipped_session",
     "encode_decoded_frame",
     "encode_skipped_session",
-    "require_frame_direction",
     "require_hex_bytes",
-    "require_session_skip_reason",
 ]

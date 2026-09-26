@@ -49,6 +49,7 @@ from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sniffer.decoders import _is_text_route
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.wire.helpers import DecodeError
 
 #: A window closes at the next SENT command, or after this many
@@ -219,7 +220,7 @@ def mine_session(scanned: ScannedSessionDict) -> list[CommandWindowDict]:
     self_id: int | None = None
 
     for frame in sorted(scanned["frames"], key=_frame_time):
-        if frame["direction"] == "sent":
+        if frame["direction"] is MessageDirection.SENT:
             fresh = _opened_window(frame)
             if fresh is None:
                 continue

@@ -55,6 +55,7 @@ from tankpit_bot.analysis.types import DecodedFrameDict, ScannedSessionDict
 from tankpit_bot.protocol import try_decode_binary_message
 from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.sim.commands import decode_client_command
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.wire.helpers import DecodeError
 
 #: Declared ``Final`` so mypy carries the literal type: the
@@ -103,7 +104,7 @@ def _own_tank_id(frames: list[DecodedFrameDict]) -> int | None:
         silently comparing against a fabricated id.
     """
     for frame in frames:
-        if frame["direction"] != "received":
+        if frame["direction"] is not MessageDirection.RECEIVED:
             continue
         try:
             message = try_decode_binary_message(frame["msg_type"], frame["body"])
@@ -152,7 +153,7 @@ def sweep_session(scanned: ScannedSessionDict) -> SessionEvidenceDict:
     malformed = 0
 
     for frame in scanned["frames"]:
-        if frame["direction"] == "sent":
+        if frame["direction"] is MessageDirection.SENT:
             if frame["msg_type"] != COMMAND_PREFIX:
                 continue
             triggers[decode_client_command(frame["body"])["kind"]] += 1

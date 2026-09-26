@@ -39,6 +39,7 @@ from tankpit_bot.analysis import _test_hooks
 from tankpit_bot.analysis.types import (
     DecodedFrameDict,
     ScannedSessionDict,
+    SessionSkipReason,
     SkippedSessionDict,
 )
 from tankpit_bot.capture.frames import split_payload_frames
@@ -147,12 +148,14 @@ def scan_session(path: Path) -> ScannedSessionDict | SkippedSessionDict:
     """
     session = load_capture_session(path)
     if session["magic"] is None:
-        return SkippedSessionDict(kind="skipped", path=str(path), reason="no_magic")
+        return SkippedSessionDict(kind="skipped", path=str(path), reason=SessionSkipReason.NO_MAGIC)
     try:
         frames = decode_session_frames(session)
     except FramingError as error:
         log.info("Skipping unframed capture %s: %s", path, error)
-        return SkippedSessionDict(kind="skipped", path=str(path), reason="unframed_payload")
+        return SkippedSessionDict(
+            kind="skipped", path=str(path), reason=SessionSkipReason.UNFRAMED_PAYLOAD
+        )
     return ScannedSessionDict(
         kind="scanned",
         path=str(path),
