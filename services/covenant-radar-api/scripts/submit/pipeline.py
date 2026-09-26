@@ -25,6 +25,8 @@ from covenant_ml.types import (
     LightGBMConfig,
     LSTMConfig,
     MLPConfig,
+    RequestedDevice,
+    RequestedPrecision,
     TrainConfig,
 )
 from numpy.typing import NDArray
@@ -195,7 +197,7 @@ def _build_lightgbm_config(config: SubmitConfig) -> LightGBMConfig:
         LightGBM-specific training configuration.
     """
     return LightGBMConfig(
-        device="cpu",
+        device=RequestedDevice.CPU,
         learning_rate=config["learning_rate"],
         max_depth=config["max_depth"],
         n_estimators=config["n_estimators"],
@@ -223,7 +225,7 @@ def _build_xgboost_config(config: SubmitConfig) -> TrainConfig:
         XGBoost-specific training configuration.
     """
     return TrainConfig(
-        device="cpu",
+        device=RequestedDevice.CPU,
         learning_rate=config["learning_rate"],
         max_depth=config["max_depth"],
         n_estimators=config["n_estimators"],
@@ -249,8 +251,8 @@ def _build_mlp_config(config: SubmitConfig) -> MLPConfig:
         MLP-specific training configuration.
     """
     return MLPConfig(
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         optimizer="adamw",
         hidden_sizes=(256, 128, 64),
         learning_rate=config["learning_rate"],
@@ -275,8 +277,8 @@ def _build_lstm_config(config: SubmitConfig) -> LSTMConfig:
         LSTM-specific training configuration.
     """
     return LSTMConfig(
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         hidden_size=128,
         num_layers=2,
         dropout=0.3,

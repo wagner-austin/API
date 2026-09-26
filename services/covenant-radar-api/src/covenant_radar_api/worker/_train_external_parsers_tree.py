@@ -12,6 +12,7 @@ from covenant_ml.types import (
     LogRegPenalty,
     LogRegSolver,
     RandomForestConfig,
+    RequestedDevice,
 )
 from platform_core.json_utils import (
     JSONObject,
@@ -101,7 +102,7 @@ def _optional_float(data: JSONObject, key: str, default: float) -> float:
 
 def _parse_lightgbm_config(
     raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
+    device: RequestedDevice,
     train_ratio: float,
     val_ratio: float,
     test_ratio: float,

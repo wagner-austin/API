@@ -11,6 +11,7 @@ from covenant_ml.datasets import TimeSeriesDatasetConfig
 from covenant_ml.types import (
     BackendName,
     LightGBMConfig,
+    RequestedDevice,
     TrainConfig,
 )
 from covenant_ml.validation.runner import TrainedModel
@@ -142,7 +143,7 @@ def _build_lightgbm_config(
         LightGBM-specific training configuration.
     """
     return LightGBMConfig(
-        device="cpu",
+        device=RequestedDevice.CPU,
         learning_rate=learning_rate,
         max_depth=-1,
         n_estimators=n_estimators,
@@ -176,7 +177,7 @@ def _build_xgboost_config(
         XGBoost-specific training configuration.
     """
     return TrainConfig(
-        device="cpu",
+        device=RequestedDevice.CPU,
         learning_rate=learning_rate,
         max_depth=6,
         n_estimators=n_estimators,

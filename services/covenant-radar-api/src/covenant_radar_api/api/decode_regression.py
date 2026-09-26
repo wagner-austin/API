@@ -6,6 +6,7 @@ from typing import Literal, TypedDict
 
 from covenant_ml import FeaturePreset
 from covenant_ml.explainers.types import SupportedExplainer
+from covenant_ml.types import RequestedDevice
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONObject,
@@ -16,6 +17,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import find_member
 
 
 def _parse_optimize_feature_preset(raw: JSONValue | None) -> FeaturePreset:
@@ -72,19 +74,16 @@ def _parse_explainer(raw: JSONValue) -> SupportedExplainer:
     )
 
 
-def _parse_device(raw: JSONValue | None) -> Literal["cpu", "cuda", "auto"]:
-    """Parse device setting, defaulting to 'auto'."""
+def _parse_device(raw: JSONValue | None) -> RequestedDevice:
+    """Parse device setting, defaulting to AUTO."""
     if raw is None:
-        return "auto"
+        return RequestedDevice.AUTO
     if not isinstance(raw, str):
         raise JSONTypeError("device must be a string")
-    if raw == "cpu":
-        return "cpu"
-    if raw == "cuda":
-        return "cuda"
-    if raw == "auto":
-        return "auto"
-    raise JSONTypeError("device must be one of: cpu, cuda, auto")
+    device = find_member(raw, RequestedDevice)
+    if device is None:
+        raise JSONTypeError("device must be one of: cpu, cuda, auto")
+    return device
 
 
 def _parse_body_as_dict(body: bytes) -> JSONObject:
@@ -127,7 +126,7 @@ class RegressionOptimizeApiParseResult(TypedDict, total=True):
     dataset: str
     n_trials: int
     timeout_seconds: int | None
-    device: Literal["cpu", "cuda", "auto"]
+    device: RequestedDevice
     feature_preset: FeaturePreset
     random_state: int
 

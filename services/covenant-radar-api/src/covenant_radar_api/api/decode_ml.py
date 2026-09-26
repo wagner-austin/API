@@ -8,6 +8,7 @@ from covenant_ml import FeaturePreset
 from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.types import (
     BackendName,
+    RequestedDevice,
 )
 from platform_core.json_utils import (
     JSONObject,
@@ -78,7 +79,7 @@ class OptimizeRequest(TypedDict, total=True):
     dataset: DatasetName
     n_trials: int
     timeout_seconds: int | None
-    device: Literal["cpu", "cuda", "auto"]
+    device: RequestedDevice
     feature_preset: FeaturePreset
     random_state: int
 
@@ -111,7 +112,7 @@ class UnifiedOptimizeApiParseResult(TypedDict, total=True):
     dataset: DatasetName
     n_trials: int
     timeout_seconds: int | None
-    device: Literal["cpu", "cuda", "auto"]
+    device: RequestedDevice
     feature_preset: FeaturePreset
     random_state: int
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 import numpy as np
 from covenant_domain.features import LoanFeatures, extract_features
@@ -19,6 +19,7 @@ from covenant_domain.models import CovenantResult, Deal
 from covenant_ml.trainer_fit import train_model_with_validation
 from covenant_ml.types import (
     EvalMetrics,
+    RequestedDevice,
     TrainConfig,
     TrainOutcome,
 )
@@ -31,23 +32,21 @@ from numpy.typing import NDArray
 from platform_core.config.covenant_radar import Settings
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
+from platform_core.members import find_member
 
 _log = get_logger(__name__)
 
 
-def _parse_device(raw: JSONValue | None) -> Literal["cpu", "cuda", "auto"]:
-    """Parse device setting, defaulting to 'auto'."""
+def _parse_device(raw: JSONValue | None) -> RequestedDevice:
+    """Parse device setting, defaulting to AUTO."""
     if raw is None:
-        return "auto"
+        return RequestedDevice.AUTO
     if not isinstance(raw, str):
         raise JSONTypeError("device must be a string")
-    if raw == "cpu":
-        return "cpu"
-    if raw == "cuda":
-        return "cuda"
-    if raw == "auto":
-        return "auto"
-    raise ValueError("device must be one of: cpu, cuda, auto")
+    device = find_member(raw, RequestedDevice)
+    if device is None:
+        raise ValueError("device must be one of: cpu, cuda, auto")
+    return device
 
 
 def _optional_float(data: JSONObject, key: str, default: float) -> float:

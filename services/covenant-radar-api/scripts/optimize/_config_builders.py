@@ -15,6 +15,8 @@ from covenant_ml.types import (
     LSTMConfig,
     MLPConfig,
     RandomForestConfig,
+    RequestedDevice,
+    RequestedPrecision,
     TrainConfig,
 )
 
@@ -33,7 +35,7 @@ def _build_xgboost_config(
         XGBoost training configuration.
     """
     return TrainConfig(
-        device="auto",
+        device=RequestedDevice.AUTO,
         learning_rate=float_params["learning_rate"],
         max_depth=int_params["max_depth"],
         n_estimators=int_params["n_estimators"],
@@ -65,8 +67,8 @@ def _build_mlp_config(
     n_layers = int_params["n_layers"]
     hidden_size = int_params["hidden_size"]
     return MLPConfig(
-        device="auto",
-        precision="fp32",
+        device=RequestedDevice.AUTO,
+        precision=RequestedPrecision.FP32,
         optimizer="adamw",
         hidden_sizes=tuple(hidden_size for _ in range(n_layers)),
         learning_rate=float_params["learning_rate"],
@@ -95,8 +97,8 @@ def _build_lstm_config(
         LSTM training configuration.
     """
     return LSTMConfig(
-        device="auto",
-        precision="fp32",
+        device=RequestedDevice.AUTO,
+        precision=RequestedPrecision.FP32,
         hidden_size=int_params["hidden_size"],
         num_layers=int_params["num_layers"],
         dropout=float_params["dropout"],
@@ -127,7 +129,7 @@ def _build_lightgbm_config(
         LightGBM training configuration.
     """
     return LightGBMConfig(
-        device="auto",
+        device=RequestedDevice.AUTO,
         learning_rate=float_params["learning_rate"],
         max_depth=int_params["max_depth"],
         n_estimators=int_params["n_estimators"],

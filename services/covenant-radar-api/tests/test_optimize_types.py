@@ -13,7 +13,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import BackendName
+from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from covenant_radar_api.worker.optimize_types import (
@@ -71,12 +71,12 @@ class TestUnifiedOptimizeParseResultEncodeDecode:
 
     def test_encode_all_devices(self) -> None:
         """All device values encode and decode correctly."""
-        for device in ("cpu", "cuda", "auto"):
+        for device in RequestedDevice:
             original = _make_parse_result()
             updated = UnifiedOptimizeParseResult(**{**original, "device": device})
             encoded = encode_unified_optimize_parse_result(updated)
             decoded = decode_unified_optimize_parse_result(encoded)
-            assert decoded["device"] == device
+            assert decoded["device"] is device
 
     def test_encode_all_feature_presets(self) -> None:
         """All feature preset values encode and decode correctly."""
@@ -90,12 +90,12 @@ class TestUnifiedOptimizeParseResultEncodeDecode:
 
     def test_encode_all_precisions(self) -> None:
         """All precision values encode and decode correctly."""
-        for precision in ("fp32", "fp16", "bf16", "auto"):
+        for precision in RequestedPrecision:
             original = _make_parse_result()
             updated = UnifiedOptimizeParseResult(**{**original, "precision": precision})
             encoded = encode_unified_optimize_parse_result(updated)
             decoded = decode_unified_optimize_parse_result(encoded)
-            assert decoded["precision"] == precision
+            assert decoded["precision"] is precision
 
     def test_encode_all_nn_optimizers(self) -> None:
         """All nn_optimizer values encode and decode correctly."""

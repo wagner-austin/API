@@ -25,6 +25,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     LightGBMConfig,
+    RequestedDevice,
     TrainOutcome,
     TrainProgress,
 )
@@ -232,7 +233,7 @@ class FakeBackend:
         )
 
         fake_config: LightGBMConfig = LightGBMConfig(
-            device="cpu",
+            device=RequestedDevice.CPU,
             learning_rate=0.1,
             max_depth=-1,
             n_estimators=100,

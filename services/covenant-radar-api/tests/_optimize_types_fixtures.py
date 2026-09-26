@@ -7,7 +7,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import BackendName
+from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
 
 from covenant_radar_api.worker.optimize_types import (
     UnifiedOptimizationResult,
@@ -33,12 +33,12 @@ def _make_parse_result(
         dataset=dataset,
         n_trials=50,
         timeout_seconds=3600,
-        device="auto",
+        device=RequestedDevice.AUTO,
         feature_preset="none",
         random_state=42,
         early_stopping_rounds=10,
         n_jobs=-1,
-        precision="fp32",
+        precision=RequestedPrecision.FP32,
         nn_optimizer="adamw",
         n_epochs=50,
         early_stopping_patience=10,

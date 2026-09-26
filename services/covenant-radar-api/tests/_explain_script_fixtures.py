@@ -88,15 +88,14 @@ class FakeExplainer:
 
     def explainer_name(self) -> ExplainerName:
         """Return the explainer name."""
-        return "permutation"
+        return ExplainerName.PERMUTATION
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
-        cost: ComputationalCost = "medium"
         return {
             "requires_gradients": False,
             "requires_background_data": False,
-            "computational_cost": cost,
+            "computational_cost": ComputationalCost.MEDIUM,
         }
 
     def compute_importance(

@@ -7,6 +7,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
+from covenant_ml.types import RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 
 from covenant_radar_api.worker.optimize_regression_results import (
@@ -35,12 +36,12 @@ def _make_regression_parse_result(
         dataset=dataset,
         n_trials=50,
         timeout_seconds=None,
-        device="cpu",
+        device=RequestedDevice.CPU,
         feature_preset="none",
         random_state=42,
         early_stopping_rounds=10,
         n_jobs=-1,
-        precision="fp32",
+        precision=RequestedPrecision.FP32,
         nn_optimizer="adamw",
         n_epochs=50,
         early_stopping_patience=10,

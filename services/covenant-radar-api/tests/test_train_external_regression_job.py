@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from covenant_ml.types import (
     FeatureImportance,
+    RequestedDevice,
 )
 
 from covenant_radar_api.worker.train_external_regression_job import (
@@ -75,7 +76,7 @@ class TestBuildXGBoostRegLog:
         from covenant_ml.types import TrainConfig
 
         config: TrainConfig = {
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "learning_rate": 0.1,
             "max_depth": 3,
             "n_estimators": 10,
@@ -104,7 +105,7 @@ class TestBuildLightGBMRegLog:
         from covenant_ml.types import LightGBMConfig
 
         config: LightGBMConfig = {
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "learning_rate": 0.05,
             "max_depth": 5,
             "n_estimators": 100,
@@ -186,7 +187,7 @@ class TestDispatchRegressionBackend:
         )
 
         config: TrainConfig = {
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "learning_rate": 0.1,
             "max_depth": 3,
             "n_estimators": 10,
@@ -217,7 +218,7 @@ class TestDispatchRegressionBackend:
         )
 
         config: LightGBMConfig = {
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "learning_rate": 0.05,
             "max_depth": 5,
             "n_estimators": 100,

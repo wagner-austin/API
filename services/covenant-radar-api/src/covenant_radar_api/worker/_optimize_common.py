@@ -17,38 +17,34 @@ from covenant_ml.datasets import LoadedDataset
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer import OptimizationConfig, make_default_optimization_config
-from covenant_ml.types import BackendName
+from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
+from platform_core.members import find_member
 
 # Dataset type discriminator
 DatasetType = Literal["standard", "timeseries"]
 
 
-def parse_precision(raw: JSONValue | None) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Parse precision setting, defaulting to 'fp32'.
+def parse_precision(raw: JSONValue | None) -> RequestedPrecision:
+    """Parse precision setting, defaulting to FP32.
 
     Args:
         raw: Raw JSON value.
 
     Returns:
-        Precision literal.
+        The RequestedPrecision member the value names.
 
     Raises:
         JSONTypeError: If value is not a valid precision.
     """
     if raw is None:
-        return "fp32"
+        return RequestedPrecision.FP32
     if not isinstance(raw, str):
         raise JSONTypeError("precision must be a string")
-    if raw == "fp32":
-        return "fp32"
-    if raw == "fp16":
-        return "fp16"
-    if raw == "bf16":
-        return "bf16"
-    if raw == "auto":
-        return "auto"
-    raise JSONTypeError("precision must be one of: fp32, fp16, bf16, auto")
+    precision = find_member(raw, RequestedPrecision)
+    if precision is None:
+        raise JSONTypeError("precision must be one of: fp32, fp16, bf16, auto")
+    return precision
 
 
 def parse_nn_optimizer(raw: JSONValue | None) -> Literal["adamw", "adam", "sgd"]:
@@ -119,30 +115,27 @@ def optional_int(data: JSONObject, key: str, default: int) -> int:
     raise JSONTypeError(f"Field '{key}' must be a number")
 
 
-def parse_device(raw: JSONValue | None) -> Literal["cpu", "cuda", "auto"]:
-    """Parse device setting, defaulting to 'auto'.
+def parse_device(raw: JSONValue | None) -> RequestedDevice:
+    """Parse device setting, defaulting to AUTO.
 
     Args:
         raw: Raw JSON value.
 
     Returns:
-        Device literal.
+        The RequestedDevice member the value names.
 
     Raises:
         JSONTypeError: If value is not a string.
         ValueError: If value is not a valid device.
     """
     if raw is None:
-        return "auto"
+        return RequestedDevice.AUTO
     if not isinstance(raw, str):
         raise JSONTypeError("device must be a string")
-    if raw == "cpu":
-        return "cpu"
-    if raw == "cuda":
-        return "cuda"
-    if raw == "auto":
-        return "auto"
-    raise ValueError("device must be one of: cpu, cuda, auto")
+    device = find_member(raw, RequestedDevice)
+    if device is None:
+        raise ValueError("device must be one of: cpu, cuda, auto")
+    return device
 
 
 def parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:

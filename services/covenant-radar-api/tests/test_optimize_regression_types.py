@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 from covenant_ml.features import FeaturePreset
+from covenant_ml.types import RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
@@ -134,12 +135,12 @@ class TestRegressionParseResultEncode:
             dataset="us_bankruptcy",
             n_trials=50,
             timeout_seconds=None,
-            device="cuda",
+            device=RequestedDevice.CUDA,
             feature_preset="none",
             random_state=42,
             early_stopping_rounds=10,
             n_jobs=-1,
-            precision="fp32",
+            precision=RequestedPrecision.FP32,
             nn_optimizer="adamw",
             n_epochs=50,
             early_stopping_patience=10,
@@ -158,12 +159,12 @@ class TestRegressionParseResultEncode:
             dataset="us_bankruptcy",
             n_trials=50,
             timeout_seconds=None,
-            device="auto",
+            device=RequestedDevice.AUTO,
             feature_preset="none",
             random_state=42,
             early_stopping_rounds=10,
             n_jobs=-1,
-            precision="fp32",
+            precision=RequestedPrecision.FP32,
             nn_optimizer="adamw",
             n_epochs=50,
             early_stopping_patience=10,

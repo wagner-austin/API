@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from covenant_ml.features import FeaturePreset
+from covenant_ml.types import RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONObject,
@@ -21,8 +22,10 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.optimize_field_decoders import (
+    _require_device,
     _require_feature_preset,
     _require_int,
+    _require_precision,
     _require_str,
 )
 from covenant_radar_api.worker.optimize_regression_results import _require_regressor_backend_name
@@ -30,58 +33,6 @@ from covenant_radar_api.worker.optimize_regression_results import _require_regre
 # =============================================================================
 # Shared Validation Helpers (private, regression-specific)
 # =============================================================================
-
-
-def _require_device(raw: JSONObject) -> Literal["cpu", "cuda", "auto"]:
-    """Extract and validate device from JSON object.
-
-    Args:
-        raw: JSON object.
-
-    Returns:
-        Device literal.
-
-    Raises:
-        JSONTypeError: If device field is invalid.
-    """
-    val = raw.get("device")
-    if val is None:
-        raise JSONTypeError("Missing required field 'device'")
-    if val == "cpu":
-        return "cpu"
-    if val == "cuda":
-        return "cuda"
-    if val == "auto":
-        return "auto"
-    raise JSONTypeError("Field 'device' must be one of: cpu, cuda, auto")
-
-
-def _require_precision(
-    raw: JSONObject,
-) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Extract and validate precision from JSON object.
-
-    Args:
-        raw: JSON object.
-
-    Returns:
-        Precision literal.
-
-    Raises:
-        JSONTypeError: If precision field is invalid.
-    """
-    val = raw.get("precision")
-    if val is None:
-        raise JSONTypeError("Missing required field 'precision'")
-    if val == "fp32":
-        return "fp32"
-    if val == "fp16":
-        return "fp16"
-    if val == "bf16":
-        return "bf16"
-    if val == "auto":
-        return "auto"
-    raise JSONTypeError("Field 'precision' must be one of: fp32, fp16, bf16, auto")
 
 
 def _require_nn_optimizer(
@@ -166,12 +117,12 @@ class UnifiedRegressionOptimizeParseResult(TypedDict, total=True):
     dataset: str
     n_trials: int
     timeout_seconds: int | None
-    device: Literal["cpu", "cuda", "auto"]
+    device: RequestedDevice
     feature_preset: FeaturePreset
     random_state: int
     early_stopping_rounds: int
     n_jobs: int
-    precision: Literal["fp32", "fp16", "bf16", "auto"]
+    precision: RequestedPrecision
     nn_optimizer: Literal["adamw", "adam", "sgd"]
     n_epochs: int
     early_stopping_patience: int

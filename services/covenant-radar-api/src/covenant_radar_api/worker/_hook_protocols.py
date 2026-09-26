@@ -26,7 +26,13 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import BackendName, PredictorProtocol, TrainProgress
+from covenant_ml.types import (
+    BackendName,
+    PredictorProtocol,
+    RequestedDevice,
+    RequestedPrecision,
+    TrainProgress,
+)
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker.optimize_types import UnifiedOptimizeParseResult
@@ -225,8 +231,8 @@ class _CreateMLPObjectiveProto(Protocol):
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
-        precision: Literal["fp32", "fp16", "bf16", "auto"],
+        device: RequestedDevice,
+        precision: RequestedPrecision,
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,
@@ -243,8 +249,8 @@ class _CreateLSTMObjectiveProto(Protocol):
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
-        precision: Literal["fp32", "fp16", "bf16", "auto"],
+        device: RequestedDevice,
+        precision: RequestedPrecision,
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,

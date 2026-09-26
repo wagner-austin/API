@@ -36,6 +36,7 @@ from covenant_ml.explainers.regression_registry import (
     default_regression_explainer_registry,
 )
 from covenant_ml.features import FeaturePreset
+from covenant_ml.types import RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressionTrainProgress, RegressorBackendName
 from numpy.typing import NDArray
 
@@ -301,8 +302,8 @@ class _CreateMLPRegressorObjectiveProto(Protocol):
         x_features: NDArray[np.float64],
         y_targets: NDArray[np.float64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
-        precision: Literal["fp32", "fp16", "bf16", "auto"],
+        device: RequestedDevice,
+        precision: RequestedPrecision,
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,
@@ -319,8 +320,8 @@ class _CreateLSTMRegressorObjectiveProto(Protocol):
         x_features: NDArray[np.float64],
         y_targets: NDArray[np.float64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
-        precision: Literal["fp32", "fp16", "bf16", "auto"],
+        device: RequestedDevice,
+        precision: RequestedPrecision,
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,

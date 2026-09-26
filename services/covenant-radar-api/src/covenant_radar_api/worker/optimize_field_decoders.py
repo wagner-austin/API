@@ -5,11 +5,12 @@ from __future__ import annotations
 from typing import Literal
 
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import BackendName
+from covenant_ml.types import BackendName, RequestedDevice, RequestedPrecision
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
 )
+from platform_core.members import find_member
 
 
 def _require_backend_name(raw: JSONObject) -> BackendName:
@@ -56,14 +57,14 @@ def _require_backend_name(raw: JSONObject) -> BackendName:
     return "random_forest"
 
 
-def _require_device(raw: JSONObject) -> Literal["cpu", "cuda", "auto"]:
+def _require_device(raw: JSONObject) -> RequestedDevice:
     """Extract and validate device from JSON object.
 
     Args:
         raw: JSON object.
 
     Returns:
-        Device literal.
+        The RequestedDevice member the field names.
 
     Raises:
         JSONTypeError: If device field is invalid.
@@ -71,13 +72,10 @@ def _require_device(raw: JSONObject) -> Literal["cpu", "cuda", "auto"]:
     val = raw.get("device")
     if val is None:
         raise JSONTypeError("Missing required field 'device'")
-    if val == "cpu":
-        return "cpu"
-    if val == "cuda":
-        return "cuda"
-    if val == "auto":
-        return "auto"
-    raise JSONTypeError("Field 'device' must be one of: cpu, cuda, auto")
+    device = find_member(val, RequestedDevice) if isinstance(val, str) else None
+    if device is None:
+        raise JSONTypeError("Field 'device' must be one of: cpu, cuda, auto")
+    return device
 
 
 def _require_feature_preset(raw: JSONObject) -> FeaturePreset:
@@ -110,14 +108,14 @@ def _require_feature_preset(raw: JSONObject) -> FeaturePreset:
     )
 
 
-def _require_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
+def _require_precision(raw: JSONObject) -> RequestedPrecision:
     """Extract and validate precision from JSON object.
 
     Args:
         raw: JSON object.
 
     Returns:
-        Precision literal.
+        The RequestedPrecision member the field names.
 
     Raises:
         JSONTypeError: If precision field is invalid.
@@ -125,15 +123,10 @@ def _require_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto
     val = raw.get("precision")
     if val is None:
         raise JSONTypeError("Missing required field 'precision'")
-    if val == "fp32":
-        return "fp32"
-    if val == "fp16":
-        return "fp16"
-    if val == "bf16":
-        return "bf16"
-    if val == "auto":
-        return "auto"
-    raise JSONTypeError("Field 'precision' must be one of: fp32, fp16, bf16, auto")
+    precision = find_member(val, RequestedPrecision) if isinstance(val, str) else None
+    if precision is None:
+        raise JSONTypeError("Field 'precision' must be one of: fp32, fp16, bf16, auto")
+    return precision
 
 
 def _require_nn_optimizer(raw: JSONObject) -> Literal["adamw", "adam", "sgd"]:

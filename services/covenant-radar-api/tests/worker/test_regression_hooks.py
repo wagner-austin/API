@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.types import RequestedDevice, RequestedPrecision
 from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 
@@ -145,12 +146,12 @@ class TestRegressorObjectiveFactoryHook:
             dataset="us_bankruptcy",
             n_trials=1,
             timeout_seconds=None,
-            device="cpu",
+            device=RequestedDevice.CPU,
             feature_preset="none",
             random_state=42,
             early_stopping_rounds=2,
             n_jobs=1,
-            precision="fp32",
+            precision=RequestedPrecision.FP32,
             nn_optimizer="adamw",
             n_epochs=5,
             early_stopping_patience=2,

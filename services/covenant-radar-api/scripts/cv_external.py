@@ -37,6 +37,7 @@ from covenant_ml.types import (
     ClearGBMConfig,
     GrowthStrategy,
     LightGBMConfig,
+    RequestedDevice,
 )
 from covenant_ml.validation.splitter import group_kfold_split, group_stratified_kfold_split
 from covenant_ml.validation.types import CVSplitInfo
@@ -121,7 +122,7 @@ def _lightgbm_config(seed: int) -> LightGBMConfig:
         The training configuration.
     """
     return LightGBMConfig(
-        device="cpu",
+        device=RequestedDevice.CPU,
         learning_rate=0.1,
         max_depth=5,
         n_estimators=300,

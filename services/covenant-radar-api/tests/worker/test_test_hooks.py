@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.types import RequestedDevice, RequestedPrecision
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._hook_defaults import (
@@ -193,12 +194,12 @@ class TestRealObjectiveFactory:
             dataset="taiwan",
             n_trials=1,
             timeout_seconds=None,
-            device="cpu",
+            device=RequestedDevice.CPU,
             feature_preset="none",
             random_state=42,
             early_stopping_rounds=2,
             n_jobs=1,
-            precision="fp32",
+            precision=RequestedPrecision.FP32,
             nn_optimizer="adamw",
             n_epochs=2,
             early_stopping_patience=2,

@@ -16,6 +16,8 @@ from covenant_ml.types import (
     LSTMConfig,
     MLPConfig,
     RandomForestConfig,
+    RequestedDevice,
+    RequestedPrecision,
     TrainConfig,
 )
 from platform_core.json_utils import (
@@ -27,6 +29,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import find_member
 
 from covenant_radar_api.worker._train_external_parsers_tree import (
     _optional_float,
@@ -42,35 +45,53 @@ from covenant_radar_api.worker._train_external_parsers_tree import (
 # =============================================================================
 
 
-def _parse_device(raw: JSONValue | None) -> Literal["cpu", "cuda", "auto"]:
-    """Parse device setting, defaulting to 'auto'.
+def _parse_device(raw: JSONValue | None) -> RequestedDevice:
+    """Parse device setting, defaulting to AUTO.
 
     Args:
         raw: Raw JSON value for the device field.
 
     Returns:
-        Device literal.
+        The RequestedDevice member the value names.
 
     Raises:
         JSONTypeError: If value is not a string.
         ValueError: If value is not cpu, cuda, or auto.
     """
     if raw is None:
-        return "auto"
+        return RequestedDevice.AUTO
     if not isinstance(raw, str):
         raise JSONTypeError("device must be a string")
-    if raw == "cpu":
-        return "cpu"
-    if raw == "cuda":
-        return "cuda"
-    if raw == "auto":
-        return "auto"
-    raise ValueError("device must be one of: cpu, cuda, auto")
+    device = find_member(raw, RequestedDevice)
+    if device is None:
+        raise ValueError("device must be one of: cpu, cuda, auto")
+    return device
+
+
+def _parse_precision(raw: JSONObject) -> RequestedPrecision:
+    """Parse and validate the precision field the MLP and LSTM configs share.
+
+    Args:
+        raw: JSON object containing precision field.
+
+    Returns:
+        The RequestedPrecision member the field names.
+
+    Raises:
+        JSONTypeError: If value is not a valid precision.
+    """
+    precision_val = raw.get("precision")
+    precision = (
+        find_member(precision_val, RequestedPrecision) if isinstance(precision_val, str) else None
+    )
+    if precision is None:
+        raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
+    return precision
 
 
 def _parse_xgboost_config(
     raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
+    device: RequestedDevice,
     train_ratio: float,
     val_ratio: float,
     test_ratio: float,
@@ -119,32 +140,6 @@ def _parse_xgboost_config(
 # =============================================================================
 # MLP parser
 # =============================================================================
-
-
-def _parse_mlp_precision(
-    raw: JSONObject,
-) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Parse and validate MLP precision field.
-
-    Args:
-        raw: JSON object containing precision field.
-
-    Returns:
-        Precision literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid precision.
-    """
-    precision_val = raw.get("precision")
-    if precision_val == "fp32":
-        return "fp32"
-    if precision_val == "fp16":
-        return "fp16"
-    if precision_val == "bf16":
-        return "bf16"
-    if precision_val == "auto":
-        return "auto"
-    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
 
 
 def _parse_mlp_optimizer(
@@ -196,7 +191,7 @@ def _parse_mlp_hidden_sizes(raw: JSONObject) -> tuple[int, ...]:
 
 def _parse_mlp_config(
     raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
+    device: RequestedDevice,
     train_ratio: float,
     val_ratio: float,
     test_ratio: float,
@@ -218,7 +213,7 @@ def _parse_mlp_config(
     """
     return {
         "device": device,
-        "precision": _parse_mlp_precision(raw),
+        "precision": _parse_precision(raw),
         "optimizer": _parse_mlp_optimizer(raw),
         "hidden_sizes": _parse_mlp_hidden_sizes(raw),
         "learning_rate": require_float(raw, "learning_rate"),
@@ -238,35 +233,9 @@ def _parse_mlp_config(
 # =============================================================================
 
 
-def _parse_lstm_precision(
-    raw: JSONObject,
-) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Parse and validate LSTM precision field.
-
-    Args:
-        raw: JSON object containing precision field.
-
-    Returns:
-        Precision literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid precision.
-    """
-    precision_val = raw.get("precision")
-    if precision_val == "fp32":
-        return "fp32"
-    if precision_val == "fp16":
-        return "fp16"
-    if precision_val == "bf16":
-        return "bf16"
-    if precision_val == "auto":
-        return "auto"
-    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
-
-
 def _parse_lstm_config(
     raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
+    device: RequestedDevice,
     train_ratio: float,
     val_ratio: float,
     test_ratio: float,
@@ -291,7 +260,7 @@ def _parse_lstm_config(
         raise JSONTypeError("bidirectional must be a boolean")
     return {
         "device": device,
-        "precision": _parse_lstm_precision(raw),
+        "precision": _parse_precision(raw),
         "hidden_size": require_int(raw, "hidden_size"),
         "num_layers": require_int(raw, "num_layers"),
         "dropout": require_float(raw, "dropout"),

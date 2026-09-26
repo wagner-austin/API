@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from covenant_ml.types import RequestedDevice
 from numpy.typing import NDArray
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
@@ -346,7 +347,7 @@ class TestFakeBackendTrain:
         y = np.random.randint(0, 2, size=100).astype(np.int64)
 
         config = LightGBMConfig(
-            device="cpu",
+            device=RequestedDevice.CPU,
             learning_rate=0.1,
             max_depth=3,
             n_estimators=10,
