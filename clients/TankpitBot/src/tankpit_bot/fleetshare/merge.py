@@ -20,6 +20,7 @@ from platform_core.json_utils import JSONTypeError, load_json_str, require_int
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.fleetshare.codecs import decode_fleet_report
 from tankpit_bot.fleetshare.report import FLEET_REPORT_FILENAME
 from tankpit_bot.fleetshare.types import FleetReportDict
@@ -207,7 +208,7 @@ def _merge_enemy_sightings(
                 timestamp_ms=sighting["observed_ms"],
                 is_wire_sourced=False,
                 storage_source=EntitySource.WORLD_STATE,
-                fact_source="fleet_report",
+                fact_source=FactSource.FLEET_REPORT,
                 position_is_authoritative=True,
                 position=(sighting["x"], sighting["y"]),
                 team=sighting["team"],
