@@ -6,17 +6,12 @@ Every TypedDict has encode/decode functions with require_* validation.
 from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, JSONValue, require_int, require_str
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.types_codecs import decode_enemy_threat, encode_enemy_threat
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.types.modes import (
-    AIMode,
-    AIModeState,
-    is_valid_ai_mode_state,
-    require_ai_mode,
-    require_ai_mode_state,
-)
+from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
 
 
 class ReplayTickTraceDict(TypedDict):
@@ -81,8 +76,8 @@ def encode_replay_tick_trace(trace: ReplayTickTraceDict) -> JSONObject:
         "behavior_mode": trace["behavior_mode"],
         "behavior_score": trace["behavior_score"],
         "behavior_reason": trace["behavior_reason"],
-        "ai_mode": trace["ai_mode"],
-        "ai_mode_state": trace["ai_mode_state"],
+        "ai_mode": trace["ai_mode"].value,
+        "ai_mode_state": trace["ai_mode_state"].value,
         "command_type": trace["command_type"],
         "target_x": trace["target_x"],
         "target_y": trace["target_y"],
@@ -114,10 +109,12 @@ def decode_replay_tick_trace(data: JSONObject) -> ReplayTickTraceDict:
         if not isinstance(raw_threat, dict):
             raise ValueError(f"visible_threats[{idx}] must be an object")
         threats.append(decode_enemy_threat(raw_threat))
-    ai_mode = require_ai_mode(data, "ai_mode")
-    ai_mode_state = require_ai_mode_state(data, "ai_mode_state")
+    ai_mode = require_member(data, "ai_mode", AIMode)
+    ai_mode_state = require_member(data, "ai_mode_state", AIModeState)
     if not is_valid_ai_mode_state(ai_mode, ai_mode_state):
-        raise ValueError(f"ai_mode_state {ai_mode_state!r} is invalid for ai_mode {ai_mode!r}")
+        raise ValueError(
+            f"ai_mode_state {ai_mode_state.value!r} is invalid for ai_mode {ai_mode.value!r}"
+        )
 
     return ReplayTickTraceDict(
         tick_index=require_int(data, "tick_index"),
