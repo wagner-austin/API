@@ -11,6 +11,7 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
     GameLogState,
+    LogCategory,
     categorize_log_line,
     decode_game_log_entry,
     decode_game_log_state,
@@ -18,7 +19,6 @@ from tankpit_bot.browser.dom_scraper import (
     encode_game_log_state,
     parse_game_log,
     scrape_game_log_text,
-    validate_log_category,
 )
 
 
@@ -413,7 +413,7 @@ def test_game_log_scraper_log_new_entries() -> None:
 
 def test_encode_game_log_entry() -> None:
     """Test encode_game_log_entry creates correct dict."""
-    entry: GameLogEntry = {"text": "Test text", "category": "combat"}
+    entry: GameLogEntry = {"text": "Test text", "category": LogCategory.COMBAT}
     encoded = encode_game_log_entry(entry)
     assert encoded["text"] == "Test text"
     assert encoded["category"] == "combat"
@@ -421,7 +421,7 @@ def test_encode_game_log_entry() -> None:
 
 def test_encode_game_log_state() -> None:
     """Test encode_game_log_state creates correct dict."""
-    entry: GameLogEntry = {"text": "Line one", "category": "action"}
+    entry: GameLogEntry = {"text": "Line one", "category": LogCategory.ACTION}
     state: GameLogState = {
         "raw_text": "Line one",
         "entries": [entry],
@@ -436,7 +436,7 @@ def test_encode_game_log_state() -> None:
     assert decoded["location"] == "99,88"
     assert len(decoded["entries"]) == 1
     assert decoded["entries"][0]["text"] == "Line one"
-    assert decoded["entries"][0]["category"] == "action"
+    assert decoded["entries"][0]["category"] is LogCategory.ACTION
 
 
 def test_decode_game_log_entry_success() -> None:
@@ -444,7 +444,7 @@ def test_decode_game_log_entry_success() -> None:
     obj: JSONObject = {"text": "Test message", "category": "combat"}
     entry = decode_game_log_entry(obj)
     assert entry["text"] == "Test message"
-    assert entry["category"] == "combat"
+    assert entry["category"] is LogCategory.COMBAT
 
 
 def test_decode_game_log_entry_missing_text() -> None:
@@ -464,8 +464,12 @@ def test_decode_game_log_entry_missing_category() -> None:
 def test_decode_game_log_entry_invalid_category() -> None:
     """Test decode_game_log_entry raises on invalid category."""
     obj: JSONObject = {"text": "Some text", "category": "invalid_cat"}
-    with pytest.raises(ValueError, match="Invalid category"):
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_game_log_entry(obj)
+    assert str(excinfo.value) == (
+        "Invalid category 'invalid_cat': must be one of 'location', 'action', 'combat', "
+        "'equipment', 'teleport', 'tip', 'fuel', 'other'"
+    )
 
 
 def test_decode_game_log_state_success() -> None:
@@ -508,19 +512,8 @@ def test_parse_game_log_location_empty_value() -> None:
 
 
 def test_decode_game_log_entry_all_categories() -> None:
-    """Test decode_game_log_entry handles all category values."""
-    # Test all categories to ensure full coverage
-    assert validate_log_category("location") == "location"
-    assert validate_log_category("action") == "action"
-    assert validate_log_category("combat") == "combat"
-    assert validate_log_category("equipment") == "equipment"
-    assert validate_log_category("teleport") == "teleport"
-    assert validate_log_category("tip") == "tip"
-    assert validate_log_category("other") == "other"
-
-    # Test via decode to cover entry creation
-    all_cats = ["location", "action", "combat", "equipment", "teleport", "tip", "other"]
-    for cat in all_cats:
-        obj: JSONObject = {"text": "Test", "category": cat}
+    """Every LogCategory word decodes to its member, fuel included."""
+    for category in LogCategory:
+        obj: JSONObject = {"text": "Test", "category": category.value}
         entry = decode_game_log_entry(obj)
-        assert entry["category"] == cat
+        assert entry["category"] is category

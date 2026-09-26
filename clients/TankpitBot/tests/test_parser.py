@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.parser import (
-    LOBBY_PREFIXES,
     PREFIX_AUTH,
     PREFIX_LEAVE,
     PREFIX_RECORD,
@@ -56,17 +55,6 @@ def test_prefix_status() -> None:
 def test_prefix_record() -> None:
     """Test PREFIX_RECORD is '='."""
     assert PREFIX_RECORD == "="
-
-
-def test_lobby_prefixes_contains_all() -> None:
-    """Test LOBBY_PREFIXES contains all prefix constants."""
-    assert PREFIX_ROOM_LIST in LOBBY_PREFIXES
-    assert PREFIX_ROOM_QUERY in LOBBY_PREFIXES
-    assert PREFIX_LEAVE in LOBBY_PREFIXES
-    assert PREFIX_AUTH in LOBBY_PREFIXES
-    assert PREFIX_STATUS in LOBBY_PREFIXES
-    assert PREFIX_RECORD in LOBBY_PREFIXES
-    assert len(LOBBY_PREFIXES) == 6
 
 
 def test_parse_room_info_world() -> None:

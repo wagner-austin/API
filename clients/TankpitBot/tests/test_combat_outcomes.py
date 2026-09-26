@@ -6,8 +6,8 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.combat import (
-    VALID_COMBAT_EVENT_TYPES,
     CombatEvent,
+    CombatEventType,
     CombatStats,
     EntityPairStats,
     decode_combat_event,
@@ -16,7 +16,6 @@ from tankpit_bot.combat import (
     encode_combat_event,
     encode_combat_stats,
     encode_entity_pair_stats,
-    validate_combat_event_type,
 )
 from tankpit_bot.combat_tracker import CombatTracker
 
@@ -26,7 +25,9 @@ def test_combat_tracker_process_log_line() -> None:
     tracker = CombatTracker()
     event = tracker.process_log_line("You hit blue-7")
 
-    assert event == CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    assert event == CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
     assert len(tracker.get_events()) == 1
 
 
@@ -44,7 +45,9 @@ def test_combat_tracker_process_log_line_entity_hit() -> None:
     tracker = CombatTracker()
     event = tracker.process_log_line("blue-7 hit red-9")
 
-    assert event == CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    assert event == CombatEvent(
+        event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9"
+    )
     assert len(tracker.get_all_entity_pair_stats()) == 1
 
 
@@ -84,7 +87,9 @@ def test_combat_tracker_get_stats_unknown_target() -> None:
 def test_combat_tracker_log_event_hit_by_player() -> None:
     """Test log_event logs hit by player correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    event = CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -93,7 +98,7 @@ def test_combat_tracker_log_event_hit_by_player() -> None:
 def test_combat_tracker_log_event_hit_by_enemy() -> None:
     """Test log_event logs hit by enemy correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_enemy", attacker="red-5", target="player")
+    event = CombatEvent(event_type=CombatEventType.HIT_BY_ENEMY, attacker="red-5", target="player")
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -102,7 +107,9 @@ def test_combat_tracker_log_event_hit_by_enemy() -> None:
 def test_combat_tracker_log_event_hit_by_unknown() -> None:
     """Test log_event logs off-screen hit correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_unknown", attacker="unknown", target="player")
+    event = CombatEvent(
+        event_type=CombatEventType.HIT_BY_UNKNOWN, attacker="unknown", target="player"
+    )
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -111,7 +118,7 @@ def test_combat_tracker_log_event_hit_by_unknown() -> None:
 def test_combat_tracker_log_event_deactivated() -> None:
     """Test log_event logs deactivation correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="deactivated", attacker="player", target="green-1")
+    event = CombatEvent(event_type=CombatEventType.DEACTIVATED, attacker="player", target="green-1")
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -120,7 +127,7 @@ def test_combat_tracker_log_event_deactivated() -> None:
 def test_combat_tracker_log_event_destroyed() -> None:
     """Test log_event logs destruction correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="destroyed", attacker="player", target="cyan-2")
+    event = CombatEvent(event_type=CombatEventType.DESTROYED, attacker="player", target="cyan-2")
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -129,7 +136,7 @@ def test_combat_tracker_log_event_destroyed() -> None:
 def test_combat_tracker_log_event_entity_hit() -> None:
     """Test log_event logs entity-to-entity hit correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    event = CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -138,7 +145,9 @@ def test_combat_tracker_log_event_entity_hit() -> None:
 def test_combat_tracker_log_event_entity_deactivated() -> None:
     """Test log_event logs entity-to-entity deactivation correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_deactivated", attacker="blue-7", target="red-9")
+    event = CombatEvent(
+        event_type=CombatEventType.ENTITY_DEACTIVATED, attacker="blue-7", target="red-9"
+    )
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -147,7 +156,9 @@ def test_combat_tracker_log_event_entity_deactivated() -> None:
 def test_combat_tracker_log_event_entity_destroyed() -> None:
     """Test log_event logs entity-to-entity destruction correctly."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_destroyed", attacker="cyan-4", target="green-3")
+    event = CombatEvent(
+        event_type=CombatEventType.ENTITY_DESTROYED, attacker="cyan-4", target="green-3"
+    )
     tracker.record_event(event)
     # Should not raise
     tracker.log_event(event)
@@ -157,7 +168,9 @@ def test_combat_tracker_log_event_without_recording() -> None:
     """Test log_event when stats not yet recorded (edge case)."""
     tracker = CombatTracker()
     # Create event but don't record it
-    event = CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    event = CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
     # Should not raise even without recording
     tracker.log_event(event)
 
@@ -165,7 +178,7 @@ def test_combat_tracker_log_event_without_recording() -> None:
 def test_combat_tracker_log_event_hit_by_enemy_without_recording() -> None:
     """Test log_event for enemy hit when stats not yet recorded."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_enemy", attacker="red-5", target="player")
+    event = CombatEvent(event_type=CombatEventType.HIT_BY_ENEMY, attacker="red-5", target="player")
     # Should not raise even without recording
     tracker.log_event(event)
 
@@ -173,14 +186,16 @@ def test_combat_tracker_log_event_hit_by_enemy_without_recording() -> None:
 def test_combat_tracker_log_event_entity_hit_without_recording() -> None:
     """Test log_event for entity hit when stats not yet recorded."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    event = CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
     # Should not raise even without recording
     tracker.log_event(event)
 
 
 def test_encode_combat_event() -> None:
     """Test encoding CombatEvent to JSON."""
-    event = CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    event = CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
     encoded = encode_combat_event(event)
 
     assert encoded["event_type"] == "hit_by_player"
@@ -200,7 +215,9 @@ def test_decode_combat_event() -> None:
 
 def test_encode_decode_combat_event_roundtrip() -> None:
     """Test encode/decode roundtrip for CombatEvent."""
-    original = CombatEvent(event_type="deactivated", attacker="player", target="green-1")
+    original = CombatEvent(
+        event_type=CombatEventType.DEACTIVATED, attacker="player", target="green-1"
+    )
     encoded = encode_combat_event(original)
     decoded = decode_combat_event(encoded)
 
@@ -209,7 +226,7 @@ def test_encode_decode_combat_event_roundtrip() -> None:
 
 def test_encode_decode_combat_event_entity_hit() -> None:
     """Test encode/decode roundtrip for entity_hit event."""
-    original = CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    original = CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
     encoded = encode_combat_event(original)
     decoded = decode_combat_event(encoded)
 
@@ -327,42 +344,27 @@ def test_decode_entity_pair_stats_missing_field() -> None:
         decode_entity_pair_stats(obj)
 
 
-def test_valid_combat_event_types_constant() -> None:
-    """Test VALID_COMBAT_EVENT_TYPES contains all types."""
-    assert "hit_by_player" in VALID_COMBAT_EVENT_TYPES
-    assert "hit_by_enemy" in VALID_COMBAT_EVENT_TYPES
-    assert "hit_by_unknown" in VALID_COMBAT_EVENT_TYPES
-    assert "deactivated" in VALID_COMBAT_EVENT_TYPES
-    assert "destroyed" in VALID_COMBAT_EVENT_TYPES
-    assert "entity_hit" in VALID_COMBAT_EVENT_TYPES
-    assert "entity_deactivated" in VALID_COMBAT_EVENT_TYPES
-    assert "entity_destroyed" in VALID_COMBAT_EVENT_TYPES
-    assert len(VALID_COMBAT_EVENT_TYPES) == 8
-
-
-def test_validate_combat_event_type_all_valid() -> None:
-    """Test validate_combat_event_type accepts all valid types."""
-    assert validate_combat_event_type("hit_by_player") == "hit_by_player"
-    assert validate_combat_event_type("hit_by_enemy") == "hit_by_enemy"
-    assert validate_combat_event_type("hit_by_unknown") == "hit_by_unknown"
-    assert validate_combat_event_type("deactivated") == "deactivated"
-    assert validate_combat_event_type("destroyed") == "destroyed"
-    assert validate_combat_event_type("entity_hit") == "entity_hit"
-    assert validate_combat_event_type("entity_deactivated") == "entity_deactivated"
-    assert validate_combat_event_type("entity_destroyed") == "entity_destroyed"
-
-
-def test_validate_combat_event_type_invalid() -> None:
-    """Test validate_combat_event_type raises on invalid type."""
-    with pytest.raises(ValueError, match="Invalid combat event type"):
-        validate_combat_event_type("invalid_type")
+def test_decode_combat_event_every_type_round_trips() -> None:
+    """Every CombatEventType survives encode then decode as the same member."""
+    for event_type in CombatEventType:
+        original = CombatEvent(event_type=event_type, attacker="blue-7", target="red-9")
+        encoded = encode_combat_event(original)
+        assert encoded["event_type"] == event_type.value
+        assert decode_combat_event(encoded)["event_type"] is event_type
 
 
 def test_decode_combat_event_invalid_type() -> None:
     """Test decode_combat_event raises on invalid event type."""
+    from platform_core.json_utils import JSONTypeError
+
     obj: JSONObject = {"event_type": "bad_type", "attacker": "player", "target": "enemy"}
-    with pytest.raises(ValueError, match="Invalid combat event type"):
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_combat_event(obj)
+    assert str(excinfo.value) == (
+        "Invalid event_type 'bad_type': must be one of 'hit_by_player', 'hit_by_enemy', "
+        "'hit_by_unknown', 'deactivated', 'destroyed', 'entity_hit', 'entity_deactivated', "
+        "'entity_destroyed'"
+    )
 
 
 def test_decode_combat_event_missing_field() -> None:

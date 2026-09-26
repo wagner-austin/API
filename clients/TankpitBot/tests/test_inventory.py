@@ -17,6 +17,7 @@ from tankpit_bot.inventory import (
     InventoryChange,
     InventoryItem,
     InventoryState,
+    ItemType,
     decode_inventory_change,
     decode_inventory_item,
     decode_inventory_state,
@@ -24,7 +25,7 @@ from tankpit_bot.inventory import (
     encode_inventory_change,
     encode_inventory_item,
     encode_inventory_state,
-    validate_item_type,
+    inventory_slot,
 )
 
 # =============================================================================
@@ -71,13 +72,13 @@ def test_diff_inventory_count_change() -> None:
     changes = diff_inventory(old, new)
     assert len(changes) == 2
 
-    dual_change = next(c for c in changes if c["item"] == "dual_shots")
+    dual_change = next(c for c in changes if c["item"] is ItemType.DUAL_SHOTS)
     assert dual_change["old_count"] == 25
     assert dual_change["new_count"] == 32
     assert dual_change["delta"] == 7
     assert dual_change["enabled_changed"] is False
 
-    radar_change = next(c for c in changes if c["item"] == "extra_radars")
+    radar_change = next(c for c in changes if c["item"] is ItemType.EXTRA_RADARS)
     assert radar_change["delta"] == -1
 
 
@@ -99,30 +100,29 @@ def test_diff_inventory_enabled_change() -> None:
     }
     changes = diff_inventory(old, new)
     assert len(changes) == 1
-    assert changes[0]["item"] == "armor_shields"
+    assert changes[0]["item"] is ItemType.ARMOR_SHIELDS
     assert changes[0]["enabled_changed"] is True
     assert changes[0]["now_enabled"] is False
     assert changes[0]["delta"] == 0
 
 
 # =============================================================================
-# validate_item_type tests
+# inventory_slot tests
 # =============================================================================
 
 
-def test_validate_item_type_all_values() -> None:
-    """``validate_item_type`` accepts every wire-known item label."""
-    assert validate_item_type("armor_shields") == "armor_shields"
-    assert validate_item_type("dual_shots") == "dual_shots"
-    assert validate_item_type("missile_shots") == "missile_shots"
-    assert validate_item_type("homing_shots") == "homing_shots"
-    assert validate_item_type("extra_radars") == "extra_radars"
-
-
-def test_validate_item_type_invalid() -> None:
-    """``validate_item_type`` raises ``ValueError`` on unknown labels."""
-    with pytest.raises(ValueError, match="Invalid item type"):
-        validate_item_type("invalid_item")
+def test_inventory_slot_reads_the_field_each_item_type_names() -> None:
+    """``inventory_slot`` returns the slot whose field name is the member's value."""
+    state: InventoryState = {
+        "armor_shields": InventoryItem(count=1, enabled=True),
+        "dual_shots": InventoryItem(count=2, enabled=False),
+        "missile_shots": InventoryItem(count=3, enabled=True),
+        "homing_shots": InventoryItem(count=4, enabled=False),
+        "extra_radars": InventoryItem(count=5, enabled=True),
+    }
+    counts = [inventory_slot(state, item_type)["count"] for item_type in ItemType]
+    assert counts == [1, 2, 3, 4, 5]
+    assert inventory_slot(state, ItemType.HOMING_SHOTS) is state["homing_shots"]
 
 
 # =============================================================================
@@ -256,7 +256,7 @@ def test_decode_inventory_state_non_dict_radar() -> None:
 def test_encode_inventory_change() -> None:
     """``encode_inventory_change`` produces a JSON-serializable dict."""
     change: InventoryChange = {
-        "item": "dual_shots",
+        "item": ItemType.DUAL_SHOTS,
         "old_count": 25,
         "new_count": 32,
         "delta": 7,
@@ -279,7 +279,7 @@ def test_decode_inventory_change() -> None:
         "now_enabled": True,
     }
     change = decode_inventory_change(obj)
-    assert change["item"] == "extra_radars"
+    assert change["item"] is ItemType.EXTRA_RADARS
     assert change["delta"] == -1
 
 
@@ -293,8 +293,12 @@ def test_decode_inventory_change_invalid_item() -> None:
         "enabled_changed": False,
         "now_enabled": True,
     }
-    with pytest.raises(ValueError, match="Invalid item type"):
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_inventory_change(obj)
+    assert str(excinfo.value) == (
+        "Invalid item 'invalid_item': must be one of 'armor_shields', 'dual_shots', "
+        "'missile_shots', 'homing_shots', 'extra_radars'"
+    )
 
 
 def test_inventory_state_encode_decode_roundtrip() -> None:
@@ -314,7 +318,7 @@ def test_inventory_state_encode_decode_roundtrip() -> None:
 def test_inventory_change_encode_decode_roundtrip() -> None:
     """``encode_inventory_change`` -> ``decode_inventory_change`` is identity."""
     original: InventoryChange = {
-        "item": "homing_shots",
+        "item": ItemType.HOMING_SHOTS,
         "old_count": 15,
         "new_count": 20,
         "delta": 5,

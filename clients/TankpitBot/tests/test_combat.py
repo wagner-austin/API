@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from tankpit_bot.combat import (
     CombatEvent,
+    CombatEventType,
     CombatStats,
     EntityPairStats,
     make_entity_pair_key,
@@ -19,31 +20,41 @@ from tankpit_bot.combat_tracker import CombatTracker
 def test_parse_combat_line_hit_by_player() -> None:
     """Test parsing 'You hit {target}' line."""
     result = parse_combat_line("You hit blue-7")
-    assert result == CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    assert result == CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
 
 
 def test_parse_combat_line_hit_by_enemy() -> None:
     """Test parsing '{attacker} hit you' line."""
     result = parse_combat_line("blue-7 hit you")
-    assert result == CombatEvent(event_type="hit_by_enemy", attacker="blue-7", target="player")
+    assert result == CombatEvent(
+        event_type=CombatEventType.HIT_BY_ENEMY, attacker="blue-7", target="player"
+    )
 
 
 def test_parse_combat_line_hit_by_unknown() -> None:
     """Test parsing 'You are hit' line (off-screen attacker)."""
     result = parse_combat_line("You are hit")
-    assert result == CombatEvent(event_type="hit_by_unknown", attacker="unknown", target="player")
+    assert result == CombatEvent(
+        event_type=CombatEventType.HIT_BY_UNKNOWN, attacker="unknown", target="player"
+    )
 
 
 def test_parse_combat_line_deactivated() -> None:
     """Test parsing '{target} has been deactivated by you' line."""
     result = parse_combat_line("red-9 has been deactivated by you")
-    assert result == CombatEvent(event_type="deactivated", attacker="player", target="red-9")
+    assert result == CombatEvent(
+        event_type=CombatEventType.DEACTIVATED, attacker="player", target="red-9"
+    )
 
 
 def test_parse_combat_line_destroyed() -> None:
     """Test parsing '{target} has been destroyed by you' line."""
     result = parse_combat_line("green-3 has been destroyed by you")
-    assert result == CombatEvent(event_type="destroyed", attacker="player", target="green-3")
+    assert result == CombatEvent(
+        event_type=CombatEventType.DESTROYED, attacker="player", target="green-3"
+    )
 
 
 def test_parse_combat_line_non_combat() -> None:
@@ -55,7 +66,9 @@ def test_parse_combat_line_non_combat() -> None:
 def test_parse_combat_line_strips_whitespace() -> None:
     """Test parsing line with leading/trailing whitespace."""
     result = parse_combat_line("  You hit blue-7  ")
-    assert result == CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    assert result == CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
 
 
 def test_parse_combat_line_empty() -> None:
@@ -73,26 +86,34 @@ def test_parse_combat_line_whitespace_only() -> None:
 def test_parse_combat_line_entity_hit() -> None:
     """Test parsing entity-to-entity hit line."""
     result = parse_combat_line("blue-7 hit red-9")
-    assert result == CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    assert result == CombatEvent(
+        event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9"
+    )
 
 
 def test_parse_combat_line_entity_deactivated() -> None:
     """Test parsing entity-to-entity deactivation line."""
     result = parse_combat_line("red-9 has been deactivated by blue-7")
-    assert result == CombatEvent(event_type="entity_deactivated", attacker="blue-7", target="red-9")
+    assert result == CombatEvent(
+        event_type=CombatEventType.ENTITY_DEACTIVATED, attacker="blue-7", target="red-9"
+    )
 
 
 def test_parse_combat_line_entity_destroyed() -> None:
     """Test parsing entity-to-entity destruction line."""
     result = parse_combat_line("green-3 has been destroyed by cyan-4")
-    assert result == CombatEvent(event_type="entity_destroyed", attacker="cyan-4", target="green-3")
+    assert result == CombatEvent(
+        event_type=CombatEventType.ENTITY_DESTROYED, attacker="cyan-4", target="green-3"
+    )
 
 
 def test_parse_combat_line_entity_hit_not_player() -> None:
     """Test entity hit doesn't match when target is 'you'."""
     # "X hit you" should be hit_by_enemy, not entity_hit
     result = parse_combat_line("blue-7 hit you")
-    assert result == CombatEvent(event_type="hit_by_enemy", attacker="blue-7", target="player")
+    assert result == CombatEvent(
+        event_type=CombatEventType.HIT_BY_ENEMY, attacker="blue-7", target="player"
+    )
 
 
 def test_parse_entity_to_entity_deactivated_by_you_falls_through() -> None:
@@ -148,7 +169,9 @@ def test_combat_tracker_init() -> None:
 def test_combat_tracker_record_hit_by_player() -> None:
     """Test recording player hits."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    event = CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
     tracker.record_event(event)
 
     stats = tracker.get_stats("blue-7")
@@ -164,7 +187,7 @@ def test_combat_tracker_record_hit_by_player() -> None:
 def test_combat_tracker_record_hit_by_enemy() -> None:
     """Test recording enemy hits."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_enemy", attacker="red-5", target="player")
+    event = CombatEvent(event_type=CombatEventType.HIT_BY_ENEMY, attacker="red-5", target="player")
     tracker.record_event(event)
 
     stats = tracker.get_stats("red-5")
@@ -180,7 +203,9 @@ def test_combat_tracker_record_hit_by_enemy() -> None:
 def test_combat_tracker_record_hit_by_unknown() -> None:
     """Test recording off-screen hits."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="hit_by_unknown", attacker="unknown", target="player")
+    event = CombatEvent(
+        event_type=CombatEventType.HIT_BY_UNKNOWN, attacker="unknown", target="player"
+    )
     tracker.record_event(event)
 
     assert tracker.get_unknown_hits_received() == 1
@@ -189,7 +214,7 @@ def test_combat_tracker_record_hit_by_unknown() -> None:
 def test_combat_tracker_record_deactivated() -> None:
     """Test recording deactivation."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="deactivated", attacker="player", target="green-1")
+    event = CombatEvent(event_type=CombatEventType.DEACTIVATED, attacker="player", target="green-1")
     tracker.record_event(event)
 
     stats = tracker.get_stats("green-1")
@@ -205,7 +230,7 @@ def test_combat_tracker_record_deactivated() -> None:
 def test_combat_tracker_record_destroyed() -> None:
     """Test recording destruction."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="destroyed", attacker="player", target="cyan-2")
+    event = CombatEvent(event_type=CombatEventType.DESTROYED, attacker="player", target="cyan-2")
     tracker.record_event(event)
 
     stats = tracker.get_stats("cyan-2")
@@ -222,11 +247,15 @@ def test_combat_tracker_multiple_hits_same_target() -> None:
     """Test multiple hits on same target accumulate."""
     tracker = CombatTracker()
 
-    hit_player = CombatEvent(event_type="hit_by_player", attacker="player", target="blue-7")
+    hit_player = CombatEvent(
+        event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target="blue-7"
+    )
     for _ in range(5):
         tracker.record_event(hit_player)
 
-    hit_enemy = CombatEvent(event_type="hit_by_enemy", attacker="blue-7", target="player")
+    hit_enemy = CombatEvent(
+        event_type=CombatEventType.HIT_BY_ENEMY, attacker="blue-7", target="player"
+    )
     for _ in range(3):
         tracker.record_event(hit_enemy)
 
@@ -244,7 +273,9 @@ def test_combat_tracker_multiple_unknown_hits() -> None:
     """Test multiple off-screen hits accumulate."""
     tracker = CombatTracker()
 
-    hit_unknown = CombatEvent(event_type="hit_by_unknown", attacker="unknown", target="player")
+    hit_unknown = CombatEvent(
+        event_type=CombatEventType.HIT_BY_UNKNOWN, attacker="unknown", target="player"
+    )
     for _ in range(4):
         tracker.record_event(hit_unknown)
 
@@ -254,7 +285,7 @@ def test_combat_tracker_multiple_unknown_hits() -> None:
 def test_combat_tracker_record_entity_hit() -> None:
     """Test recording entity-to-entity hit."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    event = CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
     tracker.record_event(event)
 
     stats = tracker.get_entity_pair_stats("blue-7", "red-9")
@@ -270,7 +301,9 @@ def test_combat_tracker_record_entity_hit() -> None:
 def test_combat_tracker_record_entity_deactivated() -> None:
     """Test recording entity-to-entity deactivation."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_deactivated", attacker="blue-7", target="red-9")
+    event = CombatEvent(
+        event_type=CombatEventType.ENTITY_DEACTIVATED, attacker="blue-7", target="red-9"
+    )
     tracker.record_event(event)
 
     stats = tracker.get_entity_pair_stats("blue-7", "red-9")
@@ -286,7 +319,9 @@ def test_combat_tracker_record_entity_deactivated() -> None:
 def test_combat_tracker_record_entity_destroyed() -> None:
     """Test recording entity-to-entity destruction."""
     tracker = CombatTracker()
-    event = CombatEvent(event_type="entity_destroyed", attacker="cyan-4", target="green-3")
+    event = CombatEvent(
+        event_type=CombatEventType.ENTITY_DESTROYED, attacker="cyan-4", target="green-3"
+    )
     tracker.record_event(event)
 
     stats = tracker.get_entity_pair_stats("cyan-4", "green-3")
@@ -303,7 +338,7 @@ def test_combat_tracker_multiple_entity_hits_same_pair() -> None:
     """Test multiple entity hits on same pair accumulate."""
     tracker = CombatTracker()
 
-    event = CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9")
+    event = CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
     for _ in range(5):
         tracker.record_event(event)
 
@@ -322,9 +357,13 @@ def test_combat_tracker_entity_pairs_direction_matters() -> None:
     tracker = CombatTracker()
 
     # blue-7 hits red-9
-    tracker.record_event(CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9"))
+    tracker.record_event(
+        CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
+    )
     # red-9 hits blue-7
-    tracker.record_event(CombatEvent(event_type="entity_hit", attacker="red-9", target="blue-7"))
+    tracker.record_event(
+        CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="red-9", target="blue-7")
+    )
 
     stats_ab = tracker.get_entity_pair_stats("blue-7", "red-9")
     stats_ba = tracker.get_entity_pair_stats("red-9", "blue-7")
@@ -340,8 +379,12 @@ def test_combat_tracker_entity_pairs_direction_matters() -> None:
 def test_combat_tracker_get_all_entity_pair_stats() -> None:
     """Test get_all_entity_pair_stats returns all pairs."""
     tracker = CombatTracker()
-    tracker.record_event(CombatEvent(event_type="entity_hit", attacker="blue-7", target="red-9"))
-    tracker.record_event(CombatEvent(event_type="entity_hit", attacker="green-1", target="cyan-4"))
+    tracker.record_event(
+        CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="blue-7", target="red-9")
+    )
+    tracker.record_event(
+        CombatEvent(event_type=CombatEventType.ENTITY_HIT, attacker="green-1", target="cyan-4")
+    )
 
     all_stats = tracker.get_all_entity_pair_stats()
     assert len(all_stats) == 2
