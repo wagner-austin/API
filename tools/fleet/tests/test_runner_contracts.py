@@ -287,12 +287,16 @@ class TestRunnerSpec:
         lavender = spec["hosts"][0]
         assert lavender["name"] == "lavender"
         # The full box, both execution environments: eight wsl-side installs
-        # (2 API + 4 MCPs + portable-claude + tree-bot) and three
-        # windows-side ones (MCPs, portable-claude, tree-bot) -- the count
-        # measured from the live services on 2026-09-09.
+        # (2 API + 4 MCPs + corvis-stick + tree-bot) and four windows-side
+        # ones (MCPs, corvis-stick, tree-bot, chat). The 2026-09-09 count
+        # from the live services missed chat, whose only runner is
+        # [self-hosted, lavender]; the 2026-09-26 rebuild found it still
+        # registered and absent here (board task 1aa6a021). corvis-stick was
+        # portable-claude until its rename, and registering against the old
+        # URL 404s.
         sides = [install["side"] for install in lavender["installs"]]
         assert sides.count("wsl") == 8
-        assert sides.count("windows") == 3
+        assert sides.count("windows") == 4
         pinned = [asset for asset in lavender["assets"] if asset["sha256"] is not None]
         assert len(pinned) == 1
         assert pinned[0]["manual"] is True

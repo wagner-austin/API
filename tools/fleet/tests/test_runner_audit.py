@@ -8,6 +8,10 @@ produce -- ids taken from :func:`expected_checks`, never retyped.
 
 from __future__ import annotations
 
+import pathlib
+import subprocess
+import sys
+
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
@@ -17,6 +21,7 @@ from fleet.contracts.runners import (
     RunnerInstall,
 )
 from fleet.core import _test_hooks, runner_audit
+from fleet.core.dialect_windows import POWERSHELL_INVOCATION
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -250,3 +255,87 @@ class TestAttemptAuditHost:
         with pytest.raises(AppError) as fault:
             runner_audit.attempt_audit_host(_host())
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE
+
+
+#: A ``wsl`` stand-in for the asset checks, defined ahead of the rendered
+#: script so PowerShell resolves the function before wsl.exe. It answers
+#: ``test`` through $LASTEXITCODE and ``sha256sum`` on stdout, from the two
+#: variables each case sets, and nothing else: every other line of the
+#: script under test runs as rendered. PowerShell's binder consumes the
+#: ``--`` a function receives, so the command is the third argument.
+FAKE_WSL = """function wsl {
+    $command = $args[2]
+    if ($command -eq 'test') { $global:LASTEXITCODE = $script:TestExit; return }
+    if ($command -eq 'sha256sum') { $global:LASTEXITCODE = 0; return $script:ShaLines }
+    throw "unexpected wsl call: $args"
+}
+"""
+
+
+def _run_asset_checks(tmp_path: pathlib.Path, test_exit: int, sha_lines: str) -> list[str]:
+    """Execute the rendered asset checks under Windows PowerShell 5.1.
+
+    Args:
+        tmp_path: Where the script is written.
+        test_exit: The exit code ``test -e`` reports.
+        sha_lines: What ``sha256sum`` prints, a PowerShell expression.
+
+    Returns:
+        The CHECK lines the script emitted.
+    """
+    pin = "8a" * 32
+    spec = _host(
+        keepalive_task=None,
+        wslconfig_min_memory_gb=None,
+        gpu_required=False,
+        systemd_timers=[],
+        assets=[
+            FileAsset(
+                path="/opt/corvis/rw-game/game-lib.jar",
+                sha256=pin,
+                writable=False,
+                reason="the provenance jar",
+                manual=True,
+                provision_command=None,
+            )
+        ],
+    )
+    spec["installs"] = []
+    script = tmp_path / "audit.ps1"
+    script.write_text(
+        f"$script:TestExit = {test_exit}\n$script:ShaLines = {sha_lines}\n"
+        + FAKE_WSL
+        + runner_audit.render_audit_script(spec),
+        encoding="utf-8",
+    )
+    ran = subprocess.run(
+        [*POWERSHELL_INVOCATION, str(script)], capture_output=True, text=True, check=False
+    )
+    assert ran.returncode == 0, ran.stderr
+    return [line for line in ran.stdout.splitlines() if line.startswith("CHECK ")]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the audit is PowerShell; run it here")
+class TestTheRenderedAuditRunsForReal:
+    """The asset checks executed, not matched. Both defects the 2026-09-26
+    lavender rebuild hit were runtime behaviour of Windows PowerShell 5.1
+    that no string assertion could see (board task 1aa6a021)."""
+
+    def test_a_missing_pinned_asset_is_two_drifted_checks_not_a_short_transcript(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        lines = _run_asset_checks(tmp_path, 1, "@()")
+        assert lines == [
+            "CHECK asset:/opt/corvis/rw-game/game-lib.jar DRIFT test -e exited 1",
+            "CHECK sha256:/opt/corvis/rw-game/game-lib.jar DRIFT sha256sum said: ",
+        ]
+
+    def test_a_present_asset_with_the_pinned_digest_passes_both(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        digest = "8a" * 32
+        lines = _run_asset_checks(tmp_path, 0, f"@('{digest}  /opt/corvis/rw-game/game-lib.jar')")
+        assert lines == [
+            "CHECK asset:/opt/corvis/rw-game/game-lib.jar OK",
+            "CHECK sha256:/opt/corvis/rw-game/game-lib.jar OK",
+        ]

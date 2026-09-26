@@ -8,6 +8,10 @@ disk.
 
 from __future__ import annotations
 
+import pathlib
+import shutil
+import subprocess
+
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import runner_render
 
@@ -159,6 +163,67 @@ class TestLinuxScript:
         assert "--url https://github.com/wagner-austin/API" in script
         assert "--labels lavender-wsl,linux-ci" in script
         assert runner_render.RUNNER_VERSION in script
+
+    def test_both_sides_take_back_a_same_named_registration(self) -> None:
+        """A rebuilt host's old runners are still registered, offline, under
+        the roster's names (board task 1aa6a021), so both config calls
+        replace rather than refuse."""
+        wsl = RunnerInstall(
+            repo="wagner-austin/MCPs",
+            runner_name="lavender-wsl",
+            side="wsl",
+            service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
+            workdir="/home/gharunner/actions-runner/_work",
+            labels=["lavender-wsl"],
+        )
+        windows = RunnerInstall(
+            repo="wagner-austin/MCPs",
+            runner_name="lavender",
+            side="windows",
+            service="actions.runner.wagner-austin-MCPs.lavender",
+            workdir="C:/actions-runner/_work",
+            labels=["lavender"],
+        )
+        [configure] = [
+            line for line in runner_render.render_wsl_install_lines(wsl) if "./config.sh" in line
+        ]
+        assert configure.endswith('--name lavender-wsl --labels lavender-wsl --replace"')
+        assert runner_render.render_windows_install_lines(windows)[-1].endswith(
+            "--name lavender --labels lavender --runasservice --replace"
+        )
+
+    def test_the_local_bin_line_appends_once_when_run_for_real(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The .path line is executed, twice, by a real bash against a real
+        file shaped as config.sh writes it: one colon-joined line. The
+        second run must leave it unchanged, because the provision is re-run
+        after any roster change."""
+        bash = shutil.which("bash")
+        if bash is None:
+            raise AssertionError("bash is required to execute the rendered provision lines")
+        install = RunnerInstall(
+            repo="wagner-austin/MCPs",
+            runner_name="lavender-wsl",
+            side="wsl",
+            service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
+            workdir="rt/_work",
+            labels=["lavender-wsl"],
+        )
+        [append] = [
+            line for line in runner_render.render_wsl_install_lines(install) if ".path" in line
+        ]
+        runner_dir = tmp_path / "rt"
+        runner_dir.mkdir()
+        (runner_dir / ".path").write_bytes(b"/usr/local/bin:/usr/bin:/bin\n")
+        for _ in range(2):
+            ran = subprocess.run(
+                [bash, "-c", append], cwd=tmp_path, capture_output=True, text=True, check=False
+            )
+            assert ran.returncode == 0, ran.stderr
+        assert (runner_dir / ".path").read_bytes() == (
+            f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}\n".encode()
+        )
 
     def test_the_ci_clean_payload_gates_on_a_running_worker(self) -> None:
         assert "Runner.Worker" in runner_render.CI_CLEAN_SCRIPT
