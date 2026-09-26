@@ -11,7 +11,12 @@ from covenant_ml.backends import (
     create_xgboost_regressor_backend,
 )
 from covenant_ml.datasets.testing import create_fake_regression_dataset_loader
-from covenant_ml.datasets.types import DatasetConfig, TargetColumnSpec
+from covenant_ml.datasets.types import (
+    DatasetConfig,
+    FileEncoding,
+    FileFormat,
+    TargetColumnSpec,
+)
 from covenant_ml.testing import (
     make_lightgbm_regressor_config,
     make_lstm_regressor_config,
@@ -33,8 +38,8 @@ def _make_config() -> DatasetConfig:
         display_name="Smoke",
         folder="fake",
         file_name="d.csv",
-        file_format="csv",
-        encoding="utf-8",
+        file_format=FileFormat.CSV,
+        encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="t",
             label_type="binary_int",
