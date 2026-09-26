@@ -29,7 +29,7 @@ from tankpit_bot.diagnostics.run_audit_types import (
     Severity,
     make_finding,
 )
-from tankpit_bot.ledger.events import ACTION_KINDS
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 _KILL_WINDOW_S = 30
@@ -132,16 +132,16 @@ def _check_unresolved_decisions(
     """Surface the shutdown sweep's pending decisions per action kind."""
     findings: list[FindingDict] = []
     for record in _diagnostics(records, "session_unresolved_decisions"):
-        for kind in ACTION_KINDS:
-            event_id = _int_field(record, kind)
+        for kind in ActionKind:
+            event_id = _int_field(record, kind.value)
             if event_id is None:
                 continue
             findings.append(
                 make_finding(
                     CheckName.UNRESOLVED_DECISION,
                     Severity.WARNING,
-                    f"{kind} decision {event_id} never got an outcome before shutdown",
-                    action_kind=kind,
+                    f"{kind.value} decision {event_id} never got an outcome before shutdown",
+                    action_kind=kind.value,
                     decision_event_id=event_id,
                 )
             )
