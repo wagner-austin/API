@@ -16,7 +16,7 @@ import pygame
 import pytest
 from procart.types import Resolution
 from scripts import _test_hooks, live_preview
-from scripts.live_preview import RenderParams
+from scripts.live_preview import ParamKey, RenderParams
 
 
 class _OffscreenDisplay:
@@ -113,22 +113,34 @@ def test_apply_delta_clamps_integer_parameter() -> None:
     """Test the orb count stays inside its bounds and stays an int."""
     params = _defaults()
 
-    live_preview._apply_delta_to_param(params, "orb_count", -10.0, 1.0, 20.0)
+    live_preview._apply_delta_to_param(params, ParamKey.ORB_COUNT, -10.0, 1.0, 20.0)
     assert params["orb_count"] == 1
 
-    live_preview._apply_delta_to_param(params, "orb_count", 100.0, 1.0, 20.0)
+    live_preview._apply_delta_to_param(params, ParamKey.ORB_COUNT, 100.0, 1.0, 20.0)
     assert params["orb_count"] == 20
 
 
-def test_apply_delta_clamps_float_parameter() -> None:
-    """Test a float parameter is clamped at both ends."""
+@pytest.mark.parametrize(
+    "param",
+    [
+        ParamKey.CORE_RADIUS,
+        ParamKey.HALO_RADIUS,
+        ParamKey.CORE_INTENSITY,
+        ParamKey.HALO_INTENSITY,
+        ParamKey.SPEED,
+    ],
+)
+def test_apply_delta_clamps_each_float_parameter(param: ParamKey) -> None:
+    """Test every float parameter is clamped at both ends and writes only its own field."""
     params = _defaults()
+    untouched = {key: value for key, value in _defaults().items() if key != param}
 
-    live_preview._apply_delta_to_param(params, "core_radius", -1.0, 0.01, 0.2)
-    assert params["core_radius"] == 0.01
+    live_preview._apply_delta_to_param(params, param, -100.0, 0.01, 0.2)
+    assert dict(params)[param] == 0.01
 
-    live_preview._apply_delta_to_param(params, "core_radius", 1.0, 0.01, 0.2)
-    assert params["core_radius"] == 0.2
+    live_preview._apply_delta_to_param(params, param, 100.0, 0.01, 0.2)
+    assert dict(params)[param] == 0.2
+    assert {key: value for key, value in params.items() if key != param} == untouched
 
 
 def test_build_key_map_covers_every_documented_key() -> None:
@@ -136,9 +148,9 @@ def test_build_key_map_covers_every_documented_key() -> None:
     key_map = live_preview._build_key_map()
 
     assert len(key_map) == 12
-    assert key_map[pygame.K_1]["param"] == "orb_count"
+    assert key_map[pygame.K_1]["param"] is ParamKey.ORB_COUNT
     assert key_map[pygame.K_1]["delta"] == -1.0
-    assert key_map[pygame.K_EQUALS]["param"] == "speed"
+    assert key_map[pygame.K_EQUALS]["param"] is ParamKey.SPEED
 
 
 def test_handle_key_event_resets_on_r() -> None:

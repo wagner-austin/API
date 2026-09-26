@@ -13,7 +13,8 @@ Controls:
 
 from __future__ import annotations
 
-from typing import Final, Literal, Protocol
+from enum import StrEnum
+from typing import Final, Protocol
 
 import pygame
 from platform_core.logging import get_logger
@@ -72,9 +73,15 @@ class RenderParams(TypedDict):
     speed: float
 
 
-ParamKey = Literal[
-    "orb_count", "core_radius", "halo_radius", "core_intensity", "halo_intensity", "speed"
-]
+class ParamKey(StrEnum):
+    """The render parameter a key adjusts, valued as its RenderParams field name."""
+
+    ORB_COUNT = "orb_count"
+    CORE_RADIUS = "core_radius"
+    HALO_RADIUS = "halo_radius"
+    CORE_INTENSITY = "core_intensity"
+    HALO_INTENSITY = "halo_intensity"
+    SPEED = "speed"
 
 
 class _KeyConfig(TypedDict):
@@ -176,19 +183,29 @@ def _apply_delta_to_param(
 ) -> None:
     """Apply delta to a parameter with bounds checking.
 
+    Each member writes its own field by name, because a TypedDict is indexed
+    only by a literal key.
+
     Args:
         params: Parameter dictionary to update (mutated in place).
-        param: Key of the parameter to update.
+        param: The parameter to update.
         delta: Amount to add to the current value.
         min_val: Minimum allowed value.
         max_val: Maximum allowed value.
     """
-    if param == "orb_count":
-        current = params[param]
-        params[param] = max(int(min_val), min(int(max_val), current + int(delta)))
+    if param is ParamKey.ORB_COUNT:
+        params["orb_count"] = max(int(min_val), min(int(max_val), params["orb_count"] + int(delta)))
+    elif param is ParamKey.CORE_RADIUS:
+        params["core_radius"] = max(min_val, min(max_val, params["core_radius"] + delta))
+    elif param is ParamKey.HALO_RADIUS:
+        params["halo_radius"] = max(min_val, min(max_val, params["halo_radius"] + delta))
+    elif param is ParamKey.CORE_INTENSITY:
+        params["core_intensity"] = max(min_val, min(max_val, params["core_intensity"] + delta))
+    elif param is ParamKey.HALO_INTENSITY:
+        params["halo_intensity"] = max(min_val, min(max_val, params["halo_intensity"] + delta))
     else:
-        current_val = params[param]
-        params[param] = max(min_val, min(max_val, current_val + delta))
+        assert param is ParamKey.SPEED
+        params["speed"] = max(min_val, min(max_val, params["speed"] + delta))
 
 
 def _build_key_map() -> dict[int, _KeyConfig]:
@@ -198,18 +215,53 @@ def _build_key_map() -> dict[int, _KeyConfig]:
         Dictionary mapping pygame key codes to their parameter configurations.
     """
     return {
-        pygame.K_1: {"param": "orb_count", "delta": -1.0, "min_val": 1.0, "max_val": 20.0},
-        pygame.K_2: {"param": "orb_count", "delta": 1.0, "min_val": 1.0, "max_val": 20.0},
-        pygame.K_3: {"param": "core_radius", "delta": -0.005, "min_val": 0.01, "max_val": 0.2},
-        pygame.K_4: {"param": "core_radius", "delta": 0.005, "min_val": 0.01, "max_val": 0.2},
-        pygame.K_5: {"param": "halo_radius", "delta": -0.01, "min_val": 0.02, "max_val": 0.5},
-        pygame.K_6: {"param": "halo_radius", "delta": 0.01, "min_val": 0.02, "max_val": 0.5},
-        pygame.K_7: {"param": "core_intensity", "delta": -0.2, "min_val": 0.1, "max_val": 10.0},
-        pygame.K_8: {"param": "core_intensity", "delta": 0.2, "min_val": 0.1, "max_val": 10.0},
-        pygame.K_9: {"param": "halo_intensity", "delta": -0.1, "min_val": 0.05, "max_val": 3.0},
-        pygame.K_0: {"param": "halo_intensity", "delta": 0.1, "min_val": 0.05, "max_val": 3.0},
-        pygame.K_MINUS: {"param": "speed", "delta": -0.1, "min_val": 0.1, "max_val": 3.0},
-        pygame.K_EQUALS: {"param": "speed", "delta": 0.1, "min_val": 0.1, "max_val": 3.0},
+        pygame.K_1: {"param": ParamKey.ORB_COUNT, "delta": -1.0, "min_val": 1.0, "max_val": 20.0},
+        pygame.K_2: {"param": ParamKey.ORB_COUNT, "delta": 1.0, "min_val": 1.0, "max_val": 20.0},
+        pygame.K_3: {
+            "param": ParamKey.CORE_RADIUS,
+            "delta": -0.005,
+            "min_val": 0.01,
+            "max_val": 0.2,
+        },
+        pygame.K_4: {
+            "param": ParamKey.CORE_RADIUS,
+            "delta": 0.005,
+            "min_val": 0.01,
+            "max_val": 0.2,
+        },
+        pygame.K_5: {
+            "param": ParamKey.HALO_RADIUS,
+            "delta": -0.01,
+            "min_val": 0.02,
+            "max_val": 0.5,
+        },
+        pygame.K_6: {"param": ParamKey.HALO_RADIUS, "delta": 0.01, "min_val": 0.02, "max_val": 0.5},
+        pygame.K_7: {
+            "param": ParamKey.CORE_INTENSITY,
+            "delta": -0.2,
+            "min_val": 0.1,
+            "max_val": 10.0,
+        },
+        pygame.K_8: {
+            "param": ParamKey.CORE_INTENSITY,
+            "delta": 0.2,
+            "min_val": 0.1,
+            "max_val": 10.0,
+        },
+        pygame.K_9: {
+            "param": ParamKey.HALO_INTENSITY,
+            "delta": -0.1,
+            "min_val": 0.05,
+            "max_val": 3.0,
+        },
+        pygame.K_0: {
+            "param": ParamKey.HALO_INTENSITY,
+            "delta": 0.1,
+            "min_val": 0.05,
+            "max_val": 3.0,
+        },
+        pygame.K_MINUS: {"param": ParamKey.SPEED, "delta": -0.1, "min_val": 0.1, "max_val": 3.0},
+        pygame.K_EQUALS: {"param": ParamKey.SPEED, "delta": 0.1, "min_val": 0.1, "max_val": 3.0},
     }
 
 
