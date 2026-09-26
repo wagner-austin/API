@@ -5,9 +5,11 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.bot.states import ActionKind
 from tankpit_bot.bot.tick_loop_actions import _emit_stall_outcome
 from tankpit_bot.bot.tick_loop_command_errors import _emit_command_rejected_outcome
 from tankpit_bot.contracts.base import LedgerInvariantError
+from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
 from tankpit_bot.ledger.outcome.teleport import TeleportDispatchContract
 from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.ledger.service import LedgerService
@@ -34,17 +36,22 @@ def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> Non
     """
     ws = WorldService()
     bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
-    _emit_command_rejected_outcome(bot, "move", 1, 2, 100, 0)
-    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 0)
-    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 4)
-    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 5)
-    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 7)
-    _emit_command_rejected_outcome(bot, "teleport", 1, 2, 100, 8)
-    _emit_command_rejected_outcome(bot, "scan", 1, 2, 100, 0)
-    _emit_command_rejected_outcome(bot, "map_open", 1, 2, 100, 0)
-    for kind in ("move", "teleport", "scan", "map_open"):
+    _emit_command_rejected_outcome(bot, ActionKind.MOVE, 1, 2, 100, 0)
+    _emit_command_rejected_outcome(bot, ActionKind.COLLECT, 1, 2, 100, 0)
+    _emit_command_rejected_outcome(bot, ActionKind.COLLECT, 1, 2, 100, 4)
+    _emit_command_rejected_outcome(bot, ActionKind.COLLECT, 1, 2, 100, 5)
+    _emit_command_rejected_outcome(bot, ActionKind.COLLECT, 1, 2, 100, 7)
+    _emit_command_rejected_outcome(bot, ActionKind.TELEPORT, 1, 2, 100, 8)
+    _emit_command_rejected_outcome(bot, ActionKind.SCAN, 1, 2, 100, 0)
+    _emit_command_rejected_outcome(bot, ActionKind.MAP_OPEN, 1, 2, 100, 0)
+    for kind in (
+        LedgerActionKind.MOVE,
+        LedgerActionKind.TELEPORT,
+        LedgerActionKind.SCAN,
+        LedgerActionKind.MAP_OPEN,
+    ):
         assert outcome_counts(ws.ledger, kind) == {"command_rejected": 1}
-    assert outcome_counts(ws.ledger, "collect") == {
+    assert outcome_counts(ws.ledger, LedgerActionKind.COLLECT) == {
         "command_rejected": 1,
         "pickup_empty": 1,
         "clamped_transfer": 1,
@@ -56,12 +63,18 @@ def test_stall_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:
     """Each action kind's stall timeout routes to its typed emitter."""
     ws = WorldService()
     bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
-    _emit_stall_outcome(bot, "move", 1, 2, 10000, 10000)
-    _emit_stall_outcome(bot, "collect", 1, 2, 10000, 10000)
-    _emit_stall_outcome(bot, "teleport", 1, 2, 10000, 10000)
-    _emit_stall_outcome(bot, "scan", 1, 2, 10000, 10000)
-    _emit_stall_outcome(bot, "map_open", 1, 2, 10000, 10000)
-    for kind in ("move", "collect", "teleport", "scan", "map_open"):
+    _emit_stall_outcome(bot, ActionKind.MOVE, 1, 2, 10000, 10000)
+    _emit_stall_outcome(bot, ActionKind.COLLECT, 1, 2, 10000, 10000)
+    _emit_stall_outcome(bot, ActionKind.TELEPORT, 1, 2, 10000, 10000)
+    _emit_stall_outcome(bot, ActionKind.SCAN, 1, 2, 10000, 10000)
+    _emit_stall_outcome(bot, ActionKind.MAP_OPEN, 1, 2, 10000, 10000)
+    for kind in (
+        LedgerActionKind.MOVE,
+        LedgerActionKind.COLLECT,
+        LedgerActionKind.TELEPORT,
+        LedgerActionKind.SCAN,
+        LedgerActionKind.MAP_OPEN,
+    ):
         assert outcome_counts(ws.ledger, kind) == {"stall_timeout": 1}
 
 
@@ -74,9 +87,9 @@ def test_dispatchers_ignore_shoot_kind(fake_env: FakeEnv) -> None:
     """
     ws = WorldService()
     bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
-    _emit_command_rejected_outcome(bot, "shoot", 1, 2, 100, 0)
-    _emit_stall_outcome(bot, "none", 1, 2, 100, 100)
-    assert outcome_counts(ws.ledger, "shoot") == {}
+    _emit_command_rejected_outcome(bot, ActionKind.SHOOT, 1, 2, 100, 0)
+    _emit_stall_outcome(bot, ActionKind.NONE, 1, 2, 100, 100)
+    assert outcome_counts(ws.ledger, LedgerActionKind.SHOOT) == {}
 
 
 def test_teleport_dispatch_contract_names_itself_and_rejects_bad_input(

@@ -12,6 +12,7 @@ from tankpit_bot.ledger.decision import (
     record_decision,
     verify_outcome_invariant,
 )
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.mode_transition import (
     emit_mode_transition,
     mode_transitions,
@@ -47,7 +48,7 @@ def _record_move_decision(ledger: LedgerService, score: int = 800) -> int:
     """
     return record_decision(
         ledger,
-        action_kind="move",
+        action_kind=ActionKind.MOVE,
         cmd_type="move",
         mode="COLLECT",
         score=score,
@@ -62,7 +63,7 @@ def _record_move_decision(ledger: LedgerService, score: int = 800) -> int:
 def test_outcome_consumes_pending_decision_into_caused_by(ledger: LedgerService) -> None:
     """The next outcome of a kind resolves the recorded decision."""
     decision_id = _record_move_decision(ledger)
-    assert pending_decision_ids(ledger) == {"move": decision_id}
+    assert pending_decision_ids(ledger) == {ActionKind.MOVE: decision_id}
     outcome = emit_move_position_reached(
         ledger, duration_ms=500, target_x=10, target_y=20, landed_x=10, landed_y=20
     )
@@ -71,7 +72,7 @@ def test_outcome_consumes_pending_decision_into_caused_by(ledger: LedgerService)
     stored = decision_record(ledger, decision_id)
     assert stored == {
         "event_id": decision_id,
-        "action_kind": "move",
+        "action_kind": ActionKind.MOVE,
         "cmd_type": "move",
         "mode": "COLLECT",
         "score": 800,
@@ -87,12 +88,12 @@ def test_superseding_decision_closes_the_prior_one(ledger: LedgerService) -> Non
     """A re-dispatch closes the unresolved prior decision explicitly."""
     first_id = _record_move_decision(ledger)
     second_id = _record_move_decision(ledger, score=900)
-    records = recent_outcomes(ledger, "move", 5)
+    records = recent_outcomes(ledger, ActionKind.MOVE, 5)
     assert len(records) == 1
     assert records[0]["outcome"] == "superseded"
     assert records[0]["caused_by"] == first_id
     assert records[0]["detail"] == {"superseded_by": second_id, "dispatched": False}
-    assert pending_decision_ids(ledger) == {"move": second_id}
+    assert pending_decision_ids(ledger) == {ActionKind.MOVE: second_id}
 
 
 def test_outcome_without_recorded_decision_is_unattributed(ledger: LedgerService) -> None:
@@ -131,7 +132,7 @@ def test_decision_record_contract_rejects_bad_score_and_empty_reason(ledger: Led
     with pytest.raises(LedgerInvariantError):
         record_decision(
             ledger,
-            action_kind="move",
+            action_kind=ActionKind.MOVE,
             cmd_type="move",
             mode="COLLECT",
             score=1001,
@@ -144,7 +145,7 @@ def test_decision_record_contract_rejects_bad_score_and_empty_reason(ledger: Led
     with pytest.raises(LedgerInvariantError):
         record_decision(
             ledger,
-            action_kind="move",
+            action_kind=ActionKind.MOVE,
             cmd_type="move",
             mode="COLLECT",
             score=500,

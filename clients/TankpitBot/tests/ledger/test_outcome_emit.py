@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.ledger.events import ACTION_KINDS
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcome.map_open import (
     emit_map_open_command_rejected,
     emit_map_open_data_processed,
@@ -88,12 +88,12 @@ def test_transfer_from_a_kind_with_nothing_pending_is_a_no_op(
         transfer_pending_decision,
     )
 
-    register_pending_decision(ledger, "map_open", 42)
+    register_pending_decision(ledger, ActionKind.MAP_OPEN, 42)
 
-    transfer_pending_decision(ledger, "teleport", "map_open")
+    transfer_pending_decision(ledger, ActionKind.TELEPORT, ActionKind.MAP_OPEN)
 
-    assert pending_decision_ids(ledger) == {"map_open": 42}
-    assert outcome_counts(ledger, "map_open").get("superseded", 0) == 0
+    assert pending_decision_ids(ledger) == {ActionKind.MAP_OPEN: 42}
+    assert outcome_counts(ledger, ActionKind.MAP_OPEN).get("superseded", 0) == 0
 
 
 def test_transfer_moves_a_real_pending_decision(ledger: LedgerService) -> None:
@@ -104,11 +104,11 @@ def test_transfer_moves_a_real_pending_decision(ledger: LedgerService) -> None:
         transfer_pending_decision,
     )
 
-    register_pending_decision(ledger, "teleport", 7)
+    register_pending_decision(ledger, ActionKind.TELEPORT, 7)
 
-    transfer_pending_decision(ledger, "teleport", "map_open")
+    transfer_pending_decision(ledger, ActionKind.TELEPORT, ActionKind.MAP_OPEN)
 
-    assert pending_decision_ids(ledger) == {"map_open": 7}
+    assert pending_decision_ids(ledger) == {ActionKind.MAP_OPEN: 7}
 
 
 def test_ring_records_and_counts_outcomes(ledger: LedgerService) -> None:
@@ -116,22 +116,22 @@ def test_ring_records_and_counts_outcomes(ledger: LedgerService) -> None:
     emit_scan_radar_complete(ledger, duration_ms=10, target_x=1, target_y=2)
     emit_scan_radar_complete(ledger, duration_ms=12, target_x=1, target_y=2)
     emit_scan_command_rejected(ledger, duration_ms=5, target_x=1, target_y=2, error_code=0)
-    records = recent_outcomes(ledger, "scan", 10)
+    records = recent_outcomes(ledger, ActionKind.SCAN, 10)
     assert [r["outcome"] for r in records] == [
         "radar_complete",
         "radar_complete",
         "command_rejected",
     ]
-    assert outcome_counts(ledger, "scan") == {"radar_complete": 2, "command_rejected": 1}
-    assert recent_outcomes(ledger, "scan", 0) == []
-    assert recent_outcomes(ledger, "move", 5) == []
+    assert outcome_counts(ledger, ActionKind.SCAN) == {"radar_complete": 2, "command_rejected": 1}
+    assert recent_outcomes(ledger, ActionKind.SCAN, 0) == []
+    assert recent_outcomes(ledger, ActionKind.MOVE, 5) == []
 
 
 def test_ring_evicts_oldest_at_capacity(ledger: LedgerService) -> None:
     """The ring stays bounded and keeps the newest records."""
     for index in range(RING_CAPACITY + 10):
         emit_map_open_data_processed(ledger, duration_ms=index)
-    records = recent_outcomes(ledger, "map_open", RING_CAPACITY + 10)
+    records = recent_outcomes(ledger, ActionKind.MAP_OPEN, RING_CAPACITY + 10)
     assert len(records) == RING_CAPACITY
     assert records[0]["duration_ms"] == 10
     assert records[-1]["duration_ms"] == RING_CAPACITY + 9
@@ -218,7 +218,15 @@ def test_action_kinds_cover_the_seven_ledgered_actions(ledger: LedgerService) ->
     from fire-and-forget ([[viewport-shift-protocol]] scope-pending
     radar drop) — a new kind here is a deliberate act, never drift.
     """
-    assert ACTION_KINDS == ("scan", "move", "teleport", "collect", "map_open", "shoot", "scope")
+    assert [kind.value for kind in ActionKind] == [
+        "scan",
+        "move",
+        "teleport",
+        "collect",
+        "map_open",
+        "shoot",
+        "scope",
+    ]
 
 
 def test_zero_dispatch_streak_counts_supersedes_and_rearms(ledger: LedgerService) -> None:
@@ -232,25 +240,25 @@ def test_zero_dispatch_streak_counts_supersedes_and_rearms(ledger: LedgerService
     """
     from tankpit_bot.ledger.outcome._emit import register_pending_decision
 
-    register_pending_decision(ledger, "collect", ledger.next_event_id())
-    assert ledger.zero_dispatch_streaks["collect"] == 0
+    register_pending_decision(ledger, ActionKind.COLLECT, ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks[ActionKind.COLLECT] == 0
 
-    register_pending_decision(ledger, "collect", ledger.next_event_id())
-    register_pending_decision(ledger, "collect", ledger.next_event_id())
-    assert ledger.zero_dispatch_streaks["collect"] == 2
+    register_pending_decision(ledger, ActionKind.COLLECT, ledger.next_event_id())
+    register_pending_decision(ledger, ActionKind.COLLECT, ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks[ActionKind.COLLECT] == 2
     # Another kind's streak is independent.
-    assert ledger.zero_dispatch_streaks["scan"] == 0
+    assert ledger.zero_dispatch_streaks[ActionKind.SCAN] == 0
 
     # A genuine resolution of the kind re-arms the counter.
     emit_move_position_reached(
         ledger, duration_ms=10, target_x=1, target_y=2, landed_x=1, landed_y=2
     )
-    assert ledger.zero_dispatch_streaks["collect"] == 2
-    register_pending_decision(ledger, "move", ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks[ActionKind.COLLECT] == 2
+    register_pending_decision(ledger, ActionKind.MOVE, ledger.next_event_id())
     emit_move_position_reached(
         ledger, duration_ms=10, target_x=1, target_y=2, landed_x=1, landed_y=2
     )
-    assert ledger.zero_dispatch_streaks["move"] == 0
+    assert ledger.zero_dispatch_streaks[ActionKind.MOVE] == 0
 
 
 def test_dispatched_supersede_resets_the_streak_and_records_the_mark(
@@ -270,23 +278,23 @@ def test_dispatched_supersede_resets_the_streak_and_records_the_mark(
     )
 
     first = ledger.next_event_id()
-    register_pending_decision(ledger, "shoot", first)
+    register_pending_decision(ledger, ActionKind.SHOOT, first)
     mark_decision_dispatched(ledger, first)
     # Build a streak first so the reset is observable.
-    ledger.zero_dispatch_streaks["shoot"] = 5
+    ledger.zero_dispatch_streaks[ActionKind.SHOOT] = 5
 
-    register_pending_decision(ledger, "shoot", ledger.next_event_id())
+    register_pending_decision(ledger, ActionKind.SHOOT, ledger.next_event_id())
 
-    assert ledger.zero_dispatch_streaks["shoot"] == 0
-    superseded = recent_outcomes(ledger, "shoot", 1)[0]
+    assert ledger.zero_dispatch_streaks[ActionKind.SHOOT] == 0
+    superseded = recent_outcomes(ledger, ActionKind.SHOOT, 1)[0]
     assert superseded["outcome"] == "superseded"
     assert superseded["detail"]["dispatched"] is True
     assert first not in ledger.dispatched_decision_ids
 
     # An UNDISPATCHED supersede still counts, from the reset baseline.
-    register_pending_decision(ledger, "shoot", ledger.next_event_id())
-    assert ledger.zero_dispatch_streaks["shoot"] == 1
-    undispatched = recent_outcomes(ledger, "shoot", 1)[0]
+    register_pending_decision(ledger, ActionKind.SHOOT, ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks[ActionKind.SHOOT] == 1
+    undispatched = recent_outcomes(ledger, ActionKind.SHOOT, 1)[0]
     assert undispatched["detail"]["dispatched"] is False
 
 
@@ -304,15 +312,15 @@ def test_dispatch_mark_survives_the_pending_transfer(ledger: LedgerService) -> N
     )
 
     decision_id = ledger.next_event_id()
-    register_pending_decision(ledger, "teleport", decision_id)
-    transfer_pending_decision(ledger, "teleport", "map_open")
+    register_pending_decision(ledger, ActionKind.TELEPORT, decision_id)
+    transfer_pending_decision(ledger, ActionKind.TELEPORT, ActionKind.MAP_OPEN)
     mark_decision_dispatched(ledger, decision_id)
 
-    register_pending_decision(ledger, "map_open", ledger.next_event_id())
+    register_pending_decision(ledger, ActionKind.MAP_OPEN, ledger.next_event_id())
 
-    superseded = recent_outcomes(ledger, "map_open", 1)[0]
+    superseded = recent_outcomes(ledger, ActionKind.MAP_OPEN, 1)[0]
     assert superseded["detail"]["dispatched"] is True
-    assert ledger.zero_dispatch_streaks["map_open"] == 0
+    assert ledger.zero_dispatch_streaks[ActionKind.MAP_OPEN] == 0
 
 
 def test_genuine_resolution_discards_the_dispatch_mark(ledger: LedgerService) -> None:
@@ -323,13 +331,13 @@ def test_genuine_resolution_discards_the_dispatch_mark(ledger: LedgerService) ->
     )
 
     decision_id = ledger.next_event_id()
-    register_pending_decision(ledger, "scan", decision_id)
+    register_pending_decision(ledger, ActionKind.SCAN, decision_id)
     mark_decision_dispatched(ledger, decision_id)
 
     emit_scan_radar_complete(ledger, duration_ms=10, target_x=1, target_y=2)
 
     assert ledger.dispatched_decision_ids == set()
-    assert ledger.zero_dispatch_streaks["scan"] == 0
+    assert ledger.zero_dispatch_streaks[ActionKind.SCAN] == 0
 
 
 def test_liveness_stall_diagnostic_fires_once_at_the_crossing(
@@ -362,13 +370,13 @@ def test_liveness_stall_diagnostic_fires_once_at_the_crossing(
         )
 
     for _ in range(LIVENESS_STALL_STREAK + 3):
-        register_pending_decision(ledger, "collect", ledger.next_event_id())
-    assert ledger.zero_dispatch_streaks["collect"] == LIVENESS_STALL_STREAK + 2
+        register_pending_decision(ledger, ActionKind.COLLECT, ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks[ActionKind.COLLECT] == LIVENESS_STALL_STREAK + 2
     assert stall_events() == 1
 
     # Genuine resolution re-arms; a second wedge announces again.
     emit_scan_radar_complete(ledger, duration_ms=10, target_x=1, target_y=2)
-    register_pending_decision(ledger, "scan", ledger.next_event_id())
+    register_pending_decision(ledger, ActionKind.SCAN, ledger.next_event_id())
     for _ in range(LIVENESS_STALL_STREAK):
-        register_pending_decision(ledger, "scan", ledger.next_event_id())
+        register_pending_decision(ledger, ActionKind.SCAN, ledger.next_event_id())
     assert stall_events() == 2
