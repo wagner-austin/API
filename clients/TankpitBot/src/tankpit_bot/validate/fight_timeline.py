@@ -22,23 +22,27 @@ Two products:
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.validate.shadow_timeline import ShadowTimelineDict, ShotEventDict
 
-FuelCause = Literal[
-    "own_shot",
-    "incoming_single_or_homing",
-    "incoming_dual",
-    "gain",
-    "spend_or_multi",
-    "walk_or_misc",
-]
-"""Attribution of one self fuel delta, from the measured cost table:
-own shots debit 10, singles/homings hit for 45, duals for 90; larger
-debits are own teleports or multi-event syncs; credits are pickups or
-refunds; the remainder is walking."""
+
+class FuelCause(StrEnum):
+    """Attribution of one self fuel delta, from the measured cost table.
+
+    Own shots debit 10, singles/homings hit for 45, duals for 90; larger
+    debits are own teleports or multi-event syncs; credits are pickups or
+    refunds; the remainder is walking.
+    """
+
+    OWN_SHOT = "own_shot"
+    INCOMING_SINGLE_OR_HOMING = "incoming_single_or_homing"
+    INCOMING_DUAL = "incoming_dual"
+    GAIN = "gain"
+    SPEND_OR_MULTI = "spend_or_multi"
+    WALK_OR_MISC = "walk_or_misc"
 
 
 class HumanEpisodeDict(TypedDict):
@@ -86,16 +90,16 @@ def classify_fuel_delta(delta: int) -> FuelCause:
         The cause bucket for the delta.
     """
     if delta == -10:
-        return "own_shot"
+        return FuelCause.OWN_SHOT
     if delta == -45:
-        return "incoming_single_or_homing"
+        return FuelCause.INCOMING_SINGLE_OR_HOMING
     if delta == -90:
-        return "incoming_dual"
+        return FuelCause.INCOMING_DUAL
     if delta > 0:
-        return "gain"
+        return FuelCause.GAIN
     if delta < -90:
-        return "spend_or_multi"
-    return "walk_or_misc"
+        return FuelCause.SPEND_OR_MULTI
+    return FuelCause.WALK_OR_MISC
 
 
 def _actor_name(timeline: ShadowTimelineDict, tank_id: int) -> str:
@@ -254,7 +258,9 @@ def _fuel_rows(timeline: ShadowTimelineDict, start_ms: int, end_ms: int) -> list
                     timestamp_ms=sync["timestamp_ms"],
                     kind="fuel",
                     actor="self",
-                    description=(f"fuel {previous_fuel} -> {fuel} ({classify_fuel_delta(delta)})"),
+                    description=(
+                        f"fuel {previous_fuel} -> {fuel} ({classify_fuel_delta(delta).value})"
+                    ),
                 )
             )
         previous_fuel = fuel
