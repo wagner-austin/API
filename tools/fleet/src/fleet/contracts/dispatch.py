@@ -66,6 +66,9 @@ DISPATCH_COMMANDS: Final = (
     # the graceful verb and its explicit hard successor.
     "kill-session",
     "kill-session-hard",
+    # MCPs mig 564, board task 01f31e4a: compacting a working session that
+    # got too big; the same hub pins, target and reason as a kill.
+    "compact-session",
 )
 
 #: Narrow type for a queue job's command.
@@ -78,10 +81,11 @@ DispatchCommand = Literal[
     "revive-session",
     "kill-session",
     "kill-session-hard",
+    "compact-session",
 ]
 
 #: The two lanes a runner claims from (MCPs mig 532, board task fd5cabfa
-#: A5). ``hub`` is the rebuild and the four session verbs, run on the hub
+#: A5). ``hub`` is the rebuild and the five session verbs, run on the hub
 #: by ``fleet-agent``; ``node`` is the make targets a fleet node runs on a
 #: checked-out commit, claimed by ``fleet-node-agent``. The queue partitions
 #: its claims by lane, which is what stops a revive queueing behind a check.

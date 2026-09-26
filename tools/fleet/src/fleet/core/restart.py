@@ -32,13 +32,15 @@ and this runner re-checks before the value lands in an argv element,
 because the runner is the layer nearest the machine and the one that
 cannot assume the other two were consulted.
 
-FOUR SESSION VERBS, ONE TABLE (MCPs migs 507, 525 and 526). Restart,
-revive, and the two kills (``kill-session`` and ``kill-session-hard``,
-board task 660964d9) each map to exactly one session-audit invocation
-through :func:`session_invocation`, so the runner has one job path for all
-of them and no verb can reach an invocation another verb owns. The hard
-kill is its own verb on the queue and its own ``--hard`` flag here: nothing
-in this module can turn a graceful kill into a hard one.
+FIVE SESSION VERBS, ONE TABLE (MCPs migs 507, 525, 526 and 564). Restart,
+revive, the two kills (``kill-session`` and ``kill-session-hard``, board
+task 660964d9) and the compact (``compact-session``, board task 01f31e4a)
+each map to exactly one session-audit invocation through
+:func:`session_invocation`, so the runner has one job path for all of them
+and no verb can reach an invocation another verb owns. The hard kill is its
+own verb on the queue and its own ``--hard`` flag here: nothing in this
+module can turn a graceful kill into a hard one, and nothing can turn a
+compact, which keeps the session running, into a kill.
 
 EVERY VERB RUNS THE PUBLISHED SESSION-AUDIT (MCPs board task f4cd489f).
 The invocation runs in the MCPs checkout's session-audit environment, but
@@ -89,11 +91,15 @@ RESTART_COMMAND: Final = "restart-session"
 REVIVE_COMMAND: Final = "revive-session"
 KILL_COMMAND: Final = "kill-session"
 KILL_HARD_COMMAND: Final = "kill-session-hard"
+#: MCPs mig 564, board task 01f31e4a: shrinking a working session that got
+#: too big, the operator's "/compact if they get too big", never an exit.
+COMPACT_COMMAND: Final = "compact-session"
 SESSION_COMMANDS: Final[tuple[str, ...]] = (
     RESTART_COMMAND,
     REVIVE_COMMAND,
     KILL_COMMAND,
     KILL_HARD_COMMAND,
+    COMPACT_COMMAND,
 )
 
 #: Detail prefix for a command this module has no invocation for.
@@ -248,11 +254,39 @@ def kill_argv(
     return session_audit_argv(mcps_root, registry_dir, *base, *(("--hard",) if hard else ()))
 
 
+def compact_argv(
+    mcps_root: pathlib.Path, registry_dir: str, session_target: str, requested_by: str
+) -> tuple[str, ...]:
+    """Compose the session-audit invocation for one compact job.
+
+    Args:
+        mcps_root: The MCPs checkout (already existence-checked).
+        registry_dir: The extracted register.
+        session_target: The session UUID (already grammar-checked).
+        requested_by: The label that enqueued the compact (already
+            grammar-checked), printed with session-audit's outcome.
+
+    Returns:
+        The argv: ``session-audit compact --session <uuid> --requested-by
+        <label>`` through :func:`session_audit_argv`.
+    """
+    return session_audit_argv(
+        mcps_root,
+        registry_dir,
+        "compact",
+        "--session",
+        session_target,
+        "--requested-by",
+        requested_by,
+    )
+
+
 class SessionInvocation(TypedDict):
     """What one session verb runs.
 
     Attributes:
-        verb: The run-id prefix: ``restart``, ``revive`` or ``kill``.
+        verb: The run-id prefix: ``restart``, ``revive``, ``kill`` or
+            ``compact``.
         mode: The session-audit mode the closing detail names.
         argv: The one invocation.
         types_requester: Whether the submitter label becomes an argv
@@ -330,6 +364,15 @@ def session_invocation(
             commit=tree["commit"],
             python_path=tree["python_path"],
         )
+    if command == COMPACT_COMMAND:
+        return SessionInvocation(
+            verb="compact",
+            mode="compact",
+            argv=compact_argv(mcps_root, registry_dir, session_target, requested_by),
+            types_requester=True,
+            commit=tree["commit"],
+            python_path=tree["python_path"],
+        )
     raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command!r} is not a session verb")
 
 
@@ -372,7 +415,8 @@ PYTHONPATH_VARIABLE: Final = "PYTHONPATH"
 #:
 #: session-audit's own rails bound each verb (a revive waits 30 seconds for
 #: a prompt and then for a record; a kill waits for a pid to leave the
-#: table), so a verb that is still running after ten minutes is one whose
+#: table; a compact waits at most six minutes for the context to fall), so
+#: a verb that is still running after ten minutes is one whose
 #: pane, ssh hop or poetry resolution has stopped answering, and the job
 #: closes failed with that fact instead of holding the tick.
 SESSION_JOB_TIMEOUT_SECONDS: Final[int] = 600
@@ -386,7 +430,7 @@ def run_session_job(invocation: SessionInvocation) -> CommandResult:
 
     Returns:
         The invocation's exit status and captured streams. Exit 0 means the
-        verb did what it names (RESTARTED, REVIVED, ENDED); anything else
+        verb did what it names (RESTARTED, REVIVED, ENDED, COMPACTED); anything else
         means it did not, and the stdout tail carries session-audit's own
         outcome line saying why. After :const:`SESSION_JOB_TIMEOUT_SECONDS`
         it is the timed-out result.
@@ -405,7 +449,7 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
     Args:
         result: The invocation's outcome.
         invocation: What ran: its session-audit mode (``rollover``,
-            ``revive`` or ``kill``), named so the reader knows which outcome
+            ``revive``, ``kill`` or ``compact``), named so the reader knows which outcome
             block the tail carries, and the published commit it ran at, so
             a closure can show its fix was the code that acted.
 
@@ -413,7 +457,7 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
         The mode, the commit, the exit code and the tail of the combined
         output -- the tail, because session-audit prints its outcome block
         (``ROLLOVER APPLIED`` with one line per session, ``REVIVE -
-        <OUTCOME>``, or ``KILL - <OUTCOME>``) last.
+        <OUTCOME>``, ``KILL - <OUTCOME>`` or ``COMPACT - <OUTCOME>``) last.
     """
     combined = (result["stdout"] + result["stderr"]).strip()
     tail = combined[-DETAIL_TAIL_CHARS:]
@@ -425,6 +469,7 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
 
 __all__ = [
     "COMMAND_UNKNOWN_CODE",
+    "COMPACT_COMMAND",
     "KILL_COMMAND",
     "KILL_HARD_COMMAND",
     "LABEL_PATTERN",
@@ -439,6 +484,7 @@ __all__ = [
     "TARGET_INVALID_CODE",
     "TARGET_MISSING_CODE",
     "SessionInvocation",
+    "compact_argv",
     "describe_result",
     "kill_argv",
     "refusal_for",

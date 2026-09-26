@@ -18,13 +18,14 @@ loop, Task Scheduler, a Monitor -- where it is visible and changeable without
 editing code. Same decision ``tools/board-watch`` made next door.
 
 THE HUB LANE ONLY (MCPs board task fd5cabfa, A5). This runner claims from
-the queue's ``hub`` lane: the ``build-bases`` rebuild and the four session
-verbs, every one of them run on the hub itself and closed in the tick that
-claimed it. The make targets, which run on a fleet node against a checked-out
-commit, are the ``node`` lane, drained by one :mod:`fleet.cli.node_agent`
-per enabled node. Until 2026-09-21 this one runner took every kind of job
-oldest-first, so a revive queued behind 129 stale kills (board task
-4199d1fb) and nine nodes behaved as one slow node; two lanes and per-node
+the queue's ``hub`` lane: the ``build-bases`` rebuild and the five session
+verbs (restart, revive, the two kills and the compact), every one of them
+run on the hub itself and closed in the tick that claimed it. The make
+targets, which run on a fleet node against a checked-out commit, are the
+``node`` lane, drained by one :mod:`fleet.cli.node_agent` per enabled node.
+Until 2026-09-21 this one runner took every kind of job oldest-first, so a
+revive queued behind 129 stale kills (board task 4199d1fb) and nine nodes
+behaved as one slow node; two lanes and per-node
 runners are the fix, and nothing here collects a suite any more because
 nothing here starts one.
 
