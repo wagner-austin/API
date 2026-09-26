@@ -61,6 +61,7 @@ from .manifest import (
     from_json_manifest_v2,
     from_path_manifest_v2,
 )
+from .optimizer_name import OptimizerName
 from .tarball import TarballError, create_tarball, extract_tarball
 from .torch_types import (
     DeviceProtocol,
@@ -120,6 +121,7 @@ __all__ = [
     "LocalExplanation",
     "MatmulBackendProtocol",
     "ModelManifestV2",
+    "OptimizerName",
     "PILImage",
     "PermutationConfig",
     "PermutationExplainer",
