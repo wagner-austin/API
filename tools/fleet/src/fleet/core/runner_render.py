@@ -37,6 +37,10 @@ from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 #: a one-line change reviewed like any other.
 RUNNER_VERSION = "2.337.0"
 
+#: Where ``pipx install`` puts its shims for the runner account, appended to
+#: each WSL runner's ``.path`` (see :func:`render_wsl_install_lines`).
+LOCAL_BIN = "/home/gharunner/.local/bin"
+
 #: The daily hygiene script, installed to /usr/local/bin/ci-clean.
 #:
 #: DOCKER FIRST, AND UNGATED. The Actions runner removes a job's service
@@ -184,9 +188,13 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
 
     Returns:
         The PowerShell lines. The registration token arrives in the same
-        per-repo environment variable the bash side uses; config.cmd
-        refuses a repeat registration loudly, which is the correct answer
-        to running this twice.
+        per-repo environment variable the bash side uses. ``--replace``
+        takes back a registration of the same name, which is what a
+        rebuilt host must do: its old runners are still registered,
+        offline, under exactly the names the roster gives the new ones
+        (board task 1aa6a021). Duplicate installs are the roster's to
+        prevent, and ``--onboard`` refuses a repo the roster already
+        carries on the host.
     """
     token_var = token_variable(install["repo"])
     directory = _install_root_for(install)
@@ -205,7 +213,7 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         "}",
         f"& '{directory}\\config.cmd' --unattended "
         f"--url https://github.com/{install['repo']} --token $env:{token_var} "
-        f"--name {install['runner_name']} --labels {labels} --runasservice",
+        f"--name {install['runner_name']} --labels {labels} --runasservice --replace",
     ]
 
 
@@ -362,6 +370,16 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
     path the roster never declared, and the audit would then have verified
     the declaration while the runner lived somewhere else.
 
+    ``--replace`` takes back a registration of the same name, as on the
+    Windows side. ``~/.local/bin`` goes onto the runner's ``.path`` AFTER
+    config.sh, which writes that file, and BEFORE the service starts,
+    because runsvc.sh reads it once at start and exports it as every job
+    step's PATH. That is where ``pipx install poetry`` puts its shims, and
+    a systemd-started runner has no login shell to add it: without it, a
+    job that installs poetry dies one step later at ``poetry: command not
+    found``, exit 127 (measured on lavender; MCPs
+    scripts/ops/provision-wsl-runner.ps1 carried it by hand).
+
     Args:
         install: The install to configure, with ``side`` ``"wsl"``.
 
@@ -385,7 +403,9 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         f"chown -R gharunner:gharunner {directory}",
         f'sudo -u gharunner bash -c "cd {directory} && ./config.sh --unattended '
         f'--url https://github.com/{install["repo"]} --token \\"${{{token_var}}}\\" '
-        f'--name {install["runner_name"]} --labels {labels}"',
+        f'--name {install["runner_name"]} --labels {labels} --replace"',
+        f"grep -qF ':{LOCAL_BIN}' {directory}/.path || "
+        f"sed -i 's#$#:{LOCAL_BIN}#' {directory}/.path",
         f"(cd {directory} && ./svc.sh install gharunner && ./svc.sh start)",
     ]
 
@@ -463,6 +483,7 @@ __all__ = [
     "CI_CLEAN_SCRIPT",
     "CI_CLEAN_SERVICE",
     "CI_CLEAN_TIMER",
+    "LOCAL_BIN",
     "RUNNER_VERSION",
     "RenderedProvision",
     "render_provision",

@@ -306,9 +306,17 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         lines += _emit_wsl_test_check(distro, f"asset:{path}", "-e", path)
         pin = asset["sha256"]
         if pin is not None:
+            # The output is JOINED, never cast. [string] over a pipeline that
+            # emitted nothing is $null in Windows PowerShell 5.1, not '', so
+            # for a MISSING pinned asset $Sum.StartsWith threw, the whole
+            # Emit statement was skipped under 'Continue', and the transcript
+            # lacked this one line: the audit then refused to score the host
+            # at all, as a script that died midway, instead of reporting one
+            # drifted check (the 2026-09-26 lavender rebuild, board task
+            # 1aa6a021; reproduced there with the line alone).
             lines += [
-                f"$Sum = [string](wsl -d '{distro}' -- sha256sum '{path}' 2>$null "
-                "| Select-Object -First 1)",
+                f"$Sum = (@(wsl -d '{distro}' -- sha256sum '{path}' 2>$null "
+                "| Select-Object -First 1) -join '')",
                 f"Emit 'sha256:{path}' ($Sum.StartsWith('{pin}')) ('sha256sum said: ' + $Sum)",
             ]
         if asset["writable"]:
