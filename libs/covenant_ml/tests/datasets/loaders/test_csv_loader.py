@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +27,30 @@ from covenant_ml.datasets.types import (
 def _get_fixtures_dir() -> Path:
     """Get path to test fixtures directory."""
     return Path(__file__).parent.parent / "fixtures"
+
+
+def _private_fixtures_dir(tmp_path: Path) -> Path:
+    """Copy the small_csv fixture into a directory only this test writes to.
+
+    The parquet cache lives beside the CSV it was built from, so every test
+    loading the shared fixture shares one cache directory. Under xdist a
+    test that needs a cold (or warm) cache can have another worker rebuild
+    or invalidate it between its own two steps; a private copy removes that
+    race instead of hoping the scheduling avoids it.
+
+    Only data.csv is copied: the shared folder also holds the other workers'
+    ``.cache`` directory, and copying that would start this test warm.
+
+    Args:
+        tmp_path: The test's own temporary directory.
+
+    Returns:
+        A fixtures root whose small_csv folder holds data.csv and no cache.
+    """
+    folder = tmp_path / "small_csv"
+    folder.mkdir()
+    shutil.copy2(_get_fixtures_dir() / "small_csv" / "data.csv", folder / "data.csv")
+    return tmp_path
 
 
 def _clear_cache_for_config(config: DatasetConfig, fixtures_dir: Path) -> None:
@@ -445,25 +470,12 @@ class TestCSVLoader:
         assert x_list[1][0] == pytest.approx(-1500.0, rel=1e-6)
         assert x_list[1][1] == pytest.approx(0.04, rel=1e-6)
 
-    def test_load_with_progress_callback(self) -> None:
+    def test_load_with_progress_callback(self, tmp_path: Path) -> None:
         """Load reports progress via callback when loading from CSV (no cache)."""
         loader = CSVLoader()
         config = _make_config()
-        fixtures_dir = _get_fixtures_dir()
-
-        # Clear cache to ensure we test CSV loading progress
-        config_parts = [
-            config["name"],
-            config["file_name"],
-            config["encoding"],
-            str(config["target"]),
-            str(config["exclude_columns"]),
-            str(config.get("group_column")),
-        ]
-        config_str = "|".join(config_parts)
-        config_hash = _compute_config_hash(config_str)
-        cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
-        invalidate_cache(cache_dir)
+        # A fresh private copy has no cache, so this load parses the CSV.
+        fixtures_dir = _private_fixtures_dir(tmp_path)
 
         progress_updates: list[LoadProgress] = []
 
@@ -483,25 +495,11 @@ class TestCSVLoader:
         # Result should still be valid
         assert result["meta"]["n_samples"] == 5
 
-    def test_load_from_cache_with_progress_callback(self) -> None:
+    def test_load_from_cache_with_progress_callback(self, tmp_path: Path) -> None:
         """Load reports progress via callback when loading from cache."""
         loader = CSVLoader()
         config = _make_config()
-        fixtures_dir = _get_fixtures_dir()
-
-        # Clear cache first, then load to populate it
-        config_parts = [
-            config["name"],
-            config["file_name"],
-            config["encoding"],
-            str(config["target"]),
-            str(config["exclude_columns"]),
-            str(config.get("group_column")),
-        ]
-        config_str = "|".join(config_parts)
-        config_hash = _compute_config_hash(config_str)
-        cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
-        invalidate_cache(cache_dir)
+        fixtures_dir = _private_fixtures_dir(tmp_path)
 
         # First load populates cache
         loader.load(config, fixtures_dir)
