@@ -41,14 +41,21 @@ WHAT THIS ADDS OVER THE INLINE RECIPE
 from __future__ import annotations
 
 from collections.abc import Sequence
+from enum import StrEnum
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final
 
 from maketools import _test_hooks, reap
 from maketools.job import join_kill_on_close_job
 from maketools.venvs import venv_executable
 
-Runner = Literal["poetry", "venv"]
+
+class Runner(StrEnum):
+    """How pytest is reached; each member is the ``--runner`` word naming it."""
+
+    POETRY = "poetry"
+    VENV = "venv"
+
 
 #: The directories coverage measures when they exist.
 COVERAGE_ROOTS: Final[Sequence[str]] = ("src", "scripts")
@@ -99,7 +106,7 @@ def pytest_argv(project: Path, runner: Runner) -> list[str]:
     Returns:
         The leading argv.
     """
-    if runner == "venv":
+    if runner is Runner.VENV:
         return [str(venv_executable(project, "python")), "-m", "pytest"]
     return list(PYTEST_ARGV)
 
@@ -163,7 +170,7 @@ def run_tests(
     *,
     sweep: bool,
     serial: bool = False,
-    runner: Runner = "poetry",
+    runner: Runner = Runner.POETRY,
 ) -> int:
     """Run the project's suite under the launcher's protections.
 

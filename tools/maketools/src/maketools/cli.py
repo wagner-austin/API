@@ -87,7 +87,7 @@ def command_test(arguments: Sequence[str]) -> int:
     """
     sweep = True
     serial = False
-    runner: Runner = "poetry"
+    runner = Runner.POETRY
     remaining = list(arguments)
     while remaining and remaining[0] in (NO_SWEEP_FLAG, SERIAL_FLAG, RUNNER_FLAG):
         flag = remaining.pop(0)
@@ -112,10 +112,10 @@ def require_runner(value: str) -> Runner:
     Raises:
         AppError: ``MAKETOOLS_USAGE`` when it is neither runner.
     """
-    if value == "poetry":
-        return "poetry"
-    if value == "venv":
-        return "venv"
+    if value == Runner.POETRY:
+        return Runner.POETRY
+    if value == Runner.VENV:
+        return Runner.VENV
     raise AppError(MaketoolsErrorCode.USAGE, f"{RUNNER_FLAG} must be poetry or venv, got {value!r}")
 
 
