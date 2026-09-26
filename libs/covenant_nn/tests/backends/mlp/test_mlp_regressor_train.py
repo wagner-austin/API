@@ -9,7 +9,7 @@ import pytest
 from covenant_ml.backends.regressor_protocol import RegressorBackend
 from covenant_ml.types import (
     MLPConfig,
-    MLPOptimizer,
+    OptimizerName,
     TrainConfig,
 )
 from covenant_ml.types_regression import (
@@ -55,7 +55,7 @@ def _make_mlp_regressor_config(
     batch_size: int = 16,
     hidden_sizes: tuple[int, ...] = (8, 4),
     dropout: float = 0.0,
-    optimizer: MLPOptimizer = "adamw",
+    optimizer: OptimizerName = OptimizerName.ADAMW,
     learning_rate: float = 0.01,
     early_stopping_patience: int = 5,
 ) -> MLPConfig:

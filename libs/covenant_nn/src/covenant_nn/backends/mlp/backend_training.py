@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Final, TypedDict
+from typing import TypedDict
 
 import numpy as np
 from covenant_ml.metrics import compute_all_metrics
 from covenant_ml.types import (
     EvalMetrics,
     MLPConfig,
+    OptimizerName,
     TrainProgress,
 )
 from numpy.typing import NDArray
@@ -79,10 +80,9 @@ def _build_model(n_in: int, hidden: tuple[int, ...], dropout: float, device: str
     return model
 
 
-def _get_optimizer(name: str, params: TensorIterable, lr: float) -> _OptimizerProto:
-    optim = __import__("torch.optim", fromlist=["AdamW", "Adam", "SGD"])
-    sym_map: Final[dict[str, str]] = {"adamw": "AdamW", "adam": "Adam", "sgd": "SGD"}
-    ctor: _OptimizerCtor = getattr(optim, sym_map[name])
+def _get_optimizer(name: OptimizerName, params: TensorIterable, lr: float) -> _OptimizerProto:
+    optim = __import__("torch.optim", fromlist=[name.torch_class_name])
+    ctor: _OptimizerCtor = getattr(optim, name.torch_class_name)
     return ctor(params, lr=float(lr))
 
 

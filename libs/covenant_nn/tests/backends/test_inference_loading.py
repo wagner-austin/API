@@ -31,7 +31,7 @@ from covenant_ml.types import (
     MLPConfig,
 )
 from numpy.typing import NDArray
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.lstm.backend import LSTMBackend, load_lstm_for_inference
 from covenant_nn.backends.mlp.backend import MLPBackend, load_mlp_for_inference
@@ -124,7 +124,7 @@ def _mlp_config(dropout: float) -> MLPConfig:
     return {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adam",
+        "optimizer": OptimizerName.ADAM,
         "hidden_sizes": _MLP_HIDDEN,
         "learning_rate": 0.01,
         "batch_size": 32,

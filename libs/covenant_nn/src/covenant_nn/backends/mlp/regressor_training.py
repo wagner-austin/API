@@ -5,13 +5,13 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from pathlib import Path
-from typing import Final, TypedDict
+from typing import TypedDict
 
 import numpy as np
 from covenant_ml.metrics_regression import compute_all_regression_metrics
 from covenant_ml.preprocessing import AutoPreprocessor
 from covenant_ml.trainer import RegressionDataSplits
-from covenant_ml.types import MLPConfig
+from covenant_ml.types import MLPConfig, OptimizerName
 from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainProgress,
@@ -85,20 +85,19 @@ def _build_regressor_model(
     return model
 
 
-def _get_optimizer(name: str, params: TensorIterable, lr: float) -> _OptimizerProto:
+def _get_optimizer(name: OptimizerName, params: TensorIterable, lr: float) -> _OptimizerProto:
     """Create optimizer by name.
 
     Args:
-        name: Optimizer name ('adamw', 'adam', or 'sgd').
+        name: The optimizer to construct.
         params: Model parameters to optimize.
         lr: Learning rate.
 
     Returns:
         An optimizer instance.
     """
-    optim = __import__("torch.optim", fromlist=["AdamW", "Adam", "SGD"])
-    sym_map: Final[dict[str, str]] = {"adamw": "AdamW", "adam": "Adam", "sgd": "SGD"}
-    ctor: _OptimizerCtor = getattr(optim, sym_map[name])
+    optim = __import__("torch.optim", fromlist=[name.torch_class_name])
+    ctor: _OptimizerCtor = getattr(optim, name.torch_class_name)
     return ctor(params, lr=float(lr))
 
 

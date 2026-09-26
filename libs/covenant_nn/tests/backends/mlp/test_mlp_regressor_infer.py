@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from covenant_ml.types import (
     MLPConfig,
-    MLPOptimizer,
+    OptimizerName,
 )
 from covenant_ml.types_regression import (
     RegressionTrainOutcome,
@@ -52,7 +52,7 @@ def _make_mlp_regressor_config(
     batch_size: int = 16,
     hidden_sizes: tuple[int, ...] = (8, 4),
     dropout: float = 0.0,
-    optimizer: MLPOptimizer = "adamw",
+    optimizer: OptimizerName = OptimizerName.ADAMW,
     learning_rate: float = 0.01,
     early_stopping_patience: int = 5,
 ) -> MLPConfig:
@@ -103,9 +103,8 @@ def test_mlp_regressor_different_optimizers(tmp_path: Path) -> None:
     backend = MLPRegressorBackend()
     x, y = _make_regression_data(100, n_features=5)
 
-    optimizers: tuple[MLPOptimizer, ...] = ("adamw", "adam", "sgd")
-    for opt_name in optimizers:
-        lr = 0.01 if opt_name == "sgd" else 0.001
+    for opt_name in OptimizerName:
+        lr = 0.01 if opt_name is OptimizerName.SGD else 0.001
         config = _make_mlp_regressor_config(
             n_epochs=10,
             optimizer=opt_name,
@@ -296,7 +295,7 @@ def test_mlp_regressor_train_on_cuda(tmp_path: Path) -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CUDA,
         "precision": RequestedPrecision.FP16,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (8, 4),
         "learning_rate": 0.01,
         "batch_size": 16,

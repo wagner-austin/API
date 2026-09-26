@@ -6,7 +6,7 @@ Tests the MLP hyperparameter optimization objective using real US bankruptcy dat
 from __future__ import annotations
 
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.objectives import MLPObjective, create_mlp_objective
 
@@ -138,7 +138,7 @@ def test_mlp_objective_class_direct_instantiation() -> None:
         feature_preset="none",
         n_epochs=2,
         early_stopping_patience=1,
-        optimizer_name="adam",  # Use adam instead of default adamw
+        optimizer_name=OptimizerName.ADAM,  # Use adam instead of default adamw
     )
 
     assert objective.n_features == dataset["n_features"]

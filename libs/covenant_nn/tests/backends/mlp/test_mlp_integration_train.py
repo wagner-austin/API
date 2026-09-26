@@ -15,7 +15,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 from numpy.typing import NDArray
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
 
@@ -67,7 +67,7 @@ def _make_mlp_config(
     return {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": hidden_sizes,
         "learning_rate": 0.01,
         "batch_size": batch_size,
@@ -90,7 +90,7 @@ def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
         "batch_size": 256,
@@ -147,7 +147,7 @@ def test_mlp_backend_train_with_progress_callback(tmp_path: Path) -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (32, 16),
         "learning_rate": 0.001,
         "batch_size": 256,
@@ -214,7 +214,7 @@ def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (64, 32),
         "learning_rate": 0.1,  # High LR causes fast convergence then plateau
         "batch_size": 256,

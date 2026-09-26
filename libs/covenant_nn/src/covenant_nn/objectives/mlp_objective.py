@@ -22,7 +22,7 @@ from covenant_ml.features import (
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.types import (
     MLPConfig,
-    MLPOptimizer,
+    OptimizerName,
     RequestedDevice,
     RequestedPrecision,
     TrainProgress,
@@ -52,7 +52,7 @@ class MLPObjective:
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,
-        optimizer_name: MLPOptimizer = "adamw",
+        optimizer_name: OptimizerName = OptimizerName.ADAMW,
         epoch_callback: Callable[[TrainProgress], None] | None = None,
     ) -> None:
         """Initialize with data and fixed training configuration.
@@ -206,7 +206,7 @@ def create_mlp_objective(
     feature_preset: FeaturePreset,
     n_epochs: int,
     early_stopping_patience: int,
-    optimizer_name: MLPOptimizer = "adamw",
+    optimizer_name: OptimizerName = OptimizerName.ADAMW,
     epoch_callback: Callable[[TrainProgress], None] | None = None,
 ) -> MLPObjective:
     """Create an objective function for MLP optimization.

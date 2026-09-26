@@ -10,7 +10,7 @@ from pathlib import Path
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.base_trainer import BaseTabularTrainer
 from covenant_ml.types import MLPConfig, TrainOutcome, TrainProgress
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
 
@@ -42,7 +42,7 @@ def test_base_trainer_with_mlp(tmp_path: Path) -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
         "batch_size": 256,
@@ -102,7 +102,7 @@ def test_base_trainer_mlp_with_progress_callback(tmp_path: Path) -> None:
     config: MLPConfig = {
         "device": RequestedDevice.CPU,
         "precision": RequestedPrecision.FP32,
-        "optimizer": "adamw",
+        "optimizer": OptimizerName.ADAMW,
         "hidden_sizes": (32,),
         "learning_rate": 0.001,
         "batch_size": 256,

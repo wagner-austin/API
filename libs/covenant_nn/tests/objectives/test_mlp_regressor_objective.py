@@ -11,7 +11,7 @@ import math
 import numpy as np
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from numpy.typing import NDArray
-from platform_ml import RequestedDevice, RequestedPrecision
+from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.objectives import MLPRegressorObjective, create_mlp_regressor_objective
 
@@ -151,7 +151,7 @@ def test_mlp_regressor_objective_class_direct_instantiation() -> None:
         feature_preset="none",
         n_epochs=2,
         early_stopping_patience=1,
-        optimizer_name="adam",
+        optimizer_name=OptimizerName.ADAM,
     )
 
     assert objective.n_features == dataset["n_features"]
