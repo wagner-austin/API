@@ -19,6 +19,7 @@ from tests.core.services.model.backends.char_lstm._train_branches_support import
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.model.backends.char_lstm.train import train_prepared_char_lstm
 from model_trainer.core.services.training import base_trainer as bt
 from model_trainer.core.services.training import base_trainer_core as bt_core
@@ -302,7 +303,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -391,7 +392,7 @@ def test_train_prepared_skips_save_when_cancelled(
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

@@ -14,6 +14,7 @@ from model_trainer.core.contracts.queue_encoding import (
     encode_train_job_payload,
     encode_train_request_payload,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 
 
 class TestTrainRequestPayloadEncoding:
@@ -46,7 +47,7 @@ class TestTrainRequestPayloadEncoding:
             "finetune_lr_cap": 1e-4,
             "loss_mask_prefix_separator": None,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,
@@ -61,7 +62,7 @@ class TestTrainRequestPayloadEncoding:
 
         assert decoded["model_family"] == "gpt2"
         assert decoded["model_size"] == "small"
-        assert decoded["finetuning_strategy"] == "full"
+        assert decoded["finetuning_strategy"] is StrategyName.FULL
         assert decoded["lora"] is None
         assert decoded["quantization"] is None
 
@@ -85,7 +86,7 @@ class TestTrainRequestPayloadEncoding:
     def test_encode_decode_roundtrip_with_lora(self) -> None:
         """Test roundtrip with LoRA config."""
         payload = self._make_minimal_payload()
-        payload["finetuning_strategy"] = "lora"
+        payload["finetuning_strategy"] = StrategyName.LORA
         payload["lora"] = {
             "enabled": True,
             "r": 16,
@@ -98,7 +99,7 @@ class TestTrainRequestPayloadEncoding:
         encoded = encode_train_request_payload(payload)
         decoded = decode_train_request_payload(encoded)
 
-        assert decoded["finetuning_strategy"] == "lora"
+        assert decoded["finetuning_strategy"] is StrategyName.LORA
         lora = decoded["lora"]
         assert lora == {
             "enabled": True,
@@ -112,7 +113,7 @@ class TestTrainRequestPayloadEncoding:
     def test_encode_decode_roundtrip_with_quantization(self) -> None:
         """Test roundtrip with quantization config."""
         payload = self._make_minimal_payload()
-        payload["finetuning_strategy"] = "qlora"
+        payload["finetuning_strategy"] = StrategyName.QLORA
         payload["lora"] = {
             "enabled": True,
             "r": 8,
@@ -206,11 +207,11 @@ class TestTrainRequestPayloadEncoding:
 
     def test_decode_all_finetuning_strategies(self) -> None:
         """Test decoding all valid finetuning strategy values."""
-        for strategy in ("full", "lora", "qlora"):
+        for strategy in StrategyName:
             encoded = encode_train_request_payload(self._make_minimal_payload())
-            encoded["finetuning_strategy"] = strategy
+            encoded["finetuning_strategy"] = strategy.value
             decoded = decode_train_request_payload(encoded)
-            assert decoded["finetuning_strategy"] == strategy
+            assert decoded["finetuning_strategy"] is strategy
 
     def test_decode_invalid_finetuning_strategy(self) -> None:
         """A queued payload naming no declared strategy carries its own code.
@@ -301,7 +302,7 @@ class TestTrainJobPayloadEncoding:
             "finetune_lr_cap": 1e-4,
             "loss_mask_prefix_separator": None,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,
@@ -395,7 +396,7 @@ class TestTrainJobPayloadEncoding:
     def test_decode_with_nested_lora(self) -> None:
         """Test decoding a full payload with nested LoRA config."""
         request = self._make_minimal_request()
-        request["finetuning_strategy"] = "lora"
+        request["finetuning_strategy"] = StrategyName.LORA
         request["lora"] = {
             "enabled": True,
             "r": 16,

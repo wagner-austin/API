@@ -17,6 +17,7 @@ from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.worker import train_job
 
 
@@ -101,7 +102,7 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,
@@ -195,7 +196,7 @@ def test_process_train_job_logs_redis_error_on_handle_error(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,

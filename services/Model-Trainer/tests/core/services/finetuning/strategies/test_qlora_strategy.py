@@ -10,6 +10,7 @@ import pytest
 from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.model import LoraConfig, ModelTrainConfig, QuantizationConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks, reset_hooks
 from model_trainer.core.services.finetuning.strategies.qlora import (
     QLoRAStrategy,
@@ -73,7 +74,7 @@ def make_test_config(
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 0.0001,
         "loss_mask_prefix_separator": None,
-        "finetuning_strategy": "qlora",
+        "finetuning_strategy": StrategyName.QLORA,
         "hub_model_id": "meta/llama-7b",
         "lora": lora,
         "cartridge": None,
@@ -227,7 +228,7 @@ class TestQLoRAStrategyAdapt:
         assert captured_params[0] == 16  # r value from make_lora_config
         assert adapted.model is returned_model
         assert adapted.base_model_id == "test/model-id"
-        assert adapted.strategy_name == "qlora"
+        assert adapted.strategy_name is StrategyName.QLORA
         assert adapted.is_peft_model is True
         assert adapted.lora_config is lora_cfg
 
@@ -331,7 +332,7 @@ class TestQLoRAStrategyLoad:
             assert captured_paths[0] == tmpdir
             assert adapted.model is returned_model
             assert adapted.base_model_id == "test/model-id"
-            assert adapted.strategy_name == "qlora"
+            assert adapted.strategy_name is StrategyName.QLORA
             assert adapted.is_peft_model is True
             assert adapted.lora_config is None
 

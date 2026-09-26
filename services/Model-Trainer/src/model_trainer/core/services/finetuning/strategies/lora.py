@@ -50,7 +50,7 @@ class LoRAStrategy:
 
     def __init__(self) -> None:
         """Initialize LoRA strategy."""
-        self._name: StrategyName = "lora"
+        self._name = StrategyName.LORA
 
     def name(self) -> StrategyName:
         """Return the strategy name identifier.

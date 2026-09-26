@@ -24,6 +24,7 @@ from model_trainer.core.contracts.cartridge import (
     trainable_parameter_count,
 )
 from model_trainer.core.contracts.model import CartridgeConfig, ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.finetuning import default_registry
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks, reset_hooks
 from model_trainer.core.services.finetuning.strategies.cartridge import (
@@ -101,7 +102,7 @@ def make_train_config(cartridge: CartridgeConfig | None) -> ModelTrainConfig:
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 0.0001,
         "loss_mask_prefix_separator": None,
-        "finetuning_strategy": "cartridge",
+        "finetuning_strategy": StrategyName.CARTRIDGE,
         "hub_model_id": "gpt2",
         "lora": None,
         "cartridge": cartridge,
@@ -191,11 +192,11 @@ class TestRegistration:
 
     def test_it_is_registered_under_its_name(self) -> None:
         """A strategy the registry cannot produce is unreachable from a request."""
-        assert "cartridge" in default_registry().list_strategies()
+        assert StrategyName.CARTRIDGE in default_registry().list_strategies()
 
     def test_the_registry_produces_it(self) -> None:
         """Through the real factory, not a direct construction."""
-        assert default_registry().get("cartridge").name() == "cartridge"
+        assert default_registry().get(StrategyName.CARTRIDGE).name() is StrategyName.CARTRIDGE
 
     def test_the_factory_makes_a_new_instance_each_time(self) -> None:
         """Two runs must not share mutable strategy state."""
@@ -203,7 +204,7 @@ class TestRegistration:
 
     def test_its_capabilities_are_exactly_these(self) -> None:
         """Pinned whole, so a change to any one of them is deliberate."""
-        assert default_registry().get_capabilities("cartridge") == {
+        assert default_registry().get_capabilities(StrategyName.CARTRIDGE) == {
             "supports_quantization": False,
             "supports_gradient_checkpointing": False,
             "requires_peft": False,
@@ -218,12 +219,13 @@ class TestRegistration:
         """
         registry = default_registry()
         others = [
-            registry.get_capabilities("full")["supports_gradient_checkpointing"],
-            registry.get_capabilities("lora")["supports_gradient_checkpointing"],
-            registry.get_capabilities("qlora")["supports_gradient_checkpointing"],
+            registry.get_capabilities(StrategyName.FULL)["supports_gradient_checkpointing"],
+            registry.get_capabilities(StrategyName.LORA)["supports_gradient_checkpointing"],
+            registry.get_capabilities(StrategyName.QLORA)["supports_gradient_checkpointing"],
         ]
         assert others == [True, True, True]
-        assert not registry.get_capabilities("cartridge")["supports_gradient_checkpointing"]
+        capabilities = registry.get_capabilities(StrategyName.CARTRIDGE)
+        assert not capabilities["supports_gradient_checkpointing"]
 
 
 class TestConfigRequirements:

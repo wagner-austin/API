@@ -27,7 +27,7 @@ class FullFineTuneStrategy:
 
     def __init__(self) -> None:
         """Initialize full fine-tuning strategy."""
-        self._name: StrategyName = "full"
+        self._name = StrategyName.FULL
 
     def name(self) -> StrategyName:
         """Return the strategy name identifier.

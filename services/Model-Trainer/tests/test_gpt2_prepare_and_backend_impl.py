@@ -8,6 +8,7 @@ from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_gpt2_backend
@@ -85,7 +86,7 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -146,7 +147,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -247,7 +248,7 @@ def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -284,7 +285,7 @@ def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -329,7 +330,7 @@ def test_gpt2_evaluate_raises_when_tokenizer_id_none(
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

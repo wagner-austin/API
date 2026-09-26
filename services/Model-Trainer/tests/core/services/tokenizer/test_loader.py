@@ -9,6 +9,7 @@ from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 
 from model_trainer.core.services.tokenizer.loader import (
+    TokenizerKind,
     detect_tokenizer_kind,
     load_tokenizer_from_dir,
     load_tokenizer_from_path,
@@ -38,7 +39,7 @@ class TestDetectTokenizerKind:
 
         kind = detect_tokenizer_kind(str(tmp_path))
 
-        assert kind == "bpe"
+        assert kind is TokenizerKind.BPE
 
     def test_detects_char_from_tokenizer_json_with_kind(self, tmp_path: Path) -> None:
         """Detect char tokenizer from tokenizer.json with kind=char."""
@@ -47,7 +48,7 @@ class TestDetectTokenizerKind:
 
         kind = detect_tokenizer_kind(str(tmp_path))
 
-        assert kind == "char"
+        assert kind is TokenizerKind.CHAR
 
     def test_detects_sentencepiece_from_model_file(self, tmp_path: Path) -> None:
         """Detect SentencePiece from tokenizer.model file."""
@@ -56,7 +57,7 @@ class TestDetectTokenizerKind:
 
         kind = detect_tokenizer_kind(str(tmp_path))
 
-        assert kind == "sentencepiece"
+        assert kind is TokenizerKind.SENTENCEPIECE
 
     def test_raises_when_no_artifacts_found(self, tmp_path: Path) -> None:
         """Raise AppError when no tokenizer artifacts exist."""

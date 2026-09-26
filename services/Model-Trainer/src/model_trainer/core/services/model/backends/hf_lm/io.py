@@ -72,7 +72,7 @@ def _encode_metadata(metadata: HFLMMetadata) -> JSONObject:
         JSON-serializable dictionary.
     """
     result: JSONObject = {
-        "strategy_name": metadata["strategy_name"],
+        "strategy_name": metadata["strategy_name"].value,
         "hub_model_id": metadata["hub_model_id"],
         "tokenizer_id": metadata["tokenizer_id"],
         "is_peft": metadata["is_peft"],
@@ -157,16 +157,14 @@ def save_prepared_hf_lm(
         ValueError: If required metadata fields are missing.
         RuntimeError: If required save hook is not configured.
     """
-    strategy_name_raw = prepared.strategy_name
+    strategy_name = prepared.strategy_name
     hub_model_id = prepared.hub_model_id
     is_peft = prepared.is_peft
 
-    if strategy_name_raw is None:
+    if strategy_name is None:
         raise ValueError("PreparedLMModel.strategy_name is required for hf_lm save")
     if hub_model_id is None:
         raise ValueError("PreparedLMModel.hub_model_id is required for hf_lm save")
-
-    strategy_name = require_strategy_name(strategy_name_raw)
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)

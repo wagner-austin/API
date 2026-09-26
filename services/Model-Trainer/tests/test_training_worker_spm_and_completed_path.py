@@ -32,6 +32,7 @@ from model_trainer.core.contracts.model import (
 )
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import ListEncoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -414,7 +415,7 @@ def test_training_worker_spm_artifact_and_completed(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from platform_workers.testing import FakeRedis
 
-from model_trainer.core.contracts.progress import TrainingProgress
+from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
 from model_trainer.worker.progress_store import ProgressStore
 
 
@@ -15,7 +15,7 @@ def test_progress_store_save_and_load() -> None:
 
     progress: TrainingProgress = {
         "run_id": "run-store-test",
-        "phase": "training",
+        "phase": TrainingPhase.TRAINING,
         "epoch": 3,
         "total_epochs": 10,
         "step": 150,
@@ -32,9 +32,8 @@ def test_progress_store_save_and_load() -> None:
     store.save(progress)
     loaded = store.load("run-store-test")
 
-    assert loaded is not None and loaded["phase"] == "training"
+    assert loaded is not None and loaded["phase"] is TrainingPhase.TRAINING
     assert loaded["run_id"] == "run-store-test"
-    assert loaded["phase"] == "training"
     assert loaded["epoch"] == 3
     assert loaded["total_epochs"] == 10
     assert loaded["step"] == 150

@@ -74,7 +74,7 @@ class QLoRAStrategy:
 
     def __init__(self) -> None:
         """Initialize QLoRA strategy."""
-        self._name: StrategyName = "qlora"
+        self._name = StrategyName.QLORA
 
     def name(self) -> StrategyName:
         """Return the strategy name identifier.

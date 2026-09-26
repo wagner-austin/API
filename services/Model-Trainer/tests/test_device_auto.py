@@ -12,6 +12,7 @@ from platform_ml.torch_types import _TorchModuleProtocol
 
 from model_trainer.api.validators.runs import _decode_train_request
 from model_trainer.core.contracts.queue import TrainRequestPayload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.worker.job_utils import build_cfg
 
 
@@ -60,7 +61,7 @@ def _auto_payload() -> TrainRequestPayload:
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "hub_model_id": None,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "lora": None,
         "cartridge": None,
         "quantization": None,

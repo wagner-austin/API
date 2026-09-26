@@ -16,6 +16,7 @@ from model_trainer.core.contracts.model import (
     QuantizationConfig,
     StoredBf16Precision,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     reset_hooks as reset_ft_hooks,
@@ -87,19 +88,19 @@ class TestRequireStrategyName:
         """Test extraction of 'full' strategy name from JSON object."""
         obj: JSONObject = {"strategy_name": "full"}
         result = _require_strategy_name(obj, "strategy_name")
-        assert result == "full"
+        assert result is StrategyName.FULL
 
     def test_extracts_lora_strategy(self) -> None:
         """Test extraction of 'lora' strategy name from JSON object."""
         obj: JSONObject = {"strategy_name": "lora"}
         result = _require_strategy_name(obj, "strategy_name")
-        assert result == "lora"
+        assert result is StrategyName.LORA
 
     def test_extracts_qlora_strategy(self) -> None:
         """Test extraction of 'qlora' strategy name from JSON object."""
         obj: JSONObject = {"strategy_name": "qlora"}
         result = _require_strategy_name(obj, "strategy_name")
-        assert result == "qlora"
+        assert result is StrategyName.QLORA
 
     def test_raises_for_missing_field(self) -> None:
         """Test that JSONTypeError is raised for missing field."""
@@ -133,7 +134,7 @@ class TestEncodeMetadata:
     def test_encodes_metadata_to_json(self) -> None:
         """Test encoding of HFLMMetadata to JSON object."""
         metadata = HFLMMetadata(
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             hub_model_id="test/model",
             tokenizer_id="test-tok",
             is_peft=False,
@@ -159,7 +160,7 @@ class TestDecodeMetadata:
             "quantization": None,
         }
         result = _decode_metadata(obj)
-        assert result["strategy_name"] == "lora"
+        assert result["strategy_name"] is StrategyName.LORA
         assert result["hub_model_id"] == "test/model"
         assert result["tokenizer_id"] == "test-tok"
         assert result["is_peft"] is True
@@ -288,7 +289,7 @@ class TestSavePreparedHFLM:
             pad_id=1,
             max_seq_len=512,
             tok_for_dataset=HFTokenizerEncoder(FakeHFTokenizer()),
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             hub_model_id=None,
             is_peft=False,
             quantization=None,
@@ -299,36 +300,6 @@ class TestSavePreparedHFLM:
             pytest.raises(ValueError, match="hub_model_id is required"),
         ):
             save_prepared_hf_lm(prepared, tmpdir)
-
-    def test_raises_for_invalid_strategy_name(self) -> None:
-        """A prepared model carrying an undeclared strategy name cannot be saved.
-
-        ``PreparedLMModel.strategy_name`` is a bare ``str`` because it is
-        reconstructed from disk, so this is the point where an unknown name is
-        caught, with the same code every other entry point raises.
-        """
-        from model_trainer.core.services.model.backends.hf_lm.prepare import (
-            HFTokenizerEncoder,
-        )
-
-        # strategy_name is str | None, so we can pass "invalid" directly
-        prepared = PreparedLMModel(
-            model=FakeHFModel(),
-            tokenizer_id="test-tok",
-            eos_id=0,
-            pad_id=1,
-            max_seq_len=512,
-            tok_for_dataset=HFTokenizerEncoder(FakeHFTokenizer()),
-            strategy_name="invalid",
-            hub_model_id="test/model",
-            is_peft=False,
-            quantization=None,
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with pytest.raises(AppError) as excinfo:
-                save_prepared_hf_lm(prepared, tmpdir)
-            assert excinfo.value.code is ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN
 
     def test_saves_prepared_model_with_full_strategy(self) -> None:
         """Test successful save of prepared model with full strategy."""
@@ -343,7 +314,7 @@ class TestSavePreparedHFLM:
             pad_id=1,
             max_seq_len=512,
             tok_for_dataset=HFTokenizerEncoder(FakeHFTokenizer()),
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             hub_model_id="test/base-model",
             is_peft=False,
             quantization=None,
@@ -431,7 +402,7 @@ class TestLoadPreparedHFLMFromHandle:
             result = load_prepared_hf_lm_from_handle(tmpdir, _FakeTokHandle())
 
             assert result.tokenizer_id == "test-tok"
-            assert result.strategy_name == "full"
+            assert result.strategy_name is StrategyName.FULL
             assert result.hub_model_id == "test/base-model"
             assert result.is_peft is False
 
@@ -468,7 +439,7 @@ class TestLoadingTheBaseOfASavedRun:
         from model_trainer.core.services.model.backends.hf_lm.io import _encode_metadata
 
         metadata = HFLMMetadata(
-            strategy_name="qlora",
+            strategy_name=StrategyName.QLORA,
             hub_model_id="Qwen/Qwen2.5-Coder-1.5B",
             tokenizer_id=None,
             is_peft=True,
@@ -524,7 +495,7 @@ class TestLoadingTheBaseOfASavedRun:
         """Three readers now open this file; one decoder answers all of them."""
         directory = self._artifact(tmp_path, quantized=True)
 
-        assert read_hf_lm_metadata(directory)["strategy_name"] == "qlora"
+        assert read_hf_lm_metadata(directory)["strategy_name"] is StrategyName.QLORA
 
     def test_the_control_and_the_arm_share_their_tokenizer_and_token_ids(
         self, tmp_path: Path

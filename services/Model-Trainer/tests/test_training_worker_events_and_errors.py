@@ -19,6 +19,7 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.worker import job_utils, train_job
 from model_trainer.worker.trainer_job_store import TrainerJobStore
 
@@ -100,7 +101,7 @@ def test_emit_metrics_helpers_publish() -> None:
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -161,7 +162,7 @@ def test_process_train_job_sets_status_message_on_exception(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,

@@ -15,6 +15,7 @@ from model_trainer.core.contracts.queue import (
     TokenizerTrainPayload,
     TrainJobPayload,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 
 # Recursive JSON type matching rq_harness
@@ -178,7 +179,7 @@ def _train_payload() -> TrainJobPayload:
             "finetune_lr_cap": 0.0,
             "loss_mask_prefix_separator": None,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,
@@ -303,7 +304,7 @@ def test_rq_enqueuer_methods() -> None:
                 "finetune_lr_cap": 0.0,
                 "loss_mask_prefix_separator": None,
                 "hub_model_id": None,
-                "finetuning_strategy": "full",
+                "finetuning_strategy": StrategyName.FULL,
                 "lora": None,
                 "cartridge": None,
                 "quantization": None,

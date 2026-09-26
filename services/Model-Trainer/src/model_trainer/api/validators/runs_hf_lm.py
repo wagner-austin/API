@@ -21,7 +21,7 @@ from model_trainer.api.validators.runs_config import (
     _narrow_finetuning_strategy,
 )
 from model_trainer.api.validators.runs_cross_fields import _validate_hf_lm_cross_fields
-from model_trainer.core.contracts.strategy_names import STRATEGY_NAMES, StrategyName
+from model_trainer.core.contracts.strategy_names import StrategyName
 
 from ..schemas.runs import (
     CartridgeConfigRequest,
@@ -30,9 +30,9 @@ from ..schemas.runs import (
     QuantizationConfigRequest,
 )
 
-#: Derived from the StrategyName Literal rather than restated, so the HTTP
+#: Derived from the StrategyName enum rather than restated, so the HTTP
 #: layer cannot accept a strategy the registry has never heard of.
-_FINETUNING_STRATEGIES: frozenset[str] = frozenset(STRATEGY_NAMES)
+_FINETUNING_STRATEGIES: frozenset[str] = frozenset(StrategyName)
 
 
 class _HfLmFields:

@@ -10,6 +10,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 from model_trainer.worker import train_job
@@ -114,7 +115,7 @@ def test_training_worker_loads_pretrained_model(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,

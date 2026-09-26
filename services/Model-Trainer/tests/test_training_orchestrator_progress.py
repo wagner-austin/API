@@ -11,7 +11,7 @@ from platform_core.job_types import JobStatus
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.progress import TrainingProgress
+from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
 from model_trainer.worker.progress_store import ProgressStore
@@ -61,7 +61,7 @@ def test_get_progress_with_progress_data(
     progress_store = ProgressStore(fake)
     progress: TrainingProgress = {
         "run_id": "run-with-progress",
-        "phase": "training",
+        "phase": TrainingPhase.TRAINING,
         "epoch": 5,
         "total_epochs": 10,
         "step": 250,
@@ -79,7 +79,7 @@ def test_get_progress_with_progress_data(
     # Get progress
     result = orchestrator.get_progress("run-with-progress")
     assert result["run_id"] == "run-with-progress"
-    assert result["phase"] == "training"
+    assert result["phase"] is TrainingPhase.TRAINING
     assert result["epoch"] == 5
     assert result["total_epochs"] == 10
     assert result["step"] == 250
@@ -137,7 +137,7 @@ def test_get_progress_no_progress_but_job_exists(
     # Get progress - should return initial state
     result = orchestrator.get_progress("run-no-progress")
     assert result["run_id"] == "run-no-progress"
-    assert result["phase"] == "queued"
+    assert result["phase"] is TrainingPhase.QUEUED
     assert result["epoch"] == 0
     assert result["total_epochs"] == 0
     assert result["step"] == 0

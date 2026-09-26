@@ -105,7 +105,7 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
         "finetune_lr_cap": payload["finetune_lr_cap"],
         "loss_mask_prefix_separator": payload["loss_mask_prefix_separator"],
         "hub_model_id": payload["hub_model_id"],
-        "finetuning_strategy": payload["finetuning_strategy"],
+        "finetuning_strategy": payload["finetuning_strategy"].value,
         "lora": lora_encoded,
         "cartridge": cartridge_encoded,
         "quantization": quantization_encoded,

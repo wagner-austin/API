@@ -155,7 +155,7 @@ def _narrow_finetuning_strategy(
             names no declared strategy.
     """
     if raw is None:
-        return "full"
+        return StrategyName.FULL
     return require_strategy_name(raw)
 
 

@@ -19,6 +19,7 @@ from model_trainer.api.main import create_app
 from model_trainer.api.schemas.runs import TrainRequest
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings, load_settings
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.infra.paths import checkpoints_dir
 from model_trainer.core.services.container import ServiceContainer
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
@@ -55,7 +56,7 @@ def _make_request() -> TrainRequest:
         "data_num_workers": None,
         "data_pin_memory": None,
         "hub_model_id": None,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "lora": None,
         "cartridge": None,
         "quantization": None,

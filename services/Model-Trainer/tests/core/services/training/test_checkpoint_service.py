@@ -24,6 +24,7 @@ from model_trainer.core.contracts.checkpoint import (
     encode_training_checkpoint_meta,
 )
 from model_trainer.core.contracts.model import ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.infra.paths import checkpoint_path, checkpoints_dir
 from model_trainer.core.services.training.checkpoint import (
     RngStates,
@@ -66,7 +67,7 @@ def _make_cfg() -> ModelTrainConfig:
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0001,
         "loss_mask_prefix_separator": None,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

@@ -7,6 +7,7 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.cloze import ClozeItemOutcome
+from model_trainer.core.contracts.progress import TrainingPhase
 from model_trainer.core.contracts.strategy_names import StrategyName
 
 
@@ -347,19 +348,7 @@ class ProgressResponse(TypedDict, total=True):
     """
 
     run_id: str
-    phase: Literal[
-        "queued",
-        "tokenization",
-        "training",
-        "validation",
-        "test",
-        "saving",
-        "exporting",
-        "uploading",
-        "completed",
-        "failed",
-        "cancelled",
-    ]
+    phase: TrainingPhase
     epoch: int
     total_epochs: int
     step: int

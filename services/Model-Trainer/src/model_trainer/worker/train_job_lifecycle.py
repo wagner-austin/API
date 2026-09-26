@@ -176,18 +176,16 @@ def _handle_post_save_or_cancel(
     total_epochs: int,
     gguf_export_result: GgufExportResult | None,
 ) -> None:
-    from model_trainer.core.contracts.progress import TrainingProgress
+    from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
 
     def _save_phase_progress(
-        phase: Literal["uploading", "completed", "cancelled"],
+        phase: Literal[TrainingPhase.UPLOADING, TrainingPhase.COMPLETED, TrainingPhase.CANCELLED],
     ) -> None:
         """Save progress with given phase."""
-        phase_lit = phase
-
         now = datetime.utcnow()
         progress: TrainingProgress = {
             "run_id": run_id,
-            "phase": phase_lit,
+            "phase": phase,
             "epoch": total_epochs,
             "total_epochs": total_epochs,
             "step": result["steps"],
@@ -203,7 +201,7 @@ def _handle_post_save_or_cancel(
         progress_store.save(progress)
 
     if cancelled:
-        _save_phase_progress("cancelled")
+        _save_phase_progress(TrainingPhase.CANCELLED)
         now = datetime.utcnow()
         store.save(
             {
@@ -229,11 +227,11 @@ def _handle_post_save_or_cancel(
         return
 
     # Transition to uploading phase
-    _save_phase_progress("uploading")
+    _save_phase_progress(TrainingPhase.UPLOADING)
     file_id, file_bytes = _upload_and_persist_pointer(settings, r, run_id, out_dir)
 
     # Transition to completed phase
-    _save_phase_progress("completed")
+    _save_phase_progress(TrainingPhase.COMPLETED)
 
     now = datetime.utcnow()
     store.save(

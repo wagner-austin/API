@@ -10,7 +10,6 @@ from model_trainer.core.contracts.finetuning import (
     StrategyName,
 )
 from model_trainer.core.contracts.model import ModelTrainConfig
-from model_trainer.core.contracts.strategy_names import STRATEGY_NAMES
 from model_trainer.core.services.finetuning.registry import (
     FineTuningRegistry,
     StrategyRegistration,
@@ -28,7 +27,7 @@ class FakeStrategy:
 
     def name(self) -> StrategyName:
         """Return the strategy name."""
-        return "full"  # Must be valid literal
+        return StrategyName.FULL
 
     def capabilities(self) -> StrategyCapabilities:
         """Return fake capabilities."""
@@ -49,7 +48,7 @@ class FakeStrategy:
         return AdaptedModel(
             model=model,
             base_model_id=model_id,
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             is_peft_model=False,
             lora_config=None,
         )
@@ -68,7 +67,7 @@ class FakeStrategy:
         return AdaptedModel(
             model=base_model,
             base_model_id=model_id,
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             is_peft_model=False,
             lora_config=None,
         )
@@ -131,48 +130,48 @@ class TestFineTuningRegistry:
     def test_register_adds_strategy(self) -> None:
         """Test that register() adds a strategy."""
         reg = FineTuningRegistry()
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
-        assert reg.is_registered("full")
-        assert "full" in reg.list_strategies()
+        assert reg.is_registered(StrategyName.FULL)
+        assert StrategyName.FULL in reg.list_strategies()
 
     def test_list_strategies_returns_sorted_names(self) -> None:
         """Test that list_strategies() returns sorted names."""
         reg = FineTuningRegistry()
         # Register in non-alphabetical order
-        reg.register("lora", StrategyRegistration(create_fake_strategy))
-        reg.register("full", StrategyRegistration(create_fake_strategy))
-        reg.register("qlora", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.LORA, StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.QLORA, StrategyRegistration(create_fake_strategy))
 
         names = reg.list_strategies()
-        assert names == ["full", "lora", "qlora"]
+        assert names == [StrategyName.FULL, StrategyName.LORA, StrategyName.QLORA]
 
     def test_get_returns_strategy_instance(self) -> None:
         """Test that get() returns a strategy instance."""
         reg = FineTuningRegistry()
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
-        strategy = reg.get("full")
+        strategy = reg.get(StrategyName.FULL)
         expected = FakeStrategy()
         assert type(strategy) is type(expected)
 
     def test_get_creates_new_instance_each_time(self) -> None:
         """Test that get() creates new instances each time."""
         reg = FineTuningRegistry()
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
-        s1 = reg.get("full")
-        s2 = reg.get("full")
+        s1 = reg.get(StrategyName.FULL)
+        s2 = reg.get(StrategyName.FULL)
         assert s1 is not s2
 
     def test_get_raises_for_unregistered_strategy(self) -> None:
         """Test that get() raises KeyError for unregistered strategy."""
         reg = FineTuningRegistry()
         # Only register "full", then try to get "lora" which is not registered
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
         with pytest.raises(KeyError):
-            reg.get("lora")
+            reg.get(StrategyName.LORA)
 
     def test_get_capabilities_returns_cached_capabilities(self) -> None:
         """Test that get_capabilities() returns cached capabilities."""
@@ -184,10 +183,10 @@ class TestFineTuningRegistry:
             return FakeStrategy()
 
         reg = FineTuningRegistry()
-        reg.register("full", StrategyRegistration(counting_factory))
+        reg.register(StrategyName.FULL, StrategyRegistration(counting_factory))
 
-        caps1 = reg.get_capabilities("full")
-        caps2 = reg.get_capabilities("full")
+        caps1 = reg.get_capabilities(StrategyName.FULL)
+        caps2 = reg.get_capabilities(StrategyName.FULL)
 
         # Should only create strategy once
         assert call_count == 1
@@ -197,25 +196,25 @@ class TestFineTuningRegistry:
         """Test that get_capabilities() raises KeyError for unregistered."""
         reg = FineTuningRegistry()
         # Only register "full", then try to get capabilities for "lora"
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
         with pytest.raises(KeyError):
-            reg.get_capabilities("lora")
+            reg.get_capabilities(StrategyName.LORA)
 
     def test_is_registered_true_for_registered(self) -> None:
         """Test that is_registered() returns True for registered strategies."""
         reg = FineTuningRegistry()
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
-        assert reg.is_registered("full") is True
+        assert reg.is_registered(StrategyName.FULL) is True
 
     def test_is_registered_false_for_unregistered(self) -> None:
         """Test that is_registered() returns False for unregistered strategies."""
         reg = FineTuningRegistry()
         # Only register "full", check that "lora" is not registered
-        reg.register("full", StrategyRegistration(create_fake_strategy))
+        reg.register(StrategyName.FULL, StrategyRegistration(create_fake_strategy))
 
-        assert reg.is_registered("lora") is False
+        assert reg.is_registered(StrategyName.LORA) is False
 
 
 class TestDefaultRegistry:
@@ -224,19 +223,19 @@ class TestDefaultRegistry:
     def test_default_registry_contains_all_strategies(self) -> None:
         """Test that the default registry has every declared strategy.
 
-        Asserted against ``STRATEGY_NAMES`` rather than a hand-written list,
+        Asserted against ``StrategyName`` rather than a hand-written list,
         so a strategy declared but never registered fails here -- which is the
         gap a restated list would hide, and the reason the names were collapsed
         onto one declaration in the first place.
         """
-        assert default_registry().list_strategies() == sorted(STRATEGY_NAMES)
+        assert default_registry().list_strategies() == sorted(StrategyName)
 
     def test_default_registry_full_strategy(self) -> None:
         """Test that full strategy is correctly registered."""
         reg = default_registry()
-        strategy = reg.get("full")
+        strategy = reg.get(StrategyName.FULL)
 
-        assert strategy.name() == "full"
+        assert strategy.name() is StrategyName.FULL
         caps = strategy.capabilities()
         assert caps["requires_peft"] is False
         assert caps["trainable_param_fraction"] == 1.0
@@ -244,18 +243,18 @@ class TestDefaultRegistry:
     def test_default_registry_lora_strategy(self) -> None:
         """Test that lora strategy is correctly registered."""
         reg = default_registry()
-        strategy = reg.get("lora")
+        strategy = reg.get(StrategyName.LORA)
 
-        assert strategy.name() == "lora"
+        assert strategy.name() is StrategyName.LORA
         caps = strategy.capabilities()
         assert caps["requires_peft"] is True
 
     def test_default_registry_qlora_strategy(self) -> None:
         """Test that qlora strategy is correctly registered."""
         reg = default_registry()
-        strategy = reg.get("qlora")
+        strategy = reg.get(StrategyName.QLORA)
 
-        assert strategy.name() == "qlora"
+        assert strategy.name() is StrategyName.QLORA
         caps = strategy.capabilities()
         assert caps["requires_peft"] is True
         assert caps["supports_quantization"] is True
@@ -271,8 +270,8 @@ class TestDefaultRegistry:
         reg = default_registry()
 
         # Get capabilities twice
-        caps1 = reg.get_capabilities("full")
-        caps2 = reg.get_capabilities("full")
+        caps1 = reg.get_capabilities(StrategyName.FULL)
+        caps2 = reg.get_capabilities(StrategyName.FULL)
 
         # Should be same object (cached)
         assert caps1 is caps2

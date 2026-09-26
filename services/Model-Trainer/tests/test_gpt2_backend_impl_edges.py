@@ -7,6 +7,7 @@ from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_gpt2_backend
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
@@ -83,7 +84,7 @@ def test_gpt2_backend_impl_name_and_type_errors(
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

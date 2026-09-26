@@ -10,6 +10,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.api.schemas.runs import TrainRequest
 from model_trainer.api.schemas.tokenizers import TokenizerTrainRequest
 from model_trainer.core.config.settings import load_settings
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 from model_trainer.orchestrators.tokenizer_orchestrator import TokenizerOrchestrator
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
@@ -83,7 +84,7 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
         "data_num_workers": None,
         "data_pin_memory": None,
         "hub_model_id": None,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "lora": None,
         "cartridge": None,
         "quantization": None,

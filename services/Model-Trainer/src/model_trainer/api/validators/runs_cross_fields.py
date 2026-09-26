@@ -26,6 +26,9 @@ from ..schemas.runs import (
     QuantizationConfigRequest,
 )
 
+#: The strategies that train a low-rank adapter, and so read a lora config.
+_LORA_STRATEGIES: tuple[StrategyName, ...] = (StrategyName.LORA, StrategyName.QLORA)
+
 
 def _validate_hf_lm_cross_fields(
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
@@ -49,13 +52,13 @@ def _validate_hf_lm_cross_fields(
             message="hub_model_id is required when model_family is 'hf_lm'",
             http_status=400,
         )
-    if finetuning_strategy in ("lora", "qlora") and lora is None:
+    if finetuning_strategy in _LORA_STRATEGIES and lora is None:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message=f"lora config is required for finetuning_strategy '{finetuning_strategy}'",
             http_status=400,
         )
-    if finetuning_strategy == "cartridge" and cartridge is None:
+    if finetuning_strategy is StrategyName.CARTRIDGE and cartridge is None:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message=(
@@ -65,7 +68,7 @@ def _validate_hf_lm_cross_fields(
             ),
             http_status=400,
         )
-    if cartridge is not None and finetuning_strategy != "cartridge":
+    if cartridge is not None and finetuning_strategy is not StrategyName.CARTRIDGE:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message=(
@@ -75,7 +78,7 @@ def _validate_hf_lm_cross_fields(
             ),
             http_status=400,
         )
-    if lora is not None and finetuning_strategy == "cartridge":
+    if lora is not None and finetuning_strategy is StrategyName.CARTRIDGE:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message=(
@@ -85,13 +88,13 @@ def _validate_hf_lm_cross_fields(
             ),
             http_status=400,
         )
-    if finetuning_strategy == "qlora" and quantization is None:
+    if finetuning_strategy is StrategyName.QLORA and quantization is None:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message="quantization config is required for finetuning_strategy 'qlora'",
             http_status=400,
         )
-    if quantization is not None and finetuning_strategy != "qlora":
+    if quantization is not None and finetuning_strategy is not StrategyName.QLORA:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message=(
@@ -102,7 +105,7 @@ def _validate_hf_lm_cross_fields(
             ),
             http_status=400,
         )
-    if gguf_export is not None and finetuning_strategy not in ("lora", "qlora"):
+    if gguf_export is not None and finetuning_strategy not in _LORA_STRATEGIES:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message="gguf_export requires finetuning_strategy lora or qlora",

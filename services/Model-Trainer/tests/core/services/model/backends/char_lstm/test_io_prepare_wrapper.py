@@ -5,6 +5,7 @@ from pathlib import Path
 from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.model.backends.char_lstm.io import get_model_max_seq_len
 from model_trainer.core.services.model.backends.char_lstm.model import CharLSTM, CharLSTMModel
@@ -74,7 +75,7 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
             "precision": ResolvedPrecision.FP32,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "hub_model_id": None,
             "lora": None,
             "cartridge": None,
@@ -108,7 +109,7 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "finetune_lr_cap": 5e-5,
             "loss_mask_prefix_separator": None,
             "precision": ResolvedPrecision.FP32,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "hub_model_id": None,
             "lora": None,
             "cartridge": None,

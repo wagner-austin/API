@@ -19,6 +19,7 @@ from model_trainer.core.contracts.checkpoint import (
     model_train_config_mismatches,
 )
 from model_trainer.core.contracts.model import LoraConfig, ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 
 
 def _make_cfg() -> ModelTrainConfig:
@@ -47,7 +48,7 @@ def _make_cfg() -> ModelTrainConfig:
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0001,
         "loss_mask_prefix_separator": " @@HUB@@ ",
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": "gpt2-medium",
         "lora": None,
         "cartridge": None,

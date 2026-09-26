@@ -9,47 +9,33 @@ counts, loss metrics, and timing information for real-time monitoring.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     optional_float,
     require_float,
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
-TrainingPhase = Literal[
-    "queued",
-    "tokenization",
-    "training",
-    "validation",
-    "test",
-    "saving",
-    "exporting",
-    "uploading",
-    "completed",
-    "failed",
-    "cancelled",
-]
 
-_VALID_PHASES: Final[frozenset[str]] = frozenset(
-    {
-        "queued",
-        "tokenization",
-        "training",
-        "validation",
-        "test",
-        "saving",
-        "exporting",
-        "uploading",
-        "completed",
-        "failed",
-        "cancelled",
-    }
-)
+class TrainingPhase(StrEnum):
+    """Where a training run is, as its progress record's phase field spells it."""
+
+    QUEUED = "queued"
+    TOKENIZATION = "tokenization"
+    TRAINING = "training"
+    VALIDATION = "validation"
+    TEST = "test"
+    SAVING = "saving"
+    EXPORTING = "exporting"
+    UPLOADING = "uploading"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class TrainingProgress(TypedDict):
@@ -97,7 +83,7 @@ def encode_training_progress(progress: TrainingProgress) -> JSONObject:
     """
     return {
         "run_id": progress["run_id"],
-        "phase": progress["phase"],
+        "phase": progress["phase"].value,
         "epoch": progress["epoch"],
         "total_epochs": progress["total_epochs"],
         "step": progress["step"],
@@ -110,39 +96,6 @@ def encode_training_progress(progress: TrainingProgress) -> JSONObject:
         "val_ppl": progress["val_ppl"],
         "updated_at": progress["updated_at"],
     }
-
-
-_PHASE_MAP: Final[dict[str, TrainingPhase]] = {
-    "queued": "queued",
-    "tokenization": "tokenization",
-    "training": "training",
-    "validation": "validation",
-    "test": "test",
-    "saving": "saving",
-    "exporting": "exporting",
-    "uploading": "uploading",
-    "completed": "completed",
-    "cancelled": "cancelled",
-    "failed": "failed",
-}
-
-
-def _narrow_phase(raw: str) -> TrainingPhase:
-    """Narrow phase string to TrainingPhase Literal with validation.
-
-    Args:
-        raw: Raw phase string.
-
-    Returns:
-        Narrowed TrainingPhase Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid phase.
-    """
-    phase = _PHASE_MAP.get(raw)
-    if phase is None:
-        raise JSONTypeError(f"Field 'phase' must be one of {sorted(_VALID_PHASES)}, got '{raw}'")
-    return phase
 
 
 def decode_training_progress(obj: JSONObject) -> TrainingProgress:
@@ -158,7 +111,7 @@ def decode_training_progress(obj: JSONObject) -> TrainingProgress:
         JSONTypeError: If required fields are missing or have wrong types.
     """
     run_id = require_str(obj, "run_id")
-    phase = _narrow_phase(require_str(obj, "phase"))
+    phase = require_member(obj, "phase", TrainingPhase)
     epoch = require_int(obj, "epoch")
     total_epochs = require_int(obj, "total_epochs")
     step = require_int(obj, "step")
@@ -206,7 +159,7 @@ def initial_progress(
     """
     return {
         "run_id": run_id,
-        "phase": "queued",
+        "phase": TrainingPhase.QUEUED,
         "epoch": 0,
         "total_epochs": total_epochs,
         "step": 0,

@@ -7,15 +7,21 @@ SentencePiece) based on the artifact files present.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import load_json_str
 
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 
-TokenizerKind = Literal["bpe", "char", "sentencepiece"]
+
+class TokenizerKind(StrEnum):
+    """Which tokenizer backend wrote an artifact, and so which one loads it."""
+
+    BPE = "bpe"
+    CHAR = "char"
+    SENTENCEPIECE = "sentencepiece"
 
 
 def detect_tokenizer_kind(artifact_dir: str) -> TokenizerKind:
@@ -41,11 +47,11 @@ def detect_tokenizer_kind(artifact_dir: str) -> TokenizerKind:
         text = tok_json.read_text(encoding="utf-8")
         obj = load_json_str(text)
         if isinstance(obj, dict) and obj.get("kind") == "char":
-            return "char"
-        return "bpe"
+            return TokenizerKind.CHAR
+        return TokenizerKind.BPE
 
     if tok_spm.exists():
-        return "sentencepiece"
+        return TokenizerKind.SENTENCEPIECE
 
     raise AppError(
         ModelTrainerErrorCode.TOKENIZER_NOT_FOUND,
@@ -97,11 +103,12 @@ def load_tokenizer_from_path(artifact_path: str) -> TokenizerHandle:
 
     # Determine kind from file name and contents
     if path.name == "tokenizer.model" or path.suffix == ".model":
-        kind: TokenizerKind = "sentencepiece"
+        kind = TokenizerKind.SENTENCEPIECE
     elif path.name == "tokenizer.json" or path.suffix == ".json":
         text = path.read_text(encoding="utf-8")
         obj = load_json_str(text)
-        kind = "char" if isinstance(obj, dict) and obj.get("kind") == "char" else "bpe"
+        is_char = isinstance(obj, dict) and obj.get("kind") == "char"
+        kind = TokenizerKind.CHAR if is_char else TokenizerKind.BPE
     else:
         raise AppError(
             ModelTrainerErrorCode.TOKENIZER_NOT_FOUND,
@@ -124,17 +131,17 @@ def _load_by_kind(artifact_dir: str, kind: TokenizerKind) -> TokenizerHandle:
     """
     base = Path(artifact_dir)
 
-    if kind == "char":
+    if kind is TokenizerKind.CHAR:
         from model_trainer.core.services.tokenizer.char_backend import CharBackend
 
         return CharBackend().load(str(base / "tokenizer.json"))
 
-    if kind == "sentencepiece":
+    if kind is TokenizerKind.SENTENCEPIECE:
         from model_trainer.core.services.tokenizer.spm_backend import SentencePieceBackend
 
         return SentencePieceBackend().load(str(base / "tokenizer.model"))
 
-    # Default to BPE
+    # The remaining kind is BPE.
     from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 
     return BPEBackend().load(str(base / "tokenizer.json"))
@@ -150,17 +157,17 @@ def _load_by_kind_from_path(artifact_path: str, kind: TokenizerKind) -> Tokenize
     Returns:
         Loaded tokenizer handle.
     """
-    if kind == "char":
+    if kind is TokenizerKind.CHAR:
         from model_trainer.core.services.tokenizer.char_backend import CharBackend
 
         return CharBackend().load(artifact_path)
 
-    if kind == "sentencepiece":
+    if kind is TokenizerKind.SENTENCEPIECE:
         from model_trainer.core.services.tokenizer.spm_backend import SentencePieceBackend
 
         return SentencePieceBackend().load(artifact_path)
 
-    # Default to BPE
+    # The remaining kind is BPE.
     from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 
     return BPEBackend().load(artifact_path)

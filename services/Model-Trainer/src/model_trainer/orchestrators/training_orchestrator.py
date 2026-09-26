@@ -27,6 +27,7 @@ from ..api.schemas.runs import (
 )
 from ..core import _test_hooks
 from ..core.config.settings import Settings
+from ..core.contracts.progress import TrainingPhase
 from ..core.contracts.queue import EvalJobPayload, TrainJobPayload, TrainRequestPayload
 from ..core.infra.redis_utils import get_with_retry, set_with_retry
 from ..core.services.queue.rq_adapter import RQEnqueuer
@@ -546,7 +547,7 @@ class TrainingOrchestrator:
 
             return ProgressResponse(
                 run_id=run_id,
-                phase="queued",
+                phase=TrainingPhase.QUEUED,
                 epoch=0,
                 total_epochs=0,
                 step=0,

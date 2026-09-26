@@ -205,7 +205,7 @@ class CartridgeStrategy:
 
     def __init__(self) -> None:
         """Initialize the cartridge strategy."""
-        self._name: StrategyName = "cartridge"
+        self._name = StrategyName.CARTRIDGE
 
     def name(self) -> StrategyName:
         """Return the strategy name identifier.

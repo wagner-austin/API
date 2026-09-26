@@ -14,6 +14,7 @@ from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.dataset import as_corpus_format
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import EvalJobPayload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.infra.paths import model_eval_dir
 from model_trainer.worker.job_utils import (
     materialize_run_artifacts,
@@ -92,7 +93,7 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             # prefix would silently change what that number covers. Masking is
             # a training-time intervention only.
             "loss_mask_prefix_separator": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "hub_model_id": None,
             "lora": None,
             "cartridge": None,

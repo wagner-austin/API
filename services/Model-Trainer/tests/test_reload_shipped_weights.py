@@ -30,6 +30,7 @@ from model_trainer.core.contracts.cartridge import (
     encode_cartridge_geometry,
 )
 from model_trainer.core.contracts.model import CartridgeConfig, ModelTrainConfig, PreparedLMModel
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.encoding import Encoder, ListEncoded
 from model_trainer.core.services.finetuning.strategies._hook_protocols import (
     _GetPeftModelFn,
@@ -86,7 +87,7 @@ def _cartridge_cfg() -> ModelTrainConfig:
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 0.01,
         "loss_mask_prefix_separator": None,
-        "finetuning_strategy": "cartridge",
+        "finetuning_strategy": StrategyName.CARTRIDGE,
         "hub_model_id": "gpt2",
         "lora": None,
         "cartridge": CartridgeConfig(enabled=True, num_slots=3, init_seed=5),
@@ -430,7 +431,7 @@ class TestTheCartridgeReader:
                 max_seq_len=8,
                 tok_for_dataset=encoder,
                 is_peft=False,
-                strategy_name="cartridge",
+                strategy_name=StrategyName.CARTRIDGE,
                 hub_model_id="gpt2",
                 quantization=None,
             ),

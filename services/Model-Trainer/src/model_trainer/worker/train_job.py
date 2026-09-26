@@ -118,7 +118,7 @@ def _execute_training(
     emit_config_event(r, run_id, user_id, cfg, threads)
 
     # Save initial progress
-    _save_progress("queued", 0, 0, 0.0, 0.0, 0.0, 0.0)
+    _save_progress(TrainingPhase.QUEUED, 0, 0, 0.0, 0.0, 0.0, 0.0)
 
     def _progress(
         step: int,
@@ -145,7 +145,7 @@ def _execute_training(
 
         # Save detailed progress
         _save_progress(
-            "training",
+            TrainingPhase.TRAINING,
             epoch,
             step,
             train_loss,
@@ -234,7 +234,7 @@ def _execute_training(
     )
     if result["cancelled"]:
         _save_progress(
-            "cancelled",
+            TrainingPhase.CANCELLED,
             cfg["num_epochs"],
             result["steps"],
             result["loss"],
@@ -267,7 +267,7 @@ def _execute_training(
         return
     # Transition to saving phase
     _save_progress(
-        "saving",
+        TrainingPhase.SAVING,
         cfg["num_epochs"],
         result["steps"],
         result["loss"],
@@ -283,7 +283,7 @@ def _execute_training(
     gguf_export_cfg = cfg.get("gguf_export")
     if gguf_export_cfg is not None and gguf_export_cfg["enabled"]:
         _save_progress(
-            "exporting",
+            TrainingPhase.EXPORTING,
             cfg["num_epochs"],
             result["steps"],
             result["loss"],

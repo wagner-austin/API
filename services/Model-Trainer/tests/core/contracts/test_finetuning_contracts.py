@@ -20,13 +20,13 @@ class TestAdaptedModel:
         adapted = AdaptedModel(
             model=model,
             base_model_id="test/model-123",
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             is_peft_model=False,
             lora_config=None,
         )
         assert adapted.model is model
         assert adapted.base_model_id == "test/model-123"
-        assert adapted.strategy_name == "full"
+        assert adapted.strategy_name is StrategyName.FULL
         assert adapted.is_peft_model is False
         assert adapted.lora_config is None
 
@@ -44,13 +44,13 @@ class TestAdaptedModel:
         adapted = AdaptedModel(
             model=model,
             base_model_id="meta/llama-7b",
-            strategy_name="lora",
+            strategy_name=StrategyName.LORA,
             is_peft_model=True,
             lora_config=lora_cfg,
         )
         assert adapted.model is model
         assert adapted.base_model_id == "meta/llama-7b"
-        assert adapted.strategy_name == "lora"
+        assert adapted.strategy_name is StrategyName.LORA
         assert adapted.is_peft_model is True
         lora_config = adapted.lora_config
         assert lora_config is lora_cfg
@@ -70,11 +70,11 @@ class TestAdaptedModel:
         adapted = AdaptedModel(
             model=model,
             base_model_id="meta/llama-7b",
-            strategy_name="qlora",
+            strategy_name=StrategyName.QLORA,
             is_peft_model=True,
             lora_config=lora_cfg,
         )
-        assert adapted.strategy_name == "qlora"
+        assert adapted.strategy_name is StrategyName.QLORA
         assert adapted.is_peft_model is True
         lora_config = adapted.lora_config
         assert lora_config is lora_cfg
@@ -86,7 +86,7 @@ class TestAdaptedModel:
         adapted = AdaptedModel(
             model=model,
             base_model_id="test/model",
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             is_peft_model=False,
             lora_config=None,
         )
@@ -100,7 +100,7 @@ class TestAdaptedModel:
         adapted = AdaptedModel(
             model=FakeModel(),
             base_model_id="test/model",
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             is_peft_model=False,
             lora_config=None,
         )
@@ -112,7 +112,7 @@ class TestAdaptedModel:
         adapted = AdaptedModel(
             model=FakeModel(),
             base_model_id="test/model",
-            strategy_name="lora",
+            strategy_name=StrategyName.LORA,
             is_peft_model=True,
             lora_config=None,
         )
@@ -157,25 +157,3 @@ class TestStrategyCapabilities:
         }
         assert caps["supports_quantization"] is True
         assert caps["requires_peft"] is True
-
-
-class TestStrategyName:
-    """Tests for StrategyName literal type."""
-
-    def test_valid_strategy_names(self) -> None:
-        """Test that valid strategy names are accepted."""
-        name_full: StrategyName = "full"
-        name_lora: StrategyName = "lora"
-        name_qlora: StrategyName = "qlora"
-
-        assert name_full == "full"
-        assert name_lora == "lora"
-        assert name_qlora == "qlora"
-
-    def test_strategy_names_in_list(self) -> None:
-        """Test strategy names can be collected in a list."""
-        names: list[StrategyName] = ["full", "lora", "qlora"]
-        assert len(names) == 3
-        assert "full" in names
-        assert "lora" in names
-        assert "qlora" in names

@@ -21,7 +21,7 @@ anywhere else.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from platform_core.json_utils import (
     JSONObject,
@@ -30,13 +30,21 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
-CONTINUATION_ARMS: tuple[Literal["base", "candidate"], ...] = ("base", "candidate")
-"""The two sides of the comparison, and the closed set an arm name may name."""
 
-ContinuationArm = Literal["base", "candidate"]
-"""Which side of the pairing one document produces."""
+class ContinuationArm(StrEnum):
+    """Which side of the pairing one document produces.
+
+    The two members are the closed set an arm name may name: a misspelled
+    arm would otherwise write a third directory nothing compares, and the
+    comparison would silently be between one arm and nothing.
+    """
+
+    BASE = "base"
+    CANDIDATE = "candidate"
+
 
 MINIMUM_REPETITION_PENALTY = 1.0
 """The neutral repetition penalty, and the floor a spec may declare.
@@ -46,28 +54,6 @@ the opposite of what anybody setting this field wants and produces exactly
 the degeneration it exists to suppress. Refused rather than clamped: a
 clamped value would run under a setting the document does not state.
 """
-
-
-def as_continuation_arm(raw: str, field: str) -> ContinuationArm:
-    """Narrow a string to an arm name.
-
-    Args:
-        raw: The value read from the document.
-        field: Field name, for the error message.
-
-    Returns:
-        The narrowed arm.
-
-    Raises:
-        JSONTypeError: If the value names no arm. A misspelled arm would
-            otherwise write a third directory nothing compares, and the
-            comparison would silently be between one arm and nothing.
-    """
-    if raw == "base":
-        return "base"
-    if raw == "candidate":
-        return "candidate"
-    raise JSONTypeError(f"Field '{field}' must be one of {list(CONTINUATION_ARMS)}, got {raw!r}")
 
 
 class ContinuationSweepSpec(TypedDict):
@@ -209,7 +195,7 @@ def decode_continuation_sweep_spec(obj: JSONObject) -> ContinuationSweepSpec:
 
     return ContinuationSweepSpec(
         run_id=_require_nonempty_str(obj, "run_id"),
-        arm=as_continuation_arm(require_str(obj, "arm"), "arm"),
+        arm=require_member(obj, "arm", ContinuationArm),
         artifact_path=_require_nonempty_str(obj, "artifact_path"),
         holdout_path=_require_nonempty_str(obj, "holdout_path"),
         prompt_lines=_require_positive_int(obj, "prompt_lines"),
@@ -235,7 +221,7 @@ def encode_continuation_sweep_spec(spec: ContinuationSweepSpec) -> JSONObject:
     """
     return {
         "run_id": spec["run_id"],
-        "arm": spec["arm"],
+        "arm": spec["arm"].value,
         "artifact_path": spec["artifact_path"],
         "holdout_path": spec["holdout_path"],
         "prompt_lines": spec["prompt_lines"],
@@ -251,12 +237,10 @@ def encode_continuation_sweep_spec(spec: ContinuationSweepSpec) -> JSONObject:
 
 
 __all__ = [
-    "CONTINUATION_ARMS",
     "MINIMUM_REPETITION_PENALTY",
     "Completion",
     "ContinuationArm",
     "ContinuationSweepSpec",
-    "as_continuation_arm",
     "decode_continuation_sweep_spec",
     "encode_continuation_sweep_spec",
 ]

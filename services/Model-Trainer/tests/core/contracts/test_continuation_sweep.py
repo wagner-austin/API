@@ -12,9 +12,8 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from model_trainer.core.contracts.continuation_sweep import (
-    CONTINUATION_ARMS,
+    ContinuationArm,
     ContinuationSweepSpec,
-    as_continuation_arm,
     decode_continuation_sweep_spec,
     encode_continuation_sweep_spec,
 )
@@ -80,22 +79,24 @@ def _spec(**overrides: JSONValue) -> ContinuationSweepSpec:
 class TestTheArmName:
     """The set is closed, because a third name compares against nothing."""
 
-    @pytest.mark.parametrize("arm", CONTINUATION_ARMS)
-    def test_every_declared_arm_narrows(self, arm: str) -> None:
+    @pytest.mark.parametrize("arm", list(ContinuationArm))
+    def test_every_declared_arm_narrows(self, arm: ContinuationArm) -> None:
         """Iterating the declared set keeps this honest as it grows.
 
         Args:
-            arm: The arm name.
+            arm: The arm.
         """
-        assert as_continuation_arm(arm, "arm") == arm
+        assert decode_continuation_sweep_spec(_document(arm=arm.value))["arm"] is arm
 
     def test_an_unknown_arm_is_refused(self) -> None:
         """A misspelling would write a third directory nothing compares."""
-        with pytest.raises(JSONTypeError, match="must be one of"):
-            _ = as_continuation_arm("baseline", "arm")
+        with pytest.raises(
+            JSONTypeError, match="Invalid arm 'baseline': must be one of 'base', 'candidate'"
+        ):
+            _ = decode_continuation_sweep_spec(_document(arm="baseline"))
 
     def test_the_refusal_names_the_field(self) -> None:
-        with pytest.raises(JSONTypeError, match="'arm'"):
+        with pytest.raises(JSONTypeError, match="Invalid arm 'control'"):
             _ = decode_continuation_sweep_spec(_document(arm="control"))
 
 

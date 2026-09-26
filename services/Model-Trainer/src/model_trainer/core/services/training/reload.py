@@ -39,6 +39,7 @@ from __future__ import annotations
 from typing import Literal, Protocol
 
 from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     Hooks as FinetuningHooks,
 )
@@ -143,7 +144,7 @@ def reload_shipped_weights(
             strategies.
         path: Directory the artifact was saved to.
     """
-    if prepared.strategy_name == "cartridge":
+    if prepared.strategy_name is StrategyName.CARTRIDGE:
         _reload_cartridge(prepared.model, path)
         return
     if prepared.is_peft:

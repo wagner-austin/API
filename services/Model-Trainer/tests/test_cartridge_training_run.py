@@ -31,6 +31,7 @@ from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.encoding import Encoder, ListEncoded
 from model_trainer.core.services.finetuning.strategies.cartridge import CartridgeStrategy
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
@@ -127,7 +128,7 @@ def _cfg(corpus_path: Path) -> ModelTrainConfig:
         "test_split_ratio": 0.2,
         "finetune_lr_cap": 1.0,
         "loss_mask_prefix_separator": None,
-        "finetuning_strategy": "cartridge",
+        "finetuning_strategy": StrategyName.CARTRIDGE,
         "hub_model_id": "gpt2",
         "lora": None,
         "cartridge": CartridgeConfig(enabled=True, num_slots=4, init_seed=7),
@@ -208,7 +209,7 @@ class _Run:
             max_seq_len=16,
             tok_for_dataset=encoder,
             is_peft=False,
-            strategy_name="cartridge",
+            strategy_name=StrategyName.CARTRIDGE,
             hub_model_id="gpt2",
             quantization=None,
         )

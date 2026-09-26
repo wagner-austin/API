@@ -16,6 +16,7 @@ from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_char_lstm_backend
@@ -127,7 +128,7 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -290,7 +291,7 @@ def test_a_cpu_run_records_no_card_even_on_a_cuda_box(
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

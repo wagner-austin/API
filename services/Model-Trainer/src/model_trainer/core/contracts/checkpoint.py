@@ -209,7 +209,7 @@ def encode_model_train_config(cfg: ModelTrainConfig) -> JSONObject:
         "test_split_ratio": cfg["test_split_ratio"],
         "finetune_lr_cap": cfg["finetune_lr_cap"],
         "loss_mask_prefix_separator": cfg["loss_mask_prefix_separator"],
-        "finetuning_strategy": cfg["finetuning_strategy"],
+        "finetuning_strategy": cfg["finetuning_strategy"].value,
         "hub_model_id": cfg["hub_model_id"],
         "lora": lora_encoded,
         "cartridge": cartridge_encoded,

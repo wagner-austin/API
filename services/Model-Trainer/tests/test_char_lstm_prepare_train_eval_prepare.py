@@ -12,6 +12,7 @@ from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_char_lstm_backend
 from model_trainer.core.services.tokenizer.char_backend import CharBackend
@@ -52,7 +53,7 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -150,7 +151,7 @@ def test_char_lstm_invalid_size_raises(settings_with_paths: Settings, tmp_path: 
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -197,7 +198,7 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -319,7 +320,7 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -407,7 +408,7 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,
@@ -509,7 +510,7 @@ def test_char_lstm_forward_pass_shapes(settings_with_paths: Settings, tmp_path: 
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

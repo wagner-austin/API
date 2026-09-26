@@ -210,7 +210,7 @@ class FakeHFTokenizer:
 
 def make_test_config(
     *,
-    finetuning_strategy: StrategyName = "full",
+    finetuning_strategy: StrategyName = StrategyName.FULL,
     hub_model_id: str | None = "test/model",
     tokenizer_id: str | None = "test-tok",
 ) -> ModelTrainConfig:

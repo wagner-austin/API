@@ -1,12 +1,4 @@
-"""The declared strategy names, and the one function that admits a string.
-
-These hold the two halves of ``strategy_names`` in agreement. The module has
-to state its names twice -- once as a ``Literal`` for the type checker and
-once as a tuple for anything that iterates -- because ``typing.get_args`` is
-unavailable under this package's ``disallow_any_expr`` and mypy will not
-narrow through membership in a variadic tuple. Nothing in the language holds
-those two in step, so these tests do.
-"""
+"""The declared strategy names, and the one function that admits a string."""
 
 from __future__ import annotations
 
@@ -14,34 +6,25 @@ import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 
 from model_trainer.core.contracts.strategy_names import (
-    STRATEGY_NAMES,
+    StrategyName,
     require_strategy_name,
 )
 
 
 class TestTheDeclaredNames:
-    """The tuple is the iterable face of the literal, and must match it."""
+    """The enum is both the type and the iterable set of names."""
 
     def test_every_declared_name_survives_a_round_trip(self) -> None:
-        """Walks the tuple and requires the narrowing chain to accept each.
-
-        This is the test that catches the half-edit: a strategy added to
-        ``STRATEGY_NAMES`` but not to ``require_strategy_name`` fails here,
-        rather than at the first request that names it.
-        """
-        assert [require_strategy_name(name) for name in STRATEGY_NAMES] == list(STRATEGY_NAMES)
+        """Every member's wire word narrows back to that same member."""
+        assert [require_strategy_name(name.value) for name in StrategyName] == list(StrategyName)
 
     def test_the_declared_names_are_exactly_these(self) -> None:
-        """Pins the set, so adding one is a deliberate edit to this line.
+        """Pins the words in registration order, so adding one is a deliberate edit.
 
-        Asserted as a sorted list rather than a membership check, so a name
-        that is REMOVED fails too.
+        Asserted as a list rather than a membership check, so a name that is
+        REMOVED fails too.
         """
-        assert sorted(STRATEGY_NAMES) == ["cartridge", "full", "lora", "qlora"]
-
-    def test_no_name_is_declared_twice(self) -> None:
-        """A duplicate would make the registry's last registration win silently."""
-        assert len(set(STRATEGY_NAMES)) == len(STRATEGY_NAMES)
+        assert [str(name) for name in StrategyName] == ["full", "lora", "qlora", "cartridge"]
 
 
 class TestRequireStrategyName:

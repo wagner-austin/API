@@ -153,13 +153,13 @@ def test_runs_progress_with_data(tmp_path: Path, settings_factory: _SettingsFact
     client, _, fake = _mk_app(tmp_path, settings_factory)
 
     # Save progress to Redis via ProgressStore
-    from model_trainer.core.contracts.progress import TrainingProgress
+    from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
     from model_trainer.worker.progress_store import ProgressStore
 
     progress_store = ProgressStore(fake)
     progress: TrainingProgress = {
         "run_id": "run-api-progress",
-        "phase": "training",
+        "phase": TrainingPhase.TRAINING,
         "epoch": 3,
         "total_epochs": 10,
         "step": 150,

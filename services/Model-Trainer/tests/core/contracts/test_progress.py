@@ -6,6 +6,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from model_trainer.core.contracts.progress import (
+    TrainingPhase,
     TrainingProgress,
     decode_training_progress,
     encode_training_progress,
@@ -17,7 +18,7 @@ def test_encode_training_progress() -> None:
     """Test encoding TrainingProgress to JSONObject."""
     progress: TrainingProgress = {
         "run_id": "run-123",
-        "phase": "training",
+        "phase": TrainingPhase.TRAINING,
         "epoch": 2,
         "total_epochs": 10,
         "step": 50,
@@ -65,7 +66,7 @@ def test_decode_training_progress() -> None:
     }
     progress = decode_training_progress(obj)
     assert progress["run_id"] == "run-456"
-    assert progress["phase"] == "validation"
+    assert progress["phase"] is TrainingPhase.VALIDATION
     assert progress["epoch"] == 5
     assert progress["total_epochs"] == 20
     assert progress["step"] == 250
@@ -130,7 +131,7 @@ def test_initial_progress() -> None:
         updated_at="2024-01-15T09:00:00",
     )
     assert progress["run_id"] == "run-init"
-    assert progress["phase"] == "queued"
+    assert progress["phase"] is TrainingPhase.QUEUED
     assert progress["epoch"] == 0
     assert progress["total_epochs"] == 10
     assert progress["step"] == 0
@@ -146,22 +147,10 @@ def test_initial_progress() -> None:
 
 def test_decode_all_valid_phases() -> None:
     """Test decoding all valid training phases."""
-    phases = [
-        "queued",
-        "tokenization",
-        "training",
-        "validation",
-        "test",
-        "saving",
-        "uploading",
-        "completed",
-        "cancelled",
-        "failed",
-    ]
-    for phase in phases:
+    for phase in TrainingPhase:
         obj: JSONObject = {
             "run_id": f"run-{phase}",
-            "phase": phase,
+            "phase": phase.value,
             "epoch": 0,
             "total_epochs": 1,
             "step": 0,
@@ -175,4 +164,4 @@ def test_decode_all_valid_phases() -> None:
             "updated_at": "2024-01-15T10:00:00",
         }
         progress = decode_training_progress(obj)
-        assert progress["phase"] == phase
+        assert progress["phase"] is phase

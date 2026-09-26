@@ -13,6 +13,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.api.schemas.runs import EvaluateRequest, TrainRequest
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.contracts.queue import EvalJobPayload, TrainJobPayload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 from model_trainer.core.services.registries import ModelRegistry
@@ -107,7 +108,7 @@ def test_orchestrator_unsupported_model_raises() -> None:
         "data_num_workers": None,
         "data_pin_memory": None,
         "hub_model_id": None,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "lora": None,
         "cartridge": None,
         "quantization": None,

@@ -17,6 +17,7 @@ from model_trainer.core.contracts.model import (
 )
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 from model_trainer.worker import train_job
@@ -96,7 +97,7 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.FP32,
             "hub_model_id": "nghuyong/ernie-2.0-base-en",
-            "finetuning_strategy": "lora",
+            "finetuning_strategy": StrategyName.LORA,
             "lora": LoraConfig(
                 enabled=True,
                 r=8,
@@ -224,7 +225,7 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,
@@ -334,7 +335,7 @@ def test_training_worker_passes_resume_flag_to_backend(
             "loss_mask_prefix_separator": None,
             "precision": RequestedPrecision.AUTO,
             "hub_model_id": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "lora": None,
             "cartridge": None,
             "quantization": None,

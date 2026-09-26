@@ -7,6 +7,7 @@ from collections.abc import Generator
 import pytest
 
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     reset_hooks as reset_ft_hooks,
 )
@@ -98,16 +99,16 @@ class TestRequireFineTuningStrategy:
 
     def test_returns_strategy_when_present(self) -> None:
         """Test extraction of finetuning_strategy from config."""
-        cfg = make_test_config(finetuning_strategy="lora")
+        cfg = make_test_config(finetuning_strategy=StrategyName.LORA)
         result = _require_finetuning_strategy(cfg)
-        assert result == "lora"
+        assert result is StrategyName.LORA
 
     def test_returns_all_valid_strategies(self) -> None:
         """Test that all valid strategy names are accepted."""
-        for strategy in ("full", "lora", "qlora"):
+        for strategy in StrategyName:
             cfg = make_test_config(finetuning_strategy=strategy)
             result = _require_finetuning_strategy(cfg)
-            assert result == strategy
+            assert result is strategy
 
 
 class TestTokenIdsFromHFTokenizer:
@@ -181,7 +182,9 @@ class TestPrepareHFLMWithHandle:
         Hooks.load_hf_model = model_loader
         Hooks.load_hf_tokenizer = tok_loader
 
-        cfg = make_test_config(finetuning_strategy="full", hub_model_id="test/base-model")
+        cfg = make_test_config(
+            finetuning_strategy=StrategyName.FULL, hub_model_id="test/base-model"
+        )
         tok = _FakeTokHandle()
 
         result = prepare_hf_lm_with_handle(tok, cfg)

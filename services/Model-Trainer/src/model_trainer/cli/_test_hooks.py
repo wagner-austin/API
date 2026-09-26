@@ -272,7 +272,7 @@ def _default_load_continuation_arm(artifact_path: str, arm: ContinuationArm, /) 
         load_prepared_hf_lm_from_handle,
     )
 
-    if arm == "candidate":
+    if arm is ContinuationArm.CANDIDATE:
         return load_prepared_hf_lm_from_handle(artifact_path, None)
     return load_base_of_prepared_hf_lm(artifact_path)
 

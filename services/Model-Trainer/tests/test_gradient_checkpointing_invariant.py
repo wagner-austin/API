@@ -71,7 +71,7 @@ class TestCapabilityIsConsulted:
         """A full finetune supports checkpointing, so it is enabled."""
         model = _RecordingModel()
 
-        enabled = _enable_gradient_checkpointing_if_supported(model, "full")
+        enabled = _enable_gradient_checkpointing_if_supported(model, StrategyName.FULL)
 
         assert enabled is True
         assert model.checkpointing_calls == 1
@@ -80,14 +80,14 @@ class TestCapabilityIsConsulted:
         """LoRA declares support, so the trainer enables it."""
         model = _RecordingModel()
 
-        assert _enable_gradient_checkpointing_if_supported(model, "lora") is True
+        assert _enable_gradient_checkpointing_if_supported(model, StrategyName.LORA) is True
         assert model.checkpointing_calls == 1
 
     def test_qlora_strategy_is_checkpointed(self) -> None:
         """QLoRA declares support, so the trainer enables it."""
         model = _RecordingModel()
 
-        assert _enable_gradient_checkpointing_if_supported(model, "qlora") is True
+        assert _enable_gradient_checkpointing_if_supported(model, StrategyName.QLORA) is True
         assert model.checkpointing_calls == 1
 
     def test_cartridge_strategy_is_not_checkpointed(self) -> None:
@@ -100,7 +100,7 @@ class TestCapabilityIsConsulted:
         """
         model = _RecordingModel()
 
-        enabled = _enable_gradient_checkpointing_if_supported(model, "cartridge")
+        enabled = _enable_gradient_checkpointing_if_supported(model, StrategyName.CARTRIDGE)
 
         assert enabled is False
         assert model.checkpointing_calls == 0
@@ -112,8 +112,7 @@ class TestCapabilityIsConsulted:
         the registry rather than silently training uncheckpointed, which is
         the failure mode this whole file exists to close.
         """
-        for name in ("full", "lora", "qlora", "cartridge"):
-            strategy: StrategyName = name
+        for strategy in StrategyName:
             model = _RecordingModel()
             enabled = _enable_gradient_checkpointing_if_supported(model, strategy)
             assert enabled == (model.checkpointing_calls == 1)
@@ -128,7 +127,7 @@ class TestDefaultHookDelegates:
 
         model = _RecordingModel()
 
-        assert _default_enable_gradient_checkpointing(model, "full") is True
+        assert _default_enable_gradient_checkpointing(model, StrategyName.FULL) is True
         assert model.checkpointing_calls == 1
 
     def test_default_hook_declines_for_cartridge(self) -> None:
@@ -137,7 +136,7 @@ class TestDefaultHookDelegates:
 
         model = _RecordingModel()
 
-        assert _default_enable_gradient_checkpointing(model, "cartridge") is False
+        assert _default_enable_gradient_checkpointing(model, StrategyName.CARTRIDGE) is False
         assert model.checkpointing_calls == 0
 
     def test_hook_is_bound_to_the_default(self) -> None:

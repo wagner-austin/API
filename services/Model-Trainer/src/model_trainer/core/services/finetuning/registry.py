@@ -137,7 +137,7 @@ def default_registry() -> FineTuningRegistry:
         fromlist=["create_full_strategy"],
     )
     create_full_strategy: StrategyFactory = full_mod.create_full_strategy
-    reg.register("full", StrategyRegistration(create_full_strategy))
+    reg.register(StrategyName.FULL, StrategyRegistration(create_full_strategy))
 
     # LoRA strategy
     lora_mod = __import__(
@@ -145,7 +145,7 @@ def default_registry() -> FineTuningRegistry:
         fromlist=["create_lora_strategy"],
     )
     create_lora_strategy: StrategyFactory = lora_mod.create_lora_strategy
-    reg.register("lora", StrategyRegistration(create_lora_strategy))
+    reg.register(StrategyName.LORA, StrategyRegistration(create_lora_strategy))
 
     # QLoRA strategy
     qlora_mod = __import__(
@@ -153,7 +153,7 @@ def default_registry() -> FineTuningRegistry:
         fromlist=["create_qlora_strategy"],
     )
     create_qlora_strategy: StrategyFactory = qlora_mod.create_qlora_strategy
-    reg.register("qlora", StrategyRegistration(create_qlora_strategy))
+    reg.register(StrategyName.QLORA, StrategyRegistration(create_qlora_strategy))
 
     # Cartridge strategy
     cartridge_mod = __import__(
@@ -161,7 +161,7 @@ def default_registry() -> FineTuningRegistry:
         fromlist=["create_cartridge_strategy"],
     )
     create_cartridge_strategy: StrategyFactory = cartridge_mod.create_cartridge_strategy
-    reg.register("cartridge", StrategyRegistration(create_cartridge_strategy))
+    reg.register(StrategyName.CARTRIDGE, StrategyRegistration(create_cartridge_strategy))
 
     return reg
 

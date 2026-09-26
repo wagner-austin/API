@@ -13,6 +13,7 @@ from platform_ml.testing import WandbTableProtocol
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.encoding import Encoder, ListEncoded
 from model_trainer.core.services.training import base_trainer as bt
 from model_trainer.core.types import (
@@ -148,7 +149,7 @@ def _make_cfg() -> ModelTrainConfig:
         "finetune_lr_cap": 0.0,
         "loss_mask_prefix_separator": None,
         "precision": ResolvedPrecision.FP32,
-        "finetuning_strategy": "full",
+        "finetuning_strategy": StrategyName.FULL,
         "hub_model_id": None,
         "lora": None,
         "cartridge": None,

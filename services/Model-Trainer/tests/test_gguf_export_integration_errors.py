@@ -11,11 +11,13 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 from model_trainer.core.contracts.model import (
     GgufExportConfig,
 )
+from model_trainer.core.contracts.progress import TrainingPhase
 from model_trainer.core.contracts.queue import TrainRequestPayload
 from model_trainer.core.contracts.queue_encoding import (
     decode_train_request_payload,
     encode_train_request_payload,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.export import _test_hooks as export_hooks
 from model_trainer.worker.train_job_lifecycle import _maybe_export_to_gguf
 from tests._gguf_integration_support import (
@@ -56,7 +58,7 @@ class TestQueueEncodingRoundTrip:
             "finetune_lr_cap": 0.0,
             "loss_mask_prefix_separator": None,
             "hub_model_id": "meta-llama/Llama-2-7b-hf",
-            "finetuning_strategy": "lora",
+            "finetuning_strategy": StrategyName.LORA,
             "lora": {
                 "enabled": True,
                 "r": 8,
@@ -106,7 +108,7 @@ class TestQueueEncodingRoundTrip:
             "finetune_lr_cap": 0.0,
             "loss_mask_prefix_separator": None,
             "hub_model_id": "meta-llama/Llama-2-7b-hf",
-            "finetuning_strategy": "lora",
+            "finetuning_strategy": StrategyName.LORA,
             "lora": {
                 "enabled": True,
                 "r": 8,
@@ -152,7 +154,7 @@ class TestQueueEncodingRoundTrip:
             "finetune_lr_cap": 0.0,
             "loss_mask_prefix_separator": None,
             "hub_model_id": "model",
-            "finetuning_strategy": "lora",
+            "finetuning_strategy": StrategyName.LORA,
             "lora": {
                 "enabled": True,
                 "r": 8,
@@ -197,7 +199,7 @@ class TestQueueEncodingRoundTrip:
             "finetune_lr_cap": 0.0,
             "loss_mask_prefix_separator": None,
             "hub_model_id": "model",
-            "finetuning_strategy": "lora",
+            "finetuning_strategy": StrategyName.LORA,
             "lora": {
                 "enabled": True,
                 "r": 8,
@@ -291,12 +293,8 @@ class TestProgressShowsExportingPhase:
     """Tests for exporting phase in progress."""
 
     def test_exporting_phase_is_valid(self) -> None:
-        """Exporting is a valid training phase."""
-        from model_trainer.core.contracts.progress import TrainingPhase
-
-        # This will be a type error if "exporting" is not in TrainingPhase
-        phase: TrainingPhase = "exporting"
-        assert phase == "exporting"
+        """Exporting is a valid training phase, named by the word progress records carry."""
+        assert TrainingPhase("exporting") is TrainingPhase.EXPORTING
 
     def test_progress_response_accepts_exporting_phase(self) -> None:
         """ProgressResponse schema accepts exporting phase."""
@@ -304,7 +302,7 @@ class TestProgressShowsExportingPhase:
 
         response: ProgressResponse = {
             "run_id": "run-123",
-            "phase": "exporting",
+            "phase": TrainingPhase.EXPORTING,
             "epoch": 1,
             "total_epochs": 1,
             "step": 100,
@@ -317,7 +315,7 @@ class TestProgressShowsExportingPhase:
             "val_ppl": None,
             "updated_at": "2024-01-01T00:00:00",
         }
-        assert response["phase"] == "exporting"
+        assert response["phase"] is TrainingPhase.EXPORTING
 
 
 class TestTrainingJobWithGgufExport:
@@ -410,7 +408,7 @@ class TestTrainingJobWithGgufExport:
                 "loss_mask_prefix_separator": None,
                 "precision": RequestedPrecision.FP32,
                 "hub_model_id": "meta-llama/Llama-2-7b-hf",
-                "finetuning_strategy": "lora",
+                "finetuning_strategy": StrategyName.LORA,
                 "lora": LoraConfig(
                     enabled=True,
                     r=8,

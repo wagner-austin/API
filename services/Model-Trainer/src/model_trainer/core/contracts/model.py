@@ -325,7 +325,7 @@ class PreparedLMModel:
     max_seq_len: int
     tok_for_dataset: Encoder
     # Optional HF LM adapter metadata
-    strategy_name: str | None
+    strategy_name: StrategyName | None
     hub_model_id: str | None
     is_peft: bool
     # The quantization this model was LOADED under, or None when it was not
@@ -343,7 +343,7 @@ class PreparedLMModel:
         pad_id: int,
         max_seq_len: int,
         tok_for_dataset: Encoder,
-        strategy_name: str | None = None,
+        strategy_name: StrategyName | None = None,
         hub_model_id: str | None = None,
         is_peft: bool = False,
         quantization: QuantizationConfig | None = None,

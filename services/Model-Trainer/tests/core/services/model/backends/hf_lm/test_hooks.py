@@ -12,6 +12,7 @@ from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     HFModelLoader,
     HFTokenizerLoader,
@@ -412,7 +413,7 @@ class TestDefaultLoadPreparedModel:
             pad_id=pad_id,
             max_seq_len=128,
             tok_for_dataset=HFTokenizerEncoder(tokenizer),
-            strategy_name="full",
+            strategy_name=StrategyName.FULL,
             hub_model_id="sshleifer/tiny-gpt2",
             is_peft=False,
         )
@@ -490,7 +491,7 @@ class TestDefaultCreateTrainer:
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 1e-5,
             "loss_mask_prefix_separator": None,
-            "finetuning_strategy": "full",
+            "finetuning_strategy": StrategyName.FULL,
             "hub_model_id": None,
             "lora": None,
             "cartridge": None,

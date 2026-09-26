@@ -29,7 +29,7 @@ from platform_core.run_record import decode_run_record
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import continuations
-from model_trainer.core.contracts.continuation_sweep import Completion
+from model_trainer.core.contracts.continuation_sweep import Completion, ContinuationArm
 from tests._continuations_support import (
     Recorder,
     command_line,
@@ -242,7 +242,7 @@ def test_a_spec_that_is_not_an_object_is_refused(tmp_path: pathlib.Path) -> None
 def test_a_spec_document_round_trips_through_the_loader(tmp_path: pathlib.Path) -> None:
     spec = continuations.load_spec(spec_file(tmp_path))
 
-    assert spec["arm"] == "candidate"
+    assert spec["arm"] is ContinuationArm.CANDIDATE
     assert spec["batch_size"] == 2
 
 
@@ -342,7 +342,9 @@ class TestTheProductionDefaults:
         hf_hooks.Hooks.load_hf_model = fake_model_loader
         hf_hooks.Hooks.load_hf_tokenizer = fake_tokenizer_loader
         try:
-            prepared = cli_hooks._default_load_continuation_arm(self._saved_run(tmp_path), "base")
+            prepared = cli_hooks._default_load_continuation_arm(
+                self._saved_run(tmp_path), ContinuationArm.BASE
+            )
         finally:
             (hf_hooks.Hooks.load_hf_model, hf_hooks.Hooks.load_hf_tokenizer) = saved
 
@@ -362,7 +364,7 @@ class TestTheProductionDefaults:
         ft_hooks.Hooks.load_full_model = fake_full_model_loader
         try:
             prepared = cli_hooks._default_load_continuation_arm(
-                self._saved_run(tmp_path), "candidate"
+                self._saved_run(tmp_path), ContinuationArm.CANDIDATE
             )
         finally:
             (hf_hooks.Hooks.load_hf_model, hf_hooks.Hooks.load_hf_tokenizer) = saved

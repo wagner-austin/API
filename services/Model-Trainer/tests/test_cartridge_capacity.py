@@ -73,6 +73,7 @@ from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
 from model_trainer.core.contracts.model import CartridgeConfig, ModelTrainConfig
 from model_trainer.core.contracts.paired_comparison import PairedComparison
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.finetuning.strategies.cartridge import CartridgeStrategy
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.model.cartridge_scoring import score_held_out, train_on
@@ -162,7 +163,7 @@ def _cfg(num_slots: int) -> ModelTrainConfig:
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 1.0,
         "loss_mask_prefix_separator": None,
-        "finetuning_strategy": "cartridge",
+        "finetuning_strategy": StrategyName.CARTRIDGE,
         "hub_model_id": "gpt2",
         "lora": None,
         "cartridge": CartridgeConfig(enabled=True, num_slots=num_slots, init_seed=7),
