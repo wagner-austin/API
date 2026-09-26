@@ -28,6 +28,7 @@ from tankpit_bot.capture.xor import (
 from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.resources import static_key_file_path
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import encode_wire_frame
 
@@ -164,37 +165,37 @@ class TestAnalyzeViewportEntities:
                     [
                         CapturedMessage(
                             timestamp_ms=1000,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=_make_viewport_payload(xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1001,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload="not-base64!",
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1002,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload=base64.b64encode(b"\x01").decode("ascii"),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1003,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload=base64.b64encode(b"\x00\x00").decode("ascii"),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1004,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload=encode_wire_frame(0x24, b"\x0e\x22\x12", xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1005,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload=encode_wire_frame(
                                 0x3D,
                                 bytes([1, 1, 0, 5, 6, 0, 0, 1, 0, 0, 0, 0]),
@@ -230,7 +231,7 @@ class TestAnalyzeViewportEntities:
                     [
                         CapturedMessage(
                             timestamp_ms=1000,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload=_make_viewport_payload(xor_table),
                             ws_url="wss://test/ws",
                         )

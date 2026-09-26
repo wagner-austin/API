@@ -19,6 +19,7 @@ from tankpit_bot.capture.protocol_census import (
 )
 from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.resources import static_key_file_path
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 from tests.conftest import FakeFileSystem
@@ -71,7 +72,7 @@ class TestAnalyzeProtocolCensus:
         messages = [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=encode_wire_frame(
                     0x2E,
                     bytes([0x0C]),  # 1-byte teleport_landed
@@ -81,19 +82,19 @@ class TestAnalyzeProtocolCensus:
             ),
             CapturedMessage(
                 timestamp_ms=1100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=encode_wire_frame(0x21, bytes([0x01, 0x02]), xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1200,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=encode_wire_frame(0x7B, bytes([0x11, 0x22, 0x33]), xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1300,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=base64.b64encode(b"\x02\x00+=").decode("ascii"),
                 ws_url="wss://test/ws",
             ),
@@ -125,7 +126,7 @@ class TestAnalyzeProtocolCensus:
                 [
                     CapturedMessage(
                         timestamp_ms=1000,
-                        direction="received",
+                        direction=MessageDirection.RECEIVED,
                         payload=payload,
                         ws_url="wss://test/ws",
                     )
@@ -302,7 +303,7 @@ def test_analyze_protocol_census_counts_framing_errors(
             [
                 CapturedMessage(
                     timestamp_ms=1000,
-                    direction="received",
+                    direction=MessageDirection.RECEIVED,
                     payload=bad_payload,
                     ws_url="wss://test/ws",
                 )
@@ -336,7 +337,7 @@ def test_analyze_protocol_census_skips_sent_messages(
         [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=base64.b64encode(b"\x02\x00+=").decode("ascii"),
                 ws_url="wss://test/ws",
             )

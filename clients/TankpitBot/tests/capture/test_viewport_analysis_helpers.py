@@ -11,6 +11,7 @@ from tankpit_bot.capture.viewport_analysis_types import (
     ViewportAnalysisStateDict,
 )
 from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.types.message import CapturedMessage
 from tests.capture._viewport_analysis_fixtures import (
     _make_session,
@@ -119,7 +120,7 @@ class TestViewportAnalysisHelperDetail:
         messages = [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_sync_payload(xor_table),
                 ws_url="wss://test/ws",
             )

@@ -7,6 +7,7 @@ import base64
 from tankpit_bot import _test_hooks
 from tankpit_bot.capture.stats import build_message_stats
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 
 
@@ -48,7 +49,7 @@ class TestBuildMessageStats:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test",
             ),
@@ -94,7 +95,7 @@ class TestBuildMessageStats:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test",
             ),
@@ -149,7 +150,10 @@ class TestBuildMessageStats:
             base_url="test",
             messages=[
                 CapturedMessage(
-                    timestamp_ms=100, direction="received", payload=payload, ws_url="wss://test"
+                    timestamp_ms=100,
+                    direction=MessageDirection.RECEIVED,
+                    payload=payload,
+                    ws_url="wss://test",
                 ),
             ],
             magic=magic,
@@ -187,7 +191,7 @@ class TestBuildMessageStats:
             messages.append(
                 CapturedMessage(
                     timestamp_ms=100 + i,
-                    direction="received",
+                    direction=MessageDirection.RECEIVED,
                     payload=payload,
                     ws_url="wss://test",
                 )

@@ -28,6 +28,7 @@ from tankpit_bot.protocol.commands import CMD_MOVE, CMD_SHOOT, TYPE_COMBAT
 from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.resources import static_key_file_path
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import encode_wire_frame
 
@@ -176,37 +177,37 @@ class TestAnalyzeShotViewportCorrelation:
                     [
                         CapturedMessage(
                             timestamp_ms=1000,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload="not-base64!",
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1001,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=base64.b64encode(b"\x01").decode("ascii"),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1002,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(ord("!"), bytes([2]), xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1003,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(ord("?"), bytes([2, 102]), xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1004,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(ord("!"), bytes([2, 102]), xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1005,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(
                                 ord("!"),
                                 bytes([4, 112, 10, 20]),
@@ -216,7 +217,7 @@ class TestAnalyzeShotViewportCorrelation:
                         ),
                         CapturedMessage(
                             timestamp_ms=1006,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(
                                 ord("!"),
                                 bytes([TYPE_COMBAT, CMD_SHOOT, 50, 60, 0]),
@@ -269,13 +270,13 @@ class TestAnalyzeShotViewportCorrelation:
                     [
                         CapturedMessage(
                             timestamp_ms=1000,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=base64.b64encode(encode_frame(b"-")).decode("ascii"),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1001,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=_make_shoot_payload(50, 60, 514, xor_table),
                             ws_url="wss://test/ws",
                         ),
@@ -321,7 +322,7 @@ class TestAnalyzeShotViewportCorrelation:
                     [
                         CapturedMessage(
                             timestamp_ms=1100,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(
                                 ord("!"),
                                 bytes([TYPE_COMBAT, CMD_MOVE, 12, 34, 9, 3]),
@@ -357,13 +358,13 @@ class TestAnalyzeShotViewportCorrelation:
                     [
                         CapturedMessage(
                             timestamp_ms=1000,
-                            direction="received",
+                            direction=MessageDirection.RECEIVED,
                             payload=_make_viewport_payload(xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1100,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=_make_shoot_payload(50, 60, 514, xor_table),
                             ws_url="wss://test/ws",
                         ),
@@ -406,13 +407,13 @@ class TestAnalyzeShotViewportCorrelation:
                     [
                         CapturedMessage(
                             timestamp_ms=1000,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=encode_wire_frame(ord("!"), bytes([2, 102]), xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1100,
-                            direction="sent",
+                            direction=MessageDirection.SENT,
                             payload=_make_shoot_payload(12, 34, 777, xor_table),
                             ws_url="wss://test/ws",
                         ),

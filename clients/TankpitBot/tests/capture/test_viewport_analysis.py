@@ -21,6 +21,7 @@ from tankpit_bot.capture.viewport_analysis import (
     format_viewport_analysis,
 )
 from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.types.message import CapturedMessage
 from tests.capture._viewport_analysis_fixtures import (
     _make_session,
@@ -62,31 +63,31 @@ class TestViewportAnalysisHelpers:
         messages = [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=_make_sync_payload(xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="not-base64!",
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1200,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=base64.b64encode(b"\x00\x00").decode("ascii"),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1250,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_unknown_payload(xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1300,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_sync_payload(xor_table),
                 ws_url="wss://test/ws",
             ),
@@ -112,43 +113,43 @@ class TestViewportAnalysisHelpers:
         messages = [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=frame_one,
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="not-base64!",
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1200,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=frame_one,
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1300,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=frame_two,
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1400,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=frame_three,
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1500,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=short_frame,
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1600,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=non_container,
                 ws_url="wss://test/ws",
             ),
@@ -178,13 +179,13 @@ class TestAnalyzeCaptureSession:
         messages = [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_movement_response_payload(638, 144, 137, xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_viewport_update_payload(136, 134, xor_table),
                 ws_url="wss://test/ws",
             ),
@@ -210,25 +211,25 @@ class TestAnalyzeCaptureSession:
         messages = [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_movement_response_payload(700, 144, 137, xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_viewport_update_payload(136, 134, xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1200,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_viewport_update_payload(137, 134, xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1300,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=_make_movement_response_payload(700, 145, 137, xor_table),
                 ws_url="wss://test/ws",
             ),
