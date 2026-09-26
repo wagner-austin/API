@@ -6,7 +6,7 @@ from typing import Protocol
 
 from platform_core.config import _require_env_str
 from platform_core.job_events import JobDomain, default_events_channel
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.queues import TRANSCRIPT_QUEUE
 from platform_workers.rq_harness import WorkerConfig
 
@@ -70,8 +70,8 @@ def main(
         runner: Worker runner function. If None, uses the worker_runner hook.
     """
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="transcript-worker",
         instance_id=None,
         extra_fields=None,
