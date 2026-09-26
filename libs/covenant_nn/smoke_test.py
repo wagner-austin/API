@@ -15,6 +15,7 @@ from covenant_ml.datasets.types import (
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     TargetColumnSpec,
 )
 from covenant_ml.testing import (
@@ -42,7 +43,7 @@ def _make_config() -> DatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="t",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
