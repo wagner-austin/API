@@ -9,7 +9,7 @@ source_paths:
   - "docs/handoffs/self-observing-bot-architecture.md"
 source_git_blobs:
   "docs/handoffs/self-observing-bot-architecture.md": "4f8a51ccb728e9e9af2e52ec663a70563ceab65e"
-fact_checked: "2026-09-03"
+fact_checked: "2026-09-26"
 confidence: high
 hubs: [architecture]
 ---
@@ -250,10 +250,11 @@ claim fails the build.[^guard]
 
 **Read the claim kinds, not the count.** This binding is deliberately
 weaker than the protocol ones, and the split is worth stating plainly:
-of 65 symbols, 7 are constants verified by value and 2 are tables
-verified member-by-member, 14 are record types whose FIELD SETS are
-verified, and 42 are functions and Literal aliases carrying `law`
-claims — prose plus an existence check. A `law` claim does not verify
+of 68 symbols, 9 are constants verified by value and 3 are StrEnum
+vocabularies (`ActionKind`, `ActionOutcome`, `FuelEntryKind`) verified
+member-by-member, 14 are record types whose FIELD SETS are verified,
+and 42 are functions, contract classes and `LedgerService` carrying
+`law` claims — prose plus an existence check. A `law` claim does not verify
 behaviour; it catches deletion and rename, nothing more. The
 behavioural guarantees for this package come from
 `scripts/contract_rules.py` (which requires `@enforce_contract` on
@@ -513,22 +514,17 @@ so the shapes had to live somewhere neither imports.[^guard]
     },
     {
       "id": "events-action-kinds",
-      "code": "tankpit_bot.ledger.events:ACTION_KINDS",
-      "members": [
-        "scan",
-        "move",
-        "teleport",
-        "collect",
-        "map_open",
-        "shoot",
-        "scope"
-      ],
-      "means": "every dispatchable action kind the ledger books outcomes for - scope joined 2026-08-20 when the pan was promoted from fire-and-forget"
-    },
-    {
-      "id": "events-actionkind",
       "code": "tankpit_bot.ledger.events:ActionKind",
-      "law": "ActionKind."
+      "members": {
+        "SCAN": "scan",
+        "MOVE": "move",
+        "TELEPORT": "teleport",
+        "COLLECT": "collect",
+        "MAP_OPEN": "map_open",
+        "SHOOT": "shoot",
+        "SCOPE": "scope"
+      },
+      "means": "every dispatchable action kind the ledger books outcomes for - scope joined 2026-08-20 when the pan was promoted from fire-and-forget"
     },
     {
       "id": "fuel-book-block-reading-cap",
@@ -657,7 +653,26 @@ so the shapes had to live somewhere neither imports.[^guard]
     {
       "id": "outcomes-actionoutcome",
       "code": "tankpit_bot.ledger.outcomes:ActionOutcome",
-      "law": "Every outcome the ledger records is one member of this StrEnum, whose value is the word written to the ledger; the per-kind subsets (scan, move, teleport, collect, map_open, shoot, scope) are documented on the class. Scope-pan resolutions are 0x5A confirmed, superseded, or stalled - the pan is a tracked action since 2026-08-20 (the scope-pending radar drop)."
+      "members": {
+        "RADAR_COMPLETE": "radar_complete",
+        "SUPERSEDED": "superseded",
+        "STALL_TIMEOUT": "stall_timeout",
+        "COMMAND_REJECTED": "command_rejected",
+        "POSITION_REACHED": "position_reached",
+        "MOVEMENT_REJECTED": "movement_rejected",
+        "LANDED_EXACT": "landed_exact",
+        "LANDED_INEXACT": "landed_inexact",
+        "CONTAINER_CONSUMED": "container_consumed",
+        "PICKUP_EMPTY": "pickup_empty",
+        "CLAMPED_TRANSFER": "clamped_transfer",
+        "INVENTORY_FULL": "inventory_full",
+        "MAP_DATA_PROCESSED": "map_data_processed",
+        "HIT": "hit",
+        "MISS": "miss",
+        "FIRED": "fired",
+        "CONFIRMED": "confirmed"
+      },
+      "means": "every outcome the ledger records, each written as its value; the per-kind subsets (scan, move, teleport, collect, map_open, shoot, scope) are documented on the class. Scope-pan resolutions are 0x5A confirmed, superseded, or stalled - the pan is a tracked action since 2026-08-20 (the scope-pending radar drop)"
     },
     {
       "id": "outcome-scope-emit-confirmed",
