@@ -260,7 +260,7 @@ class LSTMBackend(ClassifierBackend):
         )
 
     def backend_name(self) -> BackendName:
-        return "lstm"
+        return BackendName.LSTM
 
     def capabilities(self) -> BackendCapabilities:
         return LSTM_CAPABILITIES

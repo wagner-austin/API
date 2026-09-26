@@ -208,7 +208,7 @@ class MLPBackend(ClassifierBackend):
         )
 
     def backend_name(self) -> BackendName:
-        return "mlp"
+        return BackendName.MLP
 
     def capabilities(self) -> BackendCapabilities:
         return MLP_CAPABILITIES

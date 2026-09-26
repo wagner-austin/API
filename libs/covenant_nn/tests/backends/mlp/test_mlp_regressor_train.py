@@ -15,6 +15,7 @@ from covenant_ml.types import (
 from covenant_ml.types_regression import (
     RegressionTrainOutcome,
     RegressionTrainProgress,
+    RegressorBackendName,
     RegressorTrainConfig,
 )
 from numpy.typing import NDArray
@@ -104,13 +105,13 @@ def _invoke_mlp_regressor_train(
 def test_create_mlp_regressor_backend_returns_backend() -> None:
     """Factory returns a RegressorBackend instance."""
     backend: RegressorBackend = create_mlp_regressor_backend()
-    assert backend.backend_name() == "mlp_reg"
+    assert backend.backend_name() is RegressorBackendName.MLP_REG
 
 
 def test_mlp_regressor_backend_name() -> None:
     """Backend returns correct name literal."""
     backend = MLPRegressorBackend()
-    assert backend.backend_name() == "mlp_reg"
+    assert backend.backend_name() is RegressorBackendName.MLP_REG
 
 
 def test_mlp_regressor_capabilities() -> None:

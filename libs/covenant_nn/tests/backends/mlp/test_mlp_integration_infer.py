@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     MLPConfig,
     TrainOutcome,
@@ -380,7 +381,7 @@ def test_mlp_model_factory_protocol_exported() -> None:
 def test_mlp_backend_name_returns_mlp() -> None:
     """MLPBackend.backend_name returns 'mlp'."""
     backend = create_mlp_backend()
-    assert backend.backend_name() == "mlp"
+    assert backend.backend_name() is BackendName.MLP
 
 
 def test_mlp_backend_capabilities_returns_dict() -> None:

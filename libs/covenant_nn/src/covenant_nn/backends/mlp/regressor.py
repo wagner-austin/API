@@ -284,7 +284,7 @@ class MLPRegressorBackend:
         Returns:
             The backend name literal 'mlp_reg'.
         """
-        return "mlp_reg"
+        return RegressorBackendName.MLP_REG
 
     def capabilities(self) -> BackendCapabilities:
         """Return capability flags.

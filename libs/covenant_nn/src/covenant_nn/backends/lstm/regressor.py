@@ -226,7 +226,7 @@ class LSTMRegressorBackend:
         Returns:
             The backend name literal 'lstm_reg'.
         """
-        return "lstm_reg"
+        return RegressorBackendName.LSTM_REG
 
     def capabilities(self) -> BackendCapabilities:
         """Return capability flags.

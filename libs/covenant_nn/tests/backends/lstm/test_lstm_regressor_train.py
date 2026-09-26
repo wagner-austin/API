@@ -11,6 +11,7 @@ from covenant_ml.types import LSTMConfig, TrainConfig
 from covenant_ml.types_regression import (
     RegressionTrainOutcome,
     RegressionTrainProgress,
+    RegressorBackendName,
     RegressorTrainConfig,
 )
 from numpy.typing import NDArray
@@ -104,13 +105,13 @@ def _invoke_lstm_regressor_train(
 def test_create_lstm_regressor_backend_returns_backend() -> None:
     """Factory returns a RegressorBackend instance."""
     backend: RegressorBackend = create_lstm_regressor_backend()
-    assert backend.backend_name() == "lstm_reg"
+    assert backend.backend_name() is RegressorBackendName.LSTM_REG
 
 
 def test_lstm_regressor_backend_name() -> None:
     """Backend returns correct name literal."""
     backend = LSTMRegressorBackend()
-    assert backend.backend_name() == "lstm_reg"
+    assert backend.backend_name() is RegressorBackendName.LSTM_REG
 
 
 def test_lstm_regressor_capabilities() -> None:

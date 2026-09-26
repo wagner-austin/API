@@ -9,7 +9,7 @@ from pathlib import Path
 
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.base_trainer import BaseTabularTrainer
-from covenant_ml.types import MLPConfig, TrainOutcome, TrainProgress
+from covenant_ml.types import BackendName, MLPConfig, TrainOutcome, TrainProgress
 from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
@@ -20,7 +20,7 @@ from .conftest import load_us_bankruptcy_data
 def _make_mlp_registry() -> ClassifierRegistry:
     """Create a classifier registry with only the MLP backend registered."""
     registry = ClassifierRegistry()
-    registry.register("mlp", BackendRegistration(create_mlp_backend))
+    registry.register(BackendName.MLP, BackendRegistration(create_mlp_backend))
     return registry
 
 
@@ -56,7 +56,7 @@ def test_base_trainer_with_mlp(tmp_path: Path) -> None:
     }
 
     outcome: TrainOutcome = trainer.train(
-        backend="mlp",
+        backend=BackendName.MLP,
         x_features=x,
         y_labels=y,
         feature_names=names,
@@ -116,7 +116,7 @@ def test_base_trainer_mlp_with_progress_callback(tmp_path: Path) -> None:
     }
 
     outcome: TrainOutcome = trainer.train(
-        backend="mlp",
+        backend=BackendName.MLP,
         x_features=x,
         y_labels=y,
         feature_names=names,

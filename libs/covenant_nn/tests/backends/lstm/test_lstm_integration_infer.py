@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     LSTMConfig,
     TrainOutcome,
@@ -243,7 +244,7 @@ def test_lstm_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
 def test_lstm_backend_name_returns_lstm() -> None:
     """LSTMBackend.backend_name returns 'lstm'."""
     backend = create_lstm_backend()
-    assert backend.backend_name() == "lstm"
+    assert backend.backend_name() is BackendName.LSTM
 
 
 def test_lstm_backend_capabilities_returns_dict() -> None:
