@@ -24,7 +24,7 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from fleet.cli import _config, run
 from fleet.contracts.node import NodeConfig, NodeState
@@ -135,8 +135,8 @@ def entrypoint() -> None:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
     setup_logging(
-        level="INFO",
-        format_mode="text",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.TEXT,
         service_name="fleet-preflight",
         instance_id=None,
         extra_fields=None,
