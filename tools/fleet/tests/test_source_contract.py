@@ -30,6 +30,7 @@ from fleet.contracts.source import (
     decode_remote,
     encode_project_source,
 )
+from fleet.contracts.tags import NodeTag
 from tests._queue_fakes import DEFAULT_SHA, queue_job
 from tests.conftest import DEMO_PROJECT
 from tests.test_contracts import _project
@@ -322,7 +323,7 @@ class TestQueueRowCheckoutFields:
         )
 
         assert job["sha"] == DEFAULT_SHA
-        assert job["required_tags"] == ("gpu", "linux")
+        assert job["required_tags"] == (NodeTag.GPU, NodeTag.LINUX)
         assert job["task_id"] == "fd5cabfa-a328-48f4-b5e9-3a02dd531ea5"
         assert job["project"] == DEMO_PROJECT
 
@@ -338,5 +339,13 @@ class TestQueueRowCheckoutFields:
             decode_claim(dump_json_str({"claimed": row}))
 
     def test_a_tag_outside_the_derived_vocabulary_is_refused_by_index(self) -> None:
-        with pytest.raises(AppError, match=r"requiredTags\[1\] 'macos' is not one of"):
+        with pytest.raises(
+            AppError, match=r"requiredTags\[1\] 'macos' is not one of windows, linux, gpu, testdb"
+        ):
             decode_claim(dump_json_str({"claimed": queue_job(requiredTags=["windows", "macos"])}))
+
+    def test_a_tag_that_is_not_a_string_is_refused_by_index(self) -> None:
+        with pytest.raises(
+            AppError, match=r"requiredTags\[0\] 7 is not one of windows, linux, gpu, testdb"
+        ):
+            decode_claim(dump_json_str({"claimed": queue_job(requiredTags=[7])}))

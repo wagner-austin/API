@@ -70,7 +70,7 @@ def node(
     *,
     enabled: bool = True,
     user: str | None = "austin",
-    platform: NodePlatform = "windows",
+    platform: NodePlatform = NodePlatform.WINDOWS,
 ) -> RegistryNode:
     """Build one identity-registry node.
 
@@ -119,10 +119,13 @@ def linux_record() -> JSONObject:
 def test_script_path_is_literal_absolute_and_in_the_platforms_dialect() -> None:
     """The write command on the far side expands nothing, so the home is
     spelled out; the extension is the dialect's (board task cd5010c4)."""
-    assert observe.script_path("austin", "windows") == (
+    assert observe.script_path("austin", NodePlatform.WINDOWS) == (
         "C:/Users/austin/.fleet/observe-sessions.ps1"
     )
-    assert observe.script_path("corvis", "linux") == "/home/corvis/.fleet/observe-sessions.sh"
+    assert (
+        observe.script_path("corvis", NodePlatform.LINUX)
+        == "/home/corvis/.fleet/observe-sessions.sh"
+    )
 
 
 def test_iso_from_millis_keeps_milliseconds_and_names_utc() -> None:
@@ -300,7 +303,7 @@ def test_observe_node_speaks_sh_to_a_linux_node_and_records_its_machine() -> Non
     _test_hooks.http_post = board
 
     outcome = observe.observe_node(
-        BOARD, node("diphtheria", "worker", user="corvis", platform="linux"), IDENTITY
+        BOARD, node("diphtheria", "worker", user="corvis", platform=NodePlatform.LINUX), IDENTITY
     )
 
     assert outcome == observe.NodeOutcome(
@@ -350,7 +353,7 @@ def test_observe_node_records_a_linux_node_that_has_never_run_claude_code() -> N
     _test_hooks.http_post = board
 
     outcome = observe.observe_node(
-        BOARD, node("diphtheria", "worker", user="corvis", platform="linux"), IDENTITY
+        BOARD, node("diphtheria", "worker", user="corvis", platform=NodePlatform.LINUX), IDENTITY
     )
 
     assert observe.render_outcome(outcome) == (

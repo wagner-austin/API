@@ -14,9 +14,9 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.contracts.dispatch import (
-    DISPATCH_COMMANDS,
-    DISPATCH_STATUSES,
+    DispatchCommand,
     DispatchJob,
+    DispatchStatus,
     decode_claim,
     decode_listing,
     decode_listing_page,
@@ -180,13 +180,20 @@ class TestMalformedAnswers:
         with pytest.raises(AppError) as raised:
             decode_claim(answer({"claimed": queue_job(status="exploded")}))
 
-        assert "status 'exploded' is not one of" in raised.value.message
+        assert (
+            "status 'exploded' is not one of "
+            "queued, claimed, running, passed, failed, refused, cancelled" in raised.value.message
+        )
 
     def test_a_command_outside_the_vocabulary_is_refused(self) -> None:
         with pytest.raises(AppError) as raised:
             decode_claim(answer({"claimed": queue_job(command="deploy")}))
 
-        assert "command 'deploy' is not one of" in raised.value.message
+        assert (
+            "command 'deploy' is not one of check, lint, test, build-bases, restart-session, "
+            "revive-session, kill-session, kill-session-hard, compact-session"
+            in raised.value.message
+        )
 
     def test_the_refusal_names_the_repository_the_fix_belongs_in(self) -> None:
         """A malformed answer means the TOOL moved. A reader who has to work
@@ -204,12 +211,13 @@ class TestMalformedAnswers:
         assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
         assert "MCPs repo" in raised.value.message
 
-    def test_every_declared_status_and_command_decodes(self) -> None:
-        for status in DISPATCH_STATUSES:
-            assert claimed_job(answer({"claimed": queue_job(status=status)}))["status"] == status
-        for command in DISPATCH_COMMANDS:
-            decoded = claimed_job(answer({"claimed": queue_job(command=command)}))
-            assert decoded["command"] == command
+    def test_every_declared_status_and_command_decodes_to_its_member(self) -> None:
+        for status in DispatchStatus:
+            decoded = claimed_job(answer({"claimed": queue_job(status=status.value)}))
+            assert decoded["status"] is status
+        for command in DispatchCommand:
+            decoded = claimed_job(answer({"claimed": queue_job(command=command.value)}))
+            assert decoded["command"] is command
 
 
 class TestOtherEnvelopes:

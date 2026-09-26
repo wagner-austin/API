@@ -31,7 +31,7 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_dict
 
 from fleet.cli import _config, run
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.node import NodeConfig, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
 from fleet.core.capacity import Unassessed, first_fit
@@ -61,7 +61,7 @@ def _node(host: str) -> NodeConfig:
     """
     return NodeConfig(
         host=host,
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         stage_root="C:/fleet/stage",
         logical_cores=16,
         ram_gb=32.0,

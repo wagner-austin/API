@@ -20,7 +20,8 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import _config, cancel, run
-from fleet.contracts.ledger import decode_ledger_entry
+from fleet.contracts.feed import FeedKind
+from fleet.contracts.ledger import LedgerOutcome, decode_ledger_entry
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, run_lease, staging
 from tests.conftest import (
@@ -372,18 +373,18 @@ class TestFinish:
             loaded.ledger,
             loaded.feed,
             row=row,
-            outcome="passed",
+            outcome=LedgerOutcome.PASSED,
             exit_code=0,
             detail="156 passed",
         )
 
-        assert closing["outcome"] == "passed"
+        assert closing["outcome"] is LedgerOutcome.PASSED
         assert closing["exit_code"] == 0
-        assert records.read_feed(loaded.feed)[-1]["kind"] == "passed"
+        assert records.read_feed(loaded.feed)[-1]["kind"] is FeedKind.PASSED
         assert leases.find_by_run(loaded.leases, run_id=DEMO_RUN_ID, now_unix=DEMO_NOW) is None
         assert [row["outcome"] for row in records.read_ledger(loaded.ledger)] == [
-            "running",
-            "passed",
+            LedgerOutcome.RUNNING,
+            LedgerOutcome.PASSED,
         ]
 
     def test_a_closing_row_keeps_the_identity_of_its_running_one(self) -> None:
@@ -405,7 +406,11 @@ class TestFinish:
         )
 
         closing = dispatch.closed_row(
-            row, outcome="failed", exit_code=2, ended_unix=DEMO_NOW + 60, detail="make check failed"
+            row,
+            outcome=LedgerOutcome.FAILED,
+            exit_code=2,
+            ended_unix=DEMO_NOW + 60,
+            detail="make check failed",
         )
 
         assert closing["run_id"] == row["run_id"]

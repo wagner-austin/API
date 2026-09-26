@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from fleet.contracts.node import NODE_PLATFORMS, NodePlatform
+from fleet.contracts.node import NodePlatform
 from fleet.core import dialect, dialect_linux, names
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
 
 
 def test_for_platform_chooses_by_the_declared_platform() -> None:
-    assert type(dialect.for_platform("windows")) is WindowsDialect
-    assert type(dialect.for_platform("linux")) is LinuxDialect
+    assert type(dialect.for_platform(NodePlatform.WINDOWS)) is WindowsDialect
+    assert type(dialect.for_platform(NodePlatform.LINUX)) is LinuxDialect
 
 
 def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
@@ -20,9 +20,9 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
     pins that each act produces text for each platform, with the platform's
     own extension, so a new act added to one dialect and not the other is
     caught here as well as by the type checker."""
-    for platform in NODE_PLATFORMS:
+    for platform in NodePlatform:
         spoken = dialect.for_platform(platform)
-        extension = ".ps1" if platform == "windows" else ".sh"
+        extension = ".ps1" if platform is NodePlatform.WINDOWS else ".sh"
         assert spoken.script_path("/s", "x") == f"/s/x{extension}"
         assert "/s/x" in spoken.write_command("/s/x")
         assert spoken.invocation()[0] in {"powershell", "/bin/sh"}
@@ -94,7 +94,7 @@ class TestCheckedScript:
     0 -- the transport saw success and the node held nothing."""
 
     def test_powershell_checks_after_every_command_and_exits_with_its_status(self) -> None:
-        assert dialect.for_platform("windows").checked_script(("first", "second")) == (
+        assert dialect.for_platform(NodePlatform.WINDOWS).checked_script(("first", "second")) == (
             "$ErrorActionPreference = 'Stop'\n"
             "first\n"
             "if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }\n"
@@ -106,14 +106,14 @@ class TestCheckedScript:
         """``$LASTEXITCODE`` is unset until the first NATIVE command runs and
         ``$null -ne 0`` is true, so ``-ne`` would end a script whose first
         command is a cmdlet before its second ever ran."""
-        assert "-ne 0" not in dialect.for_platform("windows").checked_script(("only",))
+        assert "-ne 0" not in dialect.for_platform(NodePlatform.WINDOWS).checked_script(("only",))
 
     def test_sh_needs_nothing_per_command_because_set_e_is_the_default_here(self) -> None:
-        assert dialect.for_platform("linux").checked_script(("first", "second")) == (
+        assert dialect.for_platform(NodePlatform.LINUX).checked_script(("first", "second")) == (
             f"{dialect_linux.PROLOGUE}first\nsecond\n"
         )
 
-    @pytest.mark.parametrize("platform", NODE_PLATFORMS)
+    @pytest.mark.parametrize("platform", list(NodePlatform))
     def test_every_command_reaches_the_script_in_order(self, platform: NodePlatform) -> None:
         rendered = dialect.for_platform(platform).checked_script(("alpha", "beta", "gamma"))
 
@@ -139,7 +139,7 @@ def test_a_companion_sits_beside_an_export_and_its_staging_sits_beside_it() -> N
     assert names.recipe_directory("C:/fleet/stage/slime-17", "") == "C:/fleet/stage/slime-17"
 
 
-@pytest.mark.parametrize("platform", ["windows", "linux"])
+@pytest.mark.parametrize("platform", list(NodePlatform))
 def test_a_companions_directory_is_emptied_before_it_is_written(platform: NodePlatform) -> None:
     """Every run carrying one writes the same directory, and each dialect
     removes it read-only-objects and all: a git repository this package made
@@ -149,5 +149,5 @@ def test_a_companions_directory_is_emptied_before_it_is_written(platform: NodePl
     script = spoken.reset_directory_script("/s/MCPs")
 
     assert "/s/MCPs" in script
-    assert ("Remove-Item" in script) is (platform == "windows")
-    assert ("rm -rf" in script) is (platform == "linux")
+    assert ("Remove-Item" in script) is (platform is NodePlatform.WINDOWS)
+    assert ("rm -rf" in script) is (platform is NodePlatform.LINUX)

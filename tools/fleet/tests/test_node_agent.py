@@ -20,6 +20,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_str
 
 from fleet.cli import _config, node_agent
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.source import ProjectCompanion
 from fleet.core import _test_hooks, dialect, records, staging
 from tests._node_agent_fixtures import (
@@ -111,7 +112,7 @@ def _companion_commit_script() -> str:
     Returns:
         Its text, as the dialect renders it for a Windows node.
     """
-    return dialect.for_platform("windows").checked_script(
+    return dialect.for_platform(NodePlatform.WINDOWS).checked_script(
         dialect.companion_repository_commands("C:/fleet/stage/MCPs", COMPANION_SHA)
     )
 
@@ -348,7 +349,7 @@ class TestClaiming:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         rows = records.read_ledger(loaded.ledger)
         assert len(rows) == 1
-        expected = dialect.for_platform("windows").build_script(
+        expected = dialect.for_platform(NodePlatform.WINDOWS).build_script(
             target="C:/fleet/stage/libs-demo-1757000000",
             path=DEMO_PROJECT,
             workers=rows[0]["workers"],

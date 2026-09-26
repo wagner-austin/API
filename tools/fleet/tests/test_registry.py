@@ -20,6 +20,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core import _test_hooks, registry
 from tests.conftest import workspace_document
@@ -296,7 +297,12 @@ class TestTheObserverReadsRoleAndUser:
         nodes = registry.decode_registry_nodes(_registry_document(loki=True))
 
         assert nodes["loki"] == registry.RegistryNode(
-            name="loki", enabled=True, role="worker", user="austi", platform="windows", cuda=False
+            name="loki",
+            enabled=True,
+            role="worker",
+            user="austi",
+            platform=NodePlatform.WINDOWS,
+            cuda=False,
         )
 
     def test_a_cuda_device_the_nvidia_probe_measured_is_read_as_one(self) -> None:
@@ -312,7 +318,12 @@ class TestTheObserverReadsRoleAndUser:
         )
 
         assert nodes["phone"] == registry.RegistryNode(
-            name="phone", enabled=True, role="client", user=None, platform="linux", cuda=False
+            name="phone",
+            enabled=True,
+            role="client",
+            user=None,
+            platform=NodePlatform.LINUX,
+            cuda=False,
         )
 
     def test_integrated_graphics_the_win32_probe_found_is_not_a_cuda_device(self) -> None:

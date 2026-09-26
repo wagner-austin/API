@@ -16,6 +16,8 @@ from platform_core.json_utils import dump_json_str
 from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoints_text
 from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
+from fleet.contracts.dispatch import ClosingStatus, DispatchLane
+from fleet.contracts.tags import NodeTag
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import (
     DEFAULT_SHA,
@@ -109,7 +111,7 @@ class TestClaim:
         assert (
             queue.claim_next(
                 QUEUE_CREDENTIALS,
-                lane="hub",
+                lane=DispatchLane.HUB,
                 tags=(),
                 node=None,
                 lease_seconds=3600,
@@ -127,8 +129,8 @@ class TestClaim:
 
         job = queue.claim_next(
             QUEUE_CREDENTIALS,
-            lane="node",
-            tags=("windows", "gpu"),
+            lane=DispatchLane.NODE,
+            tags=(NodeTag.WINDOWS, NodeTag.GPU),
             node=None,
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
@@ -166,8 +168,8 @@ class TestClaim:
 
         queue.claim_next(
             QUEUE_CREDENTIALS,
-            lane="node",
-            tags=("windows",),
+            lane=DispatchLane.NODE,
+            tags=(NodeTag.WINDOWS,),
             node="lavender",
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
@@ -182,7 +184,7 @@ class TestClaim:
 
         queue.claim_next(
             QUEUE_CREDENTIALS,
-            lane="hub",
+            lane=DispatchLane.HUB,
             tags=(),
             node=None,
             lease_seconds=900,
@@ -222,7 +224,7 @@ class TestReport:
         queue.report_close(
             QUEUE_CREDENTIALS,
             job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
-            status="failed",
+            status=ClosingStatus.FAILED,
             exit_code=1,
             detail="make check exited 1",
             identity=RUNNER_IDENTITY,
@@ -241,7 +243,7 @@ class TestReport:
         queue.report_close(
             QUEUE_CREDENTIALS,
             job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
-            status="refused",
+            status=ClosingStatus.REFUSED,
             exit_code=None,
             detail="no node had capacity",
             identity=RUNNER_IDENTITY,
@@ -262,7 +264,7 @@ class TestReport:
             queue.report_close(
                 QUEUE_CREDENTIALS,
                 job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
-                status="passed",
+                status=ClosingStatus.PASSED,
                 exit_code=0,
                 detail="green",
                 identity=RUNNER_IDENTITY,

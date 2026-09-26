@@ -24,7 +24,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import _config, collect, run, watch
-from fleet.contracts.node import NodeConfig
+from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import _test_hooks, leases, records, staging
 from fleet.core import collect as core_collect
 from tests.conftest import (
@@ -52,7 +52,7 @@ def _node() -> NodeConfig:
     """
     return NodeConfig(
         host="lavender",
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         stage_root="C:/fleet/stage",
         logical_cores=16,
         ram_gb=32.0,

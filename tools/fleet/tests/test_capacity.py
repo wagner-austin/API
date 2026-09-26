@@ -33,7 +33,7 @@ def _node(
     reserved_ram_gb: float = 4.0,
     max_concurrent_runs: int = 2,
     max_disk_gb: float = 20.0,
-    platform: NodePlatform = "windows",
+    platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
 ) -> NodeConfig:
     """Build a node declaration.
@@ -163,9 +163,9 @@ class TestAssess:
     def test_a_node_missing_a_required_tag_is_refused_before_capacity(self) -> None:
         """A CPU-only linux box with every byte free is still the wrong machine."""
         verdict = assess(
-            _node(host="diphtheria", platform="linux"),
+            _node(host="diphtheria", platform=NodePlatform.LINUX),
             _state(host="diphtheria"),
-            _project(required_tags=("gpu", "windows")),
+            _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS)),
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
@@ -176,21 +176,23 @@ class TestAssess:
 
     def test_the_tag_refusal_names_only_the_tags_missing(self) -> None:
         verdict = assess(
-            _node(host="loki"), _state(host="loki"), _project(required_tags=("windows", "gpu"))
+            _node(host="loki"),
+            _state(host="loki"),
+            _project(required_tags=(NodeTag.WINDOWS, NodeTag.GPU)),
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
         assert verdict["reason"].startswith("loki lacks gpu: ")
 
     def test_a_node_carrying_every_required_tag_is_weighed_on_capacity(self) -> None:
-        project = _project(required_tags=("gpu", "windows"))
+        project = _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS))
 
         assert assess(_node(gpu=GTX_1630), _state(), project)["workers"] == 14
         full = assess(_node(gpu=GTX_1630), _state(free_ram_gb=3.0), project)
         assert full["code"] is FleetErrorCode.NODE_OWNER_RESERVED
 
     def test_a_project_requiring_nothing_takes_any_platform(self) -> None:
-        assert assess(_node(platform="linux"), _state(), _project())["workers"] == 14
+        assert assess(_node(platform=NodePlatform.LINUX), _state(), _project())["workers"] == 14
 
     def test_the_project_cost_overrides_the_node_default(self) -> None:
         """What a worker costs is a property of the suite, not the machine."""
@@ -268,11 +270,15 @@ class TestFirstFit:
         """Every node refused on its tags: nothing is full, and waiting fixes nothing."""
         candidates = (
             ("loki", _node(host="loki"), _state(host="loki")),
-            ("diphtheria", _node(host="diphtheria", platform="linux"), _state(host="diphtheria")),
+            (
+                "diphtheria",
+                _node(host="diphtheria", platform=NodePlatform.LINUX),
+                _state(host="diphtheria"),
+            ),
         )
 
         with pytest.raises(AppError) as excinfo:
-            first_fit(candidates, _project(required_tags=("gpu", "windows")))
+            first_fit(candidates, _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS)))
 
         assert excinfo.value.code is FleetErrorCode.NODE_LACKS_TAG
         assert "loki lacks gpu:" in excinfo.value.message
@@ -286,7 +292,7 @@ class TestFirstFit:
         )
 
         with pytest.raises(AppError) as excinfo:
-            first_fit(candidates, _project(required_tags=("gpu",)))
+            first_fit(candidates, _project(required_tags=(NodeTag.GPU,)))
 
         assert excinfo.value.code is FleetErrorCode.NODE_MEMORY_EXHAUSTED
         assert "loki lacks gpu:" in excinfo.value.message
@@ -298,7 +304,7 @@ class TestFirstFit:
             ("lavender", _node(gpu=GTX_1630), _state()),
         )
 
-        assert first_fit(candidates, _project(required_tags=("gpu",))) == ("lavender", 14)
+        assert first_fit(candidates, _project(required_tags=(NodeTag.GPU,))) == ("lavender", 14)
 
 
 class TestRoomForAny:
@@ -328,4 +334,4 @@ class TestRoomForAny:
     def test_the_gate_never_asks_about_tags(self) -> None:
         """A CPU-only linux node has room for something even though a gpu
         project would be refused after the claim; tags are the project's."""
-        assert room_for_any(_node(gpu=None, platform="linux"), _state()) is None
+        assert room_for_any(_node(gpu=None, platform=NodePlatform.LINUX), _state()) is None

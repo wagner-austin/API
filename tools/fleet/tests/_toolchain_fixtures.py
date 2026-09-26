@@ -12,7 +12,7 @@ the happy path and nothing about the fleet that actually exists.
 from __future__ import annotations
 
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig
+from fleet.contracts.node import NodeConfig, NodePlatform
 
 #: What loki answered: everything present, poetry on the wrong Python, and
 #: CHOCO BUT NO WINGET -- which is why the same missing tool renders a
@@ -160,7 +160,7 @@ def node(host: str = "lavender") -> NodeConfig:
     """
     return NodeConfig(
         host=host,
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         stage_root="C:/fleet/stage",
         logical_cores=16,
         ram_gb=32.0,

@@ -14,9 +14,9 @@ from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.feed import (
-    KIND_BY_NAME,
     TERMINAL_KINDS,
     FeedEvent,
+    FeedKind,
     decode_feed_event,
     encode_feed_event,
     is_terminal,
@@ -25,6 +25,7 @@ from fleet.contracts.feed import (
 from fleet.contracts.ledger import (
     NO_EXIT_CODE,
     LedgerEntry,
+    LedgerOutcome,
     decode_ledger_entry,
     encode_ledger_entry,
     is_live,
@@ -32,6 +33,7 @@ from fleet.contracts.ledger import (
 from fleet.contracts.node import (
     NodeConfig,
     NodeGpu,
+    NodePlatform,
     NodeState,
     decode_node_config,
     decode_node_gpu,
@@ -81,7 +83,7 @@ def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
     """
     return NodeConfig(
         host="lavender",
-        platform="windows",
+        platform=NodePlatform.WINDOWS,
         stage_root="C:/fleet/stage",
         logical_cores=cores,
         ram_gb=32.0,
@@ -143,7 +145,8 @@ def _entry(*, outcome: str = "running", workers: int = 6, started: int = 100) ->
         started: When it began.
 
     Returns:
-        The row, typed through its own decoder so the Literal is honest.
+        The row, typed through its own decoder so the outcome word is
+        narrowed to its LedgerOutcome member the way a real row's is.
     """
     return decode_ledger_entry(
         {
@@ -451,12 +454,16 @@ class TestWorkspace:
 
 
 class TestLedgerEntry:
-    def test_a_row_survives_encoding(self) -> None:
-        original = _entry()
+    def test_every_outcome_survives_encoding_as_its_word(self) -> None:
+        for outcome in LedgerOutcome:
+            original = _entry(outcome=outcome.value)
+            encoded = encode_ledger_entry(original)
 
-        assert decode_ledger_entry(load_json_str(dump_json_str(encode_ledger_entry(original)))) == (
-            original
-        )
+            assert encoded["outcome"] == outcome.value
+            assert type(encoded["outcome"]) is str
+            decoded = decode_ledger_entry(load_json_str(dump_json_str(encoded)))
+            assert decoded == original
+            assert decoded["outcome"] is outcome
 
     def test_a_running_row_is_live(self) -> None:
         assert is_live(_entry(outcome="running"))
@@ -470,7 +477,11 @@ class TestLedgerEntry:
 
     def test_an_unknown_outcome_is_refused(self) -> None:
         """It would read as finished and let a second dispatch onto a full node."""
-        with pytest.raises(JSONTypeError, match="is not one of"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^ledger outcome 'probably-fine' is not one of "
+            r"cancelled, failed, lost, passed, refused, running; ",
+        ):
             decode_ledger_entry({**encode_ledger_entry(_entry()), "outcome": "probably-fine"})
 
     def test_a_row_that_ends_before_it_starts_is_refused(self) -> None:
@@ -492,32 +503,39 @@ class TestFeedEvent:
             run_id="run-1",
             node="lavender",
             project="services/Model-Trainer",
-            kind="started",
+            kind=FeedKind.STARTED,
             detail="6 workers",
         )
 
-        assert decode_feed_event(load_json_str(dump_json_str(encode_feed_event(original)))) == (
-            original
-        )
+        encoded = encode_feed_event(original)
+        assert encoded["kind"] == "started"
+        assert type(encoded["kind"]) is str
+        assert decode_feed_event(load_json_str(dump_json_str(encoded))) == original
 
-    def test_every_kind_decodes(self) -> None:
-        """The mapping IS the membership test, so nothing can be half-known."""
-        for spelling in KIND_BY_NAME:
+    def test_every_kind_decodes_to_its_member(self) -> None:
+        """The enum IS the membership test, so nothing can be half-known."""
+        for kind in FeedKind:
             decoded = decode_feed_event(
                 {
                     "at_unix": 1,
                     "run_id": "r",
                     "node": "n",
                     "project": "p",
-                    "kind": spelling,
+                    "kind": kind.value,
                     "detail": "",
                 }
             )
-            assert decoded["kind"] == spelling
+            assert decoded["kind"] is kind
 
-    def test_every_terminal_kind_is_a_kind(self) -> None:
-        """A terminal kind absent from the mapping could never be decoded."""
-        assert set(KIND_BY_NAME) >= TERMINAL_KINDS
+    def test_the_terminal_kinds_are_the_five_that_end_a_run(self) -> None:
+        """Terminality is a judgement per kind, so the set is pinned whole."""
+        assert {kind.value for kind in TERMINAL_KINDS} == {
+            "refused",
+            "passed",
+            "failed",
+            "cancelled",
+            "lost",
+        }
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="feed event must be a JSON object"):
@@ -525,7 +543,11 @@ class TestFeedEvent:
 
     def test_an_unknown_kind_is_refused(self) -> None:
         """It would read as non-terminal and hang a subscriber forever."""
-        with pytest.raises(JSONTypeError, match="is not one of"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^feed event kind 'finished-ish' is not one of cancelled, failed, heartbeat, "
+            r"leased, lost, passed, phase, refused, staged, started; ",
+        ):
             decode_feed_event(
                 {
                     "at_unix": 1,
@@ -538,9 +560,11 @@ class TestFeedEvent:
             )
 
     def test_terminal_kinds_end_a_run_and_others_do_not(self) -> None:
-        ended = FeedEvent(at_unix=1, run_id="r", node="n", project="p", kind="failed", detail="")
+        ended = FeedEvent(
+            at_unix=1, run_id="r", node="n", project="p", kind=FeedKind.FAILED, detail=""
+        )
         ongoing = FeedEvent(
-            at_unix=1, run_id="r", node="n", project="p", kind="phase", detail="lint"
+            at_unix=1, run_id="r", node="n", project="p", kind=FeedKind.PHASE, detail="lint"
         )
 
         assert is_terminal(ended)
@@ -558,7 +582,7 @@ class TestFeedEvent:
                 run_id="run-1",
                 node="lavender",
                 project="services/Model-Trainer",
-                kind="failed",
+                kind=FeedKind.FAILED,
                 detail="exit 1",
             )
         )

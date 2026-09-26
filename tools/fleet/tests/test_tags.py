@@ -13,7 +13,7 @@ from platform_core.json_utils import JSONTypeError
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform
 from fleet.contracts.tags import (
-    NODE_TAGS,
+    NodeTag,
     decode_node_tag,
     decode_required_tags,
     encode_tags,
@@ -32,7 +32,7 @@ RTX_3070_TI = NodeGpu(
 
 def _node(
     *,
-    platform: NodePlatform = "windows",
+    platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
     test_database: bool = False,
 ) -> NodeConfig:
@@ -67,41 +67,62 @@ def _node(
 
 class TestNodeTags:
     def test_a_cpu_only_windows_node_carries_its_platform_alone(self) -> None:
-        assert node_tags(_node()) == frozenset({"windows"})
+        assert node_tags(_node()) == frozenset({NodeTag.WINDOWS})
 
     def test_a_linux_node_with_a_card_carries_both(self) -> None:
-        assert node_tags(_node(platform="linux", gpu=RTX_3070_TI)) == frozenset({"linux", "gpu"})
+        assert node_tags(_node(platform=NodePlatform.LINUX, gpu=RTX_3070_TI)) == frozenset(
+            {NodeTag.LINUX, NodeTag.GPU}
+        )
 
     def test_a_node_running_the_fleet_test_database_carries_testdb(self) -> None:
         """diphtheria's shape once provisioned (MCPs board task 6bbfd171)."""
-        assert node_tags(_node(platform="linux", gpu=RTX_3070_TI, test_database=True)) == (
-            frozenset({"linux", "gpu", "testdb"})
-        )
+        assert node_tags(
+            _node(platform=NodePlatform.LINUX, gpu=RTX_3070_TI, test_database=True)
+        ) == (frozenset({NodeTag.LINUX, NodeTag.GPU, NodeTag.TESTDB}))
+
+    def test_every_platform_carries_the_tag_spelled_as_its_own_word(self) -> None:
+        """The platform-to-tag table has a row for every platform, so a third
+        platform fails here before a node of it could be tagged."""
+        for platform in NodePlatform:
+            (tag,) = node_tags(_node(platform=platform))
+            assert tag.value == platform.value
 
     def test_the_vocabulary_is_the_two_platforms_gpu_and_testdb(self) -> None:
-        assert NODE_TAGS == ("windows", "linux", "gpu", "testdb")
+        """The dispatch queue's CHECK (MCPs migrations 532 and 563) is these
+        four words, so the members' values are pinned in order."""
+        assert [tag.value for tag in NodeTag] == ["windows", "linux", "gpu", "testdb"]
 
 
 class TestMissingTags:
     def test_a_satisfied_requirement_is_empty(self) -> None:
-        assert missing_tags(_node(gpu=RTX_3070_TI), ("gpu", "windows")) == ()
+        assert missing_tags(_node(gpu=RTX_3070_TI), (NodeTag.GPU, NodeTag.WINDOWS)) == ()
 
     def test_the_missing_tags_come_back_in_the_project_s_order(self) -> None:
-        assert missing_tags(_node(platform="linux"), ("windows", "gpu")) == ("windows", "gpu")
-        assert missing_tags(_node(platform="linux"), ("gpu", "windows")) == ("gpu", "windows")
+        linux = _node(platform=NodePlatform.LINUX)
+        assert missing_tags(linux, (NodeTag.WINDOWS, NodeTag.GPU)) == (
+            NodeTag.WINDOWS,
+            NodeTag.GPU,
+        )
+        assert missing_tags(linux, (NodeTag.GPU, NodeTag.WINDOWS)) == (
+            NodeTag.GPU,
+            NodeTag.WINDOWS,
+        )
 
     def test_a_database_suite_is_missing_testdb_on_a_node_without_one(self) -> None:
-        assert missing_tags(_node(platform="linux"), ("testdb",)) == ("testdb",)
-        assert missing_tags(_node(platform="linux", test_database=True), ("testdb",)) == ()
+        with_database = _node(platform=NodePlatform.LINUX, test_database=True)
+        assert missing_tags(_node(platform=NodePlatform.LINUX), (NodeTag.TESTDB,)) == (
+            NodeTag.TESTDB,
+        )
+        assert missing_tags(with_database, (NodeTag.TESTDB,)) == ()
 
     def test_a_project_requiring_nothing_is_never_missing_anything(self) -> None:
-        assert missing_tags(_node(platform="linux"), ()) == ()
+        assert missing_tags(_node(platform=NodePlatform.LINUX), ()) == ()
 
 
 class TestDecodeNodeTag:
-    def test_each_word_in_the_set_decodes_to_itself(self) -> None:
-        for tag in NODE_TAGS:
-            assert decode_node_tag(tag, field="t") == tag
+    def test_each_word_in_the_set_decodes_to_its_member(self) -> None:
+        for tag in NodeTag:
+            assert decode_node_tag(tag.value, field="t") is tag
 
     def test_a_word_outside_the_set_is_refused_with_the_set(self) -> None:
         with pytest.raises(
@@ -119,7 +140,10 @@ class TestDecodeRequiredTags:
         assert decode_required_tags([], field="p.required_tags") == ()
 
     def test_tags_keep_their_declared_order(self) -> None:
-        assert decode_required_tags(["gpu", "windows"], field="p") == ("gpu", "windows")
+        assert decode_required_tags(["gpu", "windows"], field="p") == (
+            NodeTag.GPU,
+            NodeTag.WINDOWS,
+        )
 
     def test_an_absent_key_is_refused_not_defaulted(self) -> None:
         with pytest.raises(
@@ -138,8 +162,8 @@ class TestDecodeRequiredTags:
         ):
             decode_required_tags(["gpu", "cuda"], field="p")
 
-    def test_a_repeated_tag_is_refused_by_index(self) -> None:
-        with pytest.raises(JSONTypeError, match=r"p\[1\] repeats 'gpu'"):
+    def test_a_repeated_tag_is_refused_by_index_naming_its_word(self) -> None:
+        with pytest.raises(JSONTypeError, match=r"^p\[1\] repeats 'gpu'$"):
             decode_required_tags(["gpu", "gpu"], field="p")
 
     def test_both_platforms_at_once_is_refused_because_no_node_is_both(self) -> None:
@@ -148,6 +172,8 @@ class TestDecodeRequiredTags:
 
 
 class TestEncodeTags:
-    def test_tags_encode_as_a_list_in_order(self) -> None:
-        assert encode_tags(("gpu", "windows")) == ["gpu", "windows"]
+    def test_tags_encode_as_their_words_in_order(self) -> None:
+        encoded = encode_tags((NodeTag.GPU, NodeTag.WINDOWS))
+        assert encoded == ["gpu", "windows"]
+        assert [type(word) for word in encoded] == [str, str]
         assert encode_tags(()) == []

@@ -18,6 +18,7 @@ import pathlib
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
+from fleet.contracts.node import NodePlatform
 from fleet.core import (
     _test_hooks,
     dialect,
@@ -196,7 +197,7 @@ class TestStage:
 
         target = staging.stage(
             "lavender",
-            platform="windows",
+            platform=NodePlatform.WINDOWS,
             run_id=DEMO_RUN_ID,
             stage_root="C:/fleet/stage",
             payload=payload,
@@ -230,7 +231,7 @@ class TestStage:
 
         target = staging.stage(
             "diphtheria",
-            platform="linux",
+            platform=NodePlatform.LINUX,
             run_id=DEMO_RUN_ID,
             stage_root="/home/corvis/fleet/stage",
             payload=payload,
@@ -286,7 +287,7 @@ class TestStage:
 
         staging.stage(
             "lavender",
-            platform="windows",
+            platform=NodePlatform.WINDOWS,
             run_id=DEMO_RUN_ID,
             stage_root="C:/fleet/stage",
             payload=payload,
@@ -298,7 +299,7 @@ class TestStage:
         # ignore rules to cover, and the .gitignore that gives them content
         # arrives with the tree.
         target = f"C:/fleet/stage/{DEMO_RUN_ID}"
-        spoken = dialect.for_platform("windows")
+        spoken = dialect.for_platform(NodePlatform.WINDOWS)
         assert sent.index(
             spoken.checked_script(
                 dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)
@@ -327,7 +328,7 @@ class TestStage:
         with pytest.raises(AppError) as excinfo:
             staging.stage(
                 "lavender",
-                platform="windows",
+                platform=NodePlatform.WINDOWS,
                 run_id=DEMO_RUN_ID,
                 stage_root="C:/fleet/stage",
                 payload=b"bytes",
@@ -355,7 +356,7 @@ class TestStagingACompanion:
 
         where = staging.stage_companion(
             "lavender",
-            platform="windows",
+            platform=NodePlatform.WINDOWS,
             stage_root="C:/fleet/stage",
             directory="MCPs",
             sha=COMPANION_SHA,
@@ -366,7 +367,7 @@ class TestStagingACompanion:
         assert where == "C:/fleet/stage/MCPs"
         assert sent[0] == dialect_windows.WindowsDialect().reset_directory_script(where).encode()
         assert sent[4] == staging.encode(payload).encode()
-        spoken = dialect.for_platform("windows")
+        spoken = dialect.for_platform(NodePlatform.WINDOWS)
         assert (
             sent[7]
             == spoken.checked_script(
@@ -390,7 +391,7 @@ class TestStagingACompanion:
 
         staging.stage_companion(
             "lavender",
-            platform="windows",
+            platform=NodePlatform.WINDOWS,
             stage_root="C:/fleet/stage",
             directory="MCPs",
             sha=COMPANION_SHA,
@@ -411,7 +412,7 @@ class TestStagingACompanion:
 
         staging.stage_companion(
             "diphtheria",
-            platform="linux",
+            platform=NodePlatform.LINUX,
             stage_root="/home/corvis/fleet/stage",
             directory="MCPs",
             sha=COMPANION_SHA,
@@ -421,7 +422,7 @@ class TestStagingACompanion:
         sent = [body or b"" for body in runner.stdin]
         assert b"rm -rf '/home/corvis/fleet/stage/MCPs'" in sent[0]
         assert sent.index(sent[0]) < sent.index(
-            dialect.for_platform("linux")
+            dialect.for_platform(NodePlatform.LINUX)
             .checked_script(
                 dialect.extract_commands(
                     f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
@@ -441,7 +442,7 @@ class TestStagingACompanion:
         with pytest.raises(AppError) as excinfo:
             staging.stage_companion(
                 "lavender",
-                platform="windows",
+                platform=NodePlatform.WINDOWS,
                 stage_root="C:/fleet/stage",
                 directory="MCPs",
                 sha=COMPANION_SHA,

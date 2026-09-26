@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
     PINNED_PYTHON,
@@ -135,7 +136,7 @@ class TestInstall:
 
         assert toolchain.installable(reports) == ("python",)
         body = toolchain.install_script(
-            ("python",), available_managers(reports), platform="windows"
+            ("python",), available_managers(reports), platform=NodePlatform.WINDOWS
         )
         assert "Write-Output 'installing python'" in body
         assert f"--version {PINNED_PYTHON} -e --scope user" in body
@@ -165,14 +166,18 @@ class TestInstall:
 
     def test_the_install_script_echoes_each_step(self) -> None:
         """So a transcript says which command produced which failure."""
-        body = toolchain.install_script(("poetry", "make"), ("pip", "choco"), platform="windows")
+        body = toolchain.install_script(
+            ("poetry", "make"), ("pip", "choco"), platform=NodePlatform.WINDOWS
+        )
 
         assert "Write-Output 'installing poetry'" in body
         assert "python -m pip install --user poetry" in body
         assert "choco install make -y" in body
 
     def test_a_linux_node_gets_sh_echoes_and_its_own_managers(self) -> None:
-        body = toolchain.install_script(("poetry", "make"), ("pipx", "apt-get"), platform="linux")
+        body = toolchain.install_script(
+            ("poetry", "make"), ("pipx", "apt-get"), platform=NodePlatform.LINUX
+        )
 
         assert body == (
             "printf '%s\\n' 'installing poetry'\npipx install poetry\n"
@@ -187,8 +192,12 @@ class TestInstall:
         generalised to three. lavender has no choco at all, so that command
         would have failed there with choco's own 'not recognized'.
         """
-        on_lavender = toolchain.install_script(("make",), ("pip", "winget"), platform="windows")
-        on_loki = toolchain.install_script(("make",), ("pip", "choco"), platform="windows")
+        on_lavender = toolchain.install_script(
+            ("make",), ("pip", "winget"), platform=NodePlatform.WINDOWS
+        )
+        on_loki = toolchain.install_script(
+            ("make",), ("pip", "choco"), platform=NodePlatform.WINDOWS
+        )
 
         assert "winget install --id GnuWin32.Make" in on_lavender
         assert "choco" not in on_lavender
@@ -200,7 +209,7 @@ class TestInstall:
         it claimed, and the caller would re-probe to find the tool absent
         with no explanation."""
         with pytest.raises(ValueError, match="no install command"):
-            toolchain.install_script(("make",), ("pip",), platform="windows")
+            toolchain.install_script(("make",), ("pip",), platform=NodePlatform.WINDOWS)
 
     def test_installing_runs_the_command_and_names_what_it_did(self) -> None:
         runner = FakeRun([ok(""), ok("installing make")])
@@ -217,7 +226,7 @@ class TestInstall:
         runner = FakeRun([ok(""), ok("installing make")])
         _test_hooks.run = runner
         linux = node("diphtheria")
-        linux["platform"] = "linux"
+        linux["platform"] = NodePlatform.LINUX
         linux["stage_root"] = "/home/corvis/fleet/stage"
         reports = toolchain.parse_probe(
             "python=yes=Python 3.11.9\npoetry=yes=Poetry (version 2.5.1)\n"

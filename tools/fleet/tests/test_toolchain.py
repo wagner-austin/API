@@ -19,6 +19,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str, load_json_str
 
 from fleet.cli import _config, bootstrap
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.toolchain import (
     REQUIRED_TOOLS,
     ToolReport,
@@ -277,7 +278,7 @@ class TestProbeToolchain:
         runner = FakeRun([ok(""), ok(DIPHTHERIA)])
         _test_hooks.run = runner
         linux = node("diphtheria")
-        linux["platform"] = "linux"
+        linux["platform"] = NodePlatform.LINUX
         linux["stage_root"] = "/home/corvis/fleet/stage"
 
         reports = toolchain.probe_toolchain(linux)

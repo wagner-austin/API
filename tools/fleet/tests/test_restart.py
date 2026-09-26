@@ -14,6 +14,7 @@ from typing import Final
 
 import pytest
 
+from fleet.contracts.dispatch import DispatchCommand
 from fleet.core import _test_hooks, rebuild, restart
 from fleet.core.published_tree import PublishedTree
 from tests.conftest import FakeRun, ok
@@ -60,11 +61,11 @@ class TestRestartArgv:
             REGISTRY,
         )
         assert restart.SESSION_COMMANDS == (
-            "restart-session",
-            "revive-session",
-            "kill-session",
-            "kill-session-hard",
-            "compact-session",
+            DispatchCommand.RESTART_SESSION,
+            DispatchCommand.REVIVE_SESSION,
+            DispatchCommand.KILL_SESSION,
+            DispatchCommand.KILL_SESSION_HARD,
+            DispatchCommand.COMPACT_SESSION,
         )
 
     def test_composes_the_exact_compact_invocation(self) -> None:
@@ -102,30 +103,40 @@ class TestRestartArgv:
         label = "opus-mcps-0917-e7b5"
         pinned = {"commit": TREE["commit"], "python_path": TREE["python_path"]}
 
-        assert restart.session_invocation(ROOT, TREE, "restart-session", TARGET, label) == {
+        assert restart.session_invocation(
+            ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, label
+        ) == {
             "verb": "restart",
             "mode": "rollover",
             "argv": restart.restart_argv(ROOT, REGISTRY, TARGET),
             "types_requester": False,
             **pinned,
         }
-        assert restart.session_invocation(ROOT, TREE, "revive-session", TARGET, label) == {
+        assert restart.session_invocation(
+            ROOT, TREE, DispatchCommand.REVIVE_SESSION, TARGET, label
+        ) == {
             "verb": "revive",
             "mode": "revive",
             "argv": restart.revive_argv(ROOT, REGISTRY, TARGET, label),
             "types_requester": True,
             **pinned,
         }
-        assert restart.session_invocation(ROOT, TREE, "kill-session", TARGET, label) == {
+        assert restart.session_invocation(
+            ROOT, TREE, DispatchCommand.KILL_SESSION, TARGET, label
+        ) == {
             "verb": "kill",
             "mode": "kill",
             "argv": restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=False),
             "types_requester": True,
             **pinned,
         }
-        hard = restart.session_invocation(ROOT, TREE, "kill-session-hard", TARGET, label)
+        hard = restart.session_invocation(
+            ROOT, TREE, DispatchCommand.KILL_SESSION_HARD, TARGET, label
+        )
         assert hard["argv"] == restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=True)
-        assert restart.session_invocation(ROOT, TREE, "compact-session", TARGET, label) == {
+        assert restart.session_invocation(
+            ROOT, TREE, DispatchCommand.COMPACT_SESSION, TARGET, label
+        ) == {
             "verb": "compact",
             "mode": "compact",
             "argv": restart.compact_argv(ROOT, REGISTRY, TARGET, label),
@@ -136,7 +147,9 @@ class TestRestartArgv:
     def test_a_command_that_is_not_a_session_verb_is_refused_by_code(self) -> None:
         refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
         with pytest.raises(ValueError, match=refusal):
-            restart.session_invocation(ROOT, TREE, "check", TARGET, "opus-mcps-0917-e7b5")
+            restart.session_invocation(
+                ROOT, TREE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5"
+            )
 
     def test_a_submitter_that_is_not_a_board_label_is_refused_before_argv(self) -> None:
         refusal = restart.requester_refusal("Not A Label; rm -rf /")
@@ -194,7 +207,9 @@ class TestRunAndDescribe:
         _test_hooks.run = runner
 
         result = restart.run_session_job(
-            restart.session_invocation(ROOT, TREE, "restart-session", TARGET, "fable-dm-0912")
+            restart.session_invocation(
+                ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+            )
         )
 
         assert result["returncode"] == 0
@@ -207,7 +222,7 @@ class TestRunAndDescribe:
         runner = FakeRun([ok("REVIVE - REVIVED session x: now pid 5")])
         _test_hooks.run = runner
         invocation = restart.session_invocation(
-            ROOT, TREE, "revive-session", TARGET, "fable-system-audit-0915"
+            ROOT, TREE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915"
         )
 
         result = restart.run_session_job(invocation)
@@ -230,7 +245,9 @@ class TestRunAndDescribe:
                 stderr="",
                 timed_out=False,
             ),
-            restart.session_invocation(ROOT, TREE, "restart-session", TARGET, "fable-dm-0912"),
+            restart.session_invocation(
+                ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+            ),
         )
 
         assert detail == (
@@ -247,7 +264,9 @@ class TestRunAndDescribe:
                 stderr="",
                 timed_out=False,
             ),
-            restart.session_invocation(ROOT, TREE, "restart-session", TARGET, "fable-dm-0912"),
+            restart.session_invocation(
+                ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+            ),
         )
 
         assert detail.endswith("RESTARTED mcps-99 now pid 41324")
