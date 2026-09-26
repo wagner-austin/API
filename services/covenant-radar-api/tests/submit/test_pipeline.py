@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.datasets import AggregationStrategy
 from numpy.typing import NDArray
 from scripts.submit.pipeline import (
     load_training_data,
@@ -97,7 +98,7 @@ class TestLoadTrainingData:
         """Test loading training data from fixture."""
         dataset = load_training_data(
             data_dir=timeseries_fixture_dir,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=False,
             include_diff_features=False,
         )

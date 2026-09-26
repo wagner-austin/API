@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal, TypedDict
 
-from covenant_ml.datasets.types import FileEncoding
+from covenant_ml.datasets.types import FileEncoding, LabelType
 
 # Detection status literals
 DetectionStatus = Literal["success", "warning", "error"]
@@ -77,7 +77,7 @@ class DiscoveredDataset(TypedDict, total=True):
     recommended_exclude: tuple[str, ...]
     target_positive_value: str
     target_negative_value: str
-    target_label_type: Literal["binary_int", "binary_str"]
+    target_label_type: LabelType
     positive_class_ratio: float
     status: DetectionStatus
     message: str

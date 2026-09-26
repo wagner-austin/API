@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.datasets import FileEncoding
+from covenant_ml.datasets import FileEncoding, LabelType
 from scripts.discover_datasets.main import (
     _classify_dataset_for_validation,
     _format_value_tuple,
@@ -49,31 +49,31 @@ class TestFormatValueTuple:
 
     def test_binary_int_with_numeric_values(self) -> None:
         """Test binary_int with numeric positive/negative values."""
-        pos_str, neg_str = _format_value_tuple("1", "0", "binary_int")
+        pos_str, neg_str = _format_value_tuple("1", "0", LabelType.BINARY_INT)
         assert pos_str == "(1,)"
         assert neg_str == "(0,)"
 
     def test_binary_int_with_non_numeric_values(self) -> None:
         """Test binary_int with non-numeric values uses string fallback."""
-        pos_str, neg_str = _format_value_tuple("yes", "no", "binary_int")
+        pos_str, neg_str = _format_value_tuple("yes", "no", LabelType.BINARY_INT)
         assert pos_str == '("yes",)'
         assert neg_str == '("no",)'
 
     def test_binary_int_with_empty_values(self) -> None:
         """Test binary_int with empty values uses defaults."""
-        pos_str, neg_str = _format_value_tuple("", "", "binary_int")
+        pos_str, neg_str = _format_value_tuple("", "", LabelType.BINARY_INT)
         assert pos_str == "(1,)"
         assert neg_str == "(0,)"
 
     def test_binary_str_with_values(self) -> None:
         """Test binary_str format."""
-        pos_str, neg_str = _format_value_tuple("positive", "negative", "binary_str")
+        pos_str, neg_str = _format_value_tuple("positive", "negative", LabelType.BINARY_STR)
         assert pos_str == '("positive",)'
         assert neg_str == '("negative",)'
 
     def test_binary_str_with_empty_values(self) -> None:
         """Test binary_str with empty values."""
-        pos_str, neg_str = _format_value_tuple("", "", "binary_str")
+        pos_str, neg_str = _format_value_tuple("", "", LabelType.BINARY_STR)
         assert pos_str == '("",)'
         assert neg_str == '("",)'
 
@@ -95,7 +95,7 @@ class TestClassifyDatasetForValidation:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "error",
             "message": "Error",
@@ -116,7 +116,7 @@ class TestClassifyDatasetForValidation:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "warning",
             "message": "No target",
@@ -137,7 +137,7 @@ class TestClassifyDatasetForValidation:
             "recommended_exclude": (),
             "target_positive_value": "1",
             "target_negative_value": "0",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
             "status": "success",
             "message": "OK",
@@ -158,7 +158,7 @@ class TestClassifyDatasetForValidation:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "success",
             "message": "OK",
@@ -183,7 +183,7 @@ class TestPrintValidation:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "error",
             "message": "No data files",
@@ -207,7 +207,7 @@ class TestPrintValidation:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "warning",
             "message": "No target",
@@ -231,7 +231,7 @@ class TestPrintValidation:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "0",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
             "status": "success",
             "message": "OK",
@@ -255,7 +255,7 @@ class TestPrintValidation:
             "recommended_exclude": (),
             "target_positive_value": "1",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
             "status": "success",
             "message": "OK",
@@ -279,7 +279,7 @@ class TestPrintValidation:
             "recommended_exclude": (),
             "target_positive_value": "1",
             "target_negative_value": "0",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "success",
             "message": "OK",
@@ -303,7 +303,7 @@ class TestPrintValidation:
             "recommended_exclude": ("id", "name"),
             "target_positive_value": "1",
             "target_negative_value": "0",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
             "status": "success",
             "message": "OK",

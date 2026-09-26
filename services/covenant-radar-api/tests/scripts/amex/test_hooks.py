@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from covenant_ml.datasets import FileEncoding, FileFormat
+from covenant_ml.datasets import AggregationStrategy, FileEncoding, FileFormat, LabelType
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
 )
@@ -170,7 +170,7 @@ class TestFakeTimeseriesLoader:
             encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
-                "label_type": "binary_int",
+                "label_type": LabelType.BINARY_INT,
                 "positive_values": (1,),
                 "negative_values": (0,),
             },
@@ -181,7 +181,7 @@ class TestFakeTimeseriesLoader:
             time_series={
                 "entity_column": "customer_ID",
                 "time_column": "S_2",
-                "aggregation": "statistics",
+                "aggregation": AggregationStrategy.STATISTICS,
                 "labels_file": "labels.csv",
                 "labels_entity_column": "customer_ID",
                 "include_rank_features": True,
@@ -223,7 +223,7 @@ class TestFakeTimeseriesLoader:
             encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
-                "label_type": "binary_int",
+                "label_type": LabelType.BINARY_INT,
                 "positive_values": (1,),
                 "negative_values": (0,),
             },
@@ -234,7 +234,7 @@ class TestFakeTimeseriesLoader:
             time_series={
                 "entity_column": "customer_ID",
                 "time_column": "S_2",
-                "aggregation": "statistics",
+                "aggregation": AggregationStrategy.STATISTICS,
                 "labels_file": "",
                 "labels_entity_column": "customer_ID",
                 "include_rank_features": True,
@@ -349,7 +349,7 @@ class TestRealImplementations:
             encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
-                "label_type": "binary_int",
+                "label_type": LabelType.BINARY_INT,
                 "positive_values": (1,),
                 "negative_values": (0,),
             },
@@ -360,7 +360,7 @@ class TestRealImplementations:
             time_series={
                 "entity_column": "customer_ID",
                 "time_column": "S_2",
-                "aggregation": "last",
+                "aggregation": AggregationStrategy.LAST,
                 "labels_file": "labels.csv",
                 "labels_entity_column": "customer_ID",
                 "include_rank_features": False,

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 from covenant_ml.datasets import (
+    LoadPhase,
     RegressionDatasetConfig,
     RegressionLoadedDataset,
 )
@@ -247,7 +248,7 @@ class TestRunRegressionOptimization:
             if progress_callback is not None:
                 progress_callback(
                     LoadProgress(
-                        phase="reading",
+                        phase=LoadPhase.READING,
                         bytes_read=1000,
                         bytes_total=1000,
                         percent_complete=100.0,

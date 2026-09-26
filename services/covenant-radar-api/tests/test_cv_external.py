@@ -22,6 +22,7 @@ from covenant_ml.backends.protocol import (
     PreparedClassifier,
 )
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
+from covenant_ml.datasets import LabelType
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.registry import DatasetRegistry
 from covenant_ml.datasets.types import (
@@ -69,7 +70,7 @@ def _dataset_config(name: str, grouped: bool) -> DatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="won",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),

@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from covenant_ml.datasets import AggregationStrategy
 from scripts.submit.__main__ import (
     _ArgState,
     _handle_flag_arg,
@@ -43,10 +44,8 @@ class TestParseAggregation:
 
     def test_parse_valid_aggregations(self) -> None:
         """Test parsing valid aggregation names."""
-        assert _parse_aggregation("last") == "last"
-        assert _parse_aggregation("first") == "first"
-        assert _parse_aggregation("mean") == "mean"
-        assert _parse_aggregation("statistics") == "statistics"
+        for strategy in AggregationStrategy:
+            assert _parse_aggregation(strategy.value) is strategy
 
     def test_parse_invalid_aggregation_raises(self) -> None:
         """Test that invalid aggregation raises SystemExit."""
@@ -172,7 +171,7 @@ class TestParseArgs:
         assert result["learning_rate"] == 0.05
         assert result["num_leaves"] == 31
         assert result["max_depth"] == -1
-        assert result["aggregation"] == "statistics"
+        assert result["aggregation"] is AggregationStrategy.STATISTICS
         assert result["include_rank_features"] is True
         assert result["include_diff_features"] is True
 
@@ -213,10 +212,10 @@ class TestParseArgs:
     def test_parse_args_aggregation(self) -> None:
         """Test parsing --aggregation argument."""
         result = parse_args(["--aggregation", "last"])
-        assert result["aggregation"] == "last"
+        assert result["aggregation"] is AggregationStrategy.LAST
 
         result = parse_args(["-a", "mean"])
-        assert result["aggregation"] == "mean"
+        assert result["aggregation"] is AggregationStrategy.MEAN
 
     def test_parse_args_no_rank_features(self) -> None:
         """Test parsing --no-rank-features flag."""
@@ -283,7 +282,7 @@ class TestParseArgs:
         assert result["learning_rate"] == 0.1
         assert result["num_leaves"] == 64
         assert result["max_depth"] == 8
-        assert result["aggregation"] == "last"
+        assert result["aggregation"] is AggregationStrategy.LAST
         assert result["include_rank_features"] is False
         assert result["include_diff_features"] is False
 

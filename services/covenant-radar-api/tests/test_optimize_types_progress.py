@@ -103,7 +103,7 @@ class TestLoadingProgressInfoEncodeDecode:
         """Encoding then decoding produces identical result."""
         original = LoadingProgressInfo(
             dataset="taiwan",
-            phase="reading",
+            phase=LoadPhase.READING,
             percent_complete=50.0,
             rows_processed=500,
             rows_total=1000,
@@ -115,8 +115,7 @@ class TestLoadingProgressInfoEncodeDecode:
 
     def test_all_load_phases_round_trip(self) -> None:
         """All load phase values round-trip correctly."""
-        phases: tuple[LoadPhase, ...] = ("reading", "parsing", "encoding")
-        for phase in phases:
+        for phase in (LoadPhase.READING, LoadPhase.PARSING, LoadPhase.ENCODING):
             original = LoadingProgressInfo(
                 dataset="us",
                 phase=phase,
@@ -127,7 +126,23 @@ class TestLoadingProgressInfoEncodeDecode:
             )
             encoded = encode_loading_progress_info(original)
             decoded = decode_loading_progress_info(encoded)
-            assert decoded["phase"] == phase
+            assert decoded["phase"] is phase
+
+    def test_decode_load_phase_the_job_never_reports_raises(self) -> None:
+        """A real LoadPhase outside the three an optimize job reports is refused."""
+        raw: JSONObject = {
+            "dataset": "taiwan",
+            "phase": LoadPhase.CACHING.value,
+            "percent_complete": 50.0,
+            "rows_processed": 500,
+            "rows_total": 1000,
+            "message": "test",
+        }
+        with pytest.raises(JSONTypeError) as exc_info:
+            decode_loading_progress_info(raw)
+        assert str(exc_info.value) == (
+            "Field 'phase' must be one of: reading, parsing, encoding (got caching)"
+        )
 
     def test_decode_invalid_load_phase_raises(self) -> None:
         """Invalid load phase raises JSONTypeError."""

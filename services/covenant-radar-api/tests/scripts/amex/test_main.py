@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from covenant_ml.datasets import AggregationStrategy
 from scripts.amex.__main__ import (
     _parse_aggregation,
     _parse_backends,
@@ -73,10 +74,8 @@ class TestParseAggregation:
             test_spec=FakeDatasetSpec(n_samples=5, n_features=5, positive_ratio=0.0),
         )
 
-        assert _parse_aggregation("last") == "last"
-        assert _parse_aggregation("first") == "first"
-        assert _parse_aggregation("mean") == "mean"
-        assert _parse_aggregation("statistics") == "statistics"
+        for strategy in AggregationStrategy:
+            assert _parse_aggregation(strategy.value) is strategy
 
     def test_raises_on_invalid_aggregation(self, tmp_path: Path) -> None:
         """_parse_aggregation raises SystemExit on invalid value."""
@@ -123,7 +122,7 @@ class TestParseArgs:
         assert args["n_folds"] == 5
         assert args["n_estimators"] == 1000
         assert args["learning_rate"] == 0.05
-        assert args["aggregation"] == "statistics"
+        assert args["aggregation"] is AggregationStrategy.STATISTICS
         assert args["include_rank_features"] is True
         assert args["include_diff_features"] is True
         assert args["include_window_features"] is True
@@ -292,10 +291,10 @@ class TestParseArgs:
         )
 
         args = parse_args(["--aggregation", "mean"])
-        assert args["aggregation"] == "mean"
+        assert args["aggregation"] is AggregationStrategy.MEAN
 
         args = parse_args(["-a", "last"])
-        assert args["aggregation"] == "last"
+        assert args["aggregation"] is AggregationStrategy.LAST
 
     def test_parse_train_dir_flag(self, tmp_path: Path) -> None:
         """parse_args parses --train-dir flag."""

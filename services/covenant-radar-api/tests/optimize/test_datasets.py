@@ -11,7 +11,14 @@ from pathlib import Path
 from shutil import copyfile
 
 import scripts._test_hooks as _hooks
-from covenant_ml.datasets import FileEncoding, FileFormat, TimeSeriesDatasetConfig
+from covenant_ml.datasets import (
+    AggregationStrategy,
+    FileEncoding,
+    FileFormat,
+    LabelType,
+    LoadPhase,
+    TimeSeriesDatasetConfig,
+)
 from covenant_ml.features import FeaturePreset
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
@@ -94,7 +101,7 @@ class TestRealTimeseriesHooks:
             encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
-                "label_type": "binary_int",
+                "label_type": LabelType.BINARY_INT,
                 "positive_values": (1,),
                 "negative_values": (0,),
             },
@@ -105,7 +112,7 @@ class TestRealTimeseriesHooks:
             time_series={
                 "entity_column": "customer_ID",
                 "time_column": "S_2",
-                "aggregation": "last",
+                "aggregation": AggregationStrategy.LAST,
                 "labels_file": "labels.csv",
                 "labels_entity_column": "customer_ID",
                 "include_rank_features": False,
@@ -196,7 +203,7 @@ class TestLoadingProgressCallbacks:
             if loading_progress_callback is not None:
                 info: LoadingProgressInfo = {
                     "dataset": "taiwan",
-                    "phase": "reading",
+                    "phase": LoadPhase.READING,
                     "percent_complete": 50.0,
                     "rows_processed": 500,
                     "rows_total": 1000,
@@ -215,7 +222,7 @@ class TestLoadingProgressCallbacks:
             assert result["backend"] == "xgboost"
             assert len(loading_callback_calls) == 1
             assert loading_callback_calls[0]["dataset"] == "taiwan"
-            assert loading_callback_calls[0]["phase"] == "reading"
+            assert loading_callback_calls[0]["phase"] is LoadPhase.READING
             assert loading_callback_calls[0]["percent_complete"] == 50.0
         finally:
             _hooks.optimization_runner = original
@@ -235,7 +242,7 @@ class TestLoadingProgressCallbacks:
             if loading_progress_callback is not None:
                 info: LoadingProgressInfo = {
                     "dataset": "taiwan",
-                    "phase": "parsing",
+                    "phase": LoadPhase.PARSING,
                     "percent_complete": 75.0,
                     "rows_processed": 750,
                     "rows_total": 1000,
@@ -254,7 +261,7 @@ class TestLoadingProgressCallbacks:
             assert result["backend"] == "mlp"
             assert len(loading_callback_calls) == 1
             assert loading_callback_calls[0]["dataset"] == "taiwan"
-            assert loading_callback_calls[0]["phase"] == "parsing"
+            assert loading_callback_calls[0]["phase"] is LoadPhase.PARSING
             assert loading_callback_calls[0]["percent_complete"] == 75.0
         finally:
             _hooks.optimization_runner = original
@@ -274,7 +281,7 @@ class TestLoadingProgressCallbacks:
             if loading_progress_callback is not None:
                 info: LoadingProgressInfo = {
                     "dataset": "taiwan",
-                    "phase": "encoding",
+                    "phase": LoadPhase.ENCODING,
                     "percent_complete": 100.0,
                     "rows_processed": 1000,
                     "rows_total": 1000,
@@ -293,7 +300,7 @@ class TestLoadingProgressCallbacks:
             assert result["backend"] == "lightgbm"
             assert len(loading_callback_calls) == 1
             assert loading_callback_calls[0]["dataset"] == "taiwan"
-            assert loading_callback_calls[0]["phase"] == "encoding"
+            assert loading_callback_calls[0]["phase"] is LoadPhase.ENCODING
             assert loading_callback_calls[0]["percent_complete"] == 100.0
         finally:
             _hooks.optimization_runner = original
@@ -313,7 +320,7 @@ class TestLoadingProgressCallbacks:
             if loading_progress_callback is not None:
                 info: LoadingProgressInfo = {
                     "dataset": "taiwan",
-                    "phase": "reading",
+                    "phase": LoadPhase.READING,
                     "percent_complete": 25.0,
                     "rows_processed": 250,
                     "rows_total": 1000,
@@ -332,7 +339,7 @@ class TestLoadingProgressCallbacks:
             assert result["backend"] == "lstm"
             assert len(loading_callback_calls) == 1
             assert loading_callback_calls[0]["dataset"] == "taiwan"
-            assert loading_callback_calls[0]["phase"] == "reading"
+            assert loading_callback_calls[0]["phase"] is LoadPhase.READING
             assert loading_callback_calls[0]["percent_complete"] == 25.0
         finally:
             _hooks.optimization_runner = original
@@ -352,7 +359,7 @@ class TestLoadingProgressCallbacks:
             if loading_progress_callback is not None:
                 info: LoadingProgressInfo = {
                     "dataset": "taiwan",
-                    "phase": "reading",
+                    "phase": LoadPhase.READING,
                     "percent_complete": 100.0,
                     "rows_processed": 1000,
                     "rows_total": 1000,

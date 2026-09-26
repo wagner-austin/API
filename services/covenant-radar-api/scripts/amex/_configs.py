@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 from covenant_ml.backends.protocol import ClassifierBackend
-from covenant_ml.datasets import FileEncoding, FileFormat, TimeSeriesDatasetConfig
+from covenant_ml.datasets import (
+    AggregationStrategy,
+    FileEncoding,
+    FileFormat,
+    LabelType,
+    TimeSeriesDatasetConfig,
+)
 from covenant_ml.types import (
     BackendName,
     LightGBMConfig,
@@ -20,7 +25,7 @@ from numpy.typing import NDArray
 
 def build_dataset_config(
     data_dir: Path,
-    aggregation: Literal["last", "first", "mean", "statistics"],
+    aggregation: AggregationStrategy,
     include_rank_features: bool,
     include_diff_features: bool,
     include_window_features: bool,
@@ -48,7 +53,7 @@ def build_dataset_config(
         encoding=FileEncoding.UTF_8,
         target={
             "column_name": "target",
-            "label_type": "binary_int",
+            "label_type": LabelType.BINARY_INT,
             "positive_values": (1,),
             "negative_values": (0,),
         },
@@ -72,7 +77,7 @@ def build_dataset_config(
 
 def build_test_config(
     data_dir: Path,
-    aggregation: Literal["last", "first", "mean", "statistics"],
+    aggregation: AggregationStrategy,
     include_rank_features: bool,
     include_diff_features: bool,
     include_window_features: bool,
@@ -100,7 +105,7 @@ def build_test_config(
         encoding=FileEncoding.UTF_8,
         target={
             "column_name": "target",
-            "label_type": "binary_int",
+            "label_type": LabelType.BINARY_INT,
             "positive_values": (1,),
             "negative_values": (0,),
         },

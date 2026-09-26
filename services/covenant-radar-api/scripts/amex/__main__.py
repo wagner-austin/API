@@ -11,9 +11,11 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TypedDict
 
+from covenant_ml.datasets import AggregationStrategy
 from covenant_ml.types import BackendName
+from platform_core.members import find_member
 from platform_core.rich_logging import setup_rich_logging
 
 from scripts.amex._hooks import get_console, get_project_root
@@ -48,7 +50,7 @@ class ParsedArgs(TypedDict, total=True):
     n_folds: int
     n_estimators: int
     learning_rate: float
-    aggregation: Literal["last", "first", "mean", "statistics"]
+    aggregation: AggregationStrategy
     include_rank_features: bool
     include_diff_features: bool
     include_window_features: bool
@@ -66,7 +68,7 @@ class _ArgState:
     n_folds: int
     n_estimators: int
     learning_rate: float
-    aggregation: Literal["last", "first", "mean", "statistics"]
+    aggregation: AggregationStrategy
     include_rank_features: bool
     include_diff_features: bool
     include_window_features: bool
@@ -82,7 +84,7 @@ class _ArgState:
         self.n_folds = 5
         self.n_estimators = 1000
         self.learning_rate = 0.05
-        self.aggregation = "statistics"
+        self.aggregation = AggregationStrategy.STATISTICS
         self.include_rank_features = True
         self.include_diff_features = True
         self.include_window_features = True
@@ -142,26 +144,21 @@ def _parse_backends(val: str) -> tuple[BackendName, ...]:
     return tuple(result)
 
 
-def _parse_aggregation(val: str) -> Literal["last", "first", "mean", "statistics"]:
+def _parse_aggregation(val: str) -> AggregationStrategy:
     """Parse aggregation strategy value.
 
     Args:
         val: Aggregation string from CLI.
 
     Returns:
-        Validated aggregation literal.
+        The named aggregation strategy.
 
     Raises:
         SystemExit: If aggregation is invalid.
     """
-    if val == "last":
-        return "last"
-    if val == "first":
-        return "first"
-    if val == "mean":
-        return "mean"
-    if val == "statistics":
-        return "statistics"
+    member = find_member(val, AggregationStrategy)
+    if member is not None:
+        return member
     console = get_console()
     console.write(f"Invalid aggregation: {val}. Must be last, first, mean, statistics.")
     raise SystemExit(1)

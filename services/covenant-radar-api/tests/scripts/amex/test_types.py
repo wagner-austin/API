@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+from covenant_ml.datasets import AggregationStrategy
 from numpy.typing import NDArray
 from scripts.amex.types import (
     AMEXPipelineConfig,
@@ -47,7 +48,7 @@ class TestAMEXPipelineConfig:
             n_folds=5,
             n_estimators=1000,
             learning_rate=0.05,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -59,7 +60,7 @@ class TestAMEXPipelineConfig:
         assert config["n_folds"] == 5
         assert config["n_estimators"] == 1000
         assert config["learning_rate"] == 0.05
-        assert config["aggregation"] == "statistics"
+        assert config["aggregation"] is AggregationStrategy.STATISTICS
         assert config["include_rank_features"] is True
         assert config["include_diff_features"] is True
         assert config["include_window_features"] is True
@@ -157,7 +158,7 @@ class TestMakeDefaultConfig:
         assert config["n_folds"] == 5
         assert config["n_estimators"] == 1000
         assert config["learning_rate"] == 0.05
-        assert config["aggregation"] == "statistics"
+        assert config["aggregation"] is AggregationStrategy.STATISTICS
         assert config["include_rank_features"] is True
         assert config["include_diff_features"] is True
         assert config["include_window_features"] is True

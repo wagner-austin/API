@@ -11,9 +11,11 @@ from shutil import copyfile
 
 import pytest
 from covenant_ml.datasets import (
+    AggregationStrategy,
     DatasetConfig,
     FileEncoding,
     FileFormat,
+    LabelType,
     LoadedDataset,
     TimeSeriesDatasetConfig,
 )
@@ -343,7 +345,7 @@ class TestWorkerTimeseriesHooks:
             encoding=FileEncoding.UTF_8,
             target={
                 "column_name": "target",
-                "label_type": "binary_int",
+                "label_type": LabelType.BINARY_INT,
                 "positive_values": (1,),
                 "negative_values": (0,),
             },
@@ -354,7 +356,7 @@ class TestWorkerTimeseriesHooks:
             time_series={
                 "entity_column": "customer_ID",
                 "time_column": "S_2",
-                "aggregation": "last",
+                "aggregation": AggregationStrategy.LAST,
                 "labels_file": "labels.csv",
                 "labels_entity_column": "customer_ID",
                 "include_rank_features": False,

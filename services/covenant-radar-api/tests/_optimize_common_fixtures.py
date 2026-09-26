@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 from covenant_ml.datasets import (
+    AggregationStrategy,
     DatasetConfig,
     DatasetMeta,
     DatasetRegistry,
     FileEncoding,
     FileFormat,
+    LabelType,
     LoadedDataset,
     TimeSeriesDatasetConfig,
     TimeSeriesDatasetRegistry,
@@ -87,7 +89,7 @@ def _make_fake_standard_config(name: str) -> DatasetConfig:
         "encoding": FileEncoding.UTF_8,
         "target": {
             "column_name": "target",
-            "label_type": "binary_int",
+            "label_type": LabelType.BINARY_INT,
             "positive_values": (1,),
             "negative_values": (0,),
         },
@@ -116,7 +118,7 @@ def _make_fake_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
         encoding=FileEncoding.UTF_8,
         target={
             "column_name": "target",
-            "label_type": "binary_int",
+            "label_type": LabelType.BINARY_INT,
             "positive_values": (1,),
             "negative_values": (0,),
         },
@@ -127,7 +129,7 @@ def _make_fake_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
         time_series={
             "entity_column": "customer_ID",
             "time_column": "S_2",
-            "aggregation": "last",
+            "aggregation": AggregationStrategy.LAST,
             "labels_file": "train_labels.csv",
             "labels_entity_column": "customer_ID",
             "include_rank_features": False,

@@ -20,6 +20,7 @@ from covenant_ml.datasets import (
     DatasetRegistry,
     FileEncoding,
     FileFormat,
+    LabelType,
     LoadedDataset,
     TimeSeriesDatasetRegistry,
 )
@@ -102,7 +103,7 @@ def _make_fake_standard_config(name: str) -> DatasetConfig:
         "encoding": FileEncoding.UTF_8,
         "target": {
             "column_name": "target",
-            "label_type": "binary_int",
+            "label_type": LabelType.BINARY_INT,
             "positive_values": (1,),
             "negative_values": (0,),
         },

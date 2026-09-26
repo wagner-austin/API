@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from covenant_ml.datasets import FileEncoding
+from covenant_ml.datasets import FileEncoding, LabelType
 from platform_core.rich_logging import (
     RichConsoleProtocol,
     RichRenderableProtocol,
@@ -104,7 +104,7 @@ def _make_success_dataset() -> DiscoveredDataset:
         "recommended_exclude": ("id", "name"),
         "target_positive_value": "1",
         "target_negative_value": "0",
-        "target_label_type": "binary_int",
+        "target_label_type": LabelType.BINARY_INT,
         "positive_class_ratio": 0.3,
         "status": "success",
         "message": "Single data file found",
@@ -125,7 +125,7 @@ def _make_warning_dataset() -> DiscoveredDataset:
         "recommended_exclude": (),
         "target_positive_value": "",
         "target_negative_value": "",
-        "target_label_type": "binary_int",
+        "target_label_type": LabelType.BINARY_INT,
         "positive_class_ratio": 0.0,
         "status": "warning",
         "message": "No target column candidates found",
@@ -146,7 +146,7 @@ def _make_error_dataset() -> DiscoveredDataset:
         "recommended_exclude": (),
         "target_positive_value": "",
         "target_negative_value": "",
-        "target_label_type": "binary_int",
+        "target_label_type": LabelType.BINARY_INT,
         "positive_class_ratio": 0.0,
         "status": "error",
         "message": "No data files found",

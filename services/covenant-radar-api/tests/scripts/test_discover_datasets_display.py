@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.datasets import FileEncoding
+from covenant_ml.datasets import FileEncoding, LabelType
 from scripts.discover_datasets.main import (
     _format_dataset_row,
     _generate_config_code,
@@ -197,7 +197,7 @@ class TestPrintDatasetDetail:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "success",
             "message": "ok",
@@ -225,7 +225,7 @@ class TestGenerateConfigCode:
         assert "file_format=FileFormat.CSV," in code
         assert "encoding=FileEncoding.UTF_8," in code
         assert 'column_name="target"' in code
-        assert 'label_type="binary_int"' in code
+        assert "label_type=LabelType.BINARY_INT," in code
 
     def test_skipped_for_error(self) -> None:
         """Test skipped comment for error dataset."""
@@ -263,14 +263,14 @@ class TestGenerateConfigCode:
             "recommended_exclude": (),
             "target_positive_value": "A",
             "target_negative_value": "B",
-            "target_label_type": "binary_str",
+            "target_label_type": LabelType.BINARY_STR,
             "positive_class_ratio": 0.33,
             "status": "success",
             "message": "ok",
         }
         code = _generate_config_code(ds)
 
-        assert 'label_type="binary_str"' in code
+        assert "label_type=LabelType.BINARY_STR," in code
 
     def test_exclude_columns_formatting(self) -> None:
         """Test exclude columns tuple formatting."""
@@ -301,7 +301,7 @@ class TestGenerateConfigCode:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_str",
+            "target_label_type": LabelType.BINARY_STR,
             "positive_class_ratio": 0.0,
             "status": "success",
             "message": "ok",
@@ -310,4 +310,4 @@ class TestGenerateConfigCode:
 
         # Should still generate config, defaulting to binary_str since not found
         assert "DatasetConfig(" in code
-        assert 'label_type="binary_str"' in code
+        assert "label_type=LabelType.BINARY_STR," in code

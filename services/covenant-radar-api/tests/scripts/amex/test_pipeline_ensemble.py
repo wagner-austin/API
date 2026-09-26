@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.datasets import AggregationStrategy
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
 )
@@ -84,7 +85,7 @@ class TestGenerateEnsemblePredictions:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -141,7 +142,7 @@ class TestRunPipeline:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -226,7 +227,7 @@ class TestGenerateEnsemblePredictionsMissingModel:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -311,7 +312,7 @@ class TestGenerateEnsemblePredictions2D:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import scripts._test_hooks as _hooks
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
-from covenant_ml.datasets import DatasetRegistry
+from covenant_ml.datasets import DatasetRegistry, LoadPhase
 from covenant_ml.features import FeaturePreset
 from covenant_ml.types import BackendName
 from scripts._test_hooks import (
@@ -265,7 +265,7 @@ class TestRunSingleWithProgress:
             if loading_progress_callback is not None:
                 loading_info: LoadingProgressInfo = {
                     "dataset": "taiwan",
-                    "phase": "reading",
+                    "phase": LoadPhase.READING,
                     "percent_complete": 100.0,
                     "rows_processed": 1000,
                     "rows_total": 1000,

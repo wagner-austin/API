@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final, Literal, TypedDict
 
-from covenant_ml.datasets.types import FileEncoding
+from covenant_ml.datasets.types import FileEncoding, LabelType
 
 from scripts.discover_datasets.detection import (
     calculate_positive_ratio,
@@ -55,7 +55,7 @@ class TargetInfo(TypedDict, total=True):
 
     positive_value: str
     negative_value: str
-    label_type: Literal["binary_int", "binary_str"]
+    label_type: LabelType
     positive_ratio: float
 
 
@@ -177,7 +177,7 @@ def _detect_target_info(
         return TargetInfo(
             positive_value="",
             negative_value="",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_ratio=0.0,
         )
 
@@ -200,7 +200,7 @@ def _detect_target_info(
     return TargetInfo(
         positive_value="",
         negative_value="",
-        label_type="binary_int",
+        label_type=LabelType.BINARY_INT,
         positive_ratio=0.0,
     )
 
@@ -247,7 +247,7 @@ def _create_empty_result(folder_name: str, message: str) -> DiscoveredDataset:
         recommended_exclude=(),
         target_positive_value="",
         target_negative_value="",
-        target_label_type="binary_int",
+        target_label_type=LabelType.BINARY_INT,
         positive_class_ratio=0.0,
         status="error",
         message=message,

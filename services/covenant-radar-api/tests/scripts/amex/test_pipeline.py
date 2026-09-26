@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from covenant_ml.datasets import AggregationStrategy
 from numpy.typing import NDArray
 from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
@@ -31,7 +32,7 @@ class TestBuildDatasetConfig:
 
         config = build_dataset_config(
             data_dir=data_dir,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -41,7 +42,7 @@ class TestBuildDatasetConfig:
         assert config["name"] == "amex_train"
         assert config["time_series"]["entity_column"] == "customer_ID"
         assert config["time_series"]["time_column"] == "S_2"
-        assert config["time_series"]["aggregation"] == "statistics"
+        assert config["time_series"]["aggregation"] is AggregationStrategy.STATISTICS
         assert config["time_series"]["include_rank_features"] is True
         assert config["time_series"]["include_diff_features"] is True
         assert config["time_series"]["include_window_features"] is True
@@ -53,14 +54,14 @@ class TestBuildDatasetConfig:
 
         config = build_dataset_config(
             data_dir=data_dir,
-            aggregation="mean",
+            aggregation=AggregationStrategy.MEAN,
             include_rank_features=False,
             include_diff_features=False,
             include_window_features=False,
             window_sizes=(),
         )
 
-        assert config["time_series"]["aggregation"] == "mean"
+        assert config["time_series"]["aggregation"] is AggregationStrategy.MEAN
         assert config["time_series"]["include_rank_features"] is False
 
 
@@ -73,7 +74,7 @@ class TestBuildTestConfig:
 
         config = build_test_config(
             data_dir=data_dir,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -114,7 +115,7 @@ class TestLoadTrainingData:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -251,7 +252,7 @@ class TestLoadTestData:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,
@@ -355,7 +356,7 @@ class TestTrainAllModels:
             n_folds=2,
             n_estimators=10,
             learning_rate=0.1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=True,
             include_window_features=True,

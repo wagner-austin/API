@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from covenant_ml.datasets import FileEncoding
+from covenant_ml.datasets import FileEncoding, LabelType
 from scripts.discover_datasets.types import (
     DetectionStatus,
     DiscoveredDataset,
@@ -64,7 +64,7 @@ class TestDiscoveredDataset:
             "recommended_exclude": ("id", "name"),
             "target_positive_value": "1",
             "target_negative_value": "0",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
             "status": "success",
             "message": "Single data file found",
@@ -89,7 +89,7 @@ class TestDiscoveredDataset:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "error",
             "message": "No data files found",
@@ -127,7 +127,7 @@ class TestDiscoverySummary:
             "recommended_exclude": (),
             "target_positive_value": "",
             "target_negative_value": "",
-            "target_label_type": "binary_int",
+            "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
             "status": "warning",
             "message": "No target column found",

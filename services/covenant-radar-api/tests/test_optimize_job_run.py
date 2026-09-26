@@ -15,6 +15,7 @@ import pytest
 from covenant_ml.datasets import (
     DatasetConfig,
     LoadedDataset,
+    LoadPhase,
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.optimizer import (
@@ -257,7 +258,7 @@ class TestRunOptimization:
             if progress_callback is not None:
                 progress_callback(
                     {
-                        "phase": "reading",
+                        "phase": LoadPhase.READING,
                         "bytes_read": 500,
                         "bytes_total": 1000,
                         "percent_complete": 50.0,
@@ -284,7 +285,7 @@ class TestRunOptimization:
         )
 
         assert len(loading_infos) == 1
-        assert loading_infos[0]["phase"] == "reading"
+        assert loading_infos[0]["phase"] is LoadPhase.READING
         assert loading_infos[0]["percent_complete"] == 50.0
         assert loading_infos[0]["dataset"] == "taiwan"
 

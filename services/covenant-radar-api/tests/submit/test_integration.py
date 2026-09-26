@@ -13,6 +13,7 @@ from types import ModuleType
 
 import numpy as np
 import pytest
+from covenant_ml.datasets import AggregationStrategy
 from numpy.typing import NDArray
 from scripts.submit import _hooks as submit_hooks
 from scripts.submit.__main__ import main
@@ -77,7 +78,7 @@ class TestTrainModel:
             learning_rate=0.1,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
@@ -139,7 +140,7 @@ class TestRunPipeline:
             learning_rate=0.1,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=False,
             include_diff_features=False,
         )
@@ -185,7 +186,7 @@ class TestRunPipeline:
             learning_rate=0.1,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=False,
             include_diff_features=False,
         )

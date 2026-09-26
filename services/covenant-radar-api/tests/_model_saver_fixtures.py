@@ -15,6 +15,7 @@ from covenant_ml.datasets import (
     DatasetMeta,
     FileEncoding,
     FileFormat,
+    LabelType,
     LoadedDataset,
 )
 from covenant_ml.features import FeaturePreset
@@ -324,7 +325,7 @@ def _make_fake_dataset_config(name: str = "taiwan") -> DatasetConfig:
         "encoding": FileEncoding.UTF_8,
         "target": {
             "column_name": "target",
-            "label_type": "binary_int",
+            "label_type": LabelType.BINARY_INT,
             "positive_values": (1,),
             "negative_values": (0,),
         },

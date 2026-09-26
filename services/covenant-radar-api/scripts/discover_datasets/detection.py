@@ -6,7 +6,8 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 import re
-from typing import Literal
+
+from covenant_ml.datasets import LabelType
 
 from scripts.discover_datasets.types import TargetColumnCandidate
 
@@ -345,7 +346,7 @@ def recommend_target(candidates: tuple[TargetColumnCandidate, ...]) -> str:
 
 def detect_positive_negative_values(
     unique_values: tuple[str, ...],
-) -> tuple[str, str, Literal["binary_int", "binary_str"]]:
+) -> tuple[str, str, LabelType]:
     """Detect which value is positive (bad) and which is negative (good).
 
     Args:
@@ -356,7 +357,7 @@ def detect_positive_negative_values(
         Returns empty strings if detection fails.
     """
     if len(unique_values) != 2:
-        return "", "", "binary_int"
+        return "", "", LabelType.BINARY_INT
 
     val_a, val_b = unique_values[0], unique_values[1]
     lower_a, lower_b = val_a.lower().strip(), val_b.lower().strip()
@@ -369,7 +370,7 @@ def detect_positive_negative_values(
         "1.0",
         "2",
     )
-    label_type: Literal["binary_int", "binary_str"] = "binary_int" if is_numeric else "binary_str"
+    label_type = LabelType.BINARY_INT if is_numeric else LabelType.BINARY_STR
 
     # Check if a is positive
     if lower_a in _POSITIVE_VALUES:

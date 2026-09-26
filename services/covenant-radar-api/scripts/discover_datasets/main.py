@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from covenant_ml.datasets import LabelType
 from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 
@@ -208,7 +209,7 @@ def _is_valid_numeric(value: str) -> bool:
 def _format_value_tuple(
     pos_val: str,
     neg_val: str,
-    label_type: Literal["binary_int", "binary_str"],
+    label_type: LabelType,
 ) -> tuple[str, str]:
     """Format positive and negative values as Python tuple strings.
 
@@ -220,7 +221,7 @@ def _format_value_tuple(
     Returns:
         Tuple of (positive_values_str, negative_values_str) as Python code.
     """
-    if label_type == "binary_int":
+    if label_type is LabelType.BINARY_INT:
         # Convert to int for cleaner output if valid numeric
         if _is_valid_numeric(pos_val) and _is_valid_numeric(neg_val):
             pos_int = int(float(pos_val))
@@ -274,7 +275,7 @@ def _generate_config_code(ds: DiscoveredDataset) -> str:
     encoding=FileEncoding.{ds["encoding"].name},
     target=TargetColumnSpec(
         column_name="{target_col}",
-        label_type="{label_type}",
+        label_type=LabelType.{label_type.name},
         positive_values={pos_values_str},
         negative_values={neg_values_str},
     ),

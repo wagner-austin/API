@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from covenant_ml.datasets import AggregationStrategy
 from scripts.submit.pipeline import (
     SubmitConfig,
     _build_lightgbm_config,
@@ -26,12 +27,12 @@ class TestBuildDatasetConfig:
         """Test building config with last aggregation."""
         config = build_dataset_config(
             data_dir=tmp_path,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
         assert config["name"] == "submit_data"
-        assert config["time_series"]["aggregation"] == "last"
+        assert config["time_series"]["aggregation"] is AggregationStrategy.LAST
         assert config["time_series"]["include_rank_features"] is True
         assert config["time_series"]["include_diff_features"] is True
 
@@ -39,11 +40,11 @@ class TestBuildDatasetConfig:
         """Test building config with statistics aggregation."""
         config = build_dataset_config(
             data_dir=tmp_path,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=False,
             include_diff_features=False,
         )
-        assert config["time_series"]["aggregation"] == "statistics"
+        assert config["time_series"]["aggregation"] is AggregationStrategy.STATISTICS
         assert config["time_series"]["include_rank_features"] is False
         assert config["time_series"]["include_diff_features"] is False
 
@@ -51,21 +52,21 @@ class TestBuildDatasetConfig:
         """Test building config with mean aggregation."""
         config = build_dataset_config(
             data_dir=tmp_path,
-            aggregation="mean",
+            aggregation=AggregationStrategy.MEAN,
             include_rank_features=True,
             include_diff_features=False,
         )
-        assert config["time_series"]["aggregation"] == "mean"
+        assert config["time_series"]["aggregation"] is AggregationStrategy.MEAN
 
     def test_build_with_first_aggregation(self, tmp_path: Path) -> None:
         """Test building config with first aggregation."""
         config = build_dataset_config(
             data_dir=tmp_path,
-            aggregation="first",
+            aggregation=AggregationStrategy.FIRST,
             include_rank_features=False,
             include_diff_features=True,
         )
-        assert config["time_series"]["aggregation"] == "first"
+        assert config["time_series"]["aggregation"] is AggregationStrategy.FIRST
 
 
 class TestBuildLightGBMConfig:
@@ -79,7 +80,7 @@ class TestBuildLightGBMConfig:
             learning_rate=0.1,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
@@ -102,7 +103,7 @@ class TestBuildXGBoostConfig:
             learning_rate=0.1,
             num_leaves=31,
             max_depth=6,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
@@ -123,7 +124,7 @@ class TestBuildMLPConfig:
             learning_rate=0.01,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
@@ -144,7 +145,7 @@ class TestBuildLSTMConfig:
             learning_rate=0.001,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
@@ -165,7 +166,7 @@ class TestGetTrainConfig:
             learning_rate=0.1,
             num_leaves=31,
             max_depth=-1,
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             include_rank_features=True,
             include_diff_features=True,
         )
@@ -181,7 +182,7 @@ class TestGetTrainConfig:
             learning_rate=0.05,
             num_leaves=31,
             max_depth=6,
-            aggregation="mean",
+            aggregation=AggregationStrategy.MEAN,
             include_rank_features=False,
             include_diff_features=True,
         )
@@ -197,7 +198,7 @@ class TestGetTrainConfig:
             learning_rate=0.01,
             num_leaves=31,
             max_depth=-1,
-            aggregation="statistics",
+            aggregation=AggregationStrategy.STATISTICS,
             include_rank_features=True,
             include_diff_features=False,
         )
@@ -213,7 +214,7 @@ class TestGetTrainConfig:
             learning_rate=0.001,
             num_leaves=31,
             max_depth=-1,
-            aggregation="first",
+            aggregation=AggregationStrategy.FIRST,
             include_rank_features=False,
             include_diff_features=False,
         )

@@ -5,9 +5,10 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 import numpy as np
+from covenant_ml.datasets import AggregationStrategy
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
 
@@ -32,7 +33,7 @@ class AMEXPipelineConfig(TypedDict, total=True):
     n_folds: int
     n_estimators: int
     learning_rate: float
-    aggregation: Literal["last", "first", "mean", "statistics"]
+    aggregation: AggregationStrategy
     include_rank_features: bool
     include_diff_features: bool
     include_window_features: bool
@@ -107,7 +108,7 @@ def make_default_config() -> AMEXPipelineConfig:
         n_folds=5,
         n_estimators=1000,
         learning_rate=0.05,
-        aggregation="statistics",
+        aggregation=AggregationStrategy.STATISTICS,
         include_rank_features=True,
         include_diff_features=True,
         include_window_features=True,

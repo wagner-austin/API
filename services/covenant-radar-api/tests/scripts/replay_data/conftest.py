@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from covenant_ml.datasets import AggregationStrategy, LabelType
 from covenant_ml.datasets.types import (
     DatasetConfig,
     DatasetMeta,
@@ -127,7 +128,7 @@ def make_test_dataset_config(name: str = "test_dataset") -> DatasetConfig:
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -156,7 +157,7 @@ def make_test_timeseries_config(name: str = "test_ts") -> TimeSeriesDatasetConfi
         encoding=FileEncoding.UTF_8,
         target=TargetColumnSpec(
             column_name="target",
-            label_type="binary_int",
+            label_type=LabelType.BINARY_INT,
             positive_values=(1,),
             negative_values=(0,),
         ),
@@ -167,7 +168,7 @@ def make_test_timeseries_config(name: str = "test_ts") -> TimeSeriesDatasetConfi
         time_series=TimeSeriesSpec(
             entity_column="entity_id",
             time_column="date",
-            aggregation="last",
+            aggregation=AggregationStrategy.LAST,
             labels_file="",
             labels_entity_column="",
             include_rank_features=False,

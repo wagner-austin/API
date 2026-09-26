@@ -8,7 +8,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from typing import Final, Literal, Protocol, TypedDict
 
 from covenant_ml.datasets.types import LoadPhase
 from covenant_ml.features import FeaturePreset
@@ -18,6 +18,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
 )
+from platform_core.members import find_member
 
 from covenant_radar_api.worker.optimize_field_decoders import (
     _require_backend_name,
@@ -42,6 +43,13 @@ from covenant_radar_api.worker.optimize_result_types import (
 # =============================================================================
 
 OptimizePhase = Literal["loading_data", "feature_engineering", "optimizing", "saving"]
+
+# The loading sub-phases an optimize job reports while it reads a dataset.
+_REPORTED_LOAD_PHASES: Final[tuple[LoadPhase, ...]] = (
+    LoadPhase.READING,
+    LoadPhase.PARSING,
+    LoadPhase.ENCODING,
+)
 
 # =============================================================================
 # Progress TypedDicts
@@ -378,17 +386,10 @@ def decode_loading_progress_info(raw: JSONObject) -> LoadingProgressInfo:
         JSONTypeError: If any required field is missing or has wrong type.
     """
     phase_val = _require_str(raw, "phase")
-    if phase_val not in ("reading", "parsing", "encoding"):
-        raise JSONTypeError(
-            f"Field 'phase' must be one of: reading, parsing, encoding (got {phase_val})"
-        )
-    load_phase: LoadPhase
-    if phase_val == "reading":
-        load_phase = "reading"
-    elif phase_val == "parsing":
-        load_phase = "parsing"
-    else:
-        load_phase = "encoding"
+    load_phase = find_member(phase_val, LoadPhase)
+    if load_phase is None or load_phase not in _REPORTED_LOAD_PHASES:
+        admitted = ", ".join(_REPORTED_LOAD_PHASES)
+        raise JSONTypeError(f"Field 'phase' must be one of: {admitted} (got {phase_val})")
 
     return LoadingProgressInfo(
         dataset=_require_str(raw, "dataset"),
