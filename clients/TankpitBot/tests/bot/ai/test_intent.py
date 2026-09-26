@@ -8,6 +8,8 @@ from platform_core.json_utils import JSONTypeError
 from tankpit_bot.bot.ai.intent import (
     RESOURCE_LOCK_HOLD_BOUND_TICKS,
     CollectPlanDict,
+    CollectPlanKind,
+    PlanReleaseReason,
     current_collect_plan,
     decode_collect_plan,
     encode_collect_plan,
@@ -71,19 +73,21 @@ class TestCollectPlanCodecs:
 
     def test_fuel_plan_round_trips(self) -> None:
         """A fuel plan survives encode -> decode unchanged."""
-        plan = CollectPlanDict(kind="fuel", target_x=12, target_y=34)
+        plan = CollectPlanDict(kind=CollectPlanKind.FUEL, target_x=12, target_y=34)
 
         assert decode_collect_plan(encode_collect_plan(plan)) == plan
 
     def test_equipment_plan_round_trips(self) -> None:
         """An equipment plan survives encode -> decode unchanged."""
-        plan = CollectPlanDict(kind="equipment", target_x=7, target_y=9)
+        plan = CollectPlanDict(kind=CollectPlanKind.EQUIPMENT, target_x=7, target_y=9)
 
         assert decode_collect_plan(encode_collect_plan(plan)) == plan
 
     def test_decode_rejects_unknown_kind(self) -> None:
         """A kind outside the closed vocabulary raises."""
-        with pytest.raises(JSONTypeError, match="kind must be one of"):
+        with pytest.raises(
+            JSONTypeError, match="Invalid kind 'bogus': must be one of 'fuel', 'equipment'"
+        ):
             decode_collect_plan({"kind": "bogus", "target_x": 1, "target_y": 2})
 
     def test_decode_rejects_missing_coordinate(self) -> None:
@@ -105,7 +109,7 @@ class TestCurrentCollectPlan:
 
         plan = current_collect_plan(state)
 
-        assert plan == CollectPlanDict(kind="fuel", target_x=10, target_y=20)
+        assert plan == CollectPlanDict(kind=CollectPlanKind.FUEL, target_x=10, target_y=20)
 
     def test_equipment_lock_reads_as_equipment_plan(self) -> None:
         """A held equipment lock is the equipment plan."""
@@ -113,7 +117,7 @@ class TestCurrentCollectPlan:
 
         plan = current_collect_plan(state)
 
-        assert plan == CollectPlanDict(kind="equipment", target_x=3, target_y=4)
+        assert plan == CollectPlanDict(kind=CollectPlanKind.EQUIPMENT, target_x=3, target_y=4)
 
     def test_unknown_kind_reads_as_no_plan(self) -> None:
         """A lock kind outside the vocabulary is not a plan."""
@@ -127,19 +131,19 @@ class TestPlanCompletesHere:
 
     def test_standing_on_the_target_completes(self) -> None:
         """Distance zero is inside the serve reach."""
-        plan = CollectPlanDict(kind="equipment", target_x=100, target_y=100)
+        plan = CollectPlanDict(kind=CollectPlanKind.EQUIPMENT, target_x=100, target_y=100)
 
         assert plan_completes_here(plan, 100, 100) is True
 
     def test_cardinal_adjacency_completes(self) -> None:
         """Distance one (the auto-pick reach) completes."""
-        plan = CollectPlanDict(kind="fuel", target_x=101, target_y=100)
+        plan = CollectPlanDict(kind=CollectPlanKind.FUEL, target_x=101, target_y=100)
 
         assert plan_completes_here(plan, 100, 100) is True
 
     def test_two_tiles_out_does_not_complete(self) -> None:
         """Distance two is travel, not completion."""
-        plan = CollectPlanDict(kind="fuel", target_x=101, target_y=101)
+        plan = CollectPlanDict(kind=CollectPlanKind.FUEL, target_x=101, target_y=101)
 
         assert plan_completes_here(plan, 100, 100) is False
 
@@ -151,7 +155,7 @@ class TestReleaseCollectPlan:
         """Releasing a held plan zeroes the lock fields."""
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
 
-        result = release_collect_plan(state, reason="superior_candidate")
+        result = release_collect_plan(state, reason=PlanReleaseReason.SUPERIOR_CANDIDATE)
 
         assert result["resource_target_kind"] == ""
         assert result["resource_target_x"] == 0
@@ -161,7 +165,7 @@ class TestReleaseCollectPlan:
         """Releasing nothing is nothing: the same state comes back."""
         state = make_initial_ai_state()
 
-        assert release_collect_plan(state, reason="landing_scan_reset") is state
+        assert release_collect_plan(state, reason=PlanReleaseReason.LANDING_SCAN_RESET) is state
 
 
 class TestValidateCollectPlan:
@@ -289,7 +293,7 @@ class TestHoldProgressCounter:
             hold_resource_target(set_resource_target(make_initial_ai_state(), "fuel", 10, 20))
         )
 
-        released = release_collect_plan(held, reason="progress_stalled")
+        released = release_collect_plan(held, reason=PlanReleaseReason.PROGRESS_STALLED)
 
         assert released["resource_target_kind"] == ""
         assert released["resource_target_held_ticks"] == 0
