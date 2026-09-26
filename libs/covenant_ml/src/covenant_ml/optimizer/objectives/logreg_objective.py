@@ -28,6 +28,7 @@ from covenant_ml.optimizer.types import (
     SampledStringParams,
 )
 from covenant_ml.trainer import preprocess_data_splits, stratified_split
+from covenant_ml.types_logreg import LogRegPenalty, LogRegSolver
 
 _log = get_logger(__name__)
 
@@ -222,18 +223,15 @@ class LogRegObjective:
         max_iter_value = int_params.get("max_iter", 300)
         l1_ratio_value = float_params.get("l1_ratio", None)
 
-        penalty_value = string_params.get("penalty", "l2")
-        solver_value = string_params.get("solver", "saga")
-
-        # Map penalty to sklearn format
-        penalty_arg: str | None = None if penalty_value == "none" else penalty_value
-        l1_ratio_arg: float | None = l1_ratio_value if penalty_value == "elasticnet" else None
+        penalty = LogRegPenalty(string_params.get("penalty", LogRegPenalty.L2))
+        solver = LogRegSolver(string_params.get("solver", LogRegSolver.SAGA))
+        l1_ratio_arg: float | None = l1_ratio_value if penalty is LogRegPenalty.ELASTICNET else None
 
         # Train LogReg model
         model = _build_logreg_model(
-            penalty=penalty_arg,
+            penalty=penalty.sklearn_penalty,
             c_value=c_value,
-            solver=solver_value,
+            solver=solver,
             max_iter=max_iter_value,
             tol=tol_value,
             random_state=random_state,

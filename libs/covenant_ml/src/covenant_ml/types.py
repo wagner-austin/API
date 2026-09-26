@@ -12,6 +12,8 @@ from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
 from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision, ResolvedDevice
 
+from covenant_ml.types_logreg import LogRegPenalty, LogRegSolver
+
 # Pluggable backend naming - all supported classifier backends
 BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm", "logreg", "random_forest"]
 
@@ -397,11 +399,6 @@ class ClearGBMConfig(TypedDict, total=True):
     test_ratio: float
     early_stopping_rounds: int
     min_data_in_bin: NotRequired[int]
-
-
-LogRegSolver = Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
-
-LogRegPenalty = Literal["l1", "l2", "elasticnet", "none"]
 
 
 class LogRegConfig(TypedDict, total=True):

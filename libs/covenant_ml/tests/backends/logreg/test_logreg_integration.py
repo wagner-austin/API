@@ -6,7 +6,6 @@ Tests the full training loop, prediction, and error paths using real US bankrupt
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import pytest
@@ -22,6 +21,8 @@ from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.types import (
     ClassifierTrainConfig,
     LogRegConfig,
+    LogRegPenalty,
+    LogRegSolver,
     MLPConfig,
     OptimizerName,
     TrainOutcome,
@@ -29,10 +30,6 @@ from covenant_ml.types import (
 )
 
 from ...conftest import load_us_bankruptcy_data
-
-# Type aliases for LogReg config literals
-LogRegSolver = Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
-LogRegPenalty = Literal["l1", "l2", "elasticnet", "none"]
 
 
 def _invoke_logreg_train(
@@ -94,9 +91,9 @@ def _make_synthetic_dataset(
 
 
 def _make_logreg_config(
-    penalty: LogRegPenalty = "l2",
+    penalty: LogRegPenalty = LogRegPenalty.L2,
     c_value: float = 1.0,
-    solver: LogRegSolver = "lbfgs",
+    solver: LogRegSolver = LogRegSolver.LBFGS,
     max_iter: int = 100,
 ) -> LogRegConfig:
     """Create LogReg config for testing.
@@ -131,7 +128,7 @@ def test_logreg_backend_train_returns_outcome(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="l2", c_value=1.0)
+    config = _make_logreg_config(penalty=LogRegPenalty.L2, c_value=1.0)
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
@@ -407,7 +404,7 @@ def test_logreg_backend_with_l1_penalty(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="l1", solver="saga", max_iter=10000)
+    config = _make_logreg_config(penalty=LogRegPenalty.L1, solver=LogRegSolver.SAGA, max_iter=10000)
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
@@ -421,7 +418,7 @@ def test_logreg_backend_with_no_penalty(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="none", solver="lbfgs")
+    config = _make_logreg_config(penalty=LogRegPenalty.NONE, solver=LogRegSolver.LBFGS)
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
@@ -434,7 +431,9 @@ def test_logreg_backend_with_elasticnet_penalty(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="elasticnet", solver="saga", max_iter=10000)
+    config = _make_logreg_config(
+        penalty=LogRegPenalty.ELASTICNET, solver=LogRegSolver.SAGA, max_iter=10000
+    )
     config["l1_ratio"] = 0.5  # Mix of L1 and L2
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
@@ -497,7 +496,7 @@ def test_logreg_backend_config_stored_in_outcome(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="l2", c_value=0.5)
+    config = _make_logreg_config(penalty=LogRegPenalty.L2, c_value=0.5)
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
     # Verify config matches what was passed in (compare against shared keys)

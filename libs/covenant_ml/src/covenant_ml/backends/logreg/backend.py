@@ -28,6 +28,7 @@ from covenant_ml.types import (
     TrainOutcome,
     TrainProgress,
 )
+from covenant_ml.types_logreg import LogRegPenalty
 from covenant_ml.types_model_meta import LogRegModelMeta
 
 from ...metrics import compute_all_metrics
@@ -378,11 +379,12 @@ class LogRegBackend(ClassifierBackend):
             resolved_names = feature_names
 
         class_weight_arg: str | None = "balanced" if cfg["class_weight_balanced"] else None
-        penalty_arg: str | None = None if cfg["penalty"] == "none" else cfg["penalty"]
-        l1_ratio_arg: float | None = cfg["l1_ratio"] if cfg["penalty"] == "elasticnet" else None
+        l1_ratio_arg: float | None = (
+            cfg["l1_ratio"] if cfg["penalty"] is LogRegPenalty.ELASTICNET else None
+        )
 
         model = _create_logreg_model(
-            penalty=penalty_arg,
+            penalty=cfg["penalty"].sklearn_penalty,
             inverse_reg_strength=cfg["C"],
             solver=cfg["solver"],
             max_iter=cfg["max_iter"],

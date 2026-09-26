@@ -7,6 +7,8 @@ from typing import Literal
 from covenant_ml.types import (
     LightGBMConfig,
     LogRegConfig,
+    LogRegPenalty,
+    LogRegSolver,
     LSTMConfig,
     MLPConfig,
     OptimizerName,
@@ -75,8 +77,8 @@ def make_train_config(
 
 def make_logreg_config(
     *,
-    solver: Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"] = "lbfgs",
-    penalty: Literal["l1", "l2", "elasticnet", "none"] = "l2",
+    solver: LogRegSolver = LogRegSolver.LBFGS,
+    penalty: LogRegPenalty = LogRegPenalty.L2,
     inverse_reg_strength: float = 1.0,
     max_iter: int = 100,
     tol: float = 1e-4,

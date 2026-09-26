@@ -25,6 +25,7 @@ from covenant_ml.calibration._calibrator_math import (
     _IsotonicWrapper,
     _set_isotonic_thresholds,
 )
+from covenant_ml.types_logreg import LogRegSolver
 
 from .types import (
     CalibrationMethod,
@@ -226,7 +227,7 @@ class Calibrator:
 
         logreg_model = logreg_ctor(
             penalty=None,
-            solver="lbfgs",
+            solver=LogRegSolver.LBFGS,
             max_iter=1000,
         )
 

@@ -5,6 +5,8 @@ Strict typing only: no Any, no casts, no stubs.
 
 from __future__ import annotations
 
+from covenant_ml.types_logreg import LogRegPenalty, LogRegSolver
+
 from ..types import (
     CategoricalStringSpec,
     FloatRangeSpec,
@@ -47,11 +49,11 @@ def make_logreg_default_space() -> LogRegSearchSpace:
     }
     penalty_spec: CategoricalStringSpec = {
         "param_type": "categorical_str",
-        "choices": ("l2", "l1"),
+        "choices": (LogRegPenalty.L2, LogRegPenalty.L1),
     }
     solver_spec: CategoricalStringSpec = {
         "param_type": "categorical_str",
-        "choices": ("saga",),
+        "choices": (LogRegSolver.SAGA,),
     }
     l1_ratio_spec: FloatRangeSpec = {
         "param_type": "float",

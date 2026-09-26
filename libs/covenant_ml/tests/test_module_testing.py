@@ -16,6 +16,7 @@ from covenant_ml.testing import (
     make_train_config,
     make_xgboost_regressor_config,
 )
+from covenant_ml.types_logreg import LogRegPenalty, LogRegSolver
 
 
 def test_make_train_config_defaults() -> None:
@@ -57,8 +58,8 @@ def test_make_logreg_config_defaults() -> None:
     """make_logreg_config creates LogRegConfig with defaults."""
     config = make_logreg_config()
 
-    assert config["solver"] == "lbfgs"
-    assert config["penalty"] == "l2"
+    assert config["solver"] is LogRegSolver.LBFGS
+    assert config["penalty"] is LogRegPenalty.L2
     assert config["C"] == 1.0
     assert config["max_iter"] == 100
     assert config["class_weight_balanced"] is True
@@ -68,16 +69,16 @@ def test_make_logreg_config_defaults() -> None:
 def test_make_logreg_config_custom_values() -> None:
     """make_logreg_config accepts custom values."""
     config = make_logreg_config(
-        solver="saga",
-        penalty="l1",
+        solver=LogRegSolver.SAGA,
+        penalty=LogRegPenalty.L1,
         inverse_reg_strength=0.5,
         max_iter=500,
         class_weight_balanced=False,
         random_state=99,
     )
 
-    assert config["solver"] == "saga"
-    assert config["penalty"] == "l1"
+    assert config["solver"] is LogRegSolver.SAGA
+    assert config["penalty"] is LogRegPenalty.L1
     assert config["C"] == 0.5
     assert config["max_iter"] == 500
     assert config["class_weight_balanced"] is False
@@ -87,12 +88,12 @@ def test_make_logreg_config_custom_values() -> None:
 def test_make_logreg_config_elasticnet() -> None:
     """make_logreg_config works with elasticnet penalty."""
     config = make_logreg_config(
-        solver="saga",
-        penalty="elasticnet",
+        solver=LogRegSolver.SAGA,
+        penalty=LogRegPenalty.ELASTICNET,
         l1_ratio=0.7,
     )
 
-    assert config["penalty"] == "elasticnet"
+    assert config["penalty"] is LogRegPenalty.ELASTICNET
     assert config["l1_ratio"] == 0.7
 
 
