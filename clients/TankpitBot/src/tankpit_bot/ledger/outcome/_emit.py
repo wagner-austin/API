@@ -53,7 +53,7 @@ def register_pending_decision(
         emit_action_outcome(
             ledger,
             action_kind=action_kind,
-            outcome="superseded",
+            outcome=ActionOutcome.SUPERSEDED,
             duration_ms=0,
             superseded_by=event_id,
             dispatched=dispatched,

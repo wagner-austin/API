@@ -16,14 +16,20 @@ fabricated context.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
+from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
 from tankpit_bot.ledger.service import LedgerService
 
-HitSignal = Literal["tile_occupied", "kill_confirmed", "ammo_delta"]
-"""Which wire channel proved the hit."""
+
+class HitSignal(StrEnum):
+    """Which wire channel proved the hit, as the ledger records it."""
+
+    TILE_OCCUPIED = "tile_occupied"
+    KILL_CONFIRMED = "kill_confirmed"
+    AMMO_DELTA = "ammo_delta"
 
 
 def emit_shoot_hit(
@@ -55,13 +61,13 @@ def emit_shoot_hit(
     return emit_action_outcome(
         ledger,
         action_kind="shoot",
-        outcome="hit",
+        outcome=ActionOutcome.HIT,
         duration_ms=duration_ms,
         target_id=target_id,
         target_name=target_name,
         victim_id=victim_id,
         on_intended_target=on_intended_target,
-        hit_signal=hit_signal,
+        hit_signal=hit_signal.value,
     )
 
 
@@ -82,7 +88,7 @@ def emit_shoot_miss(
     return emit_action_outcome(
         ledger,
         action_kind="shoot",
-        outcome="miss",
+        outcome=ActionOutcome.MISS,
         duration_ms=duration_ms,
         target_id=target_id,
         target_name=target_name,
@@ -113,7 +119,7 @@ def emit_shoot_fired(
     return emit_action_outcome(
         ledger,
         action_kind="shoot",
-        outcome="fired",
+        outcome=ActionOutcome.FIRED,
         duration_ms=duration_ms,
         aim_x=aim_x,
         aim_y=aim_y,
@@ -138,7 +144,7 @@ def emit_shoot_command_rejected(
     return emit_action_outcome(
         ledger,
         action_kind="shoot",
-        outcome="command_rejected",
+        outcome=ActionOutcome.COMMAND_REJECTED,
         duration_ms=duration_ms,
         target_id=target_id,
         target_name=target_name,

@@ -12,6 +12,7 @@ outcome — mirroring map_open's targetless emitters.
 from __future__ import annotations
 
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
+from tankpit_bot.ledger.outcomes import ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
 from tankpit_bot.ledger.service import LedgerService
 
@@ -30,7 +31,7 @@ def emit_scope_confirmed(ledger: LedgerService, *, duration_ms: int) -> ActionOu
     return emit_action_outcome(
         ledger,
         action_kind="scope",
-        outcome="confirmed",
+        outcome=ActionOutcome.CONFIRMED,
         duration_ms=duration_ms,
     )
 
@@ -51,7 +52,7 @@ def emit_scope_stall_timeout(
     return emit_action_outcome(
         ledger,
         action_kind="scope",
-        outcome="stall_timeout",
+        outcome=ActionOutcome.STALL_TIMEOUT,
         duration_ms=duration_ms,
         timeout_ms=timeout_ms,
     )
