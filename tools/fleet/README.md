@@ -154,7 +154,7 @@ nothing: an install whose `.runner` exists is not configured twice.
 | ci-clean script, service and timer | Rendered from `runner_render` and installed by provision.sh |
 | The distro itself | Imported from the pinned image |
 | Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1 |
-| Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned |
+| Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned, and the audit's `account:windows:<service>:LocalSystem` row drifts on any other |
 | Each Windows runner's Python tool cache | Seeded by provision.ps1 from the NuGet CPython package, with pip's `Scripts` entry points written from its bundled wheel |
 | The licensed game tree (`manual` asset) | The one exception: no script may fetch it. The rebuild prints it as `PLACE BY HAND`, and the audit fails until it is placed |
 
