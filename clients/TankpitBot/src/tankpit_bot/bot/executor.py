@@ -62,14 +62,14 @@ _COMBAT_SLOTS: list[int] = [1, 2, 3, 4]
 # Wire command type -> ledger action kind. ``hold`` dispatches nothing
 # and is deliberately absent -- it produces no attempt to correlate.
 _LEDGER_KIND_BY_CMD_TYPE: dict[str, LedgerActionKind] = {
-    "move": "move",
-    "teleport": "teleport",
-    "pickup_fuel": "collect",
-    "pickup_equipment": "collect",
-    "radar": "scan",
-    "map_open": "map_open",
-    "shoot": "shoot",
-    "scope_shift": "scope",
+    "move": LedgerActionKind.MOVE,
+    "teleport": LedgerActionKind.TELEPORT,
+    "pickup_fuel": LedgerActionKind.COLLECT,
+    "pickup_equipment": LedgerActionKind.COLLECT,
+    "radar": LedgerActionKind.SCAN,
+    "map_open": LedgerActionKind.MAP_OPEN,
+    "shoot": LedgerActionKind.SHOOT,
+    "scope_shift": LedgerActionKind.SCOPE,
 }
 _EQUIPMENT_LABELS: dict[int, str] = {
     1: "armor",
@@ -414,7 +414,9 @@ def _dispatch_teleport_command(
         )
         # This tick's product is the map open, not the teleport: the
         # recorded teleport decision resolves via the map_open outcome.
-        transfer_pending_decision(bot.world.ledger, "teleport", "map_open")
+        transfer_pending_decision(
+            bot.world.ledger, LedgerActionKind.TELEPORT, LedgerActionKind.MAP_OPEN
+        )
         return bot.open_map()
     emit_diagnostic(
         diagnostic_kind="map_open_skipped_already_open",

@@ -16,6 +16,8 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.completions import CompletionsMixin
 from tankpit_bot.bot.states import (
+    ActionKind,
+    BotState,
     make_in_flight_action,
     transition_to,
 )
@@ -80,8 +82,8 @@ class DispatchMixin(CompletionsMixin):
             return False
         now = get_current_time_ms()
         self._transition(
-            "MOVING",
-            in_flight_action=make_in_flight_action("move", x, y, now),
+            BotState.MOVING,
+            in_flight_action=make_in_flight_action(ActionKind.MOVE, x, y, now),
         )
         return True
 
@@ -104,8 +106,8 @@ class DispatchMixin(CompletionsMixin):
             return False
         now = get_current_time_ms()
         self._transition(
-            "COLLECTING",
-            in_flight_action=make_in_flight_action("collect", x, y, now),
+            BotState.COLLECTING,
+            in_flight_action=make_in_flight_action(ActionKind.COLLECT, x, y, now),
         )
         return True
 
@@ -129,8 +131,8 @@ class DispatchMixin(CompletionsMixin):
             return False
         now = get_current_time_ms()
         self._transition(
-            "COLLECTING",
-            in_flight_action=make_in_flight_action("collect", x, y, now),
+            BotState.COLLECTING,
+            in_flight_action=make_in_flight_action(ActionKind.COLLECT, x, y, now),
         )
         return True
 
@@ -158,8 +160,8 @@ class DispatchMixin(CompletionsMixin):
             return False
         now = get_current_time_ms()
         self._transition(
-            "TELEPORTING",
-            in_flight_action=make_in_flight_action("teleport", x, y, now),
+            BotState.TELEPORTING,
+            in_flight_action=make_in_flight_action(ActionKind.TELEPORT, x, y, now),
         )
         return True
 
@@ -182,13 +184,13 @@ class DispatchMixin(CompletionsMixin):
             return False
         self._capture_shot_screenshot(x, y, target_id)
         now = get_current_time_ms()
-        action = make_in_flight_action("shoot", x, y, now)
-        if self.get_state() != "COMBAT":
-            self._transition("COMBAT", in_flight_action=action)
+        action = make_in_flight_action(ActionKind.SHOOT, x, y, now)
+        if self.get_state() is not BotState.COMBAT:
+            self._transition(BotState.COMBAT, in_flight_action=action)
         else:
             self._state_data = transition_to(
                 self._state_data,
-                "COMBAT",
+                BotState.COMBAT,
                 in_flight_action=action,
             )
         return True
@@ -248,8 +250,8 @@ class DispatchMixin(CompletionsMixin):
             return False
         now = get_current_time_ms()
         self._transition(
-            "SCANNING",
-            in_flight_action=make_in_flight_action("scan", 0, 0, now),
+            BotState.SCANNING,
+            in_flight_action=make_in_flight_action(ActionKind.SCAN, 0, 0, now),
         )
         return True
 
@@ -323,7 +325,7 @@ class DispatchMixin(CompletionsMixin):
             direction=direction,
         )
         now = get_current_time_ms()
-        action = make_in_flight_action("scope", 0, 0, now)
+        action = make_in_flight_action(ActionKind.SCOPE, 0, 0, now)
         self._state_data = transition_to(
             self._state_data,
             self._state_data["state"],
@@ -472,7 +474,7 @@ class DispatchMixin(CompletionsMixin):
         self.world.check_and_clear_map_data_processed()
         if self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open"):
             now = get_current_time_ms()
-            action = make_in_flight_action("map_open", 0, 0, now)
+            action = make_in_flight_action(ActionKind.MAP_OPEN, 0, 0, now)
             self._state_data = transition_to(
                 self._state_data,
                 self._state_data["state"],

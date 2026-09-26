@@ -14,109 +14,80 @@ Design principles:
 
 from __future__ import annotations
 
-from enum import Enum, auto
-from typing import Literal
+from enum import StrEnum
 
-from platform_core.json_utils import (
-    JSONObject,
-    require_int,
-    require_str,
-)
+from platform_core.json_utils import JSONObject, require_int
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 
-class BotState(Enum):
-    """Bot state machine states.
+class BotState(StrEnum):
+    """Bot state machine states, each carrying its own name as its word.
 
     Each state represents a distinct bot behavior mode.
     Transitions between states are controlled by the state machine.
     """
 
     # Initial state before game entry
-    INITIALIZING = auto()
+    INITIALIZING = "INITIALIZING"
 
     # Connected but waiting for game data
-    WAITING_FOR_POSITION = auto()
+    WAITING_FOR_POSITION = "WAITING_FOR_POSITION"
 
     # Idle, ready to take action
-    IDLE = auto()
+    IDLE = "IDLE"
 
     # Scanning with radar
-    SCANNING = auto()
+    SCANNING = "SCANNING"
 
     # Walking to a target position
-    MOVING = auto()
+    MOVING = "MOVING"
 
     # Teleport in progress, waiting for server landing confirmation
-    TELEPORTING = auto()
+    TELEPORTING = "TELEPORTING"
 
     # Moving to pick up a container
-    COLLECTING = auto()
+    COLLECTING = "COLLECTING"
 
     # Engaging in combat
-    COMBAT = auto()
+    COMBAT = "COMBAT"
 
     # Low fuel, seeking fuel containers
-    LOW_FUEL = auto()
+    LOW_FUEL = "LOW_FUEL"
 
     # Disconnected or error state
-    DISCONNECTED = auto()
-
-
-# Type alias for state names (for TypedDict usage)
-StateName = Literal[
-    "INITIALIZING",
-    "WAITING_FOR_POSITION",
-    "IDLE",
-    "SCANNING",
-    "MOVING",
-    "TELEPORTING",
-    "COLLECTING",
-    "COMBAT",
-    "LOW_FUEL",
-    "DISCONNECTED",
-]
+    DISCONNECTED = "DISCONNECTED"
 
 
 # =============================================================================
 # InFlightActionDict — authoritative action lifecycle record
 # =============================================================================
 
-ActionKind = Literal[
-    "none",
-    "move",
-    "collect",
-    "teleport",
-    "scan",
-    "shoot",
-    "map_open",
-    "scope",
-]
 
-ACTION_KINDS: tuple[ActionKind, ...] = (
-    "none",
-    "move",
-    "collect",
-    "teleport",
-    "scan",
-    "shoot",
-    "map_open",
-    "scope",
-)
+class ActionKind(StrEnum):
+    """What type of command is in flight; ``NONE`` is the idle sentinel.
 
-ActionOutcome = Literal[
-    "pending",
-    "confirmed",
-    "timed_out",
-    "failed",
-]
+    Wider than :class:`tankpit_bot.ledger.events.ActionKind`, which
+    records only what the bot DID and so has no ``NONE``.
+    """
 
-ACTION_OUTCOMES: tuple[ActionOutcome, ...] = (
-    "pending",
-    "confirmed",
-    "timed_out",
-    "failed",
-)
+    NONE = "none"
+    MOVE = "move"
+    COLLECT = "collect"
+    TELEPORT = "teleport"
+    SCAN = "scan"
+    SHOOT = "shoot"
+    MAP_OPEN = "map_open"
+    SCOPE = "scope"
+
+
+class ActionOutcome(StrEnum):
+    """Lifecycle state of the in-flight command."""
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    TIMED_OUT = "timed_out"
+    FAILED = "failed"
 
 
 class InFlightActionDict(TypedDict):
@@ -146,14 +117,14 @@ def make_no_action() -> InFlightActionDict:
     """Create an action record representing no in-flight action.
 
     Returns:
-        InFlightActionDict with kind="none" and outcome="confirmed".
+        InFlightActionDict with kind NONE and outcome CONFIRMED.
     """
     return InFlightActionDict(
-        kind="none",
+        kind=ActionKind.NONE,
         target_x=0,
         target_y=0,
         started_ms=0,
-        outcome="confirmed",
+        outcome=ActionOutcome.CONFIRMED,
     )
 
 
@@ -172,59 +143,14 @@ def make_in_flight_action(
         started_ms: Current timestamp in milliseconds.
 
     Returns:
-        InFlightActionDict with outcome="pending".
+        InFlightActionDict with outcome PENDING.
     """
     return InFlightActionDict(
         kind=kind,
         target_x=target_x,
         target_y=target_y,
         started_ms=started_ms,
-        outcome="pending",
-    )
-
-
-def _require_action_kind(data: JSONObject, key: str) -> ActionKind:
-    """Validate and extract an ActionKind from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated ActionKind value.
-
-    Raises:
-        ValueError: If value is not a valid ActionKind.
-    """
-    raw = require_str(data, key)
-    for kind in ACTION_KINDS:
-        if raw == kind:
-            return kind
-    raise ValueError(f"{key} must be one of {ACTION_KINDS}, got {raw!r}")
-
-
-def _require_action_outcome(
-    data: JSONObject,
-    key: str,
-) -> ActionOutcome:
-    """Validate and extract an ActionOutcome from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated ActionOutcome value.
-
-    Raises:
-        ValueError: If value is not a valid ActionOutcome.
-    """
-    raw = require_str(data, key)
-    for outcome in ACTION_OUTCOMES:
-        if raw == outcome:
-            return outcome
-    raise ValueError(
-        f"{key} must be one of {ACTION_OUTCOMES}, got {raw!r}",
+        outcome=ActionOutcome.PENDING,
     )
 
 
@@ -240,11 +166,11 @@ def encode_in_flight_action(
         JSON-serializable dict representation.
     """
     return {
-        "kind": action["kind"],
+        "kind": action["kind"].value,
         "target_x": action["target_x"],
         "target_y": action["target_y"],
         "started_ms": action["started_ms"],
-        "outcome": action["outcome"],
+        "outcome": action["outcome"].value,
     }
 
 
@@ -258,15 +184,15 @@ def decode_in_flight_action(data: JSONObject) -> InFlightActionDict:
         Validated InFlightActionDict.
 
     Raises:
-        ValueError: If kind or outcome is invalid.
-        JSONTypeError: If required fields are missing or invalid.
+        JSONTypeError: If required fields are missing or invalid, or kind
+            or outcome is a word outside its vocabulary.
     """
     return InFlightActionDict(
-        kind=_require_action_kind(data, "kind"),
+        kind=require_member(data, "kind", ActionKind),
         target_x=require_int(data, "target_x"),
         target_y=require_int(data, "target_y"),
         started_ms=require_int(data, "started_ms"),
-        outcome=_require_action_outcome(data, "outcome"),
+        outcome=require_member(data, "outcome", ActionOutcome),
     )
 
 
@@ -286,7 +212,7 @@ class BotStateDataDict(TypedDict):
             lifecycle outcome.
     """
 
-    state: StateName
+    state: BotState
     fuel_threshold: int
     in_flight_action: InFlightActionDict
 
@@ -298,7 +224,7 @@ def make_initial_state_data() -> BotStateDataDict:
         BotStateDataDict with INITIALIZING state and no action.
     """
     return BotStateDataDict(
-        state="INITIALIZING",
+        state=BotState.INITIALIZING,
         fuel_threshold=200,
         in_flight_action=make_no_action(),
     )
@@ -306,7 +232,7 @@ def make_initial_state_data() -> BotStateDataDict:
 
 def transition_to(
     current: BotStateDataDict,
-    new_state: StateName,
+    new_state: BotState,
     *,
     in_flight_action: InFlightActionDict | None = None,
 ) -> BotStateDataDict:
@@ -354,44 +280,92 @@ def set_fuel_threshold(
 
 
 # Valid state transitions - maps current state to allowed next states
-VALID_TRANSITIONS: dict[StateName, frozenset[StateName]] = {
-    "INITIALIZING": frozenset({"WAITING_FOR_POSITION", "DISCONNECTED"}),
-    "WAITING_FOR_POSITION": frozenset({"IDLE", "DISCONNECTED"}),
-    "IDLE": frozenset(
+VALID_TRANSITIONS: dict[BotState, frozenset[BotState]] = {
+    BotState.INITIALIZING: frozenset({BotState.WAITING_FOR_POSITION, BotState.DISCONNECTED}),
+    BotState.WAITING_FOR_POSITION: frozenset({BotState.IDLE, BotState.DISCONNECTED}),
+    BotState.IDLE: frozenset(
         {
-            "IDLE",
-            "SCANNING",
-            "MOVING",
-            "TELEPORTING",
-            "COLLECTING",
-            "COMBAT",
-            "LOW_FUEL",
-            "DISCONNECTED",
+            BotState.IDLE,
+            BotState.SCANNING,
+            BotState.MOVING,
+            BotState.TELEPORTING,
+            BotState.COLLECTING,
+            BotState.COMBAT,
+            BotState.LOW_FUEL,
+            BotState.DISCONNECTED,
         },
     ),
-    "SCANNING": frozenset(
-        {"IDLE", "MOVING", "TELEPORTING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"},
+    BotState.SCANNING: frozenset(
+        {
+            BotState.IDLE,
+            BotState.MOVING,
+            BotState.TELEPORTING,
+            BotState.COLLECTING,
+            BotState.COMBAT,
+            BotState.LOW_FUEL,
+            BotState.DISCONNECTED,
+        },
     ),
-    "MOVING": frozenset(
-        {"IDLE", "SCANNING", "TELEPORTING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"},
+    BotState.MOVING: frozenset(
+        {
+            BotState.IDLE,
+            BotState.SCANNING,
+            BotState.TELEPORTING,
+            BotState.COLLECTING,
+            BotState.COMBAT,
+            BotState.LOW_FUEL,
+            BotState.DISCONNECTED,
+        },
     ),
-    "TELEPORTING": frozenset(
-        {"IDLE", "SCANNING", "MOVING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"},
+    BotState.TELEPORTING: frozenset(
+        {
+            BotState.IDLE,
+            BotState.SCANNING,
+            BotState.MOVING,
+            BotState.COLLECTING,
+            BotState.COMBAT,
+            BotState.LOW_FUEL,
+            BotState.DISCONNECTED,
+        },
     ),
-    "COLLECTING": frozenset(
-        {"IDLE", "SCANNING", "MOVING", "TELEPORTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"},
+    BotState.COLLECTING: frozenset(
+        {
+            BotState.IDLE,
+            BotState.SCANNING,
+            BotState.MOVING,
+            BotState.TELEPORTING,
+            BotState.COMBAT,
+            BotState.LOW_FUEL,
+            BotState.DISCONNECTED,
+        },
     ),
-    "COMBAT": frozenset(
-        {"IDLE", "SCANNING", "MOVING", "TELEPORTING", "COLLECTING", "LOW_FUEL", "DISCONNECTED"},
+    BotState.COMBAT: frozenset(
+        {
+            BotState.IDLE,
+            BotState.SCANNING,
+            BotState.MOVING,
+            BotState.TELEPORTING,
+            BotState.COLLECTING,
+            BotState.LOW_FUEL,
+            BotState.DISCONNECTED,
+        },
     ),
-    "LOW_FUEL": frozenset(
-        {"IDLE", "SCANNING", "MOVING", "TELEPORTING", "COLLECTING", "COMBAT", "DISCONNECTED"},
+    BotState.LOW_FUEL: frozenset(
+        {
+            BotState.IDLE,
+            BotState.SCANNING,
+            BotState.MOVING,
+            BotState.TELEPORTING,
+            BotState.COLLECTING,
+            BotState.COMBAT,
+            BotState.DISCONNECTED,
+        },
     ),
-    "DISCONNECTED": frozenset({"INITIALIZING"}),
+    BotState.DISCONNECTED: frozenset({BotState.INITIALIZING}),
 }
 
 
-def is_valid_transition(from_state: StateName, to_state: StateName) -> bool:
+def is_valid_transition(from_state: BotState, to_state: BotState) -> bool:
     """Check if a state transition is valid.
 
     Args:
@@ -401,11 +375,10 @@ def is_valid_transition(from_state: StateName, to_state: StateName) -> bool:
     Returns:
         True if transition is allowed.
     """
-    allowed = VALID_TRANSITIONS.get(from_state, frozenset())
-    return to_state in allowed
+    return to_state in VALID_TRANSITIONS[from_state]
 
 
-def validate_transition(from_state: StateName, to_state: StateName) -> None:
+def validate_transition(from_state: BotState, to_state: BotState) -> None:
     """Validate a state transition, raising if invalid.
 
     Args:
@@ -416,22 +389,20 @@ def validate_transition(from_state: StateName, to_state: StateName) -> None:
         ValueError: If transition is not allowed.
     """
     if not is_valid_transition(from_state, to_state):
-        allowed = VALID_TRANSITIONS.get(from_state, frozenset())
+        allowed = VALID_TRANSITIONS[from_state]
         raise ValueError(
-            f"Invalid transition from {from_state} to {to_state}. Allowed: {sorted(allowed)}"
+            f"Invalid transition from {from_state.value} to {to_state.value}."
+            f" Allowed: {sorted(state.value for state in allowed)}"
         )
 
 
 __all__ = [
-    "ACTION_KINDS",
-    "ACTION_OUTCOMES",
     "VALID_TRANSITIONS",
     "ActionKind",
     "ActionOutcome",
     "BotState",
     "BotStateDataDict",
     "InFlightActionDict",
-    "StateName",
     "decode_in_flight_action",
     "encode_in_flight_action",
     "is_valid_transition",

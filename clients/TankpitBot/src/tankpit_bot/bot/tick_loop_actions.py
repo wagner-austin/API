@@ -13,7 +13,14 @@ from tankpit_bot.bot.ai.reachability import (
     is_move_reachable_in_viewport,
 )
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import ActionKind, InFlightActionDict, make_no_action, transition_to
+from tankpit_bot.bot.states import (
+    ActionKind,
+    ActionOutcome,
+    BotState,
+    InFlightActionDict,
+    make_no_action,
+    transition_to,
+)
 from tankpit_bot.bot.tick_loop_command_errors import (
     _clear_command_error,
     _drain_orphan_command_error,
@@ -76,7 +83,7 @@ def _fuel_zero_move(bot: Bot, kind: ActionKind) -> bool:
         True when the action is a ``move`` and the tank's believed
         fuel is exactly 0 (the measured slow-service regime).
     """
-    if kind != "move":
+    if kind is not ActionKind.MOVE:
         return False
     self_state = bot.get_world_state()["self_state"]
     return self_state is not None and self_state["fuel"] == 0
@@ -92,20 +99,20 @@ def has_in_flight_action(bot: Bot) -> bool:
         True if the bot should wait for an in-flight action to resolve.
     """
     action = bot._state_data["in_flight_action"]
-    if action["kind"] == "none" or action["outcome"] != "pending":
+    if action["kind"] is ActionKind.NONE or action["outcome"] is not ActionOutcome.PENDING:
         return False
 
     kind = action["kind"]
-    if kind in ("move", "collect", "teleport"):
+    if kind in (ActionKind.MOVE, ActionKind.COLLECT, ActionKind.TELEPORT):
         return _wait_for_movement_action(bot, action)
 
-    if kind == "scan":
+    if kind is ActionKind.SCAN:
         return _wait_for_scan_action(bot, action)
 
-    if kind == "map_open":
+    if kind is ActionKind.MAP_OPEN:
         return _wait_for_map_open_action(bot, action)
 
-    if kind == "scope":
+    if kind is ActionKind.SCOPE:
         return _wait_for_scope_action(bot, action)
 
     return False
@@ -121,13 +128,13 @@ def _wait_for_movement_action(bot: Bot, action: InFlightActionDict) -> bool:
         return False
     if _clear_stalled_action(bot, action):
         return False
-    if kind == "move" and _clear_blocked_walk(bot, action):
+    if kind is ActionKind.MOVE and _clear_blocked_walk(bot, action):
         return False
-    if kind == "collect" and _clear_blocked_collection(bot, action):
+    if kind is ActionKind.COLLECT and _clear_blocked_collection(bot, action):
         return False
-    if kind == "move":
+    if kind is ActionKind.MOVE:
         emit_sync("waiting for movement to (%d,%d)", tx, ty)
-    elif kind == "teleport":
+    elif kind is ActionKind.TELEPORT:
         emit_sync("waiting for teleport to (%d,%d)", tx, ty)
     else:
         emit_sync("waiting for collection at (%d,%d)", tx, ty)
@@ -230,7 +237,7 @@ def _clear_rejected_movement(
         True if the rejected action was cleared.
     """
     kind = action["kind"]
-    if kind not in ("move", "collect"):
+    if kind not in (ActionKind.MOVE, ActionKind.COLLECT):
         return False
     tx, ty = action["target_x"], action["target_y"]
     now = get_current_time_ms()
@@ -239,7 +246,7 @@ def _clear_rejected_movement(
     started_ms = action["started_ms"]
     elapsed_ms = now - started_ms if started_ms > 0 else -1
     emit_sync("%s to (%d,%d) rejected by server, replanning", kind, tx, ty)
-    if kind == "move":
+    if kind is ActionKind.MOVE:
         emit_move_movement_rejected(
             bot.world.ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
         )
@@ -247,10 +254,10 @@ def _clear_rejected_movement(
         emit_collect_movement_rejected(
             bot.world.ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
         )
-    if kind == "collect":
+    if kind is ActionKind.COLLECT:
         increment_container_failed_pickups(bot.world, tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
-    bot._transition("IDLE", in_flight_action=make_no_action())
+    bot._transition(BotState.IDLE, in_flight_action=make_no_action())
     return True
 
 
@@ -285,16 +292,16 @@ def _clear_stalled_action(
         elapsed_ms,
     )
     _emit_stall_outcome(bot, action["kind"], tx, ty, elapsed_ms, timeout_ms)
-    if action["kind"] == "collect":
+    if action["kind"] is ActionKind.COLLECT:
         increment_container_failed_pickups(bot.world, tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
-    if action["kind"] == "scan":
+    if action["kind"] is ActionKind.SCAN:
         _mark_current_viewport_scan_failed(bot, get_current_time_ms())
-    if action["kind"] in ("move", "teleport"):
+    if action["kind"] in (ActionKind.MOVE, ActionKind.TELEPORT):
         now = get_current_time_ms()
         bot.world.mark_move_target_failed(tx, ty, now)
         emit_sync("marked (%d,%d) as failed %s target", tx, ty, action["kind"])
-    bot._transition("IDLE", in_flight_action=make_no_action())
+    bot._transition(BotState.IDLE, in_flight_action=make_no_action())
     return True
 
 
@@ -316,7 +323,7 @@ def _emit_stall_outcome(
         elapsed_ms: Dispatch-to-stall wall-clock ms.
         timeout_ms: The stall threshold that fired.
     """
-    if kind == "move":
+    if kind is ActionKind.MOVE:
         emit_move_stall_timeout(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -324,7 +331,7 @@ def _emit_stall_outcome(
             target_y=ty,
             timeout_ms=timeout_ms,
         )
-    elif kind == "collect":
+    elif kind is ActionKind.COLLECT:
         emit_collect_stall_timeout(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -332,7 +339,7 @@ def _emit_stall_outcome(
             target_y=ty,
             timeout_ms=timeout_ms,
         )
-    elif kind == "teleport":
+    elif kind is ActionKind.TELEPORT:
         emit_teleport_stall_timeout(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -341,7 +348,7 @@ def _emit_stall_outcome(
             timeout_ms=timeout_ms,
             messages=bot._messages,
         )
-    elif kind == "scan":
+    elif kind is ActionKind.SCAN:
         emit_scan_stall_timeout(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -349,9 +356,9 @@ def _emit_stall_outcome(
             target_y=ty,
             timeout_ms=timeout_ms,
         )
-    elif kind == "map_open":
+    elif kind is ActionKind.MAP_OPEN:
         emit_map_open_stall_timeout(bot.world.ledger, duration_ms=elapsed_ms, timeout_ms=timeout_ms)
-    elif kind == "scope":
+    elif kind is ActionKind.SCOPE:
         emit_scope_stall_timeout(bot.world.ledger, duration_ms=elapsed_ms, timeout_ms=timeout_ms)
 
 
@@ -432,7 +439,7 @@ def _clear_blocked_walk(
     ):
         return False
     emit_sync("movement to (%d,%d) is terrain-blocked, replanning", tx, ty)
-    bot._transition("IDLE", in_flight_action=make_no_action())
+    bot._transition(BotState.IDLE, in_flight_action=make_no_action())
     return True
 
 
@@ -473,7 +480,7 @@ def _clear_blocked_collection(
     ):
         return False
     emit_sync("collection target (%d,%d) is terrain-blocked, replanning", tx, ty)
-    bot._transition("IDLE", in_flight_action=make_no_action())
+    bot._transition(BotState.IDLE, in_flight_action=make_no_action())
     return True
 
 

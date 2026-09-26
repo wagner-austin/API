@@ -11,7 +11,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import ActionKind, InFlightActionDict, make_no_action
+from tankpit_bot.bot.states import ActionKind, BotState, InFlightActionDict, make_no_action
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.ledger.outcome.collect import (
     emit_collect_clamped_transfer,
@@ -91,7 +91,7 @@ from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_full
 # dispatch discipline. Teleport keeps 6 unlisted: no capture has ever
 # shown a teleport drawing it.
 _COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
-    "move": frozenset(
+    ActionKind.MOVE: frozenset(
         {
             SUPERVISOR_ERROR_ALREADY_THERE,
             SUPERVISOR_ERROR_CANT_DO,
@@ -99,14 +99,14 @@ _COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
             SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
         }
     ),
-    "teleport": frozenset(
+    ActionKind.TELEPORT: frozenset(
         {
             SUPERVISOR_ERROR_CANT_DO,
             SUPERVISOR_ERROR_CANT_GO,
             SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
         }
     ),
-    "collect": frozenset(
+    ActionKind.COLLECT: frozenset(
         {
             SUPERVISOR_ERROR_CANT_DO,
             SUPERVISOR_ERROR_CANT_GO,
@@ -116,10 +116,10 @@ _COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
             SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
         }
     ),
-    "scan": frozenset(),
-    "map_open": frozenset(),
-    "shoot": frozenset(),  # shot rejections use their own path in tick_loop
-    "none": frozenset(),
+    ActionKind.SCAN: frozenset(),
+    ActionKind.MAP_OPEN: frozenset(),
+    ActionKind.SHOOT: frozenset(),  # shot rejections use their own path in tick_loop
+    ActionKind.NONE: frozenset(),
 }
 
 log = get_logger(__name__)
@@ -143,7 +143,7 @@ def _mark_movement_failure(
         tx: Target X.
         ty: Target Y.
     """
-    if kind == "teleport" and error_code == SUPERVISOR_ERROR_CANT_DO:
+    if kind is ActionKind.TELEPORT and error_code == SUPERVISOR_ERROR_CANT_DO:
         emit_sync(
             "teleport to (%d,%d) refused code=0 (map closed server-side) "
             "- tile not marked, replanning with a fresh map open",
@@ -213,7 +213,7 @@ def _emit_command_error_sync(kind: ActionKind, tx: int, ty: int, error_code: int
         ty: The action's target Y.
         error_code: The 0x52 code the server answered.
     """
-    if kind == "collect" and error_code in (
+    if kind is ActionKind.COLLECT and error_code in (
         SUPERVISOR_ERROR_TANK_FULL,
         SUPERVISOR_ERROR_EMPTY_CONTAINER,
         SUPERVISOR_ERROR_INVENTORY_FULL,
@@ -280,11 +280,15 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
     elapsed_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
     _emit_command_error_sync(kind, tx, ty, error_code)
     _emit_command_rejected_outcome(bot, kind, tx, ty, elapsed_ms, error_code)
-    if kind == "collect":
+    if kind is ActionKind.COLLECT:
         _resolve_collect_rejection(bot, tx, ty, error_code, started_ms)
-    if kind in ("move", "teleport"):
+    if kind in (ActionKind.MOVE, ActionKind.TELEPORT):
         _mark_movement_failure(bot.world, kind, error_code, tx, ty)
-    if error_code == SUPERVISOR_ERROR_CANT_GO and kind in ("move", "collect", "teleport"):
+    if error_code == SUPERVISOR_ERROR_CANT_GO and kind in (
+        ActionKind.MOVE,
+        ActionKind.COLLECT,
+        ActionKind.TELEPORT,
+    ):
         # The shared fact behind a cant_go on ANY movement-bearing
         # command is "the tank tried to move and the server said no"
         # -- a walk-pickup's leg is a move even though its kind is
@@ -293,7 +297,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         # the per-tile marks because collect rejections only fed
         # failed_pickups.
         bot.world.record_movement_rejection(get_current_time_ms())
-    bot._transition("IDLE", in_flight_action=make_no_action())
+    bot._transition(BotState.IDLE, in_flight_action=make_no_action())
     return True
 
 
@@ -434,7 +438,7 @@ def _emit_command_rejected_outcome(
         elapsed_ms: Dispatch-to-rejection wall-clock ms.
         error_code: The 0x52 error code.
     """
-    if kind == "move":
+    if kind is ActionKind.MOVE:
         emit_move_command_rejected(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -442,7 +446,7 @@ def _emit_command_rejected_outcome(
             target_y=ty,
             error_code=error_code,
         )
-    elif kind == "collect":
+    elif kind is ActionKind.COLLECT:
         # Codes 4/5/7 are resolutions, not refusals (2026-07-19): the
         # container was empty, the transfer was clamped at the cap (a
         # success -- the 5-min soak gained +2472 fuel across four of
@@ -469,7 +473,7 @@ def _emit_command_rejected_outcome(
                 target_y=ty,
                 error_code=error_code,
             )
-    elif kind == "teleport":
+    elif kind is ActionKind.TELEPORT:
         emit_teleport_command_rejected(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -478,7 +482,7 @@ def _emit_command_rejected_outcome(
             error_code=error_code,
             messages=bot._messages,
         )
-    elif kind == "scan":
+    elif kind is ActionKind.SCAN:
         emit_scan_command_rejected(
             bot.world.ledger,
             duration_ms=elapsed_ms,
@@ -486,7 +490,7 @@ def _emit_command_rejected_outcome(
             target_y=ty,
             error_code=error_code,
         )
-    elif kind == "map_open":
+    elif kind is ActionKind.MAP_OPEN:
         emit_map_open_command_rejected(
             bot.world.ledger, duration_ms=elapsed_ms, error_code=error_code
         )

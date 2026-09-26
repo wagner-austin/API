@@ -20,7 +20,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
-from tankpit_bot.bot.states import make_initial_state_data
+from tankpit_bot.bot.states import BotState, make_initial_state_data
 from tankpit_bot.bot.tick_claims import _arbitrate_collect_claim
 from tankpit_bot.bot.tick_combat_feedback import (
     _get_combat_feedback,
@@ -226,7 +226,7 @@ def _tick_once(bot: Bot) -> None:
         target_x=decision["behavior"]["target_x"],
         target_y=decision["behavior"]["target_y"],
         command_sent=command_sent,
-        in_flight_kind=bot._state_data["in_flight_action"]["kind"],
+        in_flight_kind=bot._state_data["in_flight_action"]["kind"].value,
         fuel=self_state["fuel"],
         fuel_cap=fuel_capacity(self_state["rank"]),
         self_x=self_state["x"],
@@ -521,7 +521,7 @@ def _is_ready_for_decision(bot: Bot) -> bool:
         True if the bot can safely plan and execute a command this tick.
     """
     state = bot.get_state()
-    if state in ("INITIALIZING", "WAITING_FOR_POSITION", "DISCONNECTED"):
+    if state in (BotState.INITIALIZING, BotState.WAITING_FOR_POSITION, BotState.DISCONNECTED):
         emit_sync("deferring decisions while state=%s", state)
         return False
     return True

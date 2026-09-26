@@ -37,7 +37,7 @@ from tankpit_bot.diagnostics.runs_index import (
 )
 from tankpit_bot.ledger.damage_book import summarize_side, total_fuel
 from tankpit_bot.ledger.decision import verify_outcome_invariant
-from tankpit_bot.ledger.events import ACTION_KINDS
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_context import set_runtime_context
@@ -276,12 +276,12 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
     mode = ai["mode"]
     mode_state = ai["mode_state"]
     unresolved = verify_outcome_invariant(bot.world.ledger)
-    for kind in ACTION_KINDS:
+    for kind in ActionKind:
         counts = outcome_counts(bot.world.ledger, kind)
         if counts:
             emit_diagnostic(
                 diagnostic_kind="session_outcome_counts",
-                action_kind=kind,
+                action_kind=kind.value,
                 **dict(sorted(counts.items())),
             )
     if unresolved:
@@ -445,7 +445,7 @@ def _publish_tick_context(bot: Bot, tick_n: int) -> None:
     set_runtime_context(
         tick_n=tick_n,
         bot_state=f"{ai['mode']}/{ai['mode_state']}",
-        in_flight_action_kind=action["kind"],
+        in_flight_action_kind=action["kind"].value,
     )
 
 

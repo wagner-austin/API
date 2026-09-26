@@ -13,9 +13,11 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.bot.states import (
+    ActionKind,
+    ActionOutcome,
+    BotState,
     BotStateDataDict,
     InFlightActionDict,
-    StateName,
     make_initial_state_data,
     make_no_action,
     transition_to,
@@ -77,7 +79,7 @@ class CompletionsMixin(SessionBase):
         )
         self._state_data: BotStateDataDict = make_initial_state_data()
 
-    def get_state(self) -> StateName:
+    def get_state(self) -> BotState:
         """Get current bot state.
 
         Returns:
@@ -95,7 +97,7 @@ class CompletionsMixin(SessionBase):
 
     def _transition(
         self,
-        new_state: StateName,
+        new_state: BotState,
         *,
         in_flight_action: InFlightActionDict | None = None,
     ) -> None:
@@ -131,11 +133,11 @@ class CompletionsMixin(SessionBase):
             True if a transition was applied.
         """
         current_state = self._state_data["state"]
-        if current_state == "INITIALIZING" and self._magic is not None:
-            self._transition("WAITING_FOR_POSITION")
+        if current_state is BotState.INITIALIZING and self._magic is not None:
+            self._transition(BotState.WAITING_FOR_POSITION)
             return True
-        if current_state == "WAITING_FOR_POSITION" and self_state is not None:
-            self._transition("IDLE")
+        if current_state is BotState.WAITING_FOR_POSITION and self_state is not None:
+            self._transition(BotState.IDLE)
             return True
         return False
 
@@ -150,13 +152,13 @@ class CompletionsMixin(SessionBase):
         """
         current_state = self._state_data["state"]
         excluded_states = (
-            "LOW_FUEL",
-            "INITIALIZING",
-            "WAITING_FOR_POSITION",
-            "DISCONNECTED",
-            "TELEPORTING",
-            "COLLECTING",
-            "SCANNING",
+            BotState.LOW_FUEL,
+            BotState.INITIALIZING,
+            BotState.WAITING_FOR_POSITION,
+            BotState.DISCONNECTED,
+            BotState.TELEPORTING,
+            BotState.COLLECTING,
+            BotState.SCANNING,
         )
         is_low_fuel = (
             self_state is not None
@@ -164,7 +166,7 @@ class CompletionsMixin(SessionBase):
             and self_state["fuel"] < self._state_data["fuel_threshold"]
         )
         if is_low_fuel:
-            self._transition("LOW_FUEL")
+            self._transition(BotState.LOW_FUEL)
             return True
         return False
 
@@ -178,7 +180,7 @@ class CompletionsMixin(SessionBase):
             True if a transition was applied.
         """
         action = self._state_data["in_flight_action"]
-        if action["kind"] != "scan" or action["outcome"] != "pending":
+        if action["kind"] is not ActionKind.SCAN or action["outcome"] is not ActionOutcome.PENDING:
             return False
         if not self.world.check_and_clear_radar_scan_complete():
             return False
@@ -188,7 +190,7 @@ class CompletionsMixin(SessionBase):
             target_x=action["target_x"],
             target_y=action["target_y"],
         )
-        self._transition("IDLE", in_flight_action=make_no_action())
+        self._transition(BotState.IDLE, in_flight_action=make_no_action())
         return True
 
     def _maybe_complete_walk(self, self_state: SelfStateDict | None) -> bool:
@@ -200,7 +202,7 @@ class CompletionsMixin(SessionBase):
         Returns:
             True if a transition was applied.
         """
-        if self._state_data["state"] != "MOVING" or self_state is None:
+        if self._state_data["state"] is not BotState.MOVING or self_state is None:
             return False
         action = self._state_data["in_flight_action"]
         tx, ty = action["target_x"], action["target_y"]
@@ -213,7 +215,7 @@ class CompletionsMixin(SessionBase):
                 landed_x=self_state["x"],
                 landed_y=self_state["y"],
             )
-            self._transition("IDLE", in_flight_action=make_no_action())
+            self._transition(BotState.IDLE, in_flight_action=make_no_action())
             return True
         return False
 
@@ -227,7 +229,7 @@ class CompletionsMixin(SessionBase):
             True if a transition was applied.
         """
         if (
-            self._state_data["state"] == "TELEPORTING"
+            self._state_data["state"] is BotState.TELEPORTING
             and self_state is not None
             and check_and_clear_teleport_landed(self.world)
         ):
@@ -263,7 +265,7 @@ class CompletionsMixin(SessionBase):
                 landed_y=self_state["y"],
                 messages=self._messages,
             )
-            self._transition("IDLE", in_flight_action=make_no_action())
+            self._transition(BotState.IDLE, in_flight_action=make_no_action())
             return True
         return False
 
@@ -281,7 +283,7 @@ class CompletionsMixin(SessionBase):
         Returns:
             True if a transition was applied.
         """
-        if self._state_data["state"] != "COLLECTING" or self_state is None:
+        if self._state_data["state"] is not BotState.COLLECTING or self_state is None:
             return False
         if self.world.last_command_error != -1:
             # A 0x52 rejection is pending attribution. Completing by
@@ -318,7 +320,7 @@ class CompletionsMixin(SessionBase):
                     landed_x=self_state["x"],
                     landed_y=self_state["y"],
                 )
-            self._transition("IDLE", in_flight_action=make_no_action())
+            self._transition(BotState.IDLE, in_flight_action=make_no_action())
             return True
         return False
 
