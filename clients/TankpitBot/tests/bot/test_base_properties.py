@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_bot_messages_property_delegates_to_cdp_service() -> None:
     """Bot._messages delegates to CDPService.messages."""
     bot = Bot("https://test.com")
     assert bot._messages == []
-    msg = CapturedMessage(timestamp_ms=1, direction="received", payload="x", ws_url="wss://t")
+    msg = CapturedMessage(
+        timestamp_ms=1, direction=MessageDirection.RECEIVED, payload="x", ws_url="wss://t"
+    )
     bot._cdp_service.messages.append(msg)
     assert len(bot._messages) == 1
 
@@ -18,7 +21,9 @@ def test_bot_messages_property_delegates_to_cdp_service() -> None:
 def test_bot_messages_setter_delegates_to_cdp_service() -> None:
     """Bot._messages setter delegates to CDPService.messages."""
     bot = Bot("https://test.com")
-    msg = CapturedMessage(timestamp_ms=1, direction="received", payload="x", ws_url="wss://t")
+    msg = CapturedMessage(
+        timestamp_ms=1, direction=MessageDirection.RECEIVED, payload="x", ws_url="wss://t"
+    )
     bot._messages = [msg]
     assert bot._cdp_service.messages == [msg]
 
@@ -46,7 +51,9 @@ def test_bot_captured_message_count_delegates() -> None:
     bot = Bot("https://test.com")
     assert bot.captured_message_count() == 0
     bot._cdp_service.messages.append(
-        CapturedMessage(timestamp_ms=1, direction="received", payload="x", ws_url="wss://t"),
+        CapturedMessage(
+            timestamp_ms=1, direction=MessageDirection.RECEIVED, payload="x", ws_url="wss://t"
+        ),
     )
     assert bot.captured_message_count() == 1
 

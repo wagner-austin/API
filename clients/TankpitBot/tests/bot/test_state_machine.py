@@ -18,6 +18,7 @@ from tankpit_bot.sniffer.world_state_containers import (
 from tankpit_bot.sniffer.world_state_radar import (
     update_world_state_from_radar,
 )
+from tankpit_bot.types.literals import MessageDirection
 from tests.bot._state_machine_fixtures import _set_bot_action
 from tests.conftest import FakeEnv
 
@@ -344,7 +345,7 @@ class TestBotOnMessageCaptured:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         msg = CapturedMessage(
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="test",
             timestamp_ms=1000,
             ws_url="wss://test.tankpit.com/ws",

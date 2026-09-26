@@ -12,6 +12,7 @@ from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed,
     mark_teleport_landed,
 )
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeEnv
 
 
@@ -325,7 +326,7 @@ class TestBotMessageDecoding:
         payload = base64.b64encode(auth_bytes).decode("ascii")
 
         msg = CapturedMessage(
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload=payload,
             timestamp_ms=1000,
             ws_url="wss://test.tankpit.com/ws",
@@ -342,7 +343,7 @@ class TestBotMessageDecoding:
 
         # Send a non-decodable received message (too short) — should not crash
         msg = CapturedMessage(
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="AAAA",
             timestamp_ms=1000,
             ws_url="wss://test.tankpit.com/ws",
