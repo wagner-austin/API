@@ -75,7 +75,7 @@ def main() -> int:
     Returns:
         Exit code (0 for success).
     """
-    _test_hooks.setup_rich_logging("INFO")
+    _test_hooks.setup_rich_logging(_test_hooks.LogLevel.INFO)
     sys.stdout.write("Downloading field GIFs from tankpit.com...\n")
     paths = download_field_gifs()
     sys.stdout.write(f"Done: {len(paths)} field GIFs available\n")

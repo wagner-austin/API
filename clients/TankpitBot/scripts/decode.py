@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -91,7 +91,7 @@ def _decode_received(ws: WorldService, payload: str, xor_table: bytes) -> str | 
 
 def main() -> None:
     """Decode and print all messages from a capture session."""
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
 
     session_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("capture_session.json")
     if not _test_hooks.path_exists(session_path):

@@ -15,7 +15,7 @@ import datetime
 from pathlib import Path
 
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -139,7 +139,7 @@ def main() -> int:
         Process exit code (``0`` on success). Errors propagate as
         exceptions.
     """
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     args = _test_hooks.get_argv()[1:]
     capture_path = Path(args[0]) if args else _DEFAULT_CAPTURE
     capture = decode_capture_session(

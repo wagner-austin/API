@@ -50,7 +50,7 @@ def main() -> None:
         SystemExit: Code 1 if a named directory does not exist, or if
             the archive holds a command byte the sim cannot handle.
     """
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
     directories = _directories()
     for directory in directories:
         if not _test_hooks.path_exists(directory):

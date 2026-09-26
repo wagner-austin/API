@@ -38,7 +38,7 @@ def _load_session(session_path: Path) -> str:
 
 def main() -> None:
     """Correlate sent shoot commands with raw viewport entities."""
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
 
     session_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("capture_session.json")
 

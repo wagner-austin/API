@@ -25,7 +25,7 @@ from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 from typing_extensions import TypedDict
 
@@ -417,7 +417,7 @@ def main() -> int:
         Process exit code (``0`` on success). Errors propagate as
         exceptions.
     """
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     args = list(_test_hooks.get_argv())[1:]
     paths = [Path(arg) for arg in args] if args else [_DEFAULT_SOURCE]
     current = build_forage_economy(paths[0])

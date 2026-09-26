@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -77,7 +77,7 @@ def main() -> int:
     Returns:
         Exit code (0 for success, 1 for error).
     """
-    setup_rich_logging(level="WARNING")
+    setup_rich_logging(level=LogLevel.WARNING)
     set_protocol_frame_logging(False)
 
     argv = _test_hooks.get_argv()

@@ -74,7 +74,7 @@ def test_real_load_and_decode_session_loads_session(tmp_path: Path) -> None:
 
 def test_real_setup_rich_logging() -> None:
     """_real_setup_rich_logging sets up logging without error."""
-    _test_hooks._real_setup_rich_logging("INFO")
+    _test_hooks._real_setup_rich_logging(_test_hooks.LogLevel.INFO)
 
 
 def test_path_exists_hook_is_callable() -> None:
@@ -112,7 +112,7 @@ def test_load_and_decode_session_hook_is_callable(tmp_path: Path) -> None:
 
 def test_setup_rich_logging_hook_is_callable() -> None:
     """setup_rich_logging hook is callable."""
-    _test_hooks.setup_rich_logging("WARNING")
+    _test_hooks.setup_rich_logging(_test_hooks.LogLevel.WARNING)
 
 
 def test_real_http_get_returns_response() -> None:

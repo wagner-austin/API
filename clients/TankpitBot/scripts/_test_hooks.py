@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Final, Literal, Protocol
+from typing import Final, Protocol
+
+from platform_core.logging import LogLevel
 
 from tankpit_bot.decoder import DecodedCommand, DecodedLobbyMessage
-
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 #: Wall-clock bound on the git query that resolves a path to its tree or blob
 #: id. Sixty seconds: rev-parse answers in milliseconds, so this is far above

@@ -182,7 +182,7 @@ def main() -> int:
     Returns:
         Exit code (0 for success).
     """
-    _test_hooks.setup_rich_logging("INFO")
+    _test_hooks.setup_rich_logging(_test_hooks.LogLevel.INFO)
     full_argv = list(core_hooks.get_argv())
     user_args = full_argv[1:] if full_argv else []
     if not user_args:

@@ -18,7 +18,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.protocol.codec import ProtocolCodec, load_static_key
@@ -370,7 +370,7 @@ def main() -> None:
     from platform_core.rich_logging import setup_rich_logging
 
     load_dotenv()
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
 
     # Get session path from env or default
     session_path_str = _test_hooks.get_env("TANKPIT_OUTPUT") or "capture_session.json"

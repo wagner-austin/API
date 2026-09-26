@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -224,7 +224,7 @@ def main() -> int:
     Raises:
         FileNotFoundError: When no run artifacts match in the directory.
     """
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     full_argv = list(_test_hooks.get_argv())
     user_args = full_argv[1:] if full_argv else []
     runs_dir = Path(user_args[0]) if user_args else Path("runs") / "bot"

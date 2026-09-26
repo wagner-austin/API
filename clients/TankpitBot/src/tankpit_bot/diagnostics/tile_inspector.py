@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -285,7 +285,7 @@ def main() -> int:
         ValueError: When required arguments are missing or malformed.
         FileNotFoundError: When the field GIF does not exist.
     """
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     full_argv = list(_test_hooks.get_argv())
     user_args = full_argv[1:] if full_argv else []
     field_gif = Path(_require_positional(user_args, 0, "field-gif"))

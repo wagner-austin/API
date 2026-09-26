@@ -21,7 +21,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from pathlib import Path
 
-from platform_core.logging import get_logger, stdlib_logging
+from platform_core.logging import LogLevel, get_logger, stdlib_logging
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -107,7 +107,7 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     instance = resolve_bot_instance()
     artifacts = build_bot_run_artifacts(resolved_stamp, instance)
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     reset_artifact_files(
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
@@ -155,7 +155,7 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
     """
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = build_sniff_run_artifacts(resolved_stamp)
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     reset_artifact_files(
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
@@ -206,7 +206,7 @@ def configure_probe_runtime_logging(
     artifacts = build_probe_run_artifacts(
         probe_name, resolved_stamp, None if runs_root is None else Path(runs_root)
     )
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     reset_artifact_files(
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),

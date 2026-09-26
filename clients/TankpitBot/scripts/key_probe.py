@@ -39,7 +39,7 @@ def main() -> int:
     from dotenv import load_dotenv
 
     load_dotenv()
-    script_hooks.setup_rich_logging(level="INFO")
+    script_hooks.setup_rich_logging(level=script_hooks.LogLevel.INFO)
     stamp = make_run_stamp()
     configure_probe_runtime_logging("key_probe", stamp)
 

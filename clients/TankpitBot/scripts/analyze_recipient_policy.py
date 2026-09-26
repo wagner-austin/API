@@ -47,7 +47,7 @@ def main() -> None:
             never read, which is the one failure this sweep must not
             have.
     """
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
 
     directories = _requested_directories()
     for directory in directories:

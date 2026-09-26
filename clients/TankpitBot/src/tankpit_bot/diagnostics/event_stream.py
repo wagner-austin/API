@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from platform_core.logging import stdlib_logging
+from platform_core.logging import LogLevel, stdlib_logging
 from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
@@ -126,7 +126,7 @@ def run_analyzer_cli(
     Raises:
         FileNotFoundError: When the resolved artifact path is absent.
     """
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     full_argv = list(_test_hooks.get_argv())
     user_args = full_argv[1:] if full_argv else []
     source = resolve_source_path(user_args)

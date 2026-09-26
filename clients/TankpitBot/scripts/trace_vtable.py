@@ -329,7 +329,7 @@ def trace_vtable(js_path: Path) -> str:
 
 def main() -> None:
     """Trace V table handlers from beautified tpclient.js."""
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
 
     js_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("tpclient.pretty.js")
 

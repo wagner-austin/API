@@ -23,7 +23,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 from typing_extensions import TypedDict
 
@@ -435,7 +435,7 @@ def main() -> int:
     Returns:
         0 when every audited run is clean, 1 when any run is flagged.
     """
-    setup_rich_logging(level="INFO")
+    setup_rich_logging(level=LogLevel.INFO)
     argv = _test_hooks.get_argv()
     root = Path(argv[1]) if len(argv) > 1 else Path("runs") / "bot"
     corpus = audit_corpus(root)

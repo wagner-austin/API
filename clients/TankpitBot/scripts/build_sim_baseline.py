@@ -193,7 +193,7 @@ def main() -> None:
             is an artefact of an empty comparison rather than a
             fidelity verdict.
     """
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
     rounds = _int_flag(sys.argv[1:], "--rounds", DEFAULT_ROUNDS)
 
     for directory in LIVE_DIRECTORIES:

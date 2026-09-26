@@ -35,7 +35,7 @@ def _load_session(session_path: Path) -> str:
 
 def main() -> None:
     """Analyze protocol coverage from a capture session."""
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
 
     session_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("capture_session.json")
 

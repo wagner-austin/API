@@ -62,7 +62,7 @@ def main() -> None:
             the run never read — and with an empty sim side every live
             shape reads as a missing law, which looks like a result.
     """
-    _test_hooks.setup_rich_logging(level="INFO")
+    _test_hooks.setup_rich_logging(level=_test_hooks.LogLevel.INFO)
 
     directories = list(LIVE_DIRECTORIES) + _sim_directories()
     for directory in directories:
