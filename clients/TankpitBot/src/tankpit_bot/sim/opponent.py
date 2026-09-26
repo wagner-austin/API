@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from tankpit_bot.protocol.commands import CMD_MOVE, CMD_SHOOT
 from tankpit_bot.sim.actions import VIEWPORT_RADIUS
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
@@ -69,7 +69,7 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
     if beat == 0:
         step = 1 if (world["tick"] // DODGE_PERIOD) % 2 == 0 else -1
         return ClientCommandDict(
-            kind="move",
+            kind=ClientCommandKind.MOVE,
             command=CMD_MOVE,
             x=enemy["x"] + step,
             y=enemy["y"],
@@ -82,7 +82,7 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
     if beat == 2:
         return None
     return ClientCommandDict(
-        kind="shoot",
+        kind=ClientCommandKind.SHOOT,
         command=CMD_SHOOT,
         x=client["x"],
         y=client["y"],

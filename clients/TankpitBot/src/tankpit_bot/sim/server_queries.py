@@ -24,6 +24,7 @@ from tankpit_bot.protocol.types import (
 )
 from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat_clock import CombatClock
+from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.server_sessions import SimServerSessionsMixin
 from tankpit_bot.sim.wire_statements import (
     full_status_statement,
@@ -145,7 +146,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
     def _answer_connection_query(
         self,
         tank_id: int,
-        kind: str,
+        kind: ClientCommandKind,
         messages: list[BinaryMessage],
     ) -> bool:
         """Answer the commands that ask about the CONNECTION, not the world.
@@ -173,7 +174,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
             True when ``kind`` was a connection query and is now
             answered; False to let the world router try it.
         """
-        if kind == "statistics":
+        if kind is ClientCommandKind.STATISTICS:
             # Per-connection, like every other answer: the statistics
             # of the tank that asked, and only to that tank.
             if tank_id == self.session.client_id:
@@ -185,7 +186,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
                     )
                 )
             return True
-        if kind == "enter_game":
+        if kind is ClientCommandKind.ENTER_GAME:
             # THE JOIN BURST IS AN ANSWER, NOT A PUSH. Measured over
             # 343 archived sends (2026-09-03): every one is answered,
             # and the self-caused tokens are 49 x2, 5A and 3Dself per
@@ -201,7 +202,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
             if tank_id == self.session.client_id:
                 messages.extend(self.handshake())
             return True
-        if kind == "inventory":
+        if kind is ClientCommandKind.INVENTORY:
             # The 'i' key. Four archived sends, every one answered
             # with a 0x49 — thin, but the command's own name and its
             # answer agree, and the snapshot builder already exists.
@@ -233,4 +234,4 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         # client — one per tick, forever — took the server down. Our
         # bot never sends one, which is exactly why a sim built
         # against our bot never met it ([[client-commands]]).
-        return kind == "keepalive"
+        return kind is ClientCommandKind.KEEPALIVE

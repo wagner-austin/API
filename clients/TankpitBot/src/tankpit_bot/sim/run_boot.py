@@ -20,7 +20,7 @@ from tankpit_bot.protocol.commands import CMD_MINE
 from tankpit_bot.protocol.naming import is_practice_bot_name
 from tankpit_bot.resources import require_asset
 from tankpit_bot.sim.atlas_seed import seed_atlas_population
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.ghost import (
     GhostSpecDict,
     ghost_events_for_tick,
@@ -329,7 +329,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
             server.queue_command(
                 event["tank_id"],
                 ClientCommandDict(
-                    kind="shoot",
+                    kind=ClientCommandKind.SHOOT,
                     command=115,
                     x=event["x"],
                     y=event["y"],
@@ -351,7 +351,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
             server.queue_command(
                 event["tank_id"],
                 ClientCommandDict(
-                    kind="mine",
+                    kind=ClientCommandKind.MINE,
                     command=CMD_MINE,
                     x=0,
                     y=0,
@@ -366,7 +366,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
             server.queue_command(
                 event["tank_id"],
                 ClientCommandDict(
-                    kind="chat",
+                    kind=ClientCommandKind.CHAT,
                     command=109,
                     x=event["x"],
                     y=event["y"],

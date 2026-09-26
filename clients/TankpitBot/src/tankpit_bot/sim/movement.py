@@ -18,6 +18,7 @@ cost and the echoed path cover only the tiles actually walked.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
@@ -36,9 +37,27 @@ _STEP_DELTAS: dict[str, tuple[int, int]] = {
     "w": (-1, 0),
 }
 
-Surface = Literal["land", "water", "ferry"]
 
-StopReason = Literal["exhausted", "transition", "mine", "contact"]
+class Surface(StrEnum):
+    """The movement surface a tile offers; a move never chains two of them."""
+
+    LAND = "land"
+    WATER = "water"
+    FERRY = "ferry"
+
+
+class StopReason(StrEnum):
+    """Why an executed walk stopped where it did.
+
+    ``EXHAUSTED`` walked the whole path; ``TRANSITION`` stopped at a
+    surface change; ``MINE`` was arrested by a hidden mine; ``CONTACT``
+    stopped against another tank on a severed walk.
+    """
+
+    EXHAUSTED = "exhausted"
+    TRANSITION = "transition"
+    MINE = "mine"
+    CONTACT = "contact"
 
 
 def ferry_at(world: SimWorldDict, x: int, y: int) -> SimFerryDict | None:
@@ -77,14 +96,14 @@ def tile_surface(
         obstacles, and stacked blocks (impassable on every surface).
     """
     if ferry_at(world, x, y) is not None:
-        return "ferry"
+        return Surface.FERRY
     block_value = block_tile_value(world, terrain, x, y)
     if block_value != 0:
-        return "land" if block_value == BLOCK_BRIDGE else None
+        return Surface.LAND if block_value == BLOCK_BRIDGE else None
     if terrain.is_passable(x, y):
-        return "land"
+        return Surface.LAND
     if terrain.get_terrain(x, y) == terrain.WATER:
-        return "water"
+        return Surface.WATER
     return None
 
 
@@ -296,19 +315,19 @@ def _execute_walk(
             _blocked_by_world(world, mover, nx, ny)
             or block_tile_value(world, terrain, nx, ny) not in (0, BLOCK_BRIDGE)
         ):
-            return path[:walked], x, y, "contact"
+            return path[:walked], x, y, StopReason.CONTACT
         x, y = nx, ny
         walked += 1
         if _unrevealed_enemy_mine_at(world, mover, x, y):
-            return path[:walked], x, y, "mine"
+            return path[:walked], x, y, StopReason.MINE
         surface = tile_surface(world, terrain, x, y)
-        if previous == "land" and surface == "ferry":
-            return path[:walked], x, y, "transition"
-        if previous in ("water", "ferry") and surface == "land":
-            return path[:walked], x, y, "transition"
+        if previous is Surface.LAND and surface is Surface.FERRY:
+            return path[:walked], x, y, StopReason.TRANSITION
+        if previous is not Surface.LAND and surface is Surface.LAND:
+            return path[:walked], x, y, StopReason.TRANSITION
         if surface is not None:
             previous = surface
-    return path[:walked], x, y, "exhausted"
+    return path[:walked], x, y, StopReason.EXHAUSTED
 
 
 def _plan_walk(
@@ -350,7 +369,7 @@ def _plan_walk(
         surface = tile_surface(world, terrain, x, y)
         if surface is None:
             return False
-        return riding is not None or surface != "water"
+        return riding is not None or surface is not Surface.WATER
 
     def passable(x: int, y: int) -> bool:
         """Primary routing; the destination tile may hold a mine."""
@@ -400,7 +419,7 @@ def _update_ridden_ferry(
         final_x: The tile the tank stopped on.
         final_y: The tile the tank stopped on.
     """
-    if tile_surface(world, terrain, final_x, final_y) == "land":
+    if tile_surface(world, terrain, final_x, final_y) is Surface.LAND:
         last_x, last_y = start_x, start_y
         for step in walked[:-1]:
             dx, dy = _STEP_DELTAS[step]
@@ -441,7 +460,7 @@ def process_move(
     tank = world["tanks"][tank_id]
     start_x, start_y = tank["x"], tank["y"]
     riding = ferry_at(world, start_x, start_y)
-    start_surface: Surface = "ferry" if riding is not None else "land"
+    start_surface = Surface.FERRY if riding is not None else Surface.LAND
     outcome = MoveOutcomeDict(
         kind="moved",
         tank_id=tank_id,
@@ -450,7 +469,7 @@ def process_move(
         path="",
         pickups=[],
         mine_positions=[],
-        stop_reason="exhausted",
+        stop_reason=StopReason.EXHAUSTED,
         dest_reached=False,
     )
     path, severed = _plan_walk(world, terrain, tank, riding, dest_x, dest_y)
@@ -467,7 +486,7 @@ def process_move(
         # walk-over law (detonation, not refusal); any other stop is
         # the partial-walk cant_go receipt. Zero tiles walked is the
         # pure refusal: the first step was already blocked.
-        outcome["kind"] = "moved" if stop_reason == "mine" else "cant_go"
+        outcome["kind"] = "moved" if stop_reason is StopReason.MINE else "cant_go"
         if walked == "":
             return outcome
     # The debit clamps to remaining fuel (radar-analog law): the walk

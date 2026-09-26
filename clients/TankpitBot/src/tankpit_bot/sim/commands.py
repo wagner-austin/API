@@ -8,7 +8,8 @@ typed command the tick processor can queue.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from tankpit_bot.protocol.chat import CMD_CHAT
 from tankpit_bot.protocol.commands import (
@@ -31,55 +32,58 @@ from tankpit_bot.protocol.commands import (
 )
 from tankpit_bot.wire.helpers import require_min_length, x16
 
-ClientCommandKind = Literal[
-    "move",
-    "shoot",
-    "teleport",
-    "radar",
-    "mine",
-    "map_open",
-    "pickup_fuel",
-    "pickup_equipment",
-    "deposit_fuel",
-    "toggle_equipment",
-    "block",
-    "chat",
-    "scope",
-    "statistics",
-    "keepalive",
-    "enter_game",
-    "inventory",
-    "other",
-]
+
+class ClientCommandKind(StrEnum):
+    """Which client command a decoded payload is; ``OTHER`` is every unmapped byte."""
+
+    MOVE = "move"
+    SHOOT = "shoot"
+    TELEPORT = "teleport"
+    RADAR = "radar"
+    MINE = "mine"
+    MAP_OPEN = "map_open"
+    PICKUP_FUEL = "pickup_fuel"
+    PICKUP_EQUIPMENT = "pickup_equipment"
+    DEPOSIT_FUEL = "deposit_fuel"
+    TOGGLE_EQUIPMENT = "toggle_equipment"
+    BLOCK = "block"
+    CHAT = "chat"
+    SCOPE = "scope"
+    STATISTICS = "statistics"
+    KEEPALIVE = "keepalive"
+    ENTER_GAME = "enter_game"
+    INVENTORY = "inventory"
+    OTHER = "other"
+
 
 _COORD_KINDS: dict[int, ClientCommandKind] = {
-    CMD_MOVE: "move",
-    CMD_MAP_TELEPORT: "teleport",
-    CMD_PICKUP_FUEL: "pickup_fuel",
-    CMD_PICKUP_EQUIPMENT: "pickup_equipment",
-    CMD_BLOCK: "block",
+    CMD_MOVE: ClientCommandKind.MOVE,
+    CMD_MAP_TELEPORT: ClientCommandKind.TELEPORT,
+    CMD_PICKUP_FUEL: ClientCommandKind.PICKUP_FUEL,
+    CMD_PICKUP_EQUIPMENT: ClientCommandKind.PICKUP_EQUIPMENT,
+    CMD_BLOCK: ClientCommandKind.BLOCK,
 }
 _BARE_KINDS: dict[int, ClientCommandKind] = {
-    CMD_RADAR: "radar",
-    CMD_MINE: "mine",
-    CMD_MAP_OPEN: "map_open",
+    CMD_RADAR: ClientCommandKind.RADAR,
+    CMD_MINE: ClientCommandKind.MINE,
+    CMD_MAP_OPEN: ClientCommandKind.MAP_OPEN,
     # The statistics key. 279 of 386 archived 0x56 frames follow it as
     # the client's most recent sent command, which is what makes the
     # server's answer a RESPONSE rather than a broadcast
     # ([[session-state-deglobalisation]]).
-    CMD_STATISTICS: "statistics",
+    CMD_STATISTICS: ClientCommandKind.STATISTICS,
     # The client keep-alive (JS class ``dc``, [[client-commands]]). A
     # BARE kind because it carries no arguments -- the whole payload is
     # ``02 21`` in all 11,871 archived sends -- and it belongs in this
     # table rather than in ``other`` because the server has a LAW for
     # it (silence), and a sim that cannot name it cannot obey that law.
-    CMD_KEEPALIVE: "keepalive",
+    CMD_KEEPALIVE: ClientCommandKind.KEEPALIVE,
     # The two commands a REAL client sends that ours does not. Both
     # were unmapped until 2026-09-03 and both therefore decoded to
     # ``other``, the one kind the server refuses -- the keep-alive's
     # crash was not the only one waiting ([[client-commands]]).
-    CMD_ENTER_GAME: "enter_game",
-    CMD_INVENTORY: "inventory",
+    CMD_ENTER_GAME: ClientCommandKind.ENTER_GAME,
+    CMD_INVENTORY: ClientCommandKind.INVENTORY,
 }
 
 
@@ -141,7 +145,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
         require_min_length(payload, 4, "ClientCommand.shoot")
         target_id = x16(payload[4], payload[5]) if len(payload) >= 6 else 0
         return ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=command,
             x=payload[2],
             y=payload[3],
@@ -154,7 +158,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
     if command == CMD_TOGGLE_EQUIPMENT:
         require_min_length(payload, 3, "ClientCommand.toggle")
         return ClientCommandDict(
-            kind="toggle_equipment",
+            kind=ClientCommandKind.TOGGLE_EQUIPMENT,
             command=command,
             x=0,
             y=0,
@@ -169,7 +173,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
         # (wiki [[chat-messages]], wire-verified sniff-20260729-214411).
         require_min_length(payload, 5, "ClientCommand.chat")
         return ClientCommandDict(
-            kind="chat",
+            kind=ClientCommandKind.CHAT,
             command=command,
             x=payload[3],
             y=payload[4],
@@ -184,7 +188,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
         # (wire-measured 2026-08-01, [[viewport-shift-protocol]]).
         require_min_length(payload, 3, "ClientCommand.scope")
         return ClientCommandDict(
-            kind="scope",
+            kind=ClientCommandKind.SCOPE,
             command=command,
             x=0,
             y=0,
@@ -202,7 +206,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
         # ([[fuel-system]], [[client-commands]]).
         require_min_length(payload, 6, "ClientCommand.deposit_fuel")
         return ClientCommandDict(
-            kind="deposit_fuel",
+            kind=ClientCommandKind.DEPOSIT_FUEL,
             command=command,
             x=payload[4],
             y=payload[5],
@@ -225,7 +229,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             amount=0,
         )
     return ClientCommandDict(
-        kind="other",
+        kind=ClientCommandKind.OTHER,
         command=command,
         x=0,
         y=0,

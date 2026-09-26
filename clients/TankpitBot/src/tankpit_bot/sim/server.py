@@ -31,7 +31,7 @@ from tankpit_bot.sim.actions import build_map_data, process_mine_press, process_
 from tankpit_bot.sim.blocks import process_block_press
 from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat_clock import CORPSE_WINDOW_TICKS, CombatClock
-from tankpit_bot.sim.commands import ClientCommandDict, SimError
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind, SimError
 from tankpit_bot.sim.equipment import toggle_equipment_slot
 from tankpit_bot.sim.narrate import (
     narrate_block_action,
@@ -58,28 +58,17 @@ from tankpit_bot.sim.world import SimWorldDict
 #: everything a real client sends", and a private copy of this set
 #: living in the audit would drift the moment a command was added
 #: ([[client-commands]]).
-SUPPORTED_KINDS: frozenset[str] = frozenset(
+SUPPORTED_KINDS: frozenset[ClientCommandKind] = frozenset(
+    kind for kind in ClientCommandKind if kind is not ClientCommandKind.OTHER
+)
+_MOVE_KINDS: frozenset[ClientCommandKind] = frozenset(
     {
-        "move",
-        "shoot",
-        "teleport",
-        "radar",
-        "mine",
-        "map_open",
-        "pickup_fuel",
-        "pickup_equipment",
-        "deposit_fuel",
-        "toggle_equipment",
-        "block",
-        "chat",
-        "scope",
-        "statistics",
-        "keepalive",
-        "enter_game",
-        "inventory",
+        ClientCommandKind.MOVE,
+        ClientCommandKind.PICKUP_FUEL,
+        ClientCommandKind.PICKUP_EQUIPMENT,
+        ClientCommandKind.DEPOSIT_FUEL,
     }
 )
-_MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment", "deposit_fuel"})
 
 
 class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin):
@@ -207,7 +196,7 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin)
             # one for a hosted server; that tension is real and
             # recorded, not resolved by guessing ([[client-commands]]).
             raise SimError(
-                f"no modelled law for client command {command['kind']!r} "
+                f"no modelled law for client command {command['kind'].value!r} "
                 f"(byte 0x{command['command']:02X}); the sim refuses rather "
                 "than inventing a response"
             )
@@ -247,13 +236,13 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin)
         if kind in _MOVE_KINDS:
             self._process_move_command(tank_id, kind, command, messages, ammo_changed, moved)
             return
-        if kind == "shoot":
+        if kind is ClientCommandKind.SHOOT:
             self._process_shoot_command(tank_id, command, messages, ammo_changed, moved)
             return
-        if kind == "teleport":
+        if kind is ClientCommandKind.TELEPORT:
             self._process_teleport_command(tank_id, command, messages, ammo_changed, moved)
             return
-        if kind == "radar":
+        if kind is ClientCommandKind.RADAR:
             window = self.session.viewport.window if tank_id == self.session.client_id else None
             outcome = process_radar(self.world, tank_id, window)
             messages.extend(narrate_radar(self.world, outcome, self.session.client_id))
@@ -280,21 +269,21 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin)
         kind = command["kind"]
         if self._answer_connection_query(tank_id, kind, messages):
             return
-        if kind == "mine":
+        if kind is ClientCommandKind.MINE:
             press = process_mine_press(self.world, self.terrain, tank_id)
             messages.extend(narrate_mine_press(press, self.session.client_id))
             return
-        if kind == "toggle_equipment":
+        if kind is ClientCommandKind.TOGGLE_EQUIPMENT:
             toggle_equipment_slot(self.world, tank_id, command["slot"])
             messages.extend(narrate_equipment_toggle(self.world, tank_id, self.session.client_id))
             return
-        if kind == "block":
+        if kind is ClientCommandKind.BLOCK:
             self._process_block_command(tank_id, command, messages)
             return
-        if kind == "chat":
+        if kind is ClientCommandKind.CHAT:
             messages.extend(narrate_chat(tank_id, command))
             return
-        if kind == "scope":
+        if kind is ClientCommandKind.SCOPE:
             self._process_scope_command(tank_id, command, messages)
             return
         messages.append(build_map_data(self.world))

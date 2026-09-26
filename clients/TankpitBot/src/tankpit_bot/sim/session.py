@@ -40,7 +40,7 @@ from tankpit_bot.browser.page_client_snapshot import (
 from tankpit_bot.capture.xor import build_session_xor_table, require_static_key, xor_decode_body
 from tankpit_bot.protocol.commands import CMD_STATISTICS, COMMAND_PREFIX, TYPE_QUERY
 from tankpit_bot.protocol.types import BinaryMessage
-from tankpit_bot.sim.commands import decode_client_command
+from tankpit_bot.sim.commands import ClientCommandKind, decode_client_command
 from tankpit_bot.sim.lobby import SimLobby, build_auth_frame
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import (
@@ -138,7 +138,7 @@ class SimCDPSession:
         self.magic = magic
         self.table = build_session_xor_table(magic)
         self.lobby = lobby
-        self.sent_commands: list[str] = []
+        self.sent_commands: list[ClientCommandKind] = []
         self.wire_log: list[CapturedMessage] = []
         self.raw_messages: list[str] = []
         """Received payloads, the ``window.__rawMsgs`` hook's contents.
@@ -299,9 +299,9 @@ class SimCDPSession:
                 continue
             command = decode_client_command(xor_decode_body(body, self.table, offset=1))
             self.sent_commands.append(command["kind"])
-            if command["kind"] == "map_open":
+            if command["kind"] is ClientCommandKind.MAP_OPEN:
                 self.map_visible = True
-            if command["kind"] == "teleport":
+            if command["kind"] is ClientCommandKind.TELEPORT:
                 self.map_visible = False
             self.server.queue_command(self.server.session.client_id, command)
         now = get_current_time_ms()

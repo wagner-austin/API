@@ -43,7 +43,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.commands import CMD_MAP_TELEPORT, CMD_SHOOT
 from tankpit_bot.sim.actions import VIEWPORT_RADIUS
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict
 
@@ -233,7 +233,7 @@ def decide_practice_bot(
             state["hits_taken"] = 0
             state["has_pending_return"] = False
             return ClientCommandDict(
-                kind="teleport",
+                kind=ClientCommandKind.TELEPORT,
                 command=CMD_MAP_TELEPORT,
                 x=landing[0],
                 y=landing[1],
@@ -246,7 +246,7 @@ def decide_practice_bot(
     if state["has_pending_return"]:
         state["has_pending_return"] = False
         return ClientCommandDict(
-            kind="shoot",
+            kind=ClientCommandKind.SHOOT,
             command=CMD_SHOOT,
             x=state["pending_return_x"],
             y=state["pending_return_y"],

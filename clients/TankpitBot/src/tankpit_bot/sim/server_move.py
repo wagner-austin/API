@@ -19,7 +19,7 @@ from tankpit_bot.protocol.types import (
 )
 from tankpit_bot.sim.actions import process_teleport
 from tankpit_bot.sim.client_session import ClientSession
-from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.equipment import resolve_equipment_pickup
 from tankpit_bot.sim.fuel_deposit import resolve_fuel_deposit
 from tankpit_bot.sim.fuel_pickup import resolve_fuel_pickup
@@ -57,7 +57,7 @@ class SimServerMoveMixin(SimServerSessionsMixin):
     def _process_move_command(
         self,
         tank_id: int,
-        kind: str,
+        kind: ClientCommandKind,
         command: ClientCommandDict,
         messages: list[BinaryMessage],
         ammo_changed: set[int],
@@ -122,7 +122,7 @@ class SimServerMoveMixin(SimServerSessionsMixin):
         outcome = process_move(self.world, self.terrain, tank_id, command["x"], command["y"])
         if outcome["kind"] == "moved":
             moved.add(tank_id)
-        choreographed = kind == "pickup_fuel" and outcome["kind"] == "moved"
+        choreographed = kind is ClientCommandKind.PICKUP_FUEL and outcome["kind"] == "moved"
         messages.extend(
             narrate_move(
                 self.world,
@@ -143,7 +143,7 @@ class SimServerMoveMixin(SimServerSessionsMixin):
             messages.extend(narrate_fuel_pickup(pickup, self.session.client_id))
         if outcome["kind"] == "moved":
             self._resolve_arrival_equipment(tank_id, kind, messages)
-            if kind == "deposit_fuel":
+            if kind is ClientCommandKind.DEPOSIT_FUEL:
                 # The deposit resolves on ARRIVAL, after the walk that
                 # carried the tank to the tile, and it draws no 0x3F —
                 # both of the archive's two walked deposits end at the
@@ -233,7 +233,7 @@ class SimServerMoveMixin(SimServerSessionsMixin):
     def _resolve_arrival_equipment(
         self,
         tank_id: int,
-        kind: str,
+        kind: ClientCommandKind,
         messages: list[BinaryMessage],
     ) -> None:
         """Resolve an equipment container under an arriving tank.
@@ -254,7 +254,7 @@ class SimServerMoveMixin(SimServerSessionsMixin):
             narrate_equipment_pickup(self.world, grant, tank_id, kind, self.session.client_id)
         )
 
-    def _pickup_target_stocked(self, kind: str, x: int, y: int) -> bool:
+    def _pickup_target_stocked(self, kind: ClientCommandKind, x: int, y: int) -> bool:
         """Validate a pickup click's destination before any movement.
 
         A fuel click needs a container RECORD at the tile — even a
@@ -273,8 +273,8 @@ class SimServerMoveMixin(SimServerSessionsMixin):
         Returns:
             True when the command may proceed to the move law.
         """
-        if kind == "pickup_fuel":
+        if kind is ClientCommandKind.PICKUP_FUEL:
             return any((c["x"], c["y"]) == (x, y) for c in self.world["containers"])
-        if kind == "pickup_equipment":
+        if kind is ClientCommandKind.PICKUP_EQUIPMENT:
             return any((e["x"], e["y"]) == (x, y) for e in self.world["equipment"])
         return True
