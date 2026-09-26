@@ -24,6 +24,8 @@ from platform_calendar.types import (
     CalendarEvent,
     CalendarListItem,
     EventDateTime,
+    EventStatus,
+    ReminderMethod,
     decode_calendar_event,
     decode_calendar_list_item,
 )
@@ -231,7 +233,7 @@ class _GoogleCalendarClient(CalendarClientProtocol):
             data: JSON response to normalize in-place.
         """
         data.setdefault("description", "")
-        data.setdefault("status", "confirmed")
+        data.setdefault("status", EventStatus.CONFIRMED)
         data.setdefault("location", "")
         data.setdefault("recurrence", [])
         if "reminders" not in data:
@@ -380,7 +382,7 @@ class _GoogleCalendarClient(CalendarClientProtocol):
 
         overrides: list[JSONValue] = []
         for minutes in reminders:
-            override_obj: JSONObject = {"method": "popup", "minutes": minutes}
+            override_obj: JSONObject = {"method": ReminderMethod.POPUP, "minutes": minutes}
             overrides.append(override_obj)
 
         body: JSONObject = {
@@ -469,7 +471,7 @@ class _GoogleCalendarClient(CalendarClientProtocol):
         if reminders is not None:
             overrides: list[JSONValue] = []
             for minutes in reminders:
-                override_obj: JSONObject = {"method": "popup", "minutes": minutes}
+                override_obj: JSONObject = {"method": ReminderMethod.POPUP, "minutes": minutes}
                 overrides.append(override_obj)
             body["reminders"] = {
                 "useDefault": False,

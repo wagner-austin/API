@@ -29,10 +29,13 @@ from platform_calendar.testing import (
     CalendarClientProtocol,
 )
 from platform_calendar.types import (
+    CalendarAccessRole,
     CalendarEvent,
     CalendarListItem,
     EventDateTime,
     EventReminders,
+    EventStatus,
+    ReminderMethod,
     ReminderOverride,
 )
 
@@ -76,7 +79,7 @@ class FakeCalendarClient(CalendarClientProtocol):
             summary=summary,
             description=description,
             primary=primary,
-            accessRole="owner",
+            accessRole=CalendarAccessRole.OWNER,
             timeZone=time_zone,
         )
         self._calendars.append(item)
@@ -206,7 +209,7 @@ class FakeCalendarClient(CalendarClientProtocol):
 
         overrides: list[ReminderOverride] = []
         for minutes in reminders:
-            overrides.append(ReminderOverride(method="popup", minutes=minutes))
+            overrides.append(ReminderOverride(method=ReminderMethod.POPUP, minutes=minutes))
 
         event = CalendarEvent(
             id=event_id,
@@ -214,7 +217,7 @@ class FakeCalendarClient(CalendarClientProtocol):
             description=description,
             start=start,
             end=end,
-            status="confirmed",
+            status=EventStatus.CONFIRMED,
             reminders=EventReminders(
                 useDefault=False,
                 overrides=tuple(overrides),
@@ -270,7 +273,9 @@ class FakeCalendarClient(CalendarClientProtocol):
                 if reminders is not None:
                     overrides: list[ReminderOverride] = []
                     for minutes in reminders:
-                        overrides.append(ReminderOverride(method="popup", minutes=minutes))
+                        overrides.append(
+                            ReminderOverride(method=ReminderMethod.POPUP, minutes=minutes)
+                        )
                     new_reminders = EventReminders(
                         useDefault=False,
                         overrides=tuple(overrides),
@@ -354,7 +359,7 @@ def make_fake_event(
     start_datetime: str = "2025-12-26T14:00:00-08:00",
     end_datetime: str = "2025-12-26T15:00:00-08:00",
     time_zone: str = "America/Los_Angeles",
-    status: str = "confirmed",
+    status: EventStatus = EventStatus.CONFIRMED,
     location: str = "",
     recurrence: tuple[str, ...] = (),
 ) -> CalendarEvent:
@@ -374,18 +379,13 @@ def make_fake_event(
     Returns:
         CalendarEvent with the specified values.
     """
-    event_status: str = status
     return CalendarEvent(
         id=event_id,
         summary=summary,
         description=description,
         start=EventDateTime(dateTime=start_datetime, timeZone=time_zone),
         end=EventDateTime(dateTime=end_datetime, timeZone=time_zone),
-        status=(
-            "confirmed"
-            if event_status == "confirmed"
-            else ("tentative" if event_status == "tentative" else "cancelled")
-        ),
+        status=status,
         reminders=EventReminders(useDefault=True, overrides=()),
         location=location,
         recurrence=recurrence,
@@ -406,7 +406,7 @@ def make_fake_calendar(
         summary=summary,
         description=description,
         primary=primary,
-        accessRole="owner",
+        accessRole=CalendarAccessRole.OWNER,
         timeZone=time_zone,
     )
 

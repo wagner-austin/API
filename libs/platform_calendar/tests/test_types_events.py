@@ -7,10 +7,13 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 
 from platform_calendar.types import (
     DEFAULT_REMINDERS,
+    CalendarAccessRole,
     CalendarEvent,
     CalendarListItem,
     EventDateTime,
     EventReminders,
+    EventStatus,
+    ReminderMethod,
     ReminderOverride,
     decode_calendar_event,
     decode_calendar_list_item,
@@ -90,25 +93,27 @@ class TestEventDateTime:
 
 class TestReminderOverride:
     def test_encode_reminder_override(self) -> None:
-        r = ReminderOverride(method="popup", minutes=60)
+        r = ReminderOverride(method=ReminderMethod.POPUP, minutes=60)
         encoded = encode_reminder_override(r)
         assert encoded == {"method": "popup", "minutes": 60}
 
     def test_decode_reminder_override_popup(self) -> None:
         data: JSONObject = {"method": "popup", "minutes": 60}
         r = decode_reminder_override(data)
-        assert r["method"] == "popup"
+        assert r["method"] is ReminderMethod.POPUP
         assert r["minutes"] == 60
 
     def test_decode_reminder_override_email(self) -> None:
         data: JSONObject = {"method": "email", "minutes": 1440}
         r = decode_reminder_override(data)
-        assert r["method"] == "email"
+        assert r["method"] is ReminderMethod.EMAIL
         assert r["minutes"] == 1440
 
     def test_decode_reminder_override_invalid_method(self) -> None:
         data: JSONObject = {"method": "sms", "minutes": 60}
-        with pytest.raises(JSONTypeError, match="must be email/popup"):
+        with pytest.raises(
+            JSONTypeError, match=r"^Invalid method 'sms': must be one of 'email', 'popup'$"
+        ):
             decode_reminder_override(data)
 
 
@@ -117,8 +122,8 @@ class TestEventReminders:
         r = EventReminders(
             useDefault=False,
             overrides=(
-                ReminderOverride(method="popup", minutes=60),
-                ReminderOverride(method="email", minutes=1440),
+                ReminderOverride(method=ReminderMethod.POPUP, minutes=60),
+                ReminderOverride(method=ReminderMethod.EMAIL, minutes=1440),
             ),
         )
         encoded = encode_event_reminders(r)
@@ -163,7 +168,7 @@ class TestCalendarEvent:
             description="Test description",
             start=EventDateTime(dateTime="2025-12-26T14:00:00Z", timeZone="UTC"),
             end=EventDateTime(dateTime="2025-12-26T15:00:00Z", timeZone="UTC"),
-            status="confirmed",
+            status=EventStatus.CONFIRMED,
             reminders=EventReminders(useDefault=True, overrides=()),
             location="123 Main St",
             recurrence=("RRULE:FREQ=WEEKLY;COUNT=10",),
@@ -189,7 +194,7 @@ class TestCalendarEvent:
         }
         event = decode_calendar_event(data)
         assert event["id"] == "event123"
-        assert event["status"] == "confirmed"
+        assert event["status"] is EventStatus.CONFIRMED
         assert event["location"] == "Office"
         assert event["recurrence"] == ()
 
@@ -234,7 +239,7 @@ class TestCalendarEvent:
             "reminders": {"useDefault": True, "overrides": []},
         }
         event = decode_calendar_event(data)
-        assert event["status"] == "tentative"
+        assert event["status"] is EventStatus.TENTATIVE
 
     def test_decode_calendar_event_cancelled(self) -> None:
         data: JSONObject = {
@@ -247,7 +252,7 @@ class TestCalendarEvent:
             "reminders": {"useDefault": True, "overrides": []},
         }
         event = decode_calendar_event(data)
-        assert event["status"] == "cancelled"
+        assert event["status"] is EventStatus.CANCELLED
 
     def test_decode_calendar_event_invalid_status(self) -> None:
         data: JSONObject = {
@@ -259,7 +264,11 @@ class TestCalendarEvent:
             "status": "invalid",
             "reminders": {"useDefault": True, "overrides": []},
         }
-        with pytest.raises(JSONTypeError, match="must be confirmed/tentative/cancelled"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid status 'invalid': must be one of 'confirmed', 'tentative', "
+            r"'cancelled'$",
+        ):
             decode_calendar_event(data)
 
     def test_decode_calendar_event_invalid_start(self) -> None:
@@ -310,7 +319,7 @@ class TestCalendarEvent:
             description="Test description",
             start=EventDateTime(dateTime="2025-12-26T14:00:00Z", timeZone="UTC"),
             end=EventDateTime(dateTime="2025-12-26T15:00:00Z", timeZone="UTC"),
-            status="confirmed",
+            status=EventStatus.CONFIRMED,
             reminders=EventReminders(useDefault=True, overrides=()),
             location="Meeting Room A",
             recurrence=("RRULE:FREQ=DAILY;COUNT=5",),
@@ -326,7 +335,7 @@ class TestCalendarListItem:
             summary="My Calendar",
             description="Personal calendar",
             primary=True,
-            accessRole="owner",
+            accessRole=CalendarAccessRole.OWNER,
             timeZone="America/Los_Angeles",
         )
         encoded = encode_calendar_list_item(item)
@@ -345,20 +354,20 @@ class TestCalendarListItem:
         }
         item = decode_calendar_list_item(data)
         assert item["id"] == "primary"
-        assert item["accessRole"] == "owner"
+        assert item["accessRole"] is CalendarAccessRole.OWNER
 
     def test_decode_calendar_list_item_all_roles(self) -> None:
-        for role in ("freeBusyReader", "reader", "writer", "owner"):
+        for role in CalendarAccessRole:
             data: JSONObject = {
                 "id": "cal",
                 "summary": "Cal",
                 "description": "",
                 "primary": False,
-                "accessRole": role,
+                "accessRole": role.value,
                 "timeZone": "UTC",
             }
             item = decode_calendar_list_item(data)
-            assert item["accessRole"] == role
+            assert item["accessRole"] is role
 
     def test_decode_calendar_list_item_invalid_role(self) -> None:
         data: JSONObject = {
@@ -369,5 +378,9 @@ class TestCalendarListItem:
             "accessRole": "admin",
             "timeZone": "UTC",
         }
-        with pytest.raises(JSONTypeError, match="freeBusyReader/reader/writer/owner"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid accessRole 'admin': must be one of 'freeBusyReader', 'reader', "
+            r"'writer', 'owner'$",
+        ):
             decode_calendar_list_item(data)

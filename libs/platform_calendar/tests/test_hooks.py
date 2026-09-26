@@ -29,6 +29,7 @@ from platform_calendar.testing import (
     hooks,
     reset_hooks,
 )
+from platform_calendar.types import EventStatus
 
 
 class TestHooksContainer:
@@ -164,22 +165,22 @@ class TestMakeFakeEvent:
         event = make_fake_event()
         assert event["id"] == "test_event_1"
         assert event["summary"] == "Test Event"
-        assert event["status"] == "confirmed"
+        assert event["status"] is EventStatus.CONFIRMED
 
     def test_custom_values(self) -> None:
         event = make_fake_event(
             event_id="custom123",
             summary="Custom Event",
             description="Custom desc",
-            status="tentative",
+            status=EventStatus.TENTATIVE,
         )
         assert event["id"] == "custom123"
         assert event["summary"] == "Custom Event"
-        assert event["status"] == "tentative"
+        assert event["status"] is EventStatus.TENTATIVE
 
     def test_cancelled_status(self) -> None:
-        event = make_fake_event(status="cancelled")
-        assert event["status"] == "cancelled"
+        event = make_fake_event(status=EventStatus.CANCELLED)
+        assert event["status"] is EventStatus.CANCELLED
 
 
 class TestMakeFakeCalendar:

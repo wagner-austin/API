@@ -16,6 +16,7 @@ from platform_core.oauth_types import (
 
 from platform_calendar.types import (
     CompetitionsFile,
+    CompetitionSource,
     TrackedCompetition,
     decode_competitions_file,
     decode_google_credentials_file,
@@ -105,7 +106,7 @@ class TestTrackedCompetition:
     def test_encode_tracked_competition(self) -> None:
         comp = TrackedCompetition(
             id="devpost-test",
-            source="devpost",
+            source=CompetitionSource.DEVPOST,
             name="Test Competition",
             deadline="2025-12-26T22:00:00Z",
             url="https://devpost.com/test",
@@ -130,14 +131,14 @@ class TestTrackedCompetition:
             "reminders": [1440],
         }
         comp = decode_tracked_competition(data)
-        assert comp["source"] == "kaggle"
+        assert comp["source"] is CompetitionSource.KAGGLE
         assert comp["project_path"] is None
 
     def test_decode_tracked_competition_all_sources(self) -> None:
-        for source in ("kaggle", "devpost", "manual"):
+        for source in CompetitionSource:
             data: JSONObject = {
                 "id": "test",
-                "source": source,
+                "source": source.value,
                 "name": "Test",
                 "deadline": "2025-12-26T22:00:00Z",
                 "url": "https://example.com",
@@ -146,7 +147,7 @@ class TestTrackedCompetition:
                 "reminders": [],
             }
             comp = decode_tracked_competition(data)
-            assert comp["source"] == source
+            assert comp["source"] is source
 
     def test_decode_tracked_competition_invalid_source(self) -> None:
         data: JSONObject = {
@@ -159,7 +160,10 @@ class TestTrackedCompetition:
             "calendar_event_id": None,
             "reminders": [],
         }
-        with pytest.raises(JSONTypeError, match="kaggle/devpost/manual"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid source 'github': must be one of 'kaggle', 'devpost', 'manual'$",
+        ):
             decode_tracked_competition(data)
 
     def test_decode_tracked_competition_invalid_reminders(self) -> None:
@@ -179,7 +183,7 @@ class TestTrackedCompetition:
     def test_roundtrip_tracked_competition(self) -> None:
         original = TrackedCompetition(
             id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -195,7 +199,7 @@ class TestCompetitionsFile:
     def test_encode_competitions_file(self) -> None:
         comp = TrackedCompetition(
             id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -239,7 +243,7 @@ class TestCompetitionsFile:
     def test_roundtrip_competitions_file(self) -> None:
         comp = TrackedCompetition(
             id="test",
-            source="devpost",
+            source=CompetitionSource.DEVPOST,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",

@@ -21,7 +21,7 @@ from platform_calendar.fakes import (
 from platform_calendar.testing import (
     hooks,
 )
-from platform_calendar.types import TrackedCompetition
+from platform_calendar.types import CompetitionSource, TrackedCompetition
 
 
 class TestLoadSaveCompetitions:
@@ -139,7 +139,7 @@ class TestLoadSaveCompetitions:
 
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -163,7 +163,7 @@ class TestLoadSaveCompetitions:
 
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -183,7 +183,7 @@ class TestLoadSaveCompetitions:
 
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -203,7 +203,7 @@ class TestCreateCompetitionEvent:
 
         comp = make_competition(
             competition_id="test",
-            source="devpost",
+            source=CompetitionSource.DEVPOST,
             name="Test Competition",
             deadline="2025-12-26T22:00:00Z",
             url="https://devpost.com/test",
@@ -224,7 +224,7 @@ class TestCreateCompetitionEvent:
 
         comp = make_competition(
             competition_id="test",
-            source="kaggle",
+            source=CompetitionSource.KAGGLE,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://kaggle.com/test",
@@ -240,7 +240,7 @@ class TestCreateCompetitionEvent:
 
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00+00:00",  # Uses +00:00 instead of Z
             url="https://example.com",
@@ -257,7 +257,7 @@ class TestSyncCompetition:
 
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -273,7 +273,7 @@ class TestSyncCompetition:
 
         comp = TrackedCompetition(
             id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -295,14 +295,14 @@ class TestSyncAllCompetitions:
 
         comp1 = make_competition(
             competition_id="comp1",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Comp 1",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
         )
         comp2 = make_competition(
             competition_id="comp2",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Comp 2",
             deadline="2025-12-27T22:00:00Z",
             url="https://example.com",
@@ -324,7 +324,7 @@ class TestSyncAllCompetitions:
 
         comp1 = TrackedCompetition(
             id="comp1",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Already Synced",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -334,7 +334,7 @@ class TestSyncAllCompetitions:
         )
         comp2 = make_competition(
             competition_id="comp2",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Not Synced",
             deadline="2025-12-27T22:00:00Z",
             url="https://example.com",

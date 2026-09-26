@@ -20,6 +20,7 @@ from platform_calendar.types import (
     DEFAULT_REMINDERS,
     CalendarEvent,
     CompetitionsFile,
+    CompetitionSource,
     EventDateTime,
     TrackedCompetition,
     decode_competitions_file,
@@ -376,7 +377,7 @@ def sync_all_competitions(
 def make_competition(
     *,
     competition_id: str,
-    source: str,
+    source: CompetitionSource,
     name: str,
     deadline: str,
     url: str,
@@ -387,7 +388,7 @@ def make_competition(
 
     Args:
         competition_id: Unique ID for the competition.
-        source: Source platform (kaggle, devpost, manual).
+        source: Where the competition was found.
         name: Competition name.
         deadline: ISO 8601 deadline datetime.
         url: URL to competition page.
@@ -397,23 +398,10 @@ def make_competition(
     Returns:
         TrackedCompetition ready to be added.
 
-    Raises:
-        ValueError: If source is invalid.
     """
-    # Validate source
-    if source not in ("kaggle", "devpost", "manual"):
-        msg = f"Invalid source: {source}"
-        raise ValueError(msg)
-
-    actual_source: str = source
-
     return TrackedCompetition(
         id=competition_id,
-        source=(
-            "kaggle"
-            if actual_source == "kaggle"
-            else ("devpost" if actual_source == "devpost" else "manual")
-        ),
+        source=source,
         name=name,
         deadline=deadline,
         url=url,

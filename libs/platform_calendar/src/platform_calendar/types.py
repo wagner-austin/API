@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
@@ -14,71 +15,47 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
 # =============================================================================
-# Literal Types
+# Vocabularies
 # =============================================================================
 
-EventStatus = Literal["confirmed", "tentative", "cancelled"]
-ReminderMethod = Literal["email", "popup"]
-CompetitionSource = Literal["kaggle", "devpost", "manual"]
-CalendarAccessRole = Literal["freeBusyReader", "reader", "writer", "owner"]
+
+class EventStatus(StrEnum):
+    """A Google Calendar event's status, as the Calendar API spells it."""
+
+    CONFIRMED = "confirmed"
+    TENTATIVE = "tentative"
+    CANCELLED = "cancelled"
+
+
+class ReminderMethod(StrEnum):
+    """How a reminder override is delivered, as the Calendar API spells it."""
+
+    EMAIL = "email"
+    POPUP = "popup"
+
+
+class CompetitionSource(StrEnum):
+    """Where a tracked competition was found."""
+
+    KAGGLE = "kaggle"
+    DEVPOST = "devpost"
+    MANUAL = "manual"
+
+
+class CalendarAccessRole(StrEnum):
+    """The caller's access to a calendar, as the Calendar API's CalendarList spells it."""
+
+    FREE_BUSY_READER = "freeBusyReader"
+    READER = "reader"
+    WRITER = "writer"
+    OWNER = "owner"
+
 
 # Default reminders: 1 day (1440 min) + 1 hour (60 min) before deadline
 DEFAULT_REMINDERS: tuple[int, int] = (1440, 60)
-
-
-# =============================================================================
-# Validation Helpers
-# =============================================================================
-
-
-def _require_event_status(obj: JSONObject, key: str) -> EventStatus:
-    """Extract and validate EventStatus from JSON object."""
-    value = require_str(obj, key)
-    if value == "confirmed":
-        return "confirmed"
-    if value == "tentative":
-        return "tentative"
-    if value == "cancelled":
-        return "cancelled"
-    raise JSONTypeError(f"Field '{key}' must be confirmed/tentative/cancelled, got '{value}'")
-
-
-def _require_reminder_method(obj: JSONObject, key: str) -> ReminderMethod:
-    """Extract and validate ReminderMethod from JSON object."""
-    value = require_str(obj, key)
-    if value == "email":
-        return "email"
-    if value == "popup":
-        return "popup"
-    raise JSONTypeError(f"Field '{key}' must be email/popup, got '{value}'")
-
-
-def _require_competition_source(obj: JSONObject, key: str) -> CompetitionSource:
-    """Extract and validate CompetitionSource from JSON object."""
-    value = require_str(obj, key)
-    if value == "kaggle":
-        return "kaggle"
-    if value == "devpost":
-        return "devpost"
-    if value == "manual":
-        return "manual"
-    raise JSONTypeError(f"Field '{key}' must be kaggle/devpost/manual, got '{value}'")
-
-
-def _require_access_role(obj: JSONObject, key: str) -> CalendarAccessRole:
-    """Extract and validate CalendarAccessRole from JSON object."""
-    value = require_str(obj, key)
-    if value == "freeBusyReader":
-        return "freeBusyReader"
-    if value == "reader":
-        return "reader"
-    if value == "writer":
-        return "writer"
-    if value == "owner":
-        return "owner"
-    raise JSONTypeError(f"Field '{key}' must be freeBusyReader/reader/writer/owner, got '{value}'")
 
 
 def _require_dict_value(value: JSONValue, context: str) -> JSONObject:
@@ -163,7 +140,7 @@ def encode_reminder_override(r: ReminderOverride) -> JSONObject:
 def decode_reminder_override(data: JSONObject) -> ReminderOverride:
     """Decode ReminderOverride from dict with validation."""
     return ReminderOverride(
-        method=_require_reminder_method(data, "method"),
+        method=require_member(data, "method", ReminderMethod),
         minutes=require_int(data, "minutes"),
     )
 
@@ -297,7 +274,7 @@ def decode_calendar_event(data: JSONObject) -> CalendarEvent:
         description=require_str(data, "description"),
         start=decode_event_datetime(_require_dict_value(start_raw, "start")),
         end=decode_event_datetime(_require_dict_value(end_raw, "end")),
-        status=_require_event_status(data, "status"),
+        status=require_member(data, "status", EventStatus),
         reminders=decode_event_reminders(_require_dict_value(reminders_raw, "reminders")),
         location=location,
         recurrence=_require_recurrence(data, "recurrence"),
@@ -335,7 +312,7 @@ def decode_calendar_list_item(data: JSONObject) -> CalendarListItem:
         summary=require_str(data, "summary"),
         description=require_str(data, "description"),
         primary=require_bool(data, "primary"),
-        accessRole=_require_access_role(data, "accessRole"),
+        accessRole=require_member(data, "accessRole", CalendarAccessRole),
         timeZone=require_str(data, "timeZone"),
     )
 
@@ -378,7 +355,7 @@ def decode_tracked_competition(data: JSONObject) -> TrackedCompetition:
     """Decode TrackedCompetition from dict with validation."""
     return TrackedCompetition(
         id=require_str(data, "id"),
-        source=_require_competition_source(data, "source"),
+        source=require_member(data, "source", CompetitionSource),
         name=require_str(data, "name"),
         deadline=require_str(data, "deadline"),
         url=require_str(data, "url"),

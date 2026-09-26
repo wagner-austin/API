@@ -12,26 +12,26 @@ from platform_calendar.competitions import (
     remove_competition,
     update_competition,
 )
-from platform_calendar.types import DEFAULT_REMINDERS
+from platform_calendar.types import DEFAULT_REMINDERS, CompetitionSource
 
 
 class TestMakeCompetition:
     def test_make_competition_defaults(self) -> None:
         comp = make_competition(
             competition_id="test-comp",
-            source="devpost",
+            source=CompetitionSource.DEVPOST,
             name="Test Competition",
             deadline="2025-12-26T22:00:00Z",
             url="https://devpost.com/test",
         )
         assert comp["id"] == "test-comp"
-        assert comp["source"] == "devpost"
+        assert comp["source"] is CompetitionSource.DEVPOST
         assert comp["project_path"] is None
         assert comp["calendar_event_id"] is None
         assert comp["reminders"] == DEFAULT_REMINDERS
 
     def test_make_competition_all_sources(self) -> None:
-        for source in ("kaggle", "devpost", "manual"):
+        for source in CompetitionSource:
             comp = make_competition(
                 competition_id="test",
                 source=source,
@@ -39,22 +39,12 @@ class TestMakeCompetition:
                 deadline="2025-12-26T22:00:00Z",
                 url="https://example.com",
             )
-            assert comp["source"] == source
-
-    def test_make_competition_invalid_source(self) -> None:
-        with pytest.raises(ValueError, match="Invalid source"):
-            make_competition(
-                competition_id="test",
-                source="invalid",
-                name="Test",
-                deadline="2025-12-26T22:00:00Z",
-                url="https://example.com",
-            )
+            assert comp["source"] is source
 
     def test_make_competition_with_options(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="kaggle",
+            source=CompetitionSource.KAGGLE,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://kaggle.com/test",
@@ -69,7 +59,7 @@ class TestAddCompetition:
     def test_add_to_empty(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -81,14 +71,14 @@ class TestAddCompetition:
     def test_add_to_existing(self) -> None:
         comp1 = make_competition(
             competition_id="comp1",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Comp 1",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
         )
         comp2 = make_competition(
             competition_id="comp2",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Comp 2",
             deadline="2025-12-27T22:00:00Z",
             url="https://example.com",
@@ -99,7 +89,7 @@ class TestAddCompetition:
     def test_add_duplicate_id(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -115,7 +105,7 @@ class TestRemoveCompetition:
     def test_remove_existing(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -126,14 +116,14 @@ class TestRemoveCompetition:
     def test_remove_from_multiple(self) -> None:
         comp1 = make_competition(
             competition_id="comp1",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Comp 1",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
         )
         comp2 = make_competition(
             competition_id="comp2",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Comp 2",
             deadline="2025-12-27T22:00:00Z",
             url="https://example.com",
@@ -154,7 +144,7 @@ class TestGetCompetition:
     def test_get_existing(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -166,21 +156,21 @@ class TestGetCompetition:
         """Test get_competition when target is not the first item (covers loop branch)."""
         comp1 = make_competition(
             competition_id="first",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="First",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com/1",
         )
         comp2 = make_competition(
             competition_id="second",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Second",
             deadline="2025-12-27T22:00:00Z",
             url="https://example.com/2",
         )
         comp3 = make_competition(
             competition_id="third",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Third",
             deadline="2025-12-28T22:00:00Z",
             url="https://example.com/3",
@@ -202,7 +192,7 @@ class TestUpdateCompetition:
     def test_update_name(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Original",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -213,7 +203,7 @@ class TestUpdateCompetition:
     def test_update_multiple_fields(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -232,7 +222,7 @@ class TestUpdateCompetition:
     def test_update_calendar_event_id(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -243,7 +233,7 @@ class TestUpdateCompetition:
     def test_update_reminders(self) -> None:
         comp = make_competition(
             competition_id="test",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Test",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com",
@@ -262,14 +252,14 @@ class TestUpdateCompetition:
         # Test that updating one competition preserves others (hits else branch)
         comp1 = make_competition(
             competition_id="comp1",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Competition 1",
             deadline="2025-12-26T22:00:00Z",
             url="https://example.com/1",
         )
         comp2 = make_competition(
             competition_id="comp2",
-            source="manual",
+            source=CompetitionSource.MANUAL,
             name="Competition 2",
             deadline="2025-12-27T22:00:00Z",
             url="https://example.com/2",

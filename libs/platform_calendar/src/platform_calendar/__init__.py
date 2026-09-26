@@ -23,7 +23,7 @@ Example usage:
     # Create and sync a competition
     comp = make_competition(
         competition_id="devpost-visaverse-2025",
-        source="devpost",
+        source=CompetitionSource.DEVPOST,
         name="VisaVerse AI Hackathon",
         deadline="2025-12-26T22:00:00Z",
         url="https://devpost.com/...",
