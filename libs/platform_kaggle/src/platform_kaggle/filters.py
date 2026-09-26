@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from .types import (
     Competition,
+    CompetitionCategory,
     InterestFilter,
 )
 
@@ -216,7 +217,7 @@ def make_interest_filter(
     include_tags: tuple[str, ...] = (),
     exclude_tags: tuple[str, ...] = (),
     min_reward: int | None = None,
-    categories: tuple[str, ...] | None = None,
+    categories: tuple[CompetitionCategory, ...] | None = None,
 ) -> InterestFilter:
     """Create an interest filter with the given criteria.
 
@@ -229,32 +230,11 @@ def make_interest_filter(
     Returns:
         InterestFilter instance.
     """
-    # Convert category strings to CompetitionCategory
-    from .types import CompetitionCategory
-
-    validated_categories: tuple[CompetitionCategory, ...] | None = None
-    if categories is not None:
-        cat_list: list[CompetitionCategory] = []
-        for cat in categories:
-            if cat == "Featured":
-                cat_list.append("Featured")
-            elif cat == "Research":
-                cat_list.append("Research")
-            elif cat == "Playground":
-                cat_list.append("Playground")
-            elif cat == "Getting Started":
-                cat_list.append("Getting Started")
-            elif cat == "Masters":
-                cat_list.append("Masters")
-            elif cat == "Kudos":
-                cat_list.append("Kudos")
-        validated_categories = tuple(cat_list)
-
     return InterestFilter(
         include_tags=include_tags,
         exclude_tags=exclude_tags,
         min_reward=min_reward,
-        categories=validated_categories,
+        categories=categories,
     )
 
 

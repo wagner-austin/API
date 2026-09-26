@@ -15,6 +15,7 @@ from platform_stt.types import (
     TranslationResponse,
     VerboseResponse,
     VerboseSegment,
+    WhisperTask,
     decode_audio_chunk,
     decode_chunker_config,
     decode_language_detection_result,
@@ -50,12 +51,12 @@ class TestWhisperTask:
     def test_validate_whisper_task_transcribe(self) -> None:
         """Validate 'transcribe' task."""
         result = validate_whisper_task("transcribe")
-        assert result == "transcribe"
+        assert result is WhisperTask.TRANSCRIBE
 
     def test_validate_whisper_task_translate(self) -> None:
         """Validate 'translate' task."""
         result = validate_whisper_task("translate")
-        assert result == "translate"
+        assert result is WhisperTask.TRANSLATE
 
     def test_validate_whisper_task_invalid(self) -> None:
         """Reject invalid task."""
@@ -253,7 +254,7 @@ class TestTranslationRequest:
         request = TranslationRequest(
             source_language="vi",
             target_language="en",
-            task="translate",
+            task=WhisperTask.TRANSLATE,
         )
         result = encode_translation_request(request)
         assert result["source_language"] == "vi"
@@ -268,7 +269,7 @@ class TestTranslationRequest:
         }
         result = decode_translation_request(obj)
         assert result["source_language"] == "vi"
-        assert result["task"] == "translate"
+        assert result["task"] is WhisperTask.TRANSLATE
 
     def test_decode_translation_request_none_source(self) -> None:
         """Decode with None source language."""

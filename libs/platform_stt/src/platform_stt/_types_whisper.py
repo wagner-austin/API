@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
-WhisperTask = Literal["transcribe", "translate"]
+from platform_core.members import find_member
+
+
+class WhisperTask(StrEnum):
+    """What Whisper does with the audio: transcribe it, or translate it into English."""
+
+    TRANSCRIBE = "transcribe"
+    TRANSLATE = "translate"
+
 
 # Supported languages for Whisper (ISO 639-1 codes)
 # Full list at: https://platform.openai.com/docs/guides/speech-to-text
@@ -95,16 +103,15 @@ def validate_whisper_task(task: str) -> WhisperTask:
         task: Task string to validate.
 
     Returns:
-        The validated task as WhisperTask literal.
+        The member whose value is ``task``.
 
     Raises:
         ValueError: If the task is not valid.
     """
-    if task not in ("transcribe", "translate"):
+    member = find_member(task, WhisperTask)
+    if member is None:
         raise ValueError(f"Invalid Whisper task: {task}")
-    if task == "transcribe":
-        return "transcribe"
-    return "translate"
+    return member
 
 
 # =============================================================================

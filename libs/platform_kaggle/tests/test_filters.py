@@ -16,7 +16,7 @@ from platform_kaggle.filters import (
     make_interest_filter,
 )
 from platform_kaggle.testing import make_fake_competition
-from platform_kaggle.types import InterestFilter
+from platform_kaggle.types import CompetitionCategory, InterestFilter
 
 
 class TestParseRewardAmount:
@@ -241,23 +241,23 @@ class TestPassesFilter:
 
     def test_passes_categories(self) -> None:
         """Test competition passes categories filter."""
-        comp = make_fake_competition(category="Featured")
+        comp = make_fake_competition(category=CompetitionCategory.FEATURED)
         filter_ = InterestFilter(
             include_tags=(),
             exclude_tags=(),
             min_reward=None,
-            categories=("Featured", "Research"),
+            categories=(CompetitionCategory.FEATURED, CompetitionCategory.RESEARCH),
         )
         assert _passes_filter(comp, filter_) is True
 
     def test_fails_categories(self) -> None:
         """Test competition fails categories filter."""
-        comp = make_fake_competition(category="Playground")
+        comp = make_fake_competition(category=CompetitionCategory.PLAYGROUND)
         filter_ = InterestFilter(
             include_tags=(),
             exclude_tags=(),
             min_reward=None,
-            categories=("Featured", "Research"),
+            categories=(CompetitionCategory.FEATURED, CompetitionCategory.RESEARCH),
         )
         assert _passes_filter(comp, filter_) is False
 
@@ -404,38 +404,14 @@ class TestMakeInterestFilter:
     def test_filter_with_categories(self) -> None:
         """Test creating filter with categories."""
         filter_ = make_interest_filter(
-            categories=("Featured", "Research"),
+            categories=(CompetitionCategory.FEATURED, CompetitionCategory.RESEARCH),
         )
-        assert filter_.categories == ("Featured", "Research")
+        assert filter_.categories == (CompetitionCategory.FEATURED, CompetitionCategory.RESEARCH)
 
     def test_filter_with_all_categories(self) -> None:
-        """Test creating filter with all valid categories."""
-        filter_ = make_interest_filter(
-            categories=(
-                "Featured",
-                "Research",
-                "Playground",
-                "Getting Started",
-                "Masters",
-                "Kudos",
-            ),
-        )
-        assert filter_.categories == (
-            "Featured",
-            "Research",
-            "Playground",
-            "Getting Started",
-            "Masters",
-            "Kudos",
-        )
-
-    def test_filter_with_invalid_category(self) -> None:
-        """Test creating filter with invalid category ignores it."""
-        filter_ = make_interest_filter(
-            categories=("Featured", "Invalid"),
-        )
-        # Invalid category should be skipped
-        assert filter_.categories == ("Featured",)
+        """Test creating filter with every category."""
+        filter_ = make_interest_filter(categories=tuple(CompetitionCategory))
+        assert filter_.categories == tuple(CompetitionCategory)
 
     def test_filter_with_min_reward(self) -> None:
         """Test creating filter with min reward."""

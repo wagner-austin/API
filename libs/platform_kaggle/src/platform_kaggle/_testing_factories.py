@@ -25,7 +25,7 @@ def make_fake_competition(
     *,
     ref: str = "test-competition",
     title: str = "Test Competition",
-    category: CompetitionCategory = "Playground",
+    category: CompetitionCategory = CompetitionCategory.PLAYGROUND,
     reward: str = "Knowledge",
     deadline: str = _FAR_FUTURE_DEADLINE,
     team_count: int = 100,

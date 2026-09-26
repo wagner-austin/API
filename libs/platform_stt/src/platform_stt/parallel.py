@@ -30,7 +30,7 @@ class TranscribeFn(Protocol):
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         language: str | None = None,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         timeout: float | None = None,
     ) -> VerboseResponse:
         """Transcribe or translate audio file.
@@ -79,7 +79,7 @@ class ParallelTranscriber:
         max_retries: int = 2,
         timeout_seconds: float = 900.0,
         language: str | None = None,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
     ) -> None:
         """Initialize parallel transcriber.
 

@@ -9,6 +9,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
 from platform_devpost._types_theme import (
     DisplayedLocation,
@@ -21,7 +22,6 @@ from platform_devpost._types_theme import (
 from platform_devpost._types_validation import (
     HackathonState,
     _require_dict_value,
-    _require_state,
 )
 
 # -----------------------------------------------------------------------------
@@ -176,7 +176,7 @@ def decode_hackathon(data: JSONObject) -> Hackathon:
         displayed_location=decode_displayed_location(
             _require_dict_value(loc_raw, "displayed_location")
         ),
-        open_state=_require_state(data, "open_state"),
+        open_state=require_member(data, "open_state", HackathonState),
         time_left_to_submission=require_str(data, "time_left_to_submission"),
         submission_period_dates=require_str(data, "submission_period_dates"),
         themes=tuple(

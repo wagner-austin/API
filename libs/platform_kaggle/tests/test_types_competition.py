@@ -7,6 +7,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 
 from platform_kaggle.types import (
     Competition,
+    CompetitionCategory,
     decode_competition,
     encode_competition,
 )
@@ -21,7 +22,7 @@ class TestCompetition:
         comp = Competition(
             ref="test-comp",
             title="Test Competition",
-            category="Playground",
+            category=CompetitionCategory.PLAYGROUND,
             reward="Knowledge",
             deadline="2025-12-31",
             team_count=100,
@@ -31,7 +32,7 @@ class TestCompetition:
         )
         assert comp.ref == "test-comp"
         assert comp.title == "Test Competition"
-        assert comp.category == "Playground"
+        assert comp.category is CompetitionCategory.PLAYGROUND
         assert comp.reward == "Knowledge"
         assert comp.deadline == "2025-12-31"
         assert comp.team_count == 100
@@ -44,7 +45,7 @@ class TestCompetition:
         comp1 = Competition(
             ref="test",
             title="Test",
-            category="Playground",
+            category=CompetitionCategory.PLAYGROUND,
             reward="Knowledge",
             deadline="2025-12-31",
             team_count=100,
@@ -55,7 +56,7 @@ class TestCompetition:
         comp2 = Competition(
             ref="test",
             title="Test",
-            category="Playground",
+            category=CompetitionCategory.PLAYGROUND,
             reward="Knowledge",
             deadline="2025-12-31",
             team_count=100,
@@ -66,7 +67,7 @@ class TestCompetition:
         comp3 = Competition(
             ref="other",
             title="Test",
-            category="Playground",
+            category=CompetitionCategory.PLAYGROUND,
             reward="Knowledge",
             deadline="2025-12-31",
             team_count=100,
@@ -82,7 +83,7 @@ class TestCompetition:
         original = Competition(
             ref="test-comp",
             title="Test Competition",
-            category="Featured",
+            category=CompetitionCategory.FEATURED,
             reward="$100,000",
             deadline="2025-08-15",
             team_count=5000,
@@ -96,12 +97,11 @@ class TestCompetition:
 
     def test_decode_competition_all_categories(self) -> None:
         """Test decode_competition handles all valid categories."""
-        categories = ["Featured", "Research", "Playground", "Getting Started", "Masters", "Kudos"]
-        for category in categories:
+        for category in CompetitionCategory:
             data: JSONObject = {
                 "ref": "test",
                 "title": "Test",
-                "category": category,
+                "category": category.value,
                 "reward": "Knowledge",
                 "deadline": "2025-12-31",
                 "team_count": 100,
@@ -110,7 +110,7 @@ class TestCompetition:
                 "url": "https://example.com",
             }
             decoded = decode_competition(data)
-            assert decoded.category == category
+            assert decoded.category is category
 
     def test_decode_competition_invalid_category(self) -> None:
         """Test decode_competition raises on invalid category."""
@@ -125,7 +125,11 @@ class TestCompetition:
             "description": "Test",
             "url": "https://example.com",
         }
-        with pytest.raises(JSONTypeError, match="must be a valid category"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid category 'Invalid': must be one of 'Featured', 'Research', "
+            r"'Recruitment', 'Getting Started', 'Masters', 'Playground', 'Community'$",
+        ):
             decode_competition(data)
 
     def test_decode_competition_missing_field(self) -> None:

@@ -178,7 +178,7 @@ class TranscribeFnProtocol(Protocol):
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         language: str | None = None,
-        task: WhisperTask = "transcribe",
+        task: WhisperTask = WhisperTask.TRANSCRIBE,
         timeout: float | None = None,
     ) -> VerboseResponse:
         """Transcribe or translate audio file."""

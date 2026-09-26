@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from platform_core.json_utils import JSONObject
+from platform_core.members import find_member
 from platform_devpost import (
     HackathonState,
     encode_hackathon,
@@ -20,28 +21,35 @@ from opportunity_radar_api.api.container import ServiceContainer
 # Query parameter defaults as module-level constants
 _THEMES_QUERY: list[str] = []
 _EXCLUDE_QUERY: list[str] = []
-_STATES_QUERY: list[str] = ["open"]
+_STATES_QUERY: list[str] = [HackathonState.OPEN.value]
 
 
 def _parse_states(states: list[str]) -> tuple[HackathonState, ...]:
-    """Parse state strings to HackathonState tuple.
+    """Parse the states query into HackathonState members.
+
+    An unknown word is refused rather than dropped: dropping it used to leave
+    an empty tuple for a query of only unknown words, which the caller reads
+    as "no state filter" and so returned every hackathon in every state.
 
     Args:
-        states: List of state strings.
+        states: The words of the states query parameter.
 
     Returns:
-        Tuple of valid HackathonState values.
+        One member per word, in query order.
+
+    Raises:
+        HTTPException: 400 when a word names no state, naming the word and
+            every admitted one.
     """
     result: list[HackathonState] = []
-    for s in states:
-        if s == "open":
-            result.append("open")
-        elif s == "upcoming":
-            result.append("upcoming")
-        elif s == "ended":
-            result.append("ended")
-        elif s == "submissions":
-            result.append("submissions")
+    for word in states:
+        state = find_member(word, HackathonState)
+        if state is None:
+            admitted = ", ".join(f"'{declared.value}'" for declared in HackathonState)
+            raise HTTPException(
+                status_code=400, detail=f"Invalid state '{word}': must be one of {admitted}"
+            )
+        result.append(state)
     return tuple(result)
 
 

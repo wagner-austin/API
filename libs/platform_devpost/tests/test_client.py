@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from platform_devpost.client import DevpostClient
 from platform_devpost.testing import FakeDevpostApi, hooks, make_fake_hackathon
+from platform_devpost.types import HackathonState
 
 
 class TestDevpostClient:
@@ -38,13 +39,13 @@ class TestDevpostClient:
 
     def test_list_hackathons_with_state(self) -> None:
         """Test list_hackathons filters by state."""
-        h1 = make_fake_hackathon(id=1, open_state="open")
-        h2 = make_fake_hackathon(id=2, open_state="ended")
+        h1 = make_fake_hackathon(id=1, open_state=HackathonState.OPEN)
+        h2 = make_fake_hackathon(id=2, open_state=HackathonState.ENDED)
         fake_api = FakeDevpostApi(hackathons=(h1, h2))
         hooks.devpost_api_factory = lambda: fake_api
 
         client = DevpostClient()
-        result = client.list_hackathons(state="open")
+        result = client.list_hackathons(state=HackathonState.OPEN)
 
         assert len(result) == 1
         assert result[0].id == 1

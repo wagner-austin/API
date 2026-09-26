@@ -7,7 +7,7 @@ from typing import BinaryIO
 
 from platform_stt import _test_hooks
 from platform_stt.testing import reset_hooks
-from platform_stt.types import BinaryFileProtocol, RawVerboseDict
+from platform_stt.types import BinaryFileProtocol, RawVerboseDict, WhisperTask
 from platform_stt.whisper_client import OpenAISttClient
 
 
@@ -268,7 +268,7 @@ class TestOpenAISttClient:
 
         client = OpenAISttClient(api_key="test-key")
         file_obj: BinaryIO = io.BytesIO(b"fake audio")
-        result = client.process(file=file_obj, task="transcribe", language="en")
+        result = client.process(file=file_obj, task=WhisperTask.TRANSCRIBE, language="en")
 
         assert result["text"] == "Transcribed"
         assert transcriptions.calls[0]["language"] == "en"
@@ -288,7 +288,7 @@ class TestOpenAISttClient:
 
         client = OpenAISttClient(api_key="test-key")
         file_obj: BinaryIO = io.BytesIO(b"fake audio")
-        result = client.process(file=file_obj, task="translate")
+        result = client.process(file=file_obj, task=WhisperTask.TRANSLATE)
 
         assert result["text"] == "Translated"
         assert len(translations.calls) == 1

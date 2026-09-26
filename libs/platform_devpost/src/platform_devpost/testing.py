@@ -259,7 +259,7 @@ def make_fake_hackathon(
     thumbnail_url: str = "https://example.com/thumb.jpg",
     organization_name: str = "Test Org",
     displayed_location: DisplayedLocation | None = None,
-    open_state: HackathonState = "open",
+    open_state: HackathonState = HackathonState.OPEN,
     time_left_to_submission: str = "5 days left",
     submission_period_dates: str = "Jan 01 - Feb 01, 2025",
     themes: tuple[Theme, ...] = (),
