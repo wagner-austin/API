@@ -27,10 +27,14 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
+from fleet.core.runner_base_render import LONG_PATHS_KEY
 from fleet.core.script_values import scriptable
 
 #: File name the rendered audit script lands under in the host's scratch_dir.
 AUDIT_SCRIPT_NAME = "fleet-runner-audit.ps1"
+
+#: The row holding a host to long paths, both Win32's and git's.
+LONG_PATHS_CHECK_ID = "long-paths:win32-and-git"
 
 
 class ExpectedCheck(TypedDict):
@@ -121,6 +125,13 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
             check_id=f"execution-policy:LocalMachine:{spec['base']['execution_policy']}",
             reason="a Windows runner's PowerShell steps run scripts from _temp, which the "
             "Restricted default refuses",
+        )
+    )
+    checks.append(
+        ExpectedCheck(
+            check_id=LONG_PATHS_CHECK_ID,
+            reason="CI trees under the runner service's temp directory pass 260 characters, "
+            "which a fresh install refuses",
         )
     )
     if spec["gpu_required"]:
@@ -335,6 +346,10 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         "$Policy = (@(Get-ExecutionPolicy -Scope LocalMachine) -join '')",
         f"Emit 'execution-policy:LocalMachine:{policy}' ($Policy -eq '{policy}') "
         "('Get-ExecutionPolicy -Scope LocalMachine said: ' + $Policy)",
+        f"$LongPaths = (Get-ItemProperty -LiteralPath '{LONG_PATHS_KEY}').LongPathsEnabled",
+        "$GitLongPaths = (@(git config --system --get core.longpaths) -join '')",
+        f"Emit '{LONG_PATHS_CHECK_ID}' ($LongPaths -eq 1 -and $GitLongPaths -eq 'true') "
+        "('LongPathsEnabled=' + $LongPaths + ' git core.longpaths=' + $GitLongPaths)",
     ]
     if spec["gpu_required"]:
         lines += _gpu_check_lines(spec, distro)
@@ -486,6 +501,7 @@ def attempt_audit_host(spec: HostRunnerSpec) -> AuditOutcome:
 
 __all__ = [
     "AUDIT_SCRIPT_NAME",
+    "LONG_PATHS_CHECK_ID",
     "AuditFinding",
     "AuditOutcome",
     "ExpectedCheck",

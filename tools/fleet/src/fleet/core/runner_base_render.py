@@ -44,6 +44,10 @@ WSL_CONF = "[boot]\nsystemd=true\n\n[user]\ndefault=root\n"
 #: msiexec's exit code for "installed; a restart completes it".
 MSI_REBOOT_EXIT = 3010
 
+#: The registry key whose ``LongPathsEnabled`` lifts Win32's 260-character
+#: path limit, read by the Windows base and by the audit.
+LONG_PATHS_KEY = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\FileSystem"
+
 
 def _file_name(url: str) -> str:
     """The last path segment of a download URL.
@@ -150,6 +154,25 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
         f"if ((@(Get-ExecutionPolicy -Scope LocalMachine) -join '') -ne '{policy}') {{",
         f"    Set-ItemProperty -LiteralPath $PolicyKey -Name ExecutionPolicy -Value '{policy}'",
         f"    Write-Output 'set the LocalMachine execution policy to {policy}'",
+        "}",
+        # Long paths, which a fresh Windows install leaves off. Measured on
+        # the reinstalled lavender, 2026-09-26: MCPs CI's supervisor Pester
+        # case extracts a tree under NETWORK SERVICE's temp directory, whose
+        # paths pass 260 characters, and CreateDirectory failed with 'Could
+        # not find a part of the path' until LongPathsEnabled was 1; git's
+        # own checkout needs core.longpaths for the same trees.
+        f"$FileSystemKey = '{LONG_PATHS_KEY}'",
+        "if ((Get-ItemProperty -LiteralPath $FileSystemKey).LongPathsEnabled -ne 1) {",
+        "    Set-ItemProperty -LiteralPath $FileSystemKey -Name LongPathsEnabled -Value 1 "
+        "-Type DWord",
+        "    Write-Output 'enabled Win32 long paths'",
+        "}",
+        "if ((@(git config --system --get core.longpaths) -join '') -ne 'true') {",
+        "    git config --system core.longpaths true",
+        "    if ($LASTEXITCODE -ne 0) {",
+        "        throw ('git config --system core.longpaths exited ' + $LASTEXITCODE)",
+        "    }",
+        "    Write-Output 'set git core.longpaths for the system'",
         "}",
     ]
     for raw_entry in base["machine_path_entries"]:
@@ -280,6 +303,7 @@ def render_linux_base_script(spec: HostRunnerSpec) -> str:
 
 
 __all__ = [
+    "LONG_PATHS_KEY",
     "MSI_REBOOT_EXIT",
     "REBOOT_MARKER",
     "WSLCONF_CHANGED_MARKER",
