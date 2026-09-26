@@ -27,10 +27,18 @@ from typing import Final
 
 import pytest
 from platform_core.config import config_test_hooks
+from platform_core.journal_cursor import (
+    cursor_path,
+    file_is_present,
+    read_file_bytes,
+    read_offset,
+    write_file_text,
+    write_offset,
+)
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from lock_wake import _test_hooks
-from lock_wake.identity import TASK_ID_VARIABLE
+from lock_wake.identity import CURSOR_READER, TASK_ID_VARIABLE
 
 #: The standing task id every configured test posts into.
 TASK_ID: Final = "0b892f1e-0000-4000-8000-00000000c0de"
@@ -94,6 +102,28 @@ def stage_journal(tmp_path: pathlib.Path, content: bytes) -> pathlib.Path:
     journal = tmp_path / ".fleet-events.jsonl"
     journal.write_bytes(content)
     return journal
+
+
+def offset_of(journal: pathlib.Path) -> int:
+    """This bridge's recorded position in a journal, as the cycle reads it.
+
+    Args:
+        journal: The journal's path.
+
+    Returns:
+        The offset in its cursor file, 0 when the file was never written.
+    """
+    return read_offset(file_is_present, read_file_bytes, cursor_path(journal, CURSOR_READER))
+
+
+def set_offset(journal: pathlib.Path, offset: int) -> None:
+    """Record this bridge's position in a journal, as the cycle writes it.
+
+    Args:
+        journal: The journal's path.
+        offset: The offset to record.
+    """
+    write_offset(write_file_text, cursor_path(journal, CURSOR_READER), offset)
 
 
 def check_journal_path(tmp_path: pathlib.Path) -> pathlib.Path:

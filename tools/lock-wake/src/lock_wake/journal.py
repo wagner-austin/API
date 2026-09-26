@@ -7,14 +7,13 @@ docstring states the subscription contract this module implements: "a
 subscriber keeps a byte offset, reads from it, and cannot miss a transition
 at any polling interval, because nothing is ever overwritten."
 
-TORN TAILS ARE EXPECTED, NOT ERRORS. The writer may be mid-append when this
-process reads, so the bytes after the last newline are a line that does not
-exist yet. The reader consumes exactly through the last complete line and
-reports the offset just past it; the torn tail is read whole on the next
-cycle. That is cursor discipline, not tolerance -- a COMPLETE line that
-fails to decode is fatal and names itself, because a skipped transition is
-a cascade nobody was told about, which is the blindness the journal exists
-to remove.
+THE CURSOR IS SHARED; THE DECODE IS THIS PACKAGE'S. Reading complete lines
+from a byte offset, torn tails left for the next cycle, is
+:func:`platform_core.journal_cursor.read_complete_lines`, lifted out of
+this module (MCPs board task ebc80a03). What stays here is the fleet
+journal's own line shape. A COMPLETE line that fails to decode is fatal and
+names itself, because a skipped transition is a cascade nobody was told
+about, which is the blindness the journal exists to remove.
 
 ONE FIELD IS ABSENT FROM HISTORY. ``agent`` joined the journal on
 2026-09-09 (MCPs ``66b85d32``) so a publisher can @mention whoever started
@@ -29,6 +28,7 @@ from __future__ import annotations
 import pathlib
 from typing import Final, Literal
 
+from platform_core.journal_cursor import read_complete_lines
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
@@ -237,7 +237,7 @@ def decode_lock_event(value: JSONValue, line_number: int) -> LockEvent:
 
 
 def read_journal_slice(journal: pathlib.Path, offset: int) -> JournalSlice:
-    """Read every complete journal line at or past a byte offset.
+    """Read and decode every complete journal line at or past a byte offset.
 
     Args:
         journal: The journal's path.
@@ -245,46 +245,27 @@ def read_journal_slice(journal: pathlib.Path, offset: int) -> JournalSlice:
             file; 0 for a bridge that has never run.
 
     Returns:
-        The decoded events and the offset just past the last complete
-        line. An absent journal reads as empty at offset 0 rather than
-        raising: a machine whose fleet has never taken a lock has no
-        journal, and refusing the first cycle for that would make the
-        bridge impossible to start.
+        The decoded events and the offset just past the last complete line,
+        per :func:`platform_core.journal_cursor.read_complete_lines`: an
+        absent journal (a machine whose fleet has never taken a lock) reads
+        as empty at offset 0.
 
     Raises:
         JSONTypeError: A complete line that is not a valid event.
         InvalidJsonError: A complete line that is not JSON at all.
-        ValueError: An offset past the end of the journal -- the journal
-            was truncated or replaced, and silently rewinding would
-            re-announce history; the operator decides, not this reader.
+        ValueError: A position into an absent journal or past its end --
+            the journal was deleted, truncated or replaced, and the
+            operator decides, not this reader.
         OSError: A journal that exists but cannot be read.
     """
-    if not _test_hooks.file_exists(journal):
-        if offset != 0:
-            raise ValueError(
-                f"position says byte {offset} of {journal}, but the journal is absent; "
-                f"it was deleted or moved, and rewinding silently would re-announce "
-                f"every cascade in history"
-            )
-        return JournalSlice(events=(), next_offset=0)
-    data = _test_hooks.read_bytes(journal)
-    if offset > len(data):
-        raise ValueError(
-            f"position says byte {offset} of {journal}, but the journal holds only "
-            f"{len(data)} bytes; it was truncated or replaced, and rewinding silently "
-            f"would re-announce every cascade in history"
-        )
-    window = data[offset:]
-    last_newline = window.rfind(b"\n")
-    if last_newline == -1:
-        return JournalSlice(events=(), next_offset=offset)
-    complete = window[: last_newline + 1]
-    events: list[LockEvent] = []
-    for line_number, raw in enumerate(complete.decode("utf-8").splitlines(), start=1):
-        if raw.strip() == "":
-            continue
-        events.append(decode_lock_event(load_json_str(raw), line_number))
-    return JournalSlice(events=tuple(events), next_offset=offset + last_newline + 1)
+    lines = read_complete_lines(_test_hooks.file_exists, _test_hooks.read_bytes, journal, offset)
+    return JournalSlice(
+        events=tuple(
+            decode_lock_event(load_json_str(line["text"]), line["number"])
+            for line in lines["lines"]
+        ),
+        next_offset=lines["next_offset"],
+    )
 
 
 def require_check_rows(events: tuple[LockEvent, ...], journal: pathlib.Path) -> None:

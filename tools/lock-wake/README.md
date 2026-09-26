@@ -36,6 +36,10 @@ The position is a byte offset kept beside the journal
 (`.fleet-events.jsonl.lock-wake-offset.json`), per the journal's own
 subscription contract. Torn tails from a mid-append writer are left for the
 next cycle; a complete line that fails to decode is fatal, never skipped.
+The cursor itself (the offset file and the complete-line reader) is
+`platform_core.journal_cursor`, lifted out of this package when
+`tools/fleet-health-wake` needed the same one (MCPs board task `ebc80a03`);
+what stays here is the lock journal's line decoder and the announcement.
 
 ## The noise budget (board 9406cfd9, acceptance 6)
 

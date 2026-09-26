@@ -11,11 +11,11 @@ from platform_core.mcp_testing import FakeHttpPost, announcing_poster
 
 from lock_wake import _test_hooks
 from lock_wake.cli import wake
-from lock_wake.position import position_path, read_offset
 from tests.conftest import (
     CONFIGURED_ENV,
     check_journal_path,
     journal_line,
+    offset_of,
     pin_env,
     stage_journal,
 )
@@ -35,7 +35,7 @@ class TestMain:
 
         checks = check_journal_path(tmp_path)
         assert wake.main(["--journal", str(journal), "--check-journal", str(checks)]) == 0
-        assert read_offset(position_path(journal)) == len(content)
+        assert offset_of(journal) == len(content)
 
     def test_a_missing_journal_flag_refuses(self) -> None:
         with pytest.raises(ValueError, match="--journal"):

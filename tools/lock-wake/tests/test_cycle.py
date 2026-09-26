@@ -17,13 +17,14 @@ from platform_core.mcp_testing import (
 from lock_wake import _test_hooks
 from lock_wake.cycle import run_cycle
 from lock_wake.identity import BRIDGE_AGENT, HARNESS, IDENTITY, PURPOSE
-from lock_wake.position import position_path, read_offset, write_offset
 from tests.conftest import (
     CONFIGURED_ENV,
     TASK_ID,
     check_journal_path,
     journal_line,
+    offset_of,
     pin_env,
+    set_offset,
     stage_check_journal,
     stage_journal,
 )
@@ -67,7 +68,7 @@ class TestRunCycle:
         body = require_str(arguments, "body")
         assert "FLEET-LOCK: 1 hold(s) transitioned" in body
         assert "RELEASED after 165s" in body
-        assert read_offset(position_path(journal)) == len(COMPLETED_HOLD.encode("utf-8"))
+        assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
         assert emitted == [
             "posted 1 hold(s) and 0 check run(s) from 3 line(s): tagged @opus-mosh-reboot-0909"
         ]
@@ -87,8 +88,8 @@ class TestRunCycle:
         with pytest.raises(AppError):
             run_cycle(journal, checks)
 
-        assert read_offset(position_path(journal)) == 0
-        assert read_offset(position_path(checks)) == 0
+        assert offset_of(journal) == 0
+        assert offset_of(checks) == 0
         assert emitted == []
 
     def test_the_second_cycle_repeats_what_the_first_failed_to_mark(
@@ -108,15 +109,14 @@ class TestRunCycle:
         run_cycle(journal, checks)
 
         assert len(notes_sent(retry_poster)) == 1
-        assert read_offset(position_path(journal)) == len(COMPLETED_HOLD.encode("utf-8"))
+        assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
 
     def test_quiet_journals_post_nothing_and_say_so(
         self, tmp_path: pathlib.Path, emitted: list[str]
     ) -> None:
         pin_env(CONFIGURED_ENV)
         journal = stage_journal(tmp_path, COMPLETED_HOLD.encode("utf-8"))
-        marks = position_path(journal)
-        write_offset(marks, len(COMPLETED_HOLD.encode("utf-8")))
+        set_offset(journal, len(COMPLETED_HOLD.encode("utf-8")))
         poster = FakeHttpPost([])
         _test_hooks.http_post = poster
 
@@ -141,7 +141,7 @@ class TestRunCycle:
         run_cycle(journal, check_journal_path(tmp_path))
 
         assert poster.bodies == []
-        assert read_offset(position_path(journal)) == len(content)
+        assert offset_of(journal) == len(content)
         assert emitted == [f"2 progress line(s), no boundary; offsets {len(content)} and 0"]
 
     def test_an_unlabelled_hold_posts_unaddressed_and_says_so(
@@ -173,8 +173,8 @@ class TestRunCycle:
         body = require_str(notes_sent(poster)[0], "body")
         assert "CHECKS: 1 make test run(s) finished" in body
         assert "@" not in body
-        assert read_offset(position_path(checks)) == len(CHECK_RUN.encode("utf-8"))
-        assert read_offset(position_path(journal)) == 0
+        assert offset_of(checks) == len(CHECK_RUN.encode("utf-8"))
+        assert offset_of(journal) == 0
         assert emitted == ["posted 0 hold(s) and 1 check run(s) from 1 line(s): unaddressed"]
 
     def test_a_hold_and_a_check_run_share_one_post_and_both_offsets_advance(
@@ -192,8 +192,8 @@ class TestRunCycle:
         body = require_str(note, "body")
         assert "FLEET-LOCK: 1 hold(s) transitioned" in body
         assert "CHECKS: 1 make test run(s) finished" in body
-        assert read_offset(position_path(journal)) == len(COMPLETED_HOLD.encode("utf-8"))
-        assert read_offset(position_path(checks)) == len(CHECK_RUN.encode("utf-8"))
+        assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
+        assert offset_of(checks) == len(CHECK_RUN.encode("utf-8"))
 
     def test_a_lock_transition_in_the_check_journal_is_refused(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -206,7 +206,7 @@ class TestRunCycle:
         with pytest.raises(JSONTypeError, match="acquired, released, step rows"):
             run_cycle(journal, checks)
 
-        assert read_offset(position_path(checks)) == 0
+        assert offset_of(checks) == 0
         assert emitted == []
 
     def test_missing_credentials_refuse_before_any_read(

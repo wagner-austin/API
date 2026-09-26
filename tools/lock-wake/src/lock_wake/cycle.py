@@ -26,12 +26,12 @@ import pathlib
 
 from board_watch.config import load_credentials
 from platform_core.board import post_to_task, register_service_session
+from platform_core.journal_cursor import cursor_path, read_offset, write_offset
 
 from lock_wake import _test_hooks
 from lock_wake.announce import announcement
-from lock_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
+from lock_wake.identity import CURSOR_READER, HARNESS, IDENTITY, PURPOSE, load_task_id
 from lock_wake.journal import read_journal_slice, require_check_rows
-from lock_wake.position import position_path, read_offset, write_offset
 
 
 def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
@@ -66,10 +66,14 @@ def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
     credentials = load_credentials()
     task_id = load_task_id()
 
-    marks = position_path(journal)
-    check_marks = position_path(check_journal)
-    journal_slice = read_journal_slice(journal, read_offset(marks))
-    check_slice = read_journal_slice(check_journal, read_offset(check_marks))
+    marks = cursor_path(journal, CURSOR_READER)
+    check_marks = cursor_path(check_journal, CURSOR_READER)
+    journal_slice = read_journal_slice(
+        journal, read_offset(_test_hooks.file_exists, _test_hooks.read_bytes, marks)
+    )
+    check_slice = read_journal_slice(
+        check_journal, read_offset(_test_hooks.file_exists, _test_hooks.read_bytes, check_marks)
+    )
     require_check_rows(check_slice["events"], check_journal)
     events = journal_slice["events"] + check_slice["events"]
     offsets = f"offsets {journal_slice['next_offset']} and {check_slice['next_offset']}"
@@ -79,8 +83,8 @@ def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
 
     post = announcement(events)
     if post is None:
-        write_offset(marks, journal_slice["next_offset"])
-        write_offset(check_marks, check_slice["next_offset"])
+        write_offset(_test_hooks.write_text, marks, journal_slice["next_offset"])
+        write_offset(_test_hooks.write_text, check_marks, check_slice["next_offset"])
         _test_hooks.emit(f"{len(events)} progress line(s), no boundary; {offsets}")
         return
 
@@ -105,8 +109,8 @@ def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
         kind="note",
         body=post["body"],
     )
-    write_offset(marks, journal_slice["next_offset"])
-    write_offset(check_marks, check_slice["next_offset"])
+    write_offset(_test_hooks.write_text, marks, journal_slice["next_offset"])
+    write_offset(_test_hooks.write_text, check_marks, check_slice["next_offset"])
     tagged = " ".join(f"@{agent}" for agent in post["agents"])
     _test_hooks.emit(
         f"posted {post['holds']} hold(s) and {post['checks']} check run(s) "

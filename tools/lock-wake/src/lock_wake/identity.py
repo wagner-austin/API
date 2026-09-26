@@ -28,6 +28,13 @@ _SESSION_NAME: Final = "corvis:lock-wake:bridge"
 #: What the board records as this bridge's location.
 _CWD: Final = "service://lock-wake"
 
+#: The reader name the journal cursor files carry
+#: (:func:`platform_core.journal_cursor.cursor_path`), so each position is
+#: ``<journal>.lock-wake-offset.json``. NEVER EDIT: the position files on the
+#: hub already carry this name, and a different one reads as a bridge that
+#: never ran, which re-announces every transition in both journals.
+CURSOR_READER: Final = "lock-wake"
+
 #: Environment variable naming the standing board task announcements go to.
 TASK_ID_VARIABLE: Final = "LOCK_WAKE_TASK_ID"
 
@@ -66,6 +73,7 @@ def load_task_id() -> str:
 
 __all__ = [
     "BRIDGE_AGENT",
+    "CURSOR_READER",
     "IDENTITY",
     "TASK_ID_VARIABLE",
     "load_task_id",

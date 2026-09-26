@@ -12,10 +12,13 @@ cannot be unbound by anyone.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from platform_core.errors import AppError
+from platform_core.journal_cursor import cursor_path
 
-from lock_wake.identity import BRIDGE_AGENT, IDENTITY, load_task_id
+from lock_wake.identity import BRIDGE_AGENT, CURSOR_READER, IDENTITY, load_task_id
 from tests.conftest import CONFIGURED_ENV, TASK_ID, pin_env
 
 
@@ -31,6 +34,14 @@ class TestIdentity:
         """A service has no directory a person could open, and recording one
         would put a path on the board that resolves nowhere."""
         assert IDENTITY["cwd"] == "service://lock-wake"
+
+    def test_the_cursor_files_keep_the_name_the_hub_already_holds(self) -> None:
+        """Pinned: the hub's position files are named from this, and a new
+        name reads as a bridge that never ran and re-announces history."""
+        journal = pathlib.Path("C:/Users/Test/PROJECTS/MCPs/.fleet-events.jsonl")
+        assert cursor_path(journal, CURSOR_READER) == pathlib.Path(
+            "C:/Users/Test/PROJECTS/MCPs/.fleet-events.jsonl.lock-wake-offset.json"
+        )
 
 
 class TestLoadTaskId:

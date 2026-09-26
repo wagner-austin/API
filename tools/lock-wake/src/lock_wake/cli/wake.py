@@ -10,7 +10,7 @@ visible, for the same reason no sibling bridge carries a loop.
 THE JOURNAL IS NAMED, NOT DISCOVERED: it lives in another repository's
 root, and a bridge that guessed at repo layout would break the day the
 layout moved while reading as a quiet fleet. The position file derives
-from the journal's path (:func:`lock_wake.position.position_path`), so
+from the journal's path (:func:`platform_core.journal_cursor.cursor_path`), so
 the two cannot disagree. Both journals are required: the check journal is
 the MCPs check lock's record of finished ``make test`` runs, beside the
 fleet journal in the same clone root (MCPs board task ea2ea29c).
