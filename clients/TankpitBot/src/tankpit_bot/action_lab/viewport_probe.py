@@ -59,6 +59,7 @@ from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol import try_decode_plaintext_ack
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -179,7 +180,7 @@ class ViewportProbe(ProbeBase):
                 unverified and the probe must not continue guessing.
         """
         for captured in self.messages[start_index:]:
-            if captured["direction"] != "received":
+            if captured["direction"] is not MessageDirection.RECEIVED:
                 continue
             for body in split_payload_frames(captured["payload"]):
                 ack = try_decode_plaintext_ack(body)

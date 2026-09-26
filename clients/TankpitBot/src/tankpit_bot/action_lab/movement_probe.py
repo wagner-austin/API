@@ -30,6 +30,7 @@ from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 log = get_logger(__name__)
 _POLL_INTERVAL_MS = 100.0
@@ -72,9 +73,9 @@ def _find_first_sent_label_timestamp(
 ) -> int | None:
     """Return the first sent-frame timestamp with the requested label."""
     for message in messages[start_index:]:
-        if message["direction"] != "sent":
+        if message["direction"] is not MessageDirection.SENT:
             continue
-        if message.get("sent_origin") != "bot_injected":
+        if message.get("sent_origin") is not SentFrameOrigin.BOT_INJECTED:
             continue
         if message.get("sent_label") != label:
             continue

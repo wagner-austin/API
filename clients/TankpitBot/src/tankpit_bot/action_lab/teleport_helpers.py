@@ -18,6 +18,7 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.decoders import decode_message
+from tankpit_bot.types.literals import MessageDirection, SentFrameOrigin
 
 log = get_logger(__name__)
 _TELEPORT_POLL_INTERVAL_MS = 100.0
@@ -31,7 +32,7 @@ def _format_attempt_window_entries(
     provider: action_session.BufferedWorldStateProviderProtocol,
     *,
     message_start_index: int,
-    direction: Literal["sent", "received"],
+    direction: MessageDirection,
     limit: int = 6,
 ) -> str:
     """Return a compact decoded message window summary for one attempt."""
@@ -39,21 +40,25 @@ def _format_attempt_window_entries(
     magic = provider.magic
     entries: list[str] = []
     for index, message in enumerate(messages[message_start_index:], start=message_start_index):
-        if message["direction"] != direction:
+        if message["direction"] is not direction:
             continue
         decoded = decode_message(provider.world, message["payload"], direction, magic)
-        if direction == "sent":
+        if direction is MessageDirection.SENT:
             sent_origin = message.get("sent_origin")
             sent_label = message.get("sent_label")
-            if sent_origin == "bot_injected" and sent_label is not None and sent_label != "":
+            if (
+                sent_origin is SentFrameOrigin.BOT_INJECTED
+                and sent_label is not None
+                and sent_label != ""
+            ):
                 decoded = f"{decoded} origin=bot_injected label={sent_label}"
-            elif sent_origin == "page_client":
+            elif sent_origin is SentFrameOrigin.PAGE_CLIENT:
                 decoded = f"{decoded} origin=page_client"
         entries.append(f"{index}:{decoded}")
         if len(entries) >= limit:
             break
     total = sum(
-        1 for message in messages[message_start_index:] if message["direction"] == direction
+        1 for message in messages[message_start_index:] if message["direction"] is direction
     )
     if not entries:
         return "none"
@@ -103,12 +108,12 @@ def _log_teleport_attempt_diagnostic(
         sent=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
-            direction="sent",
+            direction=MessageDirection.SENT,
         ),
         received=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
         ),
         page=_format_page_snapshots(page_snapshots),
     )
@@ -126,9 +131,11 @@ def _find_map_data_message_index(
     for index, message in enumerate(messages[scan_start_index:], start=scan_start_index):
         if index < message_start_index:
             continue
-        if message["direction"] != "received":
+        if message["direction"] is not MessageDirection.RECEIVED:
             continue
-        decoded = decode_message(provider.world, message["payload"], "received", magic)
+        decoded = decode_message(
+            provider.world, message["payload"], MessageDirection.RECEIVED, magic
+        )
         if "MAP_DATA" in decoded:
             return index
     return None
@@ -159,12 +166,12 @@ def _emit_teleport_attempt_diagnostic(
         sent_window=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
-            direction="sent",
+            direction=MessageDirection.SENT,
         ),
         received_window=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
         ),
         page_snapshots=_format_page_snapshots(page_snapshots),
         page_snapshot_count=len(page_snapshots),
