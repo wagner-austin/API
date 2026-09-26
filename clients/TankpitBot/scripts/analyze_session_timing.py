@@ -16,6 +16,7 @@ from typing_extensions import TypedDict
 from scripts import _test_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.types import CapturedMessage, decode_captured_message
+from tankpit_bot.types.literals import MessageDirection
 
 
 class CommandTimingDict(TypedDict):
@@ -91,7 +92,7 @@ def _extract_timings(messages: list[CapturedMessage]) -> list[CommandTimingDict]
     """
     timings: list[CommandTimingDict] = []
     for i, msg in enumerate(messages):
-        if msg["direction"] != "sent":
+        if msg["direction"] is not MessageDirection.SENT:
             continue
         label = msg.get("sent_label", "")
         if not label:
@@ -100,7 +101,7 @@ def _extract_timings(messages: list[CapturedMessage]) -> list[CommandTimingDict]
         latency_ms = 0
         for j in range(i + 1, min(i + 50, len(messages))):
             resp = messages[j]
-            if resp["direction"] == "received":
+            if resp["direction"] is MessageDirection.RECEIVED:
                 response_ms = resp["timestamp_ms"]
                 latency_ms = response_ms - msg["timestamp_ms"]
                 break

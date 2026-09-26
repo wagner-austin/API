@@ -20,6 +20,7 @@ from tankpit_bot.sniffer.constants import TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.decoders import decode_text_message, try_decode_binary
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import decode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -128,7 +129,7 @@ def main() -> None:
 
         result = (
             _decode_sent(ws, payload, xor_table)
-            if direction == "sent"
+            if direction is MessageDirection.SENT
             else _decode_received(ws, payload, xor_table)
         )
 
