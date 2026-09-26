@@ -32,6 +32,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.sniffer.world_service import WorldService
@@ -72,7 +73,7 @@ def decide(
     """
     normalized_state = _normalize_ai_state(ai_state)
     manual = resolve_owner_from_manual(normalized_state)
-    if manual == "UNSET":
+    if manual is AIMode.UNSET:
         emit_ai("manual mode UNSET: holding position")
         return make_hold_decision(
             normalized_state,
@@ -93,12 +94,12 @@ def decide(
         ws=ws,
     )
     mode = _resolve_owner_mode(ctx, manual)
-    if mode == "COLLECT":
+    if mode is AIMode.COLLECT:
         collect_decision = decide_collect_mode(ctx)
         if collect_decision is not None:
             owned = apply_mode_to_decision(
                 collect_decision,
-                "COLLECT",
+                AIMode.COLLECT,
                 derive_collect_mode_state(collect_decision),
                 timestamp_ms,
             )
@@ -123,7 +124,7 @@ def decide(
     decision = decide_hunt_mode(ctx)
     owned = apply_mode_to_decision(
         decision,
-        "HUNT",
+        AIMode.HUNT,
         derive_hunt_mode_state(decision),
         timestamp_ms,
     )
@@ -168,10 +169,8 @@ def _resolve_owner_mode(ctx: DecideCtx, manual: AIMode | None) -> AIMode:
         skip auto-arbitration; ``None`` delegates to
         :func:`_select_owner_mode`.
     """
-    if manual == "HUNT":
-        return "HUNT"
-    if manual == "COLLECT":
-        return "COLLECT"
+    if manual is AIMode.HUNT or manual is AIMode.COLLECT:
+        return manual
     return _select_owner_mode(ctx)
 
 
@@ -186,7 +185,7 @@ def _normalize_ai_state(ai_state: AIStateDict) -> AIStateDict:
         same state with durable ownership reset to ``UNSET``.
     """
     if is_valid_ai_mode_state(ai_state["mode"], ai_state["mode_state"]):
-        if ai_state["mode"] == "UNSET" and ai_state["combat_target_id"] != -1:
+        if ai_state["mode"] is AIMode.UNSET and ai_state["combat_target_id"] != -1:
             return _migrate_unset_combat_state(ai_state)
         return ai_state
     if ai_state["combat_target_id"] != -1:
@@ -233,16 +232,16 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
         SessionExitError: ``session_complete`` when winding down and
             fully stocked — the clean exit.
     """
-    if ctx.config["role"] == "gatherer":
+    if ctx.config["role"] is FleetRole.GATHERER:
         # A gatherer never hunts ([[fleet-coordination]], fleet ruling
         # 2026-08-14): its ticks belong to the COLLECT cascade — scan,
         # sweep, hop — roaming the map and publishing what it finds
         # for the fighters of its color.
-        return "COLLECT"
+        return AIMode.COLLECT
     if ctx.ai_state["wind_down"]:
         target = ctx.world["tanks"].get(str(ctx.ai_state["combat_target_id"]))
         finishing_kill = (
-            ctx.mode == "HUNT"
+            ctx.mode is AIMode.HUNT
             and target is not None
             and target["liveness"] is TankLiveness.ALIVE
             and not should_exit_hunt(ctx)
@@ -251,21 +250,21 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
             # Never abandon a fight in progress (user rulings 2026-07-25
             # and 2026-07-26): the current kill completes; the break
             # thresholds still protect, and no NEW target is acquired.
-            return "HUNT"
+            return AIMode.HUNT
         if should_exit_collect(ctx):
             raise SessionExitError(
                 SessionExitReason.SESSION_COMPLETE,
                 f"wound down fully stocked at fuel={ctx.fuel}",
             )
-        return "COLLECT"
+        return AIMode.COLLECT
     current_mode = ctx.mode
-    if current_mode == "COLLECT" and not should_exit_collect(ctx):
-        return "COLLECT"
-    if current_mode == "HUNT" and not should_exit_hunt(ctx):
-        return "HUNT"
+    if current_mode is AIMode.COLLECT and not should_exit_collect(ctx):
+        return AIMode.COLLECT
+    if current_mode is AIMode.HUNT and not should_exit_hunt(ctx):
+        return AIMode.HUNT
     if should_enter_hunt(ctx):
-        return "HUNT"
-    return "COLLECT"
+        return AIMode.HUNT
+    return AIMode.COLLECT
 
 
 def _migrate_unset_combat_state(ai_state: AIStateDict) -> AIStateDict:
@@ -277,13 +276,13 @@ def _migrate_unset_combat_state(ai_state: AIStateDict) -> AIStateDict:
     Returns:
         AI state migrated into durable HUNT ownership.
     """
-    migrated_mode_state: AIModeState = "REFRESH"
+    migrated_mode_state = AIModeState.REFRESH
     if ai_state["last_shot_target_id"] == ai_state["combat_target_id"]:
-        migrated_mode_state = "ENGAGE"
+        migrated_mode_state = AIModeState.ENGAGE
     return AIStateDict(
         **{
             **ai_state,
-            "mode": "HUNT",
+            "mode": AIMode.HUNT,
             "mode_state": migrated_mode_state,
             "mode_started_ms": 0,
         }

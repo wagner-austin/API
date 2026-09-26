@@ -43,6 +43,7 @@ from tankpit_bot.fleetshare import (
     read_team_reports,
     write_fleet_report,
 )
+from tankpit_bot.fleetshare.types import EngagementDoctrine
 from tankpit_bot.ledger.damage_book import total_fuel
 from tankpit_bot.ledger.decision import latest_decision_event_id
 from tankpit_bot.ledger.mode_transition import emit_mode_transition
@@ -54,6 +55,7 @@ from tankpit_bot.runtime_logging import (
 )
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import SelfStateDict
+from tankpit_bot.types.modes import AIMode
 
 log = get_logger(__name__)
 
@@ -180,7 +182,7 @@ def _tick_once(bot: Bot) -> None:
     bot._entity_alignment.maybe_emit(
         world,
         snapshot,
-        in_combat=bot._ai_state["mode"] == "HUNT",
+        in_combat=bot._ai_state["mode"] is AIMode.HUNT,
     )
     bot._client_structure.maybe_emit(bot._require_cdp())
     # Account-wide ground truth (lifetime kills, play time, promotion
@@ -299,7 +301,8 @@ def _exchange_fleet_knowledge(bot: Bot) -> None:
     self_state = bot.world.world_state["self_state"]
     inventory = get_inventory_state(bot.world)
     war_ready = (
-        bot._ai_state["config"]["doctrine"] in ("skirmish", "swarm")
+        bot._ai_state["config"]["doctrine"]
+        in (EngagementDoctrine.SKIRMISH, EngagementDoctrine.SWARM)
         and self_state is not None
         and wartime_inventory_ready(
             inventory["dual_shots"]["count"],
