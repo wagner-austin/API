@@ -11,6 +11,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot.facts.provenance import make_provenance
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state.types import (
     WorldStateDict,
     coord_key,
@@ -52,7 +53,7 @@ def add_mine(
         team=team,
         source=EntitySource.VIEWPORT,
         timestamp_ms=timestamp_ms,
-        provenance=make_provenance("wire_0x4B_mine_placement", []),
+        provenance=make_provenance(FactSource.WIRE_0X4B_MINE_PLACEMENT, []),
     )
 
     key = coord_key(x, y)
@@ -200,7 +201,7 @@ def merge_mine_sighting(
         team=team,
         source=EntitySource.WORLD_STATE,
         timestamp_ms=observed_ms,
-        provenance=make_provenance("fleet_report", []),
+        provenance=make_provenance(FactSource.FLEET_REPORT, []),
     )
     new_mines = dict(state["mines"])
     new_mines[key] = new_mine

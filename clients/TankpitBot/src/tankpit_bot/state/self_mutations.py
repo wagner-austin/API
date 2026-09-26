@@ -51,7 +51,7 @@ def update_self_from_movement_response(
         fuel=state["self_state"]["fuel"] if state["self_state"] else 0,
         leaderboard_position=leaderboard_position,
         observed_ms=timestamp_ms,
-        provenance=make_provenance("wire_0x3D_movement", []),
+        provenance=make_provenance(FactSource.WIRE_0X3D_MOVEMENT, []),
     )
     return WorldStateDict(
         self_state=new_self,
@@ -70,7 +70,7 @@ def update_self_position(
     x: int,
     y: int,
     timestamp_ms: int,
-    fact_source: FactSource = "wire_0x3D_movement",
+    fact_source: FactSource = FactSource.WIRE_0X3D_MOVEMENT,
 ) -> WorldStateDict:
     """Update self position without changing viewport bounds.
 
@@ -184,7 +184,7 @@ def set_self_fuel(
     state: WorldStateDict,
     fuel: int,
     timestamp_ms: int,
-    fact_source: FactSource = "wire_0x2E_tank_status_sync",
+    fact_source: FactSource = FactSource.WIRE_0X2E_TANK_STATUS_SYNC,
 ) -> WorldStateDict:
     """Set self fuel to absolute value (from inventory or sync messages).
 
@@ -247,7 +247,7 @@ def set_self_rank(
         self_state has been established yet (rank can't precede join)
         or the rank already matches.
     """
-    return update_self_rank(state, rank, timestamp_ms, "wire_0x2B_promotion")
+    return update_self_rank(state, rank, timestamp_ms, FactSource.WIRE_0X2B_PROMOTION)
 
 
 __all__ = [
