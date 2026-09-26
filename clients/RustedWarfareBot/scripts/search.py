@@ -36,7 +36,6 @@ from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.harness.cluster_round import ClusterRound
 from rw_bot.harness.margin import batch_margins
 from rw_bot.harness.search import (
-    Candidate,
     apply_moves,
     candidate_label,
     effective_space,
@@ -110,7 +109,7 @@ def round_seeds(rng_seed: int, round_index: int, pairs: int) -> tuple[int, ...]:
 
 
 def round_job_lines(
-    survivors: Sequence[Candidate],
+    survivors: Sequence[tuple[tuple[str, int], ...]],
     seeds: Sequence[int],
     variant_dir: Path,
     spec: SearchSpec,
@@ -138,7 +137,9 @@ def round_job_lines(
     return tuple(lines)
 
 
-def write_variants(survivors: Sequence[Candidate], variant_dir: Path, base_path: Path) -> None:
+def write_variants(
+    survivors: Sequence[tuple[tuple[str, int], ...]], variant_dir: Path, base_path: Path
+) -> None:
     """Write every surviving candidate's doctrine file.
 
     Args:
@@ -320,7 +321,7 @@ def run_search(
     base_path = Path(spec["base"])
     base = parse_doctrine_lines(base_path.read_text(encoding="utf-8").splitlines())
     space = effective_space(spec["space"], base)
-    survivors: tuple[Candidate, ...] = (
+    survivors: tuple[tuple[tuple[str, int], ...], ...] = (
         *single_moves(space),
         *sampled_pairs(space, spec["pair_candidates"], rng_seed),
     )
@@ -333,7 +334,7 @@ def run_search(
         note(f"# round {round_index}: {len(survivors)} arms, {pairs} pairs, {len(lines_out)} jobs")
         runner.run(batch, lines_out)
         margins = batch_margins(sweeps_root / batch)
-        scores: dict[Candidate, float] = {}
+        scores: dict[tuple[tuple[str, int], ...], float] = {}
         for moves in survivors:
             n, mean, sd = paired_delta(margins, candidate_label(moves), "control")
             scores[moves] = mean
