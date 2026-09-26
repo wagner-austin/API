@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.request_context import install_request_id_middleware
 
 from .. import _test_hooks
@@ -16,8 +16,8 @@ from .routes import health as routes_health
 def create_app(settings: Settings | None = None) -> FastAPI:
     cfg = settings or load_settings()
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="data-bank-api",
         instance_id=None,
         extra_fields=["request_id"],
