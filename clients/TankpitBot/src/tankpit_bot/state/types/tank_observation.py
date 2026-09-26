@@ -41,11 +41,12 @@ from platform_core.json_utils import (
     require_bool,
     require_int,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.facts.source import FactSource, require_fact_source
 from tankpit_bot.state.types.tank import tank_default_fact_source
-from tankpit_bot.types.constants import EntitySource, require_entity_source
+from tankpit_bot.types.constants import EntitySource
 
 
 class TankObservation(TypedDict):
@@ -282,7 +283,7 @@ def encode_tank_observation(obs: TankObservation) -> JSONObject:
         "timestamp_ms": obs["timestamp_ms"],
         "is_wire_sourced": obs["is_wire_sourced"],
         "position_is_authoritative": obs["position_is_authoritative"],
-        "storage_source": obs["storage_source"],
+        "storage_source": obs["storage_source"].value,
         "fact_source": obs["fact_source"],
         "position": [pos[0], pos[1]] if pos is not None else None,
         "team": obs["team"],
@@ -309,7 +310,7 @@ def decode_tank_observation(data: JSONObject) -> TankObservation:
     """
     # Validate storage_source via the shared EntitySource decoder, which
     # raises JSONTypeError for unsupported values.
-    storage_source: EntitySource = require_entity_source(data, "storage_source")
+    storage_source = require_member(data, "storage_source", EntitySource)
     fact_source = (
         require_fact_source(data, "fact_source")
         if "fact_source" in data

@@ -16,6 +16,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.facts.provenance import (
@@ -25,12 +26,7 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
 )
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.types.constants import (
-    EntitySource,
-    TankLiveness,
-    require_entity_source,
-    require_tank_liveness,
-)
+from tankpit_bot.types.constants import EntitySource, TankLiveness
 
 # The viewport-presence horizon for ``last_viewport_observation_ms``:
 # how long a viewport-sourced observation still proves the tank is in
@@ -121,9 +117,9 @@ def has_real_coordinates(tank: TankStateDict) -> bool:
 
 
 _DEFAULT_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
-    "viewport": "wire_0x28_tank_entry",
-    "radar": "wire_0x48_enemy_detect",
-    "world_state": "wire_0x4C_map_data",
+    EntitySource.VIEWPORT: "wire_0x28_tank_entry",
+    EntitySource.RADAR: "wire_0x48_enemy_detect",
+    EntitySource.WORLD_STATE: "wire_0x4C_map_data",
 }
 
 
@@ -286,13 +282,13 @@ def make_tank_state(
     name: str,
     is_bot: bool,
     is_self: bool,
-    source: EntitySource = "viewport",
+    source: EntitySource = EntitySource.VIEWPORT,
     timestamp_ms: int = 0,
     last_wire_seen_ms: int = 0,
     last_position_update_ms: int = 0,
     last_viewport_observation_ms: int = 0,
     direction: int = 0,
-    liveness: TankLiveness = "alive",
+    liveness: TankLiveness = TankLiveness.ALIVE,
     last_aim_x: int = -1,
     last_aim_y: int = -1,
     last_aim_weapon: int = -1,
@@ -385,12 +381,12 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "name": state["name"],
         "is_bot": state["is_bot"],
         "is_self": state["is_self"],
-        "source": state["source"],
+        "source": state["source"].value,
         "timestamp_ms": state["timestamp_ms"],
         "last_wire_seen_ms": state["last_wire_seen_ms"],
         "last_position_update_ms": state["last_position_update_ms"],
         "last_viewport_observation_ms": state["last_viewport_observation_ms"],
-        "liveness": state["liveness"],
+        "liveness": state["liveness"].value,
         "last_aim_x": state["last_aim_x"],
         "last_aim_y": state["last_aim_y"],
         "last_aim_weapon": state["last_aim_weapon"],
@@ -412,7 +408,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    source = require_entity_source(data, "source")
+    source = require_member(data, "source", EntitySource)
     confidence = require_float(data, "confidence") if "confidence" in data else 1.0
     provenance = (
         decode_provenance(require_dict(data, "provenance"))
@@ -435,7 +431,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
         last_position_update_ms=require_int(data, "last_position_update_ms"),
         last_viewport_observation_ms=_optional_int(data, "last_viewport_observation_ms", 0),
-        liveness=require_tank_liveness(data, "liveness"),
+        liveness=require_member(data, "liveness", TankLiveness),
         last_aim_x=_optional_int(data, "last_aim_x", -1),
         last_aim_y=_optional_int(data, "last_aim_y", -1),
         last_aim_weapon=_optional_int(data, "last_aim_weapon", -1),

@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     require_float,
     require_int,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.facts.provenance import (
@@ -24,21 +25,15 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
 )
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.types.constants import (
-    ContainerRefreshKind,
-    EntitySource,
-    decode_container_refresh_kind,
-    encode_container_refresh_kind,
-    require_entity_source,
-)
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 _FACT_SOURCE_BY_REFRESH_KIND: dict[ContainerRefreshKind, FactSource] = {
-    "radar_response": "wire_0x4F_radar_response",
-    "radar_cache_refresh": "wire_0x43_cache_update",
-    "radar_known_resources": "wire_0x4F_radar_response",
-    "viewport_patch": "wire_0x5A_viewport_patch",
-    "world_state": "wire_0x4C_map_data",
-    "fleet_report": "fleet_report",
+    ContainerRefreshKind.RADAR_RESPONSE: "wire_0x4F_radar_response",
+    ContainerRefreshKind.RADAR_CACHE_REFRESH: "wire_0x43_cache_update",
+    ContainerRefreshKind.RADAR_KNOWN_RESOURCES: "wire_0x4F_radar_response",
+    ContainerRefreshKind.VIEWPORT_PATCH: "wire_0x5A_viewport_patch",
+    ContainerRefreshKind.WORLD_STATE: "wire_0x4C_map_data",
+    ContainerRefreshKind.FLEET_REPORT: "fleet_report",
 }
 
 
@@ -104,11 +99,11 @@ def _default_container_refresh_kind(source: EntitySource) -> ContainerRefreshKin
     Returns:
         Canonical refresh kind matching the source.
     """
-    if source == "radar":
-        return "radar_response"
-    if source == "viewport":
-        return "viewport_patch"
-    return "world_state"
+    if source is EntitySource.RADAR:
+        return ContainerRefreshKind.RADAR_RESPONSE
+    if source is EntitySource.VIEWPORT:
+        return ContainerRefreshKind.VIEWPORT_PATCH
+    return ContainerRefreshKind.WORLD_STATE
 
 
 def make_container_state(
@@ -116,7 +111,7 @@ def make_container_state(
     y: int,
     is_fuel: bool,
     volume: int,
-    source: EntitySource = "radar",
+    source: EntitySource = EntitySource.RADAR,
     refresh_kind: ContainerRefreshKind | None = None,
     timestamp_ms: int = 0,
     failed_pickups: int = 0,
@@ -179,8 +174,8 @@ def encode_container_state(state: ContainerStateDict) -> JSONObject:
         "y": state["y"],
         "is_fuel": state["is_fuel"],
         "volume": state["volume"],
-        "source": state["source"],
-        "refresh_kind": encode_container_refresh_kind(state["refresh_kind"]),
+        "source": state["source"].value,
+        "refresh_kind": state["refresh_kind"].value,
         "timestamp_ms": state["timestamp_ms"],
         "failed_pickups": state["failed_pickups"],
         "confidence": state["confidence"],
@@ -206,7 +201,7 @@ def decode_container_state(data: JSONObject) -> ContainerStateDict:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    refresh_kind = decode_container_refresh_kind(data, "refresh_kind")
+    refresh_kind = require_member(data, "refresh_kind", ContainerRefreshKind)
     confidence = require_float(data, "confidence") if "confidence" in data else 1.0
     provenance = (
         decode_provenance(require_dict(data, "provenance"))
@@ -218,7 +213,7 @@ def decode_container_state(data: JSONObject) -> ContainerStateDict:
         y=require_int(data, "y"),
         is_fuel=require_bool(data, "is_fuel"),
         volume=require_int(data, "volume"),
-        source=require_entity_source(data, "source"),
+        source=require_member(data, "source", EntitySource),
         refresh_kind=refresh_kind,
         timestamp_ms=require_int(data, "timestamp_ms"),
         failed_pickups=require_int(data, "failed_pickups"),

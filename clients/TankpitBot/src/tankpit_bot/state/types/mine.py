@@ -9,6 +9,7 @@ fact metadata flat -- ``source``/``timestamp_ms`` (pre-existing) plus
 from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, require_dict, require_float, require_int
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.facts.provenance import (
@@ -18,12 +19,12 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
 )
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.types.constants import EntitySource, require_entity_source
+from tankpit_bot.types.constants import EntitySource
 
 _MINE_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
-    "viewport": "wire_0x5A_viewport_patch",
-    "radar": "wire_0x4F_radar_response",
-    "world_state": "wire_0x4C_map_data",
+    EntitySource.VIEWPORT: "wire_0x5A_viewport_patch",
+    EntitySource.RADAR: "wire_0x4F_radar_response",
+    EntitySource.WORLD_STATE: "wire_0x4C_map_data",
 }
 
 
@@ -77,7 +78,7 @@ def make_mine_state(
     mine_type: int,
     tank_id: int,
     team: int,
-    source: EntitySource = "viewport",
+    source: EntitySource = EntitySource.VIEWPORT,
     timestamp_ms: int = 0,
     confidence: float = 1.0,
     provenance: ProvenanceChainDict | None = None,
@@ -130,7 +131,7 @@ def encode_mine_state(state: MineStateDict) -> JSONObject:
         "mine_type": state["mine_type"],
         "tank_id": state["tank_id"],
         "team": state["team"],
-        "source": state["source"],
+        "source": state["source"].value,
         "timestamp_ms": state["timestamp_ms"],
         "confidence": state["confidence"],
         "provenance": encode_provenance(state["provenance"]),
@@ -154,7 +155,7 @@ def decode_mine_state(data: JSONObject) -> MineStateDict:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    source = require_entity_source(data, "source")
+    source = require_member(data, "source", EntitySource)
     confidence = require_float(data, "confidence") if "confidence" in data else 1.0
     provenance = (
         decode_provenance(require_dict(data, "provenance"))
