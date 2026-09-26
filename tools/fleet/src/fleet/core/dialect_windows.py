@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
+from fleet.core.windows_log_tail import windows_log_tail_script
 
 #: Task Scheduler's ``SCHED_S_TASK_HAS_NOT_RUN``, 0x00041303.
 #:
@@ -417,17 +418,14 @@ class WindowsDialect:
             lines: How many lines from the end.
 
         Returns:
-            The script's text. An absent transcript prints nothing rather
-            than an error: the collector has already read the result file,
-            so an empty tail is a build that wrote no transcript, and the
-            verdict says so.
+            The script's text, a bounded read from the end of the UTF-16
+            transcript (:mod:`fleet.core.windows_log_tail` says why not
+            ``Get-Content -Tail``). An absent transcript prints nothing
+            rather than an error: the collector has already read the result
+            file, so an empty tail is a build that wrote no transcript, and
+            the verdict says so.
         """
-        log = names.log_path(target)
-        return (
-            f"if (Test-Path -LiteralPath '{log}') {{\n"
-            f"  Get-Content -Tail {lines} -LiteralPath '{log}'\n"
-            f"}}\n"
-        )
+        return windows_log_tail_script(names.log_path(target), lines)
 
     def launch_script(self, *, target: str, run_id: str) -> str:
         """Register a scheduled task for the build, start it, and prove it began.
