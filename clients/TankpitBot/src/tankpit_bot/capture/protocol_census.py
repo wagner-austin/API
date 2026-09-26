@@ -27,6 +27,7 @@ from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.protocol import try_decode_binary_message
 from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.wire.helpers import DecodeError
 
 log = get_logger(__name__)
@@ -456,7 +457,7 @@ def analyze_protocol_census(session: CaptureSession) -> ProtocolCensusDict:
     acc = _build_census_accumulator()
 
     for message in session["messages"]:
-        if message["direction"] != "received":
+        if message["direction"] is not MessageDirection.RECEIVED:
             continue
         acc["received_message_count"] += 1
         _accumulate_message(message["payload"], xor_table, acc)

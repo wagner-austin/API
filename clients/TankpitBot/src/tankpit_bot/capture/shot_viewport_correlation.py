@@ -35,6 +35,7 @@ from tankpit_bot.protocol.command_frames import deserialize_command
 from tankpit_bot.protocol.commands import CMD_SHOOT
 from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -378,7 +379,7 @@ def analyze_shot_viewport_correlation(session: CaptureSession) -> ShotViewportCo
         ):
             last_viewport = updates[update_index]
             update_index += 1
-        if message["direction"] != "sent":
+        if message["direction"] is not MessageDirection.SENT:
             continue
         for body in _split_sent_frames(message["payload"]):
             shot = _decode_shoot_command(body, xor_table)

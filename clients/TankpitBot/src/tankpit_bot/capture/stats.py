@@ -14,6 +14,7 @@ from tankpit_bot.capture.signature import extract_message_signature, identify_me
 from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, build_session_xor_table
 from tankpit_bot.container import DecodeLevel
 from tankpit_bot.types import CaptureSession, MessageStats, UnknownMessageEntry
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -59,7 +60,7 @@ def build_message_stats(session: CaptureSession) -> MessageStats:
     level_counts: Counter[DecodeLevel] = Counter()
 
     for msg in session["messages"]:
-        if msg["direction"] != "received":
+        if msg["direction"] is not MessageDirection.RECEIVED:
             continue
 
         decoded = extract_message_signature(msg["payload"], xor_table)

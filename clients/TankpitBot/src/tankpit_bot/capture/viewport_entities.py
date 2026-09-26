@@ -21,6 +21,7 @@ from tankpit_bot.capture.xor import (
 from tankpit_bot.protocol import try_decode_binary_message
 from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -350,7 +351,7 @@ def analyze_viewport_entities(session: CaptureSession) -> ViewportEntityDumpDict
 
     updates: list[ViewportEntityUpdateDict] = []
     for message_index, message in enumerate(session["messages"]):
-        if message["direction"] != "received":
+        if message["direction"] is not MessageDirection.RECEIVED:
             continue
         frames = _split_received_frames(message["payload"])
         for body in frames:

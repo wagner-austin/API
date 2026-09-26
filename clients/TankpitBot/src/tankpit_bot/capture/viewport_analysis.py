@@ -37,6 +37,7 @@ from tankpit_bot.capture.viewport_analysis_types import (
 from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol import try_decode_binary_message
 from tankpit_bot.protocol.framing import FramingError
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.types.session import CaptureSession
 
 log = get_logger(__name__)
@@ -79,7 +80,7 @@ def _decode_received_binary_records(
     """
     records: list[DecodedBinaryRecordDict] = []
     for message_index, message in enumerate(session["messages"]):
-        if message["direction"] != "received":
+        if message["direction"] is not MessageDirection.RECEIVED:
             continue
 
         for body in _split_frame_messages(message["payload"]):
@@ -114,7 +115,7 @@ def _collect_thirteen_byte_shapes(
     shape_counts: Counter[tuple[int, int]] = Counter()
     total_count = 0
     for message in session["messages"]:
-        if message["direction"] != "received":
+        if message["direction"] is not MessageDirection.RECEIVED:
             continue
         for body in _split_frame_messages(message["payload"]):
             if len(body) < 1 or body[0] != 0x2E:
