@@ -31,7 +31,7 @@ from typing import TypedDict
 
 from covenant_ml.types import PredictorProtocol
 from platform_core.config import _parse_float, _parse_str, _require_env_str
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 
 from . import generic_worker_entry_hooks as _hooks
 from .domains.esports.domain import (
@@ -209,8 +209,8 @@ def main(
         Exit code: 0 on a clean shutdown, 1 if streaming is disabled.
     """
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="covenant-generic-streaming-worker",
         instance_id=None,
         extra_fields=None,

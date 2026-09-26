@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 
 from scripts.optimize.cli import parse_args
@@ -41,7 +41,7 @@ def run(argv: Sequence[str]) -> int:
 
     set_verbose_mode(args.verbose)
     if args.verbose:
-        setup_rich_logging(level="DEBUG", show_time=False)
+        setup_rich_logging(level=LogLevel.DEBUG, show_time=False)
 
     suppress_verbose_logging()
 
@@ -120,7 +120,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     from scripts.optimize.state import get_state
 
-    setup_rich_logging(level="INFO", show_time=False)
+    setup_rich_logging(level=LogLevel.INFO, show_time=False)
 
     raw_args = list(argv) if argv is not None else list(sys.argv[1:])
 

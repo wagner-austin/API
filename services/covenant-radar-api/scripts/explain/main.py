@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import get_rich_console, setup_rich_logging
 
 from scripts.explain.cli import parse_args
@@ -34,7 +34,7 @@ def run(argv: Sequence[str]) -> int:
     console = get_rich_console()
 
     if args.verbose:
-        setup_rich_logging(level="DEBUG", show_time=False)
+        setup_rich_logging(level=LogLevel.DEBUG, show_time=False)
 
     print_config(
         args.backend,
@@ -69,7 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         Exit code (0 for success, 1 for error, 130 for keyboard interrupt).
     """
-    setup_rich_logging(level="INFO", show_time=False)
+    setup_rich_logging(level=LogLevel.INFO, show_time=False)
     console = get_rich_console()
 
     raw_args = list(argv) if argv is not None else list(sys.argv[1:])

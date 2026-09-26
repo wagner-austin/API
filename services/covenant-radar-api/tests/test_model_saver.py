@@ -24,6 +24,7 @@ from covenant_ml.backends.registry import (
 from covenant_ml.datasets import DatasetConfig, DatasetRegistry, LoadedDataset
 from covenant_ml.types import BackendName, TrainOutcome
 from platform_core.json_utils import dump_json_str
+from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts.optimize.cli import DatasetName
 from scripts.optimize.model_saver import (
@@ -45,7 +46,7 @@ from tests._model_saver_fixtures import (
 @pytest.fixture(autouse=True)
 def setup_logging() -> None:
     """Ensure rich logging is setup for all tests in this module."""
-    setup_rich_logging(level="WARNING", show_time=False)
+    setup_rich_logging(level=LogLevel.WARNING, show_time=False)
 
 
 @pytest.fixture()

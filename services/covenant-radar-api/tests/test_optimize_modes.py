@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
+from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize._formatters import format_loading_progress
@@ -19,7 +20,7 @@ from scripts.optimize.runner import RunResult
 @pytest.fixture(autouse=True)
 def setup_logging() -> None:
     """Ensure rich logging is setup for all tests in this module."""
-    setup_rich_logging(level="WARNING", show_time=False)
+    setup_rich_logging(level=LogLevel.WARNING, show_time=False)
 
 
 def _make_optimization_result(

@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from platform_core.config import _test_hooks as config_test_hooks
 from platform_core.config.covenant_radar import DatadogEnv, MLBackend
 from platform_core.fastapi import install_exception_handlers_fastapi
+from platform_core.logging import LogLevel
 from platform_workers.redis import RedisBytesProto, RedisStrProto
 from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
@@ -80,7 +81,7 @@ def _make_test_settings(tmp_path: Path) -> Settings:
     logs_root = tmp_path / "logs"
     return {
         "app_env": "dev",
-        "logging": {"level": "INFO"},
+        "logging": {"level": LogLevel.INFO},
         "redis": {"enabled": True, "url": "redis://test:6379/0"},
         "rq": {
             "queue_name": "covenant",

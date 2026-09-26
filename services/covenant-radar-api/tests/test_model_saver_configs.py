@@ -31,6 +31,7 @@ from covenant_ml.types import (
     BackendName,
 )
 from platform_core.json_utils import dump_json_str
+from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts.optimize.model_saver import (
     build_train_config,
@@ -133,7 +134,7 @@ def hooks_context(
 @pytest.fixture(autouse=True)
 def setup_logging() -> None:
     """Ensure rich logging is setup for all tests in this module."""
-    setup_rich_logging(level="WARNING", show_time=False)
+    setup_rich_logging(level=LogLevel.WARNING, show_time=False)
 
 
 def _make_result_for_backend(

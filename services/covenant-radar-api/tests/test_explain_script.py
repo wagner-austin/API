@@ -14,6 +14,7 @@ import scripts._test_hooks as _hooks
 from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
+from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 from scripts.explain.cli import (
     BACKEND_EXPLAINERS,
@@ -52,7 +53,7 @@ from tests._explain_script_fixtures import (
 @pytest.fixture(autouse=True)
 def _setup_rich_logging_for_tests() -> None:
     """Set up rich logging before each test that needs it."""
-    setup_rich_logging(level="WARNING", show_time=False)
+    setup_rich_logging(level=LogLevel.WARNING, show_time=False)
 
 
 class TestParseArgs:

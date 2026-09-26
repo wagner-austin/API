@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from platform_core.logging import LogLevel
 from platform_core.rich_logging import setup_rich_logging
 
 from scripts.discover_datasets import _test_hooks
@@ -443,7 +444,7 @@ def run(argv: Sequence[str]) -> int:
     console = _test_hooks.console_factory()
 
     if args["verbose"]:
-        setup_rich_logging(level="DEBUG", show_time=False)
+        setup_rich_logging(level=LogLevel.DEBUG, show_time=False)
 
     external_dir = args["external_dir"].resolve()
 
@@ -482,7 +483,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         FileNotFoundError: If a file cannot be found during processing.
         KeyboardInterrupt: If user interrupts execution.
     """
-    setup_rich_logging(level="INFO", show_time=False)
+    setup_rich_logging(level=LogLevel.INFO, show_time=False)
 
     raw_args = list(argv) if argv is not None else list(sys.argv[1:])
 

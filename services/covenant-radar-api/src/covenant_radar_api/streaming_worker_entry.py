@@ -34,7 +34,7 @@ from covenant_persistence import (
 )
 from covenant_persistence.protocols import ConnectionProtocol
 from platform_core.config import _parse_int, _parse_str, _require_env_str
-from platform_core.logging import setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 
 from . import streaming_worker_entry_hooks as _hooks
 from .integrations.datadog import MetricsClient, MetricsConfig, create_metrics_client
@@ -380,8 +380,8 @@ def main(
         Exit code (0 = success, 1 = error).
     """
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="covenant-streaming-worker",
         instance_id=None,
         extra_fields=None,

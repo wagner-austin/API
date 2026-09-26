@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from platform_core.logging import LogLevel
 from platform_core.rich_logging import (
     setup_rich_logging,
 )
@@ -270,14 +271,14 @@ class TestDefaultConsoleFactory:
     def test_default_factory(self) -> None:
         """Test default console factory returns working console."""
         # Must call setup_rich_logging before get_rich_console
-        setup_rich_logging(level="WARNING", show_time=False)
+        setup_rich_logging(level=LogLevel.WARNING, show_time=False)
         console = _test_hooks._default_console_factory()
         console.print("test")  # Should not raise
 
     def test_protocol_definition(self) -> None:
         """Test ConsoleFactory protocol can be used."""
         # Must call setup_rich_logging before get_rich_console
-        setup_rich_logging(level="WARNING", show_time=False)
+        setup_rich_logging(level=LogLevel.WARNING, show_time=False)
         factory: _test_hooks.ConsoleFactory = _test_hooks._default_console_factory
         console = factory()
         console.print("test")  # Should not raise
