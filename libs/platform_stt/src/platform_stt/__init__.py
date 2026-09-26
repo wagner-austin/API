@@ -28,7 +28,7 @@ from platform_stt.langid import (
     load_langid_model,
 )
 from platform_stt.merger import TranscriptMerger, merge_segment_text
-from platform_stt.parallel import ParallelTranscriber, TranscriptSegmentList
+from platform_stt.parallel import ParallelTranscriber
 from platform_stt.srt import (
     SrtEntry,
     decode_srt_entry,
@@ -100,7 +100,6 @@ __all__ = [
     "SupportsToDictRecursive",
     "TranscriptMerger",
     "TranscriptSegment",
-    "TranscriptSegmentList",
     "TranslationRequest",
     "TranslationResponse",
     "VerboseResponse",

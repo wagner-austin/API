@@ -13,9 +13,6 @@ from platform_core.logging import get_logger
 from .types import AudioChunk, TranscriptSegment, VerboseResponse, WhisperTask
 from .whisper_parse import convert_verbose_to_segments
 
-# Type alias for list of segments
-TranscriptSegmentList = list[TranscriptSegment]
-
 
 class TranscribeFn(Protocol):
     """Protocol for transcription function.
@@ -99,7 +96,7 @@ class ParallelTranscriber:
         self._task = task
         self._logger = get_logger(__name__)
 
-    def transcribe_chunks(self, chunks: list[AudioChunk]) -> list[TranscriptSegmentList]:
+    def transcribe_chunks(self, chunks: list[AudioChunk]) -> list[list[TranscriptSegment]]:
         """Transcribe all chunks with bounded parallelism and retries.
 
         Uses thread pool to process chunks concurrently. Failed chunks are
@@ -118,7 +115,7 @@ class ParallelTranscriber:
         """
         total = len(chunks)
 
-        def work(idx: int, chunk: AudioChunk) -> TranscriptSegmentList:
+        def work(idx: int, chunk: AudioChunk) -> list[TranscriptSegment]:
             attempt = 0
             while True:
                 attempt += 1
@@ -160,7 +157,7 @@ class ParallelTranscriber:
                         continue
                     raise
 
-        out: list[TranscriptSegmentList] = [[] for _ in chunks]
+        out: list[list[TranscriptSegment]] = [[] for _ in chunks]
         with ThreadPoolExecutor(max_workers=self._max_concurrent) as pool:
             futures = {pool.submit(work, i, c): i for i, c in enumerate(chunks)}
             for fut in as_completed(futures):
@@ -169,4 +166,4 @@ class ParallelTranscriber:
         return out
 
 
-__all__ = ["ParallelTranscriber", "TranscribeFn", "TranscriptSegmentList"]
+__all__ = ["ParallelTranscriber", "TranscribeFn"]
