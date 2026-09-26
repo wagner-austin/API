@@ -26,6 +26,7 @@ from tankpit_bot.sniffer.decoders import (
     decode_text_message,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import (
     frame_payload,
@@ -34,28 +35,28 @@ from tests.wire_builders import (
 
 def test_decode_message_invalid_base64() -> None:
     """Test decode_message handles invalid base64."""
-    result = decode_message(WorldService(), "not valid base64!!!", "sent", None)
+    result = decode_message(WorldService(), "not valid base64!!!", MessageDirection.SENT, None)
     assert result == "[SENT] (invalid base64)"
 
 
 def test_decode_message_too_short() -> None:
     """Test decode_message handles messages shorter than 2 bytes."""
     payload = base64.b64encode(b"x").decode()
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     assert "[RECEIVED] (too short:" in result
 
 
 def test_decode_message_auth() -> None:
     """Test decode_message decodes AUTH messages."""
     payload = frame_payload(b"%AUTH !be 12345|token|auth extra")
-    result = decode_message(WorldService(), payload, "sent", None)
+    result = decode_message(WorldService(), payload, MessageDirection.SENT, None)
     assert result == "[SENT] AUTH: %AUTH !be 12345|token|auth extra..."
 
 
 def test_decode_message_select() -> None:
     """Test decode_message decodes SELECT messages."""
     payload = frame_payload(b"*4")
-    result = decode_message(WorldService(), payload, "sent", None)
+    result = decode_message(WorldService(), payload, MessageDirection.SENT, None)
     assert result == "[SENT] SELECT: room=4"
 
 
@@ -64,7 +65,7 @@ def test_decode_message_select_does_not_mutate_selected_room() -> None:
 
     ws = WorldService()
     payload = frame_payload(b"*4")
-    result = decode_message(ws, payload, "sent", None)
+    result = decode_message(ws, payload, MessageDirection.SENT, None)
 
     assert result == "[SENT] SELECT: room=4"
     assert ws.selected_room is None
@@ -73,7 +74,7 @@ def test_decode_message_select_does_not_mutate_selected_room() -> None:
 def test_decode_message_response() -> None:
     """Test decode_message decodes RESPONSE messages."""
     payload = frame_payload(b"$4|0")
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     assert result == "[RECEIVED] RESPONSE: $4|0"
 
 
@@ -82,7 +83,7 @@ def test_decode_message_state() -> None:
     # Create a 14-byte state message (subtype 0x03, not fuel-related)
     state_body = bytes.fromhex("2e033c020300005c190000ca0300")
     payload = frame_payload(state_body)
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     # 14-byte STATE message with subtype shown
     assert "[RECEIVED] STATE: sub=0x03 len=14" in result
     assert "hex=" in result
@@ -93,7 +94,7 @@ def test_decode_message_state_short() -> None:
     # Short state message (4-11 bytes) - shows as POS
     short_state = bytes([0x2E, 0x01, 0x02, 0x03])  # 4 bytes
     payload = frame_payload(short_state)
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     assert "[RECEIVED] POS: len=4 hex=2e010203" in result
 
 
@@ -150,14 +151,14 @@ def test_decode_state_message_update() -> None:
 def test_decode_message_unknown() -> None:
     """Test decode_message handles unknown message types."""
     payload = frame_payload(b"some unknown message format")
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     assert "[RECEIVED] ???:" in result
 
 
 def test_decode_message_quit() -> None:
     """Test decode_message decodes QUIT messages (dash character)."""
     payload = frame_payload(b"-")
-    result = decode_message(WorldService(), payload, "sent", None)
+    result = decode_message(WorldService(), payload, MessageDirection.SENT, None)
     assert result == "[SENT] QUIT: -"
 
 
@@ -264,21 +265,21 @@ def test_decode_command_non_ascii() -> None:
 def test_decode_message_calls_decode_plus_for_room_list() -> None:
     """Test decode_message routes to decode_plus_message for ROOM_LIST."""
     payload = frame_payload(b"+3|Practice|1|0,0,0,0,0,0,0|1|p|field01.gif|2025")
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     assert result == "[RECEIVED] ROOM_LIST: room=3 name=Practice"
 
 
 def test_decode_message_calls_decode_join_confirm() -> None:
     """Test decode_message routes to decode_join_confirm."""
     payload = frame_payload(b"=4|Sep. 25, 2012|Yuppler|4|9|10|10|9")
-    result = decode_message(WorldService(), payload, "received", None)
+    result = decode_message(WorldService(), payload, MessageDirection.RECEIVED, None)
     assert result == "[RECEIVED] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant f5-8=9,10,10,9"
 
 
 def test_decode_message_calls_decode_command() -> None:
     """Test decode_message routes to decode_command."""
     payload = frame_payload(b"!7b")
-    result = decode_message(WorldService(), payload, "sent", None)
+    result = decode_message(WorldService(), payload, MessageDirection.SENT, None)
     # Without magic key, just shows raw hex
     assert result == "[SENT] CMD: ! 213762"
 
@@ -299,7 +300,7 @@ def test_decode_message_command_with_magic_but_no_static_key() -> None:
 
     payload = frame_payload(b"!7b")
     with pytest.raises(XorStaticKeyUnavailableError, match="static XOR key unavailable"):
-        decode_message(WorldService(), payload, "sent", magic="test_magic")
+        decode_message(WorldService(), payload, MessageDirection.SENT, magic="test_magic")
 
 
 class TestDecode8ByteState:

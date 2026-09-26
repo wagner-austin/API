@@ -17,6 +17,7 @@ from tankpit_bot.sniffer.core import (
 )
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage, decode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 from tests.fakes import (
     fake_sync_playwright,
@@ -310,7 +311,7 @@ class TestWebSocketSnifferMethods:
 
         message = CapturedMessage(
             timestamp_ms=12345,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload=payload,
             ws_url="wss://example.com",
         )
@@ -397,7 +398,7 @@ class TestWebSocketSnifferMethods:
         sniffer._on_message_captured(
             CapturedMessage(
                 timestamp_ms=12345,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://example.com",
             )
@@ -446,7 +447,7 @@ class TestWebSocketSnifferMethods:
         sniffer._messages = [
             CapturedMessage(
                 timestamp_ms=1100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="AAAA",
                 ws_url="wss://example.com/ws",
             )

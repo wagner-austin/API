@@ -6,6 +6,7 @@ import base64
 
 from tankpit_bot.capture.signature import extract_message_signature
 from tankpit_bot.capture.stats import build_message_stats, empty_message_stats
+from tankpit_bot.types.literals import MessageDirection
 from tests.conftest import FakeFileSystem
 
 # =============================================================================
@@ -125,7 +126,7 @@ class TestBuildMessageStatsEdgeCases:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test",
             ),
@@ -171,7 +172,7 @@ class TestBuildMessageStatsEdgeCases:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=payload,
                 ws_url="wss://test",
             ),
@@ -205,7 +206,7 @@ class TestBuildMessageStatsEdgeCases:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=100,
-                direction="sent",  # Sent messages should be ignored
+                direction=MessageDirection.SENT,  # Sent messages should be ignored
                 payload="AAAA",
                 ws_url="wss://test",
             ),
