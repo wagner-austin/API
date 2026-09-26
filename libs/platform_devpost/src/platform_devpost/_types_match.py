@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from platform_codebase import (
-    MatchRecommendation,
-    require_recommendation,
-)
+from platform_codebase import MatchRecommendation
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -13,6 +10,7 @@ from platform_core.json_utils import (
     require_float,
     require_str_list,
 )
+from platform_core.members import require_member
 
 from platform_devpost._types_hackathon import (
     Hackathon,
@@ -111,7 +109,7 @@ def decode_match(data: JSONObject) -> HackathonMatch:
         match_score=require_float(data, "match_score"),
         matched_capabilities=tuple(require_str_list(data, "matched_capabilities")),
         missing_capabilities=tuple(require_str_list(data, "missing_capabilities")),
-        recommendation=require_recommendation(data, "recommendation"),
+        recommendation=require_member(data, "recommendation", MatchRecommendation),
     )
 
 

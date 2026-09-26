@@ -11,6 +11,7 @@ from platform_devpost.types import (
     HackathonMatch,
     HackathonState,
     InterestFilter,
+    MatchRecommendation,
     decode_filter,
     decode_match,
     encode_filter,
@@ -48,11 +49,11 @@ class TestHackathonMatch:
             match_score=0.85,
             matched_capabilities=("web_development", "python_development"),
             missing_capabilities=("machine_learning",),
-            recommendation="good_fit",
+            recommendation=MatchRecommendation.GOOD_FIT,
         )
         assert match.match_score == 0.85
         assert len(match.matched_capabilities) == 2
-        assert match.recommendation == "good_fit"
+        assert match.recommendation is MatchRecommendation.GOOD_FIT
 
     def test_encode_match(self) -> None:
         """Test encoding HackathonMatch to dict."""
@@ -61,7 +62,7 @@ class TestHackathonMatch:
             match_score=0.5,
             matched_capabilities=("ai",),
             missing_capabilities=(),
-            recommendation="stretch",
+            recommendation=MatchRecommendation.STRETCH,
         )
         result = encode_match(match)
         assert result["match_score"] == 0.5
@@ -94,12 +95,11 @@ class TestHackathonMatch:
         }
         match = decode_match(data)
         assert match.match_score == 0.75
-        assert match.recommendation == "strong_fit"
+        assert match.recommendation is MatchRecommendation.STRONG_FIT
 
     def test_decode_match_all_recommendations(self) -> None:
         """Test all valid recommendation values."""
-        recs = ["strong_fit", "good_fit", "stretch", "new_territory"]
-        for rec in recs:
+        for rec in MatchRecommendation:
             data: JSONObject = {
                 "hackathon": {
                     "id": 1,
@@ -121,10 +121,10 @@ class TestHackathonMatch:
                 "match_score": 0.5,
                 "matched_capabilities": [],
                 "missing_capabilities": [],
-                "recommendation": rec,
+                "recommendation": rec.value,
             }
             match = decode_match(data)
-            assert match.recommendation == rec
+            assert match.recommendation is rec
 
     def test_decode_match_invalid_recommendation(self) -> None:
         """Test decode_match raises on invalid recommendation."""
@@ -151,7 +151,11 @@ class TestHackathonMatch:
             "missing_capabilities": [],
             "recommendation": "invalid",
         }
-        with pytest.raises(JSONTypeError, match="must be a valid recommendation"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid recommendation 'invalid': must be one of 'strong_fit', 'good_fit', "
+            r"'stretch', 'new_territory'$",
+        ):
             decode_match(data)
 
     def test_decode_match_invalid_hackathon_type(self) -> None:

@@ -14,7 +14,7 @@ from platform_devpost.testing import (
     make_interest_filter,
     reset_hooks,
 )
-from platform_devpost.types import HackathonState
+from platform_devpost.types import CapabilityStrength, HackathonState
 
 
 class TestHooksContainer:
@@ -272,18 +272,18 @@ class TestMakeFakeCapability:
         """Test make_fake_capability with default values."""
         cap = make_fake_capability()
         assert cap.name == "test_capability"
-        assert cap.strength == "moderate"
+        assert cap.strength is CapabilityStrength.MODERATE
         assert cap.tags == ("test",)
 
     def test_custom_values(self) -> None:
         """Test make_fake_capability with custom values."""
         cap = make_fake_capability(
             name="web_dev",
-            strength="strong",
+            strength=CapabilityStrength.STRONG,
             tags=("web", "frontend"),
         )
         assert cap.name == "web_dev"
-        assert cap.strength == "strong"
+        assert cap.strength is CapabilityStrength.STRONG
         assert cap.tags == ("web", "frontend")
 
 

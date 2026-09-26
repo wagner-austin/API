@@ -20,6 +20,7 @@ from platform_devpost.testing import (
     make_fake_profile,
     make_fake_theme,
 )
+from platform_devpost.types import MatchRecommendation
 
 
 class TestGetHackathonTags:
@@ -140,23 +141,23 @@ class TestDetermineRecommendation:
 
     def test_strong_fit(self) -> None:
         """Test high score returns strong_fit."""
-        assert _determine_recommendation(0.8) == "strong_fit"
-        assert _determine_recommendation(0.7) == "strong_fit"
+        assert _determine_recommendation(0.8) is MatchRecommendation.STRONG_FIT
+        assert _determine_recommendation(0.7) is MatchRecommendation.STRONG_FIT
 
     def test_good_fit(self) -> None:
         """Test medium score returns good_fit."""
-        assert _determine_recommendation(0.5) == "good_fit"
-        assert _determine_recommendation(0.4) == "good_fit"
+        assert _determine_recommendation(0.5) is MatchRecommendation.GOOD_FIT
+        assert _determine_recommendation(0.4) is MatchRecommendation.GOOD_FIT
 
     def test_stretch(self) -> None:
         """Test low score returns stretch."""
-        assert _determine_recommendation(0.3) == "stretch"
-        assert _determine_recommendation(0.2) == "stretch"
+        assert _determine_recommendation(0.3) is MatchRecommendation.STRETCH
+        assert _determine_recommendation(0.2) is MatchRecommendation.STRETCH
 
     def test_new_territory(self) -> None:
         """Test very low score returns new_territory."""
-        assert _determine_recommendation(0.1) == "new_territory"
-        assert _determine_recommendation(0.0) == "new_territory"
+        assert _determine_recommendation(0.1) is MatchRecommendation.NEW_TERRITORY
+        assert _determine_recommendation(0.0) is MatchRecommendation.NEW_TERRITORY
 
 
 class TestGetMatchedCapabilities:
@@ -243,7 +244,7 @@ class TestMatchHackathon:
         result = match_hackathon(h, profile)
 
         assert result.match_score == 0.0
-        assert result.recommendation == "new_territory"
+        assert result.recommendation is MatchRecommendation.NEW_TERRITORY
 
     def test_match_empty_hackathon_themes(self) -> None:
         """Test match with no hackathon themes."""

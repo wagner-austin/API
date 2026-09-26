@@ -127,7 +127,7 @@ def find_hackathons(
             match_score=0.0,
             matched_capabilities=(),
             missing_capabilities=(),
-            recommendation="new_territory",
+            recommendation=MatchRecommendation.NEW_TERRITORY,
         )
         for h in hackathons
     )

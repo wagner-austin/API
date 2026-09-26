@@ -19,7 +19,7 @@ from platform_devpost.testing import (
     make_fake_theme,
     make_interest_filter,
 )
-from platform_devpost.types import CodebaseProfile, HackathonState
+from platform_devpost.types import CodebaseProfile, HackathonState, MatchRecommendation
 
 
 class TestFindMonorepoRoot:
@@ -153,7 +153,7 @@ class TestFindHackathons:
         # All have 0 score and new_territory when not matching
         for match in result:
             assert match.match_score == 0.0
-            assert match.recommendation == "new_territory"
+            assert match.recommendation is MatchRecommendation.NEW_TERRITORY
 
     def test_find_with_auto_detected_root(self) -> None:
         """Test find_hackathons auto-detects monorepo root."""

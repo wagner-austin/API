@@ -16,8 +16,6 @@ from platform_codebase import (
     decode_profile,
     encode_capability,
     encode_profile,
-    require_recommendation,
-    require_strength,
 )
 
 from platform_devpost._types_hackathon import (
@@ -88,6 +86,4 @@ __all__ = [
     "encode_match",
     "encode_profile",
     "encode_theme",
-    "require_recommendation",
-    "require_strength",
 ]

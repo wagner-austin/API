@@ -141,12 +141,12 @@ def _determine_recommendation(score: float) -> MatchRecommendation:
         Match recommendation level.
     """
     if score >= 0.7:
-        return "strong_fit"
+        return MatchRecommendation.STRONG_FIT
     if score >= 0.4:
-        return "good_fit"
+        return MatchRecommendation.GOOD_FIT
     if score >= 0.2:
-        return "stretch"
-    return "new_territory"
+        return MatchRecommendation.STRETCH
+    return MatchRecommendation.NEW_TERRITORY
 
 
 def _get_matched_capabilities(
