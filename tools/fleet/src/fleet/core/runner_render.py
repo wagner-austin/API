@@ -29,7 +29,12 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
-from fleet.core.runner_account import WINDOWS_SERVICE_ACCOUNT, render_service_account_lines
+from fleet.core.runner_account import (
+    WINDOWS_SERVICE_ACCOUNT,
+    render_service_account_lines,
+    render_service_running_lines,
+)
+from fleet.core.runner_keepalive import render_keepalive_lines
 
 #: The GitHub Actions runner release the rendered provision installs.
 #:
@@ -237,6 +242,7 @@ def render_windows_install_lines(install: RunnerInstall) -> list[str]:
         f"{install['runner_name']} exited ' + $LASTEXITCODE }}",
         "}",
         *render_service_account_lines(install),
+        *render_service_running_lines(install),
     ]
 
 
@@ -374,13 +380,7 @@ def _render_windows_script(spec: HostRunnerSpec) -> str:
     floor = spec["wslconfig_min_memory_gb"]
     lines += render_wslconfig_lines(spec)
     keepalive = spec["keepalive_task"]
-    if keepalive is not None:
-        lines += [
-            f"schtasks /create /f /tn '{keepalive}' /sc onstart "
-            f"/tr 'wsl -d {spec['wsl_distro']} -- sleep infinity' /rl highest",
-            f"schtasks /run /tn '{keepalive}'",
-            f"Write-Output 'keepalive task {keepalive} registered and started'",
-        ]
+    lines += render_keepalive_lines(spec)
     windows_installs = [i for i in spec["installs"] if i["side"] == "windows"]
     for install in windows_installs:
         lines.append("")

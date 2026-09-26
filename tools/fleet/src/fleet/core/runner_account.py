@@ -42,6 +42,33 @@ SERVICE_ACCOUNT_REASON = (
 )
 
 
+def render_service_running_lines(install: RunnerInstall) -> list[str]:
+    """PowerShell lines that leave an installed runner service running.
+
+    The services install as Automatic (Delayed Start), which Windows begins
+    about two minutes after boot. A rebuild that rebooted the host reaches
+    provision.ps1 before that, and its audit found all four of lavender's
+    Windows runners Stopped at 19:39Z on 2026-09-26. Starting a stopped
+    service here makes the audit see the host the next minute will see.
+
+    Args:
+        install: A windows-side install.
+
+    Returns:
+        The lines; a running service is left alone.
+
+    Raises:
+        ValueError: When the service name cannot be embedded verbatim.
+    """
+    service = scriptable(install["service"], label="service")
+    return [
+        f"if ((Get-Service -Name '{service}').Status -ne 'Running') {{",
+        f"    Start-Service -Name '{service}'",
+        f"    Write-Output 'started {service}'",
+        "}",
+    ]
+
+
 def service_account_check_id(install: RunnerInstall) -> str:
     """The audit row holding one Windows-side service to its account.
 
@@ -132,5 +159,6 @@ __all__ = [
     "WINDOWS_SERVICE_START_NAME",
     "render_service_account_check_lines",
     "render_service_account_lines",
+    "render_service_running_lines",
     "service_account_check_id",
 ]
