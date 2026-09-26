@@ -50,7 +50,7 @@ class FactConstructionContract:
             observed_ms >= 0,
             NoUnsourcedFactError,
             observed_ms=repr(observed_ms),
-            source=source,
+            source=source.value,
         )
         require_confidence_in_bounds(confidence)
 

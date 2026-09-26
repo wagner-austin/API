@@ -16,9 +16,10 @@ from platform_core.json_utils import (
     require_int,
     require_list,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
-from tankpit_bot.facts.source import FactSource, require_fact_source
+from tankpit_bot.facts.source import FactSource
 
 
 class SourceRefDict(TypedDict):
@@ -85,7 +86,7 @@ def encode_source_ref(ref: SourceRefDict) -> JSONObject:
         JSON-serializable dict representation.
     """
     return {
-        "source": ref["source"],
+        "source": ref["source"].value,
         "observed_ms": ref["observed_ms"],
     }
 
@@ -103,7 +104,7 @@ def decode_source_ref(data: JSONObject) -> SourceRefDict:
         JSONTypeError: If required fields are missing or invalid.
     """
     return SourceRefDict(
-        source=require_fact_source(data, "source"),
+        source=require_member(data, "source", FactSource),
         observed_ms=require_int(data, "observed_ms"),
     )
 
@@ -119,7 +120,7 @@ def encode_provenance(chain: ProvenanceChainDict) -> JSONObject:
     """
     encoded_refs: list[JSONValue] = [encode_source_ref(ref) for ref in chain["derived_from"]]
     return {
-        "origin": chain["origin"],
+        "origin": chain["origin"].value,
         "derived_from": encoded_refs,
     }
 
@@ -139,7 +140,7 @@ def decode_provenance(data: JSONObject) -> ProvenanceChainDict:
     raw_refs = require_list(data, "derived_from")
     refs: list[SourceRefDict] = [decode_source_ref(narrow_json_to_dict(raw)) for raw in raw_refs]
     return ProvenanceChainDict(
-        origin=require_fact_source(data, "origin"),
+        origin=require_member(data, "origin", FactSource),
         derived_from=refs,
     )
 

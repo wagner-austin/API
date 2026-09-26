@@ -22,6 +22,7 @@ from platform_core.json_utils import (
     require_float,
     require_int,
 )
+from platform_core.members import require_member
 from typing_extensions import TypedDict
 
 from tankpit_bot.contracts.base import ProvenanceRootednessError
@@ -32,7 +33,7 @@ from tankpit_bot.facts.provenance import (
     decode_provenance,
     encode_provenance,
 )
-from tankpit_bot.facts.source import FactSource, is_observation_source, require_fact_source
+from tankpit_bot.facts.source import FactSource, is_observation_source
 
 T = TypeVar("T")
 
@@ -96,15 +97,15 @@ def make_fact(
         confidence=confidence,
     )
     require(
-        provenance["origin"] == source,
+        provenance["origin"] is source,
         ProvenanceRootednessError,
-        source=source,
-        origin=provenance["origin"],
+        source=source.value,
+        origin=provenance["origin"].value,
     )
     require(
         is_observation_source(source) or len(provenance["derived_from"]) > 0,
         ProvenanceRootednessError,
-        source=source,
+        source=source.value,
         derived_from="empty",
     )
     return Fact(
@@ -128,7 +129,7 @@ def encode_fact(fact: Fact[T], encode_value: Callable[[T], JSONValue]) -> JSONOb
     """
     return {
         "value": encode_value(fact["value"]),
-        "source": fact["source"],
+        "source": fact["source"].value,
         "observed_ms": fact["observed_ms"],
         "confidence": fact["confidence"],
         "provenance": encode_provenance(fact["provenance"]),
@@ -158,7 +159,7 @@ def decode_fact(data: JSONObject, decode_value: Callable[[JSONValue], T]) -> Fac
         raise JSONTypeError("value is required")
     return make_fact(
         value=decode_value(data["value"]),
-        source=require_fact_source(data, "source"),
+        source=require_member(data, "source", FactSource),
         observed_ms=require_int(data, "observed_ms"),
         confidence=require_float(data, "confidence"),
         provenance=decode_provenance(require_dict(data, "provenance")),

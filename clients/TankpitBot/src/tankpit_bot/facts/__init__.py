@@ -32,19 +32,11 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
     make_source_ref,
 )
-from tankpit_bot.facts.source import (
-    FACT_SOURCES,
-    INFERENCE_SOURCE,
-    FactSource,
-    is_observation_source,
-    require_fact_source,
-)
+from tankpit_bot.facts.source import FactSource, is_observation_source
 
 __all__ = [
     "CONFIDENCE_MAX",
     "CONFIDENCE_MIN",
-    "FACT_SOURCES",
-    "INFERENCE_SOURCE",
     "Fact",
     "FactSource",
     "ProvenanceChainDict",
@@ -63,5 +55,4 @@ __all__ = [
     "make_provenance",
     "make_source_ref",
     "require_confidence_in_bounds",
-    "require_fact_source",
 ]
