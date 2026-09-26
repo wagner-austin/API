@@ -250,12 +250,53 @@ def attempt_send(
     Returns:
         The reason it did not land, or None when it did.
     """
+    return _attempt_stream(
+        host,
+        dialect.for_platform(platform).write_command(remote_path),
+        body,
+        what=f"sending {remote_path}",
+    )
+
+
+def _attempt_stream(host: str, command: str, body: str, *, what: str) -> RemoteFailure | None:
+    """Stream a body into one remote command's stdin, reporting failure as a value.
+
+    Args:
+        host: SSH destination.
+        command: The remote command that reads standard input.
+        body: The text streamed, UTF-8 encoded.
+        what: What the stream does, for the failure's message.
+
+    Returns:
+        The reason it failed, or None when it did not.
+    """
     result = _test_hooks.run(
-        ["ssh", *SSH_OPTIONS, host, dialect.for_platform(platform).write_command(remote_path)],
+        ["ssh", *SSH_OPTIONS, host, command],
         timeout_seconds=SSH_TIMEOUT_SECONDS,
         stdin_bytes=body.encode("utf-8"),
     )
-    return _failure_for(host, f"sending {remote_path}", result)
+    return _failure_for(host, what, result)
+
+
+def stream_to_command(host: str, command: str, body: str, *, what: str) -> None:
+    """Stream a body into one remote command's stdin.
+
+    For a write whose bytes the platform's own :meth:`write_command` would
+    change: on Windows that command re-encodes with a BOM and CRLF line
+    ends, which a PowerShell script needs and a bash payload for a WSL
+    distro cannot survive (:mod:`fleet.core.runner_distro`).
+
+    Args:
+        host: SSH destination.
+        command: The remote command that reads standard input.
+        body: The text streamed, UTF-8 encoded.
+        what: What the stream does, for the error.
+
+    Raises:
+        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as
+            :func:`run_ssh` describes.
+    """
+    _raise_on(_attempt_stream(host, command, body, what=what))
 
 
 def send_script(host: str, remote_path: str, body: str, *, platform: NodePlatform) -> None:
@@ -371,4 +412,5 @@ __all__ = [
     "run_script_within",
     "run_ssh",
     "send_script",
+    "stream_to_command",
 ]

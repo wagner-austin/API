@@ -19,6 +19,28 @@ from __future__ import annotations
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
 
+#: How a bash payload is written on the runner host, byte for byte.
+#:
+#: NOT the Windows dialect's own write command, and that was a real bug: it
+#: pipes ``$input`` through ``Set-Content -Encoding utf8``, which in Windows
+#: PowerShell 5.1 writes a BOM and ends every line with CRLF. A PowerShell
+#: script needs exactly that; bash does not survive it. Measured on the
+#: first live ``--rebuild`` of lavender, 2026-09-26: ``line 1:
+#: ﻿#!/usr/bin/env: No such file or directory`` and ``set: pipefail:
+#: invalid option name``. The payload is copied from the raw stdin stream to
+#: the file instead, so the bytes that run are the bytes that were sent. The
+#: outer double quotes make the whole command one argument for cmd.exe, as
+#: :data:`fleet.core.dialect_windows.WRITE_COMMAND` explains.
+EXACT_WRITE_COMMAND = (
+    'powershell -NoProfile -Command "'
+    "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '{path}') | Out-Null; "
+    "$Source = [Console]::OpenStandardInput(); "
+    "$Target = [IO.File]::Create('{path}'); "
+    "$Source.CopyTo($Target); "
+    "$Target.Close()"
+    '"'
+)
+
 
 def windows_to_wsl_path(path: str) -> str:
     """A Windows drive path as the distro sees it.
@@ -59,7 +81,12 @@ def run_distro_script(spec: HostRunnerSpec, stem: str, body: str, *, timeout_sec
             with its own stderr.
     """
     windows_payload_path = f"{spec['scratch_dir']}/{stem}.sh"
-    remote.send_script(spec["host"], windows_payload_path, body, platform="windows")
+    remote.stream_to_command(
+        spec["host"],
+        EXACT_WRITE_COMMAND.format(path=windows_payload_path),
+        body,
+        what=f"sending {windows_payload_path}",
+    )
     driver = "\n".join(
         [
             "$ErrorActionPreference = 'Stop'",
@@ -78,4 +105,4 @@ def run_distro_script(spec: HostRunnerSpec, stem: str, body: str, *, timeout_sec
     )
 
 
-__all__ = ["run_distro_script", "windows_to_wsl_path"]
+__all__ = ["EXACT_WRITE_COMMAND", "run_distro_script", "windows_to_wsl_path"]
