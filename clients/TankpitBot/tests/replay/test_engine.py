@@ -6,7 +6,7 @@ import base64
 
 import pytest
 
-from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode, ReasonKind, make_behavior_score
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -204,7 +204,7 @@ class TestBuildTrace:
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(
             command=make_map_open_command(),
-            behavior=make_behavior_score("HUNT", 0, 0, 0, "find_enemies"),
+            behavior=make_behavior_score(BehaviorMode.HUNT, 0, 0, 0, ReasonKind.FIND_ENEMIES),
             updated_ai_state=ai_state,
             desired_equipment=[1, 2, 4, 5],
         )
@@ -251,7 +251,9 @@ class TestBuildTrace:
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(
             command=make_move_command(52, 63),
-            behavior=make_behavior_score("COLLECT", 900, 52, 63, "fuel_collect"),
+            behavior=make_behavior_score(
+                BehaviorMode.COLLECT, 900, 52, 63, ReasonKind.FUEL_COLLECT
+            ),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -286,7 +288,7 @@ class TestBuildTrace:
         )
         decision = make_tick_decision(
             command=make_map_open_command(),
-            behavior=make_behavior_score("HUNT", 950, 101, 100, "shoot_target"),
+            behavior=make_behavior_score(BehaviorMode.HUNT, 950, 101, 100, ReasonKind.SHOOT_TARGET),
             updated_ai_state=ai_state,
             desired_equipment=[1, 2, 4],
         )
