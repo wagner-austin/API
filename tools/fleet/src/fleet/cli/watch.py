@@ -35,7 +35,7 @@ from platform_core import cli_args
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from fleet.cli import _config
-from fleet.contracts.feed import FeedEvent, render_feed_line
+from fleet.contracts.feed import FeedEvent, FeedKind, render_feed_line
 from fleet.contracts.ledger import LedgerEntry, is_live
 from fleet.core import _test_hooks, leases, records
 
@@ -121,7 +121,7 @@ def _lost_line(row: LedgerEntry) -> str:
             run_id=row["run_id"],
             node=row["node"],
             project=row["project"],
-            kind="lost",
+            kind=FeedKind.LOST,
             detail=(
                 f"recorded running since {row['started_unix']} but holds no live lease; "
                 f"dispatched by {row['agent']}"

@@ -37,7 +37,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from fleet.cli import _config
-from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, is_live
+from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome, is_live
 from fleet.contracts.workspace import require_node
 from fleet.core import records, stop
 
@@ -78,7 +78,7 @@ def find_live_row(loaded: _config.LoadedWorkspace, *, run_id: str) -> LedgerEntr
     if not is_live(latest):
         raise AppError(
             FleetErrorCode.RUN_UNKNOWN,
-            f"{run_id} already ended as {latest['outcome']!r}; nothing to cancel",
+            f"{run_id} already ended as {latest['outcome'].value!r}; nothing to cancel",
         )
     return latest
 
@@ -111,7 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         loaded.feed,
         node=node,
         row=row,
-        outcome="cancelled",
+        outcome=LedgerOutcome.CANCELLED,
         exit_code=NO_EXIT_CODE,
         detail=f"cancelled by fleet-cancel; was dispatched by {row['agent']}",
     )

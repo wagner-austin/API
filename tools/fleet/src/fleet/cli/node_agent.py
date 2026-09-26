@@ -74,7 +74,7 @@ from typing_extensions import TypedDict
 from fleet.cli import _config
 from fleet.cli import run as run_cli
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
-from fleet.contracts.dispatch import DispatchJob, encode_job_line
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchLane, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
@@ -139,7 +139,7 @@ def refuse(
     queue.report_close(
         credentials,
         job_id=job["job_id"],
-        status="refused",
+        status=ClosingStatus.REFUSED,
         exit_code=None,
         detail=detail,
         identity=identity,
@@ -237,7 +237,7 @@ def claim_pass(
     _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
     job = queue.claim_next(
         credentials,
-        lane="node",
+        lane=DispatchLane.NODE,
         tags=tuple(sorted(node_tags(node))),
         node=alias,
         lease_seconds=CLAIM_LEASE_SECONDS,

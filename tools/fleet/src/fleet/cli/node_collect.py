@@ -42,8 +42,8 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
 from fleet.cli import collect as collect_cli
-from fleet.contracts.dispatch import DispatchJob, encode_job_line
-from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus, encode_job_line
+from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import (
@@ -149,7 +149,7 @@ def settle(
     queue.report_close(
         credentials,
         job_id=job["job_id"],
-        status="passed" if exit_code == 0 else "failed",
+        status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
         exit_code=exit_code,
         detail=line,
         identity=identity,
@@ -295,7 +295,7 @@ def stop_cancelled(
                 loaded.feed,
                 node=node,
                 row=row,
-                outcome="cancelled",
+                outcome=LedgerOutcome.CANCELLED,
                 exit_code=NO_EXIT_CODE,
                 detail=(
                     f"queue job {job['job_id']} was cancelled while it ran; stopped by "
@@ -333,7 +333,7 @@ def collect_pass(
     """
     held = queue.held_by(credentials, agent=agent)
     for job in held:
-        if job["status"] != "running":
+        if job["status"] is not DispatchStatus.RUNNING:
             continue
         _log.info("%s", collect_one_job(loaded, credentials, board, job, identity))
     stop_cancelled(

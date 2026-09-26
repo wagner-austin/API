@@ -68,7 +68,13 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
-from fleet.contracts.dispatch import DispatchJob, encode_job_line
+from fleet.contracts.dispatch import (
+    ClosingStatus,
+    DispatchCommand,
+    DispatchJob,
+    DispatchLane,
+    encode_job_line,
+)
 from fleet.core import _test_hooks, observe, published_tree, queue, rebuild, registry, restart
 
 _log = get_logger(__name__)
@@ -122,7 +128,7 @@ def _refuse_hub_job(
     queue.report_close(
         credentials,
         job_id=job["job_id"],
-        status="refused",
+        status=ClosingStatus.REFUSED,
         exit_code=None,
         detail=detail,
         identity=identity,
@@ -190,7 +196,7 @@ def rebuild_job(
     queue.report_close(
         credentials,
         job_id=job["job_id"],
-        status="passed" if result["returncode"] == 0 else "failed",
+        status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
         exit_code=result["returncode"],
         detail=detail,
         identity=identity,
@@ -279,7 +285,7 @@ def restart_job(
     queue.report_close(
         credentials,
         job_id=job["job_id"],
-        status="passed" if result["returncode"] == 0 else "failed",
+        status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
         exit_code=result["returncode"],
         detail=detail,
         identity=identity,
@@ -319,7 +325,7 @@ def claim_pass(
     """
     job = queue.claim_next(
         credentials,
-        lane="hub",
+        lane=DispatchLane.HUB,
         tags=(),
         node=node,
         lease_seconds=CLAIM_LEASE_SECONDS,
@@ -328,7 +334,7 @@ def claim_pass(
     if job is None:
         return None
     _log.info("claimed %s", encode_job_line(job))
-    if job["command"] == "build-bases":
+    if job["command"] is DispatchCommand.BUILD_BASES:
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
         return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
