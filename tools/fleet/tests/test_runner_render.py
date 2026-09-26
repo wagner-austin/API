@@ -13,7 +13,7 @@ import shutil
 import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
-from fleet.core import runner_account, runner_keepalive, runner_render
+from fleet.core import runner_account, runner_keepalive, runner_recovery, runner_render
 from tests._runner_fixtures import a_base
 
 
@@ -356,14 +356,19 @@ class TestRerunsOverAHalfBuiltHost:
         )
 
     def test_a_configured_wsl_runner_skips_config_and_svc_install(self) -> None:
-        lines = runner_render.render_wsl_install_lines(self._install("wsl"))
+        install = self._install("wsl")
+        lines = runner_render.render_wsl_install_lines(install)
         guard = lines.index("if [ ! -f /home/gharunner/actions-runner/.runner ]; then")
         assert "./config.sh" in lines[guard + 1]
         assert lines[guard + 2] == "fi"
-        assert lines[-2] == (
+        # The unit exists after svc.sh install and gets its restart policy
+        # before it starts.
+        recovery = runner_recovery.render_wsl_recovery_lines(install)
+        assert lines[-2 - len(recovery)] == (
             "[ -f /home/gharunner/actions-runner/.service ] || "
             "(cd /home/gharunner/actions-runner && ./svc.sh install gharunner)"
         )
+        assert lines[-1 - len(recovery) : -1] == recovery
         assert lines[-1] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
 
     def test_a_configured_windows_runner_skips_config_and_a_failed_one_throws(self) -> None:
@@ -380,6 +385,7 @@ class TestRerunsOverAHalfBuiltHost:
         install = self._install("windows")
         assert lines[guard + 4 :] == [
             *runner_account.render_service_account_lines(install),
+            *runner_recovery.render_windows_recovery_lines(install),
             *runner_account.render_service_running_lines(install),
         ]
 
