@@ -13,7 +13,7 @@ from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.diagnostics.run_audit import build_run_audit, capture_path_for, main
-from tankpit_bot.diagnostics.run_audit_types import make_finding
+from tankpit_bot.diagnostics.run_audit_types import CheckName, Severity, make_finding
 from tankpit_bot.runtime_logging import (
     configure_bot_runtime_logging,
     emit_diagnostic,
@@ -51,13 +51,13 @@ def test_build_run_audit_flags_missing_capture(fake_fs: FakeFileSystem) -> None:
     assert report["capture_path"] == str(Path("runs") / "bot" / "latest.capture_session.json")
     assert report["findings"] == [
         make_finding(
-            "capture_missing",
-            "warning",
+            CheckName.CAPTURE_MISSING,
+            Severity.WARNING,
             "no capture artifact beside the events file -- replay audit skipped",
         ),
         make_finding(
-            "session_exit",
-            "info",
+            CheckName.SESSION_EXIT,
+            Severity.INFO,
             "session ended: completed",
             exit_reason="completed",
             ticks=10,
@@ -89,13 +89,13 @@ def test_build_run_audit_reads_the_sibling_capture(fake_fs: FakeFileSystem) -> N
 
     assert report["findings"] == [
         make_finding(
-            "capture_unreadable",
-            "warning",
+            CheckName.CAPTURE_UNREADABLE,
+            Severity.WARNING,
             "capture carries no XOR magic -- replay audit skipped",
         ),
         make_finding(
-            "session_exit",
-            "info",
+            CheckName.SESSION_EXIT,
+            Severity.INFO,
             "session ended: completed",
             exit_reason="completed",
             ticks=10,
@@ -120,14 +120,14 @@ def test_build_run_audit_empty_artifact(fake_fs: FakeFileSystem) -> None:
 
     assert report["findings"] == [
         make_finding(
-            "empty_run",
-            "critical",
+            CheckName.EMPTY_RUN,
+            Severity.CRITICAL,
             "the events artifact contains no records -- the session "
             "died before the game loop produced anything",
         ),
         make_finding(
-            "capture_missing",
-            "warning",
+            CheckName.CAPTURE_MISSING,
+            Severity.WARNING,
             "no capture artifact beside the events file -- replay audit skipped",
         ),
     ]

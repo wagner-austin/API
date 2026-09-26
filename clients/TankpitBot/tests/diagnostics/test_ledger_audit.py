@@ -7,7 +7,12 @@ each check's timing windows and thresholds can be driven exactly.
 from __future__ import annotations
 
 from tankpit_bot.diagnostics.ledger_audit import audit_ledger
-from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
+from tankpit_bot.diagnostics.run_audit_types import (
+    CheckName,
+    FindingDict,
+    Severity,
+    make_finding,
+)
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 
@@ -39,17 +44,17 @@ def _scorecard(timestamp: str = "2026-07-19T00:51:26") -> RuntimeEventRecordDict
     )
 
 
-def _by_check(findings: list[FindingDict], check: str) -> list[FindingDict]:
+def _by_check(findings: list[FindingDict], check: CheckName) -> list[FindingDict]:
     """Return the findings produced by one check."""
-    return [f for f in findings if f["check"] == check]
+    return [f for f in findings if f["check"] is check]
 
 
 def test_empty_artifact_is_a_critical_finding() -> None:
     """No records means the session died before producing anything."""
     assert audit_ledger([]) == [
         make_finding(
-            "empty_run",
-            "critical",
+            CheckName.EMPTY_RUN,
+            Severity.CRITICAL,
             "the events artifact contains no records -- the session "
             "died before the game loop produced anything",
         )
@@ -75,10 +80,10 @@ def test_kill_double_registration_inside_window() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "kill_double_registration") == [
+    assert _by_check(findings, CheckName.KILL_DOUBLE_REGISTRATION) == [
         make_finding(
-            "kill_double_registration",
-            "critical",
+            CheckName.KILL_DOUBLE_REGISTRATION,
+            Severity.CRITICAL,
             "victim 511 registered twice within 30s -- two channels counted one death",
             victim_id=511,
             first="2026-07-19T00:50:37",
@@ -111,7 +116,7 @@ def test_kill_re_registration_outside_window_is_a_respawn_re_kill() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "kill_double_registration") == []
+    assert _by_check(findings, CheckName.KILL_DOUBLE_REGISTRATION) == []
 
 
 def test_unresolved_decisions_surface_per_action_kind() -> None:
@@ -127,17 +132,17 @@ def test_unresolved_decisions_surface_per_action_kind() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "unresolved_decision") == [
+    assert _by_check(findings, CheckName.UNRESOLVED_DECISION) == [
         make_finding(
-            "unresolved_decision",
-            "warning",
+            CheckName.UNRESOLVED_DECISION,
+            Severity.WARNING,
             "teleport decision 240 never got an outcome before shutdown",
             action_kind="teleport",
             decision_event_id=240,
         ),
         make_finding(
-            "unresolved_decision",
-            "warning",
+            CheckName.UNRESOLVED_DECISION,
+            Severity.WARNING,
             "shoot decision 235 never got an outcome before shutdown",
             action_kind="shoot",
             decision_event_id=235,
@@ -158,10 +163,10 @@ def test_stall_timeout_is_critical() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "stall_timeout") == [
+    assert _by_check(findings, CheckName.STALL_TIMEOUT) == [
         make_finding(
-            "stall_timeout",
-            "critical",
+            CheckName.STALL_TIMEOUT,
+            Severity.CRITICAL,
             "scan hit the stall timeout -- the wire never answered and "
             "the bot burned the full wait",
             action_kind="scan",
@@ -194,25 +199,25 @@ def test_single_command_rejection_is_info() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "command_rejection") == [
+    assert _by_check(findings, CheckName.COMMAND_REJECTION) == [
         make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             "server rejected a collect with error code 4",
             action_kind="collect",
             error_code=4,
             timestamp="2026-07-19T00:48:31",
         ),
         make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             "server rejected a move with error code -1",
             action_kind="move",
             error_code=-1,
             timestamp="2026-07-19T00:49:00",
         ),
     ]
-    assert _by_check(findings, "rejection_retry_loop") == []
+    assert _by_check(findings, CheckName.REJECTION_RETRY_LOOP) == []
 
 
 def test_superseded_churn_fires_only_above_threshold() -> None:
@@ -231,7 +236,7 @@ def test_superseded_churn_fires_only_above_threshold() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(quiet, "superseded_churn") == []
+    assert _by_check(quiet, CheckName.SUPERSEDED_CHURN) == []
     noisy = audit_ledger(
         [
             *(
@@ -246,10 +251,10 @@ def test_superseded_churn_fires_only_above_threshold() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(noisy, "superseded_churn") == [
+    assert _by_check(noisy, CheckName.SUPERSEDED_CHURN) == [
         make_finding(
-            "superseded_churn",
-            "warning",
+            CheckName.SUPERSEDED_CHURN,
+            Severity.WARNING,
             "6 shoot decisions were superseded mid-action -- heavy re-dispatch churn",
             action_kind="shoot",
             count=6,
@@ -268,10 +273,10 @@ def test_tick_cadence_gap_above_threshold_is_flagged() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "tick_cadence_gap") == [
+    assert _by_check(findings, CheckName.TICK_CADENCE_GAP) == [
         make_finding(
-            "tick_cadence_gap",
-            "warning",
+            CheckName.TICK_CADENCE_GAP,
+            Severity.WARNING,
             "10s of wall clock between ticks 11 and 12 -- something "
             "waited longer than any healthy cause explains",
             prev_tick=11,
@@ -295,10 +300,10 @@ def test_session_exit_reads_the_scorecard() -> None:
             )
         ]
     )
-    assert _by_check(findings, "session_exit") == [
+    assert _by_check(findings, CheckName.SESSION_EXIT) == [
         make_finding(
-            "session_exit",
-            "info",
+            CheckName.SESSION_EXIT,
+            Severity.INFO,
             "session ended: no_viable_targets",
             exit_reason="no_viable_targets",
             ticks=144,
@@ -310,10 +315,10 @@ def test_session_exit_reads_the_scorecard() -> None:
 def test_missing_scorecard_is_a_warning() -> None:
     """A run with records but no scorecard died before shutdown ran."""
     findings = audit_ledger([_record("2026-07-19T00:46:23", channel="STATE")])
-    assert _by_check(findings, "session_exit") == [
+    assert _by_check(findings, CheckName.SESSION_EXIT) == [
         make_finding(
-            "session_exit",
-            "warning",
+            CheckName.SESSION_EXIT,
+            Severity.WARNING,
             "no session scorecard in the artifact -- the run died before the shutdown path ran",
         )
     ]
@@ -330,10 +335,10 @@ def test_scorecard_with_missing_fields_uses_sentinels() -> None:
             )
         ]
     )
-    assert _by_check(findings, "session_exit") == [
+    assert _by_check(findings, CheckName.SESSION_EXIT) == [
         make_finding(
-            "session_exit",
-            "info",
+            CheckName.SESSION_EXIT,
+            Severity.INFO,
             "session ended: unknown",
             exit_reason="unknown",
             ticks=-1,
@@ -368,10 +373,10 @@ def test_successful_and_malformed_outcomes_produce_no_findings() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "command_rejection") == []
-    assert _by_check(findings, "rejection_retry_loop") == []
-    assert _by_check(findings, "executor_discards") == []
-    assert _by_check(findings, "unresolved_decision") == []
+    assert _by_check(findings, CheckName.COMMAND_REJECTION) == []
+    assert _by_check(findings, CheckName.REJECTION_RETRY_LOOP) == []
+    assert _by_check(findings, CheckName.EXECUTOR_DISCARDS) == []
+    assert _by_check(findings, CheckName.UNRESOLVED_DECISION) == []
 
 
 def test_repeated_records_for_one_tick_keep_the_first_timestamp() -> None:
@@ -384,7 +389,7 @@ def test_repeated_records_for_one_tick_keep_the_first_timestamp() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "tick_cadence_gap") == []
+    assert _by_check(findings, CheckName.TICK_CADENCE_GAP) == []
 
 
 def test_typed_collect_resolutions_classify_distinctly() -> None:
@@ -425,18 +430,18 @@ def test_typed_collect_resolutions_classify_distinctly() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "command_rejection") == [
+    assert _by_check(findings, CheckName.COMMAND_REJECTION) == [
         make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             "pickup found the container drained -- consumed by someone "
             "else between scan and pickup",
             action_kind="collect",
             timestamp="2026-07-19T17:39:00",
         ),
         make_finding(
-            "command_rejection",
-            "info",
+            CheckName.COMMAND_REJECTION,
+            Severity.INFO,
             "equipment pickup refused: all inventory slots full "
             "(beliefs reconciled) -- the fullness gate should have "
             "prevented this dispatch",
@@ -444,7 +449,7 @@ def test_typed_collect_resolutions_classify_distinctly() -> None:
             timestamp="2026-07-19T17:39:10",
         ),
     ]
-    assert _by_check(findings, "rejection_retry_loop") == []
+    assert _by_check(findings, CheckName.REJECTION_RETRY_LOOP) == []
 
 
 def test_repeated_clamped_transfers_are_not_a_retry_loop() -> None:
@@ -470,8 +475,8 @@ def test_repeated_clamped_transfers_are_not_a_retry_loop() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "rejection_retry_loop") == []
-    assert _by_check(findings, "command_rejection") == []
+    assert _by_check(findings, CheckName.REJECTION_RETRY_LOOP) == []
+    assert _by_check(findings, CheckName.COMMAND_REJECTION) == []
 
 
 def test_repeated_empty_pickups_on_one_target_are_a_retry_loop() -> None:
@@ -497,10 +502,10 @@ def test_repeated_empty_pickups_on_one_target_are_a_retry_loop() -> None:
             _scorecard(),
         ]
     )
-    assert _by_check(findings, "rejection_retry_loop") == [
+    assert _by_check(findings, CheckName.REJECTION_RETRY_LOOP) == [
         make_finding(
-            "rejection_retry_loop",
-            "critical",
+            CheckName.REJECTION_RETRY_LOOP,
+            Severity.CRITICAL,
             "collect at (200,128) failed 2 times -- replanning is not learning from the failure",
             action_kind="collect",
             target_x=200,

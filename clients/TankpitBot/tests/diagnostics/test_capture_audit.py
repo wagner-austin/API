@@ -14,9 +14,15 @@ from tests.conftest import FakeFileSystem
 from tankpit_bot import _test_hooks
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.diagnostics.capture_audit import audit_capture
-from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
+from tankpit_bot.diagnostics.run_audit_types import (
+    CheckName,
+    FindingDict,
+    Severity,
+    make_finding,
+)
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.types import CapturedMessage, CaptureSession, GameLogEntryWithTimestamp
+from tankpit_bot.types.literals import MessageDirection
 
 _MAGIC = "testmagic"
 
@@ -53,7 +59,7 @@ def _received(*frames: bytes) -> CapturedMessage:
     """Wrap frames into one received capture message."""
     return CapturedMessage(
         timestamp_ms=1000,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=base64.b64encode(b"".join(frames)).decode("ascii"),
         ws_url="wss://test",
     )
@@ -97,9 +103,9 @@ def _supervisor_frame(error_code: int) -> bytes:
     return _frame(0x52, bytes([1, 0, error_code]))
 
 
-def _by_check(findings: list[FindingDict], check: str) -> list[FindingDict]:
+def _by_check(findings: list[FindingDict], check: CheckName) -> list[FindingDict]:
     """Return the findings produced by one check."""
-    return [f for f in findings if f["check"] == check]
+    return [f for f in findings if f["check"] is check]
 
 
 def test_missing_magic_skips_the_replay(fake_fs: FakeFileSystem) -> None:
@@ -107,8 +113,8 @@ def test_missing_magic_skips_the_replay(fake_fs: FakeFileSystem) -> None:
     findings = audit_capture(_capture([], magic=None), [])
     assert findings == [
         make_finding(
-            "capture_unreadable",
-            "warning",
+            CheckName.CAPTURE_UNREADABLE,
+            Severity.WARNING,
             "capture carries no XOR magic -- replay audit skipped",
         )
     ]
@@ -124,8 +130,8 @@ def test_missing_static_key_skips_the_replay() -> None:
         _test_hooks.path_exists = original
     assert findings == [
         make_finding(
-            "capture_unreadable",
-            "warning",
+            CheckName.CAPTURE_UNREADABLE,
+            Severity.WARNING,
             "XOR static key file missing -- replay audit skipped",
         )
     ]
@@ -141,7 +147,7 @@ def test_matching_channels_report_agreement(fake_fs: FakeFileSystem) -> None:
             ),
             CapturedMessage(
                 timestamp_ms=1001,
-                direction="sent",
+                direction=MessageDirection.SENT,
                 payload=base64.b64encode(b"ignored").decode("ascii"),
                 ws_url="wss://test",
             ),
@@ -170,52 +176,52 @@ def test_matching_channels_report_agreement(fake_fs: FakeFileSystem) -> None:
         _record(diagnostic_kind="command_error", error_code=4),
     ]
     findings = audit_capture(capture, records)
-    assert _by_check(findings, "deactivation_channel_diff") == [
+    assert _by_check(findings, CheckName.DEACTIVATION_CHANNEL_DIFF) == [
         make_finding(
-            "deactivation_channel_diff",
-            "info",
+            CheckName.DEACTIVATION_CHANNEL_DIFF,
+            Severity.INFO,
             "0x41 deactivations: wire and ledger agree (1)",
             wire=1,
             ledger=1,
         )
     ]
-    assert _by_check(findings, "supervisor_channel_diff") == [
+    assert _by_check(findings, CheckName.SUPERVISOR_CHANNEL_DIFF) == [
         make_finding(
-            "supervisor_channel_diff",
-            "info",
+            CheckName.SUPERVISOR_CHANNEL_DIFF,
+            Severity.INFO,
             "0x52 command errors: wire and ledger agree (1)",
             wire=1,
             ledger=1,
         )
     ]
-    assert _by_check(findings, "dom_witness_diff") == [
+    assert _by_check(findings, CheckName.DOM_WITNESS_DIFF) == [
         make_finding(
-            "dom_witness_diff",
-            "info",
+            CheckName.DOM_WITNESS_DIFF,
+            Severity.INFO,
             "kill banners consistent with the wire (1 banner(s), 1 wire message(s))",
             banners=1,
             wire=1,
         ),
         make_finding(
-            "dom_witness_diff",
-            "info",
+            CheckName.DOM_WITNESS_DIFF,
+            Severity.INFO,
             "empty-container banners consistent with the wire (1 banner(s), 1 wire message(s))",
             banners=1,
             wire=1,
         ),
     ]
-    assert _by_check(findings, "decode_error") == []
-    assert _by_check(findings, "unknown_container_subtypes") == []
+    assert _by_check(findings, CheckName.DECODE_ERROR) == []
+    assert _by_check(findings, CheckName.UNKNOWN_CONTAINER_SUBTYPES) == []
 
 
 def test_wire_ledger_mismatch_is_critical(fake_fs: FakeFileSystem) -> None:
     """A wire message the run never ingested is the June class of bug."""
     capture = _capture([_received(_deactivation_frame(500, 1301))])
     findings = audit_capture(capture, [])
-    assert _by_check(findings, "deactivation_channel_diff") == [
+    assert _by_check(findings, CheckName.DEACTIVATION_CHANNEL_DIFF) == [
         make_finding(
-            "deactivation_channel_diff",
-            "critical",
+            CheckName.DEACTIVATION_CHANNEL_DIFF,
+            Severity.CRITICAL,
             "0x41 deactivations: capture replay found 1 but the run "
             "ingested 0 -- decode/dispatch gap",
             wire=1,
@@ -237,10 +243,10 @@ def test_unrendered_wire_banner_gap_is_critical(fake_fs: FakeFileSystem) -> None
         ],
     )
     findings = audit_capture(capture, [])
-    assert _by_check(findings, "dom_witness_diff") == [
+    assert _by_check(findings, CheckName.DOM_WITNESS_DIFF) == [
         make_finding(
-            "dom_witness_diff",
-            "critical",
+            CheckName.DOM_WITNESS_DIFF,
+            Severity.CRITICAL,
             "the client rendered 1 blocked-move banner(s) but the wire "
             "carried only 0 0x52 code-1 errors -- the decoder is "
             "missing something the client can see",
@@ -256,10 +262,10 @@ def test_unknown_container_subtype_is_the_blind_spot_canary(
     """An undecoded 0x2E subtype surfaces as a warning with its census."""
     capture = _capture([_received(_frame(0x2E, bytes([0x99, 1, 2, 3, 4, 5])))])
     findings = audit_capture(capture, [])
-    assert _by_check(findings, "unknown_container_subtypes") == [
+    assert _by_check(findings, CheckName.UNKNOWN_CONTAINER_SUBTYPES) == [
         make_finding(
-            "unknown_container_subtypes",
-            "warning",
+            CheckName.UNKNOWN_CONTAINER_SUBTYPES,
+            Severity.WARNING,
             "1 0x2E message(s) fell through to unknown_container -- "
             "undecoded wire channels (the June-blind-spot canary)",
             subtypes="0x99x1",
@@ -277,7 +283,7 @@ def test_plaintext_acks_are_not_replay_findings(fake_fs: FakeFileSystem) -> None
     ack_frames = [bytes([2, 0]) + b"A0", bytes([2, 0]) + b"C1"]
     capture = _capture([_received(*ack_frames)])
     findings = audit_capture(capture, [])
-    assert _by_check(findings, "decode_error") == []
+    assert _by_check(findings, CheckName.DECODE_ERROR) == []
 
 
 def test_decoder_crash_is_critical(fake_fs: FakeFileSystem) -> None:
@@ -286,10 +292,10 @@ def test_decoder_crash_is_critical(fake_fs: FakeFileSystem) -> None:
     # must divide by 3; two trailing bytes force a DecodeError.
     capture = _capture([_received(_frame(0x4F, bytes([1, 0, 7, 7])))])
     findings = audit_capture(capture, [])
-    assert _by_check(findings, "decode_error") == [
+    assert _by_check(findings, CheckName.DECODE_ERROR) == [
         make_finding(
-            "decode_error",
-            "critical",
+            CheckName.DECODE_ERROR,
+            Severity.CRITICAL,
             "1 received frame(s) crashed the current decoder -- the "
             "wire carries a shape the decoder rejects",
             count=1,
@@ -307,25 +313,25 @@ def test_malformed_payloads_and_short_frames_are_skipped(
         [
             CapturedMessage(
                 timestamp_ms=1000,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="not-base64!!!",
                 ws_url="wss://test",
             ),
             _received(table_frame),
             CapturedMessage(
                 timestamp_ms=1001,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload=base64.b64encode(truncated).decode("ascii"),
                 ws_url="wss://test",
             ),
         ]
     )
     findings = audit_capture(capture, [])
-    assert _by_check(findings, "decode_error") == []
-    assert _by_check(findings, "deactivation_channel_diff") == [
+    assert _by_check(findings, CheckName.DECODE_ERROR) == []
+    assert _by_check(findings, CheckName.DEACTIVATION_CHANNEL_DIFF) == [
         make_finding(
-            "deactivation_channel_diff",
-            "info",
+            CheckName.DEACTIVATION_CHANNEL_DIFF,
+            Severity.INFO,
             "0x41 deactivations: wire and ledger agree (0)",
             wire=0,
             ledger=0,
@@ -368,12 +374,12 @@ def test_other_messages_and_unknown_identity_fields(fake_fs: FakeFileSystem) -> 
         ),
     ]
     findings = audit_capture(capture, records)
-    assert _by_check(findings, "decode_error") == []
-    assert _by_check(findings, "dom_witness_diff") == []
-    assert _by_check(findings, "deactivation_channel_diff") == [
+    assert _by_check(findings, CheckName.DECODE_ERROR) == []
+    assert _by_check(findings, CheckName.DOM_WITNESS_DIFF) == []
+    assert _by_check(findings, CheckName.DEACTIVATION_CHANNEL_DIFF) == [
         make_finding(
-            "deactivation_channel_diff",
-            "info",
+            CheckName.DEACTIVATION_CHANNEL_DIFF,
+            Severity.INFO,
             "0x41 deactivations: wire and ledger agree (1)",
             wire=1,
             ledger=1,

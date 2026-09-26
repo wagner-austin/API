@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from tankpit_bot.diagnostics.run_audit_types import (
+    CheckName,
     FindingDict,
+    Severity,
     make_finding,
     make_run_audit_report,
     render_run_audit,
@@ -13,15 +15,15 @@ from tankpit_bot.diagnostics.run_audit_types import (
 def test_make_finding_builds_full_dict() -> None:
     """make_finding assembles the check, severity, summary, and evidence."""
     finding = make_finding(
-        "stall_timeout",
-        "critical",
+        CheckName.STALL_TIMEOUT,
+        Severity.CRITICAL,
         "collect hit the stall timeout",
         action_kind="collect",
         timestamp="2026-07-19T00:48:31",
     )
     assert finding == FindingDict(
-        check="stall_timeout",
-        severity="critical",
+        check=CheckName.STALL_TIMEOUT,
+        severity=Severity.CRITICAL,
         summary="collect hit the stall timeout",
         evidence={"action_kind": "collect", "timestamp": "2026-07-19T00:48:31"},
     )
@@ -29,11 +31,15 @@ def test_make_finding_builds_full_dict() -> None:
 
 def test_report_sorts_by_severity_then_check() -> None:
     """Findings order critical -> warning -> info regardless of input order."""
-    info = make_finding("session_exit", "info", "session ended: completed")
-    warn = make_finding("capture_missing", "warning", "no capture artifact")
-    crit = make_finding("stall_timeout", "critical", "scan stalled")
+    info = make_finding(CheckName.SESSION_EXIT, Severity.INFO, "session ended: completed")
+    warn = make_finding(CheckName.CAPTURE_MISSING, Severity.WARNING, "no capture artifact")
+    crit = make_finding(CheckName.STALL_TIMEOUT, Severity.CRITICAL, "scan stalled")
     report = make_run_audit_report("events.jsonl", "capture.json", [info, crit, warn])
-    assert [f["severity"] for f in report["findings"]] == ["critical", "warning", "info"]
+    assert [f["severity"] for f in report["findings"]] == [
+        Severity.CRITICAL,
+        Severity.WARNING,
+        Severity.INFO,
+    ]
     assert report["critical_count"] == 1
     assert report["warning_count"] == 1
     assert report["info_count"] == 1
@@ -47,8 +53,10 @@ def test_render_lists_findings_with_evidence() -> None:
         "events.jsonl",
         "capture.json",
         [
-            make_finding("stall_timeout", "critical", "scan stalled", action_kind="scan"),
-            make_finding("session_exit", "info", "session ended: completed"),
+            make_finding(
+                CheckName.STALL_TIMEOUT, Severity.CRITICAL, "scan stalled", action_kind="scan"
+            ),
+            make_finding(CheckName.SESSION_EXIT, Severity.INFO, "session ended: completed"),
         ],
     )
     rendered = render_run_audit(report)
