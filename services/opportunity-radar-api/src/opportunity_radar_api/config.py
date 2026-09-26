@@ -125,8 +125,8 @@ def load_settings() -> OpportunityRadarSettings:
         kaggle_api_token = ""
 
     port = _parse_int("PORT", 8010)
-    log_level = _parse_log_level("LOG_LEVEL", "INFO")
-    log_format = _parse_log_format("LOG_FORMAT", "json")
+    log_level = _parse_log_level("LOG_LEVEL", LogLevel.INFO)
+    log_format = _parse_log_format("LOG_FORMAT", LogFormat.JSON)
 
     # GitHub settings for codebase scanning from GitHub API
     github_token = _optional_env_str("GITHUB_TOKEN")

@@ -7,6 +7,8 @@ from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from opportunity_radar_api.config import (
+    LogFormat,
+    LogLevel,
     OpportunityRadarSettings,
     decode_opportunity_radar_settings,
     encode_opportunity_radar_settings,
@@ -23,8 +25,8 @@ class TestEncodeDecodeSettings:
         settings = OpportunityRadarSettings(
             kaggle_api_token="test-token",
             port=8080,
-            log_level="DEBUG",
-            log_format="text",
+            log_level=LogLevel.DEBUG,
+            log_format=LogFormat.TEXT,
             github_token="gh-token",
             github_repo="owner/repo",
         )
@@ -44,8 +46,8 @@ class TestEncodeDecodeSettings:
         settings = OpportunityRadarSettings(
             kaggle_api_token="",
             port=8010,
-            log_level="INFO",
-            log_format="json",
+            log_level=LogLevel.INFO,
+            log_format=LogFormat.JSON,
             github_token=None,
             github_repo=None,
         )

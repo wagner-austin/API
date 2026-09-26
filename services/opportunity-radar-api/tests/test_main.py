@@ -9,6 +9,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from opportunity_radar_api.api.container import ServiceContainer
 from opportunity_radar_api.api.main import create_app
+from opportunity_radar_api.config import LogFormat, LogLevel
 
 
 def test_create_app_with_container(fake_container: ServiceContainer) -> None:
@@ -66,8 +67,8 @@ def test_create_app_with_settings_but_no_container(tmp_path: Path) -> None:
     settings = OpportunityRadarSettings(
         kaggle_api_token="",
         port=8010,
-        log_level="INFO",
-        log_format="json",
+        log_level=LogLevel.INFO,
+        log_format=LogFormat.JSON,
         github_token=None,
         github_repo=None,
     )

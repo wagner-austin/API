@@ -18,7 +18,7 @@ from platform_kaggle.testing import (
 )
 
 from opportunity_radar_api.api.container import ServiceContainer
-from opportunity_radar_api.config import OpportunityRadarSettings
+from opportunity_radar_api.config import LogFormat, LogLevel, OpportunityRadarSettings
 
 
 def _make_fake_competition() -> Competition:
@@ -110,8 +110,8 @@ def _make_fake_settings() -> OpportunityRadarSettings:
     return OpportunityRadarSettings(
         kaggle_api_token="",
         port=8010,
-        log_level="INFO",
-        log_format="json",
+        log_level=LogLevel.INFO,
+        log_format=LogFormat.JSON,
         github_token=None,
         github_repo=None,
     )
