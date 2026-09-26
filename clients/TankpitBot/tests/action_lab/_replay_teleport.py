@@ -30,11 +30,8 @@ from tankpit_bot.action_lab.types import (
 from tankpit_bot.bot.world_sync import drain_messages
 from tankpit_bot.sniffer.world_service import WorldService
 
-TeleportReplayResult = ReplayResult[TeleportAttemptResultDict]
-
 __all__ = [
     "ReplayTeleportProbe",
-    "TeleportReplayResult",
     "replay_teleport_attempt",
 ]
 

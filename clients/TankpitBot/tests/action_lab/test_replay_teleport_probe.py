@@ -16,20 +16,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from tests.action_lab._replay_teleport import (
-    TeleportReplayResult,
-    replay_teleport_attempt,
-)
+from tests.action_lab._replay_core import ReplayResult
+from tests.action_lab._replay_teleport import replay_teleport_attempt
 
 from tankpit_bot.action_lab.teleport import TeleportProbeError
-from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TELEPORT_CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
 
 
 @pytest.fixture()
-def teleport_attempt() -> TeleportReplayResult:
+def teleport_attempt() -> ReplayResult[TeleportAttemptResultDict]:
     """Replay one teleport attempt against the committed capture."""
     target = TeleportTargetDict(label="recorded_pivot", x=131, y=110)
     return replay_teleport_attempt(
@@ -41,21 +39,21 @@ def teleport_attempt() -> TeleportReplayResult:
 
 
 def test_replay_consumes_recorded_frames(
-    teleport_attempt: TeleportReplayResult,
+    teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
     """Recorded frames feed the real probe through wait_for_timeout polls."""
     assert teleport_attempt.frames_fed > 0
 
 
 def test_replay_dispatches_real_map_open_command(
-    teleport_attempt: TeleportReplayResult,
+    teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
     """The real probe issues a ``map_open`` command through real ``open_map``."""
     assert "map_open" in teleport_attempt.dispatched_commands
 
 
 def test_replay_attempt_records_target(
-    teleport_attempt: TeleportReplayResult,
+    teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
     """The real attempt result preserves the supplied target verbatim."""
     target = teleport_attempt.attempt["target"]
@@ -65,7 +63,7 @@ def test_replay_attempt_records_target(
 
 
 def test_replay_attempt_reports_a_resolved_status(
-    teleport_attempt: TeleportReplayResult,
+    teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
     """The production attempt body reaches one of its declared terminal statuses."""
     assert teleport_attempt.attempt["status"] in (
@@ -77,7 +75,7 @@ def test_replay_attempt_reports_a_resolved_status(
 
 
 def test_replay_attempt_records_fuel_before(
-    teleport_attempt: TeleportReplayResult,
+    teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
     """The attempt records the real fuel snapshot from decoded frames."""
     fuel_before = teleport_attempt.attempt["fuel_before"]
@@ -85,7 +83,7 @@ def test_replay_attempt_records_fuel_before(
 
 
 def test_replay_attempt_carries_real_snapshots(
-    teleport_attempt: TeleportReplayResult,
+    teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
     """Page-client snapshots come from the real capture path."""
     snapshots = teleport_attempt.attempt["page_snapshots"]

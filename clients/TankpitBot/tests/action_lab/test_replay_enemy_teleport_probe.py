@@ -19,7 +19,6 @@ from pathlib import Path
 import pytest
 from tests.action_lab._replay_core import ReplayResult
 from tests.action_lab._replay_enemy_teleport import (
-    EnemyTeleportReplayResult,
     replay_enemy_teleport_attempt,
 )
 
@@ -42,28 +41,28 @@ def enemy_attempt() -> ReplayResult[EnemyTeleportAttemptResultDict]:
 
 
 def test_replay_consumes_recorded_frames(
-    enemy_attempt: EnemyTeleportReplayResult,
+    enemy_attempt: ReplayResult[EnemyTeleportAttemptResultDict],
 ) -> None:
     """Recorded frames feed the real probe through wait_for_timeout polls."""
     assert enemy_attempt.frames_fed > 0
 
 
 def test_replay_dispatches_real_map_open_command(
-    enemy_attempt: EnemyTeleportReplayResult,
+    enemy_attempt: ReplayResult[EnemyTeleportAttemptResultDict],
 ) -> None:
     """The real probe issues a ``map_open`` command through real ``open_map``."""
     assert "map_open" in enemy_attempt.dispatched_commands
 
 
 def test_replay_attempt_records_acquisition_strategy(
-    enemy_attempt: EnemyTeleportReplayResult,
+    enemy_attempt: ReplayResult[EnemyTeleportAttemptResultDict],
 ) -> None:
     """The real attempt result preserves the supplied acquisition strategy."""
     assert enemy_attempt.attempt["acquisition_strategy"] == "map_open"
 
 
 def test_replay_attempt_reports_a_resolved_status(
-    enemy_attempt: EnemyTeleportReplayResult,
+    enemy_attempt: ReplayResult[EnemyTeleportAttemptResultDict],
 ) -> None:
     """The production attempt body reaches one of its declared terminal statuses."""
     assert enemy_attempt.attempt["status"] in (
@@ -77,7 +76,7 @@ def test_replay_attempt_reports_a_resolved_status(
 
 
 def test_replay_attempt_records_fuel_before(
-    enemy_attempt: EnemyTeleportReplayResult,
+    enemy_attempt: ReplayResult[EnemyTeleportAttemptResultDict],
 ) -> None:
     """The attempt records the real fuel snapshot from decoded frames."""
     fuel_before = enemy_attempt.attempt["fuel_before"]

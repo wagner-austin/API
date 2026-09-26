@@ -28,10 +28,7 @@ from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.world_sync import drain_messages
 from tankpit_bot.sniffer.world_service import WorldService
 
-FuelReplayResult = ReplayResult[FuelProbeAttemptResultDict]
-
 __all__ = [
-    "FuelReplayResult",
     "ReplayFuelProbe",
     "replay_fuel_attempt",
 ]

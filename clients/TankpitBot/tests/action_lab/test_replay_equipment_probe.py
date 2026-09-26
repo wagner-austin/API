@@ -18,12 +18,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from tests.action_lab._replay_equipment import (
-    EquipmentReplayResult,
-    replay_equipment_attempt,
-)
+from tests.action_lab._replay_core import ReplayResult
+from tests.action_lab._replay_equipment import replay_equipment_attempt
 
 from tankpit_bot.action_lab.equipment_probe import EquipmentProbeError
+from tankpit_bot.action_lab.equipment_probe_types import EquipmentProbeAttemptResultDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +34,7 @@ the equipment-probe replay harness."""
 
 
 @pytest.fixture()
-def equipment_attempt() -> EquipmentReplayResult:
+def equipment_attempt() -> ReplayResult[EquipmentProbeAttemptResultDict]:
     """Replay one equipment attempt against the committed capture.
 
     Targets a tile the recording's session actually pivots toward;
@@ -55,21 +54,21 @@ def equipment_attempt() -> EquipmentReplayResult:
 
 
 def test_replay_consumes_recorded_frames(
-    equipment_attempt: EquipmentReplayResult,
+    equipment_attempt: ReplayResult[EquipmentProbeAttemptResultDict],
 ) -> None:
     """Recorded frames feed the real probe through wait_for_timeout polls."""
     assert equipment_attempt.frames_fed > 0
 
 
 def test_replay_dispatches_real_map_open_command(
-    equipment_attempt: EquipmentReplayResult,
+    equipment_attempt: ReplayResult[EquipmentProbeAttemptResultDict],
 ) -> None:
     """The real probe issues a ``map_open`` command through real ``open_map``."""
     assert "map_open" in equipment_attempt.dispatched_commands
 
 
 def test_replay_attempt_records_target(
-    equipment_attempt: EquipmentReplayResult,
+    equipment_attempt: ReplayResult[EquipmentProbeAttemptResultDict],
 ) -> None:
     """The real attempt result preserves the supplied target verbatim."""
     target = equipment_attempt.attempt["target"]
@@ -79,7 +78,7 @@ def test_replay_attempt_records_target(
 
 
 def test_replay_attempt_reports_a_resolved_status(
-    equipment_attempt: EquipmentReplayResult,
+    equipment_attempt: ReplayResult[EquipmentProbeAttemptResultDict],
 ) -> None:
     """The production attempt body reaches one of its declared terminal statuses."""
     assert equipment_attempt.attempt["status"] in (
@@ -95,7 +94,7 @@ def test_replay_attempt_reports_a_resolved_status(
 
 
 def test_replay_attempt_records_inventory_count_before(
-    equipment_attempt: EquipmentReplayResult,
+    equipment_attempt: ReplayResult[EquipmentProbeAttemptResultDict],
 ) -> None:
     """The attempt records the real inventory snapshot from decoded frames."""
     inventory_count_before = equipment_attempt.attempt["inventory_count_before"]

@@ -28,10 +28,7 @@ from tankpit_bot.action_lab.enemy_teleport_types import EnemyTeleportAttemptResu
 from tankpit_bot.bot.world_sync import drain_messages
 from tankpit_bot.sniffer.world_service import WorldService
 
-EnemyTeleportReplayResult = ReplayResult[EnemyTeleportAttemptResultDict]
-
 __all__ = [
-    "EnemyTeleportReplayResult",
     "ReplayEnemyTeleportProbe",
     "replay_enemy_teleport_attempt",
 ]

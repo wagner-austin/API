@@ -23,12 +23,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from tests.action_lab._replay_fuel import (
-    FuelReplayResult,
-    replay_fuel_attempt,
-)
+from tests.action_lab._replay_core import ReplayResult
+from tests.action_lab._replay_fuel import replay_fuel_attempt
 
 from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
+from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +35,7 @@ FUEL_CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
 
 
 @pytest.fixture()
-def fuel_attempt() -> FuelReplayResult:
+def fuel_attempt() -> ReplayResult[FuelProbeAttemptResultDict]:
     """Replay one fuel attempt against the committed capture.
 
     The recording does not surface fuel containers, so the real
@@ -55,21 +54,21 @@ def fuel_attempt() -> FuelReplayResult:
 
 
 def test_replay_consumes_recorded_frames(
-    fuel_attempt: FuelReplayResult,
+    fuel_attempt: ReplayResult[FuelProbeAttemptResultDict],
 ) -> None:
     """Recorded frames feed the real probe through wait_for_timeout polls."""
     assert fuel_attempt.frames_fed > 0
 
 
 def test_replay_dispatches_real_map_open_command(
-    fuel_attempt: FuelReplayResult,
+    fuel_attempt: ReplayResult[FuelProbeAttemptResultDict],
 ) -> None:
     """The real probe issues a ``map_open`` command through real ``open_map``."""
     assert "map_open" in fuel_attempt.dispatched_commands
 
 
 def test_replay_attempt_records_target(
-    fuel_attempt: FuelReplayResult,
+    fuel_attempt: ReplayResult[FuelProbeAttemptResultDict],
 ) -> None:
     """The real attempt result preserves the supplied target verbatim."""
     target = fuel_attempt.attempt["target"]
@@ -79,7 +78,7 @@ def test_replay_attempt_records_target(
 
 
 def test_replay_attempt_reports_a_resolved_status(
-    fuel_attempt: FuelReplayResult,
+    fuel_attempt: ReplayResult[FuelProbeAttemptResultDict],
 ) -> None:
     """The production attempt body reaches one of its declared terminal statuses."""
     assert fuel_attempt.attempt["status"] in (
@@ -95,7 +94,7 @@ def test_replay_attempt_reports_a_resolved_status(
 
 
 def test_replay_attempt_records_fuel_before(
-    fuel_attempt: FuelReplayResult,
+    fuel_attempt: ReplayResult[FuelProbeAttemptResultDict],
 ) -> None:
     """The attempt records the real fuel snapshot from decoded frames."""
     fuel_before = fuel_attempt.attempt["fuel_before"]
