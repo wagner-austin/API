@@ -191,11 +191,11 @@ def _attempt(
     adjacent_picked: bool,
 ) -> LarderAttemptDict:
     if own_picked:
-        status: LarderAttemptStatus = "own_tile_pickup"
+        status = LarderAttemptStatus.OWN_TILE_PICKUP
     elif adjacent_picked:
-        status = "adjacent_pickup"
+        status = LarderAttemptStatus.ADJACENT_PICKUP
     else:
-        status = "no_pickup"
+        status = LarderAttemptStatus.NO_PICKUP
     return LarderAttemptDict(
         container_x=104,
         container_y=100,
