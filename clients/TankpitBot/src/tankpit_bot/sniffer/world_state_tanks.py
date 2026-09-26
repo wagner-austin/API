@@ -20,6 +20,7 @@ from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import depart_tank, remove_tank
 from tankpit_bot.state.tank_mutations import apply_tank_observation
 from tankpit_bot.state.types import WorldStateDict, make_self_state, make_tank_observation
+from tankpit_bot.types.constants import EntitySource
 
 log = get_logger(__name__)
 
@@ -51,7 +52,7 @@ def update_world_state_from_tank_entry(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
-        storage_source="viewport",
+        storage_source=EntitySource.VIEWPORT,
         fact_source="wire_0x28_tank_entry",
         position=(x, y),
         team=team,
@@ -82,7 +83,7 @@ def update_world_state_from_tank_info(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
-        storage_source="viewport",
+        storage_source=EntitySource.VIEWPORT,
         fact_source="wire_0x21_tank_info",
         team=team,
         name=name,
@@ -113,7 +114,7 @@ def update_world_state_from_tank_status(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
-        storage_source="viewport",
+        storage_source=EntitySource.VIEWPORT,
         fact_source="wire_0x3E_tank_status",
         team=team,
         rank=rank,
@@ -177,7 +178,7 @@ def update_world_state_from_move_response_full(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
-        storage_source="viewport",
+        storage_source=EntitySource.VIEWPORT,
         fact_source="wire_0x3D_movement",
         position=(x, y),
         team=team,
@@ -305,7 +306,7 @@ def _update_tank_position(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
-        storage_source="viewport",
+        storage_source=EntitySource.VIEWPORT,
         fact_source=fact_source,
         position=(x, y),
     )
@@ -343,7 +344,7 @@ def _update_enemy_from_detection(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=False,
-        storage_source="world_state",
+        storage_source=EntitySource.WORLD_STATE,
         fact_source="wire_0x48_enemy_detect",
         position=(x, y),
         team=team,

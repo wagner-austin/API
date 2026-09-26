@@ -34,6 +34,7 @@ from tankpit_bot.state.scan_coverage import (
     viewport_tiles,
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 
 def _radar_revealed_tiles(ws: WorldService) -> list[tuple[int, int]]:
@@ -117,7 +118,7 @@ def update_world_state_from_radar(
             c["y"],
             c["volume"],
             ts,
-            refresh_kind="radar_response",
+            refresh_kind=ContainerRefreshKind.RADAR_RESPONSE,
         )
     for m in mines:
         ws.world_state = add_mine_from_radar(
@@ -190,7 +191,7 @@ def update_world_state_from_radar_cache(ws: WorldService) -> None:
             container["y"],
             container["volume"],
             ts,
-            refresh_kind="radar_cache_refresh",
+            refresh_kind=ContainerRefreshKind.RADAR_CACHE_REFRESH,
         )
     emit_world(
         "Radar cache refresh: refreshed %d containers in current envelope",
@@ -226,7 +227,7 @@ def update_world_state_from_radar_known_resources(ws: WorldService) -> None:
             rc["y"],
             rc["volume"],
             ts,
-            refresh_kind="radar_known_resources",
+            refresh_kind=ContainerRefreshKind.RADAR_KNOWN_RESOURCES,
         )
     emit_world(
         "Radar differential refresh: preserved %d known containers in viewport",
@@ -261,7 +262,7 @@ def _without_stale_radar_entries(
     left, top, right, bottom = bounds
     pruned: dict[str, _RadarEntityT] | None = None
     for key, entry in entries.items():
-        if entry["source"] != "radar":
+        if entry["source"] is not EntitySource.RADAR:
             continue
         x = entry["x"]
         y = entry["y"]

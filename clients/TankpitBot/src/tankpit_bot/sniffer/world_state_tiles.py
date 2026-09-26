@@ -35,6 +35,7 @@ from tankpit_bot.state.viewport_geometry import (
     viewport_patch_world_coords,
     viewport_radar_bounds,
 )
+from tankpit_bot.types.constants import EntitySource
 
 _TileEntityT = TypeVar("_TileEntityT", ContainerStateDict, MineStateDict)
 
@@ -105,7 +106,7 @@ def _without_silent_visible_entries(
     left, top, right, bottom = bounds
     pruned: dict[str, _TileEntityT] | None = None
     for key, entry in entries.items():
-        if entry["source"] == "radar":
+        if entry["source"] is EntitySource.RADAR:
             continue
         x = entry["x"]
         y = entry["y"]

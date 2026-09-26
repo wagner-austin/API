@@ -61,6 +61,7 @@ from tankpit_bot.sniffer.world_state_tiles import (
 from tankpit_bot.state import (
     deactivate_tank,
 )
+from tankpit_bot.types.constants import EntitySource
 
 log = get_logger(__name__)
 
@@ -98,7 +99,7 @@ def _update_tank_from_position_status(
         tank_id=tank_id,
         timestamp_ms=ts,
         is_wire_sourced=True,
-        storage_source="viewport",
+        storage_source=EntitySource.VIEWPORT,
         fact_source="wire_0x3D_movement",
         position=(x, y),
         team=team,
@@ -362,7 +363,7 @@ def _dispatch_map_data(
             timestamp_ms=ts,
             is_wire_sourced=False,
             position_is_authoritative=True,
-            storage_source="world_state",
+            storage_source=EntitySource.WORLD_STATE,
             fact_source="wire_0x4C_map_data",
             position=(entry["x"], entry["y"]),
             team=entry["team"],

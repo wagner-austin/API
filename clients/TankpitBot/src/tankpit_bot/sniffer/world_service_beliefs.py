@@ -16,6 +16,7 @@ from tankpit_bot.ledger.damage_book import DamageBookDict, incoming_damage_windo
 from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.state.knowledge_floors import settled_knowledge_floor_ms
+from tankpit_bot.types.constants import TankLiveness
 
 #: The reactive walk->teleport flip stays live long enough for the next
 #: decision to dispatch the teleport approach (a few server windows),
@@ -259,7 +260,7 @@ class WorldServiceBeliefsMixin:
         excluded_shooter_ids = frozenset(
             tank["tank_id"]
             for tank in self.world_state["tanks"].values()
-            if tank["liveness"] == "deactivated"
+            if tank["liveness"] is TankLiveness.DEACTIVATED
             or now_ms - tank["last_wire_seen_ms"] > presence_ttl_ms
         )
         return incoming_damage_window(self.damage_book, now_ms, window_ms, excluded_shooter_ids)
