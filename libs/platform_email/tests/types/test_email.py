@@ -6,13 +6,13 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from platform_email.types.email import (
+    BodyType,
     Email,
     EmailAddress,
+    EmailImportance,
     EmailListResult,
-    _require_body_type,
     _require_dict_value,
     _require_email_address_tuple,
-    _require_email_importance,
     decode_email,
     decode_email_address,
     decode_email_list_result,
@@ -21,61 +21,63 @@ from platform_email.types.email import (
     encode_email_list_result,
 )
 
-# =============================================================================
-# _require_body_type tests
-# =============================================================================
 
-
-class TestRequireBodyType:
-    """Tests for _require_body_type function."""
-
-    def test_returns_text_for_text_value(self) -> None:
-        """Test that 'text' value returns 'text' literal."""
-        result = _require_body_type({"body_type": "text"}, "body_type")
-        assert result == "text"
-
-    def test_returns_html_for_html_value(self) -> None:
-        """Test that 'html' value returns 'html' literal."""
-        result = _require_body_type({"body_type": "html"}, "body_type")
-        assert result == "html"
-
-    def test_raises_for_invalid_value(self) -> None:
-        """Test that invalid values raise JSONTypeError."""
-        with pytest.raises(JSONTypeError) as exc_info:
-            _require_body_type({"body_type": "markdown"}, "body_type")
-        assert "must be text/html" in str(exc_info.value)
-        assert "markdown" in str(exc_info.value)
+def _email_json(*, body_type: str, importance: str) -> JSONObject:
+    """Build an otherwise valid email JSON object with the given vocabulary words."""
+    return {
+        "id": "e",
+        "thread_id": "t",
+        "folder_id": "inbox",
+        "subject": "s",
+        "body": "b",
+        "body_type": body_type,
+        "from_address": {"address": "from@test.com", "name": "From"},
+        "to": [],
+        "cc": [],
+        "bcc": [],
+        "sent_at": "2024-01-20T12:00:00Z",
+        "received_at": "2024-01-20T12:00:01Z",
+        "is_read": False,
+        "is_draft": False,
+        "has_attachments": False,
+        "importance": importance,
+    }
 
 
 # =============================================================================
-# _require_email_importance tests
+# Vocabulary decoding tests
 # =============================================================================
 
 
-class TestRequireEmailImportance:
-    """Tests for _require_email_importance function."""
+class TestEmailVocabularies:
+    """decode_email narrows body_type and importance to their members."""
 
-    def test_returns_low_for_low_value(self) -> None:
-        """Test that 'low' value returns 'low' literal."""
-        result = _require_email_importance({"importance": "low"}, "importance")
-        assert result == "low"
+    def test_every_body_type_decodes_to_its_member(self) -> None:
+        """Each BodyType's wire word decodes to that member."""
+        for body_type in BodyType:
+            result = decode_email(_email_json(body_type=body_type.value, importance="normal"))
+            assert result["body_type"] is body_type
 
-    def test_returns_normal_for_normal_value(self) -> None:
-        """Test that 'normal' value returns 'normal' literal."""
-        result = _require_email_importance({"importance": "normal"}, "importance")
-        assert result == "normal"
+    def test_every_importance_decodes_to_its_member(self) -> None:
+        """Each EmailImportance's wire word decodes to that member."""
+        for importance in EmailImportance:
+            result = decode_email(_email_json(body_type="text", importance=importance.value))
+            assert result["importance"] is importance
 
-    def test_returns_high_for_high_value(self) -> None:
-        """Test that 'high' value returns 'high' literal."""
-        result = _require_email_importance({"importance": "high"}, "importance")
-        assert result == "high"
+    def test_unknown_body_type_is_refused(self) -> None:
+        """An unknown body_type is refused naming the word and every admitted one."""
+        with pytest.raises(
+            JSONTypeError, match=r"^Invalid body_type 'markdown': must be one of 'text', 'html'$"
+        ):
+            decode_email(_email_json(body_type="markdown", importance="normal"))
 
-    def test_raises_for_invalid_value(self) -> None:
-        """Test that invalid values raise JSONTypeError."""
-        with pytest.raises(JSONTypeError) as exc_info:
-            _require_email_importance({"importance": "urgent"}, "importance")
-        assert "must be low/normal/high" in str(exc_info.value)
-        assert "urgent" in str(exc_info.value)
+    def test_unknown_importance_is_refused(self) -> None:
+        """An unknown importance is refused naming the word and every admitted one."""
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid importance 'urgent': must be one of 'low', 'normal', 'high'$",
+        ):
+            decode_email(_email_json(body_type="text", importance="urgent"))
 
 
 # =============================================================================
@@ -206,7 +208,7 @@ def _make_test_email() -> Email:
         folder_id="inbox",
         subject="Test Subject",
         body="Test body content",
-        body_type="text",
+        body_type=BodyType.TEXT,
         from_address=EmailAddress(address="sender@test.com", name="Sender"),
         to=(EmailAddress(address="recipient@test.com", name="Recipient"),),
         cc=(),
@@ -216,7 +218,7 @@ def _make_test_email() -> Email:
         is_read=False,
         is_draft=False,
         has_attachments=False,
-        importance="normal",
+        importance=EmailImportance.NORMAL,
     )
 
 
@@ -247,7 +249,7 @@ class TestEmail:
             folder_id="sent",
             subject="Multi-recipient",
             body="Body",
-            body_type="html",
+            body_type=BodyType.HTML,
             from_address=EmailAddress(address="me@test.com", name="Me"),
             to=(
                 EmailAddress(address="a@test.com", name="A"),
@@ -260,7 +262,7 @@ class TestEmail:
             is_read=True,
             is_draft=False,
             has_attachments=True,
-            importance="high",
+            importance=EmailImportance.HIGH,
         )
         result = encode_email(email)
 
@@ -293,8 +295,8 @@ class TestEmail:
         result = decode_email(data)
 
         assert result["id"] == "email-decoded"
-        assert result["body_type"] == "html"
-        assert result["importance"] == "low"
+        assert result["body_type"] is BodyType.HTML
+        assert result["importance"] is EmailImportance.LOW
         assert result["is_read"] is True
         assert result["is_draft"] is True
         assert len(result["to"]) == 1

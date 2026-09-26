@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 from platform_core.hook_fakes import (
     make_fake_console,
@@ -23,6 +22,7 @@ from platform_email.types import (
     Draft,
     Email,
     EmailAddress,
+    EmailImportance,
     Folder,
     FolderType,
     OAuthCredentials,
@@ -115,7 +115,7 @@ def make_fake_email(
     folder_id: str = "inbox",
     subject: str = "Test Subject",
     body: str = "Test body content",
-    body_type: BodyType = "text",
+    body_type: BodyType = BodyType.TEXT,
     from_address: str = "sender@example.com",
     from_name: str = "Sender Name",
     to: tuple[str, ...] = ("recipient@example.com",),
@@ -126,7 +126,7 @@ def make_fake_email(
     is_read: bool = False,
     is_draft: bool = False,
     has_attachments: bool = False,
-    importance: EmailImportance = "normal",
+    importance: EmailImportance = EmailImportance.NORMAL,
 ) -> Email:
     """Create a fake Email for testing.
 
@@ -162,14 +162,6 @@ def make_fake_email(
     for addr in bcc:
         bcc_addrs.append(EmailAddress(address=addr, name=""))
 
-    importance_val: EmailImportance
-    if importance == "low":
-        importance_val = "low"
-    elif importance == "high":
-        importance_val = "high"
-    else:
-        importance_val = "normal"
-
     return Email(
         id=email_id,
         thread_id=thread_id,
@@ -186,7 +178,7 @@ def make_fake_email(
         is_read=is_read,
         is_draft=is_draft,
         has_attachments=has_attachments,
-        importance=importance_val,
+        importance=importance,
     )
 
 
@@ -194,7 +186,7 @@ def make_fake_folder(
     *,
     folder_id: str = "inbox",
     name: str = "Inbox",
-    folder_type: FolderType = "inbox",
+    folder_type: FolderType = FolderType.INBOX,
     unread_count: int = 0,
     total_count: int = 0,
 ) -> Folder:
@@ -253,7 +245,7 @@ def make_fake_draft(
     draft_id: str = "draft_1",
     subject: str = "Draft Subject",
     body: str = "Draft body content",
-    body_type: BodyType = "text",
+    body_type: BodyType = BodyType.TEXT,
     to: tuple[str, ...] = ("recipient@example.com",),
     cc: tuple[str, ...] = (),
     bcc: tuple[str, ...] = (),
@@ -291,10 +283,6 @@ def make_fake_draft(
         cc=tuple(cc_addrs),
         bcc=tuple(bcc_addrs),
     )
-
-
-# Type alias for EmailImportance parameter
-EmailImportance = Literal["low", "normal", "high"]
 
 
 __all__ = [

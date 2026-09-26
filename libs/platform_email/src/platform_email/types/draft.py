@@ -13,11 +13,11 @@ from platform_core.json_utils import (
     JSONValue,
     require_str,
 )
+from platform_core.members import require_member
 
 from platform_email.types.email import (
     BodyType,
     EmailAddress,
-    _require_body_type,
     _require_email_address_tuple,
     encode_email_address,
 )
@@ -95,7 +95,7 @@ def decode_draft(data: JSONObject) -> Draft:
         id=require_str(data, "id"),
         subject=require_str(data, "subject"),
         body=require_str(data, "body"),
-        body_type=_require_body_type(data, "body_type"),
+        body_type=require_member(data, "body_type", BodyType),
         to=_require_email_address_tuple(data, "to"),
         cc=_require_email_address_tuple(data, "cc"),
         bcc=_require_email_address_tuple(data, "bcc"),

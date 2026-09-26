@@ -27,7 +27,7 @@ from platform_email.testing import (
     hooks,
     reset_hooks,
 )
-from platform_email.types import Attachment
+from platform_email.types import Attachment, EmailImportance
 
 
 @pytest.fixture(autouse=True)
@@ -93,10 +93,10 @@ class TestParseImportance:
     def test_returns_high_for_high_header(self) -> None:
         """Test high importance is returned for high header."""
         headers: list[JSONValue] = [
-            {"name": "Importance", "value": "high"},
+            {"name": "Importance", "value": "High"},
         ]
         result = _parse_importance(headers)
-        assert result == "high"
+        assert result is EmailImportance.HIGH
 
     def test_returns_low_for_low_header(self) -> None:
         """Test low importance is returned for low header."""
@@ -104,13 +104,21 @@ class TestParseImportance:
             {"name": "Importance", "value": "low"},
         ]
         result = _parse_importance(headers)
-        assert result == "low"
+        assert result is EmailImportance.LOW
 
     def test_returns_normal_for_missing_header(self) -> None:
         """Test normal importance for missing header."""
         headers: list[JSONValue] = []
         result = _parse_importance(headers)
-        assert result == "normal"
+        assert result is EmailImportance.NORMAL
+
+    def test_returns_normal_for_a_word_rfc_2156_does_not_admit(self) -> None:
+        """A sender's non-standard Importance word reads as normal, not as a refusal."""
+        headers: list[JSONValue] = [
+            {"name": "Importance", "value": "urgent"},
+        ]
+        result = _parse_importance(headers)
+        assert result is EmailImportance.NORMAL
 
 
 class TestGmailEmailClientListEmailsPageToken:

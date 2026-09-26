@@ -25,6 +25,7 @@ from platform_email.types import (
     Draft,
     Email,
     EmailAddress,
+    EmailImportance,
     EmailListResult,
     Folder,
 )
@@ -37,7 +38,7 @@ class _OutlookEmailClient(_OutlookHttp):
         to: tuple[str, ...],
         subject: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         cc: tuple[str, ...] = (),
         bcc: tuple[str, ...] = (),
         attachments: tuple[Attachment, ...] = (),
@@ -138,7 +139,7 @@ class _OutlookEmailClient(_OutlookHttp):
             is_read=True,
             is_draft=False,
             has_attachments=len(attachments) > 0,
-            importance="normal",
+            importance=EmailImportance.NORMAL,
         )
 
     def get_email(self, *, email_id: str) -> Email:
@@ -232,7 +233,7 @@ class _OutlookEmailClient(_OutlookHttp):
         to: tuple[str, ...],
         subject: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         cc: tuple[str, ...] = (),
         bcc: tuple[str, ...] = (),
     ) -> Draft:
@@ -343,7 +344,7 @@ class _OutlookEmailClient(_OutlookHttp):
         *,
         email_id: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         reply_all: bool = False,
     ) -> Email:
         """Reply to an email.
@@ -386,7 +387,7 @@ class _OutlookEmailClient(_OutlookHttp):
             is_read=True,
             is_draft=False,
             has_attachments=False,
-            importance="normal",
+            importance=EmailImportance.NORMAL,
         )
 
     def delete_email(self, *, email_id: str, permanent: bool = False) -> None:

@@ -20,6 +20,7 @@ from platform_email.providers.gmail_decode import (
 from platform_email.testing import (
     reset_hooks,
 )
+from platform_email.types import FolderType
 
 
 @pytest.fixture(autouse=True)
@@ -56,33 +57,33 @@ class TestDecodeFolderType:
 
     def test_inbox(self) -> None:
         """Test inbox folder type."""
-        assert _decode_folder_type("INBOX") == "inbox"
-        assert _decode_folder_type("inbox") == "inbox"
+        assert _decode_folder_type("INBOX") is FolderType.INBOX
+        assert _decode_folder_type("inbox") is FolderType.INBOX
 
     def test_sent(self) -> None:
         """Test sent folder type."""
-        assert _decode_folder_type("SENT") == "sent"
+        assert _decode_folder_type("SENT") is FolderType.SENT
 
     def test_drafts(self) -> None:
         """Test drafts folder type."""
-        assert _decode_folder_type("DRAFT") == "drafts"
+        assert _decode_folder_type("DRAFT") is FolderType.DRAFTS
 
     def test_trash(self) -> None:
         """Test trash folder type."""
-        assert _decode_folder_type("TRASH") == "trash"
+        assert _decode_folder_type("TRASH") is FolderType.TRASH
 
     def test_spam(self) -> None:
         """Test spam folder type."""
-        assert _decode_folder_type("SPAM") == "spam"
+        assert _decode_folder_type("SPAM") is FolderType.SPAM
 
     def test_archive(self) -> None:
         """Test archive folder type."""
-        assert _decode_folder_type("ARCHIVE") == "archive"
-        assert _decode_folder_type("ALL") == "archive"
+        assert _decode_folder_type("ARCHIVE") is FolderType.ARCHIVE
+        assert _decode_folder_type("ALL") is FolderType.ARCHIVE
 
     def test_custom(self) -> None:
         """Test custom folder type."""
-        assert _decode_folder_type("MyLabel") == "custom"
+        assert _decode_folder_type("MyLabel") is FolderType.CUSTOM
 
 
 class TestGetHeaderValue:

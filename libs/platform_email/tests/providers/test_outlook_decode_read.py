@@ -6,7 +6,7 @@ from collections.abc import Generator
 
 import pytest
 from platform_core.errors import AppError, EmailErrorCode
-from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
+from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, dump_json_str
 
 from platform_email.fake_hooks import (
     make_fake_http_get,
@@ -20,7 +20,7 @@ from platform_email.providers.outlook import (
 from platform_email.providers.outlook_decode import (
     _decode_email_address,
     _decode_folder_type,
-    _decode_importance,
+    _decode_message,
     _decode_recipients,
 )
 from platform_email.testing import (
@@ -28,7 +28,7 @@ from platform_email.testing import (
     hooks,
     reset_hooks,
 )
-from platform_email.types import Attachment
+from platform_email.types import Attachment, BodyType, EmailImportance, FolderType
 
 
 @pytest.fixture(autouse=True)
@@ -98,49 +98,69 @@ class TestDecodeFolderType:
 
     def test_inbox(self) -> None:
         """Test inbox folder type."""
-        assert _decode_folder_type("Inbox") == "inbox"
-        assert _decode_folder_type("INBOX") == "inbox"
+        assert _decode_folder_type("Inbox") is FolderType.INBOX
+        assert _decode_folder_type("INBOX") is FolderType.INBOX
 
     def test_sent_items(self) -> None:
         """Test sent folder type."""
-        assert _decode_folder_type("Sent Items") == "sent"
-        assert _decode_folder_type("Sent") == "sent"
+        assert _decode_folder_type("Sent Items") is FolderType.SENT
+        assert _decode_folder_type("Sent") is FolderType.SENT
 
     def test_drafts(self) -> None:
         """Test drafts folder type."""
-        assert _decode_folder_type("Drafts") == "drafts"
+        assert _decode_folder_type("Drafts") is FolderType.DRAFTS
 
     def test_trash(self) -> None:
         """Test trash folder type."""
-        assert _decode_folder_type("Deleted Items") == "trash"
-        assert _decode_folder_type("Trash") == "trash"
+        assert _decode_folder_type("Deleted Items") is FolderType.TRASH
+        assert _decode_folder_type("Trash") is FolderType.TRASH
 
     def test_spam(self) -> None:
         """Test spam folder type."""
-        assert _decode_folder_type("Junk Email") == "spam"
-        assert _decode_folder_type("Spam") == "spam"
-        assert _decode_folder_type("Junk") == "spam"
+        assert _decode_folder_type("Junk Email") is FolderType.SPAM
+        assert _decode_folder_type("Spam") is FolderType.SPAM
+        assert _decode_folder_type("Junk") is FolderType.SPAM
 
     def test_archive(self) -> None:
         """Test archive folder type."""
-        assert _decode_folder_type("Archive") == "archive"
+        assert _decode_folder_type("Archive") is FolderType.ARCHIVE
 
     def test_custom(self) -> None:
         """Test custom folder type."""
-        assert _decode_folder_type("My Custom Folder") == "custom"
+        assert _decode_folder_type("My Custom Folder") is FolderType.CUSTOM
 
 
-class TestDecodeImportance:
-    """Tests for _decode_importance helper."""
+def _graph_message(extra: JSONObject) -> JSONObject:
+    """A Graph message with only an id, plus the fields a test names."""
+    message: JSONObject = {"id": "msg"}
+    message.update(extra)
+    return message
 
-    def test_html_body_type(self) -> None:
-        """Test html body type."""
-        assert _decode_importance("html") == "html"
 
-    def test_text_body_type(self) -> None:
-        """Test text body type."""
-        assert _decode_importance("text") == "text"
-        assert _decode_importance(None) == "text"
+class TestDecodeMessageVocabularies:
+    """_decode_message narrows Graph's bodyType and importance enumerations strictly."""
+
+    def test_absent_content_type_and_importance_read_as_text_and_normal(self) -> None:
+        """A body without contentType is text, and a message without importance is normal."""
+        email = _decode_message(_graph_message({"body": {"content": "hi"}}))
+        assert email["body_type"] is BodyType.TEXT
+        assert email["importance"] is EmailImportance.NORMAL
+
+    def test_unknown_content_type_is_refused(self) -> None:
+        """A contentType outside Graph's bodyType enumeration is refused by name."""
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid body.contentType 'markdown': must be one of 'text', 'html'$",
+        ):
+            _decode_message(_graph_message({"body": {"contentType": "markdown"}}))
+
+    def test_unknown_importance_is_refused(self) -> None:
+        """An importance outside Graph's enumeration is refused by name."""
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid importance 'urgent': must be one of 'low', 'normal', 'high'$",
+        ):
+            _decode_message(_graph_message({"importance": "urgent"}))
 
 
 class TestOutlookEmailClientInit:
@@ -208,8 +228,8 @@ class TestOutlookEmailClientGetEmail:
         client = _OutlookEmailClient(access_token="token")
         email = client.get_email(email_id="msg123")
 
-        assert email["body_type"] == "html"
-        assert email["importance"] == "high"
+        assert email["body_type"] is BodyType.HTML
+        assert email["importance"] is EmailImportance.HIGH
 
     def test_get_email_with_low_importance(self) -> None:
         """Test email with low importance."""
@@ -233,7 +253,7 @@ class TestOutlookEmailClientGetEmail:
         client = _OutlookEmailClient(access_token="token")
         email = client.get_email(email_id="msg123")
 
-        assert email["importance"] == "low"
+        assert email["importance"] is EmailImportance.LOW
 
     def test_get_email_connection_error(self) -> None:
         """Test connection error handling."""
@@ -311,7 +331,7 @@ class TestOutlookEmailClientSendEmail:
             to=("recipient@test.com",),
             subject="HTML Email",
             body="<p>Hello</p>",
-            body_type="html",
+            body_type=BodyType.HTML,
         )
 
         assert email["body_type"] == "html"

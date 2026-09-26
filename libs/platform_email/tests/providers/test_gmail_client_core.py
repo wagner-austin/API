@@ -22,7 +22,7 @@ from platform_email.testing import (
     hooks,
     reset_hooks,
 )
-from platform_email.types import Attachment
+from platform_email.types import Attachment, BodyType
 
 
 @pytest.fixture(autouse=True)
@@ -221,7 +221,7 @@ class TestGmailEmailClientSendEmail:
             to=("recipient@test.com",),
             subject="HTML Email",
             body="<p>Hello</p>",
-            body_type="html",
+            body_type=BodyType.HTML,
         )
 
         assert email["body_type"] == "html"

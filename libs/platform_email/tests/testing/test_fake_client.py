@@ -13,6 +13,7 @@ from platform_email.fake_hooks import (
 from platform_email.fakes import (
     FakeEmailClient,
 )
+from platform_email.types import BodyType
 
 
 class TestFakeEmailClientSendEmail:
@@ -52,7 +53,7 @@ class TestFakeEmailClientSendEmail:
             to=("recipient@test.com",),
             subject="HTML Email",
             body="<p>Hello</p>",
-            body_type="html",
+            body_type=BodyType.HTML,
         )
         assert email["body_type"] == "html"
 

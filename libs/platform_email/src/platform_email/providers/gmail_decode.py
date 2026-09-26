@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import base64
 import email.utils
+from collections.abc import Mapping
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Final
 
 from platform_core.json_utils import (
     JSONObject,
@@ -15,6 +17,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import find_member
 
 from platform_email.types import (
     Attachment,
@@ -39,6 +42,18 @@ def _parse_email_address(header: str) -> EmailAddress:
     return EmailAddress(address=addr, name=name)
 
 
+# Gmail's system label names, upper-cased, and the folder each one is.
+_GMAIL_SYSTEM_LABELS: Final[Mapping[str, FolderType]] = {
+    "INBOX": FolderType.INBOX,
+    "SENT": FolderType.SENT,
+    "DRAFT": FolderType.DRAFTS,
+    "TRASH": FolderType.TRASH,
+    "SPAM": FolderType.SPAM,
+    "ARCHIVE": FolderType.ARCHIVE,
+    "ALL": FolderType.ARCHIVE,
+}
+
+
 def _decode_folder_type(label_name: str) -> FolderType:
     """Map Gmail label name to FolderType.
 
@@ -46,22 +61,9 @@ def _decode_folder_type(label_name: str) -> FolderType:
         label_name: Gmail label name.
 
     Returns:
-        FolderType literal.
+        The system folder the label names, or CUSTOM for any label a user made.
     """
-    upper_name = label_name.upper()
-    if upper_name == "INBOX":
-        return "inbox"
-    if upper_name == "SENT":
-        return "sent"
-    if upper_name == "DRAFT":
-        return "drafts"
-    if upper_name == "TRASH":
-        return "trash"
-    if upper_name == "SPAM":
-        return "spam"
-    if upper_name in ("ARCHIVE", "ALL"):
-        return "archive"
-    return "custom"
+    return _GMAIL_SYSTEM_LABELS.get(label_name.upper(), FolderType.CUSTOM)
 
 
 def _get_header_value(headers: list[JSONValue], name: str) -> str:
@@ -119,7 +121,7 @@ def _decode_simple_body(payload: JSONObject) -> tuple[str, BodyType] | None:
     if decoded is None:
         return None
     mime_type = optional_str(payload, "mimeType") or "text/plain"
-    body_type: BodyType = "html" if "html" in mime_type.lower() else "text"
+    body_type = BodyType.HTML if "html" in mime_type.lower() else BodyType.TEXT
     return decoded, body_type
 
 
@@ -152,9 +154,9 @@ def _decode_multipart_body(parts: list[JSONValue]) -> tuple[str, BodyType] | Non
         elif mime_type == "text/plain":
             text_body = decoded
     if html_body:
-        return html_body, "html"
+        return html_body, BodyType.HTML
     if text_body:
-        return text_body, "text"
+        return text_body, BodyType.TEXT
     return None
 
 
@@ -179,7 +181,7 @@ def _decode_body_content(payload: JSONObject) -> tuple[str, BodyType]:
         if multipart_result is not None:
             return multipart_result
 
-    return "", "text"
+    return "", BodyType.TEXT
 
 
 def _extract_labels(data: JSONObject) -> list[str]:
@@ -263,14 +265,14 @@ def _parse_importance(headers: list[JSONValue]) -> EmailImportance:
         headers: List of header objects.
 
     Returns:
-        EmailImportance literal.
+        The importance the header names; NORMAL when it is absent or names none.
+        The header is the sender's free text, which RFC 2156 limits to low,
+        normal and high but nothing enforces, so an unrecognised word reads as
+        normal, as a mail client shows it, rather than refusing the message.
     """
-    importance_header = _get_header_value(headers, "Importance")
-    if importance_header.lower() == "high":
-        return "high"
-    if importance_header.lower() == "low":
-        return "low"
-    return "normal"
+    word = _get_header_value(headers, "Importance").lower()
+    importance = find_member(word, EmailImportance)
+    return importance if importance is not None else EmailImportance.NORMAL
 
 
 def _decode_message(data: JSONObject, include_body: bool = True) -> Email:
@@ -291,7 +293,7 @@ def _decode_message(data: JSONObject, include_body: bool = True) -> Email:
 
     # Get body content
     body_content = ""
-    body_type: BodyType = "text"
+    body_type = BodyType.TEXT
     if include_body and isinstance(payload, dict):
         body_content, body_type = _decode_body_content(payload)
 

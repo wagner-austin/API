@@ -10,7 +10,7 @@ from platform_email.types.draft import (
     decode_draft,
     encode_draft,
 )
-from platform_email.types.email import EmailAddress
+from platform_email.types.email import BodyType, EmailAddress
 
 
 def _make_test_draft() -> Draft:
@@ -19,7 +19,7 @@ def _make_test_draft() -> Draft:
         id="draft-123",
         subject="Draft Subject",
         body="Draft body content",
-        body_type="text",
+        body_type=BodyType.TEXT,
         to=(EmailAddress(address="recipient@test.com", name="Recipient"),),
         cc=(),
         bcc=(),
@@ -50,7 +50,7 @@ class TestDraft:
             id="draft-multi",
             subject="Multi-recipient draft",
             body="<p>HTML body</p>",
-            body_type="html",
+            body_type=BodyType.HTML,
             to=(
                 EmailAddress(address="a@test.com", name="A"),
                 EmailAddress(address="b@test.com", name="B"),
@@ -113,9 +113,10 @@ class TestDraft:
             "cc": [],
             "bcc": [],
         }
-        with pytest.raises(JSONTypeError) as exc_info:
+        with pytest.raises(
+            JSONTypeError, match=r"^Invalid body_type 'markdown': must be one of 'text', 'html'$"
+        ):
             decode_draft(data)
-        assert "must be text/html" in str(exc_info.value)
 
     def test_roundtrip(self) -> None:
         """Test encode then decode preserves data."""
@@ -130,7 +131,7 @@ class TestDraft:
             id="roundtrip-draft",
             subject="Roundtrip Test",
             body="<html><body>Test</body></html>",
-            body_type="html",
+            body_type=BodyType.HTML,
             to=(EmailAddress(address="to@test.com", name="To"),),
             cc=(EmailAddress(address="cc@test.com", name="CC"),),
             bcc=(EmailAddress(address="bcc@test.com", name="BCC"),),

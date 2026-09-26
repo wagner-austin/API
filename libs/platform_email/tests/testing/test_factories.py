@@ -23,7 +23,15 @@ from platform_email.fake_hooks import (
     make_raising_http_get,
     make_raising_http_send,
 )
-from platform_email.types import OAuthCredentials, OAuthTokens, OutlookOAuthConfig, TokenType
+from platform_email.types import (
+    BodyType,
+    EmailImportance,
+    FolderType,
+    OAuthCredentials,
+    OAuthTokens,
+    OutlookOAuthConfig,
+    TokenType,
+)
 
 # =============================================================================
 # HTTP Hook Factory Tests
@@ -278,8 +286,8 @@ class TestMakeFakeEmail:
             email_id="custom_id",
             subject="Custom Subject",
             body="<p>HTML</p>",
-            body_type="html",
-            importance="high",
+            body_type=BodyType.HTML,
+            importance=EmailImportance.HIGH,
         )
         assert email["id"] == "custom_id"
         assert email["subject"] == "Custom Subject"
@@ -299,7 +307,7 @@ class TestMakeFakeEmail:
 
     def test_creates_email_with_low_importance(self) -> None:
         """Test creating email with low importance."""
-        email = make_fake_email(importance="low")
+        email = make_fake_email(importance=EmailImportance.LOW)
         assert email["importance"] == "low"
 
 
@@ -318,7 +326,7 @@ class TestMakeFakeFolder:
         folder = make_fake_folder(
             folder_id="custom_folder",
             name="My Custom Folder",
-            folder_type="custom",
+            folder_type=FolderType.CUSTOM,
             unread_count=5,
             total_count=100,
         )
@@ -370,7 +378,7 @@ class TestMakeFakeDraft:
             draft_id="my_draft",
             subject="Custom Draft",
             body="<html>Draft</html>",
-            body_type="html",
+            body_type=BodyType.HTML,
             to=("a@test.com", "b@test.com"),
         )
         assert draft["id"] == "my_draft"

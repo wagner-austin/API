@@ -11,6 +11,7 @@ from platform_email.types import (
     Draft,
     Email,
     EmailAddress,
+    EmailImportance,
     EmailListResult,
     Folder,
 )
@@ -103,7 +104,7 @@ class FakeEmailClient(EmailClientProtocol):
         to: tuple[str, ...],
         subject: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         cc: tuple[str, ...] = (),
         bcc: tuple[str, ...] = (),
         attachments: tuple[Attachment, ...] = (),
@@ -138,7 +139,7 @@ class FakeEmailClient(EmailClientProtocol):
             is_read=True,
             is_draft=False,
             has_attachments=len(attachments) > 0,
-            importance="normal",
+            importance=EmailImportance.NORMAL,
         )
 
         self._emails[email_id] = email
@@ -198,7 +199,7 @@ class FakeEmailClient(EmailClientProtocol):
         to: tuple[str, ...],
         subject: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         cc: tuple[str, ...] = (),
         bcc: tuple[str, ...] = (),
     ) -> Draft:
@@ -257,7 +258,7 @@ class FakeEmailClient(EmailClientProtocol):
         *,
         email_id: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         reply_all: bool = False,
     ) -> Email:
         """Reply to an email."""

@@ -5,58 +5,31 @@ Provides Folder and FolderType types with encode/decode functions.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     require_int,
     require_str,
 )
+from platform_core.members import require_member
 
 # =============================================================================
-# Literal Types
-# =============================================================================
-
-FolderType = Literal["inbox", "sent", "drafts", "trash", "spam", "archive", "custom"]
-
-
-# =============================================================================
-# Validation Helpers
+# Vocabularies
 # =============================================================================
 
 
-def _require_folder_type(obj: JSONObject, key: str) -> FolderType:
-    """Extract and validate FolderType from JSON object.
+class FolderType(StrEnum):
+    """Which system folder a provider's folder or label is; CUSTOM for a user-made one."""
 
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated FolderType literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid FolderType.
-    """
-    value = require_str(obj, key)
-    if value == "inbox":
-        return "inbox"
-    if value == "sent":
-        return "sent"
-    if value == "drafts":
-        return "drafts"
-    if value == "trash":
-        return "trash"
-    if value == "spam":
-        return "spam"
-    if value == "archive":
-        return "archive"
-    if value == "custom":
-        return "custom"
-    raise JSONTypeError(
-        f"Field '{key}' must be inbox/sent/drafts/trash/spam/archive/custom, got '{value}'"
-    )
+    INBOX = "inbox"
+    SENT = "sent"
+    DRAFTS = "drafts"
+    TRASH = "trash"
+    SPAM = "spam"
+    ARCHIVE = "archive"
+    CUSTOM = "custom"
 
 
 # =============================================================================
@@ -116,7 +89,7 @@ def decode_folder(data: JSONObject) -> Folder:
     return Folder(
         id=require_str(data, "id"),
         name=require_str(data, "name"),
-        folder_type=_require_folder_type(data, "folder_type"),
+        folder_type=require_member(data, "folder_type", FolderType),
         unread_count=require_int(data, "unread_count"),
         total_count=require_int(data, "total_count"),
     )

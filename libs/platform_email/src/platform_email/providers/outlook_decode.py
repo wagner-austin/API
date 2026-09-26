@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Final
+
 from platform_core.json_utils import (
     JSONObject,
     JSONValue,
     optional_str,
     require_str,
 )
+from platform_core.members import as_member
 
 from platform_email.types import (
     BodyType,
     Email,
     EmailAddress,
+    EmailImportance,
     FolderType,
 )
 
@@ -51,6 +56,21 @@ def _decode_recipients(items: list[JSONValue]) -> tuple[EmailAddress, ...]:
     return tuple(result)
 
 
+# Outlook's well-known folder display names, lower-cased, and the folder each one is.
+_OUTLOOK_SYSTEM_FOLDERS: Final[Mapping[str, FolderType]] = {
+    "inbox": FolderType.INBOX,
+    "sent items": FolderType.SENT,
+    "sent": FolderType.SENT,
+    "drafts": FolderType.DRAFTS,
+    "deleted items": FolderType.TRASH,
+    "trash": FolderType.TRASH,
+    "junk email": FolderType.SPAM,
+    "spam": FolderType.SPAM,
+    "junk": FolderType.SPAM,
+    "archive": FolderType.ARCHIVE,
+}
+
+
 def _decode_folder_type(display_name: str) -> FolderType:
     """Map Outlook folder display name to FolderType.
 
@@ -58,37 +78,9 @@ def _decode_folder_type(display_name: str) -> FolderType:
         display_name: Folder display name from Graph API.
 
     Returns:
-        FolderType literal.
+        The system folder the name is, or CUSTOM for any folder a user made.
     """
-    lower_name = display_name.lower()
-    if lower_name == "inbox":
-        return "inbox"
-    if lower_name in ("sent items", "sent"):
-        return "sent"
-    if lower_name == "drafts":
-        return "drafts"
-    if lower_name in ("deleted items", "trash"):
-        return "trash"
-    if lower_name in ("junk email", "spam", "junk"):
-        return "spam"
-    if lower_name == "archive":
-        return "archive"
-    return "custom"
-
-
-def _decode_importance(value: str | None) -> BodyType:
-    """Decode importance level.
-
-    Args:
-        value: Importance value from Graph API.
-
-    Returns:
-        EmailImportance literal.
-    """
-    # This is actually mapping body type not importance - fix
-    if value == "html":
-        return "html"
-    return "text"
+    return _OUTLOOK_SYSTEM_FOLDERS.get(display_name.lower(), FolderType.CUSTOM)
 
 
 def _decode_message(data: JSONObject) -> Email:
@@ -119,24 +111,21 @@ def _decode_message(data: JSONObject) -> Email:
     # Get body
     body_raw = data.get("body")
     body_content = ""
-    body_type: BodyType = "text"
+    body_type = BodyType.TEXT
     if isinstance(body_raw, dict):
         body_content = optional_str(body_raw, "content") or ""
-        content_type = optional_str(body_raw, "contentType") or "text"
-        if content_type.lower() == "html":
-            body_type = "html"
+        content_type = optional_str(body_raw, "contentType")
+        if content_type is not None:
+            # Graph's bodyType is the enumeration text, html: another word is refused.
+            body_type = as_member(content_type.lower(), "body.contentType", BodyType)
 
-    # Get importance
-    importance_raw = optional_str(data, "importance") or "normal"
-    from platform_email.types.email import EmailImportance
-
-    final_importance: EmailImportance
-    if importance_raw == "low":
-        final_importance = "low"
-    elif importance_raw == "high":
-        final_importance = "high"
-    else:
-        final_importance = "normal"
+    # Graph's importance is the enumeration low, normal, high: another word is refused.
+    importance_word = optional_str(data, "importance")
+    final_importance = (
+        EmailImportance.NORMAL
+        if importance_word is None
+        else as_member(importance_word.lower(), "importance", EmailImportance)
+    )
 
     return Email(
         id=require_str(data, "id"),

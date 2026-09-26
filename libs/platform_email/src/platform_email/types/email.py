@@ -5,7 +5,8 @@ Provides Email, EmailAddress, and EmailListResult types with encode/decode funct
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
@@ -16,62 +17,31 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
 # =============================================================================
-# Literal Types
+# Vocabularies
 # =============================================================================
 
-BodyType = Literal["text", "html"]
-EmailImportance = Literal["low", "normal", "high"]
+
+class BodyType(StrEnum):
+    """How an email body is encoded, spelled as Microsoft Graph's bodyType spells it."""
+
+    TEXT = "text"
+    HTML = "html"
+
+
+class EmailImportance(StrEnum):
+    """An email's importance, spelled as Graph's importance and RFC 2156's header spell it."""
+
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
 
 
 # =============================================================================
 # Validation Helpers
 # =============================================================================
-
-
-def _require_body_type(obj: JSONObject, key: str) -> BodyType:
-    """Extract and validate BodyType from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated BodyType literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid BodyType.
-    """
-    value = require_str(obj, key)
-    if value == "text":
-        return "text"
-    if value == "html":
-        return "html"
-    raise JSONTypeError(f"Field '{key}' must be text/html, got '{value}'")
-
-
-def _require_email_importance(obj: JSONObject, key: str) -> EmailImportance:
-    """Extract and validate EmailImportance from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Key to extract.
-
-    Returns:
-        Validated EmailImportance literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid EmailImportance.
-    """
-    value = require_str(obj, key)
-    if value == "low":
-        return "low"
-    if value == "normal":
-        return "normal"
-    if value == "high":
-        return "high"
-    raise JSONTypeError(f"Field '{key}' must be low/normal/high, got '{value}'")
 
 
 def _require_dict_value(value: JSONValue, context: str) -> JSONObject:
@@ -277,7 +247,7 @@ def decode_email(data: JSONObject) -> Email:
         folder_id=require_str(data, "folder_id"),
         subject=require_str(data, "subject"),
         body=require_str(data, "body"),
-        body_type=_require_body_type(data, "body_type"),
+        body_type=require_member(data, "body_type", BodyType),
         from_address=decode_email_address(from_dict),
         to=_require_email_address_tuple(data, "to"),
         cc=_require_email_address_tuple(data, "cc"),
@@ -287,7 +257,7 @@ def decode_email(data: JSONObject) -> Email:
         is_read=require_bool(data, "is_read"),
         is_draft=require_bool(data, "is_draft"),
         has_attachments=require_bool(data, "has_attachments"),
-        importance=_require_email_importance(data, "importance"),
+        importance=require_member(data, "importance", EmailImportance),
     )
 
 

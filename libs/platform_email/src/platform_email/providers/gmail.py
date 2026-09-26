@@ -190,7 +190,7 @@ class _GmailEmailClient:
         to: tuple[str, ...],
         subject: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         cc: tuple[str, ...] = (),
         bcc: tuple[str, ...] = (),
         attachments: tuple[Attachment, ...] = (),
@@ -314,7 +314,7 @@ class _GmailEmailClient:
         to: tuple[str, ...],
         subject: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         cc: tuple[str, ...] = (),
         bcc: tuple[str, ...] = (),
     ) -> Draft:
@@ -389,7 +389,7 @@ class _GmailEmailClient:
         *,
         email_id: str,
         body: str,
-        body_type: BodyType = "text",
+        body_type: BodyType = BodyType.TEXT,
         reply_all: bool = False,
     ) -> Email:
         """Reply to an email.
