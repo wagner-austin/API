@@ -30,9 +30,11 @@ ceiling. This module owns the ORDER; the dialect owns what the node is asked
 to run, and :mod:`fleet.core.names` owns what each file is called.
 
 NOTHING HERE CATCHES. A failure to stage or launch propagates with its own
-code, and :func:`finish` is the explicit act that gives the lease back -- at a
-call site that knows the run is over, rather than a ``finally`` that would
-also fire on the way out of a success.
+code, and the lease goes back by an explicit act at a call site that knows the
+run is over, rather than a ``finally`` that would also fire on the way out of
+a success: :func:`finish` for a run that launched, and
+:func:`fleet.core.run_lease.abandon` for one that took its lease and never did
+(MCPs board task e12affc5), which is where the lease step itself lives.
 """
 
 from __future__ import annotations
@@ -42,11 +44,11 @@ from typing import Protocol
 
 from typing_extensions import TypedDict
 
-from fleet.contracts.feed import FeedEvent, FeedKind
+from fleet.contracts.feed import FeedKind
 from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.project import MAKE_TARGET, ProjectConfig, lease_seconds
+from fleet.contracts.project import MAKE_TARGET, ProjectConfig
 from fleet.core import (
     _test_hooks,
     dialect,
@@ -56,74 +58,9 @@ from fleet.core import (
     names,
     records,
     remote,
+    run_lease,
     staging,
 )
-
-#: How much longer than its estimate a dispatch may hold its lease.
-#:
-#: Two rather than a tighter figure because the estimate comes from whichever
-#: machine last ran the suite, and this fleet's nodes differ by more than a
-#: factor of two in free memory -- so a run on the smallest node legitimately
-#: takes far longer than one on the largest. A lease that expired underneath a
-#: healthy run would hand its environment to a second dispatch, which is the
-#: corruption the lease exists to prevent, reintroduced by its own timeout.
-LEASE_SLACK = 2.0
-
-
-def run_id_for(project: str, *, started_unix: int) -> str:
-    """Name a dispatch.
-
-    Derived rather than random, so the identifier a person reads names the
-    thing it identifies. The project's slashes become hyphens because the id
-    is used as a directory name on the node.
-
-    Args:
-        project: Repo-relative project path.
-        started_unix: When the dispatch began.
-
-    Returns:
-        The run id.
-    """
-    return f"{project.replace('/', '-')}-{started_unix}"
-
-
-def open_lease(
-    *,
-    node: str,
-    project: str,
-    run_id: str,
-    agent: str,
-    session_id: str,
-    plan: ProjectConfig,
-    now_unix: int,
-) -> Lease:
-    """Build the claim a dispatch will hold for its run.
-
-    Args:
-        node: The node's workspace name.
-        project: Repo-relative project path.
-        run_id: The dispatch.
-        agent: Board label of the dispatching session.
-        session_id: That session's UUID.
-        plan: The project, whose expected duration sizes the window.
-        now_unix: Current time, whole seconds since the epoch.
-
-    Returns:
-        The lease, sized at :data:`LEASE_SLACK` times the estimate and
-        carrying whatever fleet-wide resources the project declared. Read
-        from the plan rather than passed separately, so a caller cannot
-        dispatch a project while forgetting what it contends for.
-    """
-    return Lease(
-        node=node,
-        project=project,
-        run_id=run_id,
-        agent=agent,
-        session_id=session_id,
-        acquired_unix=now_unix,
-        expires_unix=now_unix + lease_seconds(plan, slack=LEASE_SLACK),
-        resources=plan["exclusive_resources"],
-    )
 
 
 def started_row(
@@ -199,48 +136,6 @@ def closed_row(
         exit_code=exit_code,
         workers=row["workers"],
         detail=detail,
-    )
-
-
-def emit(
-    feed_path: pathlib.Path,
-    *,
-    run_id: str,
-    node: str,
-    project: str,
-    kind: FeedKind,
-    detail: str,
-    now_unix: int,
-) -> None:
-    """Append one event to the stream subscribers tail.
-
-    It takes the three identifying strings rather than a
-    :class:`~fleet.contracts.lease.Lease`, because a lease is not what an
-    event is about: the terminal events are emitted when a run is CLOSED, at
-    which point the caller may hold a ledger row and no lease at all. Naming
-    the fields is what lets both callers use the one function.
-
-    Args:
-        feed_path: The feed file.
-        run_id: The dispatch the event belongs to.
-        node: Its node's workspace name.
-        project: Repo-relative project path.
-        kind: What happened. Typed as the Literal rather than a string, so a
-            kind that does not exist is a type error here rather than a
-            decode failure in whoever reads the feed next.
-        detail: Human-readable specifics.
-        now_unix: Current time, whole seconds since the epoch.
-    """
-    records.append_feed(
-        feed_path,
-        FeedEvent(
-            at_unix=now_unix,
-            run_id=run_id,
-            node=node,
-            project=project,
-            kind=kind,
-            detail=detail,
-        ),
     )
 
 
@@ -364,7 +259,13 @@ def start(
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
 ) -> LedgerEntry:
-    """Take the lease, stage the tree, launch the suite, and record it.
+    """Take the lease, then :func:`launch` under it: ``fleet-run``'s dispatch.
+
+    A failure after the lease propagates with the lease still held, to a
+    person at a terminal who reads the code. The queue's node lane calls
+    :func:`fleet.core.run_lease.take` and :func:`launch` itself, because an
+    unattended runner must give the lease back (:func:`run_lease.abandon`)
+    before a resubmission bounces off it.
 
     Args:
         loaded_leases: The lease file.
@@ -377,6 +278,59 @@ def start(
         workers: Test workers the capacity check granted.
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
+        build_payload: Builds the archive once the lease is held.
+        companions: The repositories staged beside the export.
+        recipe: Where in the tree the recipe runs and what readies it.
+
+    Returns:
+        The running ledger row.
+
+    Raises:
+        AppError: With ``LEASE_HELD`` from the lease, or any code
+            :func:`launch` raises.
+    """
+    lease = run_lease.take(
+        loaded_leases,
+        loaded_feed,
+        node_name=node_name,
+        project=project,
+        plan=plan,
+        workers=workers,
+        agent=agent,
+        session_id=session_id,
+    )
+    return launch(
+        loaded_ledger,
+        loaded_feed,
+        lease=lease,
+        node=node,
+        workers=workers,
+        build_payload=build_payload,
+        companions=companions,
+        recipe=recipe,
+    )
+
+
+def launch(
+    loaded_ledger: pathlib.Path,
+    loaded_feed: pathlib.Path,
+    *,
+    lease: Lease,
+    node: NodeConfig,
+    workers: int,
+    build_payload: PayloadBuilder,
+    companions: tuple[export.CompanionExport, ...],
+    recipe: Recipe,
+) -> LedgerEntry:
+    """Stage the tree, launch the suite, and record it, under a held lease.
+
+    Args:
+        loaded_ledger: The ledger file.
+        loaded_feed: The feed file.
+        lease: The lease :func:`fleet.core.run_lease.take` returned, which
+            names the run, its node and its project.
+        node: The node's declaration.
+        workers: Test workers the capacity check granted.
         build_payload: Builds the archive once the lease is held:
             :func:`working_tree_payload` for ``fleet-run``, the export of a
             commit for the queue's node lane (:mod:`fleet.core.export`).
@@ -389,34 +343,15 @@ def start(
         The running ledger row.
 
     Raises:
-        AppError: With ``LEASE_HELD`` when another dispatch holds this
-            project on this node, the builder's own codes
-            (``STAGE_ARCHIVE_UNREADABLE``, ``SHA_NOT_ON_REMOTE``,
-            ``EXPORT_FAILED``), ``STAGE_DIGEST_MISMATCH`` from staging, or
-            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the transport.
+        AppError: With the builder's own codes (``STAGE_ARCHIVE_UNREADABLE``,
+            ``SHA_NOT_ON_REMOTE``, ``EXPORT_FAILED``),
+            ``STAGE_DIGEST_MISMATCH`` from staging, or ``NODE_UNREACHABLE``
+            or ``DISPATCH_FAILED`` from the transport. The lease is still
+            held then; giving it back is the caller's act.
     """
-    now_unix = _test_hooks.now()
-    run_id = run_id_for(project, started_unix=now_unix)
-    lease = open_lease(
-        node=node_name,
-        project=project,
-        run_id=run_id,
-        agent=agent,
-        session_id=session_id,
-        plan=plan,
-        now_unix=now_unix,
-    )
-    leases.acquire(loaded_leases, lease, now_unix=now_unix)
-    emit(
-        loaded_feed,
-        run_id=run_id,
-        node=node_name,
-        project=project,
-        kind="leased",
-        detail=f"{workers} worker(s)",
-        now_unix=now_unix,
-    )
-
+    run_id = lease["run_id"]
+    node_name = lease["node"]
+    project = lease["project"]
     payload = build_payload(run_id)
     target = staging.stage(
         node["host"],
@@ -425,7 +360,7 @@ def start(
         stage_root=node["stage_root"],
         payload=payload["data"],
     )
-    emit(
+    run_lease.emit(
         loaded_feed,
         run_id=run_id,
         node=node_name,
@@ -455,7 +390,7 @@ def start(
             sha=companion["sha"],
             payload=companion["data"],
         )
-        emit(
+        run_lease.emit(
             loaded_feed,
             run_id=run_id,
             node=node_name,
@@ -489,7 +424,7 @@ def start(
     )
     row = started_row(lease=lease, host=node["host"], workers=workers, detail=f"staged to {target}")
     records.append_ledger(loaded_ledger, row)
-    emit(
+    run_lease.emit(
         loaded_feed,
         run_id=run_id,
         node=node_name,
@@ -546,7 +481,7 @@ def finish(
         row, outcome=outcome, exit_code=exit_code, ended_unix=ended_unix, detail=detail
     )
     records.append_ledger(loaded_ledger, closing)
-    emit(
+    run_lease.emit(
         loaded_feed,
         run_id=row["run_id"],
         node=row["node"],
@@ -577,15 +512,12 @@ _OUTCOME_EVENT: dict[LedgerOutcome, FeedKind] = {
 
 
 __all__ = [
-    "LEASE_SLACK",
     "Payload",
     "PayloadBuilder",
     "Recipe",
     "closed_row",
-    "emit",
     "finish",
-    "open_lease",
-    "run_id_for",
+    "launch",
     "start",
     "started_row",
     "working_tree_payload",

@@ -33,7 +33,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig, lease_seconds
-from fleet.core import dialect, dispatch, names, remote
+from fleet.core import dialect, names, remote, run_lease
 
 #: The exit status a passing ``make check`` leaves.
 PASSING_EXIT_CODE = 0
@@ -161,7 +161,7 @@ def lease_deadline(row: LedgerEntry, plan: ProjectConfig) -> int:
     removed on release and dropped on the next acquire, so by the time a
     result is collected the record of when it would have expired may be gone.
     The row's ``started_unix`` and the project's declared duration are the two
-    inputs :func:`~fleet.core.dispatch.open_lease` used, so recomputing them
+    inputs :func:`~fleet.core.run_lease.open_lease` used, so recomputing them
     reproduces the same instant without depending on the file still holding
     it.
 
@@ -173,7 +173,7 @@ def lease_deadline(row: LedgerEntry, plan: ProjectConfig) -> int:
     Returns:
         The epoch second the claim was due to lapse.
     """
-    return row["started_unix"] + lease_seconds(plan, slack=dispatch.LEASE_SLACK)
+    return row["started_unix"] + lease_seconds(plan, slack=run_lease.LEASE_SLACK)
 
 
 def outlived_its_lease(row: LedgerEntry, plan: ProjectConfig, *, finished_unix: int) -> bool:
