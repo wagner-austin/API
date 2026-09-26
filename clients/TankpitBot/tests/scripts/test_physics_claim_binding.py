@@ -208,7 +208,13 @@ class TestTheTwoTreesDisagreeing:
 
         Asserted as an equality between two runs rather than against a fixed
         verdict: the point is not what the rules decide, it is that the
-        artefacts make no difference to what they decide.
+        artefacts make no difference to what they decide. The decision is
+        the count and the printed ``physics_claim_violation`` lines, and
+        those are what is compared. The whole captured stdout is not: it
+        also carries the rich log line for the unimportable module, whose
+        time column is printed only when the second has changed since the
+        previous record, so equality of the raw text depended on where a
+        second boundary fell (API CI run 36223095675 at a543a69).
         """
         source_root = self._tree(tmp_path / "src", '__all__ = ["X"]\nX = 1\n')
         _write_page(
@@ -217,7 +223,12 @@ class TestTheTwoTreesDisagreeing:
             _claims_page('{"claims": [{"id": "x", "code": "pkg.facts:X", "value": 1}]}'),
         )
         clean_count = run_physics_claim_rules(tmp_path, package_name="pkg", source_root=source_root)
-        clean_out = capsys.readouterr().out
+        clean_verdicts = [
+            line
+            for line in capsys.readouterr().out.splitlines()
+            if line.startswith("physics_claim_violation")
+        ]
+        assert clean_verdicts, "the clean run printed no verdict, so equality would prove nothing"
 
         cache = source_root / "pkg" / "__pycache__"
         cache.mkdir()
@@ -227,8 +238,13 @@ class TestTheTwoTreesDisagreeing:
         littered_count = run_physics_claim_rules(
             tmp_path, package_name="pkg", source_root=source_root
         )
+        littered_verdicts = [
+            line
+            for line in capsys.readouterr().out.splitlines()
+            if line.startswith("physics_claim_violation")
+        ]
 
-        assert (littered_count, capsys.readouterr().out) == (clean_count, clean_out)
+        assert (littered_count, littered_verdicts) == (clean_count, clean_verdicts)
 
     def test_a_module_this_tree_has_but_python_cannot_import_is_reported(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
