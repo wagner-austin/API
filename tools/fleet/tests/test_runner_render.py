@@ -14,6 +14,7 @@ import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import runner_render
+from tests._runner_fixtures import a_base
 
 
 def _host(
@@ -49,6 +50,7 @@ def _host(
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-1/_work",
                 labels=["lavender-wsl"],
+                python_toolcache=[],
             ),
             RunnerInstall(
                 repo="wagner-austin/MCPs",
@@ -57,6 +59,7 @@ def _host(
                 service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-2/_work",
                 labels=["lavender-wsl", "linux-ci"],
+                python_toolcache=[],
             ),
         ],
         assets=[
@@ -87,6 +90,7 @@ def _host(
         ]
         if assets is None
         else assets,
+        base=a_base(),
     )
 
 
@@ -113,11 +117,18 @@ class TestWindowsScript:
             service="actions.runner.wagner-austin-tree-bot.lavender",
             workdir="C:/actions-runner-tree-bot/_work",
             labels=["lavender"],
+            python_toolcache=["3.11.9", "3.12.10"],
         )
         spec["installs"].append(windows_install)
         script = runner_render.render_provision(spec)["windows_script"]
-        expected_block = "\n".join(runner_render.render_windows_install_lines(windows_install))
+        expected_block = "\n".join(
+            [
+                *runner_render.render_windows_install_lines(windows_install),
+                *runner_render.render_windows_python_toolcache_lines(windows_install),
+            ]
+        )
         assert expected_block in script
+        assert "python/3.12.10" in script
         # And it never leaks into the Linux script, whose environment
         # cannot run it.
         assert "config.cmd" not in runner_render.render_provision(spec)["linux_script"]
@@ -175,6 +186,7 @@ class TestLinuxScript:
             service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
             workdir="/home/gharunner/actions-runner/_work",
             labels=["lavender-wsl"],
+            python_toolcache=[],
         )
         windows = RunnerInstall(
             repo="wagner-austin/MCPs",
@@ -183,14 +195,18 @@ class TestLinuxScript:
             service="actions.runner.wagner-austin-MCPs.lavender",
             workdir="C:/actions-runner/_work",
             labels=["lavender"],
+            python_toolcache=[],
         )
         [configure] = [
             line for line in runner_render.render_wsl_install_lines(wsl) if "./config.sh" in line
         ]
         assert configure.endswith('--name lavender-wsl --labels lavender-wsl --replace"')
-        assert runner_render.render_windows_install_lines(windows)[-1].endswith(
-            "--name lavender --labels lavender --runasservice --replace"
-        )
+        [configure_cmd] = [
+            line
+            for line in runner_render.render_windows_install_lines(windows)
+            if "config.cmd' --unattended" in line
+        ]
+        assert configure_cmd.endswith("--name lavender --labels lavender --runasservice --replace")
 
     def test_the_local_bin_line_appends_once_when_run_for_real(
         self, tmp_path: pathlib.Path
@@ -215,6 +231,7 @@ class TestLinuxScript:
             service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
             workdir="rt/_work",
             labels=["lavender-wsl"],
+            python_toolcache=[],
         )
         appends = [
             line for line in runner_render.render_wsl_install_lines(install) if ".path" in line
@@ -272,6 +289,66 @@ class TestLinuxScript:
     def test_the_ci_clean_timer_fires_daily(self) -> None:
         assert "OnCalendar=*-*-* 04:00" in runner_render.CI_CLEAN_TIMER
         assert "Persistent=true" in runner_render.CI_CLEAN_TIMER
+
+
+class TestRerunsOverAHalfBuiltHost:
+    """--rebuild re-runs every stage, so a configured install is left alone."""
+
+    def _install(self, side: str) -> RunnerInstall:
+        """One install on the given side.
+
+        Args:
+            side: ``wsl`` or ``windows``.
+
+        Returns:
+            The install, seeding nothing.
+        """
+        if side == "wsl":
+            return RunnerInstall(
+                repo="wagner-austin/MCPs",
+                runner_name="lavender-wsl",
+                side="wsl",
+                service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
+                workdir="/home/gharunner/actions-runner/_work",
+                labels=["lavender-wsl"],
+                python_toolcache=[],
+            )
+        return RunnerInstall(
+            repo="wagner-austin/MCPs",
+            runner_name="lavender",
+            side="windows",
+            service="actions.runner.wagner-austin-MCPs.lavender",
+            workdir="C:/actions-runner/_work",
+            labels=["lavender"],
+            python_toolcache=[],
+        )
+
+    def test_a_configured_wsl_runner_skips_config_and_svc_install(self) -> None:
+        lines = runner_render.render_wsl_install_lines(self._install("wsl"))
+        guard = lines.index("if [ ! -f /home/gharunner/actions-runner/.runner ]; then")
+        assert "./config.sh" in lines[guard + 1]
+        assert lines[guard + 2] == "fi"
+        assert lines[-2] == (
+            "[ -f /home/gharunner/actions-runner/.service ] || "
+            "(cd /home/gharunner/actions-runner && ./svc.sh install gharunner)"
+        )
+        assert lines[-1] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
+
+    def test_a_configured_windows_runner_skips_config_and_a_failed_one_throws(self) -> None:
+        lines = runner_render.render_windows_install_lines(self._install("windows"))
+        guard = lines.index("if (-not (Test-Path 'C:\\actions-runner\\.runner')) {")
+        assert "config.cmd' --unattended" in lines[guard + 1]
+        assert (
+            "if ($LASTEXITCODE -ne 0) { throw 'config.cmd for wagner-austin/MCPs"
+            in (lines[guard + 2])
+        )
+        assert lines[-1] == "}"
+
+    def test_an_install_seeding_nothing_renders_no_toolcache_lines(self) -> None:
+        assert runner_render.render_windows_python_toolcache_lines(self._install("windows")) == []
+
+    def test_no_memory_floor_writes_no_wslconfig(self) -> None:
+        assert runner_render.render_wslconfig_lines(_host(wslconfig_min_memory_gb=None)) == []
 
 
 class TestManualSteps:

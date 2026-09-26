@@ -424,6 +424,7 @@ def _restore() -> None:
     """Rebind every hook to the implementation it starts life with."""
     _test_hooks.run = _test_hooks._default_run
     _test_hooks.now = _test_hooks._default_now
+    _test_hooks.sleep = _test_hooks._default_sleep
     _test_hooks.read_text = _test_hooks._default_read_text
     _test_hooks.read_bytes = _test_hooks._default_read_bytes
     _test_hooks.file_exists = _test_hooks._default_file_exists

@@ -22,6 +22,7 @@ from fleet.contracts.runners import (
 )
 from fleet.core import _test_hooks, runner_audit
 from fleet.core.dialect_windows import POWERSHELL_INVOCATION
+from tests._runner_fixtures import a_base
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -62,6 +63,7 @@ def _host(
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-api-1/_work",
                 labels=["lavender-wsl"],
+                python_toolcache=[],
             )
         ],
         assets=[
@@ -84,7 +86,13 @@ def _host(
         ]
         if assets is None
         else assets,
+        base=a_base(),
     )
+
+
+#: The two rows every host reports whatever else it declares.
+_DISK_ID = "disk:/:ceiling-150gb:baseline-46gb@2026-09-26"
+_POLICY_ID = "execution-policy:LocalMachine:RemoteSigned"
 
 
 def _clean_transcript(spec: HostRunnerSpec) -> str:
@@ -110,6 +118,8 @@ class TestExpectedChecks:
         assert ids == [
             "keepalive:wsl-keepalive",
             "memory-floor:26gb",
+            _DISK_ID,
+            _POLICY_ID,
             "gpu:wagner-austin/API:wsl:lavender-wsl",
             "timer:ci-clean.timer",
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
@@ -130,9 +140,14 @@ class TestExpectedChecks:
         )
         ids = [check["check_id"] for check in runner_audit.expected_checks(spec)]
         assert ids == [
+            _DISK_ID,
+            _POLICY_ID,
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
             "workdir:wagner-austin/API:wsl:lavender-wsl",
         ]
+
+    def test_the_disk_row_carries_the_ceiling_and_the_idle_baseline(self) -> None:
+        assert runner_audit.disk_check_id(_host()) == _DISK_ID
 
 
 class TestRenderAuditScript:
@@ -174,18 +189,18 @@ class TestParseAuditTranscript:
     def test_a_clean_transcript_scores_every_check_ok(self) -> None:
         spec = _host()
         findings = runner_audit.parse_audit_transcript(spec, _clean_transcript(spec))
-        assert [finding["ok"] for finding in findings] == [True] * 10
+        assert [finding["ok"] for finding in findings] == [True] * 12
         assert findings[0]["reason"].startswith("the scheduled task")
 
     def test_a_drift_line_carries_its_detail_and_reason(self) -> None:
         spec = _host()
         lines = _clean_transcript(spec).splitlines()
-        lines[2] = (
+        lines[4] = (
             "CHECK gpu:wagner-austin/API:wsl:lavender-wsl DRIFT "
             "nvidia-smi on the runner PATH said: "
         )
         findings = runner_audit.parse_audit_transcript(spec, "\n".join(lines))
-        drifted = findings[2]
+        drifted = findings[4]
         assert drifted["ok"] is False
         assert drifted["detail"] == "nvidia-smi on the runner PATH said: "
         assert drifted["reason"] == "runner jobs on this host digest a real GPU"
@@ -193,7 +208,7 @@ class TestParseAuditTranscript:
     def test_blank_lines_are_not_checks(self) -> None:
         spec = _host()
         transcript = "\n\n" + _clean_transcript(spec) + "\n"
-        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 10
+        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 12
 
     def test_a_non_check_line_is_unparsable(self) -> None:
         spec = _host()
@@ -262,14 +277,17 @@ class TestAttemptAuditHost:
 
 #: A ``wsl`` stand-in for the asset checks, defined ahead of the rendered
 #: script so PowerShell resolves the function before wsl.exe. It answers
-#: ``test`` through $LASTEXITCODE and ``sha256sum`` on stdout, from the two
-#: variables each case sets, and nothing else: every other line of the
-#: script under test runs as rendered. PowerShell's binder consumes the
-#: ``--`` a function receives, so the command is the third argument.
+#: ``test`` through $LASTEXITCODE and ``sha256sum`` and ``df`` on stdout,
+#: from the variables each case sets, and nothing else: every other line of
+#: the script under test runs as rendered. PowerShell's binder consumes the
+#: ``--`` a function receives, so the command is the third argument. A
+#: ``Get-ExecutionPolicy`` function shadows the cmdlet the same way, so the
+#: policy row reads the case's value rather than this machine's.
 FAKE_WSL = """function wsl {
     $command = $args[2]
     if ($command -eq 'test') { $global:LASTEXITCODE = $script:TestExit; return }
     if ($command -eq 'sha256sum') { $global:LASTEXITCODE = 0; return $script:ShaLines }
+    if ($command -eq 'df') { $global:LASTEXITCODE = 0; return $script:DfLines }
     if ($command -eq 'systemctl') { $global:LASTEXITCODE = 0; return 'active' }
     if ($command -eq 'sh' -and $args[4] -like 'PATH=$(cat /home/gharunner/*/.path) nvidia-smi *') {
         $global:LASTEXITCODE = 0
@@ -277,7 +295,11 @@ FAKE_WSL = """function wsl {
     }
     throw "unexpected wsl call: $args"
 }
+function Get-ExecutionPolicy { param([string]$Scope) return $script:Policy }
 """
+
+#: What ``df -BG --output=used /`` prints on an idle rebuilt host.
+_IDLE_DF = "@('Used', '  46G')"
 
 
 def _run_asset_checks(tmp_path: pathlib.Path, test_exit: int, sha_lines: str) -> list[str]:
@@ -313,7 +335,14 @@ def _run_asset_checks(tmp_path: pathlib.Path, test_exit: int, sha_lines: str) ->
 
 
 def _run_audit(
-    tmp_path: pathlib.Path, spec: HostRunnerSpec, *, test_exit: int, sha_lines: str, gpu_lines: str
+    tmp_path: pathlib.Path,
+    spec: HostRunnerSpec,
+    *,
+    test_exit: int,
+    sha_lines: str,
+    gpu_lines: str,
+    df_lines: str = _IDLE_DF,
+    policy: str = "RemoteSigned",
 ) -> list[str]:
     """Execute one rendered audit script under Windows PowerShell 5.1.
 
@@ -323,6 +352,8 @@ def _run_audit(
         test_exit: The exit code every ``test`` reports.
         sha_lines: What ``sha256sum`` prints, a PowerShell expression.
         gpu_lines: What nvidia-smi on the runner PATH prints, likewise.
+        df_lines: What ``df`` prints, likewise.
+        policy: What the LocalMachine execution policy reads.
 
     Returns:
         The CHECK lines the script emitted.
@@ -330,7 +361,8 @@ def _run_audit(
     script = tmp_path / "audit.ps1"
     script.write_text(
         f"$script:TestExit = {test_exit}\n$script:ShaLines = {sha_lines}\n"
-        f"$script:GpuLines = {gpu_lines}\n" + FAKE_WSL + runner_audit.render_audit_script(spec),
+        f"$script:GpuLines = {gpu_lines}\n$script:DfLines = {df_lines}\n"
+        f"$script:Policy = '{policy}'\n" + FAKE_WSL + runner_audit.render_audit_script(spec),
         encoding="utf-8",
     )
     ran = subprocess.run(
@@ -351,6 +383,8 @@ class TestTheRenderedAuditRunsForReal:
     ) -> None:
         lines = _run_asset_checks(tmp_path, 1, "@()")
         assert lines == [
+            f"CHECK {_DISK_ID} OK",
+            f"CHECK {_POLICY_ID} OK",
             "CHECK asset:/opt/corvis/rw-game/game-lib.jar DRIFT test -e exited 1",
             "CHECK sha256:/opt/corvis/rw-game/game-lib.jar DRIFT sha256sum said: ",
         ]
@@ -361,6 +395,8 @@ class TestTheRenderedAuditRunsForReal:
         digest = "8a" * 32
         lines = _run_asset_checks(tmp_path, 0, f"@('{digest}  /opt/corvis/rw-game/game-lib.jar')")
         assert lines == [
+            f"CHECK {_DISK_ID} OK",
+            f"CHECK {_POLICY_ID} OK",
             "CHECK asset:/opt/corvis/rw-game/game-lib.jar OK",
             "CHECK sha256:/opt/corvis/rw-game/game-lib.jar OK",
         ]
@@ -383,7 +419,62 @@ class TestTheRenderedAuditRunsForReal:
         )
         lines = _run_audit(tmp_path, spec, test_exit=0, sha_lines="@()", gpu_lines=gpu_lines)
         assert lines == [
+            f"CHECK {_DISK_ID} OK",
+            f"CHECK {_POLICY_ID} OK",
             f"CHECK gpu:wagner-austin/API:wsl:lavender-wsl {expected}",
             "CHECK service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service OK",
             "CHECK workdir:wagner-austin/API:wsl:lavender-wsl OK",
+        ]
+
+    @pytest.mark.parametrize(
+        ("df_lines", "expected"),
+        [
+            (_IDLE_DF, f"CHECK {_DISK_ID} OK"),
+            ("@('Used', ' 150G')", f"CHECK {_DISK_ID} OK"),
+            (
+                "@('Used', ' 151G')",
+                f"CHECK {_DISK_ID} DRIFT the distro root uses 151 GB against a ceiling of 150 "
+                "GB; an idle rebuilt host used 46 GB on 2026-09-26; df said:  151G",
+            ),
+            (
+                "@()",
+                f"CHECK {_DISK_ID} DRIFT the distro root uses -1 GB against a ceiling of 150 "
+                "GB; an idle rebuilt host used 46 GB on 2026-09-26; df said: ",
+            ),
+        ],
+    )
+    def test_the_disk_row_fails_a_host_past_its_ceiling_and_an_unreadable_one(
+        self, tmp_path: pathlib.Path, df_lines: str, expected: str
+    ) -> None:
+        """At the ceiling passes, one GB past it drifts with both numbers
+        and df's own words, and a df that said nothing drifts rather than
+        passing as zero."""
+        spec = _host(
+            keepalive_task=None,
+            wslconfig_min_memory_gb=None,
+            gpu_required=False,
+            systemd_timers=[],
+            assets=[],
+        )
+        spec["installs"] = []
+        lines = _run_audit(
+            tmp_path, spec, test_exit=0, sha_lines="@()", gpu_lines="@()", df_lines=df_lines
+        )
+        assert lines == [expected, f"CHECK {_POLICY_ID} OK"]
+
+    def test_a_restricted_host_drifts_on_the_policy_row(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(
+            keepalive_task=None,
+            wslconfig_min_memory_gb=None,
+            gpu_required=False,
+            systemd_timers=[],
+            assets=[],
+        )
+        spec["installs"] = []
+        lines = _run_audit(
+            tmp_path, spec, test_exit=0, sha_lines="@()", gpu_lines="@()", policy="Restricted"
+        )
+        assert lines == [
+            f"CHECK {_DISK_ID} OK",
+            f"CHECK {_POLICY_ID} DRIFT Get-ExecutionPolicy -Scope LocalMachine said: Restricted",
         ]

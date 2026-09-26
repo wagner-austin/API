@@ -17,6 +17,7 @@ from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
 from fleet.cli import runners
 from fleet.core import _test_hooks, runner_load
+from tests._runner_fixtures import base_json, quiet_rebuild_answers
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -46,9 +47,11 @@ def _raw_host(name: str) -> dict[str, JSONValue]:
                 "service": f"actions.runner.wagner-austin-API.{name}-wsl.service",
                 "workdir": "/home/gharunner/actions-runner-1/_work",
                 "labels": ["lavender-wsl"],
+                "python_toolcache": [],
             }
         ],
         "assets": [],
+        "base": base_json(),
     }
 
 
@@ -74,9 +77,12 @@ def _clean_transcript(name: str) -> str:
         name: The host's name.
 
     Returns:
-        The OK lines.
+        The OK lines: the disk and policy rows every host reports, then the
+        one install's two.
     """
     return (
+        "CHECK disk:/:ceiling-150gb:baseline-46gb@2026-09-26 OK\n"
+        "CHECK execution-policy:LocalMachine:RemoteSigned OK\n"
         f"CHECK service:wsl:actions.runner.wagner-austin-API.{name}-wsl.service OK\n"
         f"CHECK workdir:wagner-austin/API:wsl:{name}-wsl OK\n"
     )
@@ -139,10 +145,8 @@ class TestAudit:
 
     def test_drift_exits_one(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
-        transcript = (
-            "CHECK service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service "
-            "DRIFT it said: inactive\n"
-            "CHECK workdir:wagner-austin/API:wsl:lavender-wsl OK\n"
+        transcript = _clean_transcript("lavender").replace(
+            "lavender-wsl.service OK", "lavender-wsl.service DRIFT it said: inactive"
         )
         _test_hooks.run = FakeRun([ok(""), ok(transcript)])
         assert runners.main(["--spec", spec_path]) == 1
@@ -393,6 +397,61 @@ class TestOnboardMode:
             "wagner-austin/API",
             "wagner-austin/x",
         ]
+
+
+class TestRebuildMode:
+    """The --rebuild mode: its confirmation, its host, and its exit codes."""
+
+    def test_rebuild_requires_host(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="--rebuild requires --host"):
+            runners.main(["--spec", spec_path, "--rebuild", "yes"])
+
+    def test_rebuild_takes_only_the_literal_yes(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="takes the literal value yes"):
+            runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "true"])
+
+    def test_a_clean_rebuild_exits_zero(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        runner = FakeRun(quiet_rebuild_answers(_clean_transcript("lavender"), repos=1))
+        _test_hooks.run = runner
+        assert runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"]) == 0
+        assert len(runner.calls) == 18
+
+    def test_a_rebuild_whose_audit_drifts_exits_one(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        transcript = _clean_transcript("lavender").replace(
+            "RemoteSigned OK", "RemoteSigned DRIFT Get-ExecutionPolicy said: Restricted"
+        )
+        _test_hooks.run = FakeRun(quiet_rebuild_answers(transcript, repos=1))
+        assert runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"]) == 1
+
+    def test_a_manual_asset_is_printed_after_the_stages(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        host = _raw_host("lavender")
+        host["assets"] = [
+            {
+                "path": "/opt/corvis/rw-game/game-lib.jar",
+                "sha256": None,
+                "writable": False,
+                "reason": "the licensed engine",
+                "manual": True,
+                "provision_command": None,
+            }
+        ]
+        spec_path = _write_roster(tmp_path, [host])
+        transcript = _clean_transcript("lavender") + (
+            "CHECK asset:/opt/corvis/rw-game/game-lib.jar DRIFT test -e exited 1\n"
+        )
+        _test_hooks.run = FakeRun(quiet_rebuild_answers(transcript, repos=1))
+        with caplog.at_level("INFO"):
+            code = runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"])
+        assert code == 1
+        messages = [record.getMessage() for record in caplog.records]
+        assert "lavender rebuild: windows base: in place" in messages
+        assert any(m.startswith("lavender PLACE BY HAND: /opt/corvis/rw-game") for m in messages)
 
 
 class TestEntrypoint:

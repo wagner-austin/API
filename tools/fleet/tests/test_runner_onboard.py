@@ -13,6 +13,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, runner_audit, runner_onboard, runner_render
+from tests._runner_fixtures import a_base
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -39,9 +40,11 @@ def _host() -> HostRunnerSpec:
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-api-1/_work",
                 labels=["lavender-wsl"],
+                python_toolcache=[],
             )
         ],
         assets=[],
+        base=a_base(),
     )
 
 
@@ -65,39 +68,47 @@ class TestPlan:
 
     def test_the_plan_follows_the_fleet_convention(self) -> None:
         plan = runner_onboard.plan_onboard(
-            _host(), "wagner-austin/tree-bot", sides=("wsl", "windows")
+            _host(), "wagner-austin/tree-bot", sides=("wsl", "windows"), python_versions=("3.11.9",)
         )
         wsl, windows = plan["installs"]
         assert wsl["side"] == "wsl"
         assert wsl["runner_name"] == "lavender-wsl"
         assert wsl["workdir"] == "/home/gharunner/actions-runner-tree-bot-1/_work"
         assert wsl["service"] == "actions.runner.wagner-austin-tree-bot.lavender-wsl.service"
+        assert wsl["python_toolcache"] == []
         assert windows["side"] == "windows"
         assert windows["runner_name"] == "lavender"
         assert windows["workdir"] == "C:/actions-runner-tree-bot/_work"
         assert windows["service"] == "actions.runner.wagner-austin-tree-bot.lavender"
+        assert windows["python_toolcache"] == ["3.11.9"]
 
     def test_one_side_yields_one_install(self) -> None:
-        plan = runner_onboard.plan_onboard(_host(), "wagner-austin/x", sides=("wsl",))
+        plan = runner_onboard.plan_onboard(
+            _host(), "wagner-austin/x", sides=("wsl",), python_versions=()
+        )
         assert [i["side"] for i in plan["installs"]] == ["wsl"]
 
     def test_a_repo_already_on_the_host_is_refused(self) -> None:
         with pytest.raises(AppError) as fault:
-            runner_onboard.plan_onboard(_host(), "wagner-austin/API", sides=("wsl",))
+            runner_onboard.plan_onboard(
+                _host(), "wagner-austin/API", sides=("wsl",), python_versions=()
+            )
         assert fault.value.code is FleetErrorCode.RUNNER_ALREADY_ONBOARDED
 
     @pytest.mark.parametrize("repo", ["no-slash", "a/b/c", "owner/"])
     def test_a_malformed_repo_is_refused(self, repo: str) -> None:
         with pytest.raises(ValueError, match="owner/repo"):
-            runner_onboard.plan_onboard(_host(), repo, sides=("wsl",))
+            runner_onboard.plan_onboard(_host(), repo, sides=("wsl",), python_versions=())
 
     def test_empty_sides_are_refused(self) -> None:
         with pytest.raises(ValueError, match="at least one"):
-            runner_onboard.plan_onboard(_host(), "wagner-austin/x", sides=())
+            runner_onboard.plan_onboard(_host(), "wagner-austin/x", sides=(), python_versions=())
 
     def test_an_unknown_side_is_refused(self) -> None:
         with pytest.raises(ValueError, match="unknown side"):
-            runner_onboard.plan_onboard(_host(), "wagner-austin/x", sides=("linux",))
+            runner_onboard.plan_onboard(
+                _host(), "wagner-austin/x", sides=("linux",), python_versions=()
+            )
 
 
 class TestMintToken:
@@ -147,7 +158,10 @@ class TestOnboard:
         grown = _host()
         grown["installs"].extend(
             runner_onboard.plan_onboard(
-                _host(), "wagner-austin/tree-bot", sides=("wsl", "windows")
+                _host(),
+                "wagner-austin/tree-bot",
+                sides=("wsl", "windows"),
+                python_versions=("3.11.9",),
             )["installs"]
         )
         transcript = _clean_transcript(grown)
@@ -192,7 +206,7 @@ class TestOnboard:
                 "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
                 "$env:RUNNER_TOKEN_TREE_BOT = 'TOKENABC123'",
                 *runner_render.render_windows_install_lines(windows_install),
-                *runner_render.render_windows_python_toolcache_lines(windows_install, ("3.11.9",)),
+                *runner_render.render_windows_python_toolcache_lines(windows_install),
             ]
         ).encode("utf-8")
         assert runner.stdin[4] == expected_windows
@@ -201,7 +215,9 @@ class TestOnboard:
         spec = _host()
         grown = _host()
         grown["installs"].extend(
-            runner_onboard.plan_onboard(_host(), "wagner-austin/x", sides=("windows",))["installs"]
+            runner_onboard.plan_onboard(
+                _host(), "wagner-austin/x", sides=("windows",), python_versions=()
+            )["installs"]
         )
         runner = FakeRun([ok("TOK1\n"), ok(""), ok("done"), ok(""), ok(_clean_transcript(grown))])
         _test_hooks.run = runner
@@ -230,17 +246,3 @@ class TestOnboard:
             runner_onboard.onboard(spec, "wagner-austin/x", sides=("windows",))
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert "staged" in fault.value.message
-
-
-class TestWindowsToWslPath:
-    """The one path translation onboarding needs."""
-
-    def test_a_drive_path_translates(self) -> None:
-        assert (
-            runner_onboard._windows_to_wsl_path("C:/fleet/stage/x.sh") == "/mnt/c/fleet/stage/x.sh"
-        )
-
-    @pytest.mark.parametrize("path", ["relative/x", "/posix/x", "C:x", ""])
-    def test_anything_else_is_refused(self, path: str) -> None:
-        with pytest.raises(ValueError, match="drive path"):
-            runner_onboard._windows_to_wsl_path(path)

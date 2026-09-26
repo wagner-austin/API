@@ -23,6 +23,7 @@ from fleet.contracts.runners import (
     decode_runner_spec,
     encode_runner_spec,
 )
+from tests._runner_fixtures import base_json
 
 #: The shipped roster, resolved from this file so the test runs from any cwd.
 SHIPPED_ROSTER = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
@@ -44,6 +45,7 @@ def _install(**overrides: JSONValue) -> dict[str, JSONValue]:
         "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
         "workdir": "/home/gharunner/actions-runner-api-1/_work",
         "labels": ["lavender-wsl"],
+        "python_toolcache": [],
     }
     raw.update(overrides)
     return raw
@@ -90,6 +92,7 @@ def _host(**overrides: JSONValue) -> dict[str, JSONValue]:
         "systemd_timers": ["ci-clean.timer"],
         "installs": [_install()],
         "assets": [_asset()],
+        "base": base_json(),
     }
     raw.update(overrides)
     return raw
@@ -140,6 +143,31 @@ class TestRunnerInstall:
     def test_a_windows_install_with_a_posix_workdir_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="drive-letter path"):
             decode_runner_install(_install(side="windows"))
+
+    def test_a_windows_install_keeps_its_exact_toolcache_seeds(self) -> None:
+        decoded = decode_runner_install(
+            _install(
+                side="windows",
+                workdir="C:/actions-runner-tree-bot/_work",
+                python_toolcache=["3.11.9", "3.12.10"],
+            )
+        )
+        assert decoded["python_toolcache"] == ["3.11.9", "3.12.10"]
+
+    def test_a_wsl_install_seeding_a_toolcache_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be empty on a wsl install"):
+            decode_runner_install(_install(python_toolcache=["3.11.9"]))
+
+    @pytest.mark.parametrize("version", ["3.11", "3.11.x", "3.11.9.1", ""])
+    def test_a_toolcache_version_that_is_not_exact_is_refused(self, version: str) -> None:
+        with pytest.raises(JSONTypeError, match=r"exact X\.Y\.Z"):
+            decode_runner_install(
+                _install(
+                    side="windows",
+                    workdir="C:/actions-runner/_work",
+                    python_toolcache=[version],
+                )
+            )
 
 
 class TestFileAsset:
@@ -255,6 +283,17 @@ class TestHostRunnerSpec:
         with pytest.raises(JSONTypeError, match="not a CI host"):
             decode_host_runner_spec(_host(installs=[]))
 
+    def test_a_host_without_a_base_is_refused(self) -> None:
+        raw = _host()
+        del raw["base"]
+        with pytest.raises(JSONTypeError, match="base"):
+            decode_host_runner_spec(raw)
+
+    def test_the_base_decodes_with_the_host(self) -> None:
+        decoded = decode_host_runner_spec(_host())
+        assert decoded["base"]["execution_policy"] == "RemoteSigned"
+        assert decoded["base"]["disk"]["ceiling_gb"] == 150
+
 
 class TestRunnerSpec:
     """decode_runner_spec's contract, and the shipped document."""
@@ -300,3 +339,19 @@ class TestRunnerSpec:
         pinned = [asset for asset in lavender["assets"] if asset["sha256"] is not None]
         assert len(pinned) == 1
         assert pinned[0]["manual"] is True
+        # The tool-cache seeds measured on the rebuilt lavender, 2026-09-26:
+        # MCPs, chat and tree-bot seed 3.11.9 and tree-bot also 3.12.10;
+        # corvis-stick's Windows jobs bring no Python.
+        seeds = {
+            install["repo"]: install["python_toolcache"]
+            for install in lavender["installs"]
+            if install["side"] == "windows"
+        }
+        assert seeds == {
+            "wagner-austin/MCPs": ["3.11.9"],
+            "wagner-austin/corvis-stick": [],
+            "wagner-austin/chat": ["3.11.9"],
+            "wagner-austin/tree-bot": ["3.11.9", "3.12.10"],
+        }
+        assert lavender["base"]["execution_policy"] == "RemoteSigned"
+        assert lavender["base"]["disk"]["baseline_gb"] < lavender["base"]["disk"]["ceiling_gb"]

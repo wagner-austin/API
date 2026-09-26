@@ -13,6 +13,7 @@ from platform_core.json_utils import JSONTypeError, load_json_str
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, remote, runner_load
+from tests._runner_fixtures import a_base
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -39,6 +40,7 @@ def _host() -> HostRunnerSpec:
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-api-1/_work",
                 labels=["lavender-wsl"],
+                python_toolcache=[],
             ),
             RunnerInstall(
                 repo="wagner-austin/MCPs",
@@ -47,9 +49,11 @@ def _host() -> HostRunnerSpec:
                 service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner/_work",
                 labels=["lavender-wsl"],
+                python_toolcache=[],
             ),
         ],
         assets=[],
+        base=a_base(),
     )
 
 
@@ -151,6 +155,7 @@ def _mixed_host() -> HostRunnerSpec:
             service="actions.runner.wagner-austin-tree-bot.lavender",
             workdir="C:/actions-runner-tree-bot/_work",
             labels=["lavender"],
+            python_toolcache=[],
         )
     )
     return spec
