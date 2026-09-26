@@ -8,11 +8,9 @@ from platform_core.json_utils import (
     require_str,
     require_str_list,
 )
+from platform_core.members import require_member
 
-from platform_kaggle._types_validation import (
-    CompetitionCategory,
-    _require_category,
-)
+from platform_kaggle._types_validation import CompetitionCategory
 
 # -----------------------------------------------------------------------------
 # Competition
@@ -121,7 +119,7 @@ def decode_competition(data: JSONObject) -> Competition:
     return Competition(
         ref=require_str(data, "ref"),
         title=require_str(data, "title"),
-        category=_require_category(data, "category"),
+        category=require_member(data, "category", CompetitionCategory),
         reward=require_str(data, "reward"),
         deadline=require_str(data, "deadline"),
         team_count=require_int(data, "team_count"),

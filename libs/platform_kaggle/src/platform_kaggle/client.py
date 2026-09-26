@@ -7,6 +7,11 @@ environment variable.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Final
+
+from platform_core.members import as_member
+
 from .testing import hooks
 from .types import (
     Competition,
@@ -18,53 +23,40 @@ from .types import (
 # Category Mapping
 # -----------------------------------------------------------------------------
 
-
-def _normalize_category(raw_category: str) -> CompetitionCategory:
-    """Normalize Kaggle API category string to CompetitionCategory.
-
-    Args:
-        raw_category: Raw category string from Kaggle API.
-
-    Returns:
-        Normalized CompetitionCategory.
-    """
-    if raw_category == "Featured":
-        return "Featured"
-    if raw_category == "Research":
-        return "Research"
-    if raw_category == "Playground":
-        return "Playground"
-    if raw_category == "Getting Started":
-        return "Getting Started"
-    if raw_category == "Masters":
-        return "Masters"
-    if raw_category == "Kudos":
-        return "Kudos"
-    # Default to Playground for unknown categories
-    return "Playground"
+# The SDK's valid_competition_categories, keyed by the category each selects.
+# Every member but COMMUNITY has one; the test suite pins that key set.
+_SDK_CATEGORY_WORDS: Final[Mapping[CompetitionCategory, str]] = {
+    CompetitionCategory.FEATURED: "featured",
+    CompetitionCategory.RESEARCH: "research",
+    CompetitionCategory.RECRUITMENT: "recruitment",
+    CompetitionCategory.GETTING_STARTED: "gettingStarted",
+    CompetitionCategory.MASTERS: "masters",
+    CompetitionCategory.PLAYGROUND: "playground",
+}
 
 
 def _to_api_category(category: CompetitionCategory) -> str:
-    """Convert CompetitionCategory to Kaggle API category string.
+    """Convert CompetitionCategory to the word ``competitions_list`` filters on.
+
+    The words are the SDK's ``valid_competition_categories``; it refuses any
+    other with ValueError.
 
     Args:
         category: CompetitionCategory to convert.
 
     Returns:
         Kaggle API category string.
+
+    Raises:
+        ValueError: For COMMUNITY, which the SDK lists as a group rather than
+            a category, so no category word selects it.
     """
-    if category == "Featured":
-        return "featured"
-    if category == "Research":
-        return "research"
-    if category == "Playground":
-        return "playground"
-    if category == "Getting Started":
-        return "gettingStarted"
-    if category == "Masters":
-        return "masters"
-    # Kudos is the only remaining valid category
-    return "kudos"
+    if category is CompetitionCategory.COMMUNITY:
+        raise ValueError(
+            "Kaggle lists community competitions as a group, not a category; "
+            "competitions_list has no category word for 'Community'"
+        )
+    return _SDK_CATEGORY_WORDS[category]
 
 
 def _extract_ref_slug(url: str) -> str:
@@ -177,7 +169,7 @@ class KaggleClient:
             competition = Competition(
                 ref=ref,
                 title=title,
-                category=_normalize_category(category_raw),
+                category=as_member(category_raw, "category", CompetitionCategory),
                 reward=reward,
                 deadline=deadline,
                 team_count=team_count,
@@ -226,7 +218,7 @@ class KaggleClient:
                 return Competition(
                     ref=comp_ref,
                     title=str(comp.title),
-                    category=_normalize_category(str(comp.category)),
+                    category=as_member(str(comp.category), "category", CompetitionCategory),
                     reward=str(comp.reward),
                     deadline=str(comp.deadline),
                     team_count=int(comp.team_count),
@@ -241,6 +233,5 @@ class KaggleClient:
 __all__ = [
     "KaggleClient",
     "_extract_ref_slug",
-    "_normalize_category",
     "_to_api_category",
 ]

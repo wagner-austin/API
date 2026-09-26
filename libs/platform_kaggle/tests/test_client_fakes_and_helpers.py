@@ -8,14 +8,15 @@ from datetime import datetime
 import pytest
 
 from platform_kaggle.client import (
+    _SDK_CATEGORY_WORDS,
     _extract_ref_slug,
-    _normalize_category,
     _to_api_category,
 )
 from platform_kaggle.testing import (
     FakeApiTag,
 )
 from platform_kaggle.types import (
+    CompetitionCategory,
     CompetitionsResponseProtocol,
     KaggleCompetitionProtocol,
     KaggleTagProtocol,
@@ -170,64 +171,40 @@ class _CompetitionWithNoneInTags:
         return "https://www.kaggle.com/competitions/mixed-tags-comp"
 
 
-class TestNormalizeCategory:
-    """Tests for _normalize_category function."""
-
-    def test_normalize_featured(self) -> None:
-        """Test normalizing Featured category."""
-        assert _normalize_category("Featured") == "Featured"
-
-    def test_normalize_research(self) -> None:
-        """Test normalizing Research category."""
-        assert _normalize_category("Research") == "Research"
-
-    def test_normalize_playground(self) -> None:
-        """Test normalizing Playground category."""
-        assert _normalize_category("Playground") == "Playground"
-
-    def test_normalize_getting_started(self) -> None:
-        """Test normalizing Getting Started category."""
-        assert _normalize_category("Getting Started") == "Getting Started"
-
-    def test_normalize_masters(self) -> None:
-        """Test normalizing Masters category."""
-        assert _normalize_category("Masters") == "Masters"
-
-    def test_normalize_kudos(self) -> None:
-        """Test normalizing Kudos category."""
-        assert _normalize_category("Kudos") == "Kudos"
-
-    def test_normalize_unknown(self) -> None:
-        """Test normalizing unknown category defaults to Playground."""
-        assert _normalize_category("Unknown") == "Playground"
-
-
 class TestToApiCategory:
     """Tests for _to_api_category function."""
 
-    def test_to_api_featured(self) -> None:
-        """Test converting Featured to API format."""
-        assert _to_api_category("Featured") == "featured"
+    @pytest.mark.parametrize(
+        ("category", "word"),
+        [
+            (CompetitionCategory.FEATURED, "featured"),
+            (CompetitionCategory.RESEARCH, "research"),
+            (CompetitionCategory.RECRUITMENT, "recruitment"),
+            (CompetitionCategory.GETTING_STARTED, "gettingStarted"),
+            (CompetitionCategory.MASTERS, "masters"),
+            (CompetitionCategory.PLAYGROUND, "playground"),
+        ],
+    )
+    def test_filterable_category_maps_to_sdk_word(
+        self, category: CompetitionCategory, word: str
+    ) -> None:
+        """Each filterable category maps to a word of the SDK's valid_competition_categories."""
+        assert _to_api_category(category) == word
 
-    def test_to_api_research(self) -> None:
-        """Test converting Research to API format."""
-        assert _to_api_category("Research") == "research"
+    def test_every_member_but_community_has_a_word(self) -> None:
+        """A new member without an SDK word fails here, not as a KeyError in a listing."""
+        assert set(_SDK_CATEGORY_WORDS) == set(CompetitionCategory) - {
+            CompetitionCategory.COMMUNITY
+        }
 
-    def test_to_api_playground(self) -> None:
-        """Test converting Playground to API format."""
-        assert _to_api_category("Playground") == "playground"
-
-    def test_to_api_getting_started(self) -> None:
-        """Test converting Getting Started to API format."""
-        assert _to_api_category("Getting Started") == "gettingStarted"
-
-    def test_to_api_masters(self) -> None:
-        """Test converting Masters to API format."""
-        assert _to_api_category("Masters") == "masters"
-
-    def test_to_api_kudos(self) -> None:
-        """Test converting Kudos to API format."""
-        assert _to_api_category("Kudos") == "kudos"
+    def test_community_has_no_category_word(self) -> None:
+        """Community is a group in the SDK, so asking to filter on it is refused."""
+        with pytest.raises(
+            ValueError,
+            match=r"^Kaggle lists community competitions as a group, not a category; "
+            r"competitions_list has no category word for 'Community'$",
+        ):
+            _to_api_category(CompetitionCategory.COMMUNITY)
 
 
 class TestExtractRefSlug:

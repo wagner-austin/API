@@ -7,6 +7,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 
 from platform_kaggle.types import (
     Competition,
+    CompetitionCategory,
     CompetitionMatch,
     InterestFilter,
     decode_filter,
@@ -25,7 +26,7 @@ class TestCompetitionMatch:
         comp = Competition(
             ref="test",
             title="Test",
-            category="Playground",
+            category=CompetitionCategory.PLAYGROUND,
             reward="Knowledge",
             deadline="2025-12-31",
             team_count=100,
@@ -51,7 +52,7 @@ class TestCompetitionMatch:
         comp = Competition(
             ref="test",
             title="Test",
-            category="Playground",
+            category=CompetitionCategory.PLAYGROUND,
             reward="Knowledge",
             deadline="2025-12-31",
             team_count=100,
@@ -88,7 +89,7 @@ class TestCompetitionMatch:
         comp = Competition(
             ref="test",
             title="Test",
-            category="Featured",
+            category=CompetitionCategory.FEATURED,
             reward="$100,000",
             deadline="2025-08-15",
             team_count=5000,
@@ -175,12 +176,12 @@ class TestInterestFilter:
             include_tags=("tabular", "nlp"),
             exclude_tags=("computer-vision",),
             min_reward=1000,
-            categories=("Featured", "Research"),
+            categories=(CompetitionCategory.FEATURED, CompetitionCategory.RESEARCH),
         )
         assert filter_.include_tags == ("tabular", "nlp")
         assert filter_.exclude_tags == ("computer-vision",)
         assert filter_.min_reward == 1000
-        assert filter_.categories == ("Featured", "Research")
+        assert filter_.categories == (CompetitionCategory.FEATURED, CompetitionCategory.RESEARCH)
 
     def test_filter_equality(self) -> None:
         """Test InterestFilter equality comparison."""
@@ -211,7 +212,11 @@ class TestInterestFilter:
             include_tags=("tabular", "classification"),
             exclude_tags=("computer-vision", "image"),
             min_reward=50000,
-            categories=("Featured", "Research", "Playground"),
+            categories=(
+                CompetitionCategory.FEATURED,
+                CompetitionCategory.RESEARCH,
+                CompetitionCategory.PLAYGROUND,
+            ),
         )
         encoded = encode_filter(original)
         decoded = decode_filter(encoded)
@@ -236,26 +241,10 @@ class TestInterestFilter:
             "include_tags": ["tabular"],
             "exclude_tags": [],
             "min_reward": None,
-            "categories": [
-                "Featured",
-                "Research",
-                "Playground",
-                "Getting Started",
-                "Masters",
-                "Kudos",
-            ],
+            "categories": [category.value for category in CompetitionCategory],
         }
         decoded = decode_filter(data)
-        if decoded.categories is None:
-            raise AssertionError("Expected categories to be set")
-        assert decoded.categories == (
-            "Featured",
-            "Research",
-            "Playground",
-            "Getting Started",
-            "Masters",
-            "Kudos",
-        )
+        assert decoded.categories == tuple(CompetitionCategory)
 
     def test_decode_filter_invalid_category(self) -> None:
         """Test decode_filter raises on invalid category."""
@@ -265,7 +254,11 @@ class TestInterestFilter:
             "min_reward": None,
             "categories": ["Invalid"],
         }
-        with pytest.raises(JSONTypeError, match="must be a valid category"):
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^Invalid categories\[0\] 'Invalid': must be one of 'Featured', 'Research', "
+            r"'Recruitment', 'Getting Started', 'Masters', 'Playground', 'Community'$",
+        ):
             decode_filter(data)
 
     def test_decode_filter_categories_not_list(self) -> None:

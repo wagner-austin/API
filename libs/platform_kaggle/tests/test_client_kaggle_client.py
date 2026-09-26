@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import pytest
+from platform_core.json_utils import JSONTypeError
+
 from platform_kaggle.client import (
     KaggleClient,
 )
@@ -13,6 +16,7 @@ from platform_kaggle.testing import (
     make_fake_kaggle_competition,
 )
 from platform_kaggle.types import (
+    CompetitionCategory,
     CompetitionsResponseProtocol,
     KaggleCompetitionProtocol,
 )
@@ -113,10 +117,34 @@ class TestKaggleClient:
 
         try:
             client = KaggleClient()
-            comps = client.list_competitions(category="Featured")
+            comps = client.list_competitions(category=CompetitionCategory.FEATURED)
 
             assert len(comps) == 1
             assert comps[0].ref == "featured-comp"
+            assert comps[0].category is CompetitionCategory.FEATURED
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_list_competitions_refuses_unknown_category(self) -> None:
+        """A category Kaggle sends that no member names is refused, never filed as Playground."""
+        fake_api = FakeKaggleApi(
+            competitions=(make_fake_kaggle_competition(ref="data-viz", category="Analytics"),)
+        )
+        original = hooks.kaggle_api_factory
+
+        def fake_factory() -> FakeKaggleApi:
+            return fake_api
+
+        hooks.kaggle_api_factory = fake_factory
+
+        try:
+            client = KaggleClient()
+            with pytest.raises(
+                JSONTypeError,
+                match=r"^Invalid category 'Analytics': must be one of 'Featured', 'Research', "
+                r"'Recruitment', 'Getting Started', 'Masters', 'Playground', 'Community'$",
+            ):
+                client.list_competitions()
         finally:
             hooks.kaggle_api_factory = original
 

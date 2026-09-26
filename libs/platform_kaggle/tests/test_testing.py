@@ -14,7 +14,7 @@ from platform_kaggle.testing import (
     make_fake_kaggle_competition,
     make_fake_profile,
 )
-from platform_kaggle.types import KaggleClientProtocol
+from platform_kaggle.types import CompetitionCategory, KaggleClientProtocol
 
 
 class TestFakeKaggleCompetition:
@@ -221,11 +221,11 @@ class TestFakeKaggleClient:
 
     def test_list_competitions_with_category(self) -> None:
         """Test listing competitions with category filter."""
-        comp1 = make_fake_competition(ref="featured", category="Featured")
-        comp2 = make_fake_competition(ref="playground", category="Playground")
+        comp1 = make_fake_competition(ref="featured", category=CompetitionCategory.FEATURED)
+        comp2 = make_fake_competition(ref="playground", category=CompetitionCategory.PLAYGROUND)
         client = FakeKaggleClient(competitions=(comp1, comp2))
 
-        result = client.list_competitions(category="Featured")
+        result = client.list_competitions(category=CompetitionCategory.FEATURED)
 
         assert len(result) == 1
         assert result[0].ref == "featured"
@@ -263,7 +263,7 @@ class TestMakeFakeCompetition:
         comp = make_fake_competition()
         assert comp.ref == "test-competition"
         assert comp.title == "Test Competition"
-        assert comp.category == "Playground"
+        assert comp.category is CompetitionCategory.PLAYGROUND
         assert comp.reward == "Knowledge"
         # Far future on purpose: a default deadline that expires turns every
         # active_only consumer red on a date rather than on a change.
@@ -278,7 +278,7 @@ class TestMakeFakeCompetition:
         comp = make_fake_competition(
             ref="custom-comp",
             title="Custom Title",
-            category="Featured",
+            category=CompetitionCategory.FEATURED,
             reward="$100,000",
             deadline="2025-06-15",
             team_count=5000,
@@ -287,7 +287,7 @@ class TestMakeFakeCompetition:
         )
         assert comp.ref == "custom-comp"
         assert comp.title == "Custom Title"
-        assert comp.category == "Featured"
+        assert comp.category is CompetitionCategory.FEATURED
         assert comp.reward == "$100,000"
         assert comp.deadline == "2025-06-15"
         assert comp.team_count == 5000
