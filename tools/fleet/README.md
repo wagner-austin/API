@@ -201,7 +201,8 @@ and the wiki page (`fleet-check-runner`, mcps-codebase) carries.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
-a CUDA device) and the queue's `required_tags <@ tags` containment returns
+a CUDA device and `testdb` for a node whose `test_database` is true) and the
+queue's `required_tags <@ tags` containment returns
 only jobs the node satisfies. A job's `required_tags` are the project's from
 `fleet.json`; `dispatch_submit` takes them and the runner re-checks them
 against the registry line on claim, refusing `PROJECT_TAGS_MISMATCH` when a
@@ -209,6 +210,19 @@ submitter named fewer than the project needs. The identity registry's
 measured `gpu` column and this workspace's declared `gpu` are reconciled by
 `fleet-nodes --registry` beside `enabled` and `platform`, so the tags the
 runners claim by are the tags the roster agrees on.
+
+**`testdb` is the one tag the roster does not measure** (MCPs board task
+6bbfd171). A node declares `test_database: true` when it runs
+`corvis-fleet-testdb`, the loopback postgres container on tmpfs that MCPs
+`scripts/host/diphtheria/provision.sh` creates and MCPs
+`scripts/testdb-setup.sh --container corvis-fleet-testdb` restarts empty and
+migrates before a run, as a CI job's service container is fresh. Every MCPs
+project whose suite starts from `packages/db`'s global test setup names that
+step as an install step and requires `testdb`, so it only reaches a node where
+the setup can succeed. No Windows node can reach a test database (measured
+2026-09-26: sedona and serendipity both refuse the cluster's 6432), and no
+node is pointed at the production cluster's `corvis_test`, which would put the
+`corvis_app` credential on it.
 
 **The identity is derived, never configured.** The label is
 `fleet-node-<alias>` and the session id is the version-5 UUID of
@@ -234,7 +248,9 @@ one) and the runner exports THAT commit:
    `source` is refused `PROJECT_REMOTE_MISSING` by name;
 3. `git archive --format=tar.gz <sha>` is staged through the same verified
    transport every dispatch uses, so the tree on the node equals the commit
-   by construction;
+   by construction, and the staged tree is made a one-commit repository
+   (`git init`, `git add --all`, one commit as `fleet`) because MCPs
+   `packages/db`'s migrator admits test migrations against `HEAD`;
 4. every repository the project's `source` declares under `companions` is
    exported BESIDE it, from its own mirror at the TIP of the declared `ref`,
    into `<stage_root>/<directory>` — which is `../<directory>` from the
@@ -371,7 +387,7 @@ The fleet is described in two repositories and the columns barely overlap:
 | file | carries |
 |---|---|
 | `MCPs/fleet-mcp/fleet-nodes.json` | name, role, user, **platform**, tailnet address, **enabled**, tunnel, notes — every machine on the tailnet, including ones nothing dispatches to |
-| `API/tools/fleet/fleet.json` | host, **platform**, stage root, cores, RAM, GPU, budget, **enabled** — what a dispatch may take |
+| `API/tools/fleet/fleet.json` | host, **platform**, stage root, cores, RAM, GPU, budget, **enabled**, test database — what a dispatch may take |
 
 Merging them would put a Cloudflare tunnel id beside a worker-RAM budget and
 make this repo depend on a checkout of the other one, which dispatch must work
