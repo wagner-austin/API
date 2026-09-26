@@ -9,6 +9,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -48,12 +49,14 @@ class MineTracker:
         """
         self._xor_table = build_session_xor_table(magic)
 
-    def process_message(self, payload: str, direction: str = "received") -> str | None:
+    def process_message(
+        self, payload: str, direction: MessageDirection = MessageDirection.RECEIVED
+    ) -> str | None:
         """Process a message and return mine status if relevant.
 
         Args:
             payload: Base64 encoded message payload.
-            direction: 'sent' or 'received'.
+            direction: Whether the frame was sent or received.
 
         Returns:
             Mine status string, or None if not a mine message.
@@ -71,7 +74,7 @@ class MineTracker:
 
         body = data[2:]
 
-        if direction == "sent" and len(body) >= 5 and body[0] == 0x21:
+        if direction is MessageDirection.SENT and len(body) >= 5 and body[0] == 0x21:
             return self._process_mine_command(body)
 
         msg_type = body[0]
