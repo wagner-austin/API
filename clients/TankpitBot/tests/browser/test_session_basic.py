@@ -17,6 +17,7 @@ from tankpit_bot.browser.cdp_utils import (
 )
 from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 from tests.fakes import (
     FakeCDPSession,
 )
@@ -175,7 +176,7 @@ def test_browser_session_on_message_captured_non_auth_sent() -> None:
     session = BrowserSession("https://example.com")
     msg = CapturedMessage(
         timestamp_ms=12345,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload="test",
         ws_url="wss://example.com/ws",
     )
@@ -188,7 +189,7 @@ def test_browser_session_on_message_captured_empty_payload() -> None:
     session = BrowserSession("https://example.com")
     msg = CapturedMessage(
         timestamp_ms=12345,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload="",
         ws_url="wss://example.com/ws",
     )
@@ -201,7 +202,7 @@ def test_browser_session_on_message_captured_invalid_base64() -> None:
     session = BrowserSession("https://example.com")
     msg = CapturedMessage(
         timestamp_ms=12345,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload="not!valid@base64",
         ws_url="wss://example.com/ws",
     )
@@ -221,7 +222,7 @@ def test_browser_session_on_message_captured_extracts_magic() -> None:
 
     msg = CapturedMessage(
         timestamp_ms=12345,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload=payload,
         ws_url="wss://example.com/ws",
     )
@@ -241,7 +242,7 @@ def test_browser_session_on_message_captured_skips_received() -> None:
 
     msg = CapturedMessage(
         timestamp_ms=12345,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=payload,
         ws_url="wss://example.com/ws",
     )
@@ -263,13 +264,13 @@ def test_browser_session_on_message_captured_only_first_magic() -> None:
 
     msg1 = CapturedMessage(
         timestamp_ms=1,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload=make_auth_payload("first_magic_key_12345"),
         ws_url="wss://example.com/ws",
     )
     msg2 = CapturedMessage(
         timestamp_ms=2,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload=make_auth_payload("second_magic_key_1234"),
         ws_url="wss://example.com/ws",
     )
@@ -296,7 +297,7 @@ def test_browser_session_on_magic_captured_called() -> None:
 
     msg = CapturedMessage(
         timestamp_ms=12345,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload=payload,
         ws_url="wss://example.com/ws",
     )
@@ -472,7 +473,7 @@ def test_browser_session_captured_message_count() -> None:
     session._messages.append(
         CapturedMessage(
             timestamp_ms=1,
-            direction="received",
+            direction=MessageDirection.RECEIVED,
             payload="x",
             ws_url="wss://test",
         )

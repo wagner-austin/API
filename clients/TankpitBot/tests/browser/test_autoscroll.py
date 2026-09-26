@@ -26,6 +26,7 @@ from tankpit_bot.browser.autoscroll import (
 from tankpit_bot.protocol.framing import FramingError, decode_frame
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.types.message import CapturedMessage
 
 
@@ -66,7 +67,7 @@ def _received(payload: str) -> CapturedMessage:
     """Build a received capture row carrying ``payload``."""
     return CapturedMessage(
         timestamp_ms=0,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         payload=payload,
         ws_url="wss://test/ws/",
     )
@@ -148,7 +149,7 @@ class TestReadAutoscrollAck:
         """Sent frames and binary bodies never satisfy the scan."""
         sent = CapturedMessage(
             timestamp_ms=0,
-            direction="sent",
+            direction=MessageDirection.SENT,
             payload=_frame(b"A0"),
             ws_url="wss://test/ws/",
         )

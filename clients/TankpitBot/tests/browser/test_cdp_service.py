@@ -8,6 +8,7 @@ from platform_core.json_utils import JSONObject
 
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 
 
 class _FakeCDP:
@@ -54,7 +55,7 @@ def test_extract_magic_without_callbacks() -> None:
 
     msg = CapturedMessage(
         timestamp_ms=1000,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload=payload,
         ws_url="wss://test",
     )
@@ -82,7 +83,7 @@ def test_extract_magic_with_callbacks() -> None:
 
     msg = CapturedMessage(
         timestamp_ms=1000,
-        direction="sent",
+        direction=MessageDirection.SENT,
         payload=payload,
         ws_url="wss://test",
     )

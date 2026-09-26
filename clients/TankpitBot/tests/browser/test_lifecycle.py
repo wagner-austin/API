@@ -17,6 +17,7 @@ from tankpit_bot.browser.lifecycle import (
 from tankpit_bot.browser.types import GameNotJoinedError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types.literals import MessageDirection
 from tests.action_lab._replay_page import (
     ClockAdvancingPage,
     ReplayClock,
@@ -128,7 +129,7 @@ class TestWaitForGameReady:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=1,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="x",
                 ws_url="wss://test",
             ),
@@ -147,7 +148,7 @@ class TestWaitForGameReady:
         messages: list[CapturedMessage] = [
             CapturedMessage(
                 timestamp_ms=1,
-                direction="received",
+                direction=MessageDirection.RECEIVED,
                 payload="x",
                 ws_url="wss://test",
             ),
@@ -161,7 +162,7 @@ class TestWaitForGameReady:
                 messages.append(
                     CapturedMessage(
                         timestamp_ms=2,
-                        direction="received",
+                        direction=MessageDirection.RECEIVED,
                         payload="y",
                         ws_url="wss://test",
                     )
