@@ -134,12 +134,14 @@ def test_get_hackathon_not_found(fake_container: ServiceContainer) -> None:
 
 
 def test_list_hackathons_with_invalid_state(fake_container: ServiceContainer) -> None:
-    """Test listing hackathons ignores invalid state strings."""
+    """An unknown state is refused, never dropped into an unfiltered listing."""
     app = create_app(container=fake_container)
     client = TestClient(app)
 
-    # Pass invalid state that should be ignored
-    response = client.get("/devpost/hackathons", params={"states": ["invalid_state"]})
+    response = client.get("/devpost/hackathons", params={"states": ["open", "invalid_state"]})
 
-    # Should still succeed (invalid states are just ignored)
-    assert response.status_code == 200
+    assert response.status_code == 400
+    data = narrow_json_to_dict(load_json_str(response.text))
+    assert data["detail"] == (
+        "Invalid state 'invalid_state': must be one of 'open', 'upcoming', 'ended', 'submissions'"
+    )

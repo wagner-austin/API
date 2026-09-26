@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 from platform_codebase import CodebaseProfile, LibInfo, ServiceInfo
 from platform_codebase.testing import make_fake_lib_info, make_fake_profile, make_fake_service_info
-from platform_devpost import Hackathon
+from platform_devpost import Hackathon, HackathonState
 from platform_devpost.testing import FakeDevpostClient, make_fake_hackathon
-from platform_kaggle import Competition
+from platform_kaggle import Competition, CompetitionCategory
 from platform_kaggle.testing import (
     FakeKaggleClient,
     FakeKagglePageFetcher,
@@ -26,7 +26,7 @@ def _make_fake_competition() -> Competition:
     return make_fake_competition(
         ref="test-comp",
         title="Test Competition",
-        category="Playground",
+        category=CompetitionCategory.PLAYGROUND,
         tags=("tabular", "classification"),
     )
 
@@ -36,7 +36,7 @@ def _make_fake_hackathon() -> Hackathon:
     return make_fake_hackathon(
         id=123,
         title="Test Hackathon",
-        open_state="open",
+        open_state=HackathonState.OPEN,
     )
 
 
