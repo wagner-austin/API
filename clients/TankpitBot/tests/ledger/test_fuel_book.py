@@ -6,8 +6,8 @@ import pytest
 
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.ledger.fuel_book import (
-    FUEL_ENTRY_KINDS,
     FuelEntryContract,
+    FuelEntryKind,
     FuelReadingContract,
     make_fuel_book,
     record_fuel_entry,
@@ -29,7 +29,7 @@ def test_exact_debit_block_balances_at_quiet_boundary() -> None:
     """A dual shot followed by exactly -10 balances once the wire quiets."""
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=1000)
-    record_fuel_entry(book=book, kind="shot_dual", lo=-10, hi=-10)
+    record_fuel_entry(book=book, kind=FuelEntryKind.SHOT_DUAL, lo=-10, hi=-10)
     assert record_fuel_reading(book=book, fuel_total=990) is None
     verdict = record_fuel_reading(book=book, fuel_total=990)
     if verdict is None:
@@ -57,13 +57,13 @@ def test_optional_and_ranged_entries_widen_the_interval() -> None:
     """Enemy hits and walks may or may not have cost fuel."""
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=1000)
-    record_fuel_entry(book=book, kind="enemy_hit", lo=-90, hi=0)
-    record_fuel_entry(book=book, kind="walk", lo=-7, hi=0)
+    record_fuel_entry(book=book, kind=FuelEntryKind.ENEMY_HIT, lo=-90, hi=0)
+    record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-7, hi=0)
     for fuel_total, expect_balanced in ((1000, True), (903, True), (902, False), (1001, False)):
         fresh = make_fuel_book()
         record_fuel_reading(book=fresh, fuel_total=1000)
-        record_fuel_entry(book=fresh, kind="enemy_hit", lo=-90, hi=0)
-        record_fuel_entry(book=fresh, kind="walk", lo=-7, hi=0)
+        record_fuel_entry(book=fresh, kind=FuelEntryKind.ENEMY_HIT, lo=-90, hi=0)
+        record_fuel_entry(book=fresh, kind=FuelEntryKind.WALK, lo=-7, hi=0)
         assert record_fuel_reading(book=fresh, fuel_total=fuel_total) is None
         verdict = record_fuel_reading(book=fresh, fuel_total=fuel_total)
         if verdict is None:
@@ -75,7 +75,7 @@ def test_pickup_credit_explains_gains() -> None:
     """An open pickup credit explains any gain up to its ceiling."""
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=400)
-    record_fuel_entry(book=book, kind="pickup", lo=0, hi=1100)
+    record_fuel_entry(book=book, kind=FuelEntryKind.PICKUP, lo=0, hi=1100)
     assert record_fuel_reading(book=book, fuel_total=1100) is None
     verdict = record_fuel_reading(book=book, fuel_total=1100)
     if verdict is None:
@@ -87,7 +87,7 @@ def test_homing_shot_seeds_a_carry_into_the_next_window() -> None:
     """A -5/-5 split across the sync boundary balances both windows."""
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=1000)
-    record_fuel_entry(book=book, kind="shot_homing", lo=-10, hi=-5)
+    record_fuel_entry(book=book, kind=FuelEntryKind.SHOT_HOMING, lo=-10, hi=-5)
     assert record_fuel_reading(book=book, fuel_total=995) is None
     first = record_fuel_reading(book=book, fuel_total=995)
     if first is None:
@@ -106,7 +106,7 @@ def test_inverted_interval_is_rejected() -> None:
     """An entry whose floor exceeds its ceiling violates the contract."""
     book = make_fuel_book()
     with pytest.raises(LedgerInvariantError):
-        record_fuel_entry(book=book, kind="walk", lo=0, hi=-5)
+        record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=0, hi=-5)
 
 
 def test_negative_reading_is_rejected() -> None:
@@ -120,17 +120,18 @@ def test_entry_flood_is_rejected() -> None:
     """A book that never reconciles must not grow without bound."""
     book = make_fuel_book()
     for _ in range(10_000):
-        book["entries"].append({"kind": "walk", "lo": -1, "hi": 0})
+        book["entries"].append({"kind": FuelEntryKind.WALK, "lo": -1, "hi": 0})
     with pytest.raises(LedgerInvariantError):
-        record_fuel_entry(book=book, kind="walk", lo=-1, hi=0)
+        record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-1, hi=0)
 
 
 def test_every_kind_is_recordable() -> None:
     """The declared kind vocabulary round-trips through the contract."""
     book = make_fuel_book()
-    for kind in FUEL_ENTRY_KINDS:
+    for kind in FuelEntryKind:
         record_fuel_entry(book=book, kind=kind, lo=-1, hi=0)
-    assert len(book["entries"]) == len(FUEL_ENTRY_KINDS)
+    assert len(book["entries"]) == len(FuelEntryKind)
+    assert sorted(book["totals"]) == sorted(kind.value for kind in FuelEntryKind)
 
 
 def test_contract_names_identify_the_invariants() -> None:
@@ -151,7 +152,7 @@ def test_block_cap_forces_judgement_in_never_quiet_combat() -> None:
     record_fuel_reading(book=book, fuel_total=10_000)
     verdict = None
     for step in range(1, BLOCK_READING_CAP + 1):
-        record_fuel_entry(book=book, kind="walk", lo=-1, hi=0)
+        record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-1, hi=0)
         verdict = record_fuel_reading(book=book, fuel_total=10_000 - step)
         if step < BLOCK_READING_CAP:
             assert verdict is None
@@ -190,7 +191,7 @@ def test_forced_boundary_tolerates_one_stranded_charge() -> None:
     record_fuel_reading(book=book, fuel_total=10_000)
     verdict = None
     for step in range(1, BLOCK_READING_CAP + 1):
-        record_fuel_entry(book=book, kind="walk", lo=-1, hi=0)
+        record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-1, hi=0)
         drop = 10 if step == BLOCK_READING_CAP else 0
         verdict = record_fuel_reading(book=book, fuel_total=10_000 - step - drop)
     if verdict is None:
@@ -206,12 +207,12 @@ def test_forced_boundary_seeds_the_mirror_credit() -> None:
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=10_000)
     for step in range(1, BLOCK_READING_CAP + 1):
-        record_fuel_entry(book=book, kind="walk", lo=-1, hi=0)
+        record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-1, hi=0)
         record_fuel_reading(book=book, fuel_total=10_000 - step)
     assert book["entries"] == [{"kind": "boundary_strand", "lo": -10, "hi": 10}]
     # The echo whose charge was judged in the previous block: its
     # entry demands a fall that already happened.
-    record_fuel_entry(book=book, kind="shot_dual", lo=-10, hi=-10)
+    record_fuel_entry(book=book, kind=FuelEntryKind.SHOT_DUAL, lo=-10, hi=-10)
     record_fuel_reading(book=book, fuel_total=10_000 - BLOCK_READING_CAP)
     verdict = record_fuel_reading(book=book, fuel_total=10_000 - BLOCK_READING_CAP)
     if verdict is None:
@@ -223,7 +224,7 @@ def test_quiet_boundary_stays_exact() -> None:
     """No strand grace at a quiet boundary: real leaks still diverge."""
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=1000)
-    record_fuel_entry(book=book, kind="walk", lo=-1, hi=0)
+    record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-1, hi=0)
     record_fuel_reading(book=book, fuel_total=989)
     verdict = record_fuel_reading(book=book, fuel_total=989)
     if verdict is None:
@@ -243,7 +244,7 @@ def test_death_reset_reanchors_the_account() -> None:
 
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=149)
-    record_fuel_entry(book=book, kind="shot_dual", lo=-10, hi=-10)
+    record_fuel_entry(book=book, kind=FuelEntryKind.SHOT_DUAL, lo=-10, hi=-10)
 
     reset_fuel_book_on_death(book=book)
 
@@ -266,7 +267,7 @@ def test_widen_last_teleport_entry_reprices_a_displaced_landing() -> None:
 
     book = make_fuel_book()
     record_fuel_reading(book=book, fuel_total=1000)
-    record_fuel_entry(book=book, kind="teleport", lo=-446, hi=-374)
+    record_fuel_entry(book=book, kind=FuelEntryKind.TELEPORT, lo=-446, hi=-374)
 
     assert widen_last_teleport_entry(book=book, widen_by=400) is True
 
@@ -286,7 +287,7 @@ def test_widening_without_an_open_teleport_entry_is_a_no_op() -> None:
     from tankpit_bot.ledger.fuel_book import widen_last_teleport_entry
 
     book = make_fuel_book()
-    record_fuel_entry(book=book, kind="walk", lo=-1, hi=0)
+    record_fuel_entry(book=book, kind=FuelEntryKind.WALK, lo=-1, hi=0)
 
     assert widen_last_teleport_entry(book=book, widen_by=50) is False
 
@@ -297,6 +298,6 @@ def test_widen_rejects_negative_widening() -> None:
     from tankpit_bot.ledger.fuel_book import widen_last_teleport_entry
 
     book = make_fuel_book()
-    record_fuel_entry(book=book, kind="teleport", lo=-40, hi=-30)
+    record_fuel_entry(book=book, kind=FuelEntryKind.TELEPORT, lo=-40, hi=-30)
     with pytest.raises(ContractError):
         widen_last_teleport_entry(book=book, widen_by=-1)
