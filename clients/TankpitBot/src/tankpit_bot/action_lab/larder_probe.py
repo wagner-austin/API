@@ -18,7 +18,8 @@ equipment container it exposes becomes an attempt candidate.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
@@ -44,7 +45,13 @@ _SETTLE_MS = 2000
 _PICKUP_SETTLE_MS = 4000
 _CARDINALS: tuple[tuple[int, int], ...] = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
-LarderAttemptStatus = Literal["own_tile_pickup", "adjacent_pickup", "no_pickup"]
+
+class LarderAttemptStatus(StrEnum):
+    """Which pickup, if either, emptied the container on one larder attempt."""
+
+    OWN_TILE_PICKUP = "own_tile_pickup"
+    ADJACENT_PICKUP = "adjacent_pickup"
+    NO_PICKUP = "no_pickup"
 
 
 class LarderAttemptDict(TypedDict):
@@ -119,7 +126,7 @@ def encode_larder_attempt(attempt: LarderAttemptDict) -> JSONObject:
         "adjacent_picked": attempt["adjacent_picked"],
         "inventory_before": attempt["inventory_before"],
         "inventory_after": attempt["inventory_after"],
-        "status": attempt["status"],
+        "status": attempt["status"].value,
     }
 
 
@@ -362,11 +369,11 @@ class LarderProbe(DensityProbe):
                 adjacent_picked = self._inventory_total() > control_before
         inventory_after = self._inventory_total()
         if own_picked:
-            status: LarderAttemptStatus = "own_tile_pickup"
+            status = LarderAttemptStatus.OWN_TILE_PICKUP
         elif adjacent_picked:
-            status = "adjacent_pickup"
+            status = LarderAttemptStatus.ADJACENT_PICKUP
         else:
-            status = "no_pickup"
+            status = LarderAttemptStatus.NO_PICKUP
         log.info(
             "Larder probe: (%d,%d) stood=%s own_tile=%s adjacent=%s",
             container_x,
