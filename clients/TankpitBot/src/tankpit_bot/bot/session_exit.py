@@ -39,16 +39,18 @@ row appended -- with ``exit_reason`` set to the request's reason.
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
-SessionExitReason = Literal[
-    "no_viable_targets",
-    "out_of_fuel",
-    "no_productive_collect",
-    "deactivated",
-    "connection_lost",
-    "session_complete",
-]
+
+class SessionExitReason(StrEnum):
+    """Why a session ended, as the session summary and the runs index record it."""
+
+    NO_VIABLE_TARGETS = "no_viable_targets"
+    OUT_OF_FUEL = "out_of_fuel"
+    NO_PRODUCTIVE_COLLECT = "no_productive_collect"
+    DEACTIVATED = "deactivated"
+    CONNECTION_LOST = "connection_lost"
+    SESSION_COMPLETE = "session_complete"
 
 
 class SessionExitError(Exception):
@@ -67,7 +69,7 @@ class SessionExitError(Exception):
             reason: Machine-readable exit reason.
             detail: Human-readable one-line explanation.
         """
-        super().__init__(f"{reason}: {detail}")
+        super().__init__(f"{reason.value}: {detail}")
         self.reason: SessionExitReason = reason
         self.detail = detail
 

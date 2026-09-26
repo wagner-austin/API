@@ -22,7 +22,7 @@ from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.ledger.ammo_book import record_ammo_scan
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
-from tankpit_bot.ledger.fuel_book import record_fuel_entry
+from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
 from tankpit_bot.ledger.outcome._emit import (
     mark_decision_dispatched,
     transfer_pending_decision,
@@ -275,7 +275,7 @@ def _dispatch_mine_drop(bot: BotProtocol) -> bool:
     if dispatched:
         record_fuel_entry(
             book=bot.world.fuel_book,
-            kind="mine_press",
+            kind=FuelEntryKind.MINE_PRESS,
             lo=-MINE_PRESS_COST,
             hi=-MINE_PRESS_COST,
         )
@@ -335,7 +335,7 @@ def dispatch_command(
         if dispatched_radar:
             record_fuel_entry(
                 book=bot.world.fuel_book,
-                kind="radar",
+                kind=FuelEntryKind.RADAR,
                 lo=-RADAR_COST,
                 hi=-RADAR_COST,
             )
@@ -478,7 +478,7 @@ def _record_teleport_fuel_entry(ws: WorldService, target_x: int, target_y: int) 
     cost = teleport_cost(self_state["x"], self_state["y"], target_x, target_y)
     record_fuel_entry(
         book=ws.fuel_book,
-        kind="teleport",
+        kind=FuelEntryKind.TELEPORT,
         lo=-(cost + _TELEPORT_DRIFT_FUEL),
         hi=-max(cost - _TELEPORT_DRIFT_FUEL, 0),
     )

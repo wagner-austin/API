@@ -30,7 +30,7 @@ from tankpit_bot.bot.ai.mode_gates import (
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
-from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.runtime_logging import emit_ai
@@ -113,7 +113,7 @@ def decide(
             # Winding down and nothing left to collect: ending early
             # and clean beats idling out the clock or re-engaging.
             raise SessionExitError(
-                "session_complete",
+                SessionExitReason.SESSION_COMPLETE,
                 f"wound down; collect exhausted at fuel={ctx.fuel}",
             )
         # Collection exhausted with healthy fuel: the tank is stocked,
@@ -253,7 +253,7 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
             return "HUNT"
         if should_exit_collect(ctx):
             raise SessionExitError(
-                "session_complete",
+                SessionExitReason.SESSION_COMPLETE,
                 f"wound down fully stocked at fuel={ctx.fuel}",
             )
         return "COLLECT"

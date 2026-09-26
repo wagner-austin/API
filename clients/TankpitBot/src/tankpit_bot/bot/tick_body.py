@@ -19,7 +19,7 @@ from tankpit_bot.bot.ai.types import (
     make_respawn_ai_state,
 )
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.bot.tick_claims import _arbitrate_collect_claim
 from tankpit_bot.bot.tick_combat_feedback import (
@@ -354,7 +354,7 @@ def _check_respawn_deadline(bot: Bot) -> None:
     """
     if bot._respawn_deadline_ms > 0 and get_current_time_ms() >= bot._respawn_deadline_ms:
         raise SessionExitError(
-            "deactivated",
+            SessionExitReason.DEACTIVATED,
             f"no respawn sync within {_RESPAWN_WAIT_MS // 1000}s of the own 0x41",
         )
 
@@ -387,7 +387,7 @@ def _check_wire_silence(bot: Bot) -> None:
     if silence_ms < _WIRE_SILENCE_LIMIT_MS:
         return
     raise SessionExitError(
-        "connection_lost",
+        SessionExitReason.CONNECTION_LOST,
         f"no game wire message for {silence_ms // 1000}s "
         f"(limit {_WIRE_SILENCE_LIMIT_MS // 1000}s) - game session is dead",
     )
