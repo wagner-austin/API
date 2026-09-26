@@ -21,8 +21,9 @@ import pathlib
 from platform_core.errors import FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
-from fleet.cli import node_agent
-from fleet.core import _test_hooks
+from fleet.cli import _config, node_agent
+from fleet.contracts.workspace import require_project
+from fleet.core import _test_hooks, leases, records, run_lease
 from tests._node_agent_fixtures import (
     PROBED,
     _credentials_in_env,
@@ -32,7 +33,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import FakeQueue, queue_job
-from tests.conftest import FakeRun, ok, timed_out
+from tests.conftest import DEMO_NOW, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok, timed_out
 
 __all__ = ["_credentials_in_env", "_sourced_config", "sourced_document"]
 
@@ -53,6 +54,18 @@ UP_TO_THE_PAYLOAD: tuple[_test_hooks.CommandResult, ...] = (
     ok(""),  # stage: run mkdir
     timed_out(SSH_DEADLINE_SECONDS),  # stage: send the payload, ended at its deadline
 )
+
+#: Every command the tick runs before it asks for the lease: the probe and
+#: ``prepare``'s mirror checks. A lease another run holds refuses the dispatch
+#: right after these, before any archive is built or anything is sent.
+UP_TO_THE_LEASE: tuple[_test_hooks.CommandResult, ...] = (
+    *PROBED,  # the probe, before any claim
+    ok(""),  # git init --bare (the mirror is new)
+    ok(""),  # git cat-file -e: the sha is present
+)
+
+#: The run that already holds the demo project on lavender, a minute older.
+HOLDER_RUN_ID = f"libs-demo-{DEMO_NOW - 60}"
 
 
 class TestAStagingFaultIsReported:
@@ -89,3 +102,72 @@ class TestAStagingFaultIsReported:
         # The reason reaches the queue, not just the fact: a refusal that
         # said only "it failed" would send the reader to the node.
         assert f"timed out after {SSH_DEADLINE_SECONDS} s" in detail
+
+    def test_the_lease_the_dead_run_took_is_given_back_and_its_feed_ends(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board task e12affc5: the resubmission must not bounce.
+
+        Before, the refusal closed the queue row and left the lease standing
+        for the project's whole window, so job 7143a25e was refused
+        ``LEASE_HELD`` by the dead run of job 4d8b28a9. Now nothing is held
+        afterwards, the feed's last word on the run is ``refused`` with the
+        same reason, and the ledger never counted it.
+        """
+        prebuilt_export(sourced_config)
+        _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
+        _test_hooks.http_post = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="refused")}),
+            ]
+        )
+
+        assert node_agent.main(node_argv(sourced_config)) == 0
+
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        assert leases.held_leases(loaded.leases, now_unix=DEMO_NOW) == ()
+        events = [e for e in records.read_feed(loaded.feed) if e["run_id"] == DEMO_RUN_ID]
+        assert [event["kind"] for event in events] == ["leased", "refused"]
+        assert events[1]["detail"].startswith(f"{FleetErrorCode.NODE_UNREACHABLE}: ")
+        assert f"timed out after {SSH_DEADLINE_SECONDS} s" in events[1]["detail"]
+        assert records.read_ledger(loaded.ledger) == ()
+
+
+class TestAnotherDispatchesLeaseStands:
+    def test_a_lease_held_refusal_releases_nothing(self, sourced_config: pathlib.Path) -> None:
+        """Only a lease this dispatch acquired is given back.
+
+        ``LEASE_HELD`` means the project belongs to another run, and releasing
+        it would hand that run's environment to the next claim, so the refusal
+        leaves it exactly as it was and writes nothing for a run that never
+        took a lease.
+        """
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        holder = run_lease.open_lease(
+            node="lavender",
+            project=DEMO_PROJECT,
+            run_id=HOLDER_RUN_ID,
+            agent="opus-other-0926",
+            session_id="22222222-bbbb-4bbb-8bbb-222222222222",
+            plan=require_project(loaded.workspace, DEMO_PROJECT),
+            now_unix=DEMO_NOW - 60,
+        )
+        leases.acquire(loaded.leases, holder, now_unix=DEMO_NOW - 60)
+        _test_hooks.run = FakeRun(list(UP_TO_THE_LEASE))
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="refused")}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert node_agent.main(node_argv(sourced_config)) == 0
+
+        detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
+        assert detail.startswith(f"{FleetErrorCode.LEASE_HELD}: ")
+        assert leases.held_leases(loaded.leases, now_unix=DEMO_NOW) == (holder,)
+        assert [e for e in records.read_feed(loaded.feed) if e["run_id"] == DEMO_RUN_ID] == []

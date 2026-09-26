@@ -22,7 +22,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.cli import _config, cancel, run
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, staging
+from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, run_lease, staging
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -56,10 +56,10 @@ def _plan() -> ProjectConfig:
 
 class TestRunIdentity:
     def test_a_run_id_names_its_project_and_time(self) -> None:
-        assert dispatch.run_id_for(DEMO_PROJECT, started_unix=DEMO_NOW) == DEMO_RUN_ID
+        assert run_lease.run_id_for(DEMO_PROJECT, started_unix=DEMO_NOW) == DEMO_RUN_ID
 
     def test_the_lease_is_sized_at_twice_the_estimate(self) -> None:
-        lease = dispatch.open_lease(
+        lease = run_lease.open_lease(
             node="lavender",
             project=DEMO_PROJECT,
             run_id=DEMO_RUN_ID,
@@ -354,7 +354,7 @@ class TestFinish:
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-        lease = dispatch.open_lease(
+        lease = run_lease.open_lease(
             node="lavender",
             project=DEMO_PROJECT,
             run_id=DEMO_RUN_ID,
