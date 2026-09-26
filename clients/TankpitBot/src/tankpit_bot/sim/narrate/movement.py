@@ -33,7 +33,7 @@ from tankpit_bot.protocol.types import (
 )
 from tankpit_bot.sim.actions import TeleportOutcomeDict
 from tankpit_bot.sim.fuel_pickup import FuelPickupOutcomeDict
-from tankpit_bot.sim.movement import MoveOutcomeDict, PickupRecordDict
+from tankpit_bot.sim.movement import MoveOutcomeDict, PickupRecordDict, StopReason
 from tankpit_bot.sim.wire_statements import movement_echo, position_statement
 from tankpit_bot.sim.world import SimWorldDict
 
@@ -123,7 +123,9 @@ def narrate_move(
         if include_pickups and outcome["pickups"]:
             messages.append(pickup_message(list(outcome["pickups"])))
             messages.append(pickup_message(list(outcome["pickups"])))
-    unfinished_transition = outcome["stop_reason"] == "transition" and not outcome["dest_reached"]
+    unfinished_transition = (
+        outcome["stop_reason"] is StopReason.TRANSITION and not outcome["dest_reached"]
+    )
     if (outcome["kind"] == "cant_go" or unfinished_transition) and (
         outcome["tank_id"] == observer_id
     ):

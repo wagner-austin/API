@@ -20,6 +20,7 @@ from tankpit_bot.protocol.types import (
     SupervisorDict,
 )
 from tankpit_bot.sim.actions import MinePressOutcomeDict, RadarOutcomeDict
+from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.equipment import EquipmentGrantDict
 from tankpit_bot.sim.fuel_deposit import FuelDepositOutcomeDict
 from tankpit_bot.sim.movement import PickupRecordDict
@@ -131,7 +132,7 @@ def narrate_equipment_pickup(
     world: SimWorldDict,
     grant: EquipmentGrantDict,
     tank_id: int,
-    kind: str,
+    kind: ClientCommandKind,
     observer_id: int,
 ) -> list[BinaryMessage]:
     """Narrate one resolved equipment pickup to a single observer.
@@ -168,7 +169,7 @@ def narrate_equipment_pickup(
             _inventory_snapshot(world, tank_id),
             pickup_message([PickupRecordDict(x=tank["x"], y=tank["y"], remaining_volume=0)]),
         ]
-    if kind != "pickup_equipment":
+    if kind is not ClientCommandKind.PICKUP_EQUIPMENT:
         return []
     return [
         SupervisorDict(
