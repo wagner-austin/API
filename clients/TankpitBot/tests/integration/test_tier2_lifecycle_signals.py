@@ -49,7 +49,12 @@ class TestStallTimeoutReplansToIdle:
         first call regardless of wall-clock fluctuation.
         """
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.states import make_in_flight_action, transition_to
+        from tankpit_bot.bot.states import (
+            ActionKind,
+            BotState,
+            make_in_flight_action,
+            transition_to,
+        )
         from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action
         from tankpit_bot.browser.cdp_utils import get_current_time_ms
 
@@ -57,23 +62,23 @@ class TestStallTimeoutReplansToIdle:
         # Walk the state machine through its valid INITIALIZING ->
         # WAITING_FOR_POSITION -> IDLE -> MOVING ladder so the stall
         # handler's replan-to-IDLE transition is permitted.
-        bot._state_data = transition_to(bot._state_data, "WAITING_FOR_POSITION")
-        bot._state_data = transition_to(bot._state_data, "IDLE")
-        bot._state_data = transition_to(bot._state_data, "MOVING")
+        bot._state_data = transition_to(bot._state_data, BotState.WAITING_FOR_POSITION)
+        bot._state_data = transition_to(bot._state_data, BotState.IDLE)
+        bot._state_data = transition_to(bot._state_data, BotState.MOVING)
         # Stamp the action 11 seconds in the past (above the default
         # 10 000 ms ``action_stall_timeout_ms``).
         action = make_in_flight_action(
-            kind="move",
+            kind=ActionKind.MOVE,
             target_x=131,
             target_y=124,
             started_ms=get_current_time_ms() - 11_000,
         )
-        bot._state_data = transition_to(bot._state_data, "MOVING", in_flight_action=action)
+        bot._state_data = transition_to(bot._state_data, BotState.MOVING, in_flight_action=action)
 
         cleared = _clear_stalled_action(bot, action)
         assert cleared is True
-        assert bot._state_data["in_flight_action"]["kind"] == "none"
-        assert bot.get_state() == "IDLE"
+        assert bot._state_data["in_flight_action"]["kind"] is ActionKind.NONE
+        assert bot.get_state() is BotState.IDLE
 
 
 class TestTeleportLandedClearsAction:
