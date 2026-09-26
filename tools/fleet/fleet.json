@@ -132,6 +132,18 @@
         "companions": []
       }
     },
+    "libs/instrument_io": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/instrument_io",
+        "install": [],
+        "companions": []
+      }
+    },
     "libs/monorepo_guards": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
