@@ -12,6 +12,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage
 from tankpit_bot.ledger.fuel_book import (
+    FuelEntryKind,
     record_fuel_entry,
     record_fuel_reading,
     reset_fuel_book_on_death,
@@ -96,7 +97,7 @@ def update_world_state_from_fuel_total(
         # exactly before folding the reading in (2026-07-21 soak 2:
         # every positive-residual divergence was an unentered gain).
         announced = fuel_total - ws.fuel_book["last_fuel"]
-        record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=announced, hi=announced)
+        record_fuel_entry(book=ws.fuel_book, kind=FuelEntryKind.PICKUP, lo=announced, hi=announced)
         if announced > 0:
             # The wire just credited US fuel -- the code=4
             # drain-vs-stale discriminator reads this stamp.
@@ -143,7 +144,7 @@ def update_world_state_from_container_pickup(
         # cannot re-import the dead belief ([[fleet-coordination]]).
         ws.container_disproofs[f"{x},{y}"] = ts
     rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] is not None else 8
-    record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=0, hi=fuel_capacity(rank))
+    record_fuel_entry(book=ws.fuel_book, kind=FuelEntryKind.PICKUP, lo=0, hi=fuel_capacity(rank))
     if remaining_volume <= 0:
         emit_world("Picked up container at (%d, %d)", x, y)
     else:

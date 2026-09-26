@@ -30,10 +30,10 @@ from tankpit_bot.sniffer.world_state_tanks import (
 log = get_logger(__name__)
 
 _SHOT_ENTRY_KINDS: dict[int, FuelEntryKind] = {
-    0: "shot_single",
-    1: "shot_dual",
-    2: "shot_missile",
-    3: "shot_homing",
+    0: FuelEntryKind.SHOT_SINGLE,
+    1: FuelEntryKind.SHOT_DUAL,
+    2: FuelEntryKind.SHOT_MISSILE,
+    3: FuelEntryKind.SHOT_HOMING,
 }
 
 _SHOT_ENTRY_COSTS: dict[int, int] = {
@@ -72,7 +72,9 @@ def _record_shot_fuel_entry(ws: WorldService, shooter_id: int, weapon: int) -> N
         record_ammo_shot(book=ws.ammo_book, weapon=weapon)
         record_own_shot_echo(ws.damage_book, weapon)
     else:
-        record_fuel_entry(book=ws.fuel_book, kind="enemy_hit", lo=-DUAL_HIT_VICTIM_COST, hi=0)
+        record_fuel_entry(
+            book=ws.fuel_book, kind=FuelEntryKind.ENEMY_HIT, lo=-DUAL_HIT_VICTIM_COST, hi=0
+        )
         record_ammo_enemy_shot(book=ws.ammo_book)
         shooter = ws.world_state["tanks"].get(str(shooter_id))
         record_incoming_shot(

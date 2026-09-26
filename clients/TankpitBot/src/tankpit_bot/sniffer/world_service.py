@@ -42,18 +42,10 @@ from tankpit_bot.state.viewport_geometry import (
 
 log = get_logger(__name__)
 
-ITEM_TYPES: list[ItemType] = [
-    "armor_shields",
-    "dual_shots",
-    "missile_shots",
-    "homing_shots",
-    "extra_radars",
-]
-
 WEAPON_BYTE_TO_ITEM: dict[int, ItemType] = {
-    1: "dual_shots",
-    2: "missile_shots",
-    3: "homing_shots",
+    1: ItemType.DUAL_SHOTS,
+    2: ItemType.MISSILE_SHOTS,
+    3: ItemType.HOMING_SHOTS,
 }
 
 
@@ -545,7 +537,6 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
 
 
 __all__ = [
-    "ITEM_TYPES",
     "WEAPON_BYTE_TO_ITEM",
     "WorldService",
 ]

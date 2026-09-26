@@ -16,6 +16,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.browser import (
     BrowserSession,
     GameLogEntry,
+    LogCategory,
     PlaywrightNotInstalledError,
     get_current_time_ms,
 )
@@ -151,12 +152,12 @@ class WebSocketSniffer(BrowserSession):
             {
                 "timestamp_ms": get_current_time_ms(),
                 "text": entry["text"],
-                "category": entry["category"],
+                "category": entry["category"].value,
             }
         )
         self._autosave_capture()
         super()._process_game_log_entry(entry)
-        if entry["category"] != "combat" or self._combat_tracker is None:
+        if entry["category"] is not LogCategory.COMBAT or self._combat_tracker is None:
             return
         event = self._combat_tracker.process_log_line(entry["text"])
         if event is None:

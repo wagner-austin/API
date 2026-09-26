@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.inventory import InventoryItem, replace_inventory_slot
+from tankpit_bot.inventory import InventoryItem, inventory_slot, replace_inventory_slot
 from tankpit_bot.sniffer.world_service import WEAPON_BYTE_TO_ITEM, WorldService
 
 log = get_logger(__name__)
@@ -205,7 +205,7 @@ def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
     item_key = WEAPON_BYTE_TO_ITEM.get(weapon_byte)
     if item_key is None:
         return
-    current = ws.inventory_state[item_key]
+    current = inventory_slot(ws.inventory_state, item_key)
     if current["count"] <= 0:
         return
     new_count = current["count"] - 1
@@ -214,7 +214,7 @@ def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
         item_key,
         InventoryItem(count=new_count, enabled=current["enabled"]),
     )
-    log.info("AMMO: %s consumed by hit (%d -> %d)", item_key, current["count"], new_count)
+    log.info("AMMO: %s consumed by hit (%d -> %d)", item_key.value, current["count"], new_count)
 
 
 def mark_tank_killed(ws: WorldService, tank_id: int, killer_id: int) -> None:

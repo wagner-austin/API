@@ -252,7 +252,7 @@ def _log_inventory_changes(changes: list[InventoryChange]) -> None:
         changes: List of inventory changes to log.
     """
     for change in changes:
-        item_display = change["item"].replace("_", " ")
+        item_display = change["item"].value.replace("_", " ")
         if change["delta"] != 0:
             if change["delta"] > 0:
                 log.info(

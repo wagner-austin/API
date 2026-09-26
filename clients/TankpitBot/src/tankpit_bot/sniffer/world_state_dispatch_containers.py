@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
-from tankpit_bot.ledger.fuel_book import record_fuel_entry, widen_last_teleport_entry
+from tankpit_bot.ledger.fuel_book import (
+    FuelEntryKind,
+    record_fuel_entry,
+    widen_last_teleport_entry,
+)
 from tankpit_bot.ledger.outcome.teleport import pending_teleport_target
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.physics.damage import MINE_DETONATION_COST
@@ -340,7 +344,9 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
         }:
             return _dispatch_mine_placement(ws, mine_type, tank_id, positions)
         case {"msg_type": 0x45, "positions": list(positions)}:
-            record_fuel_entry(book=ws.fuel_book, kind="detonation", lo=-MINE_DETONATION_COST, hi=0)
+            record_fuel_entry(
+                book=ws.fuel_book, kind=FuelEntryKind.DETONATION, lo=-MINE_DETONATION_COST, hi=0
+            )
             _note_own_mine_hit(ws, positions)
             return _dispatch_mine_detonation(ws, positions)
         case {"msg_type": "container_pickup", "pickups": tuple(pickups)}:
