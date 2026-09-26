@@ -12,8 +12,6 @@ from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import send_websocket_bytes
 
-ProbeT = type[ProbeBase]
-
 
 def create_probe_services() -> tuple[CDPService, CommandService]:
     """Create the service pair for a probe session.
