@@ -110,7 +110,7 @@ class TestExpectedChecks:
         assert ids == [
             "keepalive:wsl-keepalive",
             "memory-floor:26gb",
-            "gpu:nvidia-smi",
+            "gpu:wagner-austin/API:wsl:lavender-wsl",
             "timer:ci-clean.timer",
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
             "workdir:wagner-austin/API:wsl:lavender-wsl",
@@ -180,11 +180,14 @@ class TestParseAuditTranscript:
     def test_a_drift_line_carries_its_detail_and_reason(self) -> None:
         spec = _host()
         lines = _clean_transcript(spec).splitlines()
-        lines[2] = "CHECK gpu:nvidia-smi DRIFT nvidia-smi said: "
+        lines[2] = (
+            "CHECK gpu:wagner-austin/API:wsl:lavender-wsl DRIFT "
+            "nvidia-smi on the runner PATH said: "
+        )
         findings = runner_audit.parse_audit_transcript(spec, "\n".join(lines))
         drifted = findings[2]
         assert drifted["ok"] is False
-        assert drifted["detail"] == "nvidia-smi said: "
+        assert drifted["detail"] == "nvidia-smi on the runner PATH said: "
         assert drifted["reason"] == "runner jobs on this host digest a real GPU"
 
     def test_blank_lines_are_not_checks(self) -> None:
@@ -267,6 +270,11 @@ FAKE_WSL = """function wsl {
     $command = $args[2]
     if ($command -eq 'test') { $global:LASTEXITCODE = $script:TestExit; return }
     if ($command -eq 'sha256sum') { $global:LASTEXITCODE = 0; return $script:ShaLines }
+    if ($command -eq 'systemctl') { $global:LASTEXITCODE = 0; return 'active' }
+    if ($command -eq 'sh' -and $args[4] -like 'PATH=$(cat /home/gharunner/*/.path) nvidia-smi *') {
+        $global:LASTEXITCODE = 0
+        return $script:GpuLines
+    }
     throw "unexpected wsl call: $args"
 }
 """
@@ -301,11 +309,28 @@ def _run_asset_checks(tmp_path: pathlib.Path, test_exit: int, sha_lines: str) ->
         ],
     )
     spec["installs"] = []
+    return _run_audit(tmp_path, spec, test_exit=test_exit, sha_lines=sha_lines, gpu_lines="@()")
+
+
+def _run_audit(
+    tmp_path: pathlib.Path, spec: HostRunnerSpec, *, test_exit: int, sha_lines: str, gpu_lines: str
+) -> list[str]:
+    """Execute one rendered audit script under Windows PowerShell 5.1.
+
+    Args:
+        tmp_path: Where the script is written.
+        spec: The host the script is rendered for.
+        test_exit: The exit code every ``test`` reports.
+        sha_lines: What ``sha256sum`` prints, a PowerShell expression.
+        gpu_lines: What nvidia-smi on the runner PATH prints, likewise.
+
+    Returns:
+        The CHECK lines the script emitted.
+    """
     script = tmp_path / "audit.ps1"
     script.write_text(
         f"$script:TestExit = {test_exit}\n$script:ShaLines = {sha_lines}\n"
-        + FAKE_WSL
-        + runner_audit.render_audit_script(spec),
+        f"$script:GpuLines = {gpu_lines}\n" + FAKE_WSL + runner_audit.render_audit_script(spec),
         encoding="utf-8",
     )
     ran = subprocess.run(
@@ -338,4 +363,27 @@ class TestTheRenderedAuditRunsForReal:
         assert lines == [
             "CHECK asset:/opt/corvis/rw-game/game-lib.jar OK",
             "CHECK sha256:/opt/corvis/rw-game/game-lib.jar OK",
+        ]
+
+    @pytest.mark.parametrize(
+        ("gpu_lines", "expected"),
+        [
+            ("@('NVIDIA GeForce GTX 1630')", "OK"),
+            ("@()", "DRIFT nvidia-smi on the runner PATH said: "),
+        ],
+    )
+    def test_the_gpu_is_checked_on_each_runners_own_path(
+        self, tmp_path: pathlib.Path, gpu_lines: str, expected: str
+    ) -> None:
+        """The check asks nvidia-smi through the runner's .path, the PATH
+        its jobs get; a runner that cannot find it drifts, one line, and the
+        rest of the transcript still arrives."""
+        spec = _host(
+            keepalive_task=None, wslconfig_min_memory_gb=None, systemd_timers=[], assets=[]
+        )
+        lines = _run_audit(tmp_path, spec, test_exit=0, sha_lines="@()", gpu_lines=gpu_lines)
+        assert lines == [
+            f"CHECK gpu:wagner-austin/API:wsl:lavender-wsl {expected}",
+            "CHECK service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service OK",
+            "CHECK workdir:wagner-austin/API:wsl:lavender-wsl OK",
         ]

@@ -195,10 +195,10 @@ class TestLinuxScript:
     def test_the_local_bin_line_appends_once_when_run_for_real(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """The .path line is executed, twice, by a real bash against a real
-        file shaped as config.sh writes it: one colon-joined line. The
-        second run must leave it unchanged, because the provision is re-run
-        after any roster change."""
+        """The .path lines are executed, twice, by a real bash against a real
+        file shaped as config.sh writes it: one colon-joined line. Both
+        entries land once and in order, and the second run leaves the file
+        unchanged, because the provision is re-run after any roster change."""
         bash = shutil.which("bash")
         if bash is None:
             raise AssertionError("bash is required to execute the rendered provision lines")
@@ -210,20 +210,25 @@ class TestLinuxScript:
             workdir="rt/_work",
             labels=["lavender-wsl"],
         )
-        [append] = [
+        appends = [
             line for line in runner_render.render_wsl_install_lines(install) if ".path" in line
         ]
+        assert len(appends) == len(runner_render.RUNNER_PATH_ENTRIES)
         runner_dir = tmp_path / "rt"
         runner_dir.mkdir()
         (runner_dir / ".path").write_bytes(b"/usr/local/bin:/usr/bin:/bin\n")
         for _ in range(2):
             ran = subprocess.run(
-                [bash, "-c", append], cwd=tmp_path, capture_output=True, text=True, check=False
+                [bash, "-c", "\n".join(appends)],
+                cwd=tmp_path,
+                capture_output=True,
+                text=True,
+                check=False,
             )
             assert ran.returncode == 0, ran.stderr
         assert (runner_dir / ".path").read_bytes() == (
-            f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}\n".encode()
-        )
+            f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}:{runner_render.WSL_LIB}\n"
+        ).encode()
 
     def test_the_ci_clean_payload_gates_on_a_running_worker(self) -> None:
         assert "Runner.Worker" in runner_render.CI_CLEAN_SCRIPT
