@@ -7,6 +7,8 @@ import zipfile
 from pathlib import Path
 from typing import Literal
 
+from platform_core.logging import LogLevel
+
 from art_trainer.core.config.settings import Settings
 from art_trainer.core.services.dataset import _test_hooks
 from art_trainer.core.services.dataset._test_hooks import UploadResult
@@ -34,7 +36,7 @@ def _make_test_settings(tmp_path: Path, api_key: str = "test-key") -> Settings:
 
     return {
         "app_env": app_env,
-        "logging": {"level": "INFO"},
+        "logging": {"level": LogLevel.INFO},
         "redis": {"enabled": True, "url": "redis://localhost:6379/0"},
         "rq": {
             "queue_name": "art-trainer",

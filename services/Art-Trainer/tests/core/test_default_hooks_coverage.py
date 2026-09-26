@@ -9,6 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from platform_core.logging import LogLevel
+
 from art_trainer.core._test_hooks import (
     _default_load_settings,
     _default_lora_output_dir,
@@ -36,7 +38,7 @@ def _make_test_settings(tmp_path: Path) -> Settings:
 
     return {
         "app_env": app_env,
-        "logging": {"level": "INFO"},
+        "logging": {"level": LogLevel.INFO},
         "redis": {"enabled": True, "url": "redis://localhost:6379/0"},
         "rq": {
             "queue_name": "art-trainer",

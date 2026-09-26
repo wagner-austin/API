@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from platform_core.json_utils import JSONObject
+from platform_core.logging import LogLevel
 from platform_workers.testing import FakeRedis
 
 from art_trainer.core import _test_hooks
@@ -101,7 +102,7 @@ def _make_test_settings(tmp_path: Path) -> Settings:
 
     return {
         "app_env": app_env,
-        "logging": {"level": "INFO"},
+        "logging": {"level": LogLevel.INFO},
         "redis": {"enabled": True, "url": "redis://localhost:6379/0"},
         "rq": {
             "queue_name": "art-trainer",

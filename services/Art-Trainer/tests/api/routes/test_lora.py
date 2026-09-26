@@ -7,6 +7,7 @@ from typing import Literal
 
 from fastapi.testclient import TestClient
 from platform_core.json_utils import load_json_str, require_int, require_str
+from platform_core.logging import LogLevel
 
 from art_trainer.api.main import create_app
 from art_trainer.api.schemas.lora import LoraTrainRequest
@@ -31,7 +32,7 @@ def _make_test_settings(tmp_path: Path) -> Settings:
 
     return {
         "app_env": app_env,
-        "logging": {"level": "INFO"},
+        "logging": {"level": LogLevel.INFO},
         "redis": {"enabled": True, "url": "redis://localhost:6379/0"},
         "rq": {
             "queue_name": "art-trainer",

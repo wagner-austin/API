@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from platform_core.config import _require_env_str
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_workers.rq_harness import WorkerConfig
 
 from art_trainer import _test_hooks
@@ -85,8 +85,8 @@ def main(
         runner: Worker runner function. If None, uses the worker_runner hook.
     """
     setup_logging(
-        level="INFO",
-        format_mode="json",
+        level=LogLevel.INFO,
+        format_mode=LogFormat.JSON,
         service_name="art-trainer-worker",
         instance_id=None,
         extra_fields=None,

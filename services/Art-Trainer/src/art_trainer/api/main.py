@@ -49,7 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     cfg = settings if settings is not None else load_settings()
 
     # Set up logging
-    format_mode: LogFormat = "json"
+    format_mode: LogFormat = LogFormat.JSON
     setup_logging(
         level=cfg["logging"]["level"],
         format_mode=format_mode,
