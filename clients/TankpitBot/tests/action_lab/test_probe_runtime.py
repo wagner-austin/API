@@ -23,6 +23,7 @@ from tankpit_bot._test_hooks import (
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import probe_runtime
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.bot.states import BotState
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
@@ -148,8 +149,8 @@ class _ProbeHarness:
     def get_world_state(self) -> WorldStateDict:
         return self._world_state
 
-    def get_state(self) -> str:
-        return "WAITING_FOR_POSITION"
+    def get_state(self) -> BotState:
+        return BotState.WAITING_FOR_POSITION
 
     def _update_state_from_world(self) -> None:
         return None
@@ -274,7 +275,7 @@ def test_wait_for_probe_command_ready_advances_startup_state() -> None:
         return 2600, spawn
 
     def _advance(provider: action_session.StartupStateDriverProtocol) -> None:
-        assert provider.get_state() == "WAITING_FOR_POSITION"
+        assert provider.get_state() is BotState.WAITING_FOR_POSITION
         nonlocal advance_calls
         advance_calls += 1
         clock.advance(10)

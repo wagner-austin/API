@@ -22,6 +22,7 @@ from tankpit_bot.action_lab.session import (
     wait_for_radar_sync,
     wait_for_world_sync,
 )
+from tankpit_bot.bot.states import BotState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     WorldStateDict,
@@ -264,11 +265,11 @@ def test_wait_for_initial_self_state_raises_on_timeout() -> None:
 
 
 class _StartupBot:
-    def __init__(self, states: list[str]) -> None:
+    def __init__(self, states: list[BotState]) -> None:
         self._states = states
         self._index = 0
 
-    def get_state(self) -> str:
+    def get_state(self) -> BotState:
         return self._states[self._index]
 
     def _update_state_from_world(self) -> None:
@@ -277,17 +278,19 @@ class _StartupBot:
 
 
 def test_advance_startup_state_reaches_idle() -> None:
-    bot = _StartupBot(["INITIALIZING", "WAITING_FOR_POSITION", "IDLE"])
+    bot = _StartupBot([BotState.INITIALIZING, BotState.WAITING_FOR_POSITION, BotState.IDLE])
 
     action_session.advance_startup_state(bot)
 
-    assert bot.get_state() == "IDLE"
+    assert bot.get_state() is BotState.IDLE
 
 
 def test_advance_startup_state_raises_when_state_does_not_progress() -> None:
-    bot = _StartupBot(["INITIALIZING"])
+    bot = _StartupBot([BotState.INITIALIZING])
 
-    with pytest.raises(ActionLabSessionError, match="startup state did not advance"):
+    with pytest.raises(
+        ActionLabSessionError, match=r"startup state did not advance from INITIALIZING$"
+    ):
         action_session.advance_startup_state(bot)
 
 
