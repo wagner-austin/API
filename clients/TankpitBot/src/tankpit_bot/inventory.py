@@ -9,15 +9,16 @@ never wired into the production tick loop.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
     require_bool,
     require_int,
-    require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import require_member
 
 log = get_logger(__name__)
 
@@ -27,8 +28,17 @@ log = get_logger(__name__)
 # =============================================================================
 
 
-# Known inventory item types
-ItemType = Literal["armor_shields", "dual_shots", "missile_shots", "homing_shots", "extra_radars"]
+class ItemType(StrEnum):
+    """The five inventory slots, in 0x49/0x67 wire slot order.
+
+    Each value is the ``InventoryState`` field that holds the slot.
+    """
+
+    ARMOR_SHIELDS = "armor_shields"
+    DUAL_SHOTS = "dual_shots"
+    MISSILE_SHOTS = "missile_shots"
+    HOMING_SHOTS = "homing_shots"
+    EXTRA_RADARS = "extra_radars"
 
 
 class InventoryItem(TypedDict):
@@ -103,6 +113,31 @@ def inventory_counts(state: InventoryState) -> list[int]:
     ]
 
 
+def inventory_slot(state: InventoryState, slot: ItemType) -> InventoryItem:
+    """Return the one inventory slot an ``ItemType`` names.
+
+    The read twin of :func:`replace_inventory_slot`: ``InventoryState``
+    is keyed by field name, so a slot chosen at runtime is read here
+    rather than by indexing the TypedDict with the member.
+
+    Args:
+        state: Current inventory state.
+        slot: Which slot to read.
+
+    Returns:
+        That slot's count and enabled flag.
+    """
+    if slot is ItemType.ARMOR_SHIELDS:
+        return state["armor_shields"]
+    if slot is ItemType.DUAL_SHOTS:
+        return state["dual_shots"]
+    if slot is ItemType.MISSILE_SHOTS:
+        return state["missile_shots"]
+    if slot is ItemType.HOMING_SHOTS:
+        return state["homing_shots"]
+    return state["extra_radars"]
+
+
 def replace_inventory_slot(
     state: InventoryState,
     slot: ItemType,
@@ -123,11 +158,11 @@ def replace_inventory_slot(
         every other slot preserved from ``state``.
     """
     return InventoryState(
-        armor_shields=item if slot == "armor_shields" else state["armor_shields"],
-        dual_shots=item if slot == "dual_shots" else state["dual_shots"],
-        missile_shots=item if slot == "missile_shots" else state["missile_shots"],
-        homing_shots=item if slot == "homing_shots" else state["homing_shots"],
-        extra_radars=item if slot == "extra_radars" else state["extra_radars"],
+        armor_shields=item if slot is ItemType.ARMOR_SHIELDS else state["armor_shields"],
+        dual_shots=item if slot is ItemType.DUAL_SHOTS else state["dual_shots"],
+        missile_shots=item if slot is ItemType.MISSILE_SHOTS else state["missile_shots"],
+        homing_shots=item if slot is ItemType.HOMING_SHOTS else state["homing_shots"],
+        extra_radars=item if slot is ItemType.EXTRA_RADARS else state["extra_radars"],
     )
 
 
@@ -142,17 +177,10 @@ def diff_inventory(old: InventoryState, new: InventoryState) -> list[InventoryCh
         List of InventoryChange for each item that changed.
     """
     changes: list[InventoryChange] = []
-    item_types: list[ItemType] = [
-        "armor_shields",
-        "dual_shots",
-        "missile_shots",
-        "homing_shots",
-        "extra_radars",
-    ]
 
-    for item_type in item_types:
-        old_item = old[item_type]
-        new_item = new[item_type]
+    for item_type in ItemType:
+        old_item = inventory_slot(old, item_type)
+        new_item = inventory_slot(new, item_type)
 
         count_changed = old_item["count"] != new_item["count"]
         enabled_changed = old_item["enabled"] != new_item["enabled"]
@@ -175,36 +203,6 @@ def diff_inventory(old: InventoryState, new: InventoryState) -> list[InventoryCh
 # =============================================================================
 # Encode/Decode Functions
 # =============================================================================
-
-
-VALID_ITEM_TYPES: frozenset[str] = frozenset(
-    ["armor_shields", "dual_shots", "missile_shots", "homing_shots", "extra_radars"]
-)
-
-
-def validate_item_type(value: str) -> ItemType:
-    """Validate and narrow a string to an ItemType literal.
-
-    Args:
-        value: String value to validate.
-
-    Returns:
-        The validated item type as a Literal type.
-
-    Raises:
-        ValueError: If value is not a valid item type.
-    """
-    if value == "armor_shields":
-        return "armor_shields"
-    if value == "dual_shots":
-        return "dual_shots"
-    if value == "missile_shots":
-        return "missile_shots"
-    if value == "homing_shots":
-        return "homing_shots"
-    if value == "extra_radars":
-        return "extra_radars"
-    raise ValueError(f"Invalid item type '{value}', must be one of {VALID_ITEM_TYPES}")
 
 
 def encode_inventory_item(item: InventoryItem) -> JSONObject:
@@ -305,7 +303,7 @@ def encode_inventory_change(change: InventoryChange) -> JSONObject:
         JSON-serializable dict.
     """
     return {
-        "item": change["item"],
+        "item": change["item"].value,
         "old_count": change["old_count"],
         "new_count": change["new_count"],
         "delta": change["delta"],
@@ -324,11 +322,10 @@ def decode_inventory_change(obj: JSONObject) -> InventoryChange:
         Validated InventoryChange.
 
     Raises:
-        JSONTypeError: If required fields are missing or have wrong types.
-        ValueError: If item type is invalid.
+        JSONTypeError: If required fields are missing or have wrong types, or
+            if ``item`` is not an :class:`ItemType`.
     """
-    item_str = require_str(obj, "item")
-    item = validate_item_type(item_str)
+    item = require_member(obj, "item", ItemType)
     old_count = require_int(obj, "old_count")
     new_count = require_int(obj, "new_count")
     delta = require_int(obj, "delta")
@@ -345,7 +342,6 @@ def decode_inventory_change(obj: JSONObject) -> InventoryChange:
 
 
 __all__ = [
-    "VALID_ITEM_TYPES",
     "InventoryChange",
     "InventoryItem",
     "InventoryState",
@@ -358,6 +354,6 @@ __all__ = [
     "encode_inventory_item",
     "encode_inventory_state",
     "inventory_counts",
+    "inventory_slot",
     "replace_inventory_slot",
-    "validate_item_type",
 ]

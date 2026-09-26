@@ -40,17 +40,6 @@ PREFIX_AUTH: Literal["%"] = "%"  # Authentication
 PREFIX_STATUS: Literal["$"] = "$"  # System status
 PREFIX_RECORD: Literal["="] = "="  # Game record/history
 
-LobbyPrefix = Literal["+", "*", "-", "%", "$", "="]
-
-LOBBY_PREFIXES: tuple[LobbyPrefix, ...] = (
-    PREFIX_ROOM_LIST,
-    PREFIX_ROOM_QUERY,
-    PREFIX_LEAVE,
-    PREFIX_AUTH,
-    PREFIX_STATUS,
-    PREFIX_RECORD,
-)
-
 
 # =============================================================================
 # Room Info (from + messages)

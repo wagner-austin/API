@@ -6,6 +6,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.combat import (
     CombatEvent,
+    CombatEventType,
     CombatStats,
     EntityPairStats,
     _make_empty_combat_stats,
@@ -68,7 +69,7 @@ class CombatTracker:
         """
         event_type = event["event_type"]
 
-        if event_type == "hit_by_player":
+        if event_type is CombatEventType.HIT_BY_PLAYER:
             stats = self._get_or_create_stats(event["target"])
             self._stats[event["target"]] = CombatStats(
                 name=stats["name"],
@@ -77,7 +78,7 @@ class CombatTracker:
                 deactivated=stats["deactivated"],
                 destroyed=stats["destroyed"],
             )
-        elif event_type == "hit_by_enemy":
+        elif event_type is CombatEventType.HIT_BY_ENEMY:
             stats = self._get_or_create_stats(event["attacker"])
             self._stats[event["attacker"]] = CombatStats(
                 name=stats["name"],
@@ -86,9 +87,9 @@ class CombatTracker:
                 deactivated=stats["deactivated"],
                 destroyed=stats["destroyed"],
             )
-        elif event_type == "hit_by_unknown":
+        elif event_type is CombatEventType.HIT_BY_UNKNOWN:
             self._unknown_hits_received += 1
-        elif event_type == "deactivated":
+        elif event_type is CombatEventType.DEACTIVATED:
             stats = self._get_or_create_stats(event["target"])
             self._stats[event["target"]] = CombatStats(
                 name=stats["name"],
@@ -97,7 +98,7 @@ class CombatTracker:
                 deactivated=True,
                 destroyed=stats["destroyed"],
             )
-        else:  # event_type == "destroyed"
+        else:  # CombatEventType.DESTROYED
             stats = self._get_or_create_stats(event["target"])
             self._stats[event["target"]] = CombatStats(
                 name=stats["name"],
@@ -120,7 +121,7 @@ class CombatTracker:
 
         stats = self._get_or_create_entity_pair_stats(attacker, target)
 
-        if event_type == "entity_hit":
+        if event_type is CombatEventType.ENTITY_HIT:
             self._entity_pair_stats[key] = EntityPairStats(
                 attacker=attacker,
                 target=target,
@@ -128,7 +129,7 @@ class CombatTracker:
                 deactivated=stats["deactivated"],
                 destroyed=stats["destroyed"],
             )
-        elif event_type == "entity_deactivated":
+        elif event_type is CombatEventType.ENTITY_DEACTIVATED:
             self._entity_pair_stats[key] = EntityPairStats(
                 attacker=attacker,
                 target=target,
@@ -136,7 +137,7 @@ class CombatTracker:
                 deactivated=True,
                 destroyed=stats["destroyed"],
             )
-        else:  # event_type == "entity_destroyed"
+        else:  # CombatEventType.ENTITY_DESTROYED
             self._entity_pair_stats[key] = EntityPairStats(
                 attacker=attacker,
                 target=target,
@@ -155,7 +156,11 @@ class CombatTracker:
         event_type = event["event_type"]
 
         # Route to appropriate handler based on event type
-        if event_type in ("entity_hit", "entity_deactivated", "entity_destroyed"):
+        if event_type in (
+            CombatEventType.ENTITY_HIT,
+            CombatEventType.ENTITY_DEACTIVATED,
+            CombatEventType.ENTITY_DESTROYED,
+        ):
             self._record_entity_pair_event(event)
         else:
             self._record_player_event(event)
@@ -237,24 +242,24 @@ class CombatTracker:
             event: Event to log.
         """
         event_type = event["event_type"]
-        if event_type == "hit_by_player":
+        if event_type is CombatEventType.HIT_BY_PLAYER:
             stats = self._stats.get(event["target"])
             count = stats["hits_given"] if stats else 0
             log.info("[COMBAT:HIT] You -> %s (total: %d)", event["target"], count)
-        elif event_type == "hit_by_enemy":
+        elif event_type is CombatEventType.HIT_BY_ENEMY:
             stats = self._stats.get(event["attacker"])
             count = stats["hits_received"] if stats else 0
             log.info("[COMBAT:HIT] %s -> You (total: %d)", event["attacker"], count)
-        elif event_type == "hit_by_unknown":
+        elif event_type is CombatEventType.HIT_BY_UNKNOWN:
             log.info(
                 "[COMBAT:HIT] ??? -> You (off-screen, total: %d)",
                 self._unknown_hits_received,
             )
-        elif event_type == "deactivated":
+        elif event_type is CombatEventType.DEACTIVATED:
             log.info("[COMBAT:DEACTIVATED] You deactivated %s", event["target"])
-        elif event_type == "destroyed":
+        elif event_type is CombatEventType.DESTROYED:
             log.info("[COMBAT:DESTROYED] You destroyed %s", event["target"])
-        elif event_type == "entity_hit":
+        elif event_type is CombatEventType.ENTITY_HIT:
             pair_stats = self.get_entity_pair_stats(event["attacker"], event["target"])
             count = pair_stats["hits"] if pair_stats else 0
             log.info(
@@ -263,37 +268,18 @@ class CombatTracker:
                 event["target"],
                 count,
             )
-        elif event_type == "entity_deactivated":
+        elif event_type is CombatEventType.ENTITY_DEACTIVATED:
             log.info(
                 "[COMBAT:DEACTIVATED] %s deactivated %s",
                 event["attacker"],
                 event["target"],
             )
-        else:  # event_type == "entity_destroyed"
+        else:  # CombatEventType.ENTITY_DESTROYED
             log.info(
                 "[COMBAT:DESTROYED] %s destroyed %s",
                 event["attacker"],
                 event["target"],
             )
-
-
-# =============================================================================
-# Encode/Decode Functions
-# =============================================================================
-
-
-VALID_COMBAT_EVENT_TYPES: frozenset[str] = frozenset(
-    [
-        "hit_by_player",
-        "hit_by_enemy",
-        "hit_by_unknown",
-        "deactivated",
-        "destroyed",
-        "entity_hit",
-        "entity_deactivated",
-        "entity_destroyed",
-    ]
-)
 
 
 __all__ = [

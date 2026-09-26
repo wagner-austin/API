@@ -7,7 +7,8 @@ and entity-to-entity combat statistics for correlation with WebSocket messages.
 from __future__ import annotations
 
 import re
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
@@ -16,6 +17,7 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
+from platform_core.members import require_member
 
 log = get_logger(__name__)
 
@@ -25,16 +27,21 @@ log = get_logger(__name__)
 # =============================================================================
 
 
-CombatEventType = Literal[
-    "hit_by_player",
-    "hit_by_enemy",
-    "hit_by_unknown",
-    "deactivated",
-    "destroyed",
-    "entity_hit",
-    "entity_deactivated",
-    "entity_destroyed",
-]
+class CombatEventType(StrEnum):
+    """What a combat log line recorded, from the player's or a bystander's view.
+
+    The ``hit_by_*``, ``deactivated`` and ``destroyed`` members involve the
+    player; the ``entity_*`` members are fights between two other tanks.
+    """
+
+    HIT_BY_PLAYER = "hit_by_player"
+    HIT_BY_ENEMY = "hit_by_enemy"
+    HIT_BY_UNKNOWN = "hit_by_unknown"
+    DEACTIVATED = "deactivated"
+    DESTROYED = "destroyed"
+    ENTITY_HIT = "entity_hit"
+    ENTITY_DEACTIVATED = "entity_deactivated"
+    ENTITY_DESTROYED = "entity_destroyed"
 
 
 class CombatEvent(TypedDict):
@@ -134,26 +141,36 @@ def _parse_player_centric(stripped: str) -> CombatEvent | None:
     # "You hit {target}"
     match = _HIT_BY_PLAYER_PATTERN.match(stripped)
     if match:
-        return CombatEvent(event_type="hit_by_player", attacker="player", target=match.group(1))
+        return CombatEvent(
+            event_type=CombatEventType.HIT_BY_PLAYER, attacker="player", target=match.group(1)
+        )
 
     # "{attacker} hit you"
     match = _HIT_BY_ENEMY_PATTERN.match(stripped)
     if match:
-        return CombatEvent(event_type="hit_by_enemy", attacker=match.group(1), target="player")
+        return CombatEvent(
+            event_type=CombatEventType.HIT_BY_ENEMY, attacker=match.group(1), target="player"
+        )
 
     # "You are hit" (off-screen attacker)
     if stripped == "You are hit":
-        return CombatEvent(event_type="hit_by_unknown", attacker="unknown", target="player")
+        return CombatEvent(
+            event_type=CombatEventType.HIT_BY_UNKNOWN, attacker="unknown", target="player"
+        )
 
     # "{target} has been deactivated by you"
     match = _DEACTIVATED_BY_PLAYER_PATTERN.match(stripped)
     if match:
-        return CombatEvent(event_type="deactivated", attacker="player", target=match.group(1))
+        return CombatEvent(
+            event_type=CombatEventType.DEACTIVATED, attacker="player", target=match.group(1)
+        )
 
     # "{target} has been destroyed by you"
     match = _DESTROYED_BY_PLAYER_PATTERN.match(stripped)
     if match:
-        return CombatEvent(event_type="destroyed", attacker="player", target=match.group(1))
+        return CombatEvent(
+            event_type=CombatEventType.DESTROYED, attacker="player", target=match.group(1)
+        )
 
     return None
 
@@ -176,7 +193,7 @@ def _parse_entity_to_entity(stripped: str) -> CombatEvent | None:
         attacker_name: str = match.group(2)
         if attacker_name.lower() != "you":
             return CombatEvent(
-                event_type="entity_deactivated",
+                event_type=CombatEventType.ENTITY_DEACTIVATED,
                 attacker=attacker_name,
                 target=target_name,
             )
@@ -188,7 +205,7 @@ def _parse_entity_to_entity(stripped: str) -> CombatEvent | None:
         destroyed_attacker: str = match.group(2)
         if destroyed_attacker.lower() != "you":
             return CombatEvent(
-                event_type="entity_destroyed",
+                event_type=CombatEventType.ENTITY_DESTROYED,
                 attacker=destroyed_attacker,
                 target=destroyed_target,
             )
@@ -199,7 +216,9 @@ def _parse_entity_to_entity(stripped: str) -> CombatEvent | None:
         hit_attacker: str = match.group(1)
         hit_target: str = match.group(2)
         if hit_attacker.lower() != "you" and hit_target.lower() != "you":
-            return CombatEvent(event_type="entity_hit", attacker=hit_attacker, target=hit_target)
+            return CombatEvent(
+                event_type=CombatEventType.ENTITY_HIT, attacker=hit_attacker, target=hit_target
+            )
 
     return None
 
@@ -264,52 +283,6 @@ def _make_empty_entity_pair_stats(attacker: str, target: str) -> EntityPairStats
     )
 
 
-VALID_COMBAT_EVENT_TYPES: frozenset[str] = frozenset(
-    [
-        "hit_by_player",
-        "hit_by_enemy",
-        "hit_by_unknown",
-        "deactivated",
-        "destroyed",
-        "entity_hit",
-        "entity_deactivated",
-        "entity_destroyed",
-    ]
-)
-
-
-def validate_combat_event_type(value: str) -> CombatEventType:
-    """Validate and narrow a string to a CombatEventType literal.
-
-    Args:
-        value: String value to validate.
-
-    Returns:
-        The validated event type as a Literal type.
-
-    Raises:
-        ValueError: If value is not a valid event type.
-    """
-    if value == "hit_by_player":
-        return "hit_by_player"
-    if value == "hit_by_enemy":
-        return "hit_by_enemy"
-    if value == "hit_by_unknown":
-        return "hit_by_unknown"
-    if value == "deactivated":
-        return "deactivated"
-    if value == "destroyed":
-        return "destroyed"
-    if value == "entity_hit":
-        return "entity_hit"
-    if value == "entity_deactivated":
-        return "entity_deactivated"
-    if value == "entity_destroyed":
-        return "entity_destroyed"
-    msg = f"Invalid combat event type '{value}', must be one of {VALID_COMBAT_EVENT_TYPES}"
-    raise ValueError(msg)
-
-
 def encode_combat_event(event: CombatEvent) -> JSONObject:
     """Encode CombatEvent to JSON-serializable dict.
 
@@ -320,7 +293,7 @@ def encode_combat_event(event: CombatEvent) -> JSONObject:
         JSON-serializable dict.
     """
     return {
-        "event_type": event["event_type"],
+        "event_type": event["event_type"].value,
         "attacker": event["attacker"],
         "target": event["target"],
     }
@@ -336,11 +309,10 @@ def decode_combat_event(obj: JSONObject) -> CombatEvent:
         Validated CombatEvent.
 
     Raises:
-        JSONTypeError: If required fields are missing or have wrong types.
-        ValueError: If event_type is invalid.
+        JSONTypeError: If required fields are missing or have wrong types, or
+            if ``event_type`` is not a :class:`CombatEventType`.
     """
-    event_type_str = require_str(obj, "event_type")
-    event_type = validate_combat_event_type(event_type_str)
+    event_type = require_member(obj, "event_type", CombatEventType)
     attacker = require_str(obj, "attacker")
     target = require_str(obj, "target")
     return CombatEvent(event_type=event_type, attacker=attacker, target=target)
@@ -435,7 +407,6 @@ def decode_entity_pair_stats(obj: JSONObject) -> EntityPairStats:
 
 
 __all__ = [
-    "VALID_COMBAT_EVENT_TYPES",
     "CombatEvent",
     "CombatEventType",
     "CombatStats",
@@ -448,5 +419,4 @@ __all__ = [
     "encode_entity_pair_stats",
     "make_entity_pair_key",
     "parse_combat_line",
-    "validate_combat_event_type",
 ]
