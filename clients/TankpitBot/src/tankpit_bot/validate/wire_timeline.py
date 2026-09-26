@@ -30,6 +30,7 @@ from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -296,7 +297,7 @@ def extract_wire_timeline(session: CaptureSession) -> WireTimelineDict:
     ordered = sorted(session["messages"], key=_message_timestamp)
     for msg in ordered:
         for body in _split_frame_bodies(msg["payload"]):
-            if msg["direction"] == "sent":
+            if msg["direction"] is MessageDirection.SENT:
                 _ingest_sent(timeline, msg["timestamp_ms"], body, xor_table)
             else:
                 _ingest_received(timeline, msg["timestamp_ms"], body, xor_table)

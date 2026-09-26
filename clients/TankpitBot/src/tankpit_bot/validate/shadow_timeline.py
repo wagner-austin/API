@@ -27,6 +27,7 @@ from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.types.literals import MessageDirection
 
 log = get_logger(__name__)
 
@@ -341,7 +342,7 @@ def extract_shadow_timeline(session: CaptureSession) -> ShadowTimelineDict:
     )
     ordered = sorted(session["messages"], key=_message_timestamp)
     for msg in ordered:
-        if msg["direction"] != "received":
+        if msg["direction"] is not MessageDirection.RECEIVED:
             continue
         for body in _split_frame_bodies(msg["payload"]):
             _ingest_received(timeline, msg["timestamp_ms"], body, xor_table)

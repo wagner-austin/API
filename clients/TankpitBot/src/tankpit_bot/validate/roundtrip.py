@@ -33,6 +33,7 @@ from tankpit_bot.protocol.encoders import (
 )
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CaptureSession, decode_capture_session
+from tankpit_bot.types.literals import MessageDirection
 from tankpit_bot.validate.types import ClaimEvidenceDict
 from tankpit_bot.validate.wire_timeline import _split_frame_bodies
 from tankpit_bot.wire.helpers import DecodeError
@@ -100,7 +101,7 @@ def _roundtrip_session(session: CaptureSession, tally: _Tally) -> None:
         return
     xor_table = build_session_xor_table(magic)
     for msg in session["messages"]:
-        if msg["direction"] != "received":
+        if msg["direction"] is not MessageDirection.RECEIVED:
             continue
         for body in _split_frame_bodies(msg["payload"]):
             _roundtrip_body(body, xor_table, tally)
