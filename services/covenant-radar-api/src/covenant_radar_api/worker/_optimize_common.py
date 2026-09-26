@@ -10,8 +10,8 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
 from covenant_ml.datasets import LoadedDataset
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
@@ -20,8 +20,12 @@ from covenant_ml.types import BackendName, OptimizerName, RequestedDevice, Reque
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 from platform_core.members import find_member
 
-# Dataset type discriminator
-DatasetType = Literal["standard", "timeseries"]
+
+class DatasetType(StrEnum):
+    """Which covenant_ml registry holds a dataset."""
+
+    STANDARD = "standard"
+    TIMESERIES = "timeseries"
 
 
 def parse_precision(raw: JSONValue | None) -> RequestedPrecision:
@@ -141,7 +145,7 @@ def get_dataset_type(dataset: str) -> DatasetType:
         dataset: Dataset name string.
 
     Returns:
-        DatasetType indicating "standard" or "timeseries".
+        STANDARD or TIMESERIES, by the registry that holds the dataset.
 
     Raises:
         ValueError: If dataset name is not in any registry.
@@ -151,12 +155,12 @@ def get_dataset_type(dataset: str) -> DatasetType:
     # Check standard registry first
     standard_registry = hooks.dataset_registry_factory()
     if dataset in standard_registry:
-        return "standard"
+        return DatasetType.STANDARD
 
     # Check time-series registry
     timeseries_registry = hooks.timeseries_registry_factory()
     if dataset in timeseries_registry:
-        return "timeseries"
+        return DatasetType.TIMESERIES
 
     # Not found in either registry
     standard_names = standard_registry.list_names()
@@ -315,7 +319,7 @@ def load_any_dataset(
     """
     dataset_type = get_dataset_type(dataset_name)
 
-    if dataset_type == "standard":
+    if dataset_type is DatasetType.STANDARD:
         return load_dataset(dataset_name, external_dir, progress_callback)
 
     return load_timeseries_dataset(dataset_name, external_dir, progress_callback)

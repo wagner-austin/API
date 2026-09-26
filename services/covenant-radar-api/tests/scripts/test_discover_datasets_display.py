@@ -10,7 +10,12 @@ from scripts.discover_datasets.main import (
     _print_dataset_detail,
     _print_summary,
 )
-from scripts.discover_datasets.types import DiscoveredDataset, DiscoveredFormat, DiscoverySummary
+from scripts.discover_datasets.types import (
+    DetectionStatus,
+    DiscoveredDataset,
+    DiscoveredFormat,
+    DiscoverySummary,
+)
 
 from tests.scripts._discover_datasets_fixtures import (
     _get_test_console,
@@ -199,7 +204,7 @@ class TestPrintDatasetDetail:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "ok",
         }
         _print_dataset_detail(ds)
@@ -265,7 +270,7 @@ class TestGenerateConfigCode:
             "target_negative_value": "B",
             "target_label_type": LabelType.BINARY_STR,
             "positive_class_ratio": 0.33,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "ok",
         }
         code = _generate_config_code(ds)
@@ -303,7 +308,7 @@ class TestGenerateConfigCode:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_STR,
             "positive_class_ratio": 0.0,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "ok",
         }
         code = _generate_config_code(ds)

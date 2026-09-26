@@ -66,11 +66,11 @@ class TestDiscoveredDataset:
             "target_negative_value": "0",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "Single data file found",
         }
         assert dataset["folder_name"] == "test_dataset"
-        assert dataset["status"] == "success"
+        assert dataset["status"] is DetectionStatus.SUCCESS
         assert len(dataset["target_candidates"]) == 1
         assert dataset["target_positive_value"] == "1"
         assert dataset["positive_class_ratio"] == 0.3
@@ -91,10 +91,10 @@ class TestDiscoveredDataset:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "error",
+            "status": DetectionStatus.ERROR,
             "message": "No data files found",
         }
-        assert dataset["status"] == "error"
+        assert dataset["status"] is DetectionStatus.ERROR
         assert dataset["file_name"] == ""
 
 
@@ -129,7 +129,7 @@ class TestDiscoverySummary:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "warning",
+            "status": DetectionStatus.WARNING,
             "message": "No target column found",
         }
         summary: DiscoverySummary = {
@@ -145,14 +145,8 @@ class TestDiscoverySummary:
 
 
 class TestDetectionStatus:
-    """Tests for DetectionStatus type alias."""
+    """Tests for the DetectionStatus vocabulary."""
 
-    def test_valid_status_values(self) -> None:
-        """Test that valid status values can be assigned."""
-        status_success: DetectionStatus = "success"
-        status_warning: DetectionStatus = "warning"
-        status_error: DetectionStatus = "error"
-
-        assert status_success == "success"
-        assert status_warning == "warning"
-        assert status_error == "error"
+    def test_members_are_their_report_words(self) -> None:
+        """Each status reads as the word a discovery report carries."""
+        assert [str(m) for m in DetectionStatus] == ["success", "warning", "error"]

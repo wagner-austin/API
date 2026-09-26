@@ -6,12 +6,17 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from covenant_ml.datasets.types import FileEncoding, LabelType
 
-# Detection status literals
-DetectionStatus = Literal["success", "warning", "error"]
+
+class DetectionStatus(StrEnum):
+    """How cleanly a dataset folder was scanned."""
+
+    SUCCESS = "success"
+    WARNING = "warning"
+    ERROR = "error"
 
 
 class DiscoveredFormat(StrEnum):

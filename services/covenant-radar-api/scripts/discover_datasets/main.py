@@ -18,7 +18,7 @@ from platform_core.rich_logging import setup_rich_logging
 
 from scripts.discover_datasets import _test_hooks
 from scripts.discover_datasets.scanner import scan_external_dir
-from scripts.discover_datasets.types import DiscoveredDataset, DiscoverySummary
+from scripts.discover_datasets.types import DetectionStatus, DiscoveredDataset, DiscoverySummary
 
 
 class ParsedArgs(TypedDict, total=True):
@@ -145,7 +145,7 @@ def _print_validation(ds: DiscoveredDataset) -> None:
     console = _test_hooks.console_factory()
 
     # Skip errors
-    if ds["status"] == "error":
+    if ds["status"] is DetectionStatus.ERROR:
         console.print(f"[red]SKIP[/red] {ds['folder_name']}: {ds['message']}")
         return
 
@@ -245,7 +245,7 @@ def _generate_config_code(ds: DiscoveredDataset) -> str:
     Returns:
         Python code string for the config.
     """
-    if ds["status"] == "error" or not ds["recommended_target"]:
+    if ds["status"] is DetectionStatus.ERROR or not ds["recommended_target"]:
         return f"# Skipped {ds['folder_name']}: {ds['message']}"
 
     target_col = ds["recommended_target"]
@@ -360,7 +360,7 @@ def _classify_dataset_for_validation(ds: DiscoveredDataset) -> Literal["pass", "
     Returns:
         Classification as 'pass', 'warn', or 'skip'.
     """
-    if ds["status"] == "error" or not ds["recommended_target"]:
+    if ds["status"] is DetectionStatus.ERROR or not ds["recommended_target"]:
         return "skip"
     has_pos = bool(ds["target_positive_value"])
     has_neg = bool(ds["target_negative_value"])

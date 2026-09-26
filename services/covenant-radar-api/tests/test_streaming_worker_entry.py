@@ -66,35 +66,19 @@ def restore_hooks() -> Generator[None, None, None]:
 class TestParseModelType:
     """Tests for _parse_model_type function."""
 
-    def test_xgboost_valid(self) -> None:
-        """Test xgboost is valid."""
-        result = _parse_model_type("xgboost")
-        assert result == "xgboost"
-
-    def test_lightgbm_valid(self) -> None:
-        """Test lightgbm is valid."""
-        result = _parse_model_type("lightgbm")
-        assert result == "lightgbm"
-
-    def test_logreg_valid(self) -> None:
-        """Test logreg is valid."""
-        result = _parse_model_type("logreg")
-        assert result == "logreg"
-
-    def test_random_forest_valid(self) -> None:
-        """Test random_forest is valid."""
-        result = _parse_model_type("random_forest")
-        assert result == "random_forest"
-
-    def test_mlp_valid(self) -> None:
-        """Test mlp is valid."""
-        result = _parse_model_type("mlp")
-        assert result == "mlp"
+    def test_every_model_type_parses_to_its_member(self) -> None:
+        """Each MODEL_TYPE word parses to the member that carries it."""
+        for model_type in ModelType:
+            assert _parse_model_type(model_type.value) is model_type
 
     def test_invalid_raises_error(self) -> None:
-        """Test invalid model type raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid MODEL_TYPE"):
+        """Test invalid model type raises ValueError naming every choice."""
+        with pytest.raises(ValueError) as exc_info:
             _parse_model_type("invalid")
+        assert str(exc_info.value) == (
+            "Invalid MODEL_TYPE: 'invalid'. "
+            "Must be one of: xgboost, lightgbm, logreg, random_forest, mlp"
+        )
 
 
 class TestLoadMetricsConfig:
@@ -349,10 +333,6 @@ class TestModuleExports:
 
     def test_streaming_worker_entry_exports_types(self) -> None:
         """Test streaming_worker_entry exports expected types."""
-
-        # ModelType is a Literal type alias - verify it accepts valid values
-        model_type: ModelType = "xgboost"
-        assert model_type == "xgboost"
 
         # StreamingWorkerDeps is a TypedDict - verify it has expected keys
         assert "consumer" in StreamingWorkerDeps.__annotations__

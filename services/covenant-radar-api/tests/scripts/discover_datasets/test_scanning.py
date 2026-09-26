@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from scripts.discover_datasets.types import DiscoveredFormat
+from scripts.discover_datasets.types import DetectionStatus, DiscoveredFormat
 
 from scripts.discover_datasets import scanner as scanner_mod
 
@@ -22,7 +22,7 @@ class TestScanDatasetFolder:
 
             result = scanner_mod.scan_dataset_folder(folder)
 
-            assert result["status"] == "error"
+            assert result["status"] is DetectionStatus.ERROR
             assert result["message"] == "No data files found"
             assert result["file_name"] == ""
 
@@ -35,7 +35,7 @@ class TestScanDatasetFolder:
 
             result = scanner_mod.scan_dataset_folder(folder)
 
-            assert result["status"] == "success"
+            assert result["status"] is DetectionStatus.SUCCESS
             assert result["file_name"] == "data.csv"
             assert result["file_format"] is DiscoveredFormat.CSV
             assert result["n_rows"] == 2
@@ -52,7 +52,7 @@ class TestScanDatasetFolder:
 
             result = scanner_mod.scan_dataset_folder(folder)
 
-            assert result["status"] == "warning"
+            assert result["status"] is DetectionStatus.WARNING
             assert "No target column" in result["message"]
 
     def test_csv_non_binary_target(self) -> None:
@@ -64,7 +64,7 @@ class TestScanDatasetFolder:
 
             result = scanner_mod.scan_dataset_folder(folder)
 
-            assert result["status"] == "warning"
+            assert result["status"] is DetectionStatus.WARNING
             assert "No binary target" in result["message"]
 
     def test_arff_file(self) -> None:
@@ -110,7 +110,7 @@ class TestScanDatasetFolder:
             assert result["file_format"] == "xlsx"
             assert result["n_rows"] == 2
             assert result["recommended_target"] == "target"
-            assert result["status"] == "success"
+            assert result["status"] is DetectionStatus.SUCCESS
 
     def test_xls_file(self) -> None:
         """Test scanning folder with legacy .xls file."""
@@ -133,7 +133,7 @@ class TestScanDatasetFolder:
             assert result["file_format"] == "xls"
             assert result["n_rows"] == 2
             assert result["recommended_target"] == "target"
-            assert result["status"] == "success"
+            assert result["status"] is DetectionStatus.SUCCESS
 
     def test_data_file(self) -> None:
         """Test scanning folder with .data file."""
@@ -158,7 +158,7 @@ class TestScanDatasetFolder:
 
             result = scanner_mod.scan_dataset_folder(folder)
 
-            assert result["status"] == "error"
+            assert result["status"] is DetectionStatus.ERROR
             assert "No data files found" in result["message"]
 
 

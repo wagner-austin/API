@@ -16,6 +16,7 @@ from covenant_radar_api.streaming._test_hooks_repositories import (
     FakeMeasurementRepository,
 )
 from covenant_radar_api.streaming_worker_entry import (
+    ModelType,
     StreamingWorkerDeps,
     _create_worker,
     _load_model,
@@ -54,7 +55,7 @@ class TestLoadModel:
         """Test raises FileNotFoundError for non-existent path."""
         fake_path = tmp_path / "nonexistent_model.ubj"
         with pytest.raises(FileNotFoundError, match="Model file not found"):
-            _load_model(fake_path, "xgboost")
+            _load_model(fake_path, ModelType.XGBOOST)
 
     def test_xgboost_uses_hook(
         self,
@@ -77,7 +78,7 @@ class TestLoadModel:
 
         _hooks.xgboost_loader = _FakeLoader()
 
-        result = _load_model(model_file, "xgboost")
+        result = _load_model(model_file, ModelType.XGBOOST)
         assert result is fake_model
 
     def test_lightgbm_loads_model(self, tmp_path: Path) -> None:
@@ -124,7 +125,7 @@ class TestLoadModel:
         model_path = tmp_path / "model.txt"
         clf.booster_.save_model(str(model_path))
 
-        result = _load_model(model_path, "lightgbm")
+        result = _load_model(model_path, ModelType.LIGHTGBM)
         proba = result.predict_proba(x)
         assert proba.shape == (4, 2)
 
@@ -165,7 +166,7 @@ class TestLoadModel:
         dump_fn, _ = _get_joblib_imports()
         dump_fn(lr, str(model_path))
 
-        result = _load_model(model_path, "logreg")
+        result = _load_model(model_path, ModelType.LOGREG)
         proba = result.predict_proba(x)
         assert proba.shape == (4, 2)
 
@@ -205,7 +206,7 @@ class TestLoadModel:
         model_path = tmp_path / "model.joblib"
         dump_fn(rf, str(model_path))
 
-        result = _load_model(model_path, "random_forest")
+        result = _load_model(model_path, ModelType.RANDOM_FOREST)
         proba = result.predict_proba(x)
         assert proba.shape == (4, 2)
 
@@ -245,7 +246,7 @@ class TestLoadModel:
         meta_path = tmp_path / "model.meta.json"
         meta_path.write_text(meta)
 
-        result = _load_model(model_path, "mlp")
+        result = _load_model(model_path, ModelType.MLP)
         x_test: NDArray[np.float64] = np.zeros((2, n_features), dtype=np.float64)
         proba = result.predict_proba(x_test)
         assert proba.shape == (2, 2)

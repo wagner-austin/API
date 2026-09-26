@@ -7,7 +7,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Final, Literal, TypedDict
+from typing import Final, TypedDict
 
 from covenant_ml.datasets.types import FileEncoding, LabelType
 
@@ -27,6 +27,7 @@ from scripts.discover_datasets.parsers import (
     read_xls_header_and_sample,
 )
 from scripts.discover_datasets.types import (
+    DetectionStatus,
     DiscoveredDataset,
     DiscoveredFormat,
     DiscoverySummary,
@@ -208,7 +209,7 @@ def _detect_target_info(
 def _determine_scan_status(
     target_candidates: tuple[TargetColumnCandidate, ...],
     file_message: str,
-) -> tuple[Literal["success", "warning", "error"], str]:
+) -> tuple[DetectionStatus, str]:
     """Determine the scan status based on target detection.
 
     Args:
@@ -219,10 +220,10 @@ def _determine_scan_status(
         Tuple of (status, message).
     """
     if len(target_candidates) == 0:
-        return "warning", "No target column candidates found"
+        return DetectionStatus.WARNING, "No target column candidates found"
     if not any(c["is_binary"] for c in target_candidates):
-        return "warning", "No binary target column found"
-    return "success", file_message
+        return DetectionStatus.WARNING, "No binary target column found"
+    return DetectionStatus.SUCCESS, file_message
 
 
 def _create_empty_result(folder_name: str, message: str) -> DiscoveredDataset:
@@ -249,7 +250,7 @@ def _create_empty_result(folder_name: str, message: str) -> DiscoveredDataset:
         target_negative_value="",
         target_label_type=LabelType.BINARY_INT,
         positive_class_ratio=0.0,
-        status="error",
+        status=DetectionStatus.ERROR,
         message=message,
     )
 
@@ -343,9 +344,9 @@ def scan_external_dir(external_dir: Path) -> DiscoverySummary:
         result = scan_dataset_folder(folder)
         datasets.append(result)
 
-        if result["status"] == "success":
+        if result["status"] is DetectionStatus.SUCCESS:
             n_success += 1
-        elif result["status"] == "warning":
+        elif result["status"] is DetectionStatus.WARNING:
             n_warning += 1
         else:
             n_error += 1

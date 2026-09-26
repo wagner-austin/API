@@ -8,13 +8,36 @@ Strict typing: no Any, no casts, no type: ignore.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import Final, TypedDict
 
 # =============================================================================
-# Type Aliases
+# Vocabularies
 # =============================================================================
 
-ReplaySpeed = Literal["realtime", "fast", "instant"]
+
+class ReplaySpeed(StrEnum):
+    """How fast a replay publishes its batches."""
+
+    REALTIME = "realtime"
+    FAST = "fast"
+    INSTANT = "instant"
+
+    @property
+    def delay_seconds(self) -> float:
+        """The pause between batches at this speed.
+
+        Returns:
+            Seconds to wait after publishing each batch.
+        """
+        return _DELAY_SECONDS[self]
+
+
+_DELAY_SECONDS: Final[dict[ReplaySpeed, float]] = {
+    ReplaySpeed.REALTIME: 1.0,
+    ReplaySpeed.FAST: 0.1,
+    ReplaySpeed.INSTANT: 0.0,
+}
 
 
 # =============================================================================
@@ -69,7 +92,7 @@ def make_replay_config(
     *,
     dataset: str,
     topic: str = "covenant.measurements.v1",
-    speed: ReplaySpeed = "fast",
+    speed: ReplaySpeed = ReplaySpeed.FAST,
     batch_size: int = 100,
     deal_id_prefix: str = "replay",
     max_rows: int = 0,

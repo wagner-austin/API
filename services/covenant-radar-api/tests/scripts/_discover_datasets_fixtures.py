@@ -9,7 +9,7 @@ from platform_core.rich_logging import (
     RichConsoleProtocol,
     RichRenderableProtocol,
 )
-from scripts.discover_datasets.types import DiscoveredDataset, DiscoveredFormat
+from scripts.discover_datasets.types import DetectionStatus, DiscoveredDataset, DiscoveredFormat
 
 from scripts.discover_datasets import _test_hooks
 
@@ -106,7 +106,7 @@ def _make_success_dataset() -> DiscoveredDataset:
         "target_negative_value": "0",
         "target_label_type": LabelType.BINARY_INT,
         "positive_class_ratio": 0.3,
-        "status": "success",
+        "status": DetectionStatus.SUCCESS,
         "message": "Single data file found",
     }
 
@@ -127,7 +127,7 @@ def _make_warning_dataset() -> DiscoveredDataset:
         "target_negative_value": "",
         "target_label_type": LabelType.BINARY_INT,
         "positive_class_ratio": 0.0,
-        "status": "warning",
+        "status": DetectionStatus.WARNING,
         "message": "No target column candidates found",
     }
 
@@ -148,6 +148,6 @@ def _make_error_dataset() -> DiscoveredDataset:
         "target_negative_value": "",
         "target_label_type": LabelType.BINARY_INT,
         "positive_class_ratio": 0.0,
-        "status": "error",
+        "status": DetectionStatus.ERROR,
         "message": "No data files found",
     }

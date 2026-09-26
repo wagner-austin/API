@@ -53,14 +53,9 @@ class TestGetDatasetType:
         hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
         try:
-            result: DatasetType = get_dataset_type("taiwan")
-            assert result == "standard"
-
-            result = get_dataset_type("us")
-            assert result == "standard"
-
-            result = get_dataset_type("polish")
-            assert result == "standard"
+            assert get_dataset_type("taiwan") is DatasetType.STANDARD
+            assert get_dataset_type("us") is DatasetType.STANDARD
+            assert get_dataset_type("polish") is DatasetType.STANDARD
         finally:
             hooks.dataset_registry_factory = orig_registry
             hooks.timeseries_registry_factory = orig_ts_registry
@@ -74,8 +69,7 @@ class TestGetDatasetType:
         hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
         try:
-            result: DatasetType = get_dataset_type("kaggle_amex_default")
-            assert result == "timeseries"
+            assert get_dataset_type("kaggle_amex_default") is DatasetType.TIMESERIES
         finally:
             hooks.dataset_registry_factory = orig_registry
             hooks.timeseries_registry_factory = orig_ts_registry

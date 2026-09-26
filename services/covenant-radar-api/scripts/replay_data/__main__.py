@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import TypedDict
 
+from platform_core.members import find_member
 from platform_core.rich_logging import get_rich_console
 
 from covenant_radar_api.streaming.config import load_streaming_config
@@ -64,20 +65,16 @@ def _parse_speed(value: str) -> ReplaySpeed:
         value: Speed string from command line.
 
     Returns:
-        Validated ReplaySpeed literal.
+        The named replay speed.
 
     Raises:
         argparse.ArgumentTypeError: If value is not valid.
     """
-    if value == "realtime":
-        return "realtime"
-    if value == "fast":
-        return "fast"
-    if value == "instant":
-        return "instant"
-    raise argparse.ArgumentTypeError(
-        f"Invalid speed: {value}. Must be one of: realtime, fast, instant"
-    )
+    speed = find_member(value, ReplaySpeed)
+    if speed is None:
+        admitted = ", ".join(ReplaySpeed)
+        raise argparse.ArgumentTypeError(f"Invalid speed: {value}. Must be one of: {admitted}")
+    return speed
 
 
 def _parse_args(args: list[str] | None = None) -> ParsedArgs:
@@ -100,7 +97,7 @@ def _parse_args(args: list[str] | None = None) -> ParsedArgs:
         "--speed",
         "-s",
         type=_parse_speed,
-        default="fast",
+        default=ReplaySpeed.FAST,
         help="Replay speed: realtime (1s), fast (0.1s), instant (0) [default: fast]",
     )
     parser.add_argument(

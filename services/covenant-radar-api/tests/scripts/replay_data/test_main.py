@@ -15,6 +15,7 @@ from scripts.replay_data.__main__ import (
     _StreamingProducerAdapter,
     main,
 )
+from scripts.replay_data.types import ReplaySpeed
 
 from covenant_radar_api.streaming._test_hooks import (
     FakeKafkaProducer,
@@ -37,20 +38,10 @@ from .conftest import (
 class TestParseSpeed:
     """Tests for _parse_speed function."""
 
-    def test_realtime_valid(self) -> None:
-        """Test realtime speed is valid."""
-        result = _parse_speed("realtime")
-        assert result == "realtime"
-
-    def test_fast_valid(self) -> None:
-        """Test fast speed is valid."""
-        result = _parse_speed("fast")
-        assert result == "fast"
-
-    def test_instant_valid(self) -> None:
-        """Test instant speed is valid."""
-        result = _parse_speed("instant")
-        assert result == "instant"
+    def test_every_speed_parses_to_its_member(self) -> None:
+        """Each --speed word parses to the member that carries it."""
+        for speed in ReplaySpeed:
+            assert _parse_speed(speed.value) is speed
 
     def test_invalid_raises_error(self) -> None:
         """Test invalid speed raises ArgumentTypeError."""
@@ -84,17 +75,17 @@ class TestParseArgs:
     def test_default_speed(self) -> None:
         """Test default speed is fast."""
         args = _parse_args(["--dataset", "test"])
-        assert args["speed"] == "fast"
+        assert args["speed"] is ReplaySpeed.FAST
 
     def test_parses_speed(self) -> None:
         """Test parses speed argument."""
         args = _parse_args(["--dataset", "test", "--speed", "instant"])
-        assert args["speed"] == "instant"
+        assert args["speed"] is ReplaySpeed.INSTANT
 
     def test_parses_speed_short(self) -> None:
         """Test parses short speed flag."""
         args = _parse_args(["-d", "test", "-s", "realtime"])
-        assert args["speed"] == "realtime"
+        assert args["speed"] is ReplaySpeed.REALTIME
 
     def test_default_batch_size(self) -> None:
         """Test default batch size is 100."""

@@ -10,22 +10,23 @@ from scripts.replay_data.types import (
 
 
 class TestReplaySpeed:
-    """Tests for ReplaySpeed literal type."""
+    """Tests for the ReplaySpeed vocabulary."""
 
-    def test_realtime_is_valid(self) -> None:
-        """Test realtime speed is valid."""
-        speed: ReplaySpeed = "realtime"
-        assert speed == "realtime"
+    def test_members_are_their_cli_words(self) -> None:
+        """Each speed reads as the word --speed takes."""
+        assert [str(m) for m in ReplaySpeed] == ["realtime", "fast", "instant"]
 
-    def test_fast_is_valid(self) -> None:
-        """Test fast speed is valid."""
-        speed: ReplaySpeed = "fast"
-        assert speed == "fast"
+    def test_realtime_waits_a_second_between_batches(self) -> None:
+        """Realtime pauses one second per batch."""
+        assert ReplaySpeed.REALTIME.delay_seconds == 1.0
 
-    def test_instant_is_valid(self) -> None:
-        """Test instant speed is valid."""
-        speed: ReplaySpeed = "instant"
-        assert speed == "instant"
+    def test_fast_waits_a_tenth_of_a_second(self) -> None:
+        """Fast pauses a tenth of a second per batch."""
+        assert ReplaySpeed.FAST.delay_seconds == 0.1
+
+    def test_instant_does_not_wait(self) -> None:
+        """Instant publishes batches back to back."""
+        assert ReplaySpeed.INSTANT.delay_seconds == 0.0
 
 
 class TestMakeReplayConfig:
@@ -37,7 +38,7 @@ class TestMakeReplayConfig:
 
         assert config["dataset"] == "taiwan"
         assert config["topic"] == "covenant.measurements.v1"
-        assert config["speed"] == "fast"
+        assert config["speed"] is ReplaySpeed.FAST
         assert config["batch_size"] == 100
         assert config["deal_id_prefix"] == "replay"
         assert config["max_rows"] == 0
@@ -47,7 +48,7 @@ class TestMakeReplayConfig:
         config = make_replay_config(
             dataset="kaggle_amex_default",
             topic="custom.topic",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
             batch_size=500,
             deal_id_prefix="amex",
             max_rows=1000,
@@ -55,7 +56,7 @@ class TestMakeReplayConfig:
 
         assert config["dataset"] == "kaggle_amex_default"
         assert config["topic"] == "custom.topic"
-        assert config["speed"] == "instant"
+        assert config["speed"] is ReplaySpeed.INSTANT
         assert config["batch_size"] == 500
         assert config["deal_id_prefix"] == "amex"
         assert config["max_rows"] == 1000

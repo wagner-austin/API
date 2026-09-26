@@ -21,9 +21,10 @@ from __future__ import annotations
 
 import signal
 import sys
+from enum import StrEnum
 from pathlib import Path
 from types import FrameType
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from covenant_ml.types import PredictorProtocol
 from covenant_persistence import (
@@ -35,6 +36,7 @@ from covenant_persistence import (
 from covenant_persistence.protocols import ConnectionProtocol
 from platform_core.config import _parse_int, _parse_str, _require_env_str
 from platform_core.logging import LogFormat, LogLevel, setup_logging
+from platform_core.members import find_member
 
 from . import streaming_worker_entry_hooks as _hooks
 from .integrations.datadog import MetricsClient, MetricsConfig, create_metrics_client
@@ -50,7 +52,14 @@ from .streaming_worker_entry_hooks import LoggerProtocol
 # =============================================================================
 
 
-ModelType = Literal["xgboost", "lightgbm", "logreg", "random_forest", "mlp"]
+class ModelType(StrEnum):
+    """The kind of saved model the streaming worker loads."""
+
+    XGBOOST = "xgboost"
+    LIGHTGBM = "lightgbm"
+    LOGREG = "logreg"
+    RANDOM_FOREST = "random_forest"
+    MLP = "mlp"
 
 
 class StreamingWorkerDeps(TypedDict, total=True):
@@ -110,25 +119,16 @@ def _parse_model_type(value: str) -> ModelType:
         value: Model type string.
 
     Returns:
-        Validated ModelType literal.
+        The named model type.
 
     Raises:
         ValueError: If value is not valid.
     """
-    if value == "xgboost":
-        return "xgboost"
-    if value == "lightgbm":
-        return "lightgbm"
-    if value == "logreg":
-        return "logreg"
-    if value == "random_forest":
-        return "random_forest"
-    if value == "mlp":
-        return "mlp"
-    raise ValueError(
-        f"Invalid MODEL_TYPE: '{value}'. "
-        "Must be one of: xgboost, lightgbm, logreg, random_forest, mlp"
-    )
+    model_type = find_member(value, ModelType)
+    if model_type is None:
+        admitted = ", ".join(ModelType)
+        raise ValueError(f"Invalid MODEL_TYPE: '{value}'. Must be one of: {admitted}")
+    return model_type
 
 
 def _load_model(model_path: Path, model_type: ModelType) -> PredictorProtocol:
@@ -154,16 +154,16 @@ def _load_model(model_path: Path, model_type: ModelType) -> PredictorProtocol:
         load_random_forest_model,
     )
 
-    if model_type == "lightgbm":
+    if model_type is ModelType.LIGHTGBM:
         return load_lightgbm_model(model_path)
-    if model_type == "logreg":
+    if model_type is ModelType.LOGREG:
         return load_logreg_model(model_path)
-    if model_type == "random_forest":
+    if model_type is ModelType.RANDOM_FOREST:
         return load_random_forest_model(model_path)
-    if model_type == "xgboost":
+    if model_type is ModelType.XGBOOST:
         return _hooks.xgboost_loader(str(model_path))
 
-    # model_type == "mlp"
+    # model_type is ModelType.MLP
     from .worker._model_loaders import load_mlp_model
 
     meta_path = model_path.with_suffix(".meta.json")

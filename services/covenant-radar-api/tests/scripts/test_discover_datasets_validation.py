@@ -10,7 +10,7 @@ from scripts.discover_datasets.main import (
     _is_valid_numeric,
     _print_validation,
 )
-from scripts.discover_datasets.types import DiscoveredDataset, DiscoveredFormat
+from scripts.discover_datasets.types import DetectionStatus, DiscoveredDataset, DiscoveredFormat
 
 from tests.scripts._discover_datasets_fixtures import (
     _get_test_console,
@@ -97,7 +97,7 @@ class TestClassifyDatasetForValidation:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "error",
+            "status": DetectionStatus.ERROR,
             "message": "Error",
         }
         assert _classify_dataset_for_validation(ds) == "skip"
@@ -118,7 +118,7 @@ class TestClassifyDatasetForValidation:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "warning",
+            "status": DetectionStatus.WARNING,
             "message": "No target",
         }
         assert _classify_dataset_for_validation(ds) == "skip"
@@ -139,7 +139,7 @@ class TestClassifyDatasetForValidation:
             "target_negative_value": "0",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "OK",
         }
         assert _classify_dataset_for_validation(ds) == "pass"
@@ -160,7 +160,7 @@ class TestClassifyDatasetForValidation:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "OK",
         }
         assert _classify_dataset_for_validation(ds) == "warn"
@@ -185,7 +185,7 @@ class TestPrintValidation:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "error",
+            "status": DetectionStatus.ERROR,
             "message": "No data files",
         }
         _print_validation(ds)
@@ -209,7 +209,7 @@ class TestPrintValidation:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "warning",
+            "status": DetectionStatus.WARNING,
             "message": "No target",
         }
         _print_validation(ds)
@@ -233,7 +233,7 @@ class TestPrintValidation:
             "target_negative_value": "0",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "OK",
         }
         _print_validation(ds)
@@ -257,7 +257,7 @@ class TestPrintValidation:
             "target_negative_value": "",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "OK",
         }
         _print_validation(ds)
@@ -281,7 +281,7 @@ class TestPrintValidation:
             "target_negative_value": "0",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.0,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "OK",
         }
         _print_validation(ds)
@@ -305,7 +305,7 @@ class TestPrintValidation:
             "target_negative_value": "0",
             "target_label_type": LabelType.BINARY_INT,
             "positive_class_ratio": 0.3,
-            "status": "success",
+            "status": DetectionStatus.SUCCESS,
             "message": "OK",
         }
         _print_validation(ds)

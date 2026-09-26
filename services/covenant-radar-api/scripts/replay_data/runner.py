@@ -19,38 +19,13 @@ from scripts.replay_data import _test_hooks
 from scripts.replay_data._test_hooks import ProducerProtocol
 from scripts.replay_data.types import (
     ReplayConfig,
-    ReplaySpeed,
     ReplayStats,
     make_replay_stats,
 )
 
 # =============================================================================
-# Constants
-# =============================================================================
-
-# Delay between batches for each speed mode
-_SPEED_DELAYS: dict[ReplaySpeed, float] = {
-    "realtime": 1.0,
-    "fast": 0.1,
-    "instant": 0.0,
-}
-
-
-# =============================================================================
 # Helper Functions
 # =============================================================================
-
-
-def _get_delay_seconds(speed: ReplaySpeed) -> float:
-    """Get delay between batches for replay speed.
-
-    Args:
-        speed: Replay speed mode.
-
-    Returns:
-        Delay in seconds between batches.
-    """
-    return _SPEED_DELAYS[speed]
 
 
 def _current_iso_timestamp() -> str:
@@ -211,7 +186,7 @@ class DataReplayRunner:
             n_rows = min(n_rows, max_rows)
 
         # Replay loop
-        delay = _get_delay_seconds(self._config["speed"])
+        delay = self._config["speed"].delay_seconds
         topic = self._config["topic"]
         batch_size = self._config["batch_size"]
         deal_id_prefix = self._config["deal_id_prefix"]

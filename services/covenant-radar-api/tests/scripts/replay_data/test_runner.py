@@ -9,13 +9,12 @@ from scripts.replay_data._test_hooks import FakeProducer
 from scripts.replay_data.runner import (
     DataReplayRunner,
     _current_iso_timestamp,
-    _get_delay_seconds,
     _make_deal_id,
     _make_period_dates,
     _row_to_events,
     run_replay,
 )
-from scripts.replay_data.types import make_replay_config
+from scripts.replay_data.types import ReplaySpeed, make_replay_config
 
 from scripts.replay_data import _test_hooks
 
@@ -27,25 +26,6 @@ from .conftest import (
     make_test_loaded_dataset,
     make_test_timeseries_config,
 )
-
-
-class TestGetDelaySeconds:
-    """Tests for _get_delay_seconds helper."""
-
-    def test_realtime_delay(self) -> None:
-        """Test realtime speed returns 1.0 second delay."""
-        delay = _get_delay_seconds("realtime")
-        assert delay == 1.0
-
-    def test_fast_delay(self) -> None:
-        """Test fast speed returns 0.1 second delay."""
-        delay = _get_delay_seconds("fast")
-        assert delay == 0.1
-
-    def test_instant_delay(self) -> None:
-        """Test instant speed returns 0 delay."""
-        delay = _get_delay_seconds("instant")
-        assert delay == 0.0
 
 
 class TestMakeDealId:
@@ -222,7 +202,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="test",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
             batch_size=100,
         )
 
@@ -255,7 +235,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="test",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
             max_rows=3,
         )
 
@@ -288,7 +268,7 @@ class TestDataReplayRunner:
         replay_config = make_replay_config(
             dataset="test",
             topic="custom.topic.v1",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
         )
 
         runner = DataReplayRunner(fake_producer, replay_config, external_dir)
@@ -321,7 +301,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="test",
-            speed="fast",
+            speed=ReplaySpeed.FAST,
             batch_size=3,
         )
 
@@ -353,7 +333,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="test_ts",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
         )
 
         runner = DataReplayRunner(fake_producer, replay_config, external_dir)
@@ -382,7 +362,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="unknown",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
         )
 
         runner = DataReplayRunner(fake_producer, replay_config, external_dir)
@@ -411,7 +391,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="test",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
         )
 
         runner = DataReplayRunner(fake_producer, replay_config, external_dir)
@@ -441,7 +421,7 @@ class TestDataReplayRunner:
 
         replay_config = make_replay_config(
             dataset="test",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
             batch_size=3,
         )
 
@@ -477,7 +457,7 @@ class TestRunReplay:
 
         replay_config = make_replay_config(
             dataset="test",
-            speed="instant",
+            speed=ReplaySpeed.INSTANT,
         )
 
         stats = run_replay(fake_producer, replay_config, external_dir)
