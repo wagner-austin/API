@@ -357,6 +357,38 @@
         "companions": []
       }
     },
+    "MCPs/pc": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "pc",
+        "install": [
+          ["npm", "ci"],
+          ["node", "scripts/ci-build-consumed-workspaces.mjs"],
+          ["npm", "rebuild"]
+        ],
+        "companions": []
+      }
+    },
+    "MCPs/packages/stream-client": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "packages/stream-client",
+        "install": [
+          ["npm", "ci"],
+          ["node", "scripts/ci-build-consumed-workspaces.mjs"],
+          ["npm", "rebuild"]
+        ],
+        "companions": []
+      }
+    },
     "MCPs/fleet-mcp": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
