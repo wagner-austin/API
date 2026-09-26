@@ -15,6 +15,7 @@ import base64
 
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.physics.capacity import damage_tier
@@ -195,7 +196,7 @@ def test_real_planner_decides_on_sim_fed_state() -> None:
         inventory=service.inventory_state,
         timestamp_ms=get_current_time_ms(),
         terrain=None,
-        combat_feedback="",
+        combat_feedback=CombatFeedback.NONE,
         ws=ws,
     )
     assert decision["behavior"]["mode"] in ("HUNT", "COLLECT")
