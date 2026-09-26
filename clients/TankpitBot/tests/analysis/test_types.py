@@ -1,9 +1,8 @@
 """Tests for the archive-analysis value types.
 
 Every TypedDict here round-trips through its encode/decode pair, and
-every ``require_*`` validator is driven to each of its rejection
-branches, so a malformed record cannot reach a miner as a silently
-half-decoded value.
+every validator is driven to each of its rejection branches, so a
+malformed record cannot reach a miner as a silently half-decoded value.
 """
 
 from __future__ import annotations
@@ -12,36 +11,36 @@ import pytest
 from platform_core.json_utils import JSONTypeError
 
 from tankpit_bot.analysis.types import (
-    SESSION_SKIP_REASONS,
     DecodedFrameDict,
+    SessionSkipReason,
     SkippedSessionDict,
     decode_decoded_frame,
     decode_skipped_session,
     encode_decoded_frame,
     encode_skipped_session,
-    require_frame_direction,
     require_hex_bytes,
-    require_session_skip_reason,
 )
+from tankpit_bot.types.literals import MessageDirection
 
 
 def test_skip_reason_vocabulary_is_exactly_the_documented_set() -> None:
-    """The closed vocabulary is two reasons, and the tuple says so."""
-    assert SESSION_SKIP_REASONS == ("no_magic", "unframed_payload")
+    """The closed vocabulary is two reasons, spelled as the archive tallies them."""
+    assert [reason.value for reason in SessionSkipReason] == ["no_magic", "unframed_payload"]
 
 
 def test_skipped_session_round_trips() -> None:
     """Encode then decode returns an equal record."""
-    original = SkippedSessionDict(
-        kind="skipped", path="runs/bot/a.capture_session.json", reason="no_magic"
-    )
-    assert decode_skipped_session(encode_skipped_session(original)) == original
+    for reason in SessionSkipReason:
+        original = SkippedSessionDict(
+            kind="skipped", path="runs/bot/a.capture_session.json", reason=reason
+        )
+        assert decode_skipped_session(encode_skipped_session(original)) == original
 
 
 def test_skipped_session_encodes_every_field() -> None:
     """The wire form carries exactly kind, path and reason."""
     encoded = encode_skipped_session(
-        SkippedSessionDict(kind="skipped", path="p", reason="no_magic")
+        SkippedSessionDict(kind="skipped", path="p", reason=SessionSkipReason.NO_MAGIC)
     )
     assert encoded == {"kind": "skipped", "path": "p", "reason": "no_magic"}
 
@@ -50,27 +49,22 @@ def test_decode_skipped_session_rejects_unknown_reason() -> None:
     """An invented reason names itself and the closed vocabulary."""
     with pytest.raises(JSONTypeError) as excinfo:
         decode_skipped_session({"kind": "skipped", "path": "p", "reason": "because"})
-    message = str(excinfo.value)
-    assert "unknown session skip reason 'because'" in message
-    assert "no_magic" in message
+    assert str(excinfo.value) == (
+        "Invalid reason 'because': must be one of 'no_magic', 'unframed_payload'"
+    )
 
 
 def test_decode_skipped_session_rejects_missing_path() -> None:
     """A missing required field is a decode failure, not a default."""
     with pytest.raises(JSONTypeError):
-        decode_skipped_session({"reason": "no_magic"})
-
-
-def test_require_session_skip_reason_narrows_a_valid_value() -> None:
-    """A known reason returns unchanged and is usable as the Literal."""
-    assert require_session_skip_reason("no_magic") == "no_magic"
+        decode_skipped_session({"kind": "skipped", "reason": "no_magic"})
 
 
 def test_decoded_frame_round_trips_including_body_bytes() -> None:
     """Bytes survive the hex hop exactly, including high bytes and NUL."""
     original = DecodedFrameDict(
         timestamp_ms=1_700_000_000_123,
-        direction="received",
+        direction=MessageDirection.RECEIVED,
         msg_type=0x53,
         raw=bytes([0x53, 0x00, 0x01, 0x7F, 0x80, 0xFF]),
         body=bytes([0x00, 0x01, 0x7F, 0x80, 0xFF]),
@@ -83,7 +77,7 @@ def test_decoded_frame_encodes_raw_and_body_as_hex() -> None:
     encoded = encode_decoded_frame(
         DecodedFrameDict(
             timestamp_ms=7,
-            direction="sent",
+            direction=MessageDirection.SENT,
             msg_type=0x41,
             raw=bytes([0x41, 0xBE, 0xEF]),
             body=bytes([0xDE, 0xAD]),
@@ -101,7 +95,7 @@ def test_decoded_frame_encodes_raw_and_body_as_hex() -> None:
 def test_decoded_frame_round_trips_an_empty_body() -> None:
     """A zero-length body encodes to an empty string and back."""
     original = DecodedFrameDict(
-        timestamp_ms=1, direction="received", msg_type=2, raw=bytes([2]), body=b""
+        timestamp_ms=1, direction=MessageDirection.RECEIVED, msg_type=2, raw=bytes([2]), body=b""
     )
     assert decode_decoded_frame(encode_decoded_frame(original)) == original
 
@@ -135,15 +129,13 @@ def test_decode_decoded_frame_rejects_bad_body_hex() -> None:
         )
 
 
-def test_require_frame_direction_narrows_and_rejects() -> None:
-    """Both directions narrow; anything else names the vocabulary."""
-    assert require_frame_direction("received") == "received"
-    assert require_frame_direction("sent") == "sent"
+def test_decode_decoded_frame_rejects_an_unknown_direction() -> None:
+    """A direction outside the vocabulary names itself and both directions."""
     with pytest.raises(JSONTypeError) as excinfo:
-        require_frame_direction("sideways")
-    message = str(excinfo.value)
-    assert "unknown frame direction 'sideways'" in message
-    assert "received" in message and "sent" in message
+        decode_decoded_frame(
+            {"timestamp_ms": 1, "direction": "sideways", "msg_type": 2, "raw": "02", "body": ""}
+        )
+    assert str(excinfo.value) == "Invalid direction 'sideways': must be one of 'sent', 'received'"
 
 
 def test_decode_skipped_session_rejects_a_scanned_tag() -> None:
