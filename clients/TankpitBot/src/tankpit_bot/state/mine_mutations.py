@@ -50,7 +50,7 @@ def add_mine(
         mine_type=mine_type,
         tank_id=tank_id,
         team=team,
-        source="viewport",
+        source=EntitySource.VIEWPORT,
         timestamp_ms=timestamp_ms,
         provenance=make_provenance("wire_0x4B_mine_placement", []),
     )
@@ -118,15 +118,15 @@ def add_mine_from_radar(
     if existing is None:
         merged_mine_type = 0
         merged_tank_id = -1
-        merged_source: EntitySource = "radar"
-    elif existing["source"] == "viewport":
+        merged_source = EntitySource.RADAR
+    elif existing["source"] is EntitySource.VIEWPORT:
         merged_mine_type = existing["mine_type"]
         merged_tank_id = existing["tank_id"]
-        merged_source = "viewport"
+        merged_source = EntitySource.VIEWPORT
     else:
         merged_mine_type = existing["mine_type"]
         merged_tank_id = existing["tank_id"]
-        merged_source = "radar"
+        merged_source = EntitySource.RADAR
 
     new_mine = make_mine_state(
         x=x,
@@ -198,7 +198,7 @@ def merge_mine_sighting(
         mine_type=mine_type,
         tank_id=tank_id,
         team=team,
-        source="world_state",
+        source=EntitySource.WORLD_STATE,
         timestamp_ms=observed_ms,
         provenance=make_provenance("fleet_report", []),
     )
@@ -305,7 +305,7 @@ def apply_tile_overlay_update(
         mine_type=merged_mine_type,
         tank_id=merged_tank_id,
         team=team,
-        source="viewport",
+        source=EntitySource.VIEWPORT,
         timestamp_ms=timestamp_ms,
     )
     new_mines = dict(state["mines"])

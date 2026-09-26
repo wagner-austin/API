@@ -11,6 +11,7 @@ from tankpit_bot.state.types import (
 )
 from tankpit_bot.types.constants import (
     ContainerRefreshKind,
+    EntitySource,
 )
 
 log = get_logger(__name__)
@@ -23,7 +24,7 @@ def update_container_from_radar(
     volume: int,
     timestamp_ms: int,
     *,
-    refresh_kind: ContainerRefreshKind = "radar_response",
+    refresh_kind: ContainerRefreshKind = ContainerRefreshKind.RADAR_RESPONSE,
 ) -> WorldStateDict:
     """Update container state from RadarResponse message.
 
@@ -69,7 +70,7 @@ def update_container_from_radar(
         y=y,
         is_fuel=is_fuel,
         volume=actual_volume,
-        source="radar",
+        source=EntitySource.RADAR,
         refresh_kind=refresh_kind,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
@@ -129,8 +130,8 @@ def merge_container_sighting(
         y=y,
         is_fuel=is_fuel,
         volume=volume,
-        source="world_state",
-        refresh_kind="fleet_report",
+        source=EntitySource.WORLD_STATE,
+        refresh_kind=ContainerRefreshKind.FLEET_REPORT,
         timestamp_ms=observed_ms,
         failed_pickups=failed_pickups,
     )
@@ -352,7 +353,7 @@ def apply_tile_cache_update(
         y=y,
         is_fuel=is_fuel,
         volume=volume,
-        source="viewport",
+        source=EntitySource.VIEWPORT,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
     )

@@ -19,6 +19,7 @@ from tankpit_bot.state.types import (
 from tankpit_bot.types.constants import (
     DAMAGE_FULL,
     DIRECTION_DEAD_THRESHOLD,
+    EntitySource,
     TankLiveness,
 )
 
@@ -131,7 +132,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
     # This is what ``analyze_threats`` reads to keep the threat list
     # to actually-visible enemies; without it, every alive tank on the
     # map shows up as a HUNT candidate after every ``open_map``.
-    if obs["storage_source"] == "viewport":
+    if obs["storage_source"] is EntitySource.VIEWPORT:
         new_last_viewport_observation_ms = timestamp_ms
     else:
         new_last_viewport_observation_ms = (
@@ -161,11 +162,11 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         and obs_position is not None
         and (obs["direction"] is None or obs["direction"] < DIRECTION_DEAD_THRESHOLD)
     ):
-        new_liveness = "alive"
+        new_liveness = TankLiveness.ALIVE
     elif obs["direction"] is not None and obs["direction"] >= DIRECTION_DEAD_THRESHOLD:
-        new_liveness = "deactivated"
+        new_liveness = TankLiveness.DEACTIVATED
     elif (
-        existing["liveness"] == "deactivated"
+        existing["liveness"] is TankLiveness.DEACTIVATED
         and not obs["is_wire_sourced"]
         and obs["position_is_authoritative"]
     ):
@@ -188,7 +189,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         # map-never-touches-liveness is disproven by the same
         # measurement: the server drops the dead from the map within
         # the same second they die.
-        new_liveness = "alive"
+        new_liveness = TankLiveness.ALIVE
     else:
         new_liveness = existing["liveness"]
 
@@ -388,7 +389,7 @@ def deactivate_tank(
         New ``WorldStateDict`` with the tank's liveness set to
         ``"deactivated"``. No-op when the tank is not in state.
     """
-    return _set_tank_liveness(state, tank_id, "deactivated", timestamp_ms)
+    return _set_tank_liveness(state, tank_id, TankLiveness.DEACTIVATED, timestamp_ms)
 
 
 def remove_tank(
