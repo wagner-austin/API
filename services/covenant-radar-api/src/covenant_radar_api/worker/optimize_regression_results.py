@@ -24,6 +24,7 @@ from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_int_params,
     encode_sampled_string_params,
 )
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_field_decoders import (
     _require_float,
     _require_int,
@@ -388,9 +389,6 @@ def require_unified_regression_optimization_result(
 # =============================================================================
 
 
-RegressionOptimizePhase = Literal["loading_data", "feature_engineering", "optimizing", "saving"]
-
-
 class RegressionPhaseProgressInfo(TypedDict, total=True):
     """Information about regression optimization phase transitions.
 
@@ -402,7 +400,7 @@ class RegressionPhaseProgressInfo(TypedDict, total=True):
         n_features: Number of features (0 during loading).
     """
 
-    phase: RegressionOptimizePhase
+    phase: OptimizePhase
     backend: RegressorBackendName
     dataset: str
     n_samples: int
@@ -495,7 +493,6 @@ class RegressionTrialProgressCallbackProtocol(Protocol):
 __all__ = [
     "RegressionLoadingProgressCallbackProtocol",
     "RegressionLoadingProgressInfo",
-    "RegressionOptimizePhase",
     "RegressionPhaseProgressCallbackProtocol",
     "RegressionPhaseProgressInfo",
     "RegressionTrialProgressCallbackProtocol",

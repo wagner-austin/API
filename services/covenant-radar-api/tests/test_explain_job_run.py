@@ -19,11 +19,11 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.explain_job import (
-    ExplainJobStatus,
     ExplainProgressInfo,
     _sample_data,
     run_explanation,
 )
+from covenant_radar_api.worker.job_phases import ExplainJobStatus
 from tests._explain_job_fixtures import (
     _copy_real_taiwan,
     _create_xgboost_model,
@@ -253,13 +253,8 @@ class TestRunExplanation:
 
         assert result["status"] == "complete"
 
-        # Verify callback was called with expected statuses
-        statuses: list[ExplainJobStatus] = [c["status"] for c in callback_calls]
-        assert "started" in statuses
-        assert "loading_model" in statuses
-        assert "loading_data" in statuses
-        assert "computing" in statuses
-        assert "complete" in statuses
+        # Each status is reported once, in the order the enum declares them.
+        assert [c["status"] for c in callback_calls] == list(ExplainJobStatus)
 
         # Verify elapsed_seconds is present and non-negative
         for call in callback_calls:

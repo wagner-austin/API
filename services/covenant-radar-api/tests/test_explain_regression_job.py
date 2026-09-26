@@ -13,7 +13,6 @@ from numpy.typing import NDArray
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from covenant_radar_api.worker.explain_regression_job import (
-    RegressionExplainJobStatus,
     RegressionExplainProgressInfo,
     _optional_int,
     _parse_regression_explain_config,
@@ -21,6 +20,7 @@ from covenant_radar_api.worker.explain_regression_job import (
     _sample_data,
     run_regression_explanation,
 )
+from covenant_radar_api.worker.job_phases import ExplainJobStatus
 
 # ---------------------------------------------------------------------------
 # Tests for _optional_int
@@ -247,27 +247,11 @@ class TestProgressTypes:
     def test_regression_explain_progress_info_structure(self) -> None:
         """RegressionExplainProgressInfo has required fields."""
         info: RegressionExplainProgressInfo = {
-            "status": "computing",
+            "status": ExplainJobStatus.COMPUTING,
             "elapsed_seconds": 1.5,
         }
-        assert info["status"] == "computing"
+        assert info["status"] is ExplainJobStatus.COMPUTING
         assert info["elapsed_seconds"] == 1.5
-
-    def test_all_job_status_values(self) -> None:
-        """All RegressionExplainJobStatus values are valid."""
-        statuses: list[RegressionExplainJobStatus] = [
-            "started",
-            "loading_model",
-            "loading_data",
-            "computing",
-            "complete",
-        ]
-        for status in statuses:
-            info: RegressionExplainProgressInfo = {
-                "status": status,
-                "elapsed_seconds": 0.0,
-            }
-            assert info["status"] == status
 
 
 # ---------------------------------------------------------------------------
@@ -457,12 +441,8 @@ class TestRunRegressionExplanation:
         )
 
         assert result["status"] == "complete"
-        statuses: list[RegressionExplainJobStatus] = [c["status"] for c in calls]
-        assert "started" in statuses
-        assert "loading_model" in statuses
-        assert "loading_data" in statuses
-        assert "computing" in statuses
-        assert "complete" in statuses
+        # Each status is reported once, in the order the enum declares them.
+        assert [c["status"] for c in calls] == list(ExplainJobStatus)
 
         for call in calls:
             assert call["elapsed_seconds"] >= 0.0

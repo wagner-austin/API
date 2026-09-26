@@ -8,7 +8,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from typing import Final, Literal, Protocol, TypedDict
+from typing import Final, Protocol, TypedDict
 
 from covenant_ml.datasets.types import LoadPhase
 from covenant_ml.features import FeaturePreset
@@ -20,6 +20,7 @@ from platform_core.json_utils import (
 )
 from platform_core.members import find_member
 
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_field_decoders import (
     _require_backend_name,
     _require_bool,
@@ -39,10 +40,8 @@ from covenant_radar_api.worker.optimize_result_types import (
 )
 
 # =============================================================================
-# Phase Literals
+# Phases
 # =============================================================================
-
-OptimizePhase = Literal["loading_data", "feature_engineering", "optimizing", "saving"]
 
 # The loading sub-phases an optimize job reports while it reads a dataset.
 _REPORTED_LOAD_PHASES: Final[tuple[LoadPhase, ...]] = (
@@ -330,20 +329,10 @@ def decode_phase_progress_info(raw: JSONObject) -> PhaseProgressInfo:
         JSONTypeError: If any required field is missing or has wrong type.
     """
     phase_val = _require_str(raw, "phase")
-    if phase_val not in ("loading_data", "feature_engineering", "optimizing", "saving"):
-        raise JSONTypeError(
-            f"Field 'phase' must be one of: loading_data, feature_engineering, "
-            f"optimizing, saving (got {phase_val})"
-        )
-    phase: OptimizePhase
-    if phase_val == "loading_data":
-        phase = "loading_data"
-    elif phase_val == "feature_engineering":
-        phase = "feature_engineering"
-    elif phase_val == "optimizing":
-        phase = "optimizing"
-    else:
-        phase = "saving"
+    phase = find_member(phase_val, OptimizePhase)
+    if phase is None:
+        admitted = ", ".join(OptimizePhase)
+        raise JSONTypeError(f"Field 'phase' must be one of: {admitted} (got {phase_val})")
 
     return PhaseProgressInfo(
         phase=phase,
@@ -447,7 +436,6 @@ def decode_trial_progress_info(raw: JSONObject) -> TrialProgressInfo:
 __all__ = [
     "LoadingProgressCallbackProtocol",
     "LoadingProgressInfo",
-    "OptimizePhase",
     "PhaseProgressCallbackProtocol",
     "PhaseProgressInfo",
     "TrialProgressCallbackProtocol",

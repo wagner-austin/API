@@ -47,11 +47,11 @@ from covenant_radar_api.worker._optimize_regression_common import (
     parse_regression_dataset_name,
     parse_regressor_backend_name,
 )
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 from covenant_radar_api.worker.optimize_regression_results import (
     RegressionLoadingProgressCallbackProtocol,
     RegressionLoadingProgressInfo,
-    RegressionOptimizePhase,
     RegressionPhaseProgressCallbackProtocol,
     RegressionPhaseProgressInfo,
     RegressionTrialProgressCallbackProtocol,
@@ -140,7 +140,7 @@ def _parse_regression_optimize_config(
 
 def _report_regression_phase(
     phase_callback: RegressionPhaseProgressCallbackProtocol | None,
-    phase: RegressionOptimizePhase,
+    phase: OptimizePhase,
     backend_name: RegressorBackendName,
     dataset_name: str,
     n_samples: int,
@@ -261,7 +261,9 @@ def run_regression_optimization(
     search_space: SearchSpace = backend.get_default_search_space()
 
     # Report loading phase
-    _report_regression_phase(phase_callback, "loading_data", backend_name, dataset_name, 0, 0)
+    _report_regression_phase(
+        phase_callback, OptimizePhase.LOADING_DATA, backend_name, dataset_name, 0, 0
+    )
 
     # Create loading progress adapter
     def _loading_progress_adapter(progress: LoadProgress) -> None:
@@ -290,7 +292,7 @@ def run_regression_optimization(
     # Report feature engineering phase
     _report_regression_phase(
         phase_callback,
-        "feature_engineering",
+        OptimizePhase.FEATURE_ENGINEERING,
         backend_name,
         dataset_name,
         n_samples,
@@ -322,7 +324,7 @@ def run_regression_optimization(
     # Report optimizing phase
     _report_regression_phase(
         phase_callback,
-        "optimizing",
+        OptimizePhase.OPTIMIZING,
         backend_name,
         dataset_name,
         n_samples,
@@ -413,7 +415,7 @@ def run_regression_optimization(
     # Report saving phase
     _report_regression_phase(
         phase_callback,
-        "saving",
+        OptimizePhase.SAVING,
         backend_name,
         dataset_name,
         n_samples,

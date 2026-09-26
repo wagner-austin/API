@@ -20,13 +20,13 @@ from platform_core.json_utils import (
 
 from covenant_radar_api.worker import _regression_hooks as regression_hooks
 from covenant_radar_api.worker import _test_hooks as worker_hooks
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_regression_job import (
     _make_regression_trial_callback,
     _parse_regression_optimize_config,
     _report_regression_phase,
 )
 from covenant_radar_api.worker.optimize_regression_results import (
-    RegressionOptimizePhase,
     RegressionPhaseProgressInfo,
     RegressionTrialProgressInfo,
 )
@@ -202,7 +202,7 @@ class TestReportRegressionPhase:
 
         _report_regression_phase(
             _callback,
-            "loading_data",
+            OptimizePhase.LOADING_DATA,
             "xgboost_reg",
             "financial_distress",
             100,
@@ -211,7 +211,7 @@ class TestReportRegressionPhase:
 
         assert len(received) == 1
         info = received[0]
-        assert info["phase"] == "loading_data"
+        assert info["phase"] is OptimizePhase.LOADING_DATA
         assert info["backend"] == "xgboost_reg"
         assert info["dataset"] == "financial_distress"
         assert info["n_samples"] == 100
@@ -219,7 +219,7 @@ class TestReportRegressionPhase:
 
     def test_none_callback_is_safe(self) -> None:
         """None callback does not raise."""
-        _report_regression_phase(None, "optimizing", "xgboost_reg", "test", 50, 5)
+        _report_regression_phase(None, OptimizePhase.OPTIMIZING, "xgboost_reg", "test", 50, 5)
 
     def test_all_phases(self) -> None:
         """All four phases can be reported."""
@@ -228,17 +228,10 @@ class TestReportRegressionPhase:
         def _callback(info: RegressionPhaseProgressInfo) -> None:
             received.append(info)
 
-        phases: tuple[RegressionOptimizePhase, ...] = (
-            "loading_data",
-            "feature_engineering",
-            "optimizing",
-            "saving",
-        )
-        for phase in phases:
+        for phase in OptimizePhase:
             _report_regression_phase(_callback, phase, "lightgbm_reg", "test", 0, 0)
 
-        assert len(received) == 4
-        assert [r["phase"] for r in received] == list(phases)
+        assert [r["phase"] for r in received] == list(OptimizePhase)
 
 
 class TestMakeRegressionTrialCallback:

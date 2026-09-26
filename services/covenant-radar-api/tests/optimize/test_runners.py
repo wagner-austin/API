@@ -27,6 +27,7 @@ from scripts._test_hooks import (
 from scripts.optimize._runners import run_single_with_progress
 
 from covenant_radar_api.dataset_names import DatasetName
+from covenant_radar_api.worker.job_phases import OptimizePhase
 
 from .conftest import (
     FakeSaveModelBackend,
@@ -55,28 +56,28 @@ def _make_phase_infos(
     """
     return [
         {
-            "phase": "loading_data",
+            "phase": OptimizePhase.LOADING_DATA,
             "backend": backend,
             "dataset": dataset,
             "n_samples": 0,
             "n_features": 0,
         },
         {
-            "phase": "feature_engineering",
+            "phase": OptimizePhase.FEATURE_ENGINEERING,
             "backend": backend,
             "dataset": dataset,
             "n_samples": 1000,
             "n_features": 100,
         },
         {
-            "phase": "optimizing",
+            "phase": OptimizePhase.OPTIMIZING,
             "backend": backend,
             "dataset": dataset,
             "n_samples": 1000,
             "n_features": 150,
         },
         {
-            "phase": "saving",
+            "phase": OptimizePhase.SAVING,
             "backend": backend,
             "dataset": dataset,
             "n_samples": 1000,

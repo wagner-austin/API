@@ -19,6 +19,7 @@ from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.rich_logging import RichProgressProtocol, create_rich_progress, get_rich_console
 
 from covenant_radar_api.dataset_names import DatasetName
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from scripts._test_hooks import (
     LoadingProgressInfo,
     PhaseProgressInfo,
@@ -94,16 +95,16 @@ def _run_backend_with_progress(
         elapsed = time.perf_counter() - start
         elapsed_str = f"[dim]{format_elapsed(elapsed)}[/dim]"
         phase = info["phase"]
-        if phase == "loading_data":
+        if phase is OptimizePhase.LOADING_DATA:
             desc = f"{elapsed_str} [yellow]Loading {info['dataset']} dataset...[/yellow]"
-        elif phase == "feature_engineering":
+        elif phase is OptimizePhase.FEATURE_ENGINEERING:
             n_samples = info["n_samples"]
             n_features = info["n_features"]
             desc = (
                 f"{elapsed_str} [yellow]Loaded {n_samples:,} samples, "
                 f"{n_features} features. Applying feature engineering...[/yellow]"
             )
-        elif phase == "optimizing":
+        elif phase is OptimizePhase.OPTIMIZING:
             n_features = info["n_features"]
             desc = (
                 f"{elapsed_str} [green]Ready ({n_features} features). "

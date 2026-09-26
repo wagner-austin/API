@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Literal, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 import numpy as np
 from covenant_ml.explainers.regression_registry import RegressionExplainerRegistry
@@ -37,17 +37,9 @@ from covenant_radar_api.worker._regression_hooks import (
     regression_registry_factory,
     regressor_registry_factory,
 )
+from covenant_radar_api.worker.job_phases import ExplainJobStatus
 
 _log = get_logger(__name__)
-
-# Progress status type for regression explainer job
-RegressionExplainJobStatus = Literal[
-    "started",
-    "loading_model",
-    "loading_data",
-    "computing",
-    "complete",
-]
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +203,7 @@ class RegressionExplainProgressInfo(TypedDict):
         elapsed_seconds: Seconds since job started.
     """
 
-    status: RegressionExplainJobStatus
+    status: ExplainJobStatus
     elapsed_seconds: float
 
 
@@ -258,7 +250,7 @@ def run_regression_explanation(
     """
     start_time = time.monotonic()
 
-    def _report_progress(status: RegressionExplainJobStatus) -> None:
+    def _report_progress(status: ExplainJobStatus) -> None:
         if progress_callback is not None:
             elapsed = time.monotonic() - start_time
             info: RegressionExplainProgressInfo = {
@@ -267,7 +259,7 @@ def run_regression_explanation(
             }
             progress_callback(info)
 
-    _report_progress("started")
+    _report_progress(ExplainJobStatus.STARTED)
 
     # Parse config
     parse_result = _parse_regression_explain_config(config_json)
@@ -301,13 +293,13 @@ def run_regression_explanation(
     )
 
     # Load model via regressor backend registry hook
-    _report_progress("loading_model")
+    _report_progress(ExplainJobStatus.LOADING_MODEL)
     backend_reg = regressor_registry_factory()
     backend_impl = backend_reg.get(backend)
     model = backend_impl.load(path=model_path)
 
     # Load regression dataset via dataset registry hook
-    _report_progress("loading_data")
+    _report_progress(ExplainJobStatus.LOADING_DATA)
     ds_registry = regression_registry_factory()
     ds_config = ds_registry.get(dataset_name)
     loaded = regression_dataset_loader(ds_config, external_dir)
@@ -328,7 +320,7 @@ def run_regression_explanation(
     )
 
     # Run explainer
-    _report_progress("computing")
+    _report_progress(ExplainJobStatus.COMPUTING)
     explainer = reg.get(explainer_name)
     importances: list[FeatureImportanceScore] = explainer.compute_importance(
         model=model,
@@ -337,7 +329,7 @@ def run_regression_explanation(
     )
 
     elapsed = time.monotonic() - start_time
-    _report_progress("complete")
+    _report_progress(ExplainJobStatus.COMPLETE)
 
     _log.info(
         "Regression explanation complete",

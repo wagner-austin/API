@@ -16,9 +16,9 @@ from covenant_ml.optimizer.types import (
 )
 from platform_core.json_utils import JSONObject, JSONTypeError
 
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_types import (
     LoadingProgressInfo,
-    OptimizePhase,
     PhaseProgressInfo,
     TrialProgressInfo,
     UnifiedOptimizationResult,
@@ -42,7 +42,7 @@ class TestPhaseProgressInfoEncodeDecode:
     def test_encode_decode_round_trip(self) -> None:
         """Encoding then decoding produces identical result."""
         original = PhaseProgressInfo(
-            phase="loading_data",
+            phase=OptimizePhase.LOADING_DATA,
             backend="xgboost",
             dataset="taiwan",
             n_samples=0,
@@ -54,13 +54,7 @@ class TestPhaseProgressInfoEncodeDecode:
 
     def test_all_phases_round_trip(self) -> None:
         """All phase values round-trip correctly."""
-        phases: tuple[OptimizePhase, ...] = (
-            "loading_data",
-            "feature_engineering",
-            "optimizing",
-            "saving",
-        )
-        for phase in phases:
+        for phase in OptimizePhase:
             original = PhaseProgressInfo(
                 phase=phase,
                 backend="mlp",
@@ -70,7 +64,7 @@ class TestPhaseProgressInfoEncodeDecode:
             )
             encoded = encode_phase_progress_info(original)
             decoded = decode_phase_progress_info(encoded)
-            assert decoded["phase"] == phase
+            assert decoded["phase"] is phase
 
     def test_decode_invalid_phase_raises(self) -> None:
         """Invalid phase raises JSONTypeError."""
@@ -81,8 +75,12 @@ class TestPhaseProgressInfoEncodeDecode:
             "n_samples": 0,
             "n_features": 0,
         }
-        with pytest.raises(JSONTypeError, match="phase"):
+        with pytest.raises(JSONTypeError) as exc_info:
             decode_phase_progress_info(raw)
+        assert str(exc_info.value) == (
+            "Field 'phase' must be one of: loading_data, feature_engineering, "
+            "optimizing, saving (got unknown_phase)"
+        )
 
     def test_decode_missing_backend_raises(self) -> None:
         """Missing backend raises JSONTypeError."""

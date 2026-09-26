@@ -13,7 +13,6 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 from covenant_ml.datasets.types import LoadProgress
 from covenant_ml.optimizer import OptimizationSummary, SearchSpace, TrialResult
@@ -44,6 +43,7 @@ from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_int_params,
     encode_sampled_string_params,
 )
+from covenant_radar_api.worker.job_phases import OptimizePhase
 from covenant_radar_api.worker.optimize_field_decoders import parse_feature_preset
 from covenant_radar_api.worker.optimize_types import (
     LoadingProgressCallbackProtocol,
@@ -136,7 +136,7 @@ def _parse_optimize_config(config_json: str) -> UnifiedOptimizeParseResult:
 
 def _report_phase(
     phase_callback: PhaseProgressCallbackProtocol | None,
-    phase: Literal["loading_data", "feature_engineering", "optimizing", "saving"],
+    phase: OptimizePhase,
     backend_name: BackendName,
     dataset_name: str,
     n_samples: int,
@@ -256,7 +256,7 @@ def run_optimization(
     search_space: SearchSpace = backend.get_default_search_space()
 
     # Report loading phase
-    _report_phase(phase_callback, "loading_data", backend_name, dataset_name, 0, 0)
+    _report_phase(phase_callback, OptimizePhase.LOADING_DATA, backend_name, dataset_name, 0, 0)
 
     # Create loading progress adapter
     def _loading_progress_adapter(progress: LoadProgress) -> None:
@@ -285,7 +285,7 @@ def run_optimization(
     # Report feature engineering phase
     _report_phase(
         phase_callback,
-        "feature_engineering",
+        OptimizePhase.FEATURE_ENGINEERING,
         backend_name,
         dataset_name,
         n_samples,
@@ -317,7 +317,7 @@ def run_optimization(
     # Report optimizing phase
     _report_phase(
         phase_callback,
-        "optimizing",
+        OptimizePhase.OPTIMIZING,
         backend_name,
         dataset_name,
         n_samples,
@@ -402,7 +402,7 @@ def run_optimization(
     # Report saving phase
     _report_phase(
         phase_callback,
-        "saving",
+        OptimizePhase.SAVING,
         backend_name,
         dataset_name,
         n_samples,

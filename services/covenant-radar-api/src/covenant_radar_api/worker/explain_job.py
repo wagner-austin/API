@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Literal, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 import numpy as np
 from covenant_ml.explainers.registry import ExplainerRegistry, default_explainer_registry
@@ -41,11 +41,9 @@ from covenant_radar_api.worker._optimize_common import (
     parse_backend_name,
     parse_dataset_name,
 )
+from covenant_radar_api.worker.job_phases import ExplainJobStatus
 
 _log = get_logger(__name__)
-
-# Progress status type for explainer job
-ExplainJobStatus = Literal["started", "loading_model", "loading_data", "computing", "complete"]
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +310,7 @@ def _sample_data(
 class ExplainProgressInfo(TypedDict):
     """Progress information for explanation computation."""
 
-    status: Literal["started", "loading_model", "loading_data", "computing", "complete"]
+    status: ExplainJobStatus
     elapsed_seconds: float
 
 
@@ -359,7 +357,7 @@ def run_explanation(
             }
             progress_callback(info)
 
-    _report_progress("started")
+    _report_progress(ExplainJobStatus.STARTED)
 
     # Parse config
     parse_result = _parse_explain_config(config_json)
@@ -397,11 +395,11 @@ def run_explanation(
     )
 
     # Load model
-    _report_progress("loading_model")
+    _report_progress(ExplainJobStatus.LOADING_MODEL)
     model = load_model_for_backend(backend, model_path, mlp_config, lstm_config)
 
     # Load and sample data
-    _report_progress("loading_data")
+    _report_progress(ExplainJobStatus.LOADING_DATA)
     dataset = load_any_dataset(dataset_name, external_dir)
     x_full: NDArray[np.float64] = dataset["x"]
     x_sampled = _sample_data(x_full, n_samples, random_state)
@@ -421,7 +419,7 @@ def run_explanation(
     )
 
     # Run explainer
-    _report_progress("computing")
+    _report_progress(ExplainJobStatus.COMPUTING)
     explainer = reg.get(explainer_name)
     importances: list[FeatureImportanceScore] = explainer.compute_importance(
         model=model,
@@ -431,7 +429,7 @@ def run_explanation(
     )
 
     elapsed = time.monotonic() - start_time
-    _report_progress("complete")
+    _report_progress(ExplainJobStatus.COMPLETE)
 
     _log.info(
         "Explanation complete",

@@ -271,7 +271,7 @@ class TestRunRegressionOptimization:
 
         assert len(loading_infos) == 1
         assert loading_infos[0]["dataset"] == "financial_distress"
-        assert loading_infos[0]["phase"] == "reading"
+        assert loading_infos[0]["phase"] is LoadPhase.READING
         assert loading_infos[0]["percent_complete"] == 100.0
 
     def test_result_has_best_params(self, tmp_path: Path) -> None:
