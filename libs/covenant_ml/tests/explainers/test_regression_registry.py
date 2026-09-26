@@ -313,7 +313,7 @@ class TestRegressionExplainerRegistry:
             return _RegressionGradientAdapter(multiply_by_input=True, absolute_value=True)
 
         registry.register(
-            "gradient",
+            ExplainerName.GRADIENT,
             RegressionExplainerRegistration(
                 factory=_factory,
                 compatible_backends=frozenset(["mlp_reg"]),
@@ -322,49 +322,49 @@ class TestRegressionExplainerRegistry:
         )
 
         explainers = registry.list_explainers()
-        assert explainers == ["gradient"]
+        assert explainers == [ExplainerName.GRADIENT]
 
     def test_list_compatible(self) -> None:
         """List compatible explainers for a given backend."""
         registry = default_regression_explainer_registry()
 
         xgb_compatible = registry.list_compatible_explainers("xgboost_reg")
-        assert "permutation" in xgb_compatible
-        assert "shap_tree" in xgb_compatible
-        assert "gradient" not in xgb_compatible
+        assert ExplainerName.PERMUTATION in xgb_compatible
+        assert ExplainerName.SHAP_TREE in xgb_compatible
+        assert ExplainerName.GRADIENT not in xgb_compatible
 
         mlp_compatible = registry.list_compatible_explainers("mlp_reg")
-        assert "permutation" in mlp_compatible
-        assert "gradient" in mlp_compatible
-        assert "integrated_gradients" in mlp_compatible
-        assert "shap_tree" not in mlp_compatible
+        assert ExplainerName.PERMUTATION in mlp_compatible
+        assert ExplainerName.GRADIENT in mlp_compatible
+        assert ExplainerName.INTEGRATED_GRADIENTS in mlp_compatible
+        assert ExplainerName.SHAP_TREE not in mlp_compatible
 
     def test_get_creates_instance(self) -> None:
         """Get creates a new explainer instance."""
         registry = default_regression_explainer_registry()
-        explainer = registry.get("permutation")
+        explainer = registry.get(ExplainerName.PERMUTATION)
         assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
     def test_get_unknown_raises(self) -> None:
         """Get raises KeyError for unknown explainer."""
         registry = RegressionExplainerRegistry()
         with pytest.raises(KeyError):
-            registry.get("permutation")
+            registry.get(ExplainerName.PERMUTATION)
 
     def test_is_compatible_true(self) -> None:
         """is_compatible returns True for compatible pair."""
         registry = default_regression_explainer_registry()
-        assert registry.is_compatible("permutation", "xgboost_reg") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "xgboost_reg") is True
 
     def test_is_compatible_false(self) -> None:
         """is_compatible returns False for incompatible pair."""
         registry = default_regression_explainer_registry()
-        assert registry.is_compatible("shap_tree", "mlp_reg") is False
+        assert registry.is_compatible(ExplainerName.SHAP_TREE, "mlp_reg") is False
 
     def test_is_compatible_unknown_explainer(self) -> None:
         """is_compatible returns False for unregistered explainer."""
         registry = RegressionExplainerRegistry()
-        assert registry.is_compatible("permutation", "xgboost_reg") is False
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "xgboost_reg") is False
 
 
 class TestDefaultRegressionExplainerRegistry:
@@ -374,39 +374,43 @@ class TestDefaultRegressionExplainerRegistry:
         """Default registry has all four explainer types."""
         registry = default_regression_explainer_registry()
         explainers = registry.list_explainers()
-        assert "gradient" in explainers
-        assert "integrated_gradients" in explainers
-        assert "permutation" in explainers
-        assert "shap_tree" in explainers
+        assert ExplainerName.GRADIENT in explainers
+        assert ExplainerName.INTEGRATED_GRADIENTS in explainers
+        assert ExplainerName.PERMUTATION in explainers
+        assert ExplainerName.SHAP_TREE in explainers
 
     def test_lightgbm_reg_compatible(self) -> None:
         """LightGBM regressor has permutation + shap_tree."""
         registry = default_regression_explainer_registry()
         compatible = registry.list_compatible_explainers("lightgbm_reg")
-        assert sorted(compatible) == ["permutation", "shap_tree"]
+        assert sorted(compatible) == [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE]
 
     def test_lstm_reg_compatible(self) -> None:
         """LSTM regressor has gradient + IG + permutation."""
         registry = default_regression_explainer_registry()
         compatible = registry.list_compatible_explainers("lstm_reg")
-        assert sorted(compatible) == ["gradient", "integrated_gradients", "permutation"]
+        assert sorted(compatible) == [
+            ExplainerName.GRADIENT,
+            ExplainerName.INTEGRATED_GRADIENTS,
+            ExplainerName.PERMUTATION,
+        ]
 
     def test_get_gradient_creates_instance(self) -> None:
         """Get gradient creates a RegressionGradientAdapter instance."""
         registry = default_regression_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
         assert explainer.explainer_name() is ExplainerName.GRADIENT
 
     def test_get_integrated_gradients_creates_instance(self) -> None:
         """Get integrated_gradients creates the right adapter."""
         registry = default_regression_explainer_registry()
-        explainer = registry.get("integrated_gradients")
+        explainer = registry.get(ExplainerName.INTEGRATED_GRADIENTS)
         assert explainer.explainer_name() is ExplainerName.INTEGRATED_GRADIENTS
 
     def test_get_shap_tree_creates_instance(self) -> None:
         """Get shap_tree creates a RegressionShapTreeAdapter instance."""
         registry = default_regression_explainer_registry()
-        explainer = registry.get("shap_tree")
+        explainer = registry.get(ExplainerName.SHAP_TREE)
         caps = explainer.capabilities()
         assert caps["requires_gradients"] is False
 

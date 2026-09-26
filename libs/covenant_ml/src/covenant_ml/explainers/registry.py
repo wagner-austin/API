@@ -24,7 +24,7 @@ from covenant_ml.explainers.adapters import (
 )
 
 from ..types import BackendName
-from .types import SupportedExplainer
+from .types import ExplainerName
 
 
 class ExplainerFactory(Protocol):
@@ -83,11 +83,11 @@ class ExplainerRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._map: dict[SupportedExplainer, ExplainerRegistration] = {}
+        self._map: dict[ExplainerName, ExplainerRegistration] = {}
 
     def register(
         self,
-        name: SupportedExplainer,
+        name: ExplainerName,
         registration: ExplainerRegistration,
     ) -> None:
         """Register an explainer.
@@ -98,19 +98,19 @@ class ExplainerRegistry:
         """
         self._map[name] = registration
 
-    def list_explainers(self) -> list[SupportedExplainer]:
+    def list_explainers(self) -> list[ExplainerName]:
         """Return sorted list of registered explainer names.
 
         Returns:
             List of explainer names in alphabetical order.
         """
-        names: list[SupportedExplainer] = list(self._map.keys())
+        names: list[ExplainerName] = list(self._map.keys())
         return sorted(names)
 
     def list_compatible_explainers(
         self,
         backend: BackendName,
-    ) -> list[SupportedExplainer]:
+    ) -> list[ExplainerName]:
         """List explainers compatible with a given backend.
 
         Args:
@@ -119,13 +119,13 @@ class ExplainerRegistry:
         Returns:
             Sorted list of compatible explainer names.
         """
-        compatible: list[SupportedExplainer] = []
+        compatible: list[ExplainerName] = []
         for name, reg in self._map.items():
             if backend in reg.compatible_backends():
                 compatible.append(name)
         return sorted(compatible)
 
-    def get(self, name: SupportedExplainer) -> FeatureExplainer:
+    def get(self, name: ExplainerName) -> FeatureExplainer:
         """Create and return an explainer instance.
 
         Args:
@@ -142,7 +142,7 @@ class ExplainerRegistry:
 
     def is_compatible(
         self,
-        explainer: SupportedExplainer,
+        explainer: ExplainerName,
         backend: BackendName,
     ) -> bool:
         """Check if explainer is compatible with backend.
@@ -158,7 +158,7 @@ class ExplainerRegistry:
             return False
         return backend in self._map[explainer].compatible_backends()
 
-    def requires_gradients(self, name: SupportedExplainer) -> bool:
+    def requires_gradients(self, name: ExplainerName) -> bool:
         """Check if explainer requires gradient computation.
 
         Args:
@@ -262,7 +262,7 @@ def default_explainer_registry() -> ExplainerRegistry:
     # with no compatible explainer at all: /ml/explain refused every request
     # for them, for every explainer, while the API accepted the backend.
     reg.register(
-        "permutation",
+        ExplainerName.PERMUTATION,
         ExplainerRegistration(
             factory=_create_permutation_factory(),
             compatible_backends=frozenset(
@@ -274,7 +274,7 @@ def default_explainer_registry() -> ExplainerRegistry:
 
     # Gradient: only neural network backends (requires compute_gradients)
     reg.register(
-        "gradient",
+        ExplainerName.GRADIENT,
         ExplainerRegistration(
             factory=_create_gradient_factory(),
             compatible_backends=frozenset(["mlp", "lstm"]),
@@ -284,7 +284,7 @@ def default_explainer_registry() -> ExplainerRegistry:
 
     # Integrated Gradients: only neural network backends (requires compute_gradients)
     reg.register(
-        "integrated_gradients",
+        ExplainerName.INTEGRATED_GRADIENTS,
         ExplainerRegistration(
             factory=_create_integrated_gradients_factory(),
             compatible_backends=frozenset(["mlp", "lstm"]),
@@ -297,7 +297,7 @@ def default_explainer_registry() -> ExplainerRegistry:
     # is the prepared wrapper, which is now unwrapped before it is handed over.
     # logreg is excluded because it is not a tree model at all.
     reg.register(
-        "shap_tree",
+        ExplainerName.SHAP_TREE,
         ExplainerRegistration(
             factory=_create_shap_tree_factory(),
             compatible_backends=frozenset(["xgboost", "lightgbm", "cleargbm", "random_forest"]),

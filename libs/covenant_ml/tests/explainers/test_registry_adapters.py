@@ -291,7 +291,7 @@ class TestShapTreeAdapterWithClearGBM:
     def test_registry_shap_tree_works_with_cleargbm(self) -> None:
         """SHAP tree explainer from registry works with ClearGBM model."""
         registry = default_explainer_registry()
-        explainer = registry.get("shap_tree")
+        explainer = registry.get(ExplainerName.SHAP_TREE)
         prepared = _create_cleargbm_prepared()
 
         x: NDArray[np.float64] = np.random.randn(3, 4).astype(np.float64)

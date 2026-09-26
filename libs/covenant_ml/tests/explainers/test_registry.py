@@ -15,7 +15,6 @@ from covenant_ml.explainers.registry import (
     ExplainerRegistry,
     default_explainer_registry,
 )
-from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.types import BackendName
 from tests.explainers._registry_fixtures import (
     _make_simple_explainer_factory,
@@ -89,10 +88,10 @@ class TestExplainerRegistry:
             compatible_backends=frozenset(["xgboost"]),
             requires_gradients=False,
         )
-        registry.register("permutation", reg)
+        registry.register(ExplainerName.PERMUTATION, reg)
 
         explainers = registry.list_explainers()
-        assert explainers == ["permutation"]
+        assert explainers == [ExplainerName.PERMUTATION]
 
     def test_registry_list_sorted_alphabetically(self) -> None:
         """Registry list_explainers returns sorted list."""
@@ -100,7 +99,11 @@ class TestExplainerRegistry:
         registry = ExplainerRegistry()
 
         # Register in non-alphabetical order
-        names: list[SupportedExplainer] = ["shap_tree", "gradient", "permutation"]
+        names: list[ExplainerName] = [
+            ExplainerName.SHAP_TREE,
+            ExplainerName.GRADIENT,
+            ExplainerName.PERMUTATION,
+        ]
         for name in names:
             reg = ExplainerRegistration(
                 factory=factory,
@@ -110,7 +113,11 @@ class TestExplainerRegistry:
             registry.register(name, reg)
 
         explainers = registry.list_explainers()
-        assert explainers == ["gradient", "permutation", "shap_tree"]
+        assert explainers == [
+            ExplainerName.GRADIENT,
+            ExplainerName.PERMUTATION,
+            ExplainerName.SHAP_TREE,
+        ]
 
     def test_registry_list_compatible_explainers_xgboost(self) -> None:
         """Registry filters explainers by xgboost backend."""
@@ -119,7 +126,7 @@ class TestExplainerRegistry:
 
         # Permutation: xgboost and mlp
         registry.register(
-            "permutation",
+            ExplainerName.PERMUTATION,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["xgboost", "mlp"]),
@@ -129,7 +136,7 @@ class TestExplainerRegistry:
 
         # Gradient: mlp only
         registry.register(
-            "gradient",
+            ExplainerName.GRADIENT,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["mlp"]),
@@ -137,7 +144,7 @@ class TestExplainerRegistry:
             ),
         )
 
-        assert registry.list_compatible_explainers("xgboost") == ["permutation"]
+        assert registry.list_compatible_explainers("xgboost") == [ExplainerName.PERMUTATION]
 
     def test_registry_list_compatible_explainers_mlp(self) -> None:
         """Registry filters explainers by mlp backend."""
@@ -145,7 +152,7 @@ class TestExplainerRegistry:
         registry = ExplainerRegistry()
 
         registry.register(
-            "permutation",
+            ExplainerName.PERMUTATION,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["xgboost", "mlp"]),
@@ -153,7 +160,7 @@ class TestExplainerRegistry:
             ),
         )
         registry.register(
-            "gradient",
+            ExplainerName.GRADIENT,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["mlp"]),
@@ -162,7 +169,7 @@ class TestExplainerRegistry:
         )
 
         compatible = registry.list_compatible_explainers("mlp")
-        assert compatible == ["gradient", "permutation"]
+        assert compatible == [ExplainerName.GRADIENT, ExplainerName.PERMUTATION]
 
     def test_registry_list_compatible_explainers_empty(self) -> None:
         """Registry returns empty list when no explainers match backend."""
@@ -170,7 +177,7 @@ class TestExplainerRegistry:
         registry = ExplainerRegistry()
 
         registry.register(
-            "gradient",
+            ExplainerName.GRADIENT,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["mlp"]),
@@ -194,7 +201,7 @@ class TestExplainerRegistry:
 
         registry = ExplainerRegistry()
         registry.register(
-            "permutation",
+            ExplainerName.PERMUTATION,
             ExplainerRegistration(
                 factory=counting_factory,
                 compatible_backends=frozenset(["xgboost"]),
@@ -203,14 +210,14 @@ class TestExplainerRegistry:
         )
 
         # First get
-        result = registry.get("permutation")
+        result = registry.get(ExplainerName.PERMUTATION)
         assert call_count == 1
         # Verify it's a working explainer
         name = result.explainer_name()
         assert name is ExplainerName.PERMUTATION
 
         # Second get creates new instance
-        _ = registry.get("permutation")
+        _ = registry.get(ExplainerName.PERMUTATION)
         assert call_count == 2
 
     def test_registry_get_raises_for_unknown(self) -> None:
@@ -219,7 +226,7 @@ class TestExplainerRegistry:
 
         with pytest.raises(KeyError):
             # Cast to bypass type check - we're testing runtime behavior
-            name: SupportedExplainer = "permutation"  # Valid type but not registered
+            name: ExplainerName = ExplainerName.PERMUTATION  # Valid type but not registered
             registry.get(name)
 
     def test_registry_is_compatible_returns_true(self) -> None:
@@ -227,7 +234,7 @@ class TestExplainerRegistry:
         factory = _make_simple_explainer_factory()
         registry = ExplainerRegistry()
         registry.register(
-            "permutation",
+            ExplainerName.PERMUTATION,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["xgboost", "mlp"]),
@@ -235,15 +242,15 @@ class TestExplainerRegistry:
             ),
         )
 
-        assert registry.is_compatible("permutation", "xgboost") is True
-        assert registry.is_compatible("permutation", "mlp") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "xgboost") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "mlp") is True
 
     def test_registry_is_compatible_returns_false_for_incompatible(self) -> None:
         """Registry is_compatible returns False for incompatible backend."""
         factory = _make_simple_explainer_factory()
         registry = ExplainerRegistry()
         registry.register(
-            "gradient",
+            ExplainerName.GRADIENT,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["mlp"]),
@@ -251,13 +258,13 @@ class TestExplainerRegistry:
             ),
         )
 
-        assert registry.is_compatible("gradient", "xgboost") is False
+        assert registry.is_compatible(ExplainerName.GRADIENT, "xgboost") is False
 
     def test_registry_is_compatible_returns_false_for_unregistered(self) -> None:
         """Registry is_compatible returns False for unregistered explainer."""
         registry = ExplainerRegistry()
         # Use valid type that's not registered
-        result = registry.is_compatible("permutation", "xgboost")
+        result = registry.is_compatible(ExplainerName.PERMUTATION, "xgboost")
         assert result is False
 
     def test_registry_requires_gradients_true(self) -> None:
@@ -265,7 +272,7 @@ class TestExplainerRegistry:
         factory = _make_simple_explainer_factory()
         registry = ExplainerRegistry()
         registry.register(
-            "gradient",
+            ExplainerName.GRADIENT,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["mlp"]),
@@ -273,14 +280,14 @@ class TestExplainerRegistry:
             ),
         )
 
-        assert registry.requires_gradients("gradient") is True
+        assert registry.requires_gradients(ExplainerName.GRADIENT) is True
 
     def test_registry_requires_gradients_false(self) -> None:
         """Registry requires_gradients returns False for permutation explainer."""
         factory = _make_simple_explainer_factory()
         registry = ExplainerRegistry()
         registry.register(
-            "permutation",
+            ExplainerName.PERMUTATION,
             ExplainerRegistration(
                 factory=factory,
                 compatible_backends=frozenset(["xgboost"]),
@@ -288,14 +295,14 @@ class TestExplainerRegistry:
             ),
         )
 
-        assert registry.requires_gradients("permutation") is False
+        assert registry.requires_gradients(ExplainerName.PERMUTATION) is False
 
     def test_registry_requires_gradients_raises_for_unknown(self) -> None:
         """Registry requires_gradients raises KeyError for unregistered."""
         registry = ExplainerRegistry()
 
         with pytest.raises(KeyError):
-            registry.requires_gradients("permutation")
+            registry.requires_gradients(ExplainerName.PERMUTATION)
 
 
 class TestDefaultExplainerRegistry:
@@ -307,100 +314,100 @@ class TestDefaultExplainerRegistry:
         explainers = registry.list_explainers()
 
         assert len(explainers) == 4
-        assert "permutation" in explainers
-        assert "gradient" in explainers
-        assert "integrated_gradients" in explainers
-        assert "shap_tree" in explainers
+        assert ExplainerName.PERMUTATION in explainers
+        assert ExplainerName.GRADIENT in explainers
+        assert ExplainerName.INTEGRATED_GRADIENTS in explainers
+        assert ExplainerName.SHAP_TREE in explainers
 
     def test_default_registry_permutation_compatible_with_xgboost(self) -> None:
         """Permutation explainer is compatible with xgboost."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("permutation", "xgboost") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "xgboost") is True
 
     def test_default_registry_permutation_compatible_with_lightgbm(self) -> None:
         """Permutation explainer is compatible with lightgbm."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("permutation", "lightgbm") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "lightgbm") is True
 
     def test_default_registry_permutation_compatible_with_mlp(self) -> None:
         """Permutation explainer is compatible with mlp."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("permutation", "mlp") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "mlp") is True
 
     def test_default_registry_permutation_compatible_with_lstm(self) -> None:
         """Permutation explainer is compatible with lstm."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("permutation", "lstm") is True
+        assert registry.is_compatible(ExplainerName.PERMUTATION, "lstm") is True
 
     def test_default_registry_gradient_compatible_with_mlp(self) -> None:
         """Gradient explainer is compatible with mlp."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("gradient", "mlp") is True
+        assert registry.is_compatible(ExplainerName.GRADIENT, "mlp") is True
 
     def test_default_registry_gradient_compatible_with_lstm(self) -> None:
         """Gradient explainer is compatible with lstm."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("gradient", "lstm") is True
+        assert registry.is_compatible(ExplainerName.GRADIENT, "lstm") is True
 
     def test_default_registry_gradient_not_compatible_with_xgboost(self) -> None:
         """Gradient explainer is not compatible with xgboost."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("gradient", "xgboost") is False
+        assert registry.is_compatible(ExplainerName.GRADIENT, "xgboost") is False
 
     def test_default_registry_gradient_not_compatible_with_lightgbm(self) -> None:
         """Gradient explainer is not compatible with lightgbm."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("gradient", "lightgbm") is False
+        assert registry.is_compatible(ExplainerName.GRADIENT, "lightgbm") is False
 
     def test_default_registry_integrated_gradients_compatible_with_mlp(self) -> None:
         """Integrated gradients is compatible with mlp."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("integrated_gradients", "mlp") is True
+        assert registry.is_compatible(ExplainerName.INTEGRATED_GRADIENTS, "mlp") is True
 
     def test_default_registry_integrated_gradients_compatible_with_lstm(self) -> None:
         """Integrated gradients is compatible with lstm."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("integrated_gradients", "lstm") is True
+        assert registry.is_compatible(ExplainerName.INTEGRATED_GRADIENTS, "lstm") is True
 
     def test_default_registry_integrated_gradients_not_compatible_with_xgboost(self) -> None:
         """Integrated gradients is not compatible with xgboost."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("integrated_gradients", "xgboost") is False
+        assert registry.is_compatible(ExplainerName.INTEGRATED_GRADIENTS, "xgboost") is False
 
     def test_default_registry_shap_tree_compatible_with_xgboost(self) -> None:
         """SHAP tree is compatible with xgboost."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("shap_tree", "xgboost") is True
+        assert registry.is_compatible(ExplainerName.SHAP_TREE, "xgboost") is True
 
     def test_default_registry_shap_tree_compatible_with_lightgbm(self) -> None:
         """SHAP tree is compatible with lightgbm."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("shap_tree", "lightgbm") is True
+        assert registry.is_compatible(ExplainerName.SHAP_TREE, "lightgbm") is True
 
     def test_default_registry_shap_tree_not_compatible_with_mlp(self) -> None:
         """SHAP tree is not compatible with mlp."""
         registry = default_explainer_registry()
-        assert registry.is_compatible("shap_tree", "mlp") is False
+        assert registry.is_compatible(ExplainerName.SHAP_TREE, "mlp") is False
 
     def test_default_registry_gradient_requires_gradients(self) -> None:
         """Gradient explainer requires gradients."""
         registry = default_explainer_registry()
-        assert registry.requires_gradients("gradient") is True
+        assert registry.requires_gradients(ExplainerName.GRADIENT) is True
 
     def test_default_registry_integrated_gradients_requires_gradients(self) -> None:
         """Integrated gradients requires gradients."""
         registry = default_explainer_registry()
-        assert registry.requires_gradients("integrated_gradients") is True
+        assert registry.requires_gradients(ExplainerName.INTEGRATED_GRADIENTS) is True
 
     def test_default_registry_permutation_no_gradients(self) -> None:
         """Permutation does not require gradients."""
         registry = default_explainer_registry()
-        assert registry.requires_gradients("permutation") is False
+        assert registry.requires_gradients(ExplainerName.PERMUTATION) is False
 
     def test_default_registry_shap_tree_no_gradients(self) -> None:
         """SHAP tree does not require gradients."""
         registry = default_explainer_registry()
-        assert registry.requires_gradients("shap_tree") is False
+        assert registry.requires_gradients(ExplainerName.SHAP_TREE) is False
 
 
 class TestDefaultRegistryCoversEveryBackend:
@@ -431,7 +438,7 @@ class TestDefaultRegistryCoversEveryBackend:
         missing = [
             backend
             for backend in default_registry().list_backends()
-            if "permutation" not in registry.list_compatible_explainers(backend)
+            if ExplainerName.PERMUTATION not in registry.list_compatible_explainers(backend)
         ]
 
         assert missing == []
@@ -447,5 +454,5 @@ class TestDefaultRegistryCoversEveryBackend:
 
         for backend in ("xgboost", "lightgbm", "cleargbm", "logreg", "random_forest"):
             compatible = registry.list_compatible_explainers(backend)
-            assert "gradient" not in compatible
-            assert "integrated_gradients" not in compatible
+            assert ExplainerName.GRADIENT not in compatible
+            assert ExplainerName.INTEGRATED_GRADIENTS not in compatible

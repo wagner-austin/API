@@ -11,134 +11,14 @@ from platform_ml.explainers.types import ExplainerName as PlatformExplainerName
 from covenant_ml.explainers.types import (
     ComputationalCost,
     ExplainerCapabilities,
-    ExplainerConfigUnion,
     ExplainerName,
-    ExplainRequestConfig,
     ExplainResult,
     FeatureImportanceScore,
     GradientConfig,
-    GradientExplainConfig,
     IntegratedGradientsConfig,
-    IntegratedGradientsExplainConfig,
     PermutationConfig,
-    PermutationExplainConfig,
     RegressionExplainResult,
-    ShapTreeExplainConfig,
-    SupportedExplainer,
 )
-
-
-class TestExplainRequestConfig:
-    """Tests for ExplainRequestConfig TypedDict."""
-
-    def test_explainrequestconfig_has_all_required_fields(self) -> None:
-        """ExplainRequestConfig has explainer, target_class, n_samples, random_state."""
-        config: ExplainRequestConfig = {
-            "explainer": "permutation",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-        }
-        assert config["explainer"] == "permutation"
-        assert config["target_class"] == 1
-        assert config["n_samples"] == 100
-        assert config["random_state"] == 42
-
-    def test_explainrequestconfig_accepts_all_explainer_types(self) -> None:
-        """ExplainRequestConfig accepts all SupportedExplainer values."""
-        explainers: list[SupportedExplainer] = [
-            "permutation",
-            "gradient",
-            "integrated_gradients",
-            "shap_tree",
-        ]
-        for exp in explainers:
-            config: ExplainRequestConfig = {
-                "explainer": exp,
-                "target_class": 1,
-                "n_samples": 50,
-                "random_state": 0,
-            }
-            assert config["explainer"] == exp
-
-
-class TestPermutationExplainConfig:
-    """Tests for PermutationExplainConfig TypedDict."""
-
-    def test_permutationexplainconfig_has_n_repeats(self) -> None:
-        """PermutationExplainConfig includes n_repeats field."""
-        config: PermutationExplainConfig = {
-            "explainer": "permutation",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-            "n_repeats": 10,
-        }
-        assert config["explainer"] == "permutation"
-        assert config["n_repeats"] == 10
-
-
-class TestGradientExplainConfig:
-    """Tests for GradientExplainConfig TypedDict."""
-
-    def test_gradientexplainconfig_has_gradient_options(self) -> None:
-        """GradientExplainConfig includes multiply_by_input and absolute_value."""
-        config: GradientExplainConfig = {
-            "explainer": "gradient",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-            "multiply_by_input": True,
-            "absolute_value": True,
-        }
-        assert config["explainer"] == "gradient"
-        assert config["multiply_by_input"] is True
-        assert config["absolute_value"] is True
-
-
-class TestIntegratedGradientsExplainConfig:
-    """Tests for IntegratedGradientsExplainConfig TypedDict."""
-
-    def test_integratedgradientsexplainconfig_has_ig_options(self) -> None:
-        """IntegratedGradientsExplainConfig includes n_steps and baseline_mode."""
-        config: IntegratedGradientsExplainConfig = {
-            "explainer": "integrated_gradients",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-            "n_steps": 50,
-            "baseline_mode": "zeros",
-        }
-        assert config["explainer"] == "integrated_gradients"
-        assert config["n_steps"] == 50
-        assert config["baseline_mode"] == "zeros"
-
-    def test_integratedgradientsexplainconfig_accepts_mean_baseline(self) -> None:
-        """IntegratedGradientsExplainConfig accepts mean baseline mode."""
-        config: IntegratedGradientsExplainConfig = {
-            "explainer": "integrated_gradients",
-            "target_class": 0,
-            "n_samples": 50,
-            "random_state": 123,
-            "n_steps": 25,
-            "baseline_mode": "mean",
-        }
-        assert config["baseline_mode"] == "mean"
-
-
-class TestShapTreeExplainConfig:
-    """Tests for ShapTreeExplainConfig TypedDict."""
-
-    def test_shaptreeexplainconfig_is_minimal(self) -> None:
-        """ShapTreeExplainConfig has no extra fields beyond base."""
-        config: ShapTreeExplainConfig = {
-            "explainer": "shap_tree",
-            "target_class": 1,
-            "n_samples": 200,
-            "random_state": 99,
-        }
-        assert config["explainer"] == "shap_tree"
-        assert config["target_class"] == 1
 
 
 class TestExplainResult:
@@ -154,7 +34,7 @@ class TestExplainResult:
         result: ExplainResult = {
             "status": "complete",
             "backend": "xgboost",
-            "explainer": "permutation",
+            "explainer": ExplainerName.PERMUTATION,
             "n_samples_used": 100,
             "n_features": 10,
             "target_class": 1,
@@ -163,7 +43,7 @@ class TestExplainResult:
         }
         assert result["status"] == "complete"
         assert result["backend"] == "xgboost"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["n_samples_used"] == 100
         assert result["n_features"] == 10
         assert result["target_class"] == 1
@@ -175,7 +55,7 @@ class TestExplainResult:
         result: ExplainResult = {
             "status": "failed",
             "backend": "mlp",
-            "explainer": "gradient",
+            "explainer": ExplainerName.GRADIENT,
             "n_samples_used": 0,
             "n_features": 5,
             "target_class": 1,
@@ -247,55 +127,6 @@ class TestReExports:
         assert config["baseline_mode"] == "zeros"
 
 
-class TestExplainerConfigUnion:
-    """Tests for ExplainerConfigUnion type alias."""
-
-    def test_explainerconfigunion_accepts_permutation(self) -> None:
-        """ExplainerConfigUnion accepts PermutationExplainConfig."""
-        config: ExplainerConfigUnion = {
-            "explainer": "permutation",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-            "n_repeats": 10,
-        }
-        assert config["explainer"] == "permutation"
-
-    def test_explainerconfigunion_accepts_gradient(self) -> None:
-        """ExplainerConfigUnion accepts GradientExplainConfig."""
-        config: ExplainerConfigUnion = {
-            "explainer": "gradient",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-            "multiply_by_input": True,
-            "absolute_value": True,
-        }
-        assert config["explainer"] == "gradient"
-
-    def test_explainerconfigunion_accepts_integrated_gradients(self) -> None:
-        """ExplainerConfigUnion accepts IntegratedGradientsExplainConfig."""
-        config: ExplainerConfigUnion = {
-            "explainer": "integrated_gradients",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-            "n_steps": 50,
-            "baseline_mode": "mean",
-        }
-        assert config["explainer"] == "integrated_gradients"
-
-    def test_explainerconfigunion_accepts_shap_tree(self) -> None:
-        """ExplainerConfigUnion accepts ShapTreeExplainConfig."""
-        config: ExplainerConfigUnion = {
-            "explainer": "shap_tree",
-            "target_class": 1,
-            "n_samples": 100,
-            "random_state": 42,
-        }
-        assert config["explainer"] == "shap_tree"
-
-
 class TestRegressionExplainResult:
     """Tests for RegressionExplainResult TypedDict."""
 
@@ -309,7 +140,7 @@ class TestRegressionExplainResult:
         result: RegressionExplainResult = {
             "status": "complete",
             "backend": "xgboost_reg",
-            "explainer": "permutation",
+            "explainer": ExplainerName.PERMUTATION,
             "n_samples_used": 100,
             "n_features": 5,
             "feature_importances": [score],
@@ -317,7 +148,7 @@ class TestRegressionExplainResult:
         }
         assert result["status"] == "complete"
         assert result["backend"] == "xgboost_reg"
-        assert result["explainer"] == "permutation"
+        assert result["explainer"] is ExplainerName.PERMUTATION
         assert result["n_samples_used"] == 100
         assert result["n_features"] == 5
         assert len(result["feature_importances"]) == 1

@@ -619,7 +619,7 @@ class FoldRegressorTrainer(Protocol):
 | `ExplainerRegistry` | Registry of available explainers |
 | `ExplainerRegistration` | Registration entry with factory and metadata |
 | `FeatureImportanceScore` | TypedDict with name, importance, rank |
-| `SupportedExplainer` | Literal type of explainer names |
+| `ExplainerName` | platform_ml's StrEnum of explainer names, re-exported |
 | `ExplainerCapabilities` | TypedDict with requirements and cost |
 | `PermutationConfig` | Config for permutation explainer |
 | `GradientConfig` | Config for gradient explainer (covenant_nn) |

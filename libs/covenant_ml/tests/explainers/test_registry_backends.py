@@ -32,7 +32,7 @@ class TestPermutationExplainerFromRegistry:
     def test_permutation_explainer_computes_importance(self) -> None:
         """Permutation explainer computes feature importance scores."""
         registry = default_explainer_registry()
-        explainer = registry.get("permutation")
+        explainer = registry.get(ExplainerName.PERMUTATION)
 
         model = _FakePredictorWithGradients()
         predictor: PredictorProtocol = model
@@ -62,7 +62,7 @@ class TestGradientExplainerFromRegistry:
     def test_gradient_explainer_computes_importance(self) -> None:
         """Gradient explainer computes feature importance using gradients."""
         registry = default_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
 
         model = _FakePredictorWithGradients()
         predictor: PredictorProtocol = model
@@ -87,7 +87,7 @@ class TestGradientExplainerFromRegistry:
     def test_gradient_explainer_raises_without_gradients(self) -> None:
         """Gradient explainer raises for model without compute_gradients."""
         registry = default_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
 
         model = _FakePredictorNoGradients()
         predictor: PredictorProtocol = model
@@ -105,7 +105,7 @@ class TestGradientExplainerFromRegistry:
     def test_gradient_explainer_capabilities_requires_gradients(self) -> None:
         """Gradient explainer requires gradients."""
         registry = default_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
 
         caps = explainer.capabilities()
         assert caps["requires_gradients"] is True
@@ -113,7 +113,7 @@ class TestGradientExplainerFromRegistry:
     def test_gradient_explainer_capabilities_no_background_data(self) -> None:
         """Gradient explainer does not require background data."""
         registry = default_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
 
         caps = explainer.capabilities()
         assert caps["requires_background_data"] is False
@@ -121,7 +121,7 @@ class TestGradientExplainerFromRegistry:
     def test_gradient_explainer_capabilities_low_cost(self) -> None:
         """Gradient explainer has low computational cost."""
         registry = default_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
 
         caps = explainer.capabilities()
         assert caps["computational_cost"] is ComputationalCost.LOW
@@ -129,7 +129,7 @@ class TestGradientExplainerFromRegistry:
     def test_gradient_explainer_name(self) -> None:
         """Gradient explainer reports correct name."""
         registry = default_explainer_registry()
-        explainer = registry.get("gradient")
+        explainer = registry.get(ExplainerName.GRADIENT)
 
         name = explainer.explainer_name()
         assert name is ExplainerName.GRADIENT
@@ -141,7 +141,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
     def test_integrated_gradients_computes_importance(self) -> None:
         """Integrated gradients explainer computes feature importance."""
         registry = default_explainer_registry()
-        explainer = registry.get("integrated_gradients")
+        explainer = registry.get(ExplainerName.INTEGRATED_GRADIENTS)
 
         model = _FakePredictorWithGradients()
         predictor: PredictorProtocol = model
@@ -166,7 +166,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
     def test_integrated_gradients_raises_without_gradients(self) -> None:
         """Integrated gradients raises for model without compute_gradients."""
         registry = default_explainer_registry()
-        explainer = registry.get("integrated_gradients")
+        explainer = registry.get(ExplainerName.INTEGRATED_GRADIENTS)
 
         model = _FakePredictorNoGradients()
         predictor: PredictorProtocol = model
@@ -184,7 +184,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
     def test_integrated_gradients_capabilities_requires_gradients(self) -> None:
         """Integrated gradients requires gradients."""
         registry = default_explainer_registry()
-        explainer = registry.get("integrated_gradients")
+        explainer = registry.get(ExplainerName.INTEGRATED_GRADIENTS)
 
         caps = explainer.capabilities()
         assert caps["requires_gradients"] is True
@@ -192,7 +192,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
     def test_integrated_gradients_capabilities_high_cost(self) -> None:
         """Integrated gradients has high computational cost."""
         registry = default_explainer_registry()
-        explainer = registry.get("integrated_gradients")
+        explainer = registry.get(ExplainerName.INTEGRATED_GRADIENTS)
 
         caps = explainer.capabilities()
         assert caps["computational_cost"] is ComputationalCost.HIGH
@@ -200,7 +200,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
     def test_integrated_gradients_name(self) -> None:
         """Integrated gradients explainer reports correct name."""
         registry = default_explainer_registry()
-        explainer = registry.get("integrated_gradients")
+        explainer = registry.get(ExplainerName.INTEGRATED_GRADIENTS)
 
         name = explainer.explainer_name()
         assert name is ExplainerName.INTEGRATED_GRADIENTS
@@ -212,7 +212,7 @@ class TestShapTreeExplainerFromRegistry:
     def test_shap_tree_computes_importance(self) -> None:
         """SHAP tree explainer computes feature importance using SHAP."""
         registry = default_explainer_registry()
-        explainer = registry.get("shap_tree")
+        explainer = registry.get(ExplainerName.SHAP_TREE)
 
         predictor = _create_tree_predictor()
         x = np.random.randn(10, 4).astype(np.float64)
@@ -235,7 +235,7 @@ class TestShapTreeExplainerFromRegistry:
     def test_shap_tree_capabilities_no_gradients(self) -> None:
         """SHAP tree does not require gradients."""
         registry = default_explainer_registry()
-        explainer = registry.get("shap_tree")
+        explainer = registry.get(ExplainerName.SHAP_TREE)
 
         caps = explainer.capabilities()
         assert caps["requires_gradients"] is False
@@ -243,7 +243,7 @@ class TestShapTreeExplainerFromRegistry:
     def test_shap_tree_capabilities_medium_cost(self) -> None:
         """SHAP tree has medium computational cost."""
         registry = default_explainer_registry()
-        explainer = registry.get("shap_tree")
+        explainer = registry.get(ExplainerName.SHAP_TREE)
 
         caps = explainer.capabilities()
         assert caps["computational_cost"] is ComputationalCost.MEDIUM
@@ -251,7 +251,7 @@ class TestShapTreeExplainerFromRegistry:
     def test_shap_tree_explainer_name(self) -> None:
         """The explainer registered as shap_tree names itself SHAP_TREE."""
         registry = default_explainer_registry()
-        explainer = registry.get("shap_tree")
+        explainer = registry.get(ExplainerName.SHAP_TREE)
 
         assert explainer.explainer_name() is ExplainerName.SHAP_TREE
 
@@ -273,7 +273,7 @@ class TestNativeModelExtraction:
         without = [
             backend
             for backend in default_registry().list_backends()
-            if "shap_tree" not in registry.list_compatible_explainers(backend)
+            if ExplainerName.SHAP_TREE not in registry.list_compatible_explainers(backend)
         ]
 
         assert without == ["logreg"]

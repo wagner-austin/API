@@ -9,14 +9,14 @@ compatibility. Each explainer declares which backends it supports:
 - shap_tree: Tree models only (xgboost, lightgbm)
 
 Usage:
-    from covenant_ml.explainers import default_explainer_registry, ExplainResult
+    from covenant_ml.explainers import ExplainerName, default_explainer_registry
 
     # Get registry
     registry = default_explainer_registry()
 
     # Check compatibility
-    if registry.is_compatible("gradient", "mlp"):
-        explainer = registry.get("gradient")
+    if registry.is_compatible(ExplainerName.GRADIENT, "mlp"):
+        explainer = registry.get(ExplainerName.GRADIENT)
         importance = explainer.compute_importance(
             model=model,
             x_data=x_test,
@@ -26,7 +26,7 @@ Usage:
 
     # List compatible explainers for a backend
     compatible = registry.list_compatible_explainers("xgboost")
-    # Returns: ["permutation", "shap_tree"]
+    # Returns: [ExplainerName.PERMUTATION, ExplainerName.SHAP_TREE]
 """
 
 from __future__ import annotations
@@ -46,45 +46,31 @@ from .regression_registry import (
 from .types import (
     ComputationalCost,
     ExplainerCapabilities,
-    ExplainerConfigUnion,
     ExplainerName,
-    ExplainRequestConfig,
     ExplainResult,
     FeatureImportanceScore,
     GradientConfig,
-    GradientExplainConfig,
     IntegratedGradientsConfig,
-    IntegratedGradientsExplainConfig,
     PermutationConfig,
-    PermutationExplainConfig,
     RegressionExplainResult,
-    ShapTreeExplainConfig,
-    SupportedExplainer,
 )
 
 __all__ = [
     "ComputationalCost",
-    "ExplainRequestConfig",
     "ExplainResult",
     "ExplainerCapabilities",
-    "ExplainerConfigUnion",
     "ExplainerFactory",
     "ExplainerName",
     "ExplainerRegistration",
     "ExplainerRegistry",
     "FeatureImportanceScore",
     "GradientConfig",
-    "GradientExplainConfig",
     "IntegratedGradientsConfig",
-    "IntegratedGradientsExplainConfig",
     "PermutationConfig",
-    "PermutationExplainConfig",
     "RegressionExplainResult",
     "RegressionExplainerFactory",
     "RegressionExplainerRegistration",
     "RegressionExplainerRegistry",
-    "ShapTreeExplainConfig",
-    "SupportedExplainer",
     "default_explainer_registry",
     "default_regression_explainer_registry",
 ]

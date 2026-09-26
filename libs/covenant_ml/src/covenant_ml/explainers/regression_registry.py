@@ -32,7 +32,7 @@ from covenant_ml.explainers.regression_adapters import (
 )
 from covenant_ml.types_regression import RegressorBackendName
 
-from .types import SupportedExplainer
+from .types import ExplainerName
 
 # ---------------------------------------------------------------------------
 # Gradient model wrapper for regression
@@ -120,11 +120,11 @@ class RegressionExplainerRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._map: dict[SupportedExplainer, RegressionExplainerRegistration] = {}
+        self._map: dict[ExplainerName, RegressionExplainerRegistration] = {}
 
     def register(
         self,
-        name: SupportedExplainer,
+        name: ExplainerName,
         registration: RegressionExplainerRegistration,
     ) -> None:
         """Register a regression explainer.
@@ -135,19 +135,19 @@ class RegressionExplainerRegistry:
         """
         self._map[name] = registration
 
-    def list_explainers(self) -> list[SupportedExplainer]:
+    def list_explainers(self) -> list[ExplainerName]:
         """Return sorted list of registered explainer names.
 
         Returns:
             List of explainer names in alphabetical order.
         """
-        names: list[SupportedExplainer] = list(self._map.keys())
+        names: list[ExplainerName] = list(self._map.keys())
         return sorted(names)
 
     def list_compatible_explainers(
         self,
         backend: RegressorBackendName,
-    ) -> list[SupportedExplainer]:
+    ) -> list[ExplainerName]:
         """List explainers compatible with a given regressor backend.
 
         Args:
@@ -156,13 +156,13 @@ class RegressionExplainerRegistry:
         Returns:
             Sorted list of compatible explainer names.
         """
-        compatible: list[SupportedExplainer] = []
+        compatible: list[ExplainerName] = []
         for name, reg in self._map.items():
             if backend in reg.compatible_backends():
                 compatible.append(name)
         return sorted(compatible)
 
-    def get(self, name: SupportedExplainer) -> RegressionFeatureExplainer:
+    def get(self, name: ExplainerName) -> RegressionFeatureExplainer:
         """Create and return a regression explainer instance.
 
         Args:
@@ -179,7 +179,7 @@ class RegressionExplainerRegistry:
 
     def is_compatible(
         self,
-        explainer: SupportedExplainer,
+        explainer: ExplainerName,
         backend: RegressorBackendName,
     ) -> bool:
         """Check if explainer is compatible with a regressor backend.
@@ -250,7 +250,7 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
 
     # Permutation: works with all regressor backends (model-agnostic)
     reg.register(
-        "permutation",
+        ExplainerName.PERMUTATION,
         RegressionExplainerRegistration(
             factory=_create_regression_permutation_factory(),
             compatible_backends=frozenset(
@@ -267,7 +267,7 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
 
     # Gradient: only neural regressor backends
     reg.register(
-        "gradient",
+        ExplainerName.GRADIENT,
         RegressionExplainerRegistration(
             factory=_create_regression_gradient_factory(),
             compatible_backends=frozenset(["mlp_reg", "lstm_reg"]),
@@ -277,7 +277,7 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
 
     # Integrated Gradients: only neural regressor backends
     reg.register(
-        "integrated_gradients",
+        ExplainerName.INTEGRATED_GRADIENTS,
         RegressionExplainerRegistration(
             factory=_create_regression_integrated_gradients_factory(),
             compatible_backends=frozenset(["mlp_reg", "lstm_reg"]),
@@ -287,7 +287,7 @@ def default_regression_explainer_registry() -> RegressionExplainerRegistry:
 
     # SHAP Tree: tree-based regressor backends
     reg.register(
-        "shap_tree",
+        ExplainerName.SHAP_TREE,
         RegressionExplainerRegistration(
             factory=_create_regression_shap_tree_factory(),
             compatible_backends=frozenset(["xgboost_reg", "lightgbm_reg"]),
