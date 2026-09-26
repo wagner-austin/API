@@ -13,6 +13,7 @@ from covenant_ml.types_regression import (
     RegressorTrainConfig,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_ml.explainers.protocol import RegressionGradientModelProtocol
 
 from covenant_nn.backends.lstm.regressor import (
@@ -56,8 +57,8 @@ def _make_lstm_regressor_config(
 ) -> LSTMConfig:
     """Create LSTM config for regression testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": hidden_size,
         "num_layers": num_layers,
         "dropout": dropout,
@@ -295,8 +296,8 @@ def test_lstm_regressor_train_on_cuda(tmp_path: Path) -> None:
     x, y = _make_regression_data(120, n_features=8)
 
     config: LSTMConfig = {
-        "device": "cuda",
-        "precision": "fp16",
+        "device": RequestedDevice.CUDA,
+        "precision": RequestedPrecision.FP16,
         "hidden_size": 16,
         "num_layers": 1,
         "dropout": 0.0,

@@ -14,6 +14,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.lstm import create_lstm_backend
 
@@ -64,8 +65,8 @@ def _make_lstm_config(
 ) -> LSTMConfig:
     """Create LSTM config for testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": hidden_size,
         "num_layers": 1,
         "dropout": 0.0,
@@ -89,8 +90,8 @@ def test_lstm_backend_with_multiple_layers(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 16,
         "num_layers": 2,  # Multiple layers
         "dropout": 0.1,  # Dropout between layers
@@ -142,8 +143,8 @@ def test_lstm_backend_train_without_progress(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 32,
         "num_layers": 1,
         "dropout": 0.0,
@@ -188,8 +189,8 @@ def test_lstm_backend_train_zero_epochs_raises(tmp_path: Path) -> None:
     x, y, names = _make_synthetic_dataset(n_samples=40, n_features=8)
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 8,
         "num_layers": 1,
         "dropout": 0.0,
@@ -218,8 +219,8 @@ def test_lstm_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
     names = ["f" + str(i) for i in range(8)]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 8,
         "num_layers": 1,
         "dropout": 0.0,
@@ -272,8 +273,8 @@ def test_lstm_backend_train_on_cuda(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cuda",
-        "precision": "fp16",  # Mixed precision on CUDA
+        "device": RequestedDevice.CUDA,
+        "precision": RequestedPrecision.FP16,  # Mixed precision on CUDA
         "hidden_size": 32,
         "num_layers": 1,
         "dropout": 0.0,
@@ -328,8 +329,8 @@ def test_lstm_backend_different_sequence_lengths(tmp_path: Path) -> None:
 
     for seq_len in (2, 4, 8):
         config: LSTMConfig = {
-            "device": "cpu",
-            "precision": "fp32",
+            "device": RequestedDevice.CPU,
+            "precision": RequestedPrecision.FP32,
             "hidden_size": 16,
             "num_layers": 1,
             "dropout": 0.0,
@@ -391,8 +392,8 @@ def test_lstm_backend_triggers_early_stop_break(tmp_path: Path) -> None:
 
     # Config designed to improve then plateau early so patience triggers
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 8,  # Small capacity - will plateau
         "num_layers": 1,
         "dropout": 0.0,

@@ -12,7 +12,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Literal
 
 import numpy as np
 from covenant_ml.features import (
@@ -23,7 +22,8 @@ from covenant_ml.features import (
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.types import (
     LSTMConfig,
-    LSTMPrecision,
+    RequestedDevice,
+    RequestedPrecision,
     TrainProgress,
 )
 from numpy.typing import NDArray
@@ -49,8 +49,8 @@ class LSTMObjective:
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
-        precision: LSTMPrecision,
+        device: RequestedDevice,
+        precision: RequestedPrecision,
         feature_preset: FeaturePreset,
         n_epochs: int,
         early_stopping_patience: int,
@@ -205,8 +205,8 @@ def create_lstm_objective(
     x_features: NDArray[np.float64],
     y_labels: NDArray[np.int64],
     feature_names: list[str],
-    device: Literal["cpu", "cuda", "auto"],
-    precision: LSTMPrecision,
+    device: RequestedDevice,
+    precision: RequestedPrecision,
     feature_preset: FeaturePreset,
     n_epochs: int,
     early_stopping_patience: int,

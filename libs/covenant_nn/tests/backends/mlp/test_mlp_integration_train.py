@@ -15,6 +15,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
 
@@ -64,8 +65,8 @@ def _make_mlp_config(
 ) -> MLPConfig:
     """Create MLP config for testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": hidden_sizes,
         "learning_rate": 0.01,
@@ -87,8 +88,8 @@ def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
@@ -144,8 +145,8 @@ def test_mlp_backend_train_with_progress_callback(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (32, 16),
         "learning_rate": 0.001,
@@ -211,8 +212,8 @@ def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
     # Use very low patience (2) and high learning rate to force early stopping
     # The model will quickly plateau and trigger the early stop break
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (64, 32),
         "learning_rate": 0.1,  # High LR causes fast convergence then plateau
@@ -282,7 +283,7 @@ def test_mlp_backend_config_type_validation(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
     }

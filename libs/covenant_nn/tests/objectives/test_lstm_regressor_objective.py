@@ -11,6 +11,7 @@ import math
 import numpy as np
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.objectives import LSTMRegressorObjective, create_lstm_regressor_objective
 
@@ -46,8 +47,8 @@ def test_lstm_regressor_objective_returns_negative_rmse() -> None:
         x_features=x,
         y_targets=y,
         feature_names=names,
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         feature_preset="none",
         n_epochs=3,
         early_stopping_patience=2,
@@ -96,8 +97,8 @@ def test_lstm_regressor_objective_with_feature_engineering() -> None:
         x_features=x,
         y_targets=y,
         feature_names=names,
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         feature_preset="log_only",
         n_epochs=3,
         early_stopping_patience=2,
@@ -145,8 +146,8 @@ def test_lstm_regressor_objective_class_direct_instantiation() -> None:
         x_features=x,
         y_targets=y,
         feature_names=names,
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         feature_preset="none",
         n_epochs=2,
         early_stopping_patience=1,
@@ -194,8 +195,8 @@ def test_lstm_regressor_objective_with_bidirectional() -> None:
         x_features=x,
         y_targets=y,
         feature_names=names,
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         feature_preset="none",
         n_epochs=2,
         early_stopping_patience=1,
@@ -243,8 +244,8 @@ def test_lstm_regressor_objective_with_multiple_layers() -> None:
         x_features=x,
         y_targets=y,
         feature_names=names,
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         feature_preset="none",
         n_epochs=2,
         early_stopping_patience=1,

@@ -14,6 +14,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
 
@@ -63,8 +64,8 @@ def _make_mlp_config(
 ) -> MLPConfig:
     """Create MLP config for testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": hidden_sizes,
         "learning_rate": 0.01,
@@ -106,8 +107,8 @@ def test_mlp_backend_different_optimizers(tmp_path: Path) -> None:
         # SGD needs higher LR to converge in reasonable epochs
         lr = 0.01 if optimizer == "sgd" else 0.001
         config: MLPConfig = {
-            "device": "cpu",
-            "precision": "fp32",
+            "device": RequestedDevice.CPU,
+            "precision": RequestedPrecision.FP32,
             "optimizer": optimizer,
             "hidden_sizes": (64, 32),
             "learning_rate": lr,
@@ -158,8 +159,8 @@ def test_mlp_backend_with_dropout(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
@@ -216,8 +217,8 @@ def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
-        "device": "cuda",
-        "precision": "fp16",  # Mixed precision on CUDA
+        "device": RequestedDevice.CUDA,
+        "precision": RequestedPrecision.FP16,  # Mixed precision on CUDA
         "optimizer": "adamw",
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
@@ -274,8 +275,8 @@ def test_mlp_backend_train_without_progress(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
@@ -316,8 +317,8 @@ def test_mlp_backend_train_zero_epochs_raises(tmp_path: Path) -> None:
     x, y, names = _make_synthetic_dataset(n_samples=40, n_features=3)
 
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (4,),
         "learning_rate": 0.01,
@@ -344,8 +345,8 @@ def test_mlp_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
     names = ["f0", "f1", "f2"]
 
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (4,),
         "learning_rate": 0.01,

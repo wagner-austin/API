@@ -14,6 +14,7 @@ from covenant_ml.types_regression import (
     RegressorTrainConfig,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.lstm.regressor import (
     LSTM_REGRESSOR_CAPABILITIES,
@@ -58,8 +59,8 @@ def _make_lstm_regressor_config(
 ) -> LSTMConfig:
     """Create LSTM config for regression testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": hidden_size,
         "num_layers": num_layers,
         "dropout": dropout,
@@ -330,7 +331,7 @@ def test_lstm_regressor_train_rejects_non_lstm_config(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
     }

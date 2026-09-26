@@ -15,6 +15,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.lstm import create_lstm_backend
 
@@ -65,8 +66,8 @@ def _make_lstm_config(
 ) -> LSTMConfig:
     """Create LSTM config for testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": hidden_size,
         "num_layers": 1,
         "dropout": 0.0,
@@ -90,8 +91,8 @@ def test_lstm_backend_train_returns_outcome(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 32,
         "num_layers": 1,
         "dropout": 0.0,
@@ -149,8 +150,8 @@ def test_lstm_backend_train_with_progress_callback(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 16,
         "num_layers": 1,
         "dropout": 0.0,
@@ -216,8 +217,8 @@ def test_lstm_backend_train_early_stopping(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 32,
         "num_layers": 1,
         "dropout": 0.0,
@@ -287,7 +288,7 @@ def test_lstm_backend_config_type_validation(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
     }
@@ -363,8 +364,8 @@ def test_lstm_backend_with_bidirectional(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "hidden_size": 16,
         "num_layers": 1,
         "dropout": 0.0,

@@ -18,6 +18,7 @@ from covenant_ml.types_regression import (
     RegressorTrainConfig,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp.regressor import (
     MLP_REGRESSOR_CAPABILITIES,
@@ -60,8 +61,8 @@ def _make_mlp_regressor_config(
 ) -> MLPConfig:
     """Create MLP config for regression testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": optimizer,
         "hidden_sizes": hidden_sizes,
         "learning_rate": learning_rate,
@@ -338,7 +339,7 @@ def test_mlp_regressor_train_rejects_non_mlp_config(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
     }

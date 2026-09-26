@@ -16,6 +16,7 @@ from covenant_ml.types_regression import (
     RegressorTrainConfig,
 )
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 from platform_ml.explainers.protocol import RegressionGradientModelProtocol
 
 from covenant_nn.backends.mlp.regressor import (
@@ -57,8 +58,8 @@ def _make_mlp_regressor_config(
 ) -> MLPConfig:
     """Create MLP config for regression testing."""
     return {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": optimizer,
         "hidden_sizes": hidden_sizes,
         "learning_rate": learning_rate,
@@ -293,8 +294,8 @@ def test_mlp_regressor_train_on_cuda(tmp_path: Path) -> None:
     x, y = _make_regression_data(120, n_features=5)
 
     config: MLPConfig = {
-        "device": "cuda",
-        "precision": "fp16",
+        "device": RequestedDevice.CUDA,
+        "precision": RequestedPrecision.FP16,
         "optimizer": "adamw",
         "hidden_sizes": (8, 4),
         "learning_rate": 0.01,
