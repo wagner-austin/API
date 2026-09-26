@@ -26,6 +26,7 @@ from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.knowledge_floors import FORAGE_COVERAGE_TTL_MS, ttl_floor_ms
 from tankpit_bot.state.types import has_known_position
+from tankpit_bot.types.constants import TankLiveness
 
 FLEET_REPORT_FILENAME = "knowledge.json"
 """The report's file name inside each bot's run directory — a sibling
@@ -76,7 +77,7 @@ def _enemy_rows(ws: WorldService, own_team: int, now_ms: int) -> list[FleetEnemy
     """
     rows: list[FleetEnemySightingDict] = []
     for tank in ws.world_state["tanks"].values():
-        if tank["team"] == own_team or tank["liveness"] != "alive":
+        if tank["team"] == own_team or tank["liveness"] is not TankLiveness.ALIVE:
             continue
         if not has_known_position(tank):
             continue

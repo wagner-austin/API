@@ -31,6 +31,7 @@ from tankpit_bot.state.mine_mutations import merge_mine_sighting
 from tankpit_bot.state.scan_coverage import merge_scanned_coverage
 from tankpit_bot.state.tank_mutations import apply_tank_observation
 from tankpit_bot.state.types import make_tank_observation
+from tankpit_bot.types.constants import EntitySource
 
 FLEET_REPORT_TTL_MS = 10_000
 """Maximum age of a sibling report worth merging.
@@ -205,7 +206,7 @@ def _merge_enemy_sightings(
                 tank_id=sighting["tank_id"],
                 timestamp_ms=sighting["observed_ms"],
                 is_wire_sourced=False,
-                storage_source="world_state",
+                storage_source=EntitySource.WORLD_STATE,
                 fact_source="fleet_report",
                 position_is_authoritative=True,
                 position=(sighting["x"], sighting["y"]),
