@@ -119,19 +119,19 @@ def _resolve_device(requested: RequestedDevice, xgb_mod: _XGBModuleProto) -> Res
         RuntimeError: If 'cuda' explicitly requested but not available
 
     Example:
-        >>> resolved = _resolve_device('auto', xgb)
+        >>> resolved = _resolve_device(RequestedDevice.AUTO, xgb)
         >>> # resolved is 'cuda' on GPU systems, 'cpu' otherwise
         >>> model = xgb.XGBClassifier(device=resolved, ...)  # Valid!
     """
-    if requested == "cpu":
-        resolved: ResolvedDevice = "cpu"
-    elif requested == "cuda":
+    if requested is RequestedDevice.CPU:
+        resolved = ResolvedDevice.CPU
+    elif requested is RequestedDevice.CUDA:
         if not _cuda_is_available(xgb_mod):
             raise RuntimeError("CUDA requested but not available")
-        resolved = "cuda"
+        resolved = ResolvedDevice.CUDA
     else:
-        # requested == "auto": auto-detect based on CUDA availability
-        resolved = "cuda" if _cuda_is_available(xgb_mod) else "cpu"
+        # requested is AUTO: auto-detect based on CUDA availability
+        resolved = ResolvedDevice.CUDA if _cuda_is_available(xgb_mod) else ResolvedDevice.CPU
 
     # Log device resolution for visibility
     _log.info(

@@ -12,8 +12,8 @@ from typing import Literal, TypedDict
 # Device Types
 # =============================================================================
 
-# User-facing device request (common across all backends)
-DeviceRequest = Literal["cpu", "cuda", "auto"]
+# The user-facing device request is platform_ml's RequestedDevice, re-exported
+# by covenant_ml.types; only LightGBM's own device words are declared here.
 
 # LightGBM-specific device parameter
 # Note: "cuda" is Linux-only; "gpu" uses OpenCL and works on all platforms
@@ -372,7 +372,6 @@ __all__ = [
     "CategoricalIntSpec",
     "CategoricalStringSpec",
     "ClearGBMSearchSpace",
-    "DeviceRequest",
     "FloatRangeSpec",
     "IntRangeSpec",
     "LSTMSearchSpace",

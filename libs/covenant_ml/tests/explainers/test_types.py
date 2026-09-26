@@ -5,6 +5,9 @@ Covers all TypedDicts and type exports.
 
 from __future__ import annotations
 
+from platform_ml.explainers.types import ComputationalCost as PlatformComputationalCost
+from platform_ml.explainers.types import ExplainerName as PlatformExplainerName
+
 from covenant_ml.explainers.types import (
     ComputationalCost,
     ExplainerCapabilities,
@@ -186,24 +189,13 @@ class TestExplainResult:
 class TestReExports:
     """Tests for re-exported types from platform_ml."""
 
-    def test_computationalcost_literal_values(self) -> None:
-        """ComputationalCost literal includes expected values."""
-        # These are valid values per the type definition
-        low: ComputationalCost = "low"
-        medium: ComputationalCost = "medium"
-        high: ComputationalCost = "high"
-        assert low == "low"
-        assert medium == "medium"
-        assert high == "high"
+    def test_computational_cost_is_platform_mls_enum(self) -> None:
+        """The re-exported ComputationalCost is platform_ml's class, not a copy."""
+        assert ComputationalCost is PlatformComputationalCost
 
-    def test_explainername_literal_values(self) -> None:
-        """ExplainerName literal includes base explainer names."""
-        perm: ExplainerName = "permutation"
-        grad: ExplainerName = "gradient"
-        ig: ExplainerName = "integrated_gradients"
-        assert perm == "permutation"
-        assert grad == "gradient"
-        assert ig == "integrated_gradients"
+    def test_explainer_name_is_platform_mls_enum(self) -> None:
+        """The re-exported ExplainerName is platform_ml's class, not a copy."""
+        assert ExplainerName is PlatformExplainerName
 
     def test_featureimportancescore_structure(self) -> None:
         """FeatureImportanceScore has name, importance, rank fields."""
@@ -221,11 +213,11 @@ class TestReExports:
         caps: ExplainerCapabilities = {
             "requires_gradients": True,
             "requires_background_data": False,
-            "computational_cost": "medium",
+            "computational_cost": ComputationalCost.MEDIUM,
         }
         assert caps["requires_gradients"] is True
         assert caps["requires_background_data"] is False
-        assert caps["computational_cost"] == "medium"
+        assert caps["computational_cost"] is ComputationalCost.MEDIUM
 
     def test_permutationconfig_structure(self) -> None:
         """PermutationConfig has n_repeats and random_state."""

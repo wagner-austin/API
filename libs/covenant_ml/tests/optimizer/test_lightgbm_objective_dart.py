@@ -5,6 +5,8 @@ Uses real lightgbm library for integration testing. No mocks.
 
 from __future__ import annotations
 
+from platform_ml import RequestedDevice
+
 from covenant_ml.optimizer.objectives.lightgbm_objective import (
     LightGBMObjective,
 )
@@ -18,7 +20,7 @@ from tests.optimizer._lightgbm_objective_fixtures import (
 def test_lightgbm_objective_with_dart_boosting() -> None:
     """LightGBMObjective uses DART params when boosting_type is 'dart'."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(
@@ -52,7 +54,7 @@ def test_lightgbm_objective_with_dart_boosting() -> None:
 def test_lightgbm_objective_with_dart_partial_params() -> None:
     """LightGBMObjective handles partial DART params (only drop_rate, no skip_drop)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(
@@ -85,7 +87,7 @@ def test_lightgbm_objective_with_dart_partial_params() -> None:
 def test_lightgbm_objective_with_dart_skip_drop_only() -> None:
     """LightGBMObjective handles DART with only skip_drop (no drop_rate)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(
@@ -118,7 +120,7 @@ def test_lightgbm_objective_with_dart_skip_drop_only() -> None:
 def test_lightgbm_objective_with_dart_feature_fraction() -> None:
     """LightGBMObjective uses feature_fraction when boosting_type is 'dart' (Phase 6)."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(
@@ -153,7 +155,7 @@ def test_lightgbm_objective_with_dart_feature_fraction() -> None:
 def test_lightgbm_objective_with_dart_feature_fraction_only() -> None:
     """LightGBMObjective uses feature_fraction without other DART params."""
     x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMObjective(x, y, names, device=RequestedDevice.CPU, feature_preset="none")
 
     int_params = _make_default_int_params()
     float_params = SampledFloatParams(

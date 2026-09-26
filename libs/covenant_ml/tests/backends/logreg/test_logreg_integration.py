@@ -11,6 +11,7 @@ from typing import Literal
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.logreg import (
     LOGREG_CAPABILITIES,
@@ -161,8 +162,8 @@ def test_logreg_backend_config_type_validation(tmp_path: Path) -> None:
 
     # Try MLP config (wrong type)
     mlp_config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (32,),
         "learning_rate": 0.01,

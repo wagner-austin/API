@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 from platform_ml.explainers.protocol import PredictorProtocol
+from platform_ml.explainers.types import ComputationalCost, ExplainerName
 
 from covenant_ml.backends.registry import default_registry
 from covenant_ml.explainers.adapters import (
@@ -123,7 +124,7 @@ class TestGradientExplainerFromRegistry:
         explainer = registry.get("gradient")
 
         caps = explainer.capabilities()
-        assert caps["computational_cost"] == "low"
+        assert caps["computational_cost"] is ComputationalCost.LOW
 
     def test_gradient_explainer_name(self) -> None:
         """Gradient explainer reports correct name."""
@@ -131,7 +132,7 @@ class TestGradientExplainerFromRegistry:
         explainer = registry.get("gradient")
 
         name = explainer.explainer_name()
-        assert name == "gradient"
+        assert name is ExplainerName.GRADIENT
 
 
 class TestIntegratedGradientsExplainerFromRegistry:
@@ -194,7 +195,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
         explainer = registry.get("integrated_gradients")
 
         caps = explainer.capabilities()
-        assert caps["computational_cost"] == "high"
+        assert caps["computational_cost"] is ComputationalCost.HIGH
 
     def test_integrated_gradients_name(self) -> None:
         """Integrated gradients explainer reports correct name."""
@@ -202,7 +203,7 @@ class TestIntegratedGradientsExplainerFromRegistry:
         explainer = registry.get("integrated_gradients")
 
         name = explainer.explainer_name()
-        assert name == "integrated_gradients"
+        assert name is ExplainerName.INTEGRATED_GRADIENTS
 
 
 class TestShapTreeExplainerFromRegistry:
@@ -245,17 +246,14 @@ class TestShapTreeExplainerFromRegistry:
         explainer = registry.get("shap_tree")
 
         caps = explainer.capabilities()
-        assert caps["computational_cost"] == "medium"
+        assert caps["computational_cost"] is ComputationalCost.MEDIUM
 
     def test_shap_tree_explainer_name(self) -> None:
-        """SHAP tree explainer returns placeholder name."""
+        """The explainer registered as shap_tree names itself SHAP_TREE."""
         registry = default_explainer_registry()
         explainer = registry.get("shap_tree")
 
-        # Note: explainer_name returns "permutation" as placeholder
-        # since ExplainerName type doesn't include "shap_tree"
-        name = explainer.explainer_name()
-        assert name == "permutation"
+        assert explainer.explainer_name() is ExplainerName.SHAP_TREE
 
 
 class TestNativeModelExtraction:

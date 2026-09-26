@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.cleargbm import (
     CLEARGBM_CAPABILITIES,
@@ -40,7 +41,7 @@ def test_is_cleargbm_config_returns_true_for_cleargbm_config() -> None:
 def test_is_cleargbm_config_returns_false_for_xgboost_config() -> None:
     """_is_cleargbm_config returns False for TrainConfig (XGBoost)."""
     config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 3,
         "n_estimators": 5,
@@ -60,8 +61,8 @@ def test_is_cleargbm_config_returns_false_for_xgboost_config() -> None:
 def test_is_cleargbm_config_returns_false_for_mlp_config() -> None:
     """_is_cleargbm_config returns False for MLPConfig."""
     config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (32,),
         "learning_rate": 0.01,
@@ -81,7 +82,7 @@ def test_is_cleargbm_config_returns_false_for_missing_key() -> None:
     """_is_cleargbm_config returns False for config missing min_samples_split."""
     # XGBoost config lacks min_samples_split key used by ClearGBM
     xgb_config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 3,
         "n_estimators": 5,

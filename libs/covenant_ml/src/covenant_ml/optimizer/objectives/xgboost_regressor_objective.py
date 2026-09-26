@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import gc
 import math
-from typing import Literal, Protocol
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -32,6 +32,7 @@ from covenant_ml.metrics_regression import compute_rmse
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.preprocessing import AutoPreprocessor, PreprocessingState
 from covenant_ml.trainer import regression_split
+from covenant_ml.types import RequestedDevice
 
 _log = get_logger(__name__)
 
@@ -115,7 +116,7 @@ class XGBoostRegressorObjective:
         x_features: NDArray[np.float64],
         y_targets: NDArray[np.float64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
+        device: RequestedDevice,
         feature_preset: FeaturePreset,
     ) -> None:
         """Initialize with pre-split and preprocessed data.
@@ -171,7 +172,11 @@ class XGBoostRegressorObjective:
         x_val_processed = preprocessor.transform(raw_splits.x_val, state)
 
         # Resolve device once
-        self._device = ("cuda" if _cuda_available() else "cpu") if device == "auto" else device
+        self._device = (
+            ("cuda" if _cuda_available() else "cpu")
+            if device is RequestedDevice.AUTO
+            else device.value
+        )
 
         # Pre-create DMatrix objects with preprocessed data
         dmatrix_cls, train_fn = _get_xgb_dmatrix_and_train()
@@ -311,7 +316,7 @@ def create_xgboost_regressor_objective(
     x_features: NDArray[np.float64],
     y_targets: NDArray[np.float64],
     feature_names: list[str],
-    device: Literal["cpu", "cuda", "auto"],
+    device: RequestedDevice,
     feature_preset: FeaturePreset,
 ) -> XGBoostRegressorObjective:
     """Create an objective function for XGBoost regression optimization.

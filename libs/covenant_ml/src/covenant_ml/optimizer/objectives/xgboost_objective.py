@@ -10,7 +10,7 @@ Strict typing only: no Any, no casts, no stubs.
 from __future__ import annotations
 
 import gc
-from typing import Literal, Protocol
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -24,6 +24,7 @@ from covenant_ml.features import (
 from covenant_ml.metrics import compute_auc
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.trainer import preprocess_data_splits, stratified_split
+from covenant_ml.types import RequestedDevice
 
 _log = get_logger(__name__)
 
@@ -106,7 +107,7 @@ class XGBoostObjective:
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
+        device: RequestedDevice,
         feature_preset: FeaturePreset,
     ) -> None:
         """Initialize with pre-split data and pre-created DMatrix objects.
@@ -156,7 +157,11 @@ class XGBoostObjective:
         self._splits = preprocess_data_splits(raw_splits)
 
         # Resolve device once
-        self._device = ("cuda" if _cuda_available() else "cpu") if device == "auto" else device
+        self._device = (
+            ("cuda" if _cuda_available() else "cpu")
+            if device is RequestedDevice.AUTO
+            else device.value
+        )
 
         # Calculate scale_pos_weight from training data (once)
         n_pos = int(np.sum(self._splits.y_train))
@@ -277,7 +282,7 @@ def create_xgboost_objective(
     x_features: NDArray[np.float64],
     y_labels: NDArray[np.int64],
     feature_names: list[str],
-    device: Literal["cpu", "cuda", "auto"],
+    device: RequestedDevice,
     feature_preset: FeaturePreset,
 ) -> XGBoostObjective:
     """Create an objective function for XGBoost optimization.

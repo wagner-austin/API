@@ -10,9 +10,7 @@ from typing import Literal, NotRequired, Protocol, TypedDict
 import numpy as np
 from cleargbm.types import GrowthStrategy
 from numpy.typing import NDArray
-
-RequestedDevice = Literal["cpu", "cuda", "auto"]
-ResolvedDevice = Literal["cpu", "cuda"]
+from platform_ml import RequestedDevice, RequestedPrecision, ResolvedDevice
 
 # Pluggable backend naming - all supported classifier backends
 BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm", "logreg", "random_forest"]
@@ -244,8 +242,6 @@ class DMatrixFactory(Protocol):
 # MLPConfig, LSTMConfig, LightGBMConfig: identical for classification and regression.
 
 
-MLPPrecision = Literal["fp32", "fp16", "bf16", "auto"]
-
 MLPOptimizer = Literal["adamw", "adam", "sgd"]
 
 
@@ -257,7 +253,7 @@ class MLPConfig(TypedDict, total=True):
     """
 
     device: RequestedDevice
-    precision: MLPPrecision
+    precision: RequestedPrecision
     optimizer: MLPOptimizer
     hidden_sizes: tuple[int, ...]
     learning_rate: float
@@ -269,9 +265,6 @@ class MLPConfig(TypedDict, total=True):
     test_ratio: float
     random_state: int
     early_stopping_patience: int
-
-
-LSTMPrecision = Literal["fp32", "fp16", "bf16", "auto"]
 
 
 class LSTMConfig(TypedDict, total=True):
@@ -289,7 +282,7 @@ class LSTMConfig(TypedDict, total=True):
     """
 
     device: RequestedDevice
-    precision: LSTMPrecision
+    precision: RequestedPrecision
     hidden_size: int  # LSTM hidden state dimension
     num_layers: int  # Number of stacked LSTM layers
     dropout: float  # Dropout between LSTM layers (only if num_layers > 1)
@@ -547,17 +540,18 @@ __all__ = [
     "FeatureImportance",
     "GrowthStrategy",
     "LSTMConfig",
-    "LSTMPrecision",
     "LightGBMConfig",
     "LogRegConfig",
     "LogRegPenalty",
     "LogRegSolver",
     "MLPConfig",
     "MLPOptimizer",
-    "MLPPrecision",
     "PredictorProtocol",
     "Proba2DProtocol",
     "RandomForestConfig",
+    "RequestedDevice",
+    "RequestedPrecision",
+    "ResolvedDevice",
     "TrainConfig",
     "TrainConfigRequired",
     "TrainOutcome",

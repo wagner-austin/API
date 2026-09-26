@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice
 from platform_ml.explainers import FeatureExplainer
 
 from covenant_ml.backends.protocol import PreparedClassifier
@@ -85,7 +86,7 @@ def _create_tree_predictor() -> XGBModelProtocol:
             "test_ratio": 0.1,
             "random_state": 42,
             "early_stopping_rounds": 3,
-            "device": "cpu",
+            "device": RequestedDevice.CPU,
             "reg_alpha": 0.0,
             "reg_lambda": 1.0,
         }

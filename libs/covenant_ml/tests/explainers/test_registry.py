@@ -7,7 +7,7 @@ Uses real backend implementations - no mocks.
 from __future__ import annotations
 
 import pytest
-from platform_ml.explainers import FeatureExplainer
+from platform_ml.explainers import ExplainerName, FeatureExplainer
 
 from covenant_ml.backends.registry import default_registry
 from covenant_ml.explainers.registry import (
@@ -38,7 +38,7 @@ class TestExplainerRegistration:
         explainer = returned_factory()
         # Verify explainer works by calling its method
         name = explainer.explainer_name()
-        assert name == "permutation"
+        assert name is ExplainerName.PERMUTATION
 
     def test_registration_stores_compatible_backends(self) -> None:
         """ExplainerRegistration stores and returns compatible backends."""
@@ -207,7 +207,7 @@ class TestExplainerRegistry:
         assert call_count == 1
         # Verify it's a working explainer
         name = result.explainer_name()
-        assert name == "permutation"
+        assert name is ExplainerName.PERMUTATION
 
         # Second get creates new instance
         _ = registry.get("permutation")

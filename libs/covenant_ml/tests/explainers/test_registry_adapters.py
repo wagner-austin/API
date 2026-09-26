@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 from platform_ml.explainers.protocol import PredictorProtocol
+from platform_ml.explainers.types import ComputationalCost, ExplainerName
 
 from covenant_ml.explainers.adapters import (
     _GradientAdapter,
@@ -193,7 +194,7 @@ class TestIntegratedGradientsAdapterConfigurations:
         """IntegratedGradientsAdapter returns correct explainer name."""
         adapter = _IntegratedGradientsAdapter(n_steps=10, baseline_mode="zeros")
         name = adapter.explainer_name()
-        assert name == "integrated_gradients"
+        assert name is ExplainerName.INTEGRATED_GRADIENTS
 
     def test_integrated_gradients_adapter_capabilities(self) -> None:
         """IntegratedGradientsAdapter returns correct capabilities."""
@@ -202,7 +203,7 @@ class TestIntegratedGradientsAdapterConfigurations:
 
         assert caps["requires_gradients"] is True
         assert caps["requires_background_data"] is False
-        assert caps["computational_cost"] == "high"
+        assert caps["computational_cost"] is ComputationalCost.HIGH
 
 
 class TestGradientAdapterMetadata:
@@ -212,7 +213,7 @@ class TestGradientAdapterMetadata:
         """GradientAdapter returns correct explainer name."""
         adapter = _GradientAdapter(multiply_by_input=True, absolute_value=True)
         name = adapter.explainer_name()
-        assert name == "gradient"
+        assert name is ExplainerName.GRADIENT
 
     def test_gradient_adapter_capabilities(self) -> None:
         """GradientAdapter returns correct capabilities."""
@@ -221,18 +222,16 @@ class TestGradientAdapterMetadata:
 
         assert caps["requires_gradients"] is True
         assert caps["requires_background_data"] is False
-        assert caps["computational_cost"] == "low"
+        assert caps["computational_cost"] is ComputationalCost.LOW
 
 
 class TestShapTreeAdapterDirect:
     """Direct tests for _ShapTreeAdapter class."""
 
     def test_shap_tree_adapter_explainer_name(self) -> None:
-        """ShapTreeAdapter returns placeholder explainer name."""
+        """ShapTreeAdapter names itself SHAP_TREE, the key it is registered under."""
         adapter = _ShapTreeAdapter()
-        name = adapter.explainer_name()
-        # Returns "permutation" as placeholder since ExplainerName doesn't include shap_tree
-        assert name == "permutation"
+        assert adapter.explainer_name() is ExplainerName.SHAP_TREE
 
     def test_shap_tree_adapter_capabilities(self) -> None:
         """ShapTreeAdapter returns correct capabilities."""
@@ -241,7 +240,7 @@ class TestShapTreeAdapterDirect:
 
         assert caps["requires_gradients"] is False
         assert caps["requires_background_data"] is False
-        assert caps["computational_cost"] == "medium"
+        assert caps["computational_cost"] is ComputationalCost.MEDIUM
 
     def test_shap_tree_adapter_computes_importance(self) -> None:
         """ShapTreeAdapter computes feature importance correctly."""

@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, ResolvedDevice
 
 from covenant_ml import save_model, train_model
 from covenant_ml.testing import make_train_config, reset_cuda_hook, set_cuda_hook
@@ -57,15 +58,15 @@ def test_train_model_sets_cpu_parallel_params() -> None:
 def test_resolve_device_prefers_cuda_when_supported() -> None:
     """_resolve_device chooses cuda when xgboost reports support."""
     fake_module: _XGBModuleProto = _FakeXGBModule(True)
-    resolved = _resolve_device("auto", fake_module)
-    assert resolved == "cuda"
+    resolved = _resolve_device(RequestedDevice.AUTO, fake_module)
+    assert resolved is ResolvedDevice.CUDA
 
 
 def test_resolve_device_rejects_cuda_when_unsupported() -> None:
     """_resolve_device raises if cuda requested without support."""
     fake_module: _XGBModuleProto = _FakeXGBModule(False)
     with pytest.raises(RuntimeError, match="CUDA requested"):
-        _resolve_device("cuda", fake_module)
+        _resolve_device(RequestedDevice.CUDA, fake_module)
 
 
 def test_cuda_hook_forces_cpu_when_disabled() -> None:
@@ -73,8 +74,8 @@ def test_cuda_hook_forces_cpu_when_disabled() -> None:
     fake_module: _XGBModuleProto = _FakeXGBModule(True)
     set_cuda_hook(lambda: False)
     try:
-        resolved = _resolve_device("auto", fake_module)
-        assert resolved == "cpu"
+        resolved = _resolve_device(RequestedDevice.AUTO, fake_module)
+        assert resolved is ResolvedDevice.CPU
     finally:
         reset_cuda_hook()
 
@@ -84,8 +85,8 @@ def test_cuda_hook_allows_cuda_request_when_supported() -> None:
     fake_module: _XGBModuleProto = _FakeXGBModule(True)
     set_cuda_hook(lambda: True)
     try:
-        resolved = _resolve_device("cuda", fake_module)
-        assert resolved == "cuda"
+        resolved = _resolve_device(RequestedDevice.CUDA, fake_module)
+        assert resolved is ResolvedDevice.CUDA
     finally:
         reset_cuda_hook()
 

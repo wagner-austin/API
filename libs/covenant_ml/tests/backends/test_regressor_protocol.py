@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice
 
 from covenant_ml.backends.protocol import BackendCapabilities
 from covenant_ml.backends.regressor_protocol import (
@@ -229,7 +230,7 @@ def test_regressor_backend_train() -> None:
     """RegressorBackend.train returns RegressionTrainOutcome with valid metrics."""
     backend: RegressorBackend = _FakeRegressorBackend()
     config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 3,
         "n_estimators": 10,
@@ -272,7 +273,7 @@ def test_regressor_backend_train_with_progress() -> None:
     """RegressorBackend.train calls progress callback with valid data."""
     backend: RegressorBackend = _FakeRegressorBackend()
     config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 3,
         "n_estimators": 10,

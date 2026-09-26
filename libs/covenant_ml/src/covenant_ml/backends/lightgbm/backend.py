@@ -28,6 +28,7 @@ from ...types import (
     EvalMetrics,
     FeatureImportance,
     LightGBMConfig,
+    RequestedDevice,
     TrainOutcome,
     TrainProgress,
 )
@@ -176,7 +177,7 @@ def _get_lightgbm_imports() -> tuple[_LGBMClassifierCtor, _EarlyStoppingCallback
     return classifier_ctor, early_stopping
 
 
-def _resolve_device(requested: str, *, platform: str | None = None) -> str:
+def _resolve_device(requested: RequestedDevice, *, platform: str | None = None) -> str:
     """Resolve device preference for LightGBM.
 
     LightGBM has three device modes:
@@ -198,15 +199,15 @@ def _resolve_device(requested: str, *, platform: str | None = None) -> str:
 
     actual_platform = platform if platform is not None else sys.platform
 
-    if requested == "auto":
+    if requested is RequestedDevice.AUTO:
         return "cpu"
-    if requested == "cuda" and actual_platform == "win32":
+    if requested is RequestedDevice.CUDA and actual_platform == "win32":
         _log.info(
             "LightGBM CUDA not supported on Windows, using OpenCL GPU instead",
             extra={"requested_device": requested, "resolved_device": "gpu"},
         )
         return "gpu"
-    if requested == "cuda":
+    if requested is RequestedDevice.CUDA:
         return "cuda"
     return "cpu"
 

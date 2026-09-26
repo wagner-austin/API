@@ -9,6 +9,7 @@ import math
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice
 
 from covenant_ml.optimizer.objectives.lightgbm_regressor_objective import (
     LightGBMRegressorObjective,
@@ -114,25 +115,25 @@ def test_get_lgb_dataset_and_train_returns_valid_types() -> None:
 
 def test_resolve_device_auto() -> None:
     """'auto' resolves to 'cpu'."""
-    result = _resolve_lightgbm_device("auto")
+    result = _resolve_lightgbm_device(RequestedDevice.AUTO)
     assert result == "cpu"
 
 
 def test_resolve_device_cpu() -> None:
     """'cpu' resolves to 'cpu'."""
-    result = _resolve_lightgbm_device("cpu")
+    result = _resolve_lightgbm_device(RequestedDevice.CPU)
     assert result == "cpu"
 
 
 def test_resolve_device_cuda_on_linux() -> None:
     """'cuda' stays 'cuda' on non-Windows."""
-    result = _resolve_lightgbm_device("cuda", platform="linux")
+    result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="linux")
     assert result == "cuda"
 
 
 def test_resolve_device_cuda_on_windows() -> None:
     """'cuda' resolves to 'gpu' (OpenCL) on Windows."""
-    result = _resolve_lightgbm_device("cuda", platform="win32")
+    result = _resolve_lightgbm_device(RequestedDevice.CUDA, platform="win32")
     assert result == "gpu"
 
 
@@ -144,7 +145,9 @@ def test_resolve_device_cuda_on_windows() -> None:
 def test_init_stores_feature_count() -> None:
     """Stores correct feature count."""
     x, y, names = _make_regression_data(n_samples=50, n_features=5)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
     assert objective.n_features == 5
 
 
@@ -153,7 +156,7 @@ def test_init_with_feature_engineering_log_only() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=5)
     x_positive = _make_positive_data(x, 1.0)
     objective = LightGBMRegressorObjective(
-        x_positive, y, names, device="cpu", feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
     )
     assert objective.n_features > 5
 
@@ -163,7 +166,7 @@ def test_init_with_feature_engineering_full() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)
     objective = LightGBMRegressorObjective(
-        x_positive, y, names, device="cpu", feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
     )
     assert objective.n_features > 4
 
@@ -171,7 +174,9 @@ def test_init_with_feature_engineering_full() -> None:
 def test_init_with_auto_device() -> None:
     """Resolves 'auto' device."""
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
-    objective = LightGBMRegressorObjective(x, y, names, device="auto", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.AUTO, feature_preset="none"
+    )
     assert objective.n_features == 4
 
 
@@ -179,7 +184,7 @@ def test_init_with_custom_early_stopping() -> None:
     """Accepts custom early_stopping_rounds."""
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     objective = LightGBMRegressorObjective(
-        x, y, names, device="cpu", feature_preset="none", early_stopping_rounds=20
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none", early_stopping_rounds=20
     )
     assert objective.n_features == 4
 
@@ -192,7 +197,9 @@ def test_init_with_custom_early_stopping() -> None:
 def test_call_returns_negative_rmse() -> None:
     """__call__ returns negative RMSE."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
 
     result = objective(
         x_features=x,
@@ -214,7 +221,9 @@ def test_call_returns_negative_rmse() -> None:
 def test_call_ignores_passed_data() -> None:
     """Uses pre-split data, not passed arguments."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5, seed=42)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
 
     x_other, _, names_other = _make_regression_data(n_samples=50, n_features=3, seed=99)
 
@@ -237,7 +246,9 @@ def test_call_ignores_passed_data() -> None:
 def test_call_deterministic() -> None:
     """Multiple calls with same params return same result."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
@@ -279,7 +290,7 @@ def test_create_returns_objective() -> None:
     """create_lightgbm_regressor_objective returns callable with n_features."""
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     objective = create_lightgbm_regressor_objective(
-        x, y, names, device="cpu", feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
     )
     assert objective.n_features == 4
     assert callable(objective)
@@ -290,7 +301,7 @@ def test_create_with_feature_preset() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)
     objective = create_lightgbm_regressor_objective(
-        x_positive, y, names, device="cpu", feature_preset="full"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="full"
     )
     assert objective.n_features > 4
 
@@ -299,7 +310,7 @@ def test_create_callable() -> None:
     """Factory-created objective is callable and returns neg RMSE."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
     objective = create_lightgbm_regressor_objective(
-        x, y, names, device="cpu", feature_preset="none"
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
     )
 
     result = objective(
@@ -325,7 +336,7 @@ def test_create_with_custom_options() -> None:
         x,
         y,
         names,
-        device="cpu",
+        device=RequestedDevice.CPU,
         feature_preset="none",
         early_stopping_rounds=20,
         n_jobs=1,
@@ -341,7 +352,9 @@ def test_create_with_custom_options() -> None:
 def test_with_dart_boosting() -> None:
     """Works with DART boosting type."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
 
     float_params = SampledFloatParams(
         learning_rate=0.1,
@@ -374,7 +387,9 @@ def test_with_dart_boosting() -> None:
 def test_with_dart_partial_params() -> None:
     """Works with DART and partial params (only drop_rate)."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
 
     float_params = SampledFloatParams(
         learning_rate=0.1,
@@ -405,7 +420,9 @@ def test_with_dart_partial_params() -> None:
 def test_with_dart_skip_drop_only() -> None:
     """Works with DART and only skip_drop (no drop_rate)."""
     x, y, names = _make_regression_data(n_samples=100, n_features=5)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
 
     float_params = SampledFloatParams(
         learning_rate=0.1,
@@ -441,7 +458,9 @@ def test_with_dart_skip_drop_only() -> None:
 def test_n_features_matches_original() -> None:
     """n_features matches input when no engineering applied."""
     x, y, names = _make_regression_data(n_samples=50, n_features=7)
-    objective = LightGBMRegressorObjective(x, y, names, device="cpu", feature_preset="none")
+    objective = LightGBMRegressorObjective(
+        x, y, names, device=RequestedDevice.CPU, feature_preset="none"
+    )
     assert objective.n_features == 7
 
 
@@ -450,6 +469,6 @@ def test_n_features_reflects_engineering() -> None:
     x, y, names = _make_regression_data(n_samples=50, n_features=4)
     x_positive = _make_positive_data(x, 0.1)
     objective = LightGBMRegressorObjective(
-        x_positive, y, names, device="cpu", feature_preset="log_only"
+        x_positive, y, names, device=RequestedDevice.CPU, feature_preset="log_only"
     )
     assert objective.n_features > 4

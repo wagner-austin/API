@@ -15,6 +15,7 @@ from platform_ml.explainers.protocol import (
     RegressionFeatureExplainer,
     RegressorPredictorProtocol,
 )
+from platform_ml.explainers.types import ComputationalCost, ExplainerName
 
 from covenant_ml.explainers.regression_adapters import (
     _RegressionGradientAdapter,
@@ -162,14 +163,14 @@ class TestRegressionGradientAdapter:
     def test_explainer_name(self) -> None:
         """Returns 'gradient'."""
         adapter = _RegressionGradientAdapter(multiply_by_input=True, absolute_value=True)
-        assert adapter.explainer_name() == "gradient"
+        assert adapter.explainer_name() is ExplainerName.GRADIENT
 
     def test_capabilities(self) -> None:
         """Capabilities require gradients."""
         adapter = _RegressionGradientAdapter(multiply_by_input=True, absolute_value=True)
         caps = adapter.capabilities()
         assert caps["requires_gradients"] is True
-        assert caps["computational_cost"] == "low"
+        assert caps["computational_cost"] is ComputationalCost.LOW
 
     def test_compute_importance(self) -> None:
         """Gradient adapter produces ranked importance scores."""
@@ -217,14 +218,14 @@ class TestRegressionIntegratedGradientsAdapter:
     def test_explainer_name(self) -> None:
         """Returns 'integrated_gradients'."""
         adapter = _RegressionIntegratedGradientsAdapter(n_steps=10, baseline_mode="zeros")
-        assert adapter.explainer_name() == "integrated_gradients"
+        assert adapter.explainer_name() is ExplainerName.INTEGRATED_GRADIENTS
 
     def test_capabilities(self) -> None:
         """Capabilities require gradients, high cost."""
         adapter = _RegressionIntegratedGradientsAdapter(n_steps=10, baseline_mode="zeros")
         caps = adapter.capabilities()
         assert caps["requires_gradients"] is True
-        assert caps["computational_cost"] == "high"
+        assert caps["computational_cost"] is ComputationalCost.HIGH
 
     def test_compute_importance_zeros_baseline(self) -> None:
         """IG with zeros baseline produces importance scores."""
@@ -342,7 +343,7 @@ class TestRegressionExplainerRegistry:
         """Get creates a new explainer instance."""
         registry = default_regression_explainer_registry()
         explainer = registry.get("permutation")
-        assert explainer.explainer_name() == "permutation"
+        assert explainer.explainer_name() is ExplainerName.PERMUTATION
 
     def test_get_unknown_raises(self) -> None:
         """Get raises KeyError for unknown explainer."""
@@ -394,13 +395,13 @@ class TestDefaultRegressionExplainerRegistry:
         """Get gradient creates a RegressionGradientAdapter instance."""
         registry = default_regression_explainer_registry()
         explainer = registry.get("gradient")
-        assert explainer.explainer_name() == "gradient"
+        assert explainer.explainer_name() is ExplainerName.GRADIENT
 
     def test_get_integrated_gradients_creates_instance(self) -> None:
         """Get integrated_gradients creates the right adapter."""
         registry = default_regression_explainer_registry()
         explainer = registry.get("integrated_gradients")
-        assert explainer.explainer_name() == "integrated_gradients"
+        assert explainer.explainer_name() is ExplainerName.INTEGRATED_GRADIENTS
 
     def test_get_shap_tree_creates_instance(self) -> None:
         """Get shap_tree creates a RegressionShapTreeAdapter instance."""
@@ -418,7 +419,7 @@ class TestRegressionShapTreeAdapter:
         from covenant_ml.explainers.regression_adapters import _RegressionShapTreeAdapter
 
         adapter = _RegressionShapTreeAdapter()
-        assert adapter.explainer_name() == "shap_tree"
+        assert adapter.explainer_name() is ExplainerName.SHAP_TREE
 
     def test_capabilities(self) -> None:
         """Capabilities do not require gradients."""
@@ -427,7 +428,7 @@ class TestRegressionShapTreeAdapter:
         adapter = _RegressionShapTreeAdapter()
         caps = adapter.capabilities()
         assert caps["requires_gradients"] is False
-        assert caps["computational_cost"] == "medium"
+        assert caps["computational_cost"] is ComputationalCost.MEDIUM
 
     def test_compute_importance_with_raw_xgboost(self) -> None:
         """SHAP tree adapter works with a raw XGBRegressor."""

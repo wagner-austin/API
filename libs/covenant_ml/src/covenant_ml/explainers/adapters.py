@@ -15,6 +15,7 @@ from platform_ml.explainers import (
 from platform_ml.explainers.protocol import PredictorProtocol
 from platform_ml.explainers.ranking import rank_importances
 from platform_ml.explainers.types import (
+    ComputationalCost,
     ExplainerCapabilities,
     ExplainerName,
     FeatureImportanceScore,
@@ -128,14 +129,14 @@ class _GradientAdapter:
 
     def explainer_name(self) -> ExplainerName:
         """Return explainer name."""
-        return "gradient"
+        return ExplainerName.GRADIENT
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
         return {
             "requires_gradients": True,
             "requires_background_data": False,
-            "computational_cost": "low",
+            "computational_cost": ComputationalCost.LOW,
         }
 
     def compute_importance(
@@ -198,14 +199,14 @@ class _IntegratedGradientsAdapter:
 
     def explainer_name(self) -> ExplainerName:
         """Return explainer name."""
-        return "integrated_gradients"
+        return ExplainerName.INTEGRATED_GRADIENTS
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
         return {
             "requires_gradients": True,
             "requires_background_data": False,
-            "computational_cost": "high",
+            "computational_cost": ComputationalCost.HIGH,
         }
 
     def compute_importance(
@@ -286,15 +287,14 @@ class _ShapTreeAdapter:
 
     def explainer_name(self) -> ExplainerName:
         """Return explainer name."""
-        # Note: ExplainerName doesn't include "shap_tree", so we return closest match
-        return "permutation"  # Placeholder - actual name tracked in registry
+        return ExplainerName.SHAP_TREE
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
         return {
             "requires_gradients": False,
             "requires_background_data": False,
-            "computational_cost": "medium",
+            "computational_cost": ComputationalCost.MEDIUM,
         }
 
     def compute_importance(

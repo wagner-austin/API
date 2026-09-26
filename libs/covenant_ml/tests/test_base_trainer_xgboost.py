@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice
 
 from covenant_ml.backends.registry import default_registry
 from covenant_ml.base_trainer import BaseTabularTrainer
@@ -54,7 +55,7 @@ def test_base_trainer_with_xgboost(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
         "scale_pos_weight": 2.0,
@@ -109,7 +110,7 @@ def test_base_trainer_xgboost_with_progress_callback(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
         "scale_pos_weight": 2.0,

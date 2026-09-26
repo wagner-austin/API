@@ -11,6 +11,7 @@ from platform_ml.explainers.protocol import (
 )
 from platform_ml.explainers.ranking import rank_importances
 from platform_ml.explainers.types import (
+    ComputationalCost,
     ExplainerCapabilities,
     ExplainerName,
     FeatureImportanceScore,
@@ -72,14 +73,14 @@ class _RegressionGradientAdapter:
 
     def explainer_name(self) -> ExplainerName:
         """Return explainer name."""
-        return "gradient"
+        return ExplainerName.GRADIENT
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
         return {
             "requires_gradients": True,
             "requires_background_data": False,
-            "computational_cost": "low",
+            "computational_cost": ComputationalCost.LOW,
         }
 
     def compute_importance(
@@ -133,14 +134,14 @@ class _RegressionIntegratedGradientsAdapter:
 
     def explainer_name(self) -> ExplainerName:
         """Return explainer name."""
-        return "integrated_gradients"
+        return ExplainerName.INTEGRATED_GRADIENTS
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
         return {
             "requires_gradients": True,
             "requires_background_data": False,
-            "computational_cost": "high",
+            "computational_cost": ComputationalCost.HIGH,
         }
 
     def compute_importance(
@@ -265,14 +266,14 @@ class _RegressionShapTreeAdapter:
 
     def explainer_name(self) -> ExplainerName:
         """Return explainer name."""
-        return "shap_tree"
+        return ExplainerName.SHAP_TREE
 
     def capabilities(self) -> ExplainerCapabilities:
         """Return capabilities."""
         return {
             "requires_gradients": False,
             "requires_background_data": False,
-            "computational_cost": "medium",
+            "computational_cost": ComputationalCost.MEDIUM,
         }
 
     def compute_importance(

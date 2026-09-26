@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.lightgbm.regressor import (
     LIGHTGBM_REGRESSOR_CAPABILITIES,
@@ -60,7 +61,7 @@ def _make_lightgbm_regressor_config(
 ) -> LightGBMConfig:
     """Create LightGBM config for regression testing."""
     return {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": max_depth,
         "n_estimators": n_estimators,
@@ -264,8 +265,8 @@ def test_lightgbm_regressor_train_rejects_non_lightgbm_config(tmp_path: Path) ->
     backend = LightGBMRegressorBackend()
     x, y = _make_regression_data(40, n_features=2)
     mlp_config = MLPConfig(
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         optimizer="adamw",
         hidden_sizes=(32, 16),
         learning_rate=0.001,
@@ -346,7 +347,7 @@ def test_lightgbm_regressor_train_with_device_auto(tmp_path: Path) -> None:
     x, y = _make_regression_data(80, n_features=3)
 
     config = _make_lightgbm_regressor_config(n_estimators=10)
-    config["device"] = "auto"
+    config["device"] = RequestedDevice.AUTO
 
     outcome = _invoke_lightgbm_regressor_train(
         backend,

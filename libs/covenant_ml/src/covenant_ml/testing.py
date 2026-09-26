@@ -8,12 +8,11 @@ from covenant_ml.types import (
     LightGBMConfig,
     LogRegConfig,
     LSTMConfig,
-    LSTMPrecision,
     MLPConfig,
     MLPOptimizer,
-    MLPPrecision,
     RandomForestConfig,
     RequestedDevice,
+    RequestedPrecision,
     TrainConfig,
 )
 
@@ -38,7 +37,7 @@ def reset_cuda_hook() -> None:
 
 def make_train_config(
     *,
-    device: Literal["cpu", "cuda", "auto"] = "cpu",
+    device: RequestedDevice = RequestedDevice.CPU,
     learning_rate: float = 0.1,
     max_depth: int = 3,
     n_estimators: int = 10,
@@ -176,7 +175,7 @@ def make_random_forest_config(
 
 def make_xgboost_regressor_config(
     *,
-    device: RequestedDevice = "cpu",
+    device: RequestedDevice = RequestedDevice.CPU,
     learning_rate: float = 0.1,
     max_depth: int = 3,
     n_estimators: int = 10,
@@ -232,7 +231,7 @@ def make_xgboost_regressor_config(
 
 def make_lightgbm_regressor_config(
     *,
-    device: RequestedDevice = "cpu",
+    device: RequestedDevice = RequestedDevice.CPU,
     learning_rate: float = 0.1,
     max_depth: int = -1,
     n_estimators: int = 10,
@@ -291,8 +290,8 @@ def make_lightgbm_regressor_config(
 
 def make_mlp_regressor_config(
     *,
-    device: RequestedDevice = "cpu",
-    precision: MLPPrecision = "fp32",
+    device: RequestedDevice = RequestedDevice.CPU,
+    precision: RequestedPrecision = RequestedPrecision.FP32,
     optimizer: MLPOptimizer = "adamw",
     hidden_sizes: tuple[int, ...] = (32, 16),
     learning_rate: float = 0.001,
@@ -344,8 +343,8 @@ def make_mlp_regressor_config(
 
 def make_lstm_regressor_config(
     *,
-    device: RequestedDevice = "cpu",
-    precision: LSTMPrecision = "fp32",
+    device: RequestedDevice = RequestedDevice.CPU,
+    precision: RequestedPrecision = RequestedPrecision.FP32,
     hidden_size: int = 32,
     num_layers: int = 1,
     dropout: float = 0.0,

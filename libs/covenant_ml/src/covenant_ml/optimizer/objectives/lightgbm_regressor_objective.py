@@ -29,7 +29,6 @@ from covenant_ml.features import (
 )
 from covenant_ml.metrics_regression import compute_rmse
 from covenant_ml.optimizer.types import (
-    DeviceRequest,
     LightGBMDevice,
     SampledFloatParams,
     SampledIntParams,
@@ -37,6 +36,7 @@ from covenant_ml.optimizer.types import (
 )
 from covenant_ml.preprocessing import AutoPreprocessor, PreprocessingState
 from covenant_ml.trainer import regression_split
+from covenant_ml.types import RequestedDevice
 
 _log = get_logger(__name__)
 
@@ -113,7 +113,7 @@ def _get_lgb_dataset_and_train() -> tuple[
 
 
 def _resolve_lightgbm_device(
-    device: DeviceRequest,
+    device: RequestedDevice,
     *,
     platform: str | None = None,
 ) -> LightGBMDevice:
@@ -130,15 +130,15 @@ def _resolve_lightgbm_device(
 
     actual_platform = platform if platform is not None else sys.platform
 
-    if device == "auto":
+    if device is RequestedDevice.AUTO:
         return "cpu"
-    if device == "cuda" and actual_platform == "win32":
+    if device is RequestedDevice.CUDA and actual_platform == "win32":
         _log.info(
             "LightGBM CUDA not supported on Windows, using OpenCL GPU instead",
             extra={"requested_device": device, "resolved_device": "gpu"},
         )
         return "gpu"
-    if device == "cuda":
+    if device is RequestedDevice.CUDA:
         return "cuda"
     return "cpu"
 
@@ -160,7 +160,7 @@ class LightGBMRegressorObjective:
         x_features: NDArray[np.float64],
         y_targets: NDArray[np.float64],
         feature_names: list[str],
-        device: DeviceRequest,
+        device: RequestedDevice,
         feature_preset: FeaturePreset,
         early_stopping_rounds: int = 10,
         n_jobs: int = -1,
@@ -368,7 +368,7 @@ def create_lightgbm_regressor_objective(
     x_features: NDArray[np.float64],
     y_targets: NDArray[np.float64],
     feature_names: list[str],
-    device: DeviceRequest,
+    device: RequestedDevice,
     feature_preset: FeaturePreset,
     early_stopping_rounds: int = 10,
     n_jobs: int = -1,

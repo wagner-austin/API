@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 from platform_core.json_utils import load_json_str, narrow_json_to_dict, narrow_json_to_str
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.cleargbm.regressor import (
     CLEARGBM_REGRESSOR_CAPABILITIES,
@@ -159,8 +160,8 @@ def test_cleargbm_regressor_train_rejects_non_cleargbm_config() -> None:
     backend = ClearGBMRegressorBackend()
     x, y = _make_regression_data(40, n_features=2)
     mlp_config = MLPConfig(
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         optimizer="adamw",
         hidden_sizes=(32, 16),
         learning_rate=0.001,

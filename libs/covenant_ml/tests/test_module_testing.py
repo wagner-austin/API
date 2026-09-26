@@ -5,6 +5,8 @@ Tests the public testing utility functions.
 
 from __future__ import annotations
 
+from platform_ml import RequestedDevice
+
 from covenant_ml.testing import (
     make_lightgbm_regressor_config,
     make_logreg_config,
@@ -30,7 +32,7 @@ def test_make_train_config_defaults() -> None:
 def test_make_train_config_custom_values() -> None:
     """make_train_config accepts custom values."""
     config = make_train_config(
-        device="cuda",
+        device=RequestedDevice.CUDA,
         learning_rate=0.05,
         max_depth=5,
         n_estimators=20,
@@ -162,7 +164,7 @@ def test_make_xgboost_regressor_config_defaults() -> None:
 def test_make_xgboost_regressor_config_custom() -> None:
     """make_xgboost_regressor_config accepts custom values."""
     config = make_xgboost_regressor_config(
-        device="cuda",
+        device=RequestedDevice.CUDA,
         learning_rate=0.05,
         max_depth=5,
         n_estimators=50,

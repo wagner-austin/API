@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.lightgbm import LIGHTGBM_CAPABILITIES, create_lightgbm_backend
 from covenant_ml.backends.lightgbm.backend import _resolve_device
@@ -69,7 +70,7 @@ def _make_lightgbm_config(
 ) -> LightGBMConfig:
     """Create LightGBM config for testing."""
     return {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": max_depth,
         "n_estimators": n_estimators,
@@ -94,7 +95,7 @@ def test_lightgbm_backend_train_returns_outcome(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LightGBMConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 4,
         "n_estimators": 20,
@@ -161,8 +162,8 @@ def test_lightgbm_backend_config_type_validation(tmp_path: Path) -> None:
 
     # Try MLP config (wrong type)
     mlp_config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (32,),
         "learning_rate": 0.01,
@@ -298,7 +299,7 @@ def test_lightgbm_backend_with_device_auto(tmp_path: Path) -> None:
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=10)
-    config["device"] = "auto"  # Should resolve to "cpu"
+    config["device"] = RequestedDevice.AUTO  # Should resolve to "cpu"
 
     outcome = _invoke_lightgbm_train(backend, x, y, names, config, tmp_path)
 
@@ -461,38 +462,32 @@ def test_lightgbm_backend_different_depths(tmp_path: Path) -> None:
 
 def test_resolve_device_auto_returns_cpu() -> None:
     """_resolve_device returns 'cpu' for 'auto' device."""
-    result = _resolve_device("auto")
+    result = _resolve_device(RequestedDevice.AUTO)
     assert result == "cpu"
 
 
 def test_resolve_device_cpu_returns_cpu() -> None:
     """_resolve_device returns 'cpu' for 'cpu' device."""
-    result = _resolve_device("cpu")
+    result = _resolve_device(RequestedDevice.CPU)
     assert result == "cpu"
 
 
 def test_resolve_device_cuda_on_windows_returns_gpu() -> None:
     """_resolve_device returns 'gpu' for 'cuda' on Windows platform."""
-    result = _resolve_device("cuda", platform="win32")
+    result = _resolve_device(RequestedDevice.CUDA, platform="win32")
     assert result == "gpu"
 
 
 def test_resolve_device_cuda_on_linux_returns_cuda() -> None:
     """_resolve_device returns 'cuda' for 'cuda' on Linux platform."""
-    result = _resolve_device("cuda", platform="linux")
+    result = _resolve_device(RequestedDevice.CUDA, platform="linux")
     assert result == "cuda"
 
 
 def test_resolve_device_cuda_on_darwin_returns_cuda() -> None:
     """_resolve_device returns 'cuda' for 'cuda' on macOS platform."""
-    result = _resolve_device("cuda", platform="darwin")
+    result = _resolve_device(RequestedDevice.CUDA, platform="darwin")
     assert result == "cuda"
-
-
-def test_resolve_device_unknown_returns_cpu() -> None:
-    """_resolve_device returns 'cpu' for unknown device string."""
-    result = _resolve_device("unknown")
-    assert result == "cpu"
 
 
 def test_lightgbm_prepared_exposes_the_native_booster(tmp_path: Path) -> None:

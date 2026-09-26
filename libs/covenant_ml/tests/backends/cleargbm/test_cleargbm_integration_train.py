@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     narrow_json_to_float,
 )
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.cleargbm import (
     create_cleargbm_backend,
@@ -114,7 +115,7 @@ def test_cleargbm_backend_config_type_validation(tmp_path: Path) -> None:
 
     # Try XGBoost config (wrong type)
     xgb_config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 3,
         "n_estimators": 5,
@@ -139,8 +140,8 @@ def test_cleargbm_backend_train_with_mlp_config_raises(tmp_path: Path) -> None:
     x, y, names = _make_synthetic_dataset()
 
     mlp_config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (32,),
         "learning_rate": 0.01,

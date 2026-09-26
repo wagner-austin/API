@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.backends.xgboost import create_xgboost_backend
@@ -73,7 +74,7 @@ def test_xgboost_backend_train(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
         "scale_pos_weight": 2.0,
@@ -121,7 +122,7 @@ def test_xgboost_backend_train_generates_feature_names(tmp_path: Path) -> None:
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 2,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 1.0,
         "reg_lambda": 5.0,
         "scale_pos_weight": 2.0,
@@ -155,8 +156,8 @@ def test_xgboost_backend_config_type_validation(tmp_path: Path) -> None:
     x, y, names = _make_binary_dataset()
 
     mlp_config: MLPConfig = {
-        "device": "cpu",
-        "precision": "fp32",
+        "device": RequestedDevice.CPU,
+        "precision": RequestedPrecision.FP32,
         "optimizer": "adamw",
         "hidden_sizes": (64, 32),
         "learning_rate": 0.001,
@@ -196,7 +197,7 @@ def _train_for_reload(backend: ClassifierBackend, tmp_path: Path) -> TrainOutcom
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 5,
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "reg_alpha": 0.0,
         "reg_lambda": 1.0,
     }

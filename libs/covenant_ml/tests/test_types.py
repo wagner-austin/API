@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice
 
 from covenant_ml import TrainConfig
 from covenant_ml.types import (
@@ -29,7 +30,7 @@ from covenant_ml.types_regression import (
 def test_train_config_has_required_keys() -> None:
     """TrainConfig TypedDict has all required keys."""
     config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 6,
         "n_estimators": 100,
@@ -62,7 +63,7 @@ def test_train_config_has_required_keys() -> None:
 def test_train_config_values_are_correct_types() -> None:
     """TrainConfig values have correct types at runtime."""
     config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.05,
         "max_depth": 4,
         "n_estimators": 50,
@@ -213,7 +214,7 @@ def _fake_loader() -> XGBModelProtocol:
 def test_protocols_are_callable() -> None:
     """Ensure Protocol signatures are runtime-callable for coverage."""
     train_req: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 3,
         "n_estimators": 5,
@@ -386,7 +387,7 @@ def test_regression_train_progress_without_val() -> None:
 def test_regression_train_outcome_with_xgboost_config() -> None:
     """RegressionTrainOutcome accepts TrainConfig (XGBoost regressor)."""
     config: TrainConfig = {
-        "device": "cpu",
+        "device": RequestedDevice.CPU,
         "learning_rate": 0.1,
         "max_depth": 6,
         "n_estimators": 100,

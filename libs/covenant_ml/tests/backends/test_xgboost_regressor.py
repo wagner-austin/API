@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_ml.backends.regressor_protocol import RegressorBackend
 from covenant_ml.backends.regressor_registry import default_regressor_registry
@@ -188,8 +189,8 @@ def test_xgboost_regressor_train_rejects_non_train_config() -> None:
     backend = XGBoostRegressorBackend()
     x, y = _make_regression_data(40, n_features=2)
     mlp_config = MLPConfig(
-        device="cpu",
-        precision="fp32",
+        device=RequestedDevice.CPU,
+        precision=RequestedPrecision.FP32,
         optimizer="adamw",
         hidden_sizes=(32, 16),
         learning_rate=0.001,
