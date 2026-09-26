@@ -167,6 +167,35 @@ class TestLinuxScript:
     def test_the_ci_clean_payload_keeps_venvs_of_unknown_provenance(self) -> None:
         assert "unknown provenance: keep" in runner_render.CI_CLEAN_SCRIPT
 
+    def test_the_ci_clean_payload_prunes_docker_before_the_worker_gate(self) -> None:
+        # The order IS the fix: a prune behind the gate never runs on a host
+        # whose eight runners are never all idle, and that host is lavender.
+        script = runner_render.CI_CLEAN_SCRIPT
+        gate = script.index("pgrep -f 'Runner.Worker'")
+        for command in (
+            "docker container prune -f --filter until=24h",
+            "docker volume prune -f",
+            "docker image prune -f",
+        ):
+            assert script.index(command) < gate, command
+
+    def test_the_ci_clean_payload_never_prunes_named_volumes_or_tagged_images(
+        self,
+    ) -> None:
+        # --all widens volume prune to named volumes and image prune to every
+        # unused tagged image, the pull cache each job would pay back.
+        docker_lines = [
+            line
+            for line in runner_render.CI_CLEAN_SCRIPT.splitlines()
+            if line.startswith("docker ")
+        ]
+        assert len(docker_lines) == 3
+        assert [line for line in docker_lines if "--all" in line or " -a" in line] == []
+
+    def test_the_ci_clean_timer_fires_daily(self) -> None:
+        assert "OnCalendar=*-*-* 04:00" in runner_render.CI_CLEAN_TIMER
+        assert "Persistent=true" in runner_render.CI_CLEAN_TIMER
+
 
 class TestManualSteps:
     """What no script may do."""

@@ -37,19 +37,38 @@ from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 #: a one-line change reviewed like any other.
 RUNNER_VERSION = "2.337.0"
 
-#: The weekly hygiene script, installed to /usr/local/bin/ci-clean.
+#: The daily hygiene script, installed to /usr/local/bin/ci-clean.
+#:
+#: DOCKER FIRST, AND UNGATED. The Actions runner removes a job's service
+#: containers but never their anonymous volumes, and by 2026-09-25 lavender
+#: held 8,571 of them, 536 GB, which filled its disk and remounted every
+#: runner's root read-only (board task 9e5c7a17). The workflows now mount a
+#: tmpfs over each declared volume; this is the backstop for whatever image or
+#: job leaks next. It runs ahead of the Runner.Worker gate because Docker
+#: counts its own references -- nothing a running container holds is pruned --
+#: and because a gated pass skips whenever any one of a host's runners is busy,
+#: and lavender has eight.
 #:
 #: WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
-#: exists (they are per-package-per-runner working state, not duplicates), and
-#: everything under any _work tree (in-project venvs persist there by design).
-#: WHAT IT PRUNES: venvs whose recorded source paths are all gone, poetry
-#: wheel artifacts untouched for 60+ days, tmp download fragments a killed job
-#: left behind, and the pip cache. It refuses to run while a Runner.Worker is
-#: executing -- a venv mid-use must never race a delete.
+#: exists (they are per-package-per-runner working state, not duplicates),
+#: everything under any _work tree (in-project venvs persist there by design),
+#: named docker volumes, and every tagged image, which is the pull cache.
+#: WHAT IT PRUNES: containers stopped for a day, anonymous volumes no container
+#: references, dangling images, venvs whose recorded source paths are all
+#: gone, poetry wheel artifacts untouched for 60+ days, tmp download fragments
+#: a killed job left behind, and the pip cache. The poetry half refuses to run
+#: while a Runner.Worker is executing -- a venv mid-use must never race a
+#: delete.
 CI_CLEAN_SCRIPT = """#!/usr/bin/env bash
-# ci-clean: weekly hygiene for a CI runner host. Rendered from
+# ci-clean: daily hygiene for a CI runner host. Rendered from
 # fleet.core.runner_render -- edit THERE, never here.
 set -euo pipefail
+
+# Docker, ungated: it never prunes what a running container references.
+# `volume prune` takes anonymous volumes only; named ones need --all.
+docker container prune -f --filter until=24h
+docker volume prune -f
+docker image prune -f
 
 if pgrep -f 'Runner.Worker' >/dev/null 2>&1; then
     echo "ci-clean: a runner job is executing; skipping this pass."
@@ -100,7 +119,7 @@ echo "ci-clean: reclaimed $((reclaimed_kb / 1024))MB this pass."
 
 #: systemd unit for the hygiene pass.
 CI_CLEAN_SERVICE = """[Unit]
-Description=CI runner host hygiene (poetry orphans, stale artifacts, pip cache)
+Description=CI runner host hygiene (docker leftovers, poetry orphans, stale artifacts, pip cache)
 
 [Service]
 Type=oneshot
@@ -108,12 +127,13 @@ User=gharunner
 ExecStart=/usr/local/bin/ci-clean
 """
 
-#: systemd timer for the hygiene pass.
+#: systemd timer for the hygiene pass: daily, because a week of a leak
+#: bounded only by the disk is what filled lavender.
 CI_CLEAN_TIMER = """[Unit]
-Description=Weekly CI hygiene pass
+Description=Daily CI hygiene pass
 
 [Timer]
-OnCalendar=Sun 04:00
+OnCalendar=*-*-* 04:00
 Persistent=true
 
 [Install]
@@ -389,7 +409,7 @@ def _render_linux_script(spec: HostRunnerSpec) -> str:
         "id gharunner >/dev/null 2>&1 || useradd -m gharunner",
         "command -v pipx >/dev/null 2>&1 || { apt-get update && apt-get install -y pipx; }",
         "",
-        "# --- hygiene: ci-clean script, service and weekly timer ---",
+        "# --- hygiene: ci-clean script, service and daily timer ---",
         "cat > /usr/local/bin/ci-clean <<'CI_CLEAN_EOF'",
         CI_CLEAN_SCRIPT.rstrip("\n"),
         "CI_CLEAN_EOF",
