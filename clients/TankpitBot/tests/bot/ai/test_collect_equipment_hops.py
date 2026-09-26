@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -151,7 +152,7 @@ def test_hop_toward_equipment_declines_when_every_slot_at_rank_cap() -> None:
     ai_state = AIStateDict(
         **{
             **base_ai_state,
-            "config": {**base_ai_state["config"], "role": "gatherer"},
+            "config": {**base_ai_state["config"], "role": FleetRole.GATHERER},
         }
     )
     ctx = DecideCtx(

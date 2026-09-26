@@ -16,6 +16,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state.types import make_container_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -42,8 +43,8 @@ class TestDesyncRescan:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
             }
         )
@@ -78,8 +79,8 @@ class TestDesyncRescan:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
             }
         )
@@ -151,8 +152,8 @@ class TestRadarSpendEconomics:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
             }
         )
@@ -309,8 +310,8 @@ class TestDisplacedLandingScanEconomics:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(landing_scan_viewport=""),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "suppress_landing_scan": True,
                 "resource_target_kind": "fuel",
@@ -359,8 +360,8 @@ class TestMineRevealScan:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
             }
         )

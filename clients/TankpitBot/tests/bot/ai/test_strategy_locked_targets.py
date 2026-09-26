@@ -13,6 +13,7 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._strategy_fixtures import (
     _c,
     _make_inventory,
@@ -37,8 +38,8 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 105,
@@ -72,8 +73,8 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 105,
@@ -125,8 +126,8 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 105,
@@ -161,8 +162,8 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 200,
@@ -203,8 +204,8 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 105,

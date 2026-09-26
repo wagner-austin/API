@@ -14,6 +14,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -41,8 +42,8 @@ def test_collect_mode_continues_locked_fuel_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 105,
@@ -93,8 +94,8 @@ def test_collect_mode_preserves_combat_lock_across_recovery() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 120,
@@ -148,8 +149,8 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -178,8 +179,8 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport=""),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -204,8 +205,8 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport=""),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -242,8 +243,8 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             # Map open 4 s ago: inside the re-open cooldown (5 s), so
             # a re-open teaches nothing -- and already answered (stamp
@@ -362,8 +363,8 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -399,8 +400,8 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -436,8 +437,8 @@ def test_collect_takes_visible_equipment_before_search_hop() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -475,8 +476,8 @@ def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )

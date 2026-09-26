@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.types_codecs import (
     encode_ai_config,
     encode_ai_state,
 )
+from tankpit_bot.types.modes import AIMode
 
 
 class TestAIStateDetail:
@@ -66,7 +67,7 @@ class TestAIStateDetail:
         from tankpit_bot.bot.ai.types import AIStateDict
 
         original = make_initial_ai_state()
-        state = AIStateDict(**{**original, "manual_mode": "HUNT"})
+        state = AIStateDict(**{**original, "manual_mode": AIMode.HUNT})
         encoded = encode_ai_state(state)
         decoded = decode_ai_state(encoded)
         assert decoded["manual_mode"] == "HUNT"
@@ -77,7 +78,7 @@ class TestAIStateDetail:
         from tankpit_bot.bot.ai.types import AIStateDict
 
         original = make_initial_ai_state()
-        state = AIStateDict(**{**original, "manual_mode": "COLLECT"})
+        state = AIStateDict(**{**original, "manual_mode": AIMode.COLLECT})
         encoded = encode_ai_state(state)
         decoded = decode_ai_state(encoded)
         assert decoded["manual_mode"] == "COLLECT"
@@ -87,7 +88,7 @@ class TestAIStateDetail:
         from tankpit_bot.bot.ai.types import AIStateDict
 
         original = make_initial_ai_state()
-        state = AIStateDict(**{**original, "manual_mode": "UNSET"})
+        state = AIStateDict(**{**original, "manual_mode": AIMode.UNSET})
         encoded = encode_ai_state(state)
         decoded = decode_ai_state(encoded)
         assert decoded["manual_mode"] == "UNSET"
@@ -214,11 +215,11 @@ class TestAIStateDetail:
         assert decoded["manual_mode"] is None
 
     def test_decode_invalid_manual_mode_raises(self) -> None:
-        """An unknown ``manual_mode`` string surfaces as ValueError."""
+        """An unknown ``manual_mode`` string surfaces as JSONTypeError naming it."""
         original = make_initial_ai_state()
         encoded = encode_ai_state(original)
         encoded["manual_mode"] = "PATROL"
-        with pytest.raises(ValueError, match="manual_mode must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid manual_mode 'PATROL'"):
             decode_ai_state(encoded)
 
     def test_decode_non_string_manual_mode_raises(self) -> None:

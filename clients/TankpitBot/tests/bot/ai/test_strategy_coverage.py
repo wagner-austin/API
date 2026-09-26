@@ -12,10 +12,12 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.combat_feedback import CombatFeedback
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._strategy_fixtures import (
     _c,
     _make_inventory,
@@ -44,8 +46,8 @@ class TestRadarForEquipment:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
                 "last_landing_scan_viewport": "",
             }
@@ -90,8 +92,8 @@ class TestExplorationSkipsTeleportLowFuel:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )
@@ -187,8 +189,8 @@ class TestHuntOnlyWhenFull:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "APPROACH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.APPROACH,
                 "mode_started_ms": 90000,
                 "resource_target_kind": "fuel",
                 "resource_target_x": 105,
@@ -244,7 +246,7 @@ class TestGathererRouting:
 
         base = _scanned_ai_state()
         return AIStateDict(
-            **{**base, "config": AIConfigDict(**{**base["config"], "role": "gatherer"})}
+            **{**base, "config": AIConfigDict(**{**base["config"], "role": FleetRole.GATHERER})}
         )
 
     def test_full_stock_gatherer_never_hunts_the_adjacent_enemy(self) -> None:

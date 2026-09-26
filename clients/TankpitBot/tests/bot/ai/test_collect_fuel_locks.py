@@ -13,6 +13,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, make_container_state, make_mine_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -53,8 +54,8 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 160,
@@ -104,8 +105,8 @@ def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 105,
@@ -168,8 +169,8 @@ def test_locked_fuel_holds_when_water_locked() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 120,
@@ -277,8 +278,8 @@ def test_unservable_water_locked_fuel_releases_the_lock() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 120,
@@ -340,8 +341,8 @@ def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 130,
@@ -403,8 +404,8 @@ def test_mine_denied_locked_fuel_holds_while_the_clearance_shot_exists() -> None
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 104,
@@ -455,8 +456,8 @@ def test_out_of_window_locked_fuel_holds_so_the_hop_can_fire() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 130,
@@ -514,8 +515,8 @@ def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -562,8 +563,8 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
             "resource_target_x": 105,

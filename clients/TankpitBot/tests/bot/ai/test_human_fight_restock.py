@@ -15,7 +15,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
-from tankpit_bot.types.modes import AIMode
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import make_enemy_tank, make_scanned_ai_state, make_world
 
 
@@ -36,7 +36,7 @@ def _locked_ctx(
     target_name: str = "Yuppler",
     target_present: bool = True,
     wind_down: bool = False,
-    mode: AIMode = "COLLECT",
+    mode: AIMode = AIMode.COLLECT,
 ) -> DecideCtx:
     ws = WorldService()
     tanks: dict[str, TankStateDict] = {}
@@ -47,7 +47,7 @@ def _locked_ctx(
         **{
             **make_scanned_ai_state(),
             "mode": mode,
-            "mode_state": "",
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -180,7 +180,7 @@ def test_owner_selection_hands_the_tick_back_to_hunt_at_the_partial_bar() -> Non
     ctx = _locked_ctx(
         fuel=750,
         inventory=_inventory(duals=15, homings=15, radars=10),
-        mode="COLLECT",
+        mode=AIMode.COLLECT,
     )
 
     assert _select_owner_mode(ctx) == "HUNT"

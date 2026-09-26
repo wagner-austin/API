@@ -13,6 +13,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_pickup_fuel_command, make_teleport_command
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.modes import AIMode, AIModeState
 
 
 def _locked_state(*, attacker_x: int = 100, attacker_y: int = 100) -> AIStateDict:
@@ -149,8 +150,8 @@ def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
             "combat_target_id": 50,
@@ -219,8 +220,8 @@ class TestEscapePlanContinuity:
         ai_state = AIStateDict(
             **{
                 **set_resource_target(make_scanned_ai_state(), "equipment", 100, 100),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
                 "suppress_landing_scan": False,
             }
@@ -277,8 +278,8 @@ class TestEscapePlanContinuity:
         ai_state = AIStateDict(
             **{
                 **set_resource_target(make_scanned_ai_state(), "fuel", 101, 100),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
                 "suppress_landing_scan": False,
             }
@@ -347,8 +348,8 @@ class TestEscapePlanContinuity:
         ai_state = AIStateDict(
             **{
                 **set_resource_target(make_scanned_ai_state(), "equipment", 106, 100),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
                 "suppress_landing_scan": False,
             }
@@ -425,8 +426,8 @@ class TestMovementDeadEscape:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )
@@ -481,8 +482,8 @@ class TestMovementDeadEscape:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )

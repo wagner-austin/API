@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, make_container_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -33,8 +34,8 @@ def test_hunt_mode_owns_tick_without_running_recovery_chain() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
         }
     )
@@ -64,8 +65,8 @@ def test_hunt_mode_switches_to_recover_fuel_when_recovery_takes_priority() -> No
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
         }
     )
@@ -87,8 +88,8 @@ def test_invalid_mode_state_is_ignored_and_reselected() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -119,8 +120,8 @@ def test_invalid_mode_state_reselects_recover_fuel_when_low_fuel_demands_it() ->
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -141,8 +142,8 @@ def test_invalid_mode_state_reselects_recover_equipment_when_reserves_are_broken
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -172,8 +173,8 @@ def test_invalid_mode_state_with_locked_combat_target_migrates_into_hunt() -> No
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 120,
@@ -215,8 +216,8 @@ def test_hunt_mode_switches_to_recover_equipment_when_reserves_break() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
         }
     )
@@ -281,8 +282,8 @@ def test_collect_mode_owns_tick_below_full_threshold() -> None:
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
             "last_landing_scan_viewport": "92,92",
@@ -306,8 +307,8 @@ def test_collect_mode_switches_to_hunt_after_full_recovery() -> None:
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
         }
@@ -339,8 +340,8 @@ def test_collect_mode_owns_tick_below_resume_threshold() -> None:
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
             "last_landing_scan_viewport": "92,92",
@@ -372,8 +373,8 @@ def test_collect_mode_switches_to_hunt_after_full_restock() -> None:
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
         }

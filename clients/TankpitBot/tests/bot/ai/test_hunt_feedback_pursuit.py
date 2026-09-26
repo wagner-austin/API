@@ -10,6 +10,7 @@ from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -92,8 +93,8 @@ class TestDepartedTargetFollowUp:
         chase_state = AIStateDict(
             **{
                 **chase["updated_ai_state"],
-                "mode": "HUNT",
-                "mode_state": "ACQUIRE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ACQUIRE,
                 "mode_started_ms": 100000,
                 "last_map_open_ms": 102000,
             }

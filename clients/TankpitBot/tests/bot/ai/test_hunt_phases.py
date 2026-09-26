@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_enemy_tank,
     make_inventory,
@@ -35,8 +36,8 @@ def test_hunt_acquire_teleports_back_to_an_affordable_off_viewport_lock() -> Non
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -81,8 +82,8 @@ def test_hunt_acquire_refuels_with_lock_held_when_return_unaffordable() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -119,8 +120,8 @@ def test_hunt_acquire_returns_to_the_locked_target_after_a_mode_interrupt() -> N
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -169,8 +170,8 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -200,8 +201,8 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "REFRESH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.REFRESH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -234,8 +235,8 @@ def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CLOSE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CLOSE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -264,8 +265,8 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CLOSE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CLOSE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -295,8 +296,8 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CLOSE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CLOSE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -329,8 +330,8 @@ def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -360,8 +361,8 @@ def test_hunt_engage_shoots_visible_locked_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -387,8 +388,8 @@ def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -416,8 +417,8 @@ def test_hunt_engage_without_locked_target_id_still_confirms_and_searches() -> N
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
         }
     )
@@ -448,8 +449,8 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CONFIRM_KILL",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CONFIRM_KILL,
             "mode_started_ms": 90000,
         }
     )
@@ -472,8 +473,8 @@ def test_scan_on_landing_reacquires_when_target_gone() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SCAN_ON_LANDING",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SCAN_ON_LANDING,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -500,8 +501,8 @@ def test_scan_on_landing_engages_when_target_present() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SCAN_ON_LANDING",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SCAN_ON_LANDING,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -532,8 +533,8 @@ def test_scan_on_landing_shoots_when_target_in_range() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SCAN_ON_LANDING",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SCAN_ON_LANDING,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},

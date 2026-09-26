@@ -14,6 +14,7 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state, make_viewport_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -59,8 +60,8 @@ def _marooned_ctx(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }
@@ -110,8 +111,8 @@ def test_marooned_walk_targets_a_believed_container_too() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }
@@ -249,8 +250,8 @@ def _edge_ctx(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport="85,92"),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }
@@ -382,8 +383,8 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }
@@ -442,8 +443,8 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }
@@ -494,8 +495,8 @@ def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> Non
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }
@@ -556,8 +557,8 @@ def test_desperation_hop_picks_the_cheaper_of_two_dregs() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99000,
         }

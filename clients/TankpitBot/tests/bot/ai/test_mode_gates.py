@@ -35,7 +35,8 @@ from tankpit_bot.bot.types import (
     make_radar_command,
     make_teleport_command,
 )
-from tankpit_bot.fleetshare.types import EngagementDoctrine
+from tankpit_bot.fleetshare.types import EngagementDoctrine, FleetRole
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._mode_fixtures import (
     _make_ctx,
     _make_decision,
@@ -48,13 +49,13 @@ def test_set_ai_mode_preserves_started_timestamp_when_mode_continues() -> None:
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 2000,
         }
     )
 
-    updated = set_ai_mode(state, "HUNT", "ENGAGE", 5000)
+    updated = set_ai_mode(state, AIMode.HUNT, AIModeState.ENGAGE, 5000)
 
     assert updated["mode_state"] == "ENGAGE"
     assert updated["mode_started_ms"] == 2000
@@ -232,9 +233,9 @@ def test_make_hold_decision_preserves_started_ms_when_already_unset() -> None:
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "manual_mode": "UNSET",
-            "mode": "UNSET",
-            "mode_state": "",
+            "manual_mode": AIMode.UNSET,
+            "mode": AIMode.UNSET,
+            "mode_state": AIModeState.NONE,
             "mode_started_ms": 8000,
         }
     )
@@ -302,7 +303,7 @@ class TestGathererRoleGate:
         gatherer_state = AIStateDict(
             **{
                 **ctx.ai_state,
-                "config": AIConfigDict(**{**ctx.config, "role": "gatherer"}),
+                "config": AIConfigDict(**{**ctx.config, "role": FleetRole.GATHERER}),
             }
         )
         gatherer_ctx = DecideCtx(
@@ -336,7 +337,7 @@ class TestWartimeReadinessFloor:
         consented: bool = True,
         human_alive: bool = True,
         human_fresh: bool = True,
-        doctrine: EngagementDoctrine = "skirmish",
+        doctrine: EngagementDoctrine = EngagementDoctrine.SKIRMISH,
     ) -> DecideCtx:
         """A rank-2 ctx (caps 30) with one enemy human plus arm-coverage tanks."""
         from tankpit_bot.sniffer.world_service import WorldService
@@ -455,7 +456,11 @@ class TestWartimeReadinessFloor:
         """
         from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 
-        for doctrine in ("duelist", "passive", "swarm"):
+        for doctrine in (
+            EngagementDoctrine.DUELIST,
+            EngagementDoctrine.PASSIVE,
+            EngagementDoctrine.SWARM,
+        ):
             ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine=doctrine)
             assert hunt_entry_permitted(ctx) is False, doctrine
 
@@ -463,7 +468,7 @@ class TestWartimeReadinessFloor:
         """A war-ready sibling arms the swarm bot's wartime bar."""
         from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 
-        ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine="swarm")
+        ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine=EngagementDoctrine.SWARM)
         ctx.ws.fleet_war_ready_count = 1
 
         assert hunt_entry_permitted(ctx) is True
@@ -472,7 +477,7 @@ class TestWartimeReadinessFloor:
         """Reinforcement needs no quorum: an engaged war human arms the bar."""
         from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 
-        ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine="swarm")
+        ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine=EngagementDoctrine.SWARM)
         ctx.ws.fleet_engaged_target_ids = {60: 99000}
 
         assert hunt_entry_permitted(ctx) is True

@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -136,8 +137,8 @@ def _make_blocked_equipment_setup(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "attempted_equipment_targets": attempted_equipment_targets,
         }

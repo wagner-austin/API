@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.modes import AIMode
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -48,7 +49,7 @@ def test_manual_hunt_forces_hunt_even_when_auto_would_collect() -> None:
     """
     ws = WorldService()
     world, self_state = make_world(fuel=150)
-    ai_state = AIStateDict(**{**make_scanned_ai_state(), "manual_mode": "HUNT"})
+    ai_state = AIStateDict(**{**make_scanned_ai_state(), "manual_mode": AIMode.HUNT})
     inventory = make_inventory()
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
@@ -67,7 +68,7 @@ def test_manual_collect_forces_collect_even_when_auto_would_hunt() -> None:
     """
     ws = WorldService()
     world, self_state = make_world(fuel=800)
-    ai_state = AIStateDict(**{**make_scanned_ai_state(), "manual_mode": "COLLECT"})
+    ai_state = AIStateDict(**{**make_scanned_ai_state(), "manual_mode": AIMode.COLLECT})
     inventory = make_inventory()
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
@@ -83,7 +84,7 @@ def test_manual_unset_produces_hold_decision() -> None:
     """``manual_mode = "UNSET"`` short-circuits every planner path with a hold."""
     ws = WorldService()
     world, self_state = make_world(fuel=800)
-    ai_state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "UNSET"})
+    ai_state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": AIMode.UNSET})
     inventory = make_inventory()
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)

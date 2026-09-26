@@ -18,6 +18,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._combat_fixtures import _enemy_threat
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
@@ -58,8 +59,8 @@ def _ctx(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": enemy_x,

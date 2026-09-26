@@ -81,21 +81,21 @@ def test_skirmish_acquires_the_consented_human() -> None:
     """The default doctrine is today's behavior: consent is enough."""
     ws, world, self_state = _consented_human_world()
 
-    assert _acquire(ws, world, self_state, "skirmish") == _HUMAN_ID
+    assert _acquire(ws, world, self_state, EngagementDoctrine.SKIRMISH) == _HUMAN_ID
 
 
 def test_passive_never_initiates_against_humans() -> None:
     """Consent notwithstanding, a passive bot never opens the fight."""
     ws, world, self_state = _consented_human_world()
 
-    assert _acquire(ws, world, self_state, "passive") == -1
+    assert _acquire(ws, world, self_state, EngagementDoctrine.PASSIVE) == -1
 
 
 def test_duelist_takes_an_unclaimed_duel() -> None:
     """First come: with no sibling engaged, the duelist fights."""
     ws, world, self_state = _consented_human_world()
 
-    assert _acquire(ws, world, self_state, "duelist") == _HUMAN_ID
+    assert _acquire(ws, world, self_state, EngagementDoctrine.DUELIST) == _HUMAN_ID
 
 
 def test_duelist_yields_a_claimed_duel() -> None:
@@ -103,14 +103,14 @@ def test_duelist_yields_a_claimed_duel() -> None:
     ws, world, self_state = _consented_human_world()
     ws.fleet_engaged_target_ids = {_HUMAN_ID: 99000}
 
-    assert _acquire(ws, world, self_state, "duelist") == -1
+    assert _acquire(ws, world, self_state, EngagementDoctrine.DUELIST) == -1
 
 
 def test_swarm_holds_until_the_muster_quorum_stands() -> None:
     """Nobody engaged and no war-ready sibling: the swarm bot farms on."""
     ws, world, self_state = _consented_human_world()
 
-    assert _acquire(ws, world, self_state, "swarm") == -1
+    assert _acquire(ws, world, self_state, EngagementDoctrine.SWARM) == -1
 
 
 def test_swarm_strikes_when_the_quorum_stands() -> None:
@@ -118,7 +118,7 @@ def test_swarm_strikes_when_the_quorum_stands() -> None:
     ws, world, self_state = _consented_human_world()
     ws.fleet_war_ready_count = 1
 
-    assert _acquire(ws, world, self_state, "swarm") == _HUMAN_ID
+    assert _acquire(ws, world, self_state, EngagementDoctrine.SWARM) == _HUMAN_ID
 
 
 def test_swarm_reinforces_an_engaged_sibling_without_a_quorum() -> None:
@@ -126,7 +126,7 @@ def test_swarm_reinforces_an_engaged_sibling_without_a_quorum() -> None:
     ws, world, self_state = _consented_human_world()
     ws.fleet_engaged_target_ids = {_HUMAN_ID: 99000}
 
-    assert _acquire(ws, world, self_state, "swarm") == _HUMAN_ID
+    assert _acquire(ws, world, self_state, EngagementDoctrine.SWARM) == _HUMAN_ID
 
 
 def test_doctrine_never_touches_practice_bots() -> None:
@@ -147,4 +147,4 @@ def test_doctrine_never_touches_practice_bots() -> None:
     bot["last_viewport_observation_ms"] = 100000
     world["tanks"]["530"] = bot
 
-    assert _acquire(ws, world, self_state, "passive") == 530
+    assert _acquire(ws, world, self_state, EngagementDoctrine.PASSIVE) == 530

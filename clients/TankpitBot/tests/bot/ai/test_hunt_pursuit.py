@@ -8,7 +8,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
-from tankpit_bot.types.modes import AIModeState
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_pursuit_target,
@@ -33,8 +33,8 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -61,8 +61,8 @@ def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CLOSE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CLOSE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -88,8 +88,8 @@ def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "REFRESH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.REFRESH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -122,7 +122,7 @@ class TestPursuitHomingCapVsHumans:
         self,
         *,
         name: str = "Yuppler",
-        mode_state: AIModeState = "ENGAGE",
+        mode_state: AIModeState = AIModeState.ENGAGE,
         pursuit_shot_target_id: int = -1,
         pursuit_shot_ms: int = 0,
     ) -> DecideCtx:
@@ -132,7 +132,7 @@ class TestPursuitHomingCapVsHumans:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
+                "mode": AIMode.HUNT,
                 "mode_state": mode_state,
                 "mode_started_ms": 90000,
                 "combat_target_id": 50,
@@ -186,7 +186,7 @@ class TestPursuitHomingCapVsHumans:
     def test_scan_on_landing_pursuit_honors_the_cap(self) -> None:
         decision = decide_hunt_mode(
             self._ctx(
-                mode_state="SCAN_ON_LANDING",
+                mode_state=AIModeState.SCAN_ON_LANDING,
                 pursuit_shot_target_id=50,
                 pursuit_shot_ms=95000,
             )
@@ -215,8 +215,8 @@ class TestPursuitFramesNearTargets:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "combat_target_id": 50,
                 "combat_target_x": 100,
@@ -258,8 +258,8 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CLOSE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CLOSE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -284,8 +284,8 @@ def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -310,8 +310,8 @@ def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "REFRESH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.REFRESH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -358,8 +358,8 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -409,8 +409,8 @@ def test_pursuit_tick_diverts_to_a_visible_bot_finisher_in_a_bot_fight() -> None
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -458,8 +458,8 @@ class TestMapReplacedInWindowTarget:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "combat_target_id": 50,
                 "combat_target_x": target["x"],
@@ -518,8 +518,8 @@ def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SCAN_ON_LANDING",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SCAN_ON_LANDING,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -552,8 +552,8 @@ def test_scan_on_landing_pursuit_past_the_trace_wall_chases_via_map() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "SCAN_ON_LANDING",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.SCAN_ON_LANDING,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,

@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._strategy_fixtures import (
     _c,
     _make_inventory,
@@ -36,8 +37,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )
@@ -80,8 +81,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )
@@ -118,8 +119,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )
@@ -155,8 +156,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
                 "wind_down": True,
             }
@@ -184,8 +185,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "wind_down": True,
             }
@@ -235,8 +236,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "combat_target_id": 511,
                 "wind_down": True,
@@ -268,8 +269,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "wind_down": True,
             }
@@ -306,8 +307,8 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )

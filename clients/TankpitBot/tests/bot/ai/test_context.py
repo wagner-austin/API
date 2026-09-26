@@ -20,6 +20,7 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_viewport_state,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 
 
 def _world_with_container(
@@ -67,8 +68,8 @@ class TestLockedResourceTarget:
         ai_state = AIStateDict(
             **{
                 **make_initial_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ACQUIRE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ACQUIRE,
                 "mode_started_ms": 999,
             }
         )

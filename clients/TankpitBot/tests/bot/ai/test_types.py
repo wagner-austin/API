@@ -35,6 +35,7 @@ from tankpit_bot.bot.ai.world_types import (
     make_enemy_threat,
     make_path_step,
 )
+from tankpit_bot.types.modes import AIMode
 
 
 class TestAIState:
@@ -53,7 +54,7 @@ class TestAIState:
         previous["wind_down"] = True
         previous["greeted_tank_ids"] = {"2678": 1}
         previous["visited_tank_ids"] = {"984": 1}
-        previous["mode"] = "HUNT"
+        previous["mode"] = AIMode.HUNT
 
         fresh = make_respawn_ai_state(previous)
 
@@ -148,7 +149,7 @@ class TestAIState:
             "combat_target_x": 0,
             "combat_target_y": 0,
         }
-        with pytest.raises(ValueError, match="must be one of"):
+        with pytest.raises(JSONTypeError, match="Invalid mode 'INVALID'"):
             decode_ai_state(data)
 
     def test_decode_invalid_mode_state_pair_raises(self) -> None:

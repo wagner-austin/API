@@ -17,6 +17,7 @@ from tankpit_bot.state.types import (
     make_container_state,
     make_tank_state,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -74,8 +75,8 @@ class TestHuntDisengage:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
@@ -147,8 +148,8 @@ class TestHuntDisengage:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "ENGAGE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.ENGAGE,
                 "mode_started_ms": 90000,
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,

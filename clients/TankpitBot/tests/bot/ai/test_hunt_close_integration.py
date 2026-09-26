@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -52,8 +53,8 @@ class TestDecideTeleportToFarTarget:
                 "mine_pin_presses": {"50": "0,0"},
                 "combat_target_x": 101,
                 "combat_target_y": 100,
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
             }
         )
@@ -235,8 +236,8 @@ class TestDecideTeleportToFarTarget:
                 "mine_pin_presses": {"50": "0,0"},
                 "combat_target_x": 101,
                 "combat_target_y": 100,
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
             }
         )
@@ -398,8 +399,8 @@ class TestDecideTeleportToFarTarget:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
                 "last_map_open_ms": 94000,
                 "combat_target_id": 50,
@@ -506,8 +507,8 @@ class TestDecideTeleportToFarTarget:
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
                 "last_shot_target_name": "red-21",
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
             }
         )
@@ -558,8 +559,8 @@ class TestDecideTeleportToFarTarget:
                 "combat_target_x": 105,
                 "combat_target_y": 100,
                 "last_shot_target_id": -1,
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
             }
         )

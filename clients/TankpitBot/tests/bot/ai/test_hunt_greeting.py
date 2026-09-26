@@ -11,6 +11,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     consent_human,
     make_inventory,
@@ -40,8 +41,8 @@ def test_greeting_approach_lands_a_few_tiles_off_an_unconsented_human() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -85,8 +86,8 @@ def test_visited_unconsented_human_is_left_alone() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
             "visited_tank_ids": {"90": 90000},
@@ -123,8 +124,8 @@ def test_greeting_approach_declines_when_teleport_unaffordable() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -167,8 +168,8 @@ def test_greeting_scan_ignores_map_stale_humans() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -203,8 +204,8 @@ def test_consented_human_map_winner_is_teleport_acquired() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }

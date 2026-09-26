@@ -37,6 +37,7 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._mode_fixtures import (
     _make_decision,
     _make_hold_inventory,
@@ -48,8 +49,8 @@ def test_clear_ai_mode_resets_durable_fields() -> None:
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 12345,
         }
     )
@@ -66,7 +67,7 @@ def test_set_ai_mode_starts_new_mode_at_current_timestamp() -> None:
     """Entering a new durable mode records the entry timestamp."""
     state = make_initial_ai_state()
 
-    updated = set_ai_mode(state, "HUNT", "ACQUIRE", 2000)
+    updated = set_ai_mode(state, AIMode.HUNT, AIModeState.ACQUIRE, 2000)
 
     assert updated["mode"] == "HUNT"
     assert updated["mode_state"] == "ACQUIRE"
@@ -76,7 +77,7 @@ def test_set_ai_mode_starts_new_mode_at_current_timestamp() -> None:
 def test_set_ai_mode_rejects_invalid_pair() -> None:
     """Invalid durable mode/state pairs fail immediately."""
     with pytest.raises(ValueError, match="Invalid AI mode/state pair"):
-        set_ai_mode(make_initial_ai_state(), "HUNT", "SEARCH", 1000)
+        set_ai_mode(make_initial_ai_state(), AIMode.HUNT, AIModeState.SEARCH, 1000)
 
 
 def test_set_ai_mode_allows_unset_without_started_timestamp() -> None:
@@ -84,13 +85,13 @@ def test_set_ai_mode_allows_unset_without_started_timestamp() -> None:
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 1000,
         }
     )
 
-    updated = set_ai_mode(state, "UNSET", "", 5000)
+    updated = set_ai_mode(state, AIMode.UNSET, AIModeState.NONE, 5000)
 
     assert updated["mode"] == "UNSET"
     assert updated["mode_state"] == ""
@@ -102,8 +103,8 @@ def test_clear_mode_on_decision_clears_updated_ai_state_mode() -> None:
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 1000,
         }
     )
@@ -131,7 +132,7 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
         desired_equipment=[],
     )
 
-    updated = apply_mode_to_decision(decision, "HUNT", "CLOSE", 9000)
+    updated = apply_mode_to_decision(decision, AIMode.HUNT, AIModeState.CLOSE, 9000)
 
     assert updated["updated_ai_state"]["mode"] == "HUNT"
     assert updated["updated_ai_state"]["mode_state"] == "CLOSE"
@@ -344,19 +345,19 @@ def test_resolve_owner_from_manual_returns_none_when_unset() -> None:
 
 def test_resolve_owner_from_manual_pins_unset() -> None:
     """``manual_mode = "UNSET"`` short-circuits with the same literal."""
-    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "UNSET"})
+    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": AIMode.UNSET})
     assert resolve_owner_from_manual(state) == "UNSET"
 
 
 def test_resolve_owner_from_manual_pins_hunt() -> None:
     """``manual_mode = "HUNT"`` short-circuits with the same literal."""
-    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "HUNT"})
+    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": AIMode.HUNT})
     assert resolve_owner_from_manual(state) == "HUNT"
 
 
 def test_resolve_owner_from_manual_pins_collect() -> None:
     """``manual_mode = "COLLECT"`` short-circuits with the same literal."""
-    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "COLLECT"})
+    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": AIMode.COLLECT})
     assert resolve_owner_from_manual(state) == "COLLECT"
 
 
@@ -365,9 +366,9 @@ def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "manual_mode": "UNSET",
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "manual_mode": AIMode.UNSET,
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 12000,
         }
     )
@@ -397,7 +398,7 @@ def test_make_hold_decision_drops_empty_weapon_stocks_from_the_loadout() -> None
     state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "manual_mode": "UNSET",
+            "manual_mode": AIMode.UNSET,
         }
     )
 

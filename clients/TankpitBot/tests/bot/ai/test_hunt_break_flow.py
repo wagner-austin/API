@@ -19,6 +19,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -69,8 +70,8 @@ def _engage_ctx(*, fuel: int, damage_state: int = 3) -> DecideCtx:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -227,8 +228,8 @@ def test_latched_close_phase_stays_on_the_escape() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "CLOSE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.CLOSE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,
@@ -302,7 +303,7 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
     close_ctx = DecideCtx(
         base_ctx.world,
         base_ctx.self_state,
-        AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
+        AIStateDict(**{**base_ctx.ai_state, "mode_state": AIModeState.CLOSE}),
         base_ctx.inventory,
         base_ctx.timestamp_ms,
         base_ctx.terrain,
@@ -388,7 +389,7 @@ def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
     close_ctx = DecideCtx(
         base_ctx.world,
         base_ctx.self_state,
-        AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
+        AIStateDict(**{**base_ctx.ai_state, "mode_state": AIModeState.CLOSE}),
         base_ctx.inventory,
         base_ctx.timestamp_ms,
         base_ctx.terrain,

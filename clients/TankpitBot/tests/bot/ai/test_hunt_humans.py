@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     consent_human,
     make_inventory,
@@ -38,8 +39,8 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -82,8 +83,8 @@ def test_human_pursuit_falls_back_to_bot_when_no_leg_helps() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -128,8 +129,8 @@ def test_recruit_human_is_not_pursued() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -170,8 +171,8 @@ def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
             "combat_target_id": 90,
@@ -216,8 +217,8 @@ def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
             "combat_target_id": 90,
@@ -259,8 +260,8 @@ def test_locked_human_with_no_relay_leg_falls_back_to_refuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
             "combat_target_id": 90,
@@ -300,8 +301,8 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -348,8 +349,8 @@ def test_stale_known_human_forces_a_map_refresh_over_bot_farming() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 90000,
         }
@@ -378,8 +379,8 @@ def test_fresh_map_showing_stale_human_farms_normally() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -459,8 +460,8 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }

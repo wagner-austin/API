@@ -12,6 +12,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     consent_human,
     make_inventory,
@@ -47,8 +48,8 @@ def _stale_human_ctx(ws: WorldService, *, last_map_open_ms: int) -> DecideCtx:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 80000,
             "last_map_open_ms": last_map_open_ms,
         }
@@ -102,8 +103,8 @@ def test_hunt_acquire_teleports_at_an_affordablemake_map_known_enemy() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -142,8 +143,8 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -199,8 +200,8 @@ def test_relay_tries_the_next_enemy_when_the_nearest_is_dot_starved() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -256,8 +257,8 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -291,8 +292,8 @@ def test_hunt_relay_tie_breaks_on_cheaper_hop() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -330,8 +331,8 @@ def test_hunt_relay_exits_when_only_dot_is_impassable() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -373,8 +374,8 @@ def test_hunt_refuels_in_place_when_no_dot_makes_progress() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -416,8 +417,8 @@ def test_hunt_refuel_exits_at_fuel_capacity() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -455,8 +456,8 @@ def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ENGAGE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ENGAGE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "combat_target_x": 150,

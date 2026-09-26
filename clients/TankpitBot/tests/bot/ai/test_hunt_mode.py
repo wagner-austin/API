@@ -11,6 +11,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_enemy_tank,
     make_inventory,
@@ -26,8 +27,8 @@ def test_hunt_acquire_searches_for_enemies_when_no_target_exists() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
         }
     )
@@ -59,8 +60,8 @@ def test_hunt_search_dispatches_map_open_not_radar_during_acquire() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 90000,
         }
@@ -92,8 +93,8 @@ def test_hunt_acquire_exits_when_fresh_map_has_no_viable_targets() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -124,8 +125,8 @@ def test_hunt_acquire_keeps_searching_when_data_is_stale_despite_fresh_dispatch(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -154,8 +155,8 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 90000,
             "last_scan_ms": 90000,
@@ -173,8 +174,8 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
     next_ai_state = AIStateDict(
         **{
             **first_decision["updated_ai_state"],
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
         }
     )
@@ -197,8 +198,8 @@ def test_hunt_acquire_uses_fresh_target_position_to_close_on_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -225,8 +226,8 @@ def test_hunt_acquire_targets_enemy_between_break_and_resume_thresholds() -> Non
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -255,8 +256,8 @@ def test_hunt_refresh_engages_visible_adjacent_locked_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "REFRESH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.REFRESH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -286,8 +287,8 @@ def test_hunt_refresh_returns_close_decision_for_visible_nonadjacent_target() ->
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "REFRESH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.REFRESH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -325,8 +326,8 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
         }
@@ -357,8 +358,8 @@ def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "REFRESH",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.REFRESH,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -394,8 +395,8 @@ def test_hunt_acquire_resumes_visible_locked_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},
@@ -430,8 +431,8 @@ def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "HUNT",
-            "mode_state": "ACQUIRE",
+            "mode": AIMode.HUNT,
+            "mode_state": AIModeState.ACQUIRE,
             "mode_started_ms": 90000,
             "combat_target_id": 50,
             "mine_pin_presses": {"50": "0,0"},

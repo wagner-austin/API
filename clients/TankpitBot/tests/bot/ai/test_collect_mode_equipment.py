@@ -10,6 +10,7 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import WorldStateDict, make_container_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -39,8 +40,8 @@ def test_full_inventory_skips_equipment_pickup() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -75,8 +76,8 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
             "config": {
                 **base_state["config"],
             },
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -115,8 +116,8 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
             "config": {
                 **base_state["config"],
             },
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -179,8 +180,8 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
             "config": {
                 **base_state["config"],
             },
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             # Map open 4 s ago: inside the re-open cooldown (5 s), so
             # a re-open teaches nothing -- and already answered (stamp
@@ -235,8 +236,8 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
             "config": {
                 **base_state["config"],
             },
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             # Map open 4 s ago: inside the re-open cooldown (5 s), so
             # a re-open teaches nothing -- and already answered (stamp
@@ -298,8 +299,8 @@ def test_collect_mode_picks_equipment_before_adjacent_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -353,8 +354,8 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -404,8 +405,8 @@ def test_collect_mode_skips_opportunistic_fuel_at_rank_capacity() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -450,8 +451,8 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -499,8 +500,8 @@ def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "resource_target_kind": "equipment",
             "resource_target_x": 160,
@@ -549,8 +550,8 @@ def test_collect_mode_keeps_lock_against_marginally_closer_equipment() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "resource_target_kind": "equipment",
             "resource_target_x": 105,

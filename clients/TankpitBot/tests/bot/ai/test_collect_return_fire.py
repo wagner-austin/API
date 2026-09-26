@@ -18,6 +18,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_container,
     make_inventory,
@@ -70,8 +71,8 @@ def _ctx(
     ai_state = AIStateDict(
         **{
             **base,
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -142,7 +143,7 @@ def test_weapon_break_leaves_the_escape_doctrine_in_charge() -> None:
 
 def test_gatherer_role_never_returns_fire() -> None:
     """The fleet role gate holds: a gatherer's ticks never shoot."""
-    ctx = _ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}, role="gatherer")
+    ctx = _ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}, role=FleetRole.GATHERER)
 
     assert collect_return_fire(ctx, ctx.base) is None
 

@@ -15,6 +15,7 @@ from tankpit_bot.state.types import (
     make_tank_state,
 )
 from tankpit_bot.types.constants import TankLiveness
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -149,8 +150,8 @@ class TestDecideKillCooldown:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
@@ -250,8 +251,8 @@ class TestDecideKillCooldown:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
+                "mode": AIMode.HUNT,
+                "mode_state": AIModeState.CLOSE,
                 "mode_started_ms": 90000,
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,

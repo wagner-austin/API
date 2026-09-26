@@ -9,6 +9,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, make_container_state
+from tankpit_bot.types.modes import AIMode, AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -44,8 +45,8 @@ def _collect_ctx(
         else AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
+                "mode": AIMode.COLLECT,
+                "mode_state": AIModeState.SEARCH,
                 "mode_started_ms": 90000,
             }
         )
@@ -169,8 +170,8 @@ def test_larder_landing_latches_the_viewport_without_a_radar() -> None:
     state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport="0,0"),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
             "suppress_landing_scan": True,
         }
@@ -198,8 +199,8 @@ def test_fresh_viewport_without_the_flag_still_radars_on_landing() -> None:
     state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport="0,0"),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.SEARCH,
             "mode_started_ms": 90000,
         }
     )
@@ -282,8 +283,8 @@ def test_displaced_harvest_landing_unsuppresses_the_radar() -> None:
     state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport="0,0"),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "suppress_landing_scan": True,
             "resource_target_kind": "fuel",
@@ -331,8 +332,8 @@ def test_displaced_landing_with_fresh_evidence_scans_despite_live_coverage() -> 
     state = AIStateDict(
         **{
             **make_scanned_ai_state(landing_scan_viewport="0,0"),
-            "mode": "COLLECT",
-            "mode_state": "APPROACH",
+            "mode": AIMode.COLLECT,
+            "mode_state": AIModeState.APPROACH,
             "mode_started_ms": 90000,
             "suppress_landing_scan": True,
             "resource_target_kind": "fuel",
