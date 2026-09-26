@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from platform_core.errors import AppError, ErrorCode
 from platform_core.job_types import JobStatus
 from platform_core.json_utils import JSONValue, load_json_bytes
+from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import QueueProtocol
 
-from ...dependencies import LoggerDep, QueueDep, RedisDep
+from ...dependencies import get_queue, get_redis, get_request_logger
 from ...job_store import TranscriptJobStore
+from ...types import LoggerProtocol
 from ...youtube import canonicalize_youtube_url, extract_video_id
 
 
@@ -44,9 +48,9 @@ def build_router() -> APIRouter:
 
     async def create_stt_job(
         request: Request,
-        queue: QueueDep,
-        redis: RedisDep,
-        logger: LoggerDep,
+        queue: Annotated[QueueProtocol, Depends(get_queue)],
+        redis: Annotated[RedisStrProto, Depends(get_redis)],
+        logger: Annotated[LoggerProtocol, Depends(get_request_logger)],
     ) -> JSONResponse:
         body = await request.body()
         raw_payload = load_json_bytes(body)
@@ -107,7 +111,7 @@ def build_router() -> APIRouter:
 
     async def get_stt_job_status(
         job_id: str,
-        redis: RedisDep,
+        redis: Annotated[RedisStrProto, Depends(get_redis)],
     ) -> JSONResponse:
         store = TranscriptJobStore(redis)
         status = store.load(job_id)

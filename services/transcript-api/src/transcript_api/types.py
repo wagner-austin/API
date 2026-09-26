@@ -8,9 +8,6 @@ from platform_core.json_utils import JSONValue
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
-# Public JSON type for API boundaries - non-recursive, one-level deep
-JsonDict = dict[str, str | int | float | bool | list[str | int | float | bool | None] | None]
-
 
 class LoggerProtocol(Protocol):
     """Protocol for a minimal structured logger interface."""
@@ -89,10 +86,6 @@ class AudioChunk(TypedDict):
     start_seconds: float
     duration_seconds: float
     size_bytes: int
-
-
-# Alias for readability in signatures
-TranscriptSegmentList = list[TranscriptSegment]
 
 
 class TranscriptOptions(TypedDict):

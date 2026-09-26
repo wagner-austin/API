@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
-from typing import Annotated
 
-from fastapi import Depends
 from platform_core.config import _require_env_str
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
@@ -68,15 +66,7 @@ def get_queue() -> QueueProtocol:
     return connecting_queue(TRANSCRIPT_QUEUE, _get_redis_url())
 
 
-RedisDep = Annotated[RedisStrProto, Depends(get_redis)]
-LoggerDep = Annotated[LoggerProtocol, Depends(get_request_logger)]
-QueueDep = Annotated[QueueProtocol, Depends(get_queue)]
-
-
 __all__ = [
-    "LoggerDep",
-    "QueueDep",
-    "RedisDep",
     "get_queue",
     "get_redis",
     "get_request_logger",
