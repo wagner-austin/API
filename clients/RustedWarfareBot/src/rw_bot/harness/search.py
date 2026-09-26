@@ -13,6 +13,12 @@ The discipline the laws impose stays explicit: the margin
 round graduates to an ordinary full panel judged on wins against the +4
 bar, and then fresh-tree replication (laws six and nine). The search
 proposes; the bar disposes.
+
+A candidate is spelled ``tuple[tuple[str, int], ...]``: the knob moves it
+applies to the base doctrine, ``(field, value)`` pairs sorted by field so
+equal candidates compare equal and hash alike as score keys. It is written
+out at each use rather than named, because the workspace refuses type
+aliases (MCPs board task 1374feba).
 """
 
 from __future__ import annotations
@@ -25,10 +31,6 @@ from rw_bot import RwBotError
 from rw_bot.policy.doctrine import INT_FIELDS, Doctrine
 from rw_bot.policy.doctrine_codecs import decode_doctrine, encode_doctrine
 
-#: One candidate: the knob moves it applies to the base doctrine, sorted
-#: by field so equal candidates compare equal.
-Candidate = tuple[tuple[str, int], ...]
-
 
 class SearchError(RwBotError):
     """A candidate asked for a knob the doctrine does not carry.
@@ -39,7 +41,7 @@ class SearchError(RwBotError):
     """
 
 
-def candidate_label(moves: Candidate) -> str:
+def candidate_label(moves: tuple[tuple[str, int], ...]) -> str:
     """Name a candidate by its moves, stable across runs.
 
     Args:
@@ -51,7 +53,7 @@ def candidate_label(moves: Candidate) -> str:
     return "-".join(f"{field}{value}" for field, value in moves)
 
 
-def single_moves(space: Mapping[str, Sequence[int]]) -> tuple[Candidate, ...]:
+def single_moves(space: Mapping[str, Sequence[int]]) -> tuple[tuple[tuple[str, int], ...], ...]:
     """Every one-knob candidate the space allows, in field order.
 
     Args:
@@ -103,7 +105,7 @@ def effective_space(
 
 def sampled_pairs(
     space: Mapping[str, Sequence[int]], count: int, seed: int
-) -> tuple[Candidate, ...]:
+) -> tuple[tuple[tuple[str, int], ...], ...]:
     """A deterministic sample of two-knob candidates.
 
     Law two: knobs do not compose freely, so pairs are their own
@@ -119,7 +121,7 @@ def sampled_pairs(
         Distinct two-knob candidates, each combining different fields.
     """
     fields = sorted(space)
-    pool: list[Candidate] = []
+    pool: list[tuple[tuple[str, int], ...]] = []
     for i, first in enumerate(fields):
         for second in fields[i + 1 :]:
             for a in space[first]:
@@ -130,7 +132,7 @@ def sampled_pairs(
     return tuple(random.Random(seed).sample(pool, count))
 
 
-def apply_moves(base: Doctrine, moves: Candidate) -> Doctrine:
+def apply_moves(base: Doctrine, moves: tuple[tuple[str, int], ...]) -> Doctrine:
     """Build the variant doctrine one candidate names.
 
     Args:
@@ -181,7 +183,9 @@ def paired_delta(
     return len(shared), mean, sd
 
 
-def keep_top(scores: Mapping[Candidate, float], keep: int) -> tuple[Candidate, ...]:
+def keep_top(
+    scores: Mapping[tuple[tuple[str, int], ...], float], keep: int
+) -> tuple[tuple[tuple[str, int], ...], ...]:
     """The survivors of one halving round, deterministically ordered.
 
     Args:
@@ -193,14 +197,13 @@ def keep_top(scores: Mapping[Candidate, float], keep: int) -> tuple[Candidate, .
         by label so two runs of one search agree.
     """
 
-    def rank(candidate: Candidate) -> tuple[float, str]:
+    def rank(candidate: tuple[tuple[str, int], ...]) -> tuple[float, str]:
         return (-scores[candidate], candidate_label(candidate))
 
     return tuple(sorted(scores, key=rank)[: max(0, keep)])
 
 
 __all__ = [
-    "Candidate",
     "SearchError",
     "apply_moves",
     "candidate_label",
