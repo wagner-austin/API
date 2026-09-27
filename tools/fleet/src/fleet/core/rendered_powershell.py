@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import RunnerSpec
-from fleet.core import names, runner_rebuild
+from fleet.core import dialect, names, runner_rebuild, verdict
 from fleet.core.dialect_windows import WindowsDialect
 
 #: Where the committed renders live, relative to tools/fleet.
@@ -37,6 +37,9 @@ EXAMPLE_STAGE_ROOT = "C:/fleet/stage"
 
 #: The example dispatch's id, in the shape fleet-run mints.
 EXAMPLE_RUN_ID = "MCPs-packages-maketools-1790000000"
+
+#: The commit the example dispatch's companion was archived from.
+EXAMPLE_COMPANION_SHA = "5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2"
 
 
 class RenderedScript(TypedDict):
@@ -69,6 +72,32 @@ def _dialect_scripts() -> list[RenderedScript]:
         ),
         RenderedScript(name="dialect-digest", text=spoken.digest_script(target)),
         RenderedScript(name="dialect-result", text=spoken.result_script(target)),
+        RenderedScript(
+            name="dialect-log-tail",
+            text=spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
+        ),
+        RenderedScript(
+            name="dialect-launch", text=spoken.launch_script(target=target, run_id=EXAMPLE_RUN_ID)
+        ),
+        RenderedScript(
+            name="dialect-stop", text=spoken.stop_script(target=target, run_id=EXAMPLE_RUN_ID)
+        ),
+        RenderedScript(
+            name="dialect-extract",
+            text=spoken.checked_script(
+                dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)
+            ),
+        ),
+        RenderedScript(
+            name="dialect-init-repository",
+            text=spoken.checked_script(dialect.init_repository_commands(target, EXAMPLE_RUN_ID)),
+        ),
+        RenderedScript(
+            name="dialect-companion-repository",
+            text=spoken.checked_script(
+                dialect.companion_repository_commands(companion, EXAMPLE_COMPANION_SHA)
+            ),
+        ),
     ]
 
 
@@ -107,6 +136,7 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
 
 
 __all__ = [
+    "EXAMPLE_COMPANION_SHA",
     "EXAMPLE_RUN_ID",
     "EXAMPLE_STAGE_ROOT",
     "RENDERED_DIRECTORY",

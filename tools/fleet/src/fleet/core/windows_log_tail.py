@@ -27,6 +27,9 @@ from __future__ import annotations
 
 from typing import Final
 
+from fleet.core.powershell_text import STRICT_HEADER
+from fleet.core.script_values import scriptable
+
 #: How many bytes from the end the tail reads. Two hundred lines of pytest's
 #: or vitest's summary and coverage table run to a few hundred characters
 #: each at most, so 256 KiB (128 Ki UTF-16 characters) holds the lines the
@@ -38,43 +41,67 @@ TAIL_BYTES: Final[int] = 262_144
 def windows_log_tail_script(log: str, lines: int) -> str:
     """The PowerShell that prints a transcript's last lines, or nothing.
 
+    The transcript and the line count are parameters defaulting to the
+    rendered values, so a node runs it with no arguments and the Pester suite
+    over its committed render (MCPs board task d69786fa) reads transcripts it
+    wrote. A short read ends the loop by its own condition rather than by a
+    ``break`` arm: a read of zero bytes is a file that shrank under the
+    reader, which no test can arrange, and an arm no case can enter is one
+    the harness's branch coverage refuses.
+
     Args:
-        log: Absolute path of the transcript on the node. Single-quoted into
-            the script; run paths carry no quote by construction.
+        log: Absolute path of the transcript on the node.
         lines: How many lines from the end to print.
 
     Returns:
         The script's text. An absent transcript prints nothing, which the
         verdict reports as a build that wrote no transcript.
+
+    Raises:
+        ValueError: When the path cannot be embedded verbatim.
     """
-    return (
-        f"if (Test-Path -LiteralPath '{log}') {{\n"
-        f"  $stream = [System.IO.File]::Open('{log}', 'Open', 'Read', 'ReadWrite')\n"
-        "  $mark = New-Object byte[] 3\n"
-        "  $marked = $stream.Read($mark, 0, 3)\n"
-        "  $encoding = [System.Text.Encoding]::UTF8\n"
-        "  $skip = 0\n"
-        "  if (($marked -ge 2) -and ($mark[0] -eq 255) -and ($mark[1] -eq 254)) {"
-        " $encoding = [System.Text.Encoding]::Unicode; $skip = 2 }\n"
-        "  if (($marked -eq 3) -and ($mark[0] -eq 239) -and ($mark[1] -eq 187)"
-        " -and ($mark[2] -eq 191)) { $skip = 3 }\n"
-        f"  $start = [Math]::Max([long]$skip, $stream.Length - {TAIL_BYTES})\n"
-        "  if (($skip -eq 2) -and (($start % 2) -eq 1)) { $start = $start + 1 }\n"
-        "  $null = $stream.Seek($start, 'Begin')\n"
-        "  $bytes = New-Object byte[] ($stream.Length - $start)\n"
-        "  $read = 0\n"
-        "  while ($read -lt $bytes.Length) {\n"
-        "    $got = $stream.Read($bytes, $read, $bytes.Length - $read)\n"
-        "    if ($got -eq 0) { break }\n"
-        "    $read = $read + $got\n"
-        "  }\n"
-        "  $stream.Close()\n"
-        '  $text = $encoding.GetString($bytes, 0, $read).TrimEnd([char[]]"`r`n")\n'
-        '  $parts = $text -split "`r?`n"\n'
-        "  if ($start -gt $skip) { $parts = $parts | Select-Object -Skip 1 }\n"
-        f"  $parts | Select-Object -Last {lines}\n"
-        "}\n"
-    )
+    path = scriptable(log, label="log")
+    body = [
+        "param(",
+        f"    [string]$Log = '{path}',",
+        f"    [int]$Lines = {lines}",
+        ")",
+        *STRICT_HEADER,
+        "if (Test-Path -LiteralPath $Log) {",
+        "    $stream = [System.IO.File]::Open($Log, 'Open', 'Read', 'ReadWrite')",
+        "    $mark = New-Object byte[] 3",
+        "    $marked = $stream.Read($mark, 0, 3)",
+        "    $encoding = [System.Text.Encoding]::UTF8",
+        "    $skip = 0",
+        "    if (($marked -ge 2) -and ($mark[0] -eq 255) -and ($mark[1] -eq 254)) {",
+        "        $encoding = [System.Text.Encoding]::Unicode",
+        "        $skip = 2",
+        "    }",
+        "    if (($marked -eq 3) -and ($mark[0] -eq 239) -and ($mark[1] -eq 187) "
+        "-and ($mark[2] -eq 191)) {",
+        "        $skip = 3",
+        "    }",
+        f"    $start = [Math]::Max([long]$skip, $stream.Length - {TAIL_BYTES})",
+        "    if (($skip -eq 2) -and (($start % 2) -eq 1)) {",
+        "        $start = $start + 1",
+        "    }",
+        "    $null = $stream.Seek($start, 'Begin')",
+        "    $bytes = New-Object byte[] ($stream.Length - $start)",
+        "    $read = 0",
+        "    do {",
+        "        $got = $stream.Read($bytes, $read, $bytes.Length - $read)",
+        "        $read = $read + $got",
+        "    } while (($got -gt 0) -and ($read -lt $bytes.Length))",
+        "    $stream.Close()",
+        '    $text = $encoding.GetString($bytes, 0, $read).TrimEnd([char[]]"`r`n")',
+        '    $parts = $text -split "`r?`n"',
+        "    if ($start -gt $skip) {",
+        "        $parts = $parts | Select-Object -Skip 1",
+        "    }",
+        "    $parts | Select-Object -Last $Lines",
+        "}",
+    ]
+    return "\n".join(body) + "\n"
 
 
 __all__ = ["TAIL_BYTES", "windows_log_tail_script"]

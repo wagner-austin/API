@@ -28,6 +28,8 @@ hand is the one the build finds.
 
 from __future__ import annotations
 
+import shlex
+
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
 
@@ -236,22 +238,25 @@ class LinuxDialect:
         Returns:
             ``mkdir -p`` of it.
         """
-        return self.checked_script((f"mkdir -p '{target}'",))
+        return self.checked_script((("mkdir", "-p", target),))
 
-    def checked_script(self, commands: tuple[str, ...]) -> str:
+    def checked_script(self, commands: tuple[tuple[str, ...], ...]) -> str:
         """Render commands as a script that ends at the first failure.
 
         Nothing is added per command: :data:`PROLOGUE`'s ``set -e`` already
         ends the script at the first non-zero status and ``sh`` exits with
-        it, which is the default the other dialect has to be given.
+        it, which is the default the other dialect has to be given. Each
+        word is quoted by :func:`shlex.quote`, which leaves a plain path bare
+        and single-quotes anything else.
 
         Args:
-            commands: Command lines, in order.
+            commands: Commands in order, each an argument vector.
 
         Returns:
             The script's text.
         """
-        return PROLOGUE + "".join(f"{command}\n" for command in commands)
+        lines = (" ".join(shlex.quote(word) for word in command) for command in commands)
+        return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
     def reset_directory_script(self, target: str) -> str:
         """The script that empties a companion's directory and creates it.
@@ -265,7 +270,7 @@ class LinuxDialect:
             read-only loose objects of the git repository a previous run
             made there.
         """
-        return self.checked_script((f"rm -rf '{target}'", f"mkdir -p '{target}'"))
+        return self.checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
 
     def digest_script(self, target: str) -> str:
         """Print the landed archive's SHA-256, extracting nothing.

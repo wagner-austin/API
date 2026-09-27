@@ -20,29 +20,11 @@ registration interpolates one path and no code.
 from __future__ import annotations
 
 from fleet.contracts.project import MAKE_TARGET
-from fleet.core import names
-from fleet.core.powershell_text import STRICT_HEADER
+from fleet.core import names, windows_task
+from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
 from fleet.core.windows_log_tail import windows_log_tail_script
 from fleet.core.windows_toolchain_probe import TOOLCHAIN_PROBE_SCRIPT
-
-#: Task Scheduler's ``SCHED_S_TASK_HAS_NOT_RUN``, 0x00041303.
-#:
-#: The status a registered task reports until it has run once. It is the
-#: signal the launch script waits to stop seeing, because
-#: ``Start-ScheduledTask`` reports a failure to start as a NON-TERMINATING
-#: error: PowerShell prints it, exits 0, and the dispatch records a run that
-#: does not exist. Measured 2026-09-04 -- the ledger said ``running`` for a
-#: task whose ``LastRunTime`` was still the 1999 sentinel.
-TASK_HAS_NOT_RUN = 267011
-
-#: How long the node waits for a started task to leave that state.
-#:
-#: Generous because it is bounding a Task Scheduler round trip and not any
-#: work: the task only has to BEGIN. A build that starts and fails in the
-#: first second still leaves this state, so the wait ends on the first status
-#: change rather than on success.
-LAUNCH_TIMEOUT_SECONDS = 30
 
 #: How the node is asked to run a script file it has just been handed.
 #:
@@ -129,6 +111,14 @@ $document = [pscustomobject]@{
 }
 $document | ConvertTo-Json -Depth 8 -Compress
 """
+
+
+#: The tools a checked script may run: the PowerShell variable each is named
+#: by, and its param-block line.
+_CHECKED_TOOLS: dict[str, tuple[str, str]] = {
+    "tar": ("Tar", system32_parameter("Tar", "tar.exe")),
+    "git": ("Git", "[string]$Git = 'git'"),
+}
 
 
 def _located_script(parameter: str, location: str, body: tuple[str, ...]) -> str:
@@ -221,32 +211,67 @@ class WindowsDialect:
         """
         return f"Write-Output '{text}'"
 
-    def checked_script(self, commands: tuple[str, ...]) -> str:
+    def checked_script(self, commands: tuple[tuple[str, ...], ...]) -> str:
         """Render commands as a script that ends at the first failure.
 
         TWO MECHANISMS BECAUSE POWERSHELL HAS TWO KINDS OF FAILURE, and
-        neither one alone catches the other. ``$ErrorActionPreference =
-        'Stop'`` makes a CMDLET's error terminating, which exits the script
-        non-zero; a NATIVE program's non-zero status is not an error at all
-        to PowerShell, and with ``-File`` it is not the script's status
-        either, so each command is followed by an explicit check.
+        neither one alone catches the other. The strict header's ``Stop``
+        makes a CMDLET's error terminating; a NATIVE program's non-zero
+        status is not an error at all to PowerShell, and with ``-File`` it is
+        not the script's status either. So every command runs through one
+        ``Invoke-Step`` that reads the exit code straight after the call and
+        exits with it, and the check is written once per script rather than
+        once per command.
 
-        ``-gt 0`` rather than ``-ne 0`` because ``$LASTEXITCODE`` is unset
-        until the first native command runs, and ``$null -ne 0`` is true:
-        with ``-ne`` a script whose first command is a cmdlet would exit
-        before its second. A stale value cannot survive into a later check,
-        since any non-zero status exits at the check that follows it.
+        EACH TOOL IS A PARAMETER (:data:`_CHECKED_TOOLS`): ``tar`` is
+        System32's own by absolute path, because a shell whose ``PATH`` puts
+        Git's ``usr/bin`` first resolves a bare ``tar`` to GNU tar, which
+        reads ``C:`` as a remote host; ``git`` is whichever the node's
+        ``PATH`` names, as it always was. The Pester suite over the committed
+        render passes stand-ins for both (MCPs board task d69786fa).
 
         Args:
-            commands: Command lines, in order.
+            commands: Commands in order, each an argument vector whose first
+                word names a tool in :data:`_CHECKED_TOOLS`.
 
         Returns:
             The script's text.
+
+        Raises:
+            ValueError: When a command names another tool, or a word cannot
+                be embedded verbatim.
         """
-        lines = ["$ErrorActionPreference = 'Stop'"]
+        tools: list[str] = []
         for command in commands:
-            lines.append(command)
-            lines.append("if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }")
+            if command[0] not in tools:
+                tools.append(command[0])
+        unknown = [tool for tool in tools if tool not in _CHECKED_TOOLS]
+        if unknown:
+            raise ValueError(
+                f"a checked script runs only {', '.join(sorted(_CHECKED_TOOLS))}, "
+                f"not {', '.join(unknown)}"
+            )
+        parameters = ",\n".join(f"    {_CHECKED_TOOLS[tool][1]}" for tool in tools)
+        steps = [
+            f"Invoke-Step ${_CHECKED_TOOLS[command[0]][0]} @("
+            + ", ".join(f"'{scriptable(word, label='argument')}'" for word in command[1:])
+            + ")"
+            for command in commands
+        ]
+        lines = [
+            "param(",
+            parameters,
+            ")",
+            *STRICT_HEADER,
+            "function Invoke-Step {",
+            "    param([string]$Tool, [string[]]$Arguments)",
+            "    & $Tool @Arguments",
+            "    if ($LASTEXITCODE -ne 0) {",
+            "        exit $LASTEXITCODE",
+            "    }",
+            "}",
+            *steps,
+        ]
         return "\n".join(lines) + "\n"
 
     def make_directory_script(self, target: str) -> str:
@@ -419,54 +444,15 @@ class WindowsDialect:
     def launch_script(self, *, target: str, run_id: str) -> str:
         """Register a scheduled task for the build, start it, and prove it began.
 
-        WHY TASK SCHEDULER AND NOT AN SSH CHILD. Windows OpenSSH assigns the
-        session's process tree to a job object precisely so the tree dies when
-        the connection ends, and a process cannot be moved out of a job object
-        once it is in one (``memory/reference_long_runs_need_task_scheduler.md``).
-
-        ``-AllowStartIfOnBatteries`` and ``-DontStopIfGoingOnBatteries`` are
-        not optional and their defaults are the wrong way round for this
-        fleet: two of the three Windows nodes are laptops, so a dispatch to an
-        unplugged sedona would register a task that never runs, or would have
-        a running suite killed the moment somebody unplugged it. ``-Priority
-        4`` because 7, the default, sets LOW I/O and a run that inherits it
-        crawls in a way that reads as a slow node.
-
-        The script then WAITS for the task to leave :data:`TASK_HAS_NOT_RUN`
-        before saying so, because ``Start-ScheduledTask`` reports a refusal as
-        a non-terminating error that would otherwise exit 0 and be recorded as
-        a launch.
-
         Args:
             target: Absolute remote directory holding the staged tree.
             run_id: The dispatch, which names its own task.
 
         Returns:
-            The script's text.
+            :func:`fleet.core.windows_task.launch_script`'s text, which says
+            why Task Scheduler and why it waits for the build's process id.
         """
-        task = names.task_name(run_id)
-        build = f"{target}/{names.BUILD_STEM}.ps1"
-        return (
-            f"$ErrorActionPreference = 'Stop'\n"
-            f"$action = New-ScheduledTaskAction -Execute 'powershell.exe' "
-            f"-Argument '-NoProfile -ExecutionPolicy Bypass -File \"{build}\"'\n"
-            f"$settings = New-ScheduledTaskSettingsSet -Priority 4 "
-            f"-ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew "
-            f"-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries\n"
-            f"$principal = New-ScheduledTaskPrincipal "
-            f"-UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) "
-            f"-LogonType S4U\n"
-            f"Register-ScheduledTask -TaskName '{task}' -Action $action "
-            f"-Settings $settings -Principal $principal -Force | Out-Null\n"
-            f"Start-ScheduledTask -TaskName '{task}'\n"
-            f"$deadline = (Get-Date).AddSeconds({LAUNCH_TIMEOUT_SECONDS})\n"
-            f"while ((Get-Date) -lt $deadline) {{\n"
-            f"  if ((Get-ScheduledTaskInfo -TaskName '{task}').LastTaskResult "
-            f"-ne {TASK_HAS_NOT_RUN}) {{ Write-Output 'launched'; exit 0 }}\n"
-            f"  Start-Sleep -Milliseconds 500\n"
-            f"}}\n"
-            f'throw "{task} registered but has not run after {LAUNCH_TIMEOUT_SECONDS}s"\n'
-        )
+        return windows_task.launch_script(target=target, run_id=run_id)
 
     def result_script(self, target: str) -> str:
         """Print the status and the epoch second it was written, or nothing.
@@ -506,55 +492,16 @@ class WindowsDialect:
     def stop_script(self, *, target: str, run_id: str) -> str:
         """End the build's process tree, then stop and unregister the task.
 
-        STOPPING THE TASK IS NOT STOPPING THE BUILD. ``Stop-ScheduledTask``
-        ends the process the task started and leaves its children running:
-        measured on sedona 2026-09-23, a probe task whose ``build.ps1`` ran a
-        native child read parent alive=False, child alive=True afterwards. So
-        the tree is ended first, by the process id the build recorded as its
-        first act, with ``taskkill /T /F``, which on the same probe ended the
-        parent, its child and its grandchild.
-
-        THE ID IS CHECKED BEFORE ANYTHING IS KILLED. A recorded id outlives
-        its process, and Windows reuses ids, so the kill happens only when
-        the process holding that id right now is running this dispatch's own
-        ``build.ps1``, read off its command line. A build that has finished
-        or died leaves an id that names nothing or names a stranger, and
-        either way nothing is killed. It kills by id and never by name or
-        pattern, which is the fleet's one rule about killing.
-
-        ``-Confirm:$false`` because there is nobody at the node to answer, and
-        an unanswered prompt would hang the cancel until its ssh timeout
-        rather than stopping anything.
-
         Args:
             target: Absolute remote directory holding the staged tree and the
                 build's recorded process id.
             run_id: The dispatch.
 
         Returns:
-            The script's text. ``taskkill`` exiting non-zero on a verified
-            process fails the script, so a stop that ended nothing is never
-            reported as one that did.
+            :func:`fleet.core.windows_task.stop_script`'s text, which says
+            why the tree is killed first and only by a verified id.
         """
-        task = names.task_name(run_id)
-        pid_file = f"{target}/{names.PID_NAME}"
-        build = f"{target}/{names.BUILD_STEM}.ps1"
-        return (
-            f"if (Test-Path -LiteralPath '{pid_file}') {{\n"
-            f"  $buildPid = [int](Get-Content -Raw -LiteralPath '{pid_file}').Trim()\n"
-            f'  $process = Get-CimInstance Win32_Process -Filter "ProcessId=$buildPid"\n'
-            f"  if ($null -ne $process -and $process.CommandLine -like '*{build}*') {{\n"
-            f"    & taskkill.exe /PID $buildPid /T /F\n"
-            f"    if ($LASTEXITCODE -gt 0) {{\n"
-            f'      throw "taskkill of $buildPid exited $LASTEXITCODE"\n'
-            f"    }}\n"
-            f"  }}\n"
-            f"}}\n"
-            f"Stop-ScheduledTask -TaskName '{task}' -ErrorAction SilentlyContinue\n"
-            f"Unregister-ScheduledTask -TaskName '{task}' -Confirm:$false "
-            f"-ErrorAction SilentlyContinue\n"
-            f"Write-Output 'stopped {task}'\n"
-        )
+        return windows_task.stop_script(target=target, run_id=run_id)
 
     def capacity_probe_script(self) -> str:
         """The constant capacity probe.
@@ -575,10 +522,8 @@ class WindowsDialect:
 
 __all__ = [
     "CAPACITY_PROBE_SCRIPT",
-    "LAUNCH_TIMEOUT_SECONDS",
     "OBSERVE_SESSIONS_SCRIPT",
     "POWERSHELL_INVOCATION",
-    "TASK_HAS_NOT_RUN",
     "WRITE_COMMAND",
     "WindowsDialect",
 ]

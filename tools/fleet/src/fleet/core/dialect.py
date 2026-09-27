@@ -43,10 +43,19 @@ script's unless the script says so. The transport saw success, the stage
 reported success, and the node held a companion directory that did not exist.
 ``sh`` has the opposite default: the last command's status IS the script's,
 and ``set -e`` stops at the first failure. So the shared functions return
-COMMAND LINES and each dialect wraps them in its own status handling
+COMMANDS and each dialect wraps them in its own status handling
 (:meth:`Dialect.checked_script`) -- one place per platform where "a command
 that failed ends the script with its status" is written down, rather than one
 per script where it can be forgotten.
+
+A COMMAND IS AN ARGUMENT VECTOR, NOT A LINE, since MCPs board task d69786fa
+(2026-09-27). Each dialect renders the words its own way: ``sh`` quotes them
+with :func:`shlex.quote`, and PowerShell names each tool through a parameter
+(``tar`` as System32's own, by absolute path) so the Pester suite over the
+committed render can run it against a stand-in. As one line, ``tar`` was
+resolved through ``PATH`` on Windows, and a shell whose ``PATH`` put Git's
+``usr/bin`` first ran GNU tar, which reads ``C:`` as a remote host (the
+harness-gate tick, 2026-09-26).
 """
 
 from __future__ import annotations
@@ -69,20 +78,28 @@ EXPORT_AUTHOR_NAME = "fleet"
 EXPORT_AUTHOR_EMAIL = "fleet@corvis.invalid"
 
 
-def _commit_command(target: str, message: str) -> str:
+def _commit_command(target: str, message: str) -> tuple[str, ...]:
     """The one commit of a staged tree, under the export identity.
 
     Args:
         target: Absolute remote directory holding the repository.
-        message: The commit message; single-quoted into the script, so it
-            carries no quote by construction (a sha or a run id).
+        message: The commit message (a sha or a run id in words).
 
     Returns:
-        The command line.
+        The command, as an argument vector.
     """
     return (
-        f"git -C '{target}' -c user.name='{EXPORT_AUTHOR_NAME}' "
-        f"-c user.email='{EXPORT_AUTHOR_EMAIL}' commit --quiet --message '{message}'"
+        "git",
+        "-C",
+        target,
+        "-c",
+        f"user.name={EXPORT_AUTHOR_NAME}",
+        "-c",
+        f"user.email={EXPORT_AUTHOR_EMAIL}",
+        "commit",
+        "--quiet",
+        "--message",
+        message,
     )
 
 
@@ -176,7 +193,7 @@ class Dialect(Protocol):
         """
         ...
 
-    def checked_script(self, commands: tuple[str, ...]) -> str:
+    def checked_script(self, commands: tuple[tuple[str, ...], ...]) -> str:
         """Render commands as a script that ends at the first failure.
 
         The one place per platform where "a command that failed ends the
@@ -184,9 +201,8 @@ class Dialect(Protocol):
         carries the silent failure that put it here.
 
         Args:
-            commands: Command lines, in order, each already quoted for a
-                shell that single-quotes a literal the same way on both
-                platforms.
+            commands: Commands in order, each an argument vector whose first
+                word is the tool, rendered with the platform's own quoting.
 
         Returns:
             The script's text: every command in order, and a non-zero
@@ -339,7 +355,7 @@ def for_platform(platform: NodePlatform) -> Dialect:
     return LinuxDialect()
 
 
-def extract_commands(archive: str, destination: str) -> tuple[str, ...]:
+def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], ...]:
     """The command that unpacks a verified archive.
 
     THE SAME COMMAND ON BOTH PLATFORMS: Windows ships bsdtar and the flags
@@ -360,13 +376,12 @@ def extract_commands(archive: str, destination: str) -> tuple[str, ...]:
         destination: Absolute remote directory to unpack it into.
 
     Returns:
-        The one command line, for a dialect's
-        :meth:`Dialect.checked_script`.
+        The one command, for a dialect's :meth:`Dialect.checked_script`.
     """
-    return (f"tar -xzmf '{archive}' -C '{destination}'",)
+    return (("tar", "-xzmf", archive, "-C", destination),)
 
 
-def companion_repository_commands(target: str, sha: str) -> tuple[str, ...]:
+def companion_repository_commands(target: str, sha: str) -> tuple[tuple[str, ...], ...]:
     """The commands that make a staged companion a one-commit repository.
 
     A companion exists to be read as a workspace, and the thing that reads
@@ -391,17 +406,17 @@ def companion_repository_commands(target: str, sha: str) -> tuple[str, ...]:
             message so the tree on the node names what it is.
 
     Returns:
-        The three command lines, in order, for a dialect's
+        The three commands, in order, for a dialect's
         :meth:`Dialect.checked_script`.
     """
     return (
-        f"git -C '{target}' init --quiet",
-        f"git -C '{target}' add --all --force",
+        ("git", "-C", target, "init", "--quiet"),
+        ("git", "-C", target, "add", "--all", "--force"),
         _commit_command(target, f"fleet companion export {sha}"),
     )
 
 
-def init_repository_commands(target: str, run_id: str) -> tuple[str, ...]:
+def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...], ...]:
     """The commands that make a staged tree a one-commit git repository.
 
     THE SAME ON BOTH PLATFORMS, and without them a staged build lints
@@ -456,12 +471,12 @@ def init_repository_commands(target: str, run_id: str) -> tuple[str, ...]:
             node names the run it was staged for.
 
     Returns:
-        The three command lines, in order, for a dialect's
+        The three commands, in order, for a dialect's
         :meth:`Dialect.checked_script`.
     """
     return (
-        f"git -C '{target}' init --quiet",
-        f"git -C '{target}' add --all",
+        ("git", "-C", target, "init", "--quiet"),
+        ("git", "-C", target, "add", "--all"),
         _commit_command(target, f"fleet export {run_id}"),
     )
 
