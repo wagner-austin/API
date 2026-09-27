@@ -217,6 +217,11 @@ class FleetErrorCode(ErrorCodeBase):
     # carried v18.13.0 and was dispatched to, because node was judged on
     # presence alone.
     NODE_NODEJS_MISMATCH = "NODE_NODEJS_MISMATCH"
+    # A node's declared Rust toolchain disagrees with the cargo its probe
+    # reports. The declaration is what gives a node the `rust` tag, so a
+    # runner that claimed on it would hand a Rust-crate build to a node that
+    # cannot compile it (MCPs board task 1e2da299).
+    NODE_RUST_MISMATCH = "NODE_RUST_MISMATCH"
 
     # Staging -- the bytes the node is entitled to run.
     STAGE_DIGEST_MISMATCH = "STAGE_DIGEST_MISMATCH"
