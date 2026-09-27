@@ -26,10 +26,10 @@ test:
 check: lint test
 	@echo "=== ALL CHECKS PASSED ==="
 
-# The host-mode start/stop scripts and the log tail are PowerShell over a
-# Windows path and a Windows-only start (scripts/start.ps1 hard-codes the
-# hub's checkout); the docker route (`make up-grandma` at the root) is the
-# portable one.
+# The host-mode start/stop scripts and the log tail are Windows PowerShell
+# (scripts/start.ps1 and stop.ps1 over GrandmaService.ps1, which read the
+# listening-socket table and end process trees with taskkill); the docker
+# route (`make up-grandma` at the root) is the portable one.
 ifeq ($(OS),Windows_NT)
 up:
 	& .\scripts\start.ps1
@@ -41,7 +41,7 @@ logs:
 	$$logDir = ".\logs"; if (Test-Path "$$logDir\api.log") { Write-Host "=== API Log ===" -ForegroundColor Cyan; Get-Content "$$logDir\api.log" -Tail 50 }; if (Test-Path "$$logDir\web.log") { Write-Host "`n=== Web Log ===" -ForegroundColor Cyan; Get-Content "$$logDir\web.log" -Tail 20 }
 else
 up:
-	@echo "up is Windows-only here (the start script under scripts hard-codes the hub's checkout): use make up-grandma at the root"
+	@echo "up is Windows-only here (the start script is Windows PowerShell over the Windows socket table): use make up-grandma at the root"
 	@exit 1
 
 down:
