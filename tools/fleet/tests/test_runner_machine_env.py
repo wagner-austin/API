@@ -55,6 +55,7 @@ class TestRendered:
         assert runner_machine_env.render_machine_environment_check_lines(spec) == []
         assert [check["check_id"] for check in runner_audit.expected_checks(spec)] == [
             "disk:/:ceiling-150gb:baseline-46gb@2026-09-26",
+            "cache:/home/gharunner/.cache:ceiling-60gb",
             "execution-policy:LocalMachine:RemoteSigned",
             runner_audit.LONG_PATHS_CHECK_ID,
         ]
@@ -62,7 +63,7 @@ class TestRendered:
     def test_each_variable_is_one_row_carrying_its_reason(self) -> None:
         other = MachineVariable(name="PIP_CACHE_DIR", value="C:\\fleet\\pip", reason="also")
         checks = runner_audit.expected_checks(_host([_POETRY, other]))
-        assert checks[3:] == [
+        assert checks[4:] == [
             runner_audit.ExpectedCheck(check_id="machine-env:POETRY_CACHE_DIR", reason="why"),
             runner_audit.ExpectedCheck(check_id="machine-env:PIP_CACHE_DIR", reason="also"),
         ]

@@ -61,6 +61,9 @@ def _disk(**overrides: JSONValue) -> dict[str, JSONValue]:
         "ceiling_gb": 150,
         "baseline_gb": 46,
         "baseline_measured": "2026-09-26",
+        "cache_path": "/home/gharunner/.cache",
+        "cache_ceiling_gb": 60,
+        "work_ceiling_gb": 15,
     }
     raw.update(overrides)
     return raw
@@ -221,3 +224,31 @@ class TestDiskCeiling:
     def test_a_date_that_is_not_iso_is_refused(self, date: str) -> None:
         with pytest.raises(JSONTypeError, match="YYYY-MM-DD"):
             decode_disk_ceiling(_disk(baseline_measured=date))
+
+    def test_the_cache_ceilings_decode(self) -> None:
+        disk = decode_disk_ceiling(_disk())
+        assert (disk["cache_path"], disk["cache_ceiling_gb"], disk["work_ceiling_gb"]) == (
+            "/home/gharunner/.cache",
+            60,
+            15,
+        )
+
+    @pytest.mark.parametrize("path", ["home/gharunner/.cache", "~/.cache", ""])
+    def test_a_cache_path_that_is_not_absolute_is_refused(self, path: str) -> None:
+        with pytest.raises(JSONTypeError, match=f"cache_path must be absolute.*{path!r}"):
+            decode_disk_ceiling(_disk(cache_path=path))
+
+    @pytest.mark.parametrize(("cache", "work"), [(0, 15), (60, 0), (-1, -1)])
+    def test_a_cache_ceiling_that_is_not_positive_is_refused(self, cache: int, work: int) -> None:
+        with pytest.raises(
+            JSONTypeError,
+            match=f"cache_ceiling_gb and work_ceiling_gb must be positive, got {cache} and {work}",
+        ):
+            decode_disk_ceiling(_disk(cache_ceiling_gb=cache, work_ceiling_gb=work))
+
+    @pytest.mark.parametrize("field", ["cache_path", "cache_ceiling_gb", "work_ceiling_gb"])
+    def test_a_missing_cache_field_is_refused(self, field: str) -> None:
+        raw = _disk()
+        del raw[field]
+        with pytest.raises(JSONTypeError, match=field):
+            decode_disk_ceiling(raw)

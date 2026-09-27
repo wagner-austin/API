@@ -46,7 +46,14 @@ def a_base() -> HostBase:
             )
         ],
         execution_policy="RemoteSigned",
-        disk=DiskCeiling(ceiling_gb=150, baseline_gb=46, baseline_measured="2026-09-26"),
+        disk=DiskCeiling(
+            ceiling_gb=150,
+            baseline_gb=46,
+            baseline_measured="2026-09-26",
+            cache_path="/home/gharunner/.cache",
+            cache_ceiling_gb=60,
+            work_ceiling_gb=15,
+        ),
     )
 
 
@@ -77,7 +84,14 @@ def base_json() -> dict[str, JSONValue]:
             {"name": "POETRY_CACHE_DIR", "value": "C:\\fleet\\poetry", "reason": "out of System32"}
         ],
         "execution_policy": "RemoteSigned",
-        "disk": {"ceiling_gb": 150, "baseline_gb": 46, "baseline_measured": "2026-09-26"},
+        "disk": {
+            "ceiling_gb": 150,
+            "baseline_gb": 46,
+            "baseline_measured": "2026-09-26",
+            "cache_path": "/home/gharunner/.cache",
+            "cache_ceiling_gb": 60,
+            "work_ceiling_gb": 15,
+        },
     }
 
 

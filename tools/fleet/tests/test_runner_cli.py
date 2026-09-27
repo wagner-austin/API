@@ -77,17 +77,42 @@ def _clean_transcript(name: str) -> str:
         name: The host's name.
 
     Returns:
-        The OK lines: the disk, policy and long-paths rows every host
-        reports, the fixture base's one machine variable, then the one
-        install's two.
+        The OK lines: the disk row, the cache rows for the account's cache
+        and the one install's _work tree, the policy and long-paths rows
+        every host reports, the fixture base's one machine variable, then
+        the one install's two.
     """
     return (
         "CHECK disk:/:ceiling-150gb:baseline-46gb@2026-09-26 OK\n"
+        "CHECK cache:/home/gharunner/.cache:ceiling-60gb OK\n"
+        "CHECK cache:/home/gharunner/actions-runner-1/_work:ceiling-15gb OK\n"
         "CHECK execution-policy:LocalMachine:RemoteSigned OK\n"
         "CHECK long-paths:win32-and-git OK\n"
         "CHECK machine-env:POETRY_CACHE_DIR OK\n"
         f"CHECK service:wsl:actions.runner.wagner-austin-API.{name}-wsl.service OK\n"
         f"CHECK workdir:wagner-austin/API:wsl:{name}-wsl OK\n"
+    )
+
+
+#: The cache row of the pre-existing install's _work tree.
+_EXISTING_WORK_ROW = "CHECK cache:/home/gharunner/actions-runner-1/_work:ceiling-15gb OK\n"
+
+
+def _with_onboarded_work_row(transcript: str) -> str:
+    """A clean transcript with the onboarded install's _work cache row added.
+
+    Args:
+        transcript: The clean transcript of the host before onboarding.
+
+    Returns:
+        The same lines with the new install's cache row after the existing
+        install's, where the audit reports it: cache rows follow the disk
+        row, in roster order.
+    """
+    return transcript.replace(
+        _EXISTING_WORK_ROW,
+        _EXISTING_WORK_ROW
+        + "CHECK cache:/home/gharunner/actions-runner-x-1/_work:ceiling-15gb OK\n",
     )
 
 
@@ -335,7 +360,7 @@ class TestOnboardMode:
         # The post-onboard audit covers the pre-existing install AND the new
         # wsl one, in roster order.
         transcript = (
-            _clean_transcript("lavender")
+            _with_onboarded_work_row(_clean_transcript("lavender"))
             + "CHECK service:wsl:actions.runner.wagner-austin-x.lavender-wsl.service OK\n"
             + "CHECK workdir:wagner-austin/x:wsl:lavender-wsl OK\n"
         )
@@ -375,7 +400,7 @@ class TestOnboardMode:
         exit code carries the audit's verdict, not the provisioning's."""
         spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
         transcript = (
-            _clean_transcript("lavender")
+            _with_onboarded_work_row(_clean_transcript("lavender"))
             + "CHECK service:wsl:actions.runner.wagner-austin-x.lavender-wsl.service "
             "DRIFT it said: inactive\n" + "CHECK workdir:wagner-austin/x:wsl:lavender-wsl OK\n"
         )

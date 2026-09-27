@@ -85,8 +85,10 @@ def _host(
     )
 
 
-#: The two rows every host reports whatever else it declares.
+#: The rows every host reports whatever else it declares.
 _DISK_ID = "disk:/:ceiling-150gb:baseline-46gb@2026-09-26"
+_CACHE_ID = "cache:/home/gharunner/.cache:ceiling-60gb"
+_WORK_ID = "cache:/home/gharunner/actions-runner-api-1/_work:ceiling-15gb"
 _POLICY_ID = "execution-policy:LocalMachine:RemoteSigned"
 _LONG_ID = runner_audit.LONG_PATHS_CHECK_ID
 _ENV_ID = "machine-env:POETRY_CACHE_DIR"
@@ -116,6 +118,8 @@ class TestExpectedChecks:
             "keepalive:wsl-keepalive",
             "memory-floor:26gb",
             _DISK_ID,
+            _CACHE_ID,
+            _WORK_ID,
             _POLICY_ID,
             _LONG_ID,
             _ENV_ID,
@@ -140,6 +144,8 @@ class TestExpectedChecks:
         ids = [check["check_id"] for check in runner_audit.expected_checks(spec)]
         assert ids == [
             _DISK_ID,
+            _CACHE_ID,
+            _WORK_ID,
             _POLICY_ID,
             _LONG_ID,
             _ENV_ID,
@@ -190,18 +196,18 @@ class TestParseAuditTranscript:
     def test_a_clean_transcript_scores_every_check_ok(self) -> None:
         spec = _host()
         findings = runner_audit.parse_audit_transcript(spec, _clean_transcript(spec))
-        assert [finding["ok"] for finding in findings] == [True] * 14
+        assert [finding["ok"] for finding in findings] == [True] * 16
         assert findings[0]["reason"].startswith("the scheduled task")
 
     def test_a_drift_line_carries_its_detail_and_reason(self) -> None:
         spec = _host()
         lines = _clean_transcript(spec).splitlines()
-        lines[6] = (
+        lines[8] = (
             "CHECK gpu:wagner-austin/API:wsl:lavender-wsl DRIFT "
             "nvidia-smi on the runner PATH said: "
         )
         findings = runner_audit.parse_audit_transcript(spec, "\n".join(lines))
-        drifted = findings[6]
+        drifted = findings[8]
         assert drifted["ok"] is False
         assert drifted["detail"] == "nvidia-smi on the runner PATH said: "
         assert drifted["reason"] == "runner jobs on this host digest a real GPU"
@@ -209,7 +215,7 @@ class TestParseAuditTranscript:
     def test_blank_lines_are_not_checks(self) -> None:
         spec = _host()
         transcript = "\n\n" + _clean_transcript(spec) + "\n"
-        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 14
+        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 16
 
     def test_a_non_check_line_is_unparsable(self) -> None:
         spec = _host()
