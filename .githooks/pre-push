@@ -76,7 +76,7 @@ ZERO="0000000000000000000000000000000000000000"
 # commit-tasks reads each pushed commit's message ('board task <id>' names
 # one) and asks the board's task_registration, which resolves every named
 # id, so a made-up one is refused too, run as MCPs' origin/main carries it
-# (published-maketools.sh), with the board's address from ../MCPs. It
+# (published_maketools.py), with the board's address from ../MCPs. It
 # runs FIRST, before the GitHub check below that ends a push to any other
 # remote, so no remote escapes it; the one push it never sees is the
 # mirror's own, which ended above. There is no variable that skips it and
@@ -88,9 +88,9 @@ printf '%s\n' "$PUSH_INPUT" | while read -r _ct_local_ref ct_local_sha _ct_remot
     [ -z "$ct_local_sha" ] && continue
     [ "$ct_local_sha" = "$ZERO" ] && continue
     if [ "$ct_remote_sha" = "$ZERO" ]; then
-        sh "$REPO/.githooks/published-maketools.sh" commit-tasks "$MCPS" "$REPO" "$ct_local_sha" "^origin/main" < /dev/null
+        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" "$ct_local_sha" "^origin/main" < /dev/null
     else
-        sh "$REPO/.githooks/published-maketools.sh" commit-tasks "$MCPS" "$REPO" "$ct_remote_sha..$ct_local_sha" < /dev/null
+        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" "$ct_remote_sha..$ct_local_sha" < /dev/null
     fi
 done
 
