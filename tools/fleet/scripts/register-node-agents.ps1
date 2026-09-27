@@ -41,7 +41,7 @@
     Unregister every node's task with: register-node-agents.ps1 -UnregisterAll
 
 .PARAMETER Workspace
-    The fleet.json to read the nodes from. Defaults to the one beside this
+    The fleet.json to read the nodes from; empty means the one beside this
     package.
 
 .PARAMETER UnregisterAll
@@ -51,22 +51,45 @@
     What every node task's name starts with, before the alias.
 
 .PARAMETER Tick
-    The script each node task runs, and the announce runs once.
+    The script each node task runs, and the announce runs once; empty means
+    run-node-agent-tick.ps1 beside this one.
 
 .PARAMETER PowerShell
     The powershell.exe the announce runs in.
+
+.PARAMETER Register
+    Registers one node's task: FleetSchedule.ps1's Register-FleetTick. The
+    suite records the call instead, where registering the real tick would
+    start a real agent within three minutes.
+
+.NOTES
+    The defaults naming this script's directory are resolved in the body,
+    not the param block, because $PSScriptRoot is empty in an advanced
+    script's param default under -File in Windows PowerShell 5.1;
+    run-agent-tick.ps1 carries the incident.
 #>
 [CmdletBinding()]
 param(
-    [string]$Workspace = "$PSScriptRoot\..\fleet.json",
+    [string]$Workspace = '',
     [switch]$UnregisterAll,
     [string]$TaskPrefix = 'API-FleetNode-',
-    [string]$Tick = "$PSScriptRoot\run-node-agent-tick.ps1",
-    [string]$PowerShell = "$PSHOME\powershell.exe"
+    [string]$Tick = '',
+    [string]$PowerShell = "$PSHOME\powershell.exe",
+    [scriptblock]$Register = {
+        param([string]$TaskName, [string]$Tick, [string]$TickArguments, [string]$Description)
+        Register-FleetTick -TaskName $TaskName -Tick $Tick -TickArguments $TickArguments -Description $Description
+    }
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'FleetSchedule.ps1')
+
+if ($Workspace -eq '') {
+    $Workspace = "$PSScriptRoot\..\fleet.json"
+}
+if ($Tick -eq '') {
+    $Tick = "$PSScriptRoot\run-node-agent-tick.ps1"
+}
 
 $taskSuffix = '-3min'
 
@@ -119,8 +142,8 @@ foreach ($task in $registered) {
 
 foreach ($alias in $enabled) {
     $taskName = "$TaskPrefix$alias$taskSuffix"
-    $identity = Register-FleetTick -TaskName $taskName -Tick $Tick -TickArguments " -Node $alias" `
-        -Description "One fleet-node-agent tick for ${alias}: claim the node lane's jobs ${alias} carries the tags for (API tools/fleet). See register-node-agents.ps1."
+    $identity = & $Register $taskName $Tick " -Node $alias" `
+        "One fleet-node-agent tick for ${alias}: claim the node lane's jobs ${alias} carries the tags for (API tools/fleet). See register-node-agents.ps1."
     # The announce runs in this console, synchronously, so a refused
     # check-in is seen here rather than in a log nobody reads yet.
     & $PowerShell -NoProfile -ExecutionPolicy Bypass -File $Tick -Node $alias -Announce

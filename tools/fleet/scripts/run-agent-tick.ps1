@@ -51,21 +51,33 @@
     suite runs this entry against a stand-in poetry and a scratch log.
 
 .PARAMETER ApiRoot
-    The API checkout.
+    The API checkout; empty means the one this script is in.
 
 .PARAMETER EnvironmentScript
-    The hpc-wake pump's runs/env.ps1.
+    The hpc-wake pump's runs/env.ps1; empty means the one in ApiRoot.
 
 .PARAMETER Poetry
     The poetry executable.
 
 .PARAMETER LogDirectory
     Where the day's log goes.
+
+.NOTES
+    The roots default to empty and are resolved in the body because
+    $PSScriptRoot is EMPTY inside a param default of an advanced script
+    ([CmdletBinding()]) when Windows PowerShell 5.1 runs it with -File, which
+    is how Task Scheduler runs this one (a plain script, or the same script
+    run with &, sees it set). The defaults "$PSScriptRoot\..\..\.." and
+    "$PSScriptRoot\..\..\hpc-wake\runs\env.ps1" lost their root, the API
+    root resolved to C:\, whose empty parent Join-Path refused before the
+    tick logged anything, and every
+    scheduled tick from 16:27Z on 2026-09-27 exited 1 (MCPs board task
+    d69786fa).
 #>
 [CmdletBinding()]
 param(
-    [string]$ApiRoot = "$PSScriptRoot\..\..\..",
-    [string]$EnvironmentScript = "$PSScriptRoot\..\..\hpc-wake\runs\env.ps1",
+    [string]$ApiRoot = '',
+    [string]$EnvironmentScript = '',
     [string]$Poetry = 'poetry',
     [string]$LogDirectory = "$env:LOCALAPPDATA\Temp\claude"
 )
@@ -73,7 +85,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'FleetTick.ps1')
 
+if ($ApiRoot -eq '') {
+    $ApiRoot = "$PSScriptRoot\..\..\.."
+}
 $apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
+if ($EnvironmentScript -eq '') {
+    $EnvironmentScript = "$apiRoot\tools\hpc-wake\runs\env.ps1"
+}
 $mcpsRoot = Join-Path (Split-Path -Parent $apiRoot) 'MCPs'
 # THE ROLLED COMMIT RUNS, NEVER THIS CHECKOUT (board task 465689f5).
 # fleet.cli.rolled extracts the commit `make fleet-roll` pointed

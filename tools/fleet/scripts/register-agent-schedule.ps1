@@ -34,17 +34,35 @@
     The task's name.
 
 .PARAMETER Tick
-    The script the task runs.
+    The script the task runs; empty means run-agent-tick.ps1 beside this one.
+
+.PARAMETER Register
+    Registers the task: FleetSchedule.ps1's Register-FleetTick. The suite
+    records the call instead, where registering the real tick would start a
+    real agent within three minutes.
+
+.NOTES
+    The default is resolved in the body, not the param block, because
+    $PSScriptRoot is empty in an advanced script's param default under -File
+    in Windows PowerShell 5.1; run-agent-tick.ps1 carries the incident.
 #>
 [CmdletBinding()]
 param(
     [string]$TaskName = 'API-FleetAgent-3min',
-    [string]$Tick = "$PSScriptRoot\run-agent-tick.ps1"
+    [string]$Tick = '',
+    [scriptblock]$Register = {
+        param([string]$TaskName, [string]$Tick, [string]$TickArguments, [string]$Description)
+        Register-FleetTick -TaskName $TaskName -Tick $Tick -TickArguments $TickArguments -Description $Description
+    }
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'FleetSchedule.ps1')
 
-$identity = Register-FleetTick -TaskName $TaskName -Tick $Tick -TickArguments '' `
-    -Description 'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.'
+if ($Tick -eq '') {
+    $Tick = "$PSScriptRoot\run-agent-tick.ps1"
+}
+
+$identity = & $Register $TaskName $Tick '' `
+    'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.'
 Write-Information "Registered $TaskName (every 3 minutes and at boot, $identity, S4U, Limited)." -InformationAction Continue

@@ -46,10 +46,10 @@
     ledger, and claim nothing. Used once, by register-node-agents.ps1.
 
 .PARAMETER ApiRoot
-    The API checkout, by default the one this script runs from.
+    The API checkout; empty means the one this script is in.
 
 .PARAMETER EnvironmentScript
-    The hpc-wake pump's runs/env.ps1.
+    The hpc-wake pump's runs/env.ps1; empty means the one in ApiRoot.
 
 .PARAMETER Poetry
     The poetry executable.
@@ -57,6 +57,11 @@
 .PARAMETER LogDirectory
     Where the day's log goes: one file per node per day, beside the hub
     tick's. The credentials, the log and the run are FleetTick.ps1's.
+
+.NOTES
+    The roots are resolved in the body, not in param defaults, because
+    $PSScriptRoot is empty there in an advanced script under -File in
+    Windows PowerShell 5.1; run-agent-tick.ps1 carries the incident.
 #>
 [CmdletBinding()]
 param(
@@ -65,8 +70,8 @@ param(
     [string]$Node,
 
     [switch]$Announce,
-    [string]$ApiRoot = "$PSScriptRoot\..\..\..",
-    [string]$EnvironmentScript = "$PSScriptRoot\..\..\hpc-wake\runs\env.ps1",
+    [string]$ApiRoot = '',
+    [string]$EnvironmentScript = '',
     [string]$Poetry = 'poetry',
     [string]$LogDirectory = "$env:LOCALAPPDATA\Temp\claude"
 )
@@ -74,7 +79,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'FleetTick.ps1')
 
+if ($ApiRoot -eq '') {
+    $ApiRoot = "$PSScriptRoot\..\..\.."
+}
 $apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
+if ($EnvironmentScript -eq '') {
+    $EnvironmentScript = "$apiRoot\tools\hpc-wake\runs\env.ps1"
+}
 $fleetRoot = Join-Path $apiRoot 'tools\fleet'
 # THE ROLLED COMMIT RUNS, NEVER THIS CHECKOUT (board task 465689f5).
 # fleet.cli.rolled extracts the commit `make fleet-roll` pointed
