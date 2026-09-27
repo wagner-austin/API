@@ -14,21 +14,20 @@ things they pin -- no inner quote in the argument, a wait for the task to
 actually start, the battery settings -- are each the difference between a
 dispatch that runs and one that silently does not, and each was found by
 reading a task's XML off a node rather than by reasoning about the string.
-The toolchain probe IS run for real here, on this machine, because it is a
-Windows hub. The scripts moved into tools/fleet/rendered (the capacity
-probe, the session observer, the directory, digest and result scripts) are
-run for real by tests/pester/rendered-dialect-state.Tests.ps1 instead, under
-MCPs' PowerShell harness (MCPs board task d69786fa).
+The Python install guard IS run for real here, on this machine, because it
+is a Windows hub. The scripts committed under tools/fleet/rendered (the
+probes, the session observer, the directory, digest, result, launch, stop,
+build and log-tail scripts) are run for real by the Pester suites under
+tests/pester instead, under MCPs' PowerShell harness (MCPs board task
+d69786fa).
 """
 
 from __future__ import annotations
 
 import pathlib
-import shutil
 import subprocess
 
 import pytest
-from platform_core.config import config_test_hooks
 
 from fleet.contracts.toolchain import (
     PINNED_PYTHON,
@@ -72,10 +71,6 @@ def _python_registered_here(prefix: str) -> bool:
         if found.returncode == 0:
             return True
     return False
-
-
-#: Where an App Execution Alias for ``python`` sits, below any profile.
-WINDOWSAPPS_ALIAS = pathlib.Path("Microsoft", "WindowsApps", "python.exe")
 
 
 def _build(
@@ -338,69 +333,10 @@ class TestTransportShape:
 
 
 @pytest.mark.host_windows
-class TestProbesForReal:
-    """The toolchain probe and its install guard, executed on this hub.
-
-    This machine is a Windows one, so the assertions can be about what
-    PowerShell 5.1 actually prints. The capacity probe moved to the Pester
-    suite over tools/fleet/rendered. The ``pip`` line in particular was read as absent on a
-    hub that has pip until the probe stopped piping ``python -m pip`` through
-    ``Select-Object -First 1``.
-    """
-
-    def run_probe(self, tmp_path: pathlib.Path, body: str) -> dict[str, str]:
-        """Write a probe under tmp_path, run it by path, and split its lines.
-
-        Args:
-            tmp_path: Where to write it.
-            body: The probe's text.
-
-        Returns:
-            Every ``key=value`` line as a mapping.
-        """
-        script = tmp_path / "probe.ps1"
-        script.write_text(body, encoding="utf-8")
-        completed = subprocess.run(
-            [*POWERSHELL_INVOCATION, str(script)],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-        )
-        assert completed.returncode == 0, completed.stderr
-        fields: dict[str, str] = {}
-        for line in completed.stdout.splitlines():
-            key, _separator, value = line.partition("=")
-            fields[key] = value
-        return fields
-
-    def test_the_toolchain_probe_reports_every_tool_and_pip_by_module(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        fields = self.run_probe(tmp_path, DIALECT.toolchain_probe_script())
-
-        assert set(fields) == {
-            "python",
-            "poetry",
-            "git",
-            "make",
-            "node",
-            "tar",
-            "cargo",
-            "winget",
-            "choco",
-            "pip",
-            "cxx",
-            "docker",
-        }
-        # No Windows node carries the rootless execdocker daemon (MCPs board
-        # task 6c4516af), whatever Docker it may have.
-        assert fields["docker"] == "no="
-        assert fields["python"].startswith("yes=Python 3.")
-        assert fields["pip"].startswith("yes=pip ")
-        assert fields["node"].startswith("yes=v")
-        for value in fields.values():
-            assert value.startswith(("yes=", "no="))
+class TestTheInstallGuardForReal:
+    """The Python install guard, executed on this hub against its own
+    registry. The toolchain probe moved to the Pester suite over
+    tools/fleet/rendered, which lays out the PATH it reads."""
 
     def test_the_python_install_guard_stops_exactly_where_the_version_is_registered(
         self, tmp_path: pathlib.Path
@@ -425,43 +361,23 @@ class TestProbesForReal:
             assert completed.returncode == 0, completed.stderr
             assert completed.stdout.strip() == "clear"
 
-    def test_a_python_only_under_windowsapps_is_absent_and_never_run(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """LAVENDER'S RUNNER, 2026-09-22/23, reproduced on any Windows host:
-        with no real interpreter ahead of it, ``python`` resolves to the
-        WindowsApps alias. The probe reports it absent, and pip with it,
-        without running it: on the hub that alias is the Python Install
-        Manager, which a run could answer by installing something. The alias
-        here is laid out by the test, an empty ``python.exe`` that fails if
-        anything runs it, so the case runs on a node that has none
-        (board task 465689f5)."""
-        alias = tmp_path / WINDOWSAPPS_ALIAS
-        alias.parent.mkdir(parents=True)
-        alias.write_bytes(b"")
-        script = tmp_path / "probe.ps1"
-        script.write_text(DIALECT.toolchain_probe_script(), encoding="utf-8")
-        powershell = shutil.which(POWERSHELL_INVOCATION[0])
-        if powershell is None:
-            pytest.fail("the probes run through powershell, and it is not on this hub's PATH")
-        shell_directory = pathlib.Path(powershell).parent
-        system = shell_directory.parent.parent
-        path = (alias.parent, system, shell_directory)
-        parent = config_test_hooks.get_environment()
-        env = {
-            **{key: value for key, value in parent.items() if key.upper() != "PATH"},
-            "PATH": ";".join(str(entry) for entry in path),
-        }
-        completed = subprocess.run(
-            [*POWERSHELL_INVOCATION, str(script)],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-            env=env,
-        )
 
-        assert completed.returncode == 0, completed.stderr
-        lines = completed.stdout.splitlines()
-        assert "python=no=" in lines
-        assert "pip=no=" in lines
+class TestToolchainProbeText:
+    """The text's contract. The Pester suite over the committed render
+    (tests/pester/rendered-dialect-toolchain.Tests.ps1) runs it against a PATH
+    of stand-in tools, a python under WindowsApps (lavender's runner,
+    2026-09-22/23, board task 465689f5) and a pip that fails."""
+
+    def test_it_runs_under_the_strict_header_and_suppresses_nothing(self) -> None:
+        body = DIALECT.toolchain_probe_script()
+
+        assert "Set-StrictMode -Version Latest\n$ErrorActionPreference = 'Stop'\n" in body
+        assert "SilentlyContinue" not in body
+        assert "Get-Command" not in body
+
+    def test_every_tool_answers_through_cmd_exes_redirection(self) -> None:
+        body = DIALECT.toolchain_probe_script()
+
+        assert '[string]$Cmd = "$env:SystemRoot\\System32\\cmd.exe",' in body
+        assert '    $lines = & $Shell /d /s /c "`"$Path`" $Arguments 2>&1"' in body
+        assert body.count(" 2>&1") == 1

@@ -66,6 +66,7 @@ class TestTheCommittedCopies:
             "rebuild-boot-instant",
             "rebuild-restart",
             "dialect-capacity-probe",
+            "dialect-toolchain-probe",
             "dialect-observe-sessions",
             "dialect-make-directory",
             "dialect-reset-directory",
