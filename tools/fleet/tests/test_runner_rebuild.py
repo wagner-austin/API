@@ -217,7 +217,7 @@ class TestWslConf:
         _test_hooks.run = runner
         report = runner_rebuild.rebuild(spec)
         assert report["steps"][2] == "wsl.conf: written, and the distro restarted into systemd"
-        assert runner.stdin[7] == b"wsl --terminate 'Ubuntu'\nexit $LASTEXITCODE\n"
+        assert runner.stdin[7] == runner_rebuild.render_terminate_script("Ubuntu").encode()
 
 
 class TestTheReboot:
@@ -254,9 +254,8 @@ class TestTheReboot:
             "(booted 2026-09-26T13:03:00.0000000Z)"
         )
         assert sleeper.slept == [runner_rebuild.REBOOT_POLL_SECONDS] * 3
-        assert runner.stdin[4] == (
-            b"shutdown.exe /r /t 10 /c 'fleet-runners --rebuild'\nexit $LASTEXITCODE\n"
-        )
+        assert runner.stdin[2] == runner_rebuild.render_boot_instant_script().encode()
+        assert runner.stdin[4] == runner_rebuild.render_restart_script().encode()
 
     def test_a_host_that_never_comes_back_is_unreachable_with_the_way_on(self) -> None:
         spec = _host()
