@@ -222,6 +222,10 @@ class FleetErrorCode(ErrorCodeBase):
     # runner that claimed on it would hand a Rust-crate build to a node that
     # cannot compile it (MCPs board task 1e2da299).
     NODE_RUST_MISMATCH = "NODE_RUST_MISMATCH"
+    # The same for the C++ toolchain node-gyp uses: an npm ci that rebuilds
+    # a native module on a node without one fails before any test runs
+    # (MCPs board task 3f19c136).
+    NODE_CXX_MISMATCH = "NODE_CXX_MISMATCH"
 
     # Staging -- the bytes the node is entitled to run.
     STAGE_DIGEST_MISMATCH = "STAGE_DIGEST_MISMATCH"
