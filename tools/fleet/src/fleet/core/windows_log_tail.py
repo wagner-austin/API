@@ -1,9 +1,12 @@
 """The last lines of a Windows build transcript, read at a cost that does not grow with it.
 
 WHY NOT ``Get-Content -Tail`` (MCPs board task 704f324f). The Windows build
-appends every step to its transcript with ``*>>``, and Windows PowerShell 5.1
-writes that redirection as UTF-16LE with a byte-order mark. On a transcript
-that size ``Get-Content -Tail 200`` did not return within the collector's
+appended every step to its transcript with ``*>>`` until 2026-09-27, and
+Windows PowerShell 5.1 writes that redirection as UTF-16LE with a byte-order
+mark; since then cmd.exe appends the tools' own bytes, UTF-8 in practice
+(:mod:`fleet.core.windows_build`), and a node still running an earlier roll
+writes the UTF-16 form. On a UTF-16 transcript of this size
+``Get-Content -Tail 200`` did not return within the collector's
 120-second deadline: measured 2026-09-26 on sedona, run
 ``tools-fleet-1790400468`` finished at 05:31:41Z with a 2,973,062-byte log,
 and every collect tick for the next hour died at ``log-tail.ps1`` with

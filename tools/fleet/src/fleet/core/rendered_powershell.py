@@ -41,6 +41,15 @@ EXAMPLE_RUN_ID = "MCPs-packages-maketools-1790000000"
 #: The commit the example dispatch's companion was archived from.
 EXAMPLE_COMPANION_SHA = "5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2"
 
+#: The example dispatch's project, inside its export.
+EXAMPLE_PROJECT = "packages/maketools"
+
+#: The test workers the example dispatch was granted.
+EXAMPLE_WORKERS = 4
+
+#: The example dispatch's install steps.
+EXAMPLE_INSTALL: tuple[tuple[str, ...], ...] = (("npm", "ci"),)
+
 
 class RenderedScript(TypedDict):
     """One rendered script and the name its committed copy carries.
@@ -98,6 +107,16 @@ def _dialect_scripts() -> list[RenderedScript]:
                 dialect.companion_repository_commands(companion, EXAMPLE_COMPANION_SHA)
             ),
         ),
+        RenderedScript(
+            name="dialect-build",
+            text=spoken.build_script(
+                target=target,
+                path=EXAMPLE_PROJECT,
+                workers=EXAMPLE_WORKERS,
+                install=EXAMPLE_INSTALL,
+                cache_root=names.cache_root(EXAMPLE_STAGE_ROOT),
+            ),
+        ),
     ]
 
 
@@ -137,8 +156,11 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
 
 __all__ = [
     "EXAMPLE_COMPANION_SHA",
+    "EXAMPLE_INSTALL",
+    "EXAMPLE_PROJECT",
     "EXAMPLE_RUN_ID",
     "EXAMPLE_STAGE_ROOT",
+    "EXAMPLE_WORKERS",
     "RENDERED_DIRECTORY",
     "RenderedScript",
     "render_all",

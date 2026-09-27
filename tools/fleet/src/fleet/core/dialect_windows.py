@@ -19,8 +19,7 @@ registration interpolates one path and no code.
 
 from __future__ import annotations
 
-from fleet.contracts.project import MAKE_TARGET
-from fleet.core import names, windows_task
+from fleet.core import names, windows_build, windows_task
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
 from fleet.core.windows_log_tail import windows_log_tail_script
@@ -366,27 +365,6 @@ class WindowsDialect:
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
-        ``$LASTEXITCODE`` rather than ``$?`` because the recipe is a native
-        program: PowerShell sets ``$?`` false whenever a native command writes
-        to a redirected stderr, which ``make`` does routinely on a passing run.
-
-        THE CACHES ARE THE NODE'S, NOT THE RUN'S. A clean export carries no
-        ``node_modules``, no ``.venv`` and no browsers, and installing them
-        from the network on every run would make a twelve-minute suite a
-        thirty-minute one. The three package managers each honour one
-        environment variable naming their cache, so the build points all
-        three at ``<stage_root>/cache`` (:func:`fleet.core.names.cache_root`),
-        which every run on the node shares and no run directory contains:
-        the first run fills it and every later run restores from it, which
-        is what "restores dependencies from the node's cache" means here.
-
-        THE INSTALL STEPS RUN AT THE EXPORT ROOT, before the recipe, each
-        appending to the same transcript; the first that exits non-zero ends
-        the build with ITS status in the result file, so a dependency that
-        will not install reads as an install failure in the log and never as
-        the suite's fault. Each token was held to the source grammar at
-        decode (:mod:`fleet.contracts.source`), so it is written bare.
-
         Args:
             target: Absolute remote directory holding the export, its root.
             path: The project's directory inside the export, ``""`` for the
@@ -396,33 +374,13 @@ class WindowsDialect:
             cache_root: The node's cache directory.
 
         Returns:
-            The script's text. Its first act records its own process id in
-            :data:`~fleet.core.names.PID_NAME`, for :meth:`stop_script`, and
-            its last writes the recipe's exit status to the result file.
+            :func:`fleet.core.windows_build.build_script`'s text, which says
+            why every native run goes through cmd.exe and why the caches are
+            the node's.
         """
-        log = names.log_path(target)
-        result = f"{target}/{names.RESULT_NAME}"
-        lines = [
-            f"$PID | Set-Content -LiteralPath '{target}/{names.PID_NAME}'",
-            "$ErrorActionPreference = 'Continue'",
-            f"$env:npm_config_cache = '{cache_root}/npm'",
-            f"$env:POETRY_CACHE_DIR = '{cache_root}/pypoetry'",
-            f"$env:PLAYWRIGHT_BROWSERS_PATH = '{cache_root}/ms-playwright'",
-            f"$env:PYTEST_XDIST_AUTO_NUM_WORKERS = '{workers}'",
-            f"Set-Location -LiteralPath '{target}'",
-        ]
-        for step in install:
-            command = " ".join(step)
-            lines.append(f"Write-Output '$ {command}' *>> '{log}'")
-            lines.append(f"{command} *>> '{log}'")
-            lines.append(
-                f"if ($LASTEXITCODE -ne 0) {{ $LASTEXITCODE | Set-Content -LiteralPath "
-                f"'{result}'; exit 0 }}"
-            )
-        lines.append(f"Set-Location -LiteralPath '{names.recipe_directory(target, path)}'")
-        lines.append(f"make {MAKE_TARGET} *>> '{log}'")
-        lines.append(f"$LASTEXITCODE | Set-Content -LiteralPath '{result}'")
-        return "\n".join(lines) + "\n"
+        return windows_build.build_script(
+            target=target, path=path, workers=workers, install=install, cache_root=cache_root
+        )
 
     def log_tail_script(self, target: str, lines: int) -> str:
         """Print the last lines of the build's transcript, or nothing.
@@ -432,8 +390,9 @@ class WindowsDialect:
             lines: How many lines from the end.
 
         Returns:
-            The script's text, a bounded read from the end of the UTF-16
-            transcript (:mod:`fleet.core.windows_log_tail` says why not
+            The script's text, a bounded read from the end of the
+            transcript in whichever encoding it carries
+            (:mod:`fleet.core.windows_log_tail` says which, and why not
             ``Get-Content -Tail``). An absent transcript prints nothing
             rather than an error: the collector has already read the result
             file, so an empty tail is a build that wrote no transcript, and
