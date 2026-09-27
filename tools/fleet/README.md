@@ -901,9 +901,12 @@ so the task could not be started at all. Nothing failed loudly:
 PowerShell exited 0, and the ledger recorded a run that did not exist.
 
 So the build is its own script file, sent and named by path, and the
-registration interpolates one path and no code. It then waits for the task to
-leave `SCHED_S_TASK_HAS_NOT_RUN` before reporting a launch, because a
-registration that cannot start is not a dispatch.
+registration interpolates one path and no code. It then waits for the build
+to record its own process id, which `build.ps1` writes as its first act,
+before reporting a launch, because a registration that cannot start is not a
+dispatch. It waited for the task to leave `SCHED_S_TASK_HAS_NOT_RUN` until
+2026-09-27, which a task that fails to *start* also leaves, with its launch
+error, and so read as launched (MCPs board task d69786fa).
 
 `-AllowStartIfOnBatteries` and `-DontStopIfGoingOnBatteries` are on the
 settings for the same reason: `New-ScheduledTaskSettingsSet` defaults both to
