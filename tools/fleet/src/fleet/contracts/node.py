@@ -31,7 +31,7 @@ from platform_core.members import find_member
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
-from fleet.contracts.rust import decode_rust
+from fleet.contracts.capability import Capability, decode_capability
 
 
 #: The operating-system family a node runs, which decides every script a
@@ -135,8 +135,14 @@ class NodeConfig(TypedDict):
             ``1.98.1``, or None for a node with no Rust toolchain. Non-null
             gives the node the ``rust`` tag a crate-building project
             requires, and the runner's probe re-measures it every tick
-            (:mod:`fleet.contracts.rust`, MCPs board task 1e2da299).
+            (:mod:`fleet.contracts.capability`, MCPs board task 1e2da299).
             REQUIRED like ``gpu``, null spelled out, for the same reason.
+        cxx: The version of the C++ toolchain node-gyp would build with,
+            as the probe reads it (vswhere's VC tools installationVersion
+            on Windows, ``g++ -dumpfullversion`` on Linux), or None. Gives
+            the ``cxx`` tag every project whose ``npm ci`` rebuilds a native
+            module requires; required and re-measured like ``rust`` (MCPs
+            board task 3f19c136).
         budget: What share of this machine a dispatch may take.
     """
 
@@ -149,6 +155,7 @@ class NodeConfig(TypedDict):
     enabled: bool
     test_database: bool
     rust: str | None
+    cxx: str | None
     budget: NodeBudget
 
 
@@ -246,6 +253,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "enabled": node["enabled"],
         "test_database": node["test_database"],
         "rust": node["rust"],
+        "cxx": node["cxx"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -287,12 +295,14 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
             "database (corvis-fleet-testdb), false otherwise. A Postgres-backed package handed "
             "to a node without one fails its global setup, so neither default is safe."
         )
-    if "rust" not in value:
-        raise JSONTypeError(
-            "node must declare 'rust': the version cargo --version prints on it, or null for a "
-            "node with no Rust toolchain. A crate build handed to a node without cargo fails "
-            "in poetry sync, so an absent key is not a safe way to say none."
-        )
+    for capability in Capability:
+        if capability.value not in value:
+            raise JSONTypeError(
+                f"node must declare {capability.value!r}: the version of that toolchain its "
+                "probe reports, or null for a node without one. A build handed to a node "
+                "without it fails during its install, so an absent key is not a safe way to "
+                "say none."
+            )
     logical_cores = require_int(value, "logical_cores")
     if logical_cores < 1:
         raise JSONTypeError(f"logical_cores must be at least 1, got {logical_cores}")
@@ -309,9 +319,25 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         gpu=None if gpu_value is None else decode_node_gpu(gpu_value),
         enabled=require_bool(value, "enabled"),
         test_database=require_bool(value, "test_database"),
-        rust=decode_rust(value["rust"]),
+        rust=decode_capability(Capability.RUST, value["rust"]),
+        cxx=decode_capability(Capability.CXX, value["cxx"]),
         budget=decode_node_budget(require_dict(value, "budget")),
     )
+
+
+def declared_capability(node: NodeConfig, capability: Capability) -> str | None:
+    """Read a node's declaration of one toolchain.
+
+    Args:
+        node: The node's declaration.
+        capability: The toolchain.
+
+    Returns:
+        The declared version, or None.
+    """
+    if capability is Capability.RUST:
+        return node["rust"]
+    return node["cxx"]
 
 
 def decode_node_platform(value: str) -> NodePlatform:
@@ -381,6 +407,7 @@ __all__ = [
     "NodeGpu",
     "NodePlatform",
     "NodeState",
+    "declared_capability",
     "decode_node_config",
     "decode_node_gpu",
     "decode_node_platform",

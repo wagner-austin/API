@@ -3,15 +3,15 @@
 A project says what it needs (``required_tags``); a node never declares tags
 at all. Its tags are DERIVED from the fields the node contract already
 carries: its ``platform``, whether ``gpu`` is a device rather than None,
-whether it runs the fleet test database (``test_database``), and whether it
-names a Rust toolchain (``rust``). That is the
+whether it runs the fleet test database (``test_database``), and which
+toolchains it names by version (``rust``, ``cxx``). That is the
 whole reason this module exists beside :mod:`node`: a declared ``tags``
 column on the node would be a second copy of those facts, and the copy is
 the one that drifts (a box whose card was pulled would keep its ``gpu`` tag
 until somebody remembered the list). Deriving means the tag is exactly as
 true as the declaration it comes from.
 
-WHY THESE FIVE. ``windows`` and ``linux`` because a suite may run on one
+WHY THESE SIX. ``windows`` and ``linux`` because a suite may run on one
 dialect only: slime's browser project launches Chromium with ANGLE over
 Direct3D 11 and refuses every other platform by name
 (``slime/scripts/chromium-launch.ts``, MCPs board task 41f45bd7), so it needs
@@ -34,7 +34,11 @@ because API ``services/covenant-radar-api`` builds the maturin crate
 ``libs/cleargbm_rs`` from source in ``poetry sync``, and on 2026-09-26 no
 node carried cargo (MCPs board task 1e2da299): the tag means the node
 declares the version its cargo prints, which the runner's probe re-measures
-every tick (:mod:`fleet.contracts.rust`).
+every tick. ``cxx`` because every MCPs TypeScript project's root ``npm ci``
+rebuilds ``hnswlib-node`` under node-gyp, and on 2026-09-27 no Windows node
+had the VC tools it needs (MCPs board task 3f19c136): the tag means the node
+declares the version of the C++ toolchain its probe finds. Both are
+:mod:`fleet.contracts.capability`.
 
 A project naming both platforms is refused at decode: no node is both, so
 the declaration could never match anything, and the honest way to say "either"
@@ -49,14 +53,15 @@ from typing import Final
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.members import find_member
 
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.capability import Capability
+from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
 
 
 class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
-    The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563 and
-    569) is the same five words as these members' values, in this order.
+    The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569
+    and 570) is the same six words as these members' values, in this order.
     """
 
     WINDOWS = "windows"
@@ -64,6 +69,7 @@ class NodeTag(StrEnum):
     GPU = "gpu"
     TESTDB = "testdb"
     RUST = "rust"
+    CXX = "cxx"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -72,6 +78,12 @@ class NodeTag(StrEnum):
 _PLATFORM_TAG: Final[dict[NodePlatform, NodeTag]] = {
     NodePlatform.WINDOWS: NodeTag.WINDOWS,
     NodePlatform.LINUX: NodeTag.LINUX,
+}
+
+#: The tag each declared toolchain carries, for the same reason.
+_CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
+    Capability.RUST: NodeTag.RUST,
+    Capability.CXX: NodeTag.CXX,
 }
 
 
@@ -83,16 +95,19 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
 
     Returns:
         Its platform, plus ``gpu`` when the node declares a CUDA device,
-        ``testdb`` when it declares the fleet test database and ``rust`` when
-        it declares a Rust toolchain.
+        ``testdb`` when it declares the fleet test database, and ``rust`` or
+        ``cxx`` for each toolchain it declares a version of.
     """
     tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
         tags.add(NodeTag.GPU)
     if node["test_database"]:
         tags.add(NodeTag.TESTDB)
-    if node["rust"] is not None:
-        tags.add(NodeTag.RUST)
+    tags.update(
+        tag
+        for capability, tag in _CAPABILITY_TAG.items()
+        if declared_capability(node, capability) is not None
+    )
     return frozenset(tags)
 
 
@@ -118,8 +133,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
     raise JSONTypeError(
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
-        "fleet test database, or a Rust toolchain), and one it does not carry could never "
-        "be satisfied"
+        "fleet test database, or a Rust or C++ toolchain), and one it does not carry could "
+        "never be satisfied"
     )
 
 
