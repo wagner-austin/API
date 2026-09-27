@@ -5,7 +5,7 @@ and until 2026-09-20 every one of those scripts was PowerShell: the fleet was
 three Windows laptops and a Windows hub. diphtheria (Ubuntu 24.04, the corvis
 Docker host) is the first Linux node, and a dispatch to it needs the same
 twelve acts in ``sh`` -- how a file is written over ssh, how a script is run,
-how a directory is made, how the archive is reassembled and digested, how the
+how a directory is made, how the landed archive is digested, how the
 suite is detached from the connection, how its result and the node's capacity
 are read, how a run is stopped. Board task 33bb86ce, Phase C step 3. The
 session observer's two acts joined the set under board task cd5010c4: its
@@ -214,8 +214,8 @@ class Dialect(Protocol):
         """
         ...
 
-    def reassemble_script(self, target: str) -> str:
-        """The script that decodes the archive and prints its digest.
+    def digest_script(self, target: str) -> str:
+        """The script that prints the digest of the archive scp landed.
 
         It must NOT extract: the sender compares the digest first.
 

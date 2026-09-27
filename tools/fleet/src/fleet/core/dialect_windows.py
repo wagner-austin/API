@@ -322,21 +322,17 @@ class WindowsDialect:
             )
         )
 
-    def reassemble_script(self, target: str) -> str:
-        """Decode the one-line base64 and print the SHA-256, extracting nothing.
+    def digest_script(self, target: str) -> str:
+        """Print the landed archive's SHA-256, extracting nothing.
 
         Args:
             target: Absolute remote directory for this dispatch.
 
         Returns:
-            The script's text. ``Get-Content -Raw`` because the archive
-            travels as one line; wrapping would make the decode depend on how
-            the writer chose to fold it.
+            The script's text. ``Get-FileHash`` reports upper case, lowered
+            here so the output is exactly what the sender compares.
         """
         return (
-            f"$encoded = Get-Content -Raw -LiteralPath '{target}/{names.ENCODED_NAME}'\n"
-            f"$bytes = [Convert]::FromBase64String($encoded.Trim())\n"
-            f"[IO.File]::WriteAllBytes('{target}/{names.ARCHIVE_NAME}', $bytes)\n"
             f"(Get-FileHash -Algorithm SHA256 -LiteralPath "
             f"'{target}/{names.ARCHIVE_NAME}').Hash.ToLower()\n"
         )

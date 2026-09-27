@@ -1,8 +1,8 @@
 """What a dispatch's directory on a node is called, file by file.
 
 ONE SPELLING, SHARED BY EVERY DIALECT AND EVERY LIFECYCLE STEP. The build
-writes the result file, the collector reads it, the stager writes the encoded
-archive and the reassembler decodes it; the dispatch registers a task or unit
+writes the result file, the collector reads it, the stager lands the archive
+and the digest script reads it; the dispatch registers a task or unit
 by name and the cancel stops it by the same name. Each of those pairs used to
 spell its name in two places, and the task name in particular was separately
 spelled by the launch and the cancel -- one rename away from a cancel that
@@ -35,11 +35,8 @@ RESULT_NAME = "result.txt"
 #: it stops its whole control group.
 PID_NAME = "build.pid"
 
-#: The reassembled archive, under a dispatch's directory.
+#: The archive as scp lands it, under a dispatch's directory.
 ARCHIVE_NAME = "tree.tgz"
-
-#: The archive as it crossed the transport: standard base64, one line.
-ENCODED_NAME = "tree.b64"
 
 #: The script that runs the suite, which is all it does.
 #:
@@ -62,8 +59,8 @@ LAUNCH_STEM = "launch"
 #: The script the collector runs to ask whether the build has finished.
 COLLECT_STEM = "collect"
 
-#: The script that decodes the archive and prints its digest.
-REASSEMBLE_STEM = "reassemble"
+#: The script that prints the landed archive's digest.
+DIGEST_STEM = "digest"
 
 #: The script that unpacks a verified archive.
 EXTRACT_STEM = "extract"
@@ -283,14 +280,13 @@ __all__ = [
     "COLLECT_STEM",
     "COMPANION_REPOSITORY_STEM",
     "COMPANION_STAGE_SUFFIX",
-    "ENCODED_NAME",
+    "DIGEST_STEM",
     "EXTRACT_STEM",
     "INIT_REPOSITORY_STEM",
     "INSTALL_STEM",
     "LAUNCH_STEM",
     "LOG_TAIL_STEM",
     "PID_NAME",
-    "REASSEMBLE_STEM",
     "RESULT_NAME",
     "TOOLCHAIN_PROBE_STEM",
     "cache_root",

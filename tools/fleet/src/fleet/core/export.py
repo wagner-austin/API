@@ -14,7 +14,7 @@ credentials for every private remote and is the one machine the tailnet
 policy lets reach the others; a node holds no credential and cannot open a
 socket to the hub (docker-compose.diphtheria.yml's header measures the
 packet filter). So the commit travels with the work, through the same
-verified base64 staging every dispatch uses (:mod:`fleet.core.staging`).
+verified staging every dispatch uses (:mod:`fleet.core.staging`).
 
 WHY A SHA THE REMOTE LACKS IS ITS OWN REFUSAL. The ordinary way this fails is
 a session submitting HEAD before pushing it. That is not a fleet fault and not
@@ -453,11 +453,14 @@ class CompanionExport(TypedDict):
     Attributes:
         directory: The declared directory it lands in on the node.
         sha: The commit its ref resolved to on this fetch.
-        data: The gzipped tar's bytes.
+        path: The local file the archive was written to, which scp copies.
+        data: The same archive's bytes, which the node's digest is compared
+            against.
     """
 
     directory: str
     sha: str
+    path: pathlib.Path
     data: bytes
 
 
@@ -485,10 +488,12 @@ def export_companions(
     for companion in companions:
         prepared = prepare_companion(mirrors_root, companion)
         key = companion_mirror_key(companion["remote"])
+        path = archive_dir / f"{key}-{prepared['sha']}.tgz"
         exported.append(
             CompanionExport(
                 directory=companion["directory"],
                 sha=prepared["sha"],
+                path=path,
                 # UNSCOPED, and that is a decision rather than an omission.
                 # A companion is a whole other repository staged beside the
                 # export because the project's check reads it (slime lints
@@ -497,12 +502,7 @@ def export_companions(
                 # data-path scope belongs to the project under check, whose
                 # registry line names its repository; a companion has no
                 # project line and no declaration to read.
-                data=archive_commit(
-                    prepared["mirror"],
-                    prepared["sha"],
-                    archive_dir / f"{key}-{prepared['sha']}.tgz",
-                    (),
-                ),
+                data=archive_commit(prepared["mirror"], prepared["sha"], path, ()),
             )
         )
     return tuple(exported)

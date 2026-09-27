@@ -143,12 +143,16 @@ class Payload(TypedDict):
     """The archive a dispatch stages, and how the feed describes it.
 
     Attributes:
-        data: The gzipped tar's bytes, which the node digests and unpacks.
+        path: The local file the archive was written to, which scp copies
+            to the node (:func:`fleet.core.remote.send_file`).
+        data: The same archive's bytes, which the node's digest is compared
+            against before it unpacks.
         description: What the archive holds, for the ``staged`` feed line:
             counted, never listed (a working tree carries about forty-six
             members; an export is one commit).
     """
 
+    path: pathlib.Path
     data: bytes
     description: str
 
@@ -222,8 +226,11 @@ def working_tree_payload(
         # scratch directory rather than one per workspace, that is two
         # writers on one file. The lease stops them sharing a node, not a
         # filename.
-        data = staging.archive(project_root, members, archive_dir / f"{run_id}-{node_name}.tgz")
-        return Payload(data=data, description=f"{len(members)} member(s) of the working tree")
+        path = archive_dir / f"{run_id}-{node_name}.tgz"
+        data = staging.archive(project_root, members, path)
+        return Payload(
+            path=path, data=data, description=f"{len(members)} member(s) of the working tree"
+        )
 
     return build
 
@@ -358,6 +365,7 @@ def launch(
         platform=node["platform"],
         run_id=run_id,
         stage_root=node["stage_root"],
+        source=payload["path"],
         payload=payload["data"],
     )
     run_lease.emit(
@@ -388,6 +396,7 @@ def launch(
             stage_root=node["stage_root"],
             directory=companion["directory"],
             sha=companion["sha"],
+            source=companion["path"],
             payload=companion["data"],
         )
         run_lease.emit(

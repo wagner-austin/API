@@ -11,14 +11,19 @@ branches -- so "push and pull" would either refuse to dispatch the thing
 somebody is actually working on, or demand a branch nobody wants. The dispatch
 carries the working tree as it is.
 
-WHY THE ARCHIVE TRAVELS AS BASE64. The transport is ssh into PowerShell, and
-raw bytes do not survive it: the stream is decoded as text at more than one
-layer, and a single mangled byte in a gzip member is a corrupt archive that
-extracts partially. Base64 is text by construction, costs a third more bytes,
-and removes the failure mode entirely rather than making it rarer.
+WHY THE ARCHIVE TRAVELS OVER scp. Until 2026-09-26 it travelled as one
+base64 line streamed into the node's write command, because raw bytes do not
+survive ssh INTO POWERSHELL: the stream is decoded as text at more than one
+layer. That kept the bytes intact and made the send's cost grow with the
+archive through a PowerShell pipeline that reads its input line by line, so
+an 83 MB archive (``libs/instrument_io`` with its own fixtures, MCPs board
+task 140e7042) did not land on serendipity within the ssh deadline at all.
+scp copies over ssh's file transfer, where no shell reads the bytes, so they
+arrive unchanged without the encoding: the same archive landed in 7.3 s with
+its digest intact (:func:`fleet.core.remote.send_file`).
 
-THE DIGEST IS COMPARED BEFORE ANYTHING IS EXTRACTED. The node reassembles the
-archive, digests it, and reports; only then is it told to unpack. Verifying
+THE DIGEST IS COMPARED BEFORE ANYTHING IS EXTRACTED. The archive lands, the
+node digests it and reports, and only then is it told to unpack. Verifying
 after extraction would mean an unverified tree had already landed where the
 build will look for it, and a truncated tree builds and fails in a way that
 reads as the code's fault.
@@ -31,7 +36,6 @@ lockfile that IS sent.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import pathlib
 
@@ -150,43 +154,31 @@ def digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def encode(payload: bytes) -> str:
-    """Render an archive as the text that will cross the transport.
-
-    Args:
-        payload: The archive bytes.
-
-    Returns:
-        Standard base64, one line. One line rather than wrapped, because the
-        node reads it in one go (``Get-Content -Raw`` on one platform,
-        ``base64 -d`` on the other) and wrapping would make the decode depend
-        on how the writer chose to fold it.
-    """
-    return base64.b64encode(payload).decode("ascii")
-
-
 def send_verified(
     host: str,
     *,
     platform: NodePlatform,
     into: str,
+    source: pathlib.Path,
     payload: bytes,
     described_as: str,
 ) -> None:
     """Send an archive to a directory on a node and verify it lands whole.
 
     The half of staging that is the same for a project's export and for a
-    companion beside it: the encoded archive lands, the node reassembles and
-    digests it WITHOUT extracting, and the sender compares. Nothing is
-    unpacked here -- the caller decides where the verified bytes go, which
-    is the one thing the two cases do differently.
+    companion beside it: the archive lands over scp, the node digests it
+    WITHOUT extracting, and the sender compares. Nothing is unpacked here --
+    the caller decides where the verified bytes go, which is the one thing
+    the two cases do differently.
 
     Args:
         host: SSH destination.
         platform: The node's declared platform.
-        into: Absolute remote directory, which must already exist, holding
-            the encoded archive and then the archive.
-        payload: The archive bytes.
+        into: Absolute remote directory, which must already exist, that the
+            archive lands in as :data:`fleet.core.names.ARCHIVE_NAME`.
+        source: The local archive file, which scp copies.
+        payload: The same archive's bytes, which the node's digest is
+            compared against.
         described_as: What the archive is, for the mismatch's message.
 
     Raises:
@@ -197,18 +189,18 @@ def send_verified(
             retry loop turns a diagnosable fault into an intermittent one.
     """
     spoken = dialect.for_platform(platform)
-    remote.send_script(host, f"{into}/{names.ENCODED_NAME}", encode(payload), platform=platform)
+    remote.send_file(host, source, f"{into}/{names.ARCHIVE_NAME}")
     received = remote.run_script(
         host,
-        spoken.script_path(into, names.REASSEMBLE_STEM),
-        spoken.reassemble_script(into),
+        spoken.script_path(into, names.DIGEST_STEM),
+        spoken.digest_script(into),
         platform=platform,
     ).strip()
     expected = digest(payload)
     if received != expected:
         raise AppError(
             FleetErrorCode.STAGE_DIGEST_MISMATCH,
-            f"{host} reassembled {described_as} digesting {received or '<nothing>'} where "
+            f"{host} received {described_as} digesting {received or '<nothing>'} where "
             f"{expected} was sent; nothing has been unpacked",
         )
 
@@ -220,6 +212,7 @@ def stage_companion(
     stage_root: str,
     directory: str,
     sha: str,
+    source: pathlib.Path,
     payload: bytes,
 ) -> str:
     """Put one companion repository on a node, beside the exports.
@@ -236,6 +229,7 @@ def stage_companion(
         stage_root: Absolute directory on the node holding staged trees.
         directory: The companion's declared directory name.
         sha: The commit the archive was written from.
+        source: The local archive file.
         payload: The archive bytes.
 
     Returns:
@@ -265,6 +259,7 @@ def stage_companion(
         host,
         platform=platform,
         into=staged,
+        source=source,
         payload=payload,
         described_as=f"the {directory} companion at {sha}",
     )
@@ -289,13 +284,14 @@ def stage(
     platform: NodePlatform,
     run_id: str,
     stage_root: str,
+    source: pathlib.Path,
     payload: bytes,
 ) -> str:
     """Send a project's tree to a node and verify it before unpacking.
 
     The scripts are the node's dialect (:mod:`fleet.core.dialect`): the
-    directory is made, the encoded archive lands, the node reassembles and
-    digests it WITHOUT extracting, and only a digest that matches the
+    directory is made, the archive lands over scp, the node digests it
+    WITHOUT extracting, and only a digest that matches the
     sender's is followed by the extract and the ``git init`` that makes ruff
     honour ``.gitignore`` there.
 
@@ -305,6 +301,7 @@ def stage(
         run_id: The dispatch, which names its own directory so two dispatches
             of one project cannot extract over each other.
         stage_root: Absolute directory on the node holding staged trees.
+        source: The local archive file.
         payload: The archive bytes.
 
     Returns:
@@ -322,7 +319,14 @@ def stage(
         spoken.make_directory_script(target),
         platform=platform,
     )
-    send_verified(host, platform=platform, into=target, payload=payload, described_as="an archive")
+    send_verified(
+        host,
+        platform=platform,
+        into=target,
+        source=source,
+        payload=payload,
+        described_as="an archive",
+    )
     remote.run_script(
         host,
         spoken.script_path(target, names.EXTRACT_STEM),
@@ -342,7 +346,6 @@ __all__ = [
     "EXCLUDED_DIRECTORIES",
     "archive",
     "digest",
-    "encode",
     "send_verified",
     "stage",
     "stage_companion",

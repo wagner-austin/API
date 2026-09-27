@@ -241,8 +241,8 @@ class LinuxDialect:
         """
         return self.checked_script((f"rm -rf '{target}'", f"mkdir -p '{target}'"))
 
-    def reassemble_script(self, target: str) -> str:
-        """Decode the one-line base64 and print the SHA-256, extracting nothing.
+    def digest_script(self, target: str) -> str:
+        """Print the landed archive's SHA-256, extracting nothing.
 
         Args:
             target: Absolute remote directory for this dispatch.
@@ -252,12 +252,7 @@ class LinuxDialect:
             name; only the digest is kept, so the output is exactly what the
             sender compares.
         """
-        encoded = f"{target}/{names.ENCODED_NAME}"
-        archive = f"{target}/{names.ARCHIVE_NAME}"
-        return (
-            f"{PROLOGUE}base64 -d '{encoded}' > '{archive}'\n"
-            f"sha256sum '{archive}' | cut -d ' ' -f 1\n"
-        )
+        return f"{PROLOGUE}sha256sum '{target}/{names.ARCHIVE_NAME}' | cut -d ' ' -f 1\n"
 
     def build_script(
         self,

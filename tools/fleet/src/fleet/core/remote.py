@@ -44,6 +44,7 @@ first thing sent to a node is a probe, and it has to be written somehow.
 
 from __future__ import annotations
 
+import pathlib
 from typing import TypedDict
 
 from platform_core.errors import AppError, FleetErrorCode
@@ -299,6 +300,41 @@ def stream_to_command(host: str, command: str, body: str, *, what: str) -> None:
     _raise_on(_attempt_stream(host, command, body, what=what))
 
 
+def send_file(host: str, source: pathlib.Path, remote_path: str) -> None:
+    """Copy a local file's bytes to a path on a node, over scp.
+
+    For an ARCHIVE, where :func:`send_script` is the wrong transport: that
+    streams text into the platform's write command, and on Windows the
+    command is a PowerShell pipeline that reads its input line by line.
+    Measured 2026-09-26 (MCPs board task 140e7042): an 83,210,142-byte
+    archive, sent that way as one base64 line, did not land on serendipity
+    within :data:`SSH_TIMEOUT_SECONDS`, and scp copied the same file there in
+    7.3 s with the digest intact. scp uses ssh's file transfer, so no shell
+    reads the bytes and nothing re-encodes them, on either platform.
+
+    Its exit status keeps ssh's meaning, measured on OpenSSH for Windows 9.5
+    and Git's scp: 255 when the node cannot be reached, 1 when the node
+    refused the write (a directory that does not exist), which
+    :func:`_failure_for` already tells apart.
+
+    Args:
+        host: SSH destination.
+        source: The local file.
+        remote_path: Absolute path on the node to write, replacing any file
+            there. Its directory must exist.
+
+    Raises:
+        AppError: With ``NODE_UNREACHABLE`` when the node cannot be reached or
+            stops answering before :data:`SSH_TIMEOUT_SECONDS`, or
+            ``DISPATCH_FAILED`` when it refuses the write.
+    """
+    result = _test_hooks.run(
+        ["scp", "-q", *SSH_OPTIONS, str(source), f"{host}:{remote_path}"],
+        timeout_seconds=SSH_TIMEOUT_SECONDS,
+    )
+    _raise_on(_failure_for(host, f"copying {source.name} to {remote_path}", result))
+
+
 def send_script(host: str, remote_path: str, body: str, *, platform: NodePlatform) -> None:
     """Place a script on a node.
 
@@ -411,6 +447,7 @@ __all__ = [
     "run_script",
     "run_script_within",
     "run_ssh",
+    "send_file",
     "send_script",
     "stream_to_command",
 ]
