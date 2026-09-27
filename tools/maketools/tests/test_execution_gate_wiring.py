@@ -82,7 +82,7 @@ def test_every_scheduled_tick_runs_the_rolled_commit(script: str, agent: str) ->
 def test_the_execution_project_runs_tools_fleet_host_cases() -> None:
     makefile = (ROOT / "tools" / "fleet-execution" / "Makefile").read_text(encoding="utf-8")
     assert "\ncheck: lint test\n" in makefile.replace("\r\n", "\n")
-    assert _recipe("tools/fleet-execution/Makefile", "test") == ["$(MAKE) -C ../fleet execution"]
+    assert _recipe("tools/fleet-execution/Makefile", "test") == ["make -C ../fleet execution"]
     assert _recipe("tools/fleet/Makefile", "execution") == [
         "poetry sync --with dev",
         "$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov",
