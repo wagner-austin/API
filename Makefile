@@ -13,11 +13,11 @@ MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 # b6eb30c8's R8). Every up-* target runs infra first, and what it builds is
 # HEAD's, so HEAD's message must name a board task it serves ('board task
 # <id>'), asked of the board by MCPs' maketools as MCPs' origin/main
-# carries it (.githooks/published-maketools.sh), with the MCPs checkout
+# carries it (.githooks/published_maketools.py), with the MCPs checkout
 # beside this one supplying the board's credentials and address. It reads
 # no variable, and a board that cannot be asked stops the deploy.
 commit-tasks:
-	sh .githooks/published-maketools.sh commit-tasks ../MCPs . HEAD^!
+	$(PYTHON) .githooks/published_maketools.py commit-tasks ../MCPs . HEAD^!
 
 infra: commit-tasks
 	docker compose up -d
