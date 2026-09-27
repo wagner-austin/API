@@ -218,7 +218,7 @@ class TestStage:
         )
 
         assert target == f"C:/fleet/stage/{DEMO_RUN_ID}"
-        assert any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
+        assert any(b"Invoke-Step $Tar @('-xzmf'" in (sent or b"") for sent in runner.stdin)
         # Every script went out under the Windows dialect's name and runner.
         assert runner.calls[0][-1].endswith(f"mkdir-{DEMO_RUN_ID}.ps1' -Encoding utf8\"")
         assert runner.calls[1][-6:-1] == dialect_windows.POWERSHELL_INVOCATION
@@ -275,14 +275,14 @@ class TestStage:
         # a command that failed -- the other dialect has to be asked for that
         # and was not, which is the silent stage this pair now pins.
         assert runner.stdin[5] == (
-            f"{dialect_linux.PROLOGUE}tar -xzmf '{target}/tree.tgz' -C '{target}'\n".encode()
+            f"{dialect_linux.PROLOGUE}tar -xzmf {target}/tree.tgz -C {target}\n".encode()
         )
         assert (
             runner.stdin[7]
             == (
-                f"{dialect_linux.PROLOGUE}git -C '{target}' init --quiet\n"
-                f"git -C '{target}' add --all\n"
-                f"git -C '{target}' -c user.name='fleet' -c user.email='fleet@corvis.invalid' "
+                f"{dialect_linux.PROLOGUE}git -C {target} init --quiet\n"
+                f"git -C {target} add --all\n"
+                f"git -C {target} -c user.name=fleet -c user.email=fleet@corvis.invalid "
                 f"commit --quiet --message 'fleet export {DEMO_RUN_ID}'\n"
             ).encode()
         )
@@ -320,7 +320,7 @@ class TestStage:
         )
 
         sent = [payload or b"" for payload in runner.stdin]
-        assert any(b"git -C" in body and b"init" in body for body in sent)
+        assert any(b"Invoke-Step $Git @('-C'" in body and b"'init'" in body for body in sent)
         # After the tree lands: before extraction there is nothing for the
         # ignore rules to cover, and the .gitignore that gives them content
         # arrives with the tree.
@@ -410,7 +410,7 @@ class TestStage:
             f"lavender received an archive digesting {'0' * 64} where "
             f"{staging.digest(b'bytes')} was sent; nothing has been unpacked"
         )
-        assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
+        assert not any(b"Invoke-Step $Tar @('-xzmf'" in (sent or b"") for sent in runner.stdin)
 
 
 class TestStagingACompanion:
@@ -498,7 +498,7 @@ class TestStagingACompanion:
         )
 
         sent = [body or b"" for body in runner.stdin]
-        assert b"rm -rf '/home/corvis/fleet/stage/MCPs'" in sent[0]
+        assert b"rm -rf /home/corvis/fleet/stage/MCPs" in sent[0]
         assert sent.index(sent[0]) < sent.index(
             dialect.for_platform(NodePlatform.LINUX)
             .checked_script(
@@ -530,4 +530,4 @@ class TestStagingACompanion:
 
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
         assert f"the MCPs companion at {COMPANION_SHA}" in excinfo.value.message
-        assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
+        assert not any(b"Invoke-Step $Tar @('-xzmf'" in (sent or b"") for sent in runner.stdin)

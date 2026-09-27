@@ -269,7 +269,8 @@ class TestTransportShape:
         assert command == "mkdir -p \"$(dirname '/s/run-1/x.sh')\" && cat > '/s/run-1/x.sh'"
 
     def test_the_directory_script_is_mkdir_p(self) -> None:
-        assert DIALECT.make_directory_script("/s/run-1").endswith("mkdir -p '/s/run-1'\n")
+        assert DIALECT.make_directory_script("/s/run-1").endswith("mkdir -p /s/run-1\n")
+        assert DIALECT.make_directory_script("/s/run 1").endswith("mkdir -p '/s/run 1'\n")
 
     def test_the_digest_script_digests_the_landed_archive_and_does_not_extract(self) -> None:
         body = DIALECT.digest_script(TARGET)

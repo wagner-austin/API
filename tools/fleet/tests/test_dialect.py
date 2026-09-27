@@ -53,13 +53,25 @@ def test_the_shared_commands_are_the_same_on_both_platforms() -> None:
     what gives packages/db's migrator the HEAD its test admission reads
     (MCPs board task 6bbfd171)."""
     archive = f"/s/run/{names.ARCHIVE_NAME}"
-    assert dialect.extract_commands(archive, "/s/run") == (f"tar -xzmf '{archive}' -C '/s/run'",)
+    assert dialect.extract_commands(archive, "/s/run") == (
+        ("tar", "-xzmf", archive, "-C", "/s/run"),
+    )
     assert dialect.init_repository_commands("/s/run", "MCPs-packages-db-1790400000") == (
-        "git -C '/s/run' init --quiet",
-        "git -C '/s/run' add --all",
-        f"git -C '/s/run' -c user.name='{dialect.EXPORT_AUTHOR_NAME}' "
-        f"-c user.email='{dialect.EXPORT_AUTHOR_EMAIL}' commit --quiet "
-        "--message 'fleet export MCPs-packages-db-1790400000'",
+        ("git", "-C", "/s/run", "init", "--quiet"),
+        ("git", "-C", "/s/run", "add", "--all"),
+        (
+            "git",
+            "-C",
+            "/s/run",
+            "-c",
+            f"user.name={dialect.EXPORT_AUTHOR_NAME}",
+            "-c",
+            f"user.email={dialect.EXPORT_AUTHOR_EMAIL}",
+            "commit",
+            "--quiet",
+            "--message",
+            "fleet export MCPs-packages-db-1790400000",
+        ),
     )
 
 
@@ -68,7 +80,7 @@ def test_the_extract_takes_the_archive_and_the_destination_separately() -> None:
     repository lands in the directory the recipe reads, so the tree committed
     there is the export and nothing else."""
     assert dialect.extract_commands("/s/MCPs.stage/tree.tgz", "/s/MCPs") == (
-        "tar -xzmf '/s/MCPs.stage/tree.tgz' -C '/s/MCPs'",
+        ("tar", "-xzmf", "/s/MCPs.stage/tree.tgz", "-C", "/s/MCPs"),
     )
 
 
@@ -77,13 +89,13 @@ def test_a_companion_is_committed_so_the_check_reading_it_has_a_head() -> None:
     an uncommitted edit in the workspace is not mistaken for the code. On a
     node there is no HEAD until one is made, and the identity is passed rather
     than configured so nothing is left behind on the machine."""
-    assert dialect.companion_repository_commands("/s/MCPs", "a" * 40) == (
-        "git -C '/s/MCPs' init --quiet",
-        "git -C '/s/MCPs' add --all --force",
-        f"git -C '/s/MCPs' -c user.name='{dialect.EXPORT_AUTHOR_NAME}' "
-        f"-c user.email='{dialect.EXPORT_AUTHOR_EMAIL}' commit --quiet "
-        f"--message 'fleet companion export {'a' * 40}'",
+    commands = dialect.companion_repository_commands("/s/MCPs", "a" * 40)
+
+    assert commands[:2] == (
+        ("git", "-C", "/s/MCPs", "init", "--quiet"),
+        ("git", "-C", "/s/MCPs", "add", "--all", "--force"),
     )
+    assert commands[2][-1] == f"fleet companion export {'a' * 40}"
 
 
 class TestCheckedScript:
@@ -92,31 +104,60 @@ class TestCheckedScript:
     sedona 2026-09-22: `New-Item -LiteralPath` (a parameter that cmdlet does
     not have) left a directory uncreated, tar then wrote "could not chdir to
     'C:/fleet/stage/MCPs'" and exited non-zero, and `powershell -File` exited
-    0 -- the transport saw success and the node held nothing."""
+    0 -- the transport saw success and the node held nothing. The PowerShell
+    rendering is run by the Pester suite over its committed copies."""
 
-    def test_powershell_checks_after_every_command_and_exits_with_its_status(self) -> None:
-        assert dialect.for_platform(NodePlatform.WINDOWS).checked_script(("first", "second")) == (
-            "$ErrorActionPreference = 'Stop'\n"
-            "first\n"
-            "if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }\n"
-            "second\n"
-            "if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }\n"
+    def test_powershell_names_each_tool_by_parameter_and_checks_once_per_step(self) -> None:
+        rendered = dialect.for_platform(NodePlatform.WINDOWS).checked_script(
+            (("tar", "-xzmf", "C:/s/t.tgz", "-C", "C:/s"), ("git", "-C", "C:/s", "init"))
         )
 
-    def test_the_check_is_gt_so_an_unset_status_is_not_a_failure(self) -> None:
-        """``$LASTEXITCODE`` is unset until the first NATIVE command runs and
-        ``$null -ne 0`` is true, so ``-ne`` would end a script whose first
-        command is a cmdlet before its second ever ran."""
-        assert "-ne 0" not in dialect.for_platform(NodePlatform.WINDOWS).checked_script(("only",))
+        assert rendered == (
+            "param(\n"
+            '    [string]$Tar = "$env:SystemRoot\\System32\\tar.exe",\n'
+            "    [string]$Git = 'git'\n"
+            ")\n"
+            "Set-StrictMode -Version Latest\n"
+            "$ErrorActionPreference = 'Stop'\n"
+            "function Invoke-Step {\n"
+            "    param([string]$Tool, [string[]]$Arguments)\n"
+            "    & $Tool @Arguments\n"
+            "    if ($LASTEXITCODE -ne 0) {\n"
+            "        exit $LASTEXITCODE\n"
+            "    }\n"
+            "}\n"
+            "Invoke-Step $Tar @('-xzmf', 'C:/s/t.tgz', '-C', 'C:/s')\n"
+            "Invoke-Step $Git @('-C', 'C:/s', 'init')\n"
+        )
+
+    def test_powershell_declares_only_the_tools_its_commands_run(self) -> None:
+        rendered = dialect.for_platform(NodePlatform.WINDOWS).checked_script(
+            (("git", "init"), ("git", "add"))
+        )
+
+        assert "$Tar" not in rendered
+        assert rendered.count("[string]$Git = 'git'") == 1
+
+    def test_powershell_refuses_a_tool_it_has_no_parameter_for(self) -> None:
+        with pytest.raises(ValueError, match="runs only git, tar, not curl"):
+            dialect.for_platform(NodePlatform.WINDOWS).checked_script((("curl", "-O"),))
+
+    def test_powershell_refuses_a_word_that_cannot_be_embedded(self) -> None:
+        with pytest.raises(ValueError, match="argument"):
+            dialect.for_platform(NodePlatform.WINDOWS).checked_script((("git", "it's"),))
 
     def test_sh_needs_nothing_per_command_because_set_e_is_the_default_here(self) -> None:
-        assert dialect.for_platform(NodePlatform.LINUX).checked_script(("first", "second")) == (
-            f"{dialect_linux.PROLOGUE}first\nsecond\n"
+        assert dialect.for_platform(NodePlatform.LINUX).checked_script(
+            (("git", "-C", "/s/run", "init"), ("git", "commit", "--message", "fleet export r"))
+        ) == (
+            f"{dialect_linux.PROLOGUE}git -C /s/run init\ngit commit --message 'fleet export r'\n"
         )
 
     @pytest.mark.parametrize("platform", list(NodePlatform))
     def test_every_command_reaches_the_script_in_order(self, platform: NodePlatform) -> None:
-        rendered = dialect.for_platform(platform).checked_script(("alpha", "beta", "gamma"))
+        rendered = dialect.for_platform(platform).checked_script(
+            (("git", "alpha"), ("git", "beta"), ("git", "gamma"))
+        )
 
         assert rendered.index("alpha") < rendered.index("beta") < rendered.index("gamma")
         assert rendered.endswith("\n")

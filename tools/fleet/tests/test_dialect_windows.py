@@ -37,12 +37,11 @@ from fleet.contracts.toolchain import (
 )
 from fleet.core import names
 from fleet.core.dialect_windows import (
-    LAUNCH_TIMEOUT_SECONDS,
     OBSERVE_SESSIONS_SCRIPT,
     POWERSHELL_INVOCATION,
-    TASK_HAS_NOT_RUN,
     WindowsDialect,
 )
+from fleet.core.windows_task import LAUNCH_TIMEOUT_SECONDS
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 DIALECT = WindowsDialect()
@@ -190,19 +189,22 @@ class TestLaunchScript:
         """
         body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
 
-        assert f'-File "{DIALECT.script_path("C:/s/run-1", names.BUILD_STEM)}"' in body
+        assert "[string]$Target = 'C:/s/run-1'" in body
+        assert f'$build = "$Target/{names.BUILD_STEM}.ps1"' in body
         assert "-Command" not in body
         assert "make check" not in body
 
     def test_the_argument_string_contains_no_single_quotes(self) -> None:
         """The mechanical form of the same defect, asserted directly.
 
-        -Argument is passed as a single-quoted PowerShell string, so ANY
-        single quote inside it terminates the argument early.
+        -Argument is one double-quoted PowerShell string whose only
+        interpolation is the build's path, so no quote from the tree can end
+        it early.
         """
         body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
-        argument = body.split("-Argument '", 1)[1].split("'\n", 1)[0]
+        argument = body.split('-Argument "', 1)[1].split('"\n', 1)[0]
 
+        assert argument == '-NoProfile -ExecutionPolicy Bypass -File `"$build`"'
         assert "'" not in argument
 
     def test_it_survives_the_lid_being_shut(self) -> None:
@@ -215,19 +217,19 @@ class TestLaunchScript:
         assert "-AllowStartIfOnBatteries" in body
         assert "-DontStopIfGoingOnBatteries" in body
 
-    def test_it_waits_for_the_task_to_actually_start(self) -> None:
+    def test_it_waits_for_the_build_to_record_itself(self) -> None:
         """Start-ScheduledTask reports a refusal as a NON-terminating error.
 
         On 2026-09-04 it failed with 'Element not found', PowerShell exited 0,
-        and the dispatch was recorded as running. The script now watches for
-        the task to leave SCHED_S_TASK_HAS_NOT_RUN and throws if it does not.
+        and the dispatch was recorded as running. The script waits for the
+        build's own process id and throws by name when it never appears; the
+        Pester suite over its render runs both outcomes against real tasks.
         """
         body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
 
-        assert "$ErrorActionPreference = 'Stop'" in body
-        assert str(TASK_HAS_NOT_RUN) in body
-        assert str(LAUNCH_TIMEOUT_SECONDS) in body
-        assert "throw" in body
+        assert f"[int]$LaunchSeconds = {LAUNCH_TIMEOUT_SECONDS}" in body
+        assert f'$recorded = "$Target/{names.PID_NAME}"' in body
+        assert "FLEET_LAUNCH_NOT_STARTED" in body
 
 
 class TestResultAndStopScripts:

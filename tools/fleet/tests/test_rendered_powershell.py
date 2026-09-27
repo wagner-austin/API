@@ -71,6 +71,12 @@ class TestTheCommittedCopies:
             "dialect-reset-directory",
             "dialect-digest",
             "dialect-result",
+            "dialect-log-tail",
+            "dialect-launch",
+            "dialect-stop",
+            "dialect-extract",
+            "dialect-init-repository",
+            "dialect-companion-repository",
             *(f"rebuild-terminate-{host['name']}" for host in roster["hosts"]),
         ]
 
