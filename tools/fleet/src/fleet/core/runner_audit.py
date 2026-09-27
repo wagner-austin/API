@@ -34,6 +34,7 @@ from fleet.core.runner_account import (
     render_service_account_check_lines,
     service_account_check_id,
 )
+from fleet.core.runner_audit_cache import cache_rows, render_cache_check_lines
 from fleet.core.runner_base_render import EXECUTION_POLICY_KEY, LONG_PATHS_KEY
 from fleet.core.runner_machine_env import (
     MACHINE_ENVIRONMENT_KEY,
@@ -131,6 +132,9 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
             reason="a runner host holds nothing that needs keeping, so its distro stays near "
             "the idle baseline; growth past the ceiling is a leak, as on 2026-09-25",
         )
+    )
+    checks.extend(
+        ExpectedCheck(check_id=row["check_id"], reason=row["reason"]) for row in cache_rows(spec)
     )
     checks.append(
         ExpectedCheck(
@@ -411,6 +415,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
             "('the VM reports ' + $TotalMb + ' MB; free said: ' + $Probe.Text)",
         ]
     lines += _disk_check_lines(spec)
+    lines += render_cache_check_lines(spec)
     policy = scriptable(spec["base"]["execution_policy"], label="execution_policy")
     lines += [
         "$Policy = [string](Get-Item -LiteralPath $PolicyKey).GetValue('ExecutionPolicy')",
