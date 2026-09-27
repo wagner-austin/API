@@ -12,13 +12,13 @@ commit-tasks is tested in MCPs against the board's answers.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
+from maketools import _test_hooks
 from maketools.cli import repository_root
 
 SCRIPT: Final[Path] = repository_root() / ".githooks" / "published-maketools.sh"
@@ -89,7 +89,7 @@ def _run(repo: Path, git_env: Mapping[str, str], *args: str) -> subprocess.Compl
     return subprocess.run(
         ["sh", ".githooks/published-maketools.sh", *args],
         cwd=repo,
-        env={**os.environ, **git_env},
+        env={**_test_hooks.environ(), **git_env},
         capture_output=True,
         text=True,
         timeout=PROBE_WALL_SECONDS,
