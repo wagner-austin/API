@@ -86,9 +86,12 @@ $startedAt = Get-Date -Format o
 # fleet.cli.rolled extracts the commit `make fleet-roll` pointed
 # refs/fleet/rolled at, once both execution suites passed there, and runs
 # fleet-agent from it with the extracted fleet.json as its --config; with no
-# roll it refuses by name, exit 2, and no agent starts.
+# roll it refuses by name, exit 2, and no agent starts. The '--' after
+# 'run' is required: without it poetry parses the whole line itself when it
+# holds the launcher's own '--', and refuses with 'The option "-m" does not
+# exist' before any agent starts (every tick from 10:12Z on 2026-09-27).
 $agentArguments = @(
-    'run', 'python', '-m', 'fleet.cli.rolled',
+    'run', '--', 'python', '-m', 'fleet.cli.rolled',
     '--repo-root', $apiRoot,
     '--agent', 'fleet-agent',
     '--',
