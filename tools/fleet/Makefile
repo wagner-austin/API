@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check execution
+.PHONY: lint test check execution render-powershell
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -41,3 +41,12 @@ check: lint | test
 execution:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov
+
+# The committed copies of every PowerShell script this package renders
+# (fleet.core.rendered_powershell, MCPs board task d69786fa). They are
+# committed so MCPs' PowerShell harness, which finds scripts through git,
+# guards and covers them, and tests/pester executes them. Run this after
+# changing a renderer or runners.json; tests/test_rendered_powershell.py
+# fails until the copies match.
+render-powershell:
+	poetry run python -m fleet.cli.render_powershell --spec runners.json --out rendered
