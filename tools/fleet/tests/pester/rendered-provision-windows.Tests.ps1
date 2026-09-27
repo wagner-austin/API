@@ -118,8 +118,22 @@ BeforeAll {
         return [string[]]@($Said | ForEach-Object { [string]$_ } | Where-Object { $_ -notlike 'wrote .wslconfig*' -and $_ -notlike 'keepalive task *' })
     }
 
+    # Stops and deletes a Describe's keepalive through Task Scheduler's COM
+    # service. It runs in that Describe's AfterAll, before Pester removes
+    # the Describe's TestDrive: the task's action is a stand-in there, and an
+    # instance the scheduler started must not hold the directory.
+    function Unregister-KeepaliveTask {
+        param([string]$Name)
+        $scheduler = New-Object -ComObject Schedule.Service
+        $scheduler.Connect()
+        $root = $scheduler.GetFolder('\')
+        foreach ($task in @($root.GetTasks(1) | Where-Object { $_.Name -eq $Name })) {
+            $task.Stop(0)
+            $root.DeleteTask($Name, 0)
+        }
+    }
+
     $script:variables = [System.Collections.Generic.List[string]]::new()
-    $script:tasks = [System.Collections.Generic.List[string]]::new()
 }
 
 AfterAll {
@@ -128,22 +142,16 @@ AfterAll {
             Remove-Item -LiteralPath "env:$variable"
         }
     }
-    $scheduler = New-Object -ComObject Schedule.Service
-    $scheduler.Connect()
-    $root = $scheduler.GetFolder('\')
-    foreach ($task in $script:tasks) {
-        if (@($root.GetTasks(1) | Where-Object { $_.Name -eq $task }).Count -gt 0) {
-            $root.DeleteTask($task, 0)
-        }
-    }
 }
 
 Describe 'The Windows install loop in <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'rendered') -Filter '*-windows-*.ps1' | Where-Object { $_.BaseName -like 'provision-windows-*' -or $_.BaseName -like 'onboard-windows-*' } | ForEach-Object { $_.BaseName }) {
     BeforeAll {
         $script:name = $_
         $script:task = 'fleet-test-keepalive-' + [guid]::NewGuid().ToString('N')
-        $script:tasks.Add($script:task)
         $script:wsl = Initialize-Batch 'wsl' @('exit /b 0')
+    }
+    AfterAll {
+        Unregister-KeepaliveTask $script:task
     }
 
     It 'downloads, configures and seeds a fresh install with the token it was handed, and leaves a running SYSTEM service alone' {
@@ -283,8 +291,10 @@ Describe 'The host-level provision in <_>' -ForEach @(Get-ChildItem -LiteralPath
     BeforeAll {
         $script:name = $_
         $script:task = 'fleet-test-keepalive-' + [guid]::NewGuid().ToString('N')
-        $script:tasks.Add($script:task)
         $script:wsl = Initialize-Batch 'wsl' @('exit /b 0')
+    }
+    AfterAll {
+        Unregister-KeepaliveTask $script:task
     }
 
     It 'writes the memory floor to .wslconfig and registers the keepalive through S4U at boot, restarting, and starts it' {
