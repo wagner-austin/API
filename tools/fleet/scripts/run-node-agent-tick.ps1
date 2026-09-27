@@ -44,40 +44,38 @@
 .PARAMETER Announce
     Post the check-in that registers the runner's session on the board's
     ledger, and claim nothing. Used once, by register-node-agents.ps1.
-#>
 
+.PARAMETER ApiRoot
+    The API checkout, by default the one this script runs from.
+
+.PARAMETER EnvironmentScript
+    The hpc-wake pump's runs/env.ps1.
+
+.PARAMETER Poetry
+    The poetry executable.
+
+.PARAMETER LogDirectory
+    Where the day's log goes: one file per node per day, beside the hub
+    tick's. The credentials, the log and the run are FleetTick.ps1's.
+#>
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[a-z][a-z0-9-]*$')]
     [string]$Node,
 
-    [switch]$Announce
+    [switch]$Announce,
+    [string]$ApiRoot = "$PSScriptRoot\..\..\..",
+    [string]$EnvironmentScript = "$PSScriptRoot\..\..\hpc-wake\runs\env.ps1",
+    [string]$Poetry = 'poetry',
+    [string]$LogDirectory = "$env:LOCALAPPDATA\Temp\claude"
 )
-
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'FleetTick.ps1')
 
-$apiRoot = 'C:\Users\Test\PROJECTS\API'
-
-. (Join-Path $apiRoot 'tools\hpc-wake\runs\env.ps1')
-
+$apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
 $fleetRoot = Join-Path $apiRoot 'tools\fleet'
-Set-Location $fleetRoot
-
-# One log file per node per day, beside the hub tick's, with the same
-# retention and the same reason: a tick that wrote nothing was found only
-# by its absence (run-agent-tick.ps1 carries the incident). Start-Process
-# with the streams redirected to FILES because this is an S4U task with no
-# console, where a pipe has no EOF and 5.1 wraps native stderr on `*>>`.
-$logDirectory = Join-Path $env:LOCALAPPDATA 'Temp\claude'
-New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
-$retentionDays = 14
-Get-ChildItem -Path $logDirectory -Filter "fleet-node-$Node-*.log" |
-    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$retentionDays) } |
-    Remove-Item -Force
-$log = Join-Path $logDirectory ("fleet-node-$Node-" + (Get-Date -Format 'yyyy-MM-dd') + '.log')
-$stdoutFile = Join-Path $env:TEMP "fleet-node-$Node-tick-$PID.out"
-$stderrFile = Join-Path $env:TEMP "fleet-node-$Node-tick-$PID.err"
-$startedAt = Get-Date -Format o
 # THE ROLLED COMMIT RUNS, NEVER THIS CHECKOUT (board task 465689f5).
 # fleet.cli.rolled extracts the commit `make fleet-roll` pointed
 # refs/fleet/rolled at, once both execution suites passed there, and runs
@@ -96,15 +94,6 @@ $agentArguments = @(
 if ($Announce) {
     $agentArguments += '--announce'
 }
-$process = Start-Process -FilePath 'poetry' -ArgumentList $agentArguments `
-    -WorkingDirectory $fleetRoot `
-    -NoNewWindow -Wait -PassThru `
-    -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
-$exitCode = $process.ExitCode
-$lines = @("TICK START $startedAt node $Node pid $($process.Id) task-pid $PID")
-$lines += Get-Content -Path $stdoutFile -Encoding UTF8
-$lines += Get-Content -Path $stderrFile -Encoding UTF8
-$lines += "TICK EXIT $exitCode $(Get-Date -Format o)"
-[System.IO.File]::AppendAllLines($log, [string[]]$lines, (New-Object System.Text.UTF8Encoding($false)))
-Remove-Item -Force $stdoutFile, $stderrFile
-exit $exitCode
+exit (Invoke-FleetTick -EnvironmentScript $EnvironmentScript -Poetry $Poetry -WorkingDirectory $fleetRoot `
+    -AgentArguments $agentArguments -LogDirectory $LogDirectory -LogStem "fleet-node-$Node" `
+    -Header "node $Node" -RetentionDays 14)

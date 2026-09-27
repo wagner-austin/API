@@ -46,98 +46,86 @@
 
 .PARAMETER UnregisterAll
     Remove every API-FleetNode-*-3min task and register none.
+
+.PARAMETER TaskPrefix
+    What every node task's name starts with, before the alias.
+
+.PARAMETER Tick
+    The script each node task runs, and the announce runs once.
+
+.PARAMETER PowerShell
+    The powershell.exe the announce runs in.
 #>
-
+[CmdletBinding()]
 param(
-    [string]$Workspace = (Join-Path (Split-Path -Parent $PSScriptRoot) 'fleet.json'),
-    [switch]$UnregisterAll
+    [string]$Workspace = "$PSScriptRoot\..\fleet.json",
+    [switch]$UnregisterAll,
+    [string]$TaskPrefix = 'API-FleetNode-',
+    [string]$Tick = "$PSScriptRoot\run-node-agent-tick.ps1",
+    [string]$PowerShell = "$PSHOME\powershell.exe"
 )
-
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'FleetSchedule.ps1')
 
-$taskPrefix = 'API-FleetNode-'
 $taskSuffix = '-3min'
-$tick = Join-Path $PSScriptRoot 'run-node-agent-tick.ps1'
 
-function Get-NodeTasks {
-    Get-ScheduledTask -ErrorAction SilentlyContinue |
-        Where-Object { $_.TaskName.StartsWith($taskPrefix) -and $_.TaskName.EndsWith($taskSuffix) }
+function Get-EnabledFleetNode {
+    <#
+    .SYNOPSIS
+        The aliases fleet.json enables, in its order.
+    .PARAMETER Path
+        fleet.json.
+    .OUTPUTS
+        String[].
+    #>
+    [OutputType([string[]])]
+    param([Parameter(Mandatory)][string]$Path)
+    $document = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    $nodes = $document.PSObject.Properties['nodes']
+    if ($null -eq $nodes) {
+        throw "FLEET_NODES_MISSING: $Path has no nodes object"
+    }
+    $enabled = foreach ($node in $nodes.Value.PSObject.Properties) {
+        $flag = $node.Value.PSObject.Properties['enabled']
+        if ($null -ne $flag -and $flag.Value -eq $true) { $node.Name }
+    }
+    return [string[]]@($enabled)
 }
 
+$registered = @(Get-FleetScheduledTask -Prefix $TaskPrefix -Suffix $taskSuffix)
 if ($UnregisterAll) {
-    foreach ($task in @(Get-NodeTasks)) {
-        Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false
-        Write-Host "Unregistered $($task.TaskName)."
+    foreach ($task in $registered) {
+        [void](Unregister-FleetTick $task.TaskName)
+        Write-Information "Unregistered $($task.TaskName)." -InformationAction Continue
     }
-    exit 0
+    return
 }
 
-$document = Get-Content -LiteralPath $Workspace -Raw -Encoding UTF8 | ConvertFrom-Json
-$enabled = @()
-foreach ($property in $document.nodes.PSObject.Properties) {
-    if ($property.Value.enabled -eq $true) {
-        $enabled += $property.Name
-    }
-}
+$enabled = @(Get-EnabledFleetNode $Workspace)
 if ($enabled.Count -eq 0) {
-    throw "fleet.json at $Workspace enables no node; nothing to register"
+    throw "FLEET_NODES_NONE_ENABLED: fleet.json at $Workspace enables no node; nothing to register"
 }
 
 # Tasks whose node is no longer enabled (or declared) are removed first, so
 # the set of tasks after this script equals the set of enabled nodes.
-foreach ($task in @(Get-NodeTasks)) {
-    $alias = $task.TaskName.Substring($taskPrefix.Length)
-    $alias = $alias.Substring(0, $alias.Length - $taskSuffix.Length)
+foreach ($task in $registered) {
+    $alias = $task.TaskName.Substring($TaskPrefix.Length, $task.TaskName.Length - $TaskPrefix.Length - $taskSuffix.Length)
     if ($enabled -notcontains $alias) {
-        Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false
-        Write-Host "Unregistered $($task.TaskName): $alias is not an enabled node."
+        [void](Unregister-FleetTick $task.TaskName)
+        Write-Information "Unregistered $($task.TaskName): $alias is not an enabled node." -InformationAction Continue
     }
 }
-
-# The identity comes from WindowsIdentity, NOT "$env:USERDOMAIN\$env:USERNAME":
-# austinpc is not domain-joined and "WORKGROUP\test" does not resolve
-# (0x80070534). GetCurrent().Name yields "AUSTINPC\Test".
-$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-$principal = New-ScheduledTaskPrincipal `
-    -UserId $identity `
-    -LogonType S4U `
-    -RunLevel Limited
-$settings = New-ScheduledTaskSettingsSet `
-    -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries `
-    -MultipleInstances IgnoreNew `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 40) `
-    -StartWhenAvailable
 
 foreach ($alias in $enabled) {
-    $taskName = "$taskPrefix$alias$taskSuffix"
-    $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    if ($existing) {
-        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-    }
-    $action = New-ScheduledTaskAction `
-        -Execute 'powershell.exe' `
-        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$tick`" -Node $alias"
-    $bootTrigger = New-ScheduledTaskTrigger -AtStartup
-    $timeTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
-        -RepetitionInterval (New-TimeSpan -Minutes 3)
-    Register-ScheduledTask `
-        -TaskName $taskName `
-        -Action $action `
-        -Trigger @($bootTrigger, $timeTrigger) `
-        -Settings $settings `
-        -Principal $principal `
-        -Description "One fleet-node-agent tick for ${alias}: claim the node lane's jobs ${alias} carries the tags for (API tools/fleet). See register-node-agents.ps1." | Out-Null
-
+    $taskName = "$TaskPrefix$alias$taskSuffix"
+    $identity = Register-FleetTick -TaskName $taskName -Tick $Tick -TickArguments " -Node $alias" `
+        -Description "One fleet-node-agent tick for ${alias}: claim the node lane's jobs ${alias} carries the tags for (API tools/fleet). See register-node-agents.ps1."
     # The announce runs in this console, synchronously, so a refused
     # check-in is seen here rather than in a log nobody reads yet.
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $tick -Node $alias -Announce
+    & $PowerShell -NoProfile -ExecutionPolicy Bypass -File $Tick -Node $alias -Announce
     if ($LASTEXITCODE -ne 0) {
-        throw "the announce tick for $alias exited $LASTEXITCODE; see the fleet-node-$alias-*.log under $env:LOCALAPPDATA\Temp\claude"
+        throw "FLEET_NODE_ANNOUNCE_FAILED: the announce tick for $alias exited $LASTEXITCODE; see the fleet-node-$alias-*.log under $env:LOCALAPPDATA\Temp\claude"
     }
-    Write-Host "Registered $taskName (every 3 minutes and at boot, $identity, S4U, Limited) and announced it."
+    Write-Information "Registered $taskName (every 3 minutes and at boot, $identity, S4U, Limited) and announced it." -InformationAction Continue
 }
-
-Get-NodeTasks |
-    Select-Object TaskName, State, @{ n = 'LogonType'; e = { $_.Principal.LogonType } } |
-    Format-Table -AutoSize

@@ -44,44 +44,37 @@
     carries the argument); a non-zero here therefore means the tick itself
     broke -- credentials, transport, or a records/fleet disagreement -- and
     Task Scheduler's "last result" shows something real changed.
+
+    The credentials, the log and the run are FleetTick.ps1's, with the
+    incidents behind each. The roots are parameters, defaulting to the
+    checkout this script runs from and the MCPs checkout beside it, so the
+    suite runs this entry against a stand-in poetry and a scratch log.
+
+.PARAMETER ApiRoot
+    The API checkout.
+
+.PARAMETER EnvironmentScript
+    The hpc-wake pump's runs/env.ps1.
+
+.PARAMETER Poetry
+    The poetry executable.
+
+.PARAMETER LogDirectory
+    Where the day's log goes.
 #>
-
+[CmdletBinding()]
+param(
+    [string]$ApiRoot = "$PSScriptRoot\..\..\..",
+    [string]$EnvironmentScript = "$PSScriptRoot\..\..\hpc-wake\runs\env.ps1",
+    [string]$Poetry = 'poetry',
+    [string]$LogDirectory = "$env:LOCALAPPDATA\Temp\claude"
+)
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'FleetTick.ps1')
 
-$apiRoot = 'C:\Users\Test\PROJECTS\API'
-$mcpsRoot = 'C:\Users\Test\PROJECTS\MCPs'
-
-. (Join-Path $apiRoot 'tools\hpc-wake\runs\env.ps1')
-
-Set-Location (Join-Path $apiRoot 'tools\fleet')
-
-# THE TICK WRITES A LOG, BECAUSE UNTIL 2026-09-20 IT WROTE NOTHING. The
-# scheduled action carried no redirection, the agent logs to its streams,
-# and Task Scheduler's own history was disabled on the hub, so a tick that
-# hung for three days (board tasks 35940277 and 41ac6ed2) left no record
-# of itself anywhere: it was found by its absence from the fleet
-# container's log. One file per day under the same directory the
-# supervisor and manager-audit passes log to; both streams land in it
-# with the tick's start, pid and exit; files older than the retention are
-# removed at the start of each tick, so the directory bounds itself.
-#
-# Start-Process with the streams redirected to FILES, not `*>>` or a pipe:
-# Windows PowerShell 5.1 wraps a native command's stderr lines in
-# NativeCommandError records on redirection, and a pipe with no console
-# (this is an S4U task) is the shape `tasklist | findstr` blocked on
-# (memory: powershell-deadlocks-under-s4u-tasks). A redirected file handle
-# has a real EOF. The exit code is read off the process object, which no
-# redirection can clobber.
-$logDirectory = Join-Path $env:LOCALAPPDATA 'Temp\claude'
-New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
-$retentionDays = 14
-Get-ChildItem -Path $logDirectory -Filter 'fleet-agent-*.log' |
-    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$retentionDays) } |
-    Remove-Item -Force
-$log = Join-Path $logDirectory ("fleet-agent-" + (Get-Date -Format 'yyyy-MM-dd') + '.log')
-$stdoutFile = Join-Path $env:TEMP "fleet-agent-tick-$PID.out"
-$stderrFile = Join-Path $env:TEMP "fleet-agent-tick-$PID.err"
-$startedAt = Get-Date -Format o
+$apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
+$mcpsRoot = Join-Path (Split-Path -Parent $apiRoot) 'MCPs'
 # THE ROLLED COMMIT RUNS, NEVER THIS CHECKOUT (board task 465689f5).
 # fleet.cli.rolled extracts the commit `make fleet-roll` pointed
 # refs/fleet/rolled at, once both execution suites passed there, and runs
@@ -101,15 +94,6 @@ $agentArguments = @(
     '--mcps-root', $mcpsRoot,
     '--registry', (Join-Path $mcpsRoot 'fleet-mcp\fleet-nodes.json')
 )
-$process = Start-Process -FilePath 'poetry' -ArgumentList $agentArguments `
-    -WorkingDirectory (Join-Path $apiRoot 'tools\fleet') `
-    -NoNewWindow -Wait -PassThru `
-    -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
-$exitCode = $process.ExitCode
-$lines = @("TICK START $startedAt pid $($process.Id) task-pid $PID")
-$lines += Get-Content -Path $stdoutFile -Encoding UTF8
-$lines += Get-Content -Path $stderrFile -Encoding UTF8
-$lines += "TICK EXIT $exitCode $(Get-Date -Format o)"
-[System.IO.File]::AppendAllLines($log, [string[]]$lines, (New-Object System.Text.UTF8Encoding($false)))
-Remove-Item -Force $stdoutFile, $stderrFile
-exit $exitCode
+exit (Invoke-FleetTick -EnvironmentScript $EnvironmentScript -Poetry $Poetry `
+    -WorkingDirectory (Join-Path $apiRoot 'tools\fleet') -AgentArguments $agentArguments `
+    -LogDirectory $LogDirectory -LogStem 'fleet-agent' -Header 'hub' -RetentionDays 14)
