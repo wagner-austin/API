@@ -365,13 +365,22 @@ jobs:
           path: ${{ matrix.package }}/.venv
           key: pkg-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package), 'libs/cleargbm_rs/Cargo.lock', 'libs/cleargbm_rs/src/**') }}-${{ github.workspace }}
 
+      - name: Keep each virtualenv in its project
+        run: poetry config virtualenvs.in-project true
+
       # `sync` rather than `install`, matching the other workflows: install
       # leaves behind anything the lock file no longer mentions, which is how
       # a removed dependency kept resolving out of a stale environment.
+      #
+      # ONLY FOR A PACKAGE THAT IS A POETRY PROJECT (MCPs board task
+      # 465689f5). tools/fleet-execution is a gated directory with a Makefile
+      # and nothing else: its check runs tools/fleet's host cases through
+      # `make -C ../fleet execution`, which syncs tools/fleet itself. Run
+      # here, poetry found no pyproject.toml in it and failed the job before
+      # the check started (run 36311134636).
       - name: Install dependencies
-        run: |
-          poetry config virtualenvs.in-project true
-          poetry sync --with dev
+        if: ${{ hashFiles(format('{0}/pyproject.toml', matrix.package)) != '' }}
+        run: poetry sync --with dev
 
       # RustedWarfareBot only: the licensed game tree, held on the
       # self-hosted runner's host and never in this repository. The
