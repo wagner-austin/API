@@ -181,13 +181,20 @@ DIPHTHERIA_2026_09_27_CXX = (
 WRONG_PYTHON = LOKI.replace("Python 3.11.9", "Python 3.12.4")
 
 
-def node(host: str = "lavender", *, rust: str | None = None, cxx: str | None = None) -> NodeConfig:
+def node(
+    host: str = "lavender",
+    *,
+    rust: str | None = None,
+    cxx: str | None = None,
+    docker: str | None = None,
+) -> NodeConfig:
     """Build a Windows node declaration.
 
     Args:
         host: SSH alias.
         rust: The cargo version it declares, or None.
         cxx: The C++ toolchain version it declares, or None.
+        docker: The rootless execdocker daemon version it declares, or None.
 
     Returns:
         The node.
@@ -203,6 +210,7 @@ def node(host: str = "lavender", *, rust: str | None = None, cxx: str | None = N
         test_database=False,
         rust=rust,
         cxx=cxx,
+        docker=docker,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

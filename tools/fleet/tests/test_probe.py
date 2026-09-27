@@ -35,6 +35,7 @@ def _node() -> NodeConfig:
         test_database=False,
         rust=None,
         cxx=None,
+        docker=None,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

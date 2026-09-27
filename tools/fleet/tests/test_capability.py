@@ -41,6 +41,7 @@ SHIM_ERROR = "error: no default toolchain is configured"
 
 RUST = Capability.RUST
 CXX = Capability.CXX
+DOCKER = Capability.DOCKER
 
 
 def _answered(name: str, present: bool, version: str) -> tuple[ToolReport, ...]:
@@ -62,11 +63,12 @@ def _answered(name: str, present: bool, version: str) -> tuple[ToolReport, ...]:
 
 class TestTheCapabilityTables:
     def test_each_capability_has_its_probe_line_and_refusal_code(self) -> None:
-        assert [capability.value for capability in Capability] == ["rust", "cxx"]
-        assert PROBE_NAME == {RUST: "cargo", CXX: "cxx"}
+        assert [capability.value for capability in Capability] == ["rust", "cxx", "docker"]
+        assert PROBE_NAME == {RUST: "cargo", CXX: "cxx", DOCKER: "docker"}
         assert MISMATCH_CODE == {
             RUST: FleetErrorCode.NODE_RUST_MISMATCH,
             CXX: FleetErrorCode.NODE_CXX_MISMATCH,
+            DOCKER: FleetErrorCode.NODE_DOCKER_MISMATCH,
         }
 
 
@@ -80,6 +82,12 @@ class TestMeasured:
 
     def test_a_windows_vc_tools_version_has_four_parts(self) -> None:
         assert measured(CXX, _answered("cxx", True, "17.14.36310.24")) == "17.14.36310.24"
+
+    def test_the_docker_line_carries_the_rootless_daemon_s_bare_server_version(self) -> None:
+        """MCPs board task 6c4516af: the probe prints only the ServerVersion,
+        and only when the daemon says it is rootless."""
+        assert measured(DOCKER, _answered("docker", True, "29.8.1")) == "29.8.1"
+        assert measured(DOCKER, _answered("docker", False, "")) is None
 
     def test_an_absent_or_missing_line_measures_none(self) -> None:
         older = toolchain.read_reports(DIPHTHERIA_2026_09_23)
@@ -116,6 +124,12 @@ class TestCapabilityGap:
             "declares cxx '17.14.36310.24' but its probe reports no cxx; the declaration is "
             "what gives a node the cxx tag, so an npm ci claimed on it would fail rebuilding a "
             "native module under node-gyp. Set cxx to null, or install that toolchain"
+        )
+        assert capability_gap(DOCKER, "29.8.1", _answered("docker", False, "")) == (
+            "declares docker '29.8.1' but its probe reports no docker; the declaration is what "
+            "gives a node the docker tag, so a deploy suite claimed on it would have no daemon it "
+            "may use, and must never use the stack's. Set docker to null, or install that "
+            "toolchain"
         )
 
     def test_another_version_names_the_one_that_would_match(self) -> None:
@@ -170,13 +184,15 @@ class TestDecodeCapability:
 
 class TestTheNodeContractCarriesBoth:
     def test_declared_toolchains_survive_encoding_and_read_back_by_capability(self) -> None:
-        declared = node("diphtheria", rust="1.98.1", cxx="13.3.0")
+        declared = node("diphtheria", rust="1.98.1", cxx="13.3.0", docker="29.8.1")
         assert decode_node_config(encode_node_config(declared)) == declared
         assert declared_capability(declared, RUST) == "1.98.1"
         assert declared_capability(declared, CXX) == "13.3.0"
+        assert declared_capability(declared, DOCKER) == "29.8.1"
         assert encode_node_config(node())["cxx"] is None
+        assert encode_node_config(node())["docker"] is None
 
-    @pytest.mark.parametrize("key", ["rust", "cxx"])
+    @pytest.mark.parametrize("key", ["rust", "cxx", "docker"])
     def test_an_absent_key_is_refused(self, key: str) -> None:
         encoded = encode_node_config(node())
         del encoded[key]

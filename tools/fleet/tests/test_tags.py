@@ -37,8 +37,9 @@ def _node(
     test_database: bool = False,
     rust: str | None = None,
     cxx: str | None = None,
+    docker: str | None = None,
 ) -> NodeConfig:
-    """Build a node declaration with the five fields tags derive from.
+    """Build a node declaration with the six fields tags derive from.
 
     Args:
         platform: The node's dialect.
@@ -46,6 +47,7 @@ def _node(
         test_database: Whether it runs the fleet test database.
         rust: The cargo version it declares, or None.
         cxx: The C++ toolchain version it declares, or None.
+        docker: The rootless execdocker daemon version it declares, or None.
 
     Returns:
         The node.
@@ -61,6 +63,7 @@ def _node(
         test_database=test_database,
         rust=rust,
         cxx=cxx,
+        docker=docker,
         budget=NodeBudget(
             reserved_cores=4,
             reserved_ram_gb=4.0,
@@ -102,6 +105,14 @@ class TestNodeTags:
         )
         assert NodeTag.CXX not in node_tags(_node())
 
+    def test_a_node_declaring_the_rootless_exec_daemon_carries_docker(self) -> None:
+        """diphtheria once provisioned with execdocker's rootless daemon (MCPs
+        board task 6c4516af); a node declaring none carries no docker."""
+        assert node_tags(_node(platform=NodePlatform.LINUX, docker="29.8.1")) == (
+            frozenset({NodeTag.LINUX, NodeTag.DOCKER})
+        )
+        assert NodeTag.DOCKER not in node_tags(_node(platform=NodePlatform.LINUX))
+
     def test_every_platform_carries_the_tag_spelled_as_its_own_word(self) -> None:
         """The platform-to-tag table has a row for every platform, so a third
         platform fails here before a node of it could be tagged."""
@@ -109,9 +120,9 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_two_platforms_gpu_testdb_rust_and_cxx(self) -> None:
-        """The dispatch queue's CHECK (MCPs migrations 532, 563, 569 and 570)
-        is these six words, so the members' values are pinned in order."""
+    def test_the_vocabulary_is_the_two_platforms_gpu_testdb_rust_cxx_and_docker(self) -> None:
+        """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570 and
+        571) is these seven words, so the members' values are pinned in order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
             "linux",
@@ -119,6 +130,7 @@ class TestNodeTags:
             "testdb",
             "rust",
             "cxx",
+            "docker",
         ]
 
 
@@ -161,10 +173,10 @@ class TestDecodeNodeTag:
     def test_a_word_outside_the_set_is_refused_with_the_set(self) -> None:
         with pytest.raises(
             JSONTypeError,
-            match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, got 'docker'; .* a "
-            r"Rust or C\+\+ toolchain",
+            match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, got 'podman'; "
+            r".* a Rust or C\+\+ toolchain, or the execution suite's rootless Docker daemon",
         ):
-            decode_node_tag("docker", field="t")
+            decode_node_tag("podman", field="t")
 
     def test_a_non_string_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="t must be a string, got int"):

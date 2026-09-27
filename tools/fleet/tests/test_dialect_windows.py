@@ -393,7 +393,11 @@ class TestProbesForReal:
             "choco",
             "pip",
             "cxx",
+            "docker",
         }
+        # No Windows node carries the rootless execdocker daemon (MCPs board
+        # task 6c4516af), whatever Docker it may have.
+        assert fields["docker"] == "no="
         assert fields["python"].startswith("yes=Python 3.")
         assert fields["pip"].startswith("yes=pip ")
         assert fields["node"].startswith("yes=v")

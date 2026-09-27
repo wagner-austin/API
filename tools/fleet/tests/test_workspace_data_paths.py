@@ -61,6 +61,7 @@ def _document(
                 "test_database": False,
                 "rust": None,
                 "cxx": None,
+                "docker": None,
                 "budget": {
                     "reserved_cores": 4,
                     "reserved_ram_gb": 8.0,
