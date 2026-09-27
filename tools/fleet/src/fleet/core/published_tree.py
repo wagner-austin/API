@@ -56,12 +56,10 @@ from __future__ import annotations
 
 import os
 import pathlib
-import re
 import sys
 from typing import Final, TypedDict
 
-from fleet.core import _test_hooks
-from fleet.core._test_hooks import CommandResult
+from fleet.core import _test_hooks, commit_tree
 
 #: The ref a session verb's code is read from.
 PUBLISHED_REF: Final = "refs/remotes/origin/main"
@@ -100,16 +98,6 @@ REQUIRED_FILES: Final[tuple[str, ...]] = (
 #: who finds it knows what left it there.
 EXTRACTIONS_DIR: Final = "fleet-session-audit"
 
-#: The tarball's name inside an extraction directory.
-TARBALL_NAME: Final = "published.tar"
-
-#: A full commit id as ``git rev-parse`` prints it.
-COMMIT_PATTERN: Final = re.compile(r"^[0-9a-f]{40}$")
-
-#: The deadline for each of the three local git and tar steps, in seconds.
-#: Each reads or writes a few megabytes on this machine's own disk.
-TREE_STEP_TIMEOUT_SECONDS: Final[int] = 120
-
 #: Detail prefix when the published ref does not resolve to a commit.
 REF_UNRESOLVED_CODE: Final = "SESSION_TREE_REF_UNRESOLVED"
 
@@ -142,20 +130,6 @@ class PublishedTree(TypedDict):
     registry_dir: str
 
 
-def _step_refusal(code: str, step: str, result: CommandResult) -> str:
-    """Compose the refusal for one failed step.
-
-    Args:
-        code: The detail prefix.
-        step: What was run, for the reader.
-        result: Its outcome.
-
-    Returns:
-        ``CODE: <step> exited <n>: <stderr>``, the stderr trimmed.
-    """
-    return f"{code}: {step} exited {result['returncode']}: {result['stderr'].strip()[:400]}"
-
-
 def extract_published_tree(mcps_root: pathlib.Path) -> PublishedTree | str:
     """Extract the published session-audit, or say why it cannot be.
 
@@ -166,60 +140,32 @@ def extract_published_tree(mcps_root: pathlib.Path) -> PublishedTree | str:
         The extraction, or a ``CODE: message`` refusal detail for the queue
         when any step fails; nothing is run from the working tree instead.
     """
-    resolved = _test_hooks.run(
-        ("git", "-C", str(mcps_root), "rev-parse", "--verify", f"{PUBLISHED_REF}^{{commit}}"),
-        timeout_seconds=TREE_STEP_TIMEOUT_SECONDS,
+    resolved = commit_tree.resolve_commit(mcps_root, PUBLISHED_REF, REF_UNRESOLVED_CODE)
+    if isinstance(resolved, str):
+        return resolved
+    commit = resolved["commit"]
+    destination = commit_tree.extract_paths(
+        mcps_root,
+        commit,
+        ARCHIVED_PATHS,
+        directory=EXTRACTIONS_DIR,
+        archive_code=ARCHIVE_FAILED_CODE,
+        extract_code=EXTRACT_FAILED_CODE,
     )
-    commit = resolved["stdout"].strip()
-    if resolved["returncode"] != 0 or COMMIT_PATTERN.fullmatch(commit) is None:
-        return (
-            f"{REF_UNRESOLVED_CODE}: {PUBLISHED_REF} in {mcps_root} did not resolve to a "
-            f"commit (exit {resolved['returncode']}, stdout {commit[:80]!r}, stderr "
-            f"{resolved['stderr'].strip()[:200]!r}); nothing ran"
-        )
-    destination = _test_hooks.temp_root() / EXTRACTIONS_DIR / commit
-    _test_hooks.make_directory(destination)
-    tarball = destination / TARBALL_NAME
-    archived = _test_hooks.run(
-        (
-            "git",
-            "-C",
-            str(mcps_root),
-            "archive",
-            "--format=tar",
-            "-o",
-            str(tarball),
-            commit,
-            "--",
-            *ARCHIVED_PATHS,
-        ),
-        timeout_seconds=TREE_STEP_TIMEOUT_SECONDS,
-    )
-    if archived["returncode"] != 0:
-        return _step_refusal(ARCHIVE_FAILED_CODE, f"git archive {commit}", archived)
-    extracted = _test_hooks.run(
-        ("tar", "-x", "-f", str(tarball), "-C", str(destination)),
-        timeout_seconds=TREE_STEP_TIMEOUT_SECONDS,
-    )
-    if extracted["returncode"] != 0:
-        return _step_refusal(EXTRACT_FAILED_CODE, f"tar -x {tarball}", extracted)
+    if isinstance(destination, str):
+        return destination
     generator = destination / pathlib.PurePosixPath(CONTRACT_HASH_SCRIPT)
     generated = _test_hooks.run(
         (sys.executable, str(generator)),
-        timeout_seconds=TREE_STEP_TIMEOUT_SECONDS,
+        timeout_seconds=commit_tree.TREE_STEP_TIMEOUT_SECONDS,
     )
     if generated["returncode"] != 0:
-        return _step_refusal(GENERATE_FAILED_CODE, str(generator), generated)
-    missing = [
-        required
-        for required in REQUIRED_FILES
-        if not _test_hooks.file_exists(destination / pathlib.PurePosixPath(required))
-    ]
-    if missing:
-        return (
-            f"{INCOMPLETE_CODE}: the extraction of {commit} at {destination} lacks "
-            f"{', '.join(missing)}; nothing ran"
-        )
+        return commit_tree.step_refusal(GENERATE_FAILED_CODE, str(generator), generated)
+    incomplete = commit_tree.incompleteness(
+        destination, commit, REQUIRED_FILES, code=INCOMPLETE_CODE
+    )
+    if incomplete is not None:
+        return incomplete
     return PublishedTree(
         commit=commit,
         python_path=os.pathsep.join(
@@ -235,7 +181,6 @@ def extract_published_tree(mcps_root: pathlib.Path) -> PublishedTree | str:
 __all__ = [
     "ARCHIVED_PATHS",
     "ARCHIVE_FAILED_CODE",
-    "COMMIT_PATTERN",
     "CONTRACT_HASH_SCRIPT",
     "EXTRACTIONS_DIR",
     "EXTRACT_FAILED_CODE",
@@ -247,8 +192,6 @@ __all__ = [
     "REQUIRED_FILES",
     "SESSION_AUDIT_SRC",
     "SHARED_PY_SRC",
-    "TARBALL_NAME",
-    "TREE_STEP_TIMEOUT_SECONDS",
     "PublishedTree",
     "extract_published_tree",
 ]
