@@ -1,39 +1,18 @@
-"""Machine variables: rendered, and the audit row run for real.
+"""Machine variables: what the base and the audit render for them.
 
-The base's writes are executed in :mod:`tests.test_runner_base_render`, with
-the rest of the Windows base. Here the audit driver runs under Windows
-PowerShell 5.1 for a host with no installs, with functions standing in for
-the host reads (``wsl``'s ``df``, the execution policy, the registry, git),
-so the rows under test read the case's registry value and every other line
-runs as rendered.
+Both renders are executed by their Pester suites over the committed files
+under rendered/: the base's writes in rendered-base-windows.Tests.ps1, the
+audit row in rendered-audit.Tests.ps1, each against a scratch HKCU key.
 """
 
 from __future__ import annotations
-
-import pathlib
-import subprocess
 
 import pytest
 
 from fleet.contracts.runner_base import MachineVariable
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_audit, runner_machine_env
-from fleet.core.dialect_windows import POWERSHELL_INVOCATION
 from tests._runner_fixtures import a_base
-
-#: The host reads, answered as a laid host answers them except for the
-#: machine environment, which reads ``$script:Held``.
-_FAKES = """function wsl { $global:LASTEXITCODE = 0; return @('Used', '  46G') }
-function Get-ExecutionPolicy { param([string]$Scope) return 'RemoteSigned' }
-function Get-ItemProperty {
-    param([string]$LiteralPath)
-    if ($LiteralPath -like '*\\Session Manager\\Environment') {
-        return [pscustomobject]$script:Held
-    }
-    [pscustomobject]@{ LongPathsEnabled = 1 }
-}
-function git { return 'true' }
-"""
 
 
 def _host(variables: list[MachineVariable]) -> HostRunnerSpec:
@@ -118,50 +97,13 @@ class TestRendered:
             "rendered script verbatim; rename the item rather than escaping it"
         )
 
-
-def _audit(tmp_path: pathlib.Path, held: str) -> list[str]:
-    """Run the rendered audit for a host declaring POETRY_CACHE_DIR.
-
-    Args:
-        tmp_path: Where the script is written.
-        held: What the environment key holds, a PowerShell hashtable.
-
-    Returns:
-        The CHECK lines the script emitted.
-    """
-    script = tmp_path / "audit.ps1"
-    script.write_text(
-        f"$script:Held = {held}\n" + _FAKES + runner_audit.render_audit_script(_host([_POETRY])),
-        encoding="utf-8",
-    )
-    ran = subprocess.run(
-        [*POWERSHELL_INVOCATION, str(script)], capture_output=True, text=True, check=False
-    )
-    assert ran.returncode == 0, ran.stderr
-    return [line for line in ran.stdout.splitlines() if line.startswith("CHECK machine-env:")]
-
-
-@pytest.mark.host_windows
-class TestTheRowRunsForReal:
-    """The row executed: exact value passes, anything else drifts naming it."""
-
-    @pytest.mark.parametrize(
-        ("held", "verdict"),
-        [
-            ("@{ 'POETRY_CACHE_DIR' = 'C:\\fleet\\poetry' }", "OK"),
-            (
-                "@{ 'POETRY_CACHE_DIR' = 'C:\\FLEET\\POETRY' }",
-                "DRIFT the machine environment holds POETRY_CACHE_DIR=C:\\FLEET\\POETRY; "
-                "the roster says C:\\fleet\\poetry",
-            ),
-            (
-                "@{}",
-                "DRIFT the machine environment holds POETRY_CACHE_DIR=; "
-                "the roster says C:\\fleet\\poetry",
-            ),
-        ],
-    )
-    def test_the_row_holds_the_exact_value(
-        self, tmp_path: pathlib.Path, held: str, verdict: str
-    ) -> None:
-        assert _audit(tmp_path, held) == [f"CHECK machine-env:POETRY_CACHE_DIR {verdict}"]
+    def test_the_audit_row_reads_the_key_parameter_and_compares_case_sensitively(self) -> None:
+        """The row executed is the Pester suite over the committed audit
+        render (tests/pester/rendered-audit.Tests.ps1): exact value, a
+        case-only difference, and an absent variable."""
+        assert runner_machine_env.render_machine_environment_check_lines(_host([_POETRY])) == [
+            "$Held = [string](Get-Item -LiteralPath $EnvironmentKey).GetValue('POETRY_CACHE_DIR')",
+            "Write-Check 'machine-env:POETRY_CACHE_DIR' ($Held -ceq 'C:\\fleet\\poetry') "
+            "('the machine environment holds POETRY_CACHE_DIR=' + $Held + "
+            "'; the roster says C:\\fleet\\poetry')",
+        ]

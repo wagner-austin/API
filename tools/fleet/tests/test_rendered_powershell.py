@@ -86,6 +86,7 @@ class TestTheCommittedCopies:
                     f"rebuild-terminate-{host['name']}",
                     f"base-windows-{host['name']}",
                     f"base-import-{host['name']}",
+                    f"audit-{host['name']}",
                 )
             ),
         ]
@@ -95,8 +96,8 @@ class TestTheRegistry:
     def test_two_scripts_sharing_a_file_name_are_refused(self) -> None:
         host = _roster()["hosts"][0]
         shared = (
-            f"share a file name: base-import-{host['name']}, base-windows-{host['name']}, "
-            f"rebuild-terminate-{host['name']}"
+            f"share a file name: audit-{host['name']}, base-import-{host['name']}, "
+            f"base-windows-{host['name']}, rebuild-terminate-{host['name']}"
         )
         with pytest.raises(ValueError, match=shared):
             rendered_powershell.render_all(RunnerSpec(hosts=[host, host]))
