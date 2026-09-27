@@ -65,6 +65,12 @@ class TestTheCommittedCopies:
         assert names == [
             "rebuild-boot-instant",
             "rebuild-restart",
+            "dialect-capacity-probe",
+            "dialect-observe-sessions",
+            "dialect-make-directory",
+            "dialect-reset-directory",
+            "dialect-digest",
+            "dialect-result",
             *(f"rebuild-terminate-{host['name']}" for host in roster["hosts"]),
         ]
 

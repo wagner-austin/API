@@ -14,19 +14,21 @@ things they pin -- no inner quote in the argument, a wait for the task to
 actually start, the battery settings -- are each the difference between a
 dispatch that runs and one that silently does not, and each was found by
 reading a task's XML off a node rather than by reasoning about the string.
-The two probes ARE run for real, on this machine, because it is a Windows hub.
+The toolchain probe IS run for real here, on this machine, because it is a
+Windows hub. The scripts moved into tools/fleet/rendered (the capacity
+probe, the session observer, the directory, digest and result scripts) are
+run for real by tests/pester/rendered-dialect-state.Tests.ps1 instead, under
+MCPs' PowerShell harness (MCPs board task d69786fa).
 """
 
 from __future__ import annotations
 
 import pathlib
 import shutil
-import socket
 import subprocess
 
 import pytest
 from platform_core.config import config_test_hooks
-from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
 from fleet.contracts.toolchain import (
     PINNED_PYTHON,
@@ -75,22 +77,6 @@ def _python_registered_here(prefix: str) -> bool:
 
 #: Where an App Execution Alias for ``python`` sits, below any profile.
 WINDOWSAPPS_ALIAS = pathlib.Path("Microsoft", "WindowsApps", "python.exe")
-
-#: One registration document in the shape the harness writes on a Windows
-#: node: a drive-letter cwd and a named-pipe socket.
-SESSION_RECORD: JSONObject = {
-    "sessionId": "d31e5228-3269-4a22-a27f-e535cbef1894",
-    "pid": 4242,
-    "startedAt": 1_789_000_000_000,
-    "updatedAt": 1_789_000_030_500,
-    "name": "api-7e",
-    "nameSource": "derived",
-    "cwd": "C:\\Users\\serendipity\\PROJECTS\\API",
-    "messagingSocketPath": "\\\\.\\pipe\\LOCAL\\cc-msg-abc",
-    "version": "2.1.278",
-    "status": "idle",
-    "pidDomain": "win32:serendipity",
-}
 
 
 def _build(
@@ -250,7 +236,8 @@ class TestResultAndStopScripts:
         covered it, and only the node knows when the build ended. Asking for
         the status alone forced the reader to substitute "is a lease held now"
         -- a question about how promptly somebody collected -- which refused a
-        run that finished three minutes inside its window."""
+        run that finished three minutes inside its window. Pester runs it
+        (tests/pester/rendered-dialect-state.Tests.ps1)."""
         body = DIALECT.result_script("C:/s/run-1")
 
         assert "LastWriteTimeUtc" in body
@@ -261,12 +248,13 @@ class TestResultAndStopScripts:
         put every node's answer out by its own offset."""
         assert "-UFormat" not in DIALECT.result_script("C:/s/run-1")
 
-    def test_the_result_script_prints_nothing_while_running(self) -> None:
+    def test_the_result_script_reads_the_result_file_under_its_target(self) -> None:
         """Absence is the signal, so an unfinished run is not read as exit 0."""
         body = DIALECT.result_script("C:/s/run-1")
 
-        assert "Test-Path" in body
-        assert f"C:/s/run-1/{names.RESULT_NAME}" in body
+        assert "[string]$Target = 'C:/s/run-1'" in body
+        assert f'$result = "$Target/{names.RESULT_NAME}"' in body
+        assert "if (Test-Path -LiteralPath $result) {" in body
 
 
 class TestTransportShape:
@@ -295,12 +283,19 @@ class TestTransportShape:
         made = DIALECT.make_directory_script("C:/s/run-[1]")
         digested = DIALECT.digest_script("C:/s/run-1")
 
-        assert "[IO.Directory]::CreateDirectory('C:/s/run-[1]')" in made
+        assert "[string]$Directory = 'C:/s/run-[1]'" in made
+        assert "[IO.Directory]::CreateDirectory($Directory) | Out-Null" in made
         assert "New-Item" not in made
-        assert digested == (
-            f"(Get-FileHash -Algorithm SHA256 -LiteralPath "
-            f"'C:/s/run-1/{names.ARCHIVE_NAME}').Hash.ToLower()\n"
+        assert "LASTEXITCODE" not in made
+        assert "[string]$Target = 'C:/s/run-1'" in digested
+        assert digested.endswith(
+            f'(Get-FileHash -Algorithm SHA256 -LiteralPath "$Target/{names.ARCHIVE_NAME}")'
+            ".Hash.ToLower()\n"
         )
+
+    def test_a_location_that_cannot_be_embedded_is_refused(self) -> None:
+        with pytest.raises(ValueError, match='directory "C:/s/it\'s" contains'):
+            DIALECT.make_directory_script("C:/s/it's")
 
     def test_echo_is_write_output_of_a_quoted_literal(self) -> None:
         assert DIALECT.echo_command("installing make") == "Write-Output 'installing make'"
@@ -322,9 +317,10 @@ class TestTransportShape:
         body = DIALECT.observe_sessions_script()
 
         assert body == OBSERVE_SESSIONS_SCRIPT
-        assert body.startswith("$ErrorActionPreference = 'Stop'\n")
-        assert "'.claude\\sessions'" in body
-        assert "if (Test-Path -LiteralPath $dir)" in body
+        assert body.startswith(
+            'param(\n    [string]$SessionsDirectory = "$HOME\\.claude\\sessions"\n)'
+        )
+        assert "if (Test-Path -LiteralPath $SessionsDirectory)" in body
         assert "-Filter '*.json'" in body
         assert "$env:COMPUTERNAME.ToLowerInvariant()" in body
         assert "platform = 'win32'" in body
@@ -333,11 +329,11 @@ class TestTransportShape:
 
 @pytest.mark.host_windows
 class TestProbesForReal:
-    """The two constant probes, executed on this hub and parsed by shape.
+    """The toolchain probe and its install guard, executed on this hub.
 
-    The one place the Windows dialect's text is run rather than read: this
-    machine is one, so the assertions can be about what PowerShell 5.1
-    actually prints. The ``pip`` line in particular was read as absent on a
+    This machine is a Windows one, so the assertions can be about what
+    PowerShell 5.1 actually prints. The capacity probe moved to the Pester
+    suite over tools/fleet/rendered. The ``pip`` line in particular was read as absent on a
     hub that has pip until the probe stopped piping ``python -m pip`` through
     ``Select-Object -First 1``.
     """
@@ -367,14 +363,6 @@ class TestProbesForReal:
             key, _separator, value = line.partition("=")
             fields[key] = value
         return fields
-
-    def test_the_capacity_probe_reports_the_three_numbers(self, tmp_path: pathlib.Path) -> None:
-        fields = self.run_probe(tmp_path, DIALECT.capacity_probe_script())
-
-        assert set(fields) == {"free_ram_gb", "free_disk_gb", "logical_cores"}
-        assert float(fields["free_ram_gb"].replace(",", "")) > 0.0
-        assert float(fields["free_disk_gb"].replace(",", "")) > 0.0
-        assert int(fields["logical_cores"]) >= 1
 
     def test_the_toolchain_probe_reports_every_tool_and_pip_by_module(
         self, tmp_path: pathlib.Path
@@ -467,71 +455,3 @@ class TestProbesForReal:
         lines = completed.stdout.splitlines()
         assert "python=no=" in lines
         assert "pip=no=" in lines
-
-
-@pytest.mark.host_windows
-class TestObserveScriptForReal:
-    """The observe script, run by PowerShell 5.1 against a profile on disk.
-
-    ``$HOME`` follows ``USERPROFILE`` (measured on the hub 2026-09-21), so
-    the script reads a directory this test laid out rather than the
-    operator's own sessions, and the document it prints is decoded the way
-    the hub decodes it.
-    """
-
-    def run_observe(self, tmp_path: pathlib.Path, profile: pathlib.Path) -> JSONObject:
-        """Run the script by path with ``profile`` as the home, decode its line.
-
-        Args:
-            tmp_path: Where the script is written.
-            profile: The directory ``$HOME`` resolves to.
-
-        Returns:
-            The decoded document.
-        """
-        script = tmp_path / "observe-sessions.ps1"
-        script.write_text(DIALECT.observe_sessions_script(), encoding="utf-8")
-        parent = config_test_hooks.get_environment()
-        completed = subprocess.run(
-            [*POWERSHELL_INVOCATION, str(script)],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-            env={**parent, "USERPROFILE": str(profile)},
-        )
-        assert completed.returncode == 0, completed.stderr
-        document: JSONValue = load_json_str(completed.stdout)
-        if not isinstance(document, dict):
-            raise AssertionError(f"the script printed {type(document).__name__}, not an object")
-        return document
-
-    def test_it_reports_every_record_verbatim_under_win32_and_the_lowercased_host(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        profile = tmp_path / "profile"
-        sessions = profile / ".claude" / "sessions"
-        sessions.mkdir(parents=True)
-        (sessions / "4242.json").write_text(dump_json_str(SESSION_RECORD), encoding="utf-8")
-
-        document = self.run_observe(tmp_path, profile)
-
-        assert document == {
-            "platform": "win32",
-            "hostname": socket.gethostname().lower(),
-            "records": [SESSION_RECORD],
-        }
-
-    def test_it_reports_zero_records_for_a_profile_that_never_ran_claude_code(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        profile = tmp_path / "profile"
-        profile.mkdir()
-
-        document = self.run_observe(tmp_path, profile)
-
-        assert document == {
-            "platform": "win32",
-            "hostname": socket.gethostname().lower(),
-            "records": [],
-        }
