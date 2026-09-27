@@ -25,6 +25,9 @@ coverage.xml
 coverage_output.txt
 mypy_errors.txt
 htmlcov/
+# make check-powershell: MCPs' harness writes its Pester results here, one
+# directory per PowerShell edition (MCPs board task d69786fa).
+/coverage/powershell/
 
 # Virtual environments
 env/
