@@ -4,11 +4,14 @@
 .DESCRIPTION
     Loads .env into the process, then starts whichever side is not already
     listening and waits until it is (GrandmaService.ps1). The project root
-    is the checkout this script is in, where it was once the hub's checkout
-    hard-coded, and every target is a parameter so the suite runs this
-    entry against stand-ins.
+    is the directory make runs this from, where it was once the hub's
+    checkout hard-coded, and every target is a parameter so the suite runs
+    this entry against stand-ins.
 .PARAMETER ProjectRoot
-    services\grandma-api.
+    services\grandma-api, relative to the current location, where make runs
+    this. Not a default naming $PSScriptRoot, which is empty in an advanced
+    script's param default under -File in Windows PowerShell 5.1 (API
+    tools/fleet/scripts/run-agent-tick.ps1 carries the incident).
 .PARAMETER WebPort
     The web server's port.
 .PARAMETER Poetry
@@ -20,7 +23,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$ProjectRoot = "$PSScriptRoot\..",
+    [string]$ProjectRoot = '.',
     [int]$WebPort = 8091,
     [string]$Poetry = 'poetry',
     [string]$Npm = 'npm.cmd',
@@ -30,7 +33,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GrandmaService.ps1')
 
-$root = [System.IO.Path]::GetFullPath($ProjectRoot)
+$root = (Resolve-Path -LiteralPath $ProjectRoot).ProviderPath
 [void](Import-GrandmaEnvironment (Join-Path $root '.env'))
 # PORT comes from .env or the caller's environment, as the API reads it.
 $apiPort = 8090
