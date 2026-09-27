@@ -226,6 +226,10 @@ class FleetErrorCode(ErrorCodeBase):
     # a native module on a node without one fails before any test runs
     # (MCPs board task 3f19c136).
     NODE_CXX_MISMATCH = "NODE_CXX_MISMATCH"
+    # The same for the execution suite's own rootless Docker daemon: a deploy
+    # suite claimed on a node without it would have no daemon it may use, and
+    # must never fall back to the stack's (MCPs board task 6c4516af).
+    NODE_DOCKER_MISMATCH = "NODE_DOCKER_MISMATCH"
 
     # Staging -- the bytes the node is entitled to run.
     STAGE_DIGEST_MISMATCH = "STAGE_DIGEST_MISMATCH"
