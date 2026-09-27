@@ -551,13 +551,16 @@ Tar, because no node has `rsync` and all three have `tar`. Not git: uncommitted
 work is the normal state here and the standing rule is no branches, so "push
 and pull" would refuse to dispatch the thing you are actually working on.
 
-The archive crosses as **base64**. Raw bytes do not survive ssh into
-PowerShell — the stream is decoded as text at more than one layer, and one
-mangled byte is a corrupt gzip that extracts partially. Base64 costs a third
-more bytes and removes the failure mode instead of making it rarer.
+The archive crosses over **scp**, as bytes. Until 2026-09-26 it crossed as one
+base64 line streamed into PowerShell, because raw bytes do not survive ssh
+INTO a shell; scp uses ssh's file transfer, where no shell reads them. The
+base64 route's cost grew with the archive through a pipeline that reads line
+by line: an 83 MB archive did not land on serendipity inside the 120 s ssh
+deadline, and scp copied it in 7.3 s with its digest intact (MCPs board task
+140e7042).
 
-The node reassembles the archive, digests it, and reports. **Only then is it
-told to unpack.** Verifying after extraction would mean an unverified tree had
+The node digests the landed archive and reports. **Only then is it told to
+unpack.** Verifying after extraction would mean an unverified tree had
 already landed where the build looks, and a truncated tree builds and fails in
 a way that reads as the code's fault.
 
@@ -888,9 +891,8 @@ and the wrong one is a parse error on the far side that reads as the node's
 fault. `fleet.core.dialect` names the acts once as a protocol and
 `dialect_windows` / `dialect_linux` render each: how a file is written over
 ssh (`Set-Content` behind cmd's quoting, or `mkdir -p … && cat >`), how a
-script is run by path (`powershell -File` or `/bin/sh`), how the archive is
-reassembled and digested (`[Convert]::FromBase64String` + `Get-FileHash`, or
-`base64 -d` + `sha256sum`), how capacity is read (`Win32_OperatingSystem`, or
+script is run by path (`powershell -File` or `/bin/sh`), how the archive scp
+landed is digested (`Get-FileHash`, or `sha256sum`), how capacity is read (`Win32_OperatingSystem`, or
 `/proc/meminfo` and `df`), and how the suite is detached from the connection.
 On Linux that last one is a **transient systemd user unit**
 (`systemd-run --user --unit=fleet-<run>`), the user manager's equivalent of a
