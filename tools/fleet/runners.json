@@ -199,7 +199,10 @@
         "disk": {
           "ceiling_gb": 150,
           "baseline_gb": 46,
-          "baseline_measured": "2026-09-26"
+          "baseline_measured": "2026-09-26",
+          "cache_path": "/home/gharunner/.cache",
+          "cache_ceiling_gb": 60,
+          "work_ceiling_gb": 15
         }
       }
     }
