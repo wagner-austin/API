@@ -67,11 +67,22 @@ class DiskCeiling(TypedDict):
         baseline_gb: What an idle rebuilt host's root used, in GB.
         baseline_measured: The date the baseline was measured,
             ``YYYY-MM-DD``.
+        cache_path: The runner account's cache directory inside the distro,
+            absolute: what pip, npm, poetry and playwright fill across jobs.
+        cache_ceiling_gb: The most that directory may hold, in GB.
+        work_ceiling_gb: The most each WSL install's ``_work`` tree may hold,
+            in GB. Both are MCPs board task bfca20e6: lavender's distro grew
+            from 10 GB to 97 GB in a day after its rebuild, 50 GB of it in the
+            cache and about 23 GB in the eight ``_work`` trees, and only the
+            root's total was audited.
     """
 
     ceiling_gb: int
     baseline_gb: int
     baseline_measured: str
+    cache_path: str
+    cache_ceiling_gb: int
+    work_ceiling_gb: int
 
 
 class MachineVariable(TypedDict):
@@ -172,6 +183,9 @@ def encode_disk_ceiling(disk: DiskCeiling) -> JSONObject:
         "ceiling_gb": disk["ceiling_gb"],
         "baseline_gb": disk["baseline_gb"],
         "baseline_measured": disk["baseline_measured"],
+        "cache_path": disk["cache_path"],
+        "cache_ceiling_gb": disk["cache_ceiling_gb"],
+        "work_ceiling_gb": disk["work_ceiling_gb"],
     }
 
 
@@ -187,9 +201,9 @@ def decode_disk_ceiling(value: JSONValue) -> DiskCeiling:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, a size is not positive, the baseline is not below the
-            ceiling, or the date is not ``YYYY-MM-DD``. A ceiling at or under
-            the idle baseline fails a freshly rebuilt host, which is a roster
-            that contradicts itself.
+            ceiling, the date is not ``YYYY-MM-DD``, or the cache path is not
+            absolute. A ceiling at or under the idle baseline fails a freshly
+            rebuilt host, which is a roster that contradicts itself.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"disk ceiling must be a JSON object, got {type(value).__name__}")
@@ -208,7 +222,24 @@ def decode_disk_ceiling(value: JSONValue) -> DiskCeiling:
     parts = measured.split("-")
     if [len(part) for part in parts] != [4, 2, 2] or not all(part.isdigit() for part in parts):
         raise JSONTypeError(f"baseline_measured must be YYYY-MM-DD, got {measured!r}")
-    return DiskCeiling(ceiling_gb=ceiling, baseline_gb=baseline, baseline_measured=measured)
+    cache_path = require_str(value, "cache_path")
+    if not cache_path.startswith("/"):
+        raise JSONTypeError(f"cache_path must be absolute inside the distro, got {cache_path!r}")
+    cache_ceiling = require_int(value, "cache_ceiling_gb")
+    work_ceiling = require_int(value, "work_ceiling_gb")
+    if cache_ceiling <= 0 or work_ceiling <= 0:
+        raise JSONTypeError(
+            f"cache_ceiling_gb and work_ceiling_gb must be positive, got {cache_ceiling} and "
+            f"{work_ceiling}"
+        )
+    return DiskCeiling(
+        ceiling_gb=ceiling,
+        baseline_gb=baseline,
+        baseline_measured=measured,
+        cache_path=cache_path,
+        cache_ceiling_gb=cache_ceiling,
+        work_ceiling_gb=work_ceiling,
+    )
 
 
 def encode_machine_variable(variable: MachineVariable) -> JSONObject:
