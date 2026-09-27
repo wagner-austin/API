@@ -78,9 +78,16 @@ $log = Join-Path $logDirectory ("fleet-node-$Node-" + (Get-Date -Format 'yyyy-MM
 $stdoutFile = Join-Path $env:TEMP "fleet-node-$Node-tick-$PID.out"
 $stderrFile = Join-Path $env:TEMP "fleet-node-$Node-tick-$PID.err"
 $startedAt = Get-Date -Format o
+# THE ROLLED COMMIT RUNS, NEVER THIS CHECKOUT (board task 465689f5).
+# fleet.cli.rolled extracts the commit `make fleet-roll` pointed
+# refs/fleet/rolled at, once both execution suites passed there, and runs
+# the node agent from it with the extracted fleet.json as its --config; with
+# no roll it refuses by name, exit 2, and no agent starts.
 $agentArguments = @(
-    'run', 'python', '-m', 'fleet.cli.node_agent',
-    '--config', 'fleet.json',
+    'run', 'python', '-m', 'fleet.cli.rolled',
+    '--repo-root', $apiRoot,
+    '--agent', 'fleet-node-agent',
+    '--',
     '--node', $Node
 )
 if ($Announce) {
