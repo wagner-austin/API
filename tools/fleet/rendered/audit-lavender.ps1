@@ -50,6 +50,60 @@ if ($DiskLine -match '(\d+)G') {
     $UsedGb = [int]$Matches[1]
 }
 Write-Check 'disk:/:ceiling-150gb:baseline-46gb@2026-09-26' ($UsedGb -ge 0 -and $UsedGb -le 150) ('the distro root uses ' + $UsedGb + ' GB against a ceiling of 150 GB; an idle rebuilt host used 46 GB on 2026-09-26; df said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/.cache'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/.cache:ceiling-60gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 60) ('/home/gharunner/.cache holds ' + $CacheGb + ' GB against a ceiling of 60 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-api-1/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-api-1/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-api-1/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-api-2/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-api-2/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-api-2/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-2/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-2/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-2/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-3/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-3/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-3/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-4/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-4/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-4/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-corvis-stick-1/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-corvis-stick-1/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-corvis-stick-1/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "du -s -BG '/home/gharunner/actions-runner-treebot-1/_work'"
+$CacheGb = -1
+if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\d+)G') {
+    $CacheGb = [int]$Matches[1]
+}
+Write-Check 'cache:/home/gharunner/actions-runner-treebot-1/_work:ceiling-15gb' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and $CacheGb -le 15) ('/home/gharunner/actions-runner-treebot-1/_work holds ' + $CacheGb + ' GB against a ceiling of 15 GB; du said: ' + $Probe.Text)
 $Policy = [string](Get-Item -LiteralPath $PolicyKey).GetValue('ExecutionPolicy')
 Write-Check 'execution-policy:LocalMachine:RemoteSigned' ($Policy -eq 'RemoteSigned') ('the LocalMachine ExecutionPolicy value is: ' + $Policy)
 $LongPaths = [string](Get-Item -LiteralPath $FileSystemKey).GetValue('LongPathsEnabled')
