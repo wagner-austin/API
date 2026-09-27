@@ -90,6 +90,7 @@ def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
         gpu=gpu,
         enabled=True,
         test_database=False,
+        rust=None,
         budget=_BUDGET,
     )
 

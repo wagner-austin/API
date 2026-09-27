@@ -60,6 +60,7 @@ def _node(
         gpu=gpu,
         enabled=True,
         test_database=False,
+        rust=None,
         budget=NodeBudget(
             reserved_cores=reserved_cores,
             reserved_ram_gb=reserved_ram_gb,

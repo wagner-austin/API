@@ -391,6 +391,7 @@ class TestProbesForReal:
             "make",
             "node",
             "tar",
+            "cargo",
             "winget",
             "choco",
             "pip",

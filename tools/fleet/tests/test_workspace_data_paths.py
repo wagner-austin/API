@@ -59,6 +59,7 @@ def _document(
                 "gpu": None,
                 "enabled": True,
                 "test_database": False,
+                "rust": None,
                 "budget": {
                     "reserved_cores": 4,
                     "reserved_ram_gb": 8.0,

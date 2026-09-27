@@ -35,13 +35,15 @@ def _node(
     platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
     test_database: bool = False,
+    rust: str | None = None,
 ) -> NodeConfig:
-    """Build a node declaration with the three fields tags derive from.
+    """Build a node declaration with the four fields tags derive from.
 
     Args:
         platform: The node's dialect.
         gpu: Its CUDA device, or None for a CPU-only node.
         test_database: Whether it runs the fleet test database.
+        rust: The cargo version it declares, or None.
 
     Returns:
         The node.
@@ -55,6 +57,7 @@ def _node(
         gpu=gpu,
         enabled=True,
         test_database=test_database,
+        rust=rust,
         budget=NodeBudget(
             reserved_cores=4,
             reserved_ram_gb=4.0,
@@ -80,6 +83,13 @@ class TestNodeTags:
             _node(platform=NodePlatform.LINUX, gpu=RTX_3070_TI, test_database=True)
         ) == (frozenset({NodeTag.LINUX, NodeTag.GPU, NodeTag.TESTDB}))
 
+    def test_a_node_declaring_a_rust_toolchain_carries_rust(self) -> None:
+        """diphtheria's shape once rustup was installed (MCPs board task 1e2da299)."""
+        assert node_tags(_node(platform=NodePlatform.LINUX, test_database=True, rust="1.98.1")) == (
+            frozenset({NodeTag.LINUX, NodeTag.TESTDB, NodeTag.RUST})
+        )
+        assert NodeTag.RUST not in node_tags(_node(platform=NodePlatform.LINUX))
+
     def test_every_platform_carries_the_tag_spelled_as_its_own_word(self) -> None:
         """The platform-to-tag table has a row for every platform, so a third
         platform fails here before a node of it could be tagged."""
@@ -87,10 +97,10 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_two_platforms_gpu_and_testdb(self) -> None:
-        """The dispatch queue's CHECK (MCPs migrations 532 and 563) is these
-        four words, so the members' values are pinned in order."""
-        assert [tag.value for tag in NodeTag] == ["windows", "linux", "gpu", "testdb"]
+    def test_the_vocabulary_is_the_two_platforms_gpu_testdb_and_rust(self) -> None:
+        """The dispatch queue's CHECK (MCPs migrations 532, 563 and 569) is
+        these five words, so the members' values are pinned in order."""
+        assert [tag.value for tag in NodeTag] == ["windows", "linux", "gpu", "testdb", "rust"]
 
 
 class TestMissingTags:
@@ -115,6 +125,11 @@ class TestMissingTags:
         )
         assert missing_tags(with_database, (NodeTag.TESTDB,)) == ()
 
+    def test_a_crate_build_is_missing_rust_on_a_node_without_cargo(self) -> None:
+        with_cargo = _node(platform=NodePlatform.LINUX, rust="1.98.1")
+        assert missing_tags(_node(platform=NodePlatform.LINUX), (NodeTag.RUST,)) == (NodeTag.RUST,)
+        assert missing_tags(with_cargo, (NodeTag.RUST,)) == ()
+
     def test_a_project_requiring_nothing_is_never_missing_anything(self) -> None:
         assert missing_tags(_node(platform=NodePlatform.LINUX), ()) == ()
 
@@ -126,7 +141,9 @@ class TestDecodeNodeTag:
 
     def test_a_word_outside_the_set_is_refused_with_the_set(self) -> None:
         with pytest.raises(
-            JSONTypeError, match="t must be one of windows, linux, gpu, testdb, got 'docker'"
+            JSONTypeError,
+            match=r"t must be one of windows, linux, gpu, testdb, rust, got 'docker'; .* a Rust "
+            r"toolchain",
         ):
             decode_node_tag("docker", field="t")
 
@@ -158,7 +175,7 @@ class TestDecodeRequiredTags:
 
     def test_an_unknown_tag_is_refused_by_index(self) -> None:
         with pytest.raises(
-            JSONTypeError, match=r"p\[1\] must be one of windows, linux, gpu, testdb"
+            JSONTypeError, match=r"p\[1\] must be one of windows, linux, gpu, testdb, rust"
         ):
             decode_required_tags(["gpu", "cuda"], field="p")
 

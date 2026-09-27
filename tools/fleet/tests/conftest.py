@@ -294,6 +294,7 @@ def workspace_document() -> JSONObject:
                 "gpu": None,
                 "enabled": True,
                 "test_database": False,
+                "rust": None,
                 "budget": {
                     "reserved_cores": 2,
                     "reserved_ram_gb": 4.0,
