@@ -14,6 +14,13 @@ the whole tree and before any test runs:
   on Linux. Measured 2026-09-27, no Windows node had the VC tools; dispatch
   job 31fd1548 on lavender and 69f696cb on serendipity died in
   ``find-visualstudio.js``.
+- ``docker`` (MCPs board task 6c4516af). MCPs/execution-deploy runs the
+  real make deploy against a throwaway compose project, and on the
+  operator's ruling of 2026-09-27 it may only use a ROOTLESS daemon under a
+  user outside the docker group (``execdocker``, provisioned by MCPs
+  ``scripts/host/diphtheria/provision.sh``), never the daemon running the
+  stack. The version is that daemon's own ``ServerVersion``, reported only
+  when the daemon also says it is rootless.
 
 A project that needs one requires the tag of the same name
 (:mod:`fleet.contracts.tags`), and a node carries it when its declaration
@@ -47,18 +54,26 @@ class Capability(StrEnum):
 
     RUST = "rust"
     CXX = "cxx"
+    DOCKER = "docker"
 
 
 #: The probe line each capability is read from. ``cargo`` is the tool's own
 #: name because maturin builds with it; ``cxx`` is a synthetic line, since the
 #: toolchain node-gyp finds is not one executable on both platforms (vswhere's
-#: VC tools component on Windows, ``g++ -dumpfullversion`` on Linux).
-PROBE_NAME: Final[dict[Capability, str]] = {Capability.RUST: "cargo", Capability.CXX: "cxx"}
+#: VC tools component on Windows, ``g++ -dumpfullversion`` on Linux); so is
+#: ``docker``, whose answer is the rootless execdocker daemon's, not whatever
+#: ``docker`` on the runner's PATH would reach.
+PROBE_NAME: Final[dict[Capability, str]] = {
+    Capability.RUST: "cargo",
+    Capability.CXX: "cxx",
+    Capability.DOCKER: "docker",
+}
 
 #: What refuses a node whose declaration disagrees with its probe.
 MISMATCH_CODE: Final[dict[Capability, FleetErrorCode]] = {
     Capability.RUST: FleetErrorCode.NODE_RUST_MISMATCH,
     Capability.CXX: FleetErrorCode.NODE_CXX_MISMATCH,
+    Capability.DOCKER: FleetErrorCode.NODE_DOCKER_MISMATCH,
 }
 
 #: Where a declared version is read, for the decode refusal.
@@ -68,12 +83,19 @@ _SOURCE: Final[dict[Capability, str]] = {
         "vswhere reports for the VC tools on Windows or g++ -dumpfullversion prints on Linux, "
         "e.g. '13.3.0'"
     ),
+    Capability.DOCKER: (
+        "the execdocker user's rootless daemon reports as its ServerVersion, e.g. '29.8.1'"
+    ),
 }
 
 #: What goes wrong when a node carries a tag it cannot honour.
 _CONSEQUENCE: Final[dict[Capability, str]] = {
     Capability.RUST: "a crate build claimed on it would fail in poetry sync",
     Capability.CXX: "an npm ci claimed on it would fail rebuilding a native module under node-gyp",
+    Capability.DOCKER: (
+        "a deploy suite claimed on it would have no daemon it may use, and must never use the "
+        "stack's"
+    ),
 }
 
 #: A declared version: two to four dotted numbers, the shapes cargo (1.98.1),
@@ -91,7 +113,7 @@ def _version_in(capability: Capability, answer: str) -> str | None:
     Returns:
         The version, or None when the answer is not of the expected shape.
         cargo's is its SECOND word, because the last is its build date;
-        the ``cxx`` line carries the bare version.
+        the ``cxx`` and ``docker`` lines carry the bare version.
     """
     words = answer.split()
     if capability is Capability.RUST:

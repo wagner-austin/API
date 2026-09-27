@@ -37,7 +37,12 @@ declares the version its cargo prints, which the runner's probe re-measures
 every tick. ``cxx`` because every MCPs TypeScript project's root ``npm ci``
 rebuilds ``hnswlib-node`` under node-gyp, and on 2026-09-27 no Windows node
 had the VC tools it needs (MCPs board task 3f19c136): the tag means the node
-declares the version of the C++ toolchain its probe finds. Both are
+declares the version of the C++ toolchain its probe finds. ``docker``
+because MCPs/execution-deploy runs the real make deploy and, on the
+operator's ruling of 2026-09-27, may only do so on a rootless daemon under a
+user outside the docker group, never the stack's (MCPs board task
+6c4516af): the tag means the node declares that daemon's version, which its
+probe reads only when the daemon says it is rootless. All three are
 :mod:`fleet.contracts.capability`.
 
 A project naming both platforms is refused at decode: no node is both, so
@@ -60,8 +65,9 @@ from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
 class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
-    The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569
-    and 570) is the same six words as these members' values, in this order.
+    The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
+    570 and 571) is the same seven words as these members' values, in this
+    order.
     """
 
     WINDOWS = "windows"
@@ -70,6 +76,7 @@ class NodeTag(StrEnum):
     TESTDB = "testdb"
     RUST = "rust"
     CXX = "cxx"
+    DOCKER = "docker"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -84,6 +91,7 @@ _PLATFORM_TAG: Final[dict[NodePlatform, NodeTag]] = {
 _CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.RUST: NodeTag.RUST,
     Capability.CXX: NodeTag.CXX,
+    Capability.DOCKER: NodeTag.DOCKER,
 }
 
 
@@ -95,8 +103,8 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
 
     Returns:
         Its platform, plus ``gpu`` when the node declares a CUDA device,
-        ``testdb`` when it declares the fleet test database, and ``rust`` or
-        ``cxx`` for each toolchain it declares a version of.
+        ``testdb`` when it declares the fleet test database, and ``rust``,
+        ``cxx`` or ``docker`` for each capability it declares a version of.
     """
     tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
@@ -133,7 +141,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
     raise JSONTypeError(
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
-        "fleet test database, or a Rust or C++ toolchain), and one it does not carry could "
+        "fleet test database, a Rust or C++ toolchain, or the execution suite's rootless "
+        "Docker daemon), and one it does not carry could "
         "never be satisfied"
     )
 

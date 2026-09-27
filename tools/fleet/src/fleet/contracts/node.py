@@ -143,6 +143,11 @@ class NodeConfig(TypedDict):
             the ``cxx`` tag every project whose ``npm ci`` rebuilds a native
             module requires; required and re-measured like ``rust`` (MCPs
             board task 3f19c136).
+        docker: The ServerVersion the execdocker user's ROOTLESS daemon
+            reports, read only when that daemon also says it is rootless, or
+            None. Gives the ``docker`` tag the MCPs deploy suite requires,
+            so it runs on a daemon that cannot reach the stack's; required
+            and re-measured like ``rust`` (MCPs board task 6c4516af).
         budget: What share of this machine a dispatch may take.
     """
 
@@ -156,6 +161,7 @@ class NodeConfig(TypedDict):
     test_database: bool
     rust: str | None
     cxx: str | None
+    docker: str | None
     budget: NodeBudget
 
 
@@ -254,6 +260,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "test_database": node["test_database"],
         "rust": node["rust"],
         "cxx": node["cxx"],
+        "docker": node["docker"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -321,6 +328,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         test_database=require_bool(value, "test_database"),
         rust=decode_capability(Capability.RUST, value["rust"]),
         cxx=decode_capability(Capability.CXX, value["cxx"]),
+        docker=decode_capability(Capability.DOCKER, value["docker"]),
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 
@@ -337,7 +345,9 @@ def declared_capability(node: NodeConfig, capability: Capability) -> str | None:
     """
     if capability is Capability.RUST:
         return node["rust"]
-    return node["cxx"]
+    if capability is Capability.CXX:
+        return node["cxx"]
+    return node["docker"]
 
 
 def decode_node_platform(value: str) -> NodePlatform:
