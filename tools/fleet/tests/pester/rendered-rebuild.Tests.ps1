@@ -9,29 +9,7 @@ $ErrorActionPreference = 'Stop'
 # distro. The boot instant is a read and runs for real.
 
 BeforeAll {
-    $script:rendered = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'rendered'
-
-    # A render fails by throwing; a stand-in's exit code is left in
-    # $LASTEXITCODE, so every run goes through here, where a non-zero one is
-    # itself an error.
-    function Invoke-Rendered {
-        param([string]$Name, [hashtable]$Parameters)
-        $global:LASTEXITCODE = 0
-        & (Join-Path $script:rendered "$Name.ps1") @Parameters
-        if ($LASTEXITCODE -ne 0) {
-            throw "TEST_RENDER_EXITED: $Name exited $LASTEXITCODE"
-        }
-    }
-
-    function Initialize-StandIn {
-        param([int]$ExitCode)
-        $root = Join-Path $TestDrive ('standin-' + [guid]::NewGuid().ToString('N'))
-        [void][System.IO.Directory]::CreateDirectory($root)
-        $record = Join-Path $root 'arguments.txt'
-        $path = Join-Path $root 'tool.cmd'
-        [System.IO.File]::WriteAllText($path, "@echo off`r`necho %*>`"$record`"`r`nexit /b $ExitCode`r`n", [System.Text.Encoding]::ASCII)
-        return [pscustomobject]@{ Path = $path; Record = $record }
-    }
+    . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 }
 
 Describe 'The boot instant' {
