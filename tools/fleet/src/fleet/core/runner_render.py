@@ -2,9 +2,11 @@
 
 ``fleet-runners render`` writes two artifacts and prints the run order:
 
-  provision.ps1   Windows side. Writes ``.wslconfig`` when the roster
-                  declares a memory floor, and registers + starts the
-                  keepalive scheduled task when one is declared.
+  provision.ps1   Windows side, rendered by
+                  :mod:`fleet.core.runner_windows_provision`. Writes
+                  ``.wslconfig`` when the roster declares a memory floor,
+                  registers + starts the keepalive scheduled task when one
+                  is declared, and installs every Windows-side runner.
   provision.sh    Linux side, run INSIDE the distro as root. Installs the
                   hygiene units, creates writable assets, clones fetchable
                   ones, and configures + installs every runner instance.
@@ -29,20 +31,9 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
-from fleet.core.runner_account import (
-    WINDOWS_SERVICE_ACCOUNT,
-    render_service_account_lines,
-    render_service_running_lines,
-)
-from fleet.core.runner_keepalive import render_keepalive_lines
-from fleet.core.runner_recovery import render_windows_recovery_lines, render_wsl_recovery_lines
-
-#: The GitHub Actions runner release the rendered provision installs.
-#:
-#: Pinned so two hosts provisioned a week apart run the same agent; measured
-#: as the version the live lavender installs run (2026-09-08). Bumping it is
-#: a one-line change reviewed like any other.
-RUNNER_VERSION = "2.337.0"
+from fleet.core.runner_install import RUNNER_VERSION, install_root_for, token_variable
+from fleet.core.runner_recovery import render_wsl_recovery_lines
+from fleet.core.runner_windows_provision import render_windows_provision_script
 
 #: Where ``pipx install`` puts its shims for the runner account, appended to
 #: each WSL runner's ``.path`` (see :func:`render_wsl_install_lines`).
@@ -178,247 +169,6 @@ class RenderedProvision(TypedDict):
     manual_steps: list[str]
 
 
-def token_variable(repo: str) -> str:
-    """The environment variable a repo's registration token arrives in.
-
-    Args:
-        repo: The repository, ``owner/name`` form.
-
-    Returns:
-        The variable name, e.g. ``RUNNER_TOKEN_API`` for ``wagner-austin/API``.
-    """
-    name = repo.split("/")[1]
-    sanitized = "".join(c if c.isalnum() else "_" for c in name.upper())
-    return f"RUNNER_TOKEN_{sanitized}"
-
-
-def render_windows_install_lines(install: RunnerInstall) -> list[str]:
-    """PowerShell lines that install one WINDOWS-side runner.
-
-    Lifted from the tree-bot install of 2026-09-09 (the last hand-rolled
-    runner on this fleet, by operator mandate) and from the layout its
-    siblings already share: an install directory beside
-    ``C:\\actions-runner`` named for the repo, the pinned runner release,
-    and ``config.cmd --runasservice`` so the service survives reboots.
-
-    Args:
-        install: The install to provision, with ``side`` ``"windows"``.
-
-    Returns:
-        The PowerShell lines. The registration token arrives in the same
-        per-repo environment variable the bash side uses. ``--replace``
-        takes back a registration of the same name, which is what a
-        rebuilt host must do: its old runners are still registered,
-        offline, under exactly the names the roster gives the new ones
-        (board task 1aa6a021). An install whose ``.runner`` file exists is
-        already configured and is left alone, because config.cmd refuses a
-        second configuration and ``--rebuild`` re-runs every stage over a
-        host that may be half built. Duplicate installs are the roster's
-        to prevent, and ``--onboard`` refuses a repo the roster already
-        carries on the host. The service runs as SYSTEM, a deliberate
-        privilege decision whose reasons and cost
-        :mod:`fleet.core.runner_account` states.
-    """
-    token_var = token_variable(install["repo"])
-    directory = _install_root_for(install)
-    labels = ",".join(install["labels"])
-    return [
-        f"if (-not $env:{token_var}) {{ throw 'set {token_var} to a fresh registration "
-        f"token for {install['repo']}' }}",
-        f"New-Item -ItemType Directory -Force -Path '{directory}' | Out-Null",
-        f"if (-not (Test-Path '{directory}\\config.cmd')) {{",
-        f"    $zip = '{directory}\\runner.zip'",
-        "    Invoke-WebRequest -Uri "
-        f"'https://github.com/actions/runner/releases/download/v{RUNNER_VERSION}/"
-        f"actions-runner-win-x64-{RUNNER_VERSION}.zip' -OutFile $zip",
-        f"    Expand-Archive -LiteralPath $zip -DestinationPath '{directory}' -Force",
-        "    Remove-Item $zip",
-        "}",
-        f"if (-not (Test-Path '{directory}\\.runner')) {{",
-        f"    & '{directory}\\config.cmd' --unattended "
-        f"--url https://github.com/{install['repo']} --token $env:{token_var} "
-        f"--name {install['runner_name']} --labels {labels} --runasservice "
-        f"--windowslogonaccount '{WINDOWS_SERVICE_ACCOUNT}' --replace",
-        f"    if ($LASTEXITCODE -ne 0) {{ throw 'config.cmd for {install['repo']} "
-        f"{install['runner_name']} exited ' + $LASTEXITCODE }}",
-        "}",
-        *render_service_account_lines(install),
-        *render_windows_recovery_lines(install),
-        *render_service_running_lines(install),
-    ]
-
-
-def render_windows_python_toolcache_lines(install: RunnerInstall) -> list[str]:
-    """PowerShell lines that seed a Windows runner's Python tool cache.
-
-    On self-hosted Windows, ``actions/setup-python`` INSTALLS when the tool
-    cache misses -- via the python.org all-users installer, whose registry
-    writes the runner's service account rightly lacks (measured on
-    tree-bot run 34394258775: SecurityException in Remove-Item Registry).
-    Seeding the cache turns setup-python's install path into its find
-    path. The source is the NuGet CPython package: full xcopy-deployable
-    Python with pip, no installer, no registry -- exactly the property a
-    service-account tool cache needs. The find path wants only
-    ``Python/<ver>/x64/python.exe`` plus an ``x64.complete`` marker.
-
-    The package carries pip as a module but no ``Scripts`` directory, and
-    setup-python puts ``Scripts`` on PATH, so a workflow's bare ``pip``
-    fails on a seed that stops at the copy (measured on MCPs run
-    36254365786, session-audit: CommandNotFoundException for pip). pip is
-    therefore reinstalled from the package's own bundled wheel, offline,
-    which writes the entry points; ``Scripts\\pip.exe`` is both the
-    idempotency test and the verification.
-
-    Args:
-        install: The windows-side install whose tool cache to seed, with the
-            exact versions in its ``python_toolcache``. Exact on purpose:
-            NuGet carries only versions python.org built for Windows, and a
-            floating spec here would re-create the drift this module exists
-            to prevent.
-
-    Returns:
-        The PowerShell lines, none for an install that seeds nothing.
-        Idempotent: an already-seeded version is left alone.
-    """
-    if not install["python_toolcache"]:
-        return []
-    root = _install_root_for(install)
-    lines: list[str] = [
-        f"$ToolDir = '{root}\\_work\\_tool'",
-    ]
-    for version in install["python_toolcache"]:
-        lines += [
-            f"$Target = Join-Path $ToolDir 'Python\\{version}\\x64'",
-            "if (-not (Test-Path (Join-Path $Target 'Scripts\\pip.exe'))) {",
-            "    $Work = Join-Path $env:TEMP ([guid]::NewGuid().ToString('N'))",
-            "    New-Item -ItemType Directory -Path $Work | Out-Null",
-            "    $Zip = Join-Path $Work 'python.nupkg.zip'",
-            "    Invoke-WebRequest -Uri "
-            f"'https://www.nuget.org/api/v2/package/python/{version}' "
-            "-OutFile $Zip -UseBasicParsing",
-            "    Expand-Archive -LiteralPath $Zip -DestinationPath $Work -Force",
-            "    New-Item -ItemType Directory -Force -Path $Target | Out-Null",
-            "    Copy-Item -Path (Join-Path $Work 'tools\\*') -Destination $Target -Recurse -Force",
-            "    $Wheel = @(Get-ChildItem -LiteralPath "
-            "(Join-Path $Target 'Lib\\ensurepip\\_bundled') -Filter 'pip-*.whl')",
-            "    if ($Wheel.Count -ne 1) { throw "
-            f'"expected one bundled pip wheel in seeded {version}, found $($Wheel.Count)" }}',
-            "    & (Join-Path $Target 'python.exe') -m pip install --force-reinstall --no-deps "
-            "--no-index --no-warn-script-location --disable-pip-version-check $Wheel[0].FullName",
-            f"    if ($LASTEXITCODE -ne 0) {{ throw 'pip reinstall failed in seeded {version}' }}",
-            "    if (-not (Test-Path (Join-Path $Target 'Scripts\\pip.exe'))) { "
-            f"throw 'pip.exe missing in seeded {version}' }}",
-            "    New-Item -ItemType File -Force -Path "
-            f"(Join-Path $ToolDir 'Python\\{version}\\x64.complete') | Out-Null",
-            "    Remove-Item -Recurse -Force $Work",
-            "}",
-        ]
-    return lines
-
-
-def _install_root_for(install: RunnerInstall) -> str:
-    """The install directory an install's workdir sits under.
-
-    Args:
-        install: The install.
-
-    Returns:
-        The parent of the ``_work`` tree, backslashed for a windows-side
-        install (command lines and cmdlets both take that form) and POSIX
-        for a wsl one.
-    """
-    root = install["workdir"].rsplit("/", 1)[0]
-    if install["side"] == "windows":
-        return root.replace("/", "\\")
-    return root
-
-
-def render_wslconfig_lines(spec: HostRunnerSpec) -> list[str]:
-    """PowerShell lines that write ``.wslconfig`` for a declared memory floor.
-
-    Shared by ``provision.ps1`` and the rebuild's Windows base stage, which
-    writes it BEFORE the distro is first started so the VM boots into the
-    floor rather than needing a restart to take it.
-
-    The file is ``$WslConfigPath``, which the Windows base takes as a
-    parameter (:func:`render_wslconfig_parameters`) so the Pester suite over
-    its committed render writes under TestDrive, and ``provision.ps1`` sets
-    to the profile's own file.
-
-    Args:
-        spec: The host's roster entry.
-
-    Returns:
-        The lines, none when the roster declares no floor.
-    """
-    floor = spec["wslconfig_min_memory_gb"]
-    if floor is None:
-        return []
-    return [
-        "$WslConfig = @(",
-        "  '[wsl2]',",
-        f"  'memory={floor}GB',",
-        "  'swap=8GB'",
-        ")",
-        "Set-Content -LiteralPath $WslConfigPath -Value $WslConfig -Encoding ascii",
-        "Write-Output 'wrote .wslconfig; the ceiling applies when the VM next starts'",
-    ]
-
-
-#: Where ``.wslconfig`` lives: the running account's profile.
-WSLCONFIG_PATH = '"$env:USERPROFILE\\.wslconfig"'
-
-
-def render_wslconfig_parameters(spec: HostRunnerSpec) -> list[str]:
-    """The Windows base's param-block line naming ``.wslconfig``'s path.
-
-    Args:
-        spec: The host's roster entry.
-
-    Returns:
-        ``[string]$WslConfigPath = "$env:USERPROFILE\\.wslconfig",``, or
-        nothing when the roster declares no floor and so no file is written.
-    """
-    if spec["wslconfig_min_memory_gb"] is None:
-        return []
-    return [f"    [string]$WslConfigPath = {WSLCONFIG_PATH},"]
-
-
-def _render_windows_script(spec: HostRunnerSpec) -> str:
-    """The Windows-side provision for one host.
-
-    Args:
-        spec: The host's roster entry.
-
-    Returns:
-        The complete ``provision.ps1`` text: the ``.wslconfig`` floor and
-        keepalive task when declared, then every windows-side runner
-        install. Documents emptiness rather than being omitted when the
-        roster declares none of those, so the run order the CLI prints
-        holds for every host.
-    """
-    lines: list[str] = [
-        "# provision.ps1 -- Windows side. Rendered by fleet-runners; run as the",
-        "# machine's interactive user. Re-run after any change: every step is",
-        "# idempotent, and an install already configured is left alone.",
-        "$ErrorActionPreference = 'Stop'",
-    ]
-    floor = spec["wslconfig_min_memory_gb"]
-    if floor is not None:
-        lines.append(f"$WslConfigPath = {WSLCONFIG_PATH}")
-    lines += render_wslconfig_lines(spec)
-    keepalive = spec["keepalive_task"]
-    lines += render_keepalive_lines(spec)
-    windows_installs = [i for i in spec["installs"] if i["side"] == "windows"]
-    for install in windows_installs:
-        lines.append("")
-        lines += render_windows_install_lines(install)
-        lines += render_windows_python_toolcache_lines(install)
-    if floor is None and keepalive is None and not windows_installs:
-        lines.append("Write-Output 'nothing declared for the Windows side of this host'")
-    return "\n".join(lines) + "\n"
-
-
 def _render_asset_lines(asset: FileAsset) -> list[str]:
     """Provision lines for one fetchable asset.
 
@@ -479,7 +229,7 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         The bash lines that download, configure and start it.
     """
     token_var = token_variable(install["repo"])
-    directory = _install_root_for(install)
+    directory = install_root_for(install)
     labels = ",".join(install["labels"])
     return [
         f': "${{{token_var}:?set {token_var} to a fresh registration token for '
@@ -571,7 +321,7 @@ def render_provision(spec: HostRunnerSpec) -> RenderedProvision:
         if asset["manual"]
     ]
     return RenderedProvision(
-        windows_script=_render_windows_script(spec),
+        windows_script=render_windows_provision_script(spec, {}),
         linux_script=_render_linux_script(spec),
         manual_steps=manual,
     )
@@ -583,15 +333,8 @@ __all__ = [
     "CI_CLEAN_TIMER",
     "LOCAL_BIN",
     "RUNNER_PATH_ENTRIES",
-    "RUNNER_VERSION",
-    "WSLCONFIG_PATH",
     "WSL_LIB",
     "RenderedProvision",
     "render_provision",
-    "render_windows_install_lines",
-    "render_windows_python_toolcache_lines",
     "render_wsl_install_lines",
-    "render_wslconfig_lines",
-    "render_wslconfig_parameters",
-    "token_variable",
 ]

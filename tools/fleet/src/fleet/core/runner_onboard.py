@@ -44,7 +44,15 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import _test_hooks, remote, runner_audit, runner_distro, runner_render
+from fleet.core import (
+    _test_hooks,
+    remote,
+    runner_audit,
+    runner_distro,
+    runner_render,
+    runner_windows_provision,
+)
+from fleet.core.runner_install import token_variable
 
 #: The token mint's deadline, in seconds: one HTTPS round trip to GitHub.
 #: A minute outlasts any answer ``gh`` gives and ends a hung login prompt
@@ -223,7 +231,7 @@ def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> 
             remote layer -- config.sh refusing (already configured, expired
             token) surfaces as the latter with the script's own stderr.
     """
-    token_var = runner_render.token_variable(install["repo"])
+    token_var = token_variable(install["repo"])
     payload = "\n".join(
         [
             "#!/usr/bin/env bash",
@@ -254,18 +262,12 @@ def _provision_windows(spec: HostRunnerSpec, install: RunnerInstall, token: str)
         AppError: ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
             remote layer.
     """
-    token_var = runner_render.token_variable(install["repo"])
-    lines = [
-        "$ErrorActionPreference = 'Stop'",
-        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
-        f"$env:{token_var} = '{token}'",
-        *runner_render.render_windows_install_lines(install),
-        *runner_render.render_windows_python_toolcache_lines(install),
-    ]
     remote.run_script(
         spec["host"],
         f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-win.ps1",
-        "\n".join(lines),
+        runner_windows_provision.render_windows_onboard_script(
+            install, {token_variable(install["repo"]): token}
+        ),
         platform=NodePlatform.WINDOWS,
     )
 

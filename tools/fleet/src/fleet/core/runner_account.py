@@ -42,8 +42,8 @@ SERVICE_ACCOUNT_REASON = (
 )
 
 
-def render_service_running_lines(install: RunnerInstall) -> list[str]:
-    """PowerShell lines that leave an installed runner service running.
+def render_service_running_lines() -> list[str]:
+    """Windows provision lines that leave the install's service running.
 
     The services install as Automatic (Delayed Start), which Windows begins
     about two minutes after boot. A rebuild that rebooted the host reaches
@@ -51,20 +51,18 @@ def render_service_running_lines(install: RunnerInstall) -> list[str]:
     Windows runners Stopped at 19:39Z on 2026-09-26. Starting a stopped
     service here makes the audit see the host the next minute will see.
 
-    Args:
-        install: A windows-side install.
-
     Returns:
-        The lines; a running service is left alone.
-
-    Raises:
-        ValueError: When the service name cannot be embedded verbatim.
+        The lines, over the provision loop's ``$ServiceName`` and its
+        ``$GetService`` and ``$StartService`` parameters
+        (:mod:`fleet.core.runner_windows_provision`). The state is JOINED
+        from the service rows, so an absent service reads '' and is started,
+        which throws; a running service is left alone.
     """
-    service = scriptable(install["service"], label="service")
     return [
-        f"if ((Get-Service -Name '{service}').Status -ne 'Running') {{",
-        f"    Start-Service -Name '{service}'",
-        f"    Write-Output 'started {service}'",
+        "$State = (@(& $GetService $ServiceName | ForEach-Object { [string]$_.State }) -join '')",
+        "if ($State -ne 'Running') {",
+        "    & $StartService $ServiceName",
+        "    Write-Output ('started ' + $ServiceName)",
         "}",
     ]
 
@@ -111,8 +109,8 @@ def render_service_account_check_lines(install: RunnerInstall) -> list[str]:
     ]
 
 
-def render_service_account_lines(install: RunnerInstall) -> list[str]:
-    """PowerShell lines that bind an installed runner service to SYSTEM.
+def render_service_account_lines() -> list[str]:
+    """Windows provision lines that bind the install's service to SYSTEM.
 
     Run after the install, whose ``config.cmd`` already names the account;
     these lines rebind a service that an earlier install left under another
@@ -123,32 +121,34 @@ def render_service_account_lines(install: RunnerInstall) -> list[str]:
     ``safe.directory``, because the mismatch is real. That also removes the
     tool cache inside it, so these lines run before the cache is seeded.
 
-    Args:
-        install: A windows-side install.
-
     Returns:
-        The lines. A service already running as SYSTEM is left alone; a
-        missing service or a failed rebind throws, and the stopped service
-        stays stopped for the audit to report.
-
-    Raises:
-        ValueError: When the service name or workdir cannot be embedded
-            verbatim; see :func:`fleet.core.script_values.scriptable`.
+        The lines, over the provision loop's ``$ServiceName`` and
+        ``$Workdir`` and its ``$GetService``, ``$StopService``,
+        ``$StartService`` and ``$Sc`` parameters
+        (:mod:`fleet.core.runner_windows_provision`). A service already
+        running as SYSTEM is left alone; a missing service throws
+        ``FLEET_RUNNER_SERVICE_MISSING`` and a refused rebind
+        ``FLEET_RUNNER_REBIND_REFUSED``, and the stopped service stays
+        stopped for the audit to report.
     """
-    service = scriptable(install["service"], label="service")
-    workdir = scriptable(install["workdir"], label="workdir").replace("/", "\\")
     return [
-        f"$Service = Get-CimInstance Win32_Service -Filter \"Name='{service}'\"",
-        f"if ($null -eq $Service) {{ throw 'service {service} is not installed' }}",
-        f"if ($Service.StartName -ne '{WINDOWS_SERVICE_START_NAME}') {{",
-        f"    Stop-Service -Name '{service}'",
-        f"    & sc.exe config '{service}' obj= {WINDOWS_SERVICE_START_NAME}",
-        "    if ($LASTEXITCODE -ne 0) { "
-        f"throw 'sc.exe config {service} exited ' + $LASTEXITCODE }}",
-        f"    if (Test-Path -LiteralPath '{workdir}') {{ "
-        f"Remove-Item -LiteralPath '{workdir}' -Recurse -Force }}",
-        f"    Start-Service -Name '{service}'",
-        f"    Write-Output ('rebound {service} from ' + $Service.StartName + "
+        "$Rows = @(& $GetService $ServiceName)",
+        "if ($Rows.Count -eq 0) {",
+        '    throw "FLEET_RUNNER_SERVICE_MISSING: service $ServiceName is not installed"',
+        "}",
+        "$StartName = [string]$Rows[0].StartName",
+        f"if ($StartName -ne '{WINDOWS_SERVICE_START_NAME}') {{",
+        "    & $StopService $ServiceName",
+        f"    & $Sc config $ServiceName obj= {WINDOWS_SERVICE_START_NAME} | Out-Null",
+        "    if ($LASTEXITCODE -ne 0) {",
+        '        throw "FLEET_RUNNER_REBIND_REFUSED: sc.exe config $ServiceName exited '
+        '$LASTEXITCODE"',
+        "    }",
+        "    if (Test-Path -LiteralPath $Workdir) {",
+        "        Remove-Item -LiteralPath $Workdir -Recurse -Force",
+        "    }",
+        "    & $StartService $ServiceName",
+        "    Write-Output ('rebound ' + $ServiceName + ' from ' + $StartName + "
         f"' to {WINDOWS_SERVICE_START_NAME} and removed its work tree')",
         "}",
     ]

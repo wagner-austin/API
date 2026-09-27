@@ -16,7 +16,8 @@ audited runner host:
   4. the Linux base: packages, docker, the runner account;
   5. registration tokens minted with ``gh``, one per repository;
   6. the roster's ``provision.ps1`` and ``provision.sh``
-     (:mod:`fleet.core.runner_render`), carrying those tokens;
+     (:mod:`fleet.core.runner_windows_provision`, :mod:`fleet.core.runner_render`),
+     carrying those tokens;
   7. the audit, whose findings are the verdict.
 
 EVERY STAGE IS IDEMPOTENT, so a rebuild cut short by anything -- a dropped
@@ -51,8 +52,10 @@ from fleet.core import (
     runner_distro,
     runner_onboard,
     runner_render,
+    runner_windows_provision,
 )
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
+from fleet.core.runner_install import token_variable
 from fleet.core.script_values import scriptable
 
 #: The deadline for one long stage, in seconds: the distro image is 357 MB
@@ -344,16 +347,12 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> list[str]:
     steps.append(f"tokens: minted for {len(tokens)} repositories")
     rendered = runner_render.render_provision(spec)
     windows_repos = _distinct_repos([i for i in spec["installs"] if i["side"] == "windows"])
-    windows_script = "\n".join(
-        [
-            *(f"$env:{runner_render.token_variable(r)} = '{tokens[r]}'" for r in windows_repos),
-            rendered["windows_script"],
-        ]
-    )
     remote.run_script_within(
         spec["host"],
         _script_path(spec, "fleet-rebuild-provision.ps1"),
-        windows_script,
+        runner_windows_provision.render_windows_provision_script(
+            spec, {token_variable(r): tokens[r] for r in windows_repos}
+        ),
         platform=NodePlatform.WINDOWS,
         timeout_seconds=STAGE_TIMEOUT_SECONDS,
     )
@@ -362,7 +361,7 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> list[str]:
     linux_script = "\n".join(
         [
             "#!/usr/bin/env bash",
-            *(f"export {runner_render.token_variable(r)}='{tokens[r]}'" for r in wsl_repos),
+            *(f"export {token_variable(r)}='{tokens[r]}'" for r in wsl_repos),
             rendered["linux_script"],
         ]
     )

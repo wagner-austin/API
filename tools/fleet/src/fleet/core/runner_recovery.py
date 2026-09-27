@@ -31,29 +31,28 @@ SYSTEMD_DROP_IN_NAME = "fleet-restart.conf"
 SYSTEMD_DROP_IN = "[Service]\nRestart=always\nRestartSec=15\n"
 
 
-def render_windows_recovery_lines(install: RunnerInstall) -> list[str]:
-    """PowerShell lines that make the SCM restart a runner service on failure.
-
-    Args:
-        install: A windows-side install.
+def render_windows_recovery_lines() -> list[str]:
+    """Windows provision lines that make the SCM restart a runner service on failure.
 
     Returns:
-        The lines. Both settings are written on every run: writing a value
-        the service already holds changes nothing, and a failed write
-        throws with sc.exe's exit code.
-
-    Raises:
-        ValueError: When the service name cannot be embedded verbatim; see
-            :func:`fleet.core.script_values.scriptable`.
+        The lines, over the provision loop's ``$ServiceName`` and its ``$Sc``
+        parameter (:mod:`fleet.core.runner_windows_provision`). Both
+        settings are written on every run: writing a value the service
+        already holds changes nothing, and a refused write throws
+        ``FLEET_RUNNER_RECOVERY_REFUSED`` with sc.exe's exit code.
     """
-    service = scriptable(install["service"], label="service")
     return [
-        f"& sc.exe failure '{service}' reset= {WINDOWS_FAILURE_RESET_SECONDS} "
+        f"& $Sc failure $ServiceName reset= {WINDOWS_FAILURE_RESET_SECONDS} "
         f"actions= {WINDOWS_FAILURE_ACTIONS} | Out-Null",
-        f"if ($LASTEXITCODE -ne 0) {{ throw 'sc.exe failure {service} exited ' + $LASTEXITCODE }}",
-        f"& sc.exe failureflag '{service}' 1 | Out-Null",
-        "if ($LASTEXITCODE -ne 0) { "
-        f"throw 'sc.exe failureflag {service} exited ' + $LASTEXITCODE }}",
+        "if ($LASTEXITCODE -ne 0) {",
+        '    throw "FLEET_RUNNER_RECOVERY_REFUSED: sc.exe failure $ServiceName exited '
+        '$LASTEXITCODE"',
+        "}",
+        "& $Sc failureflag $ServiceName 1 | Out-Null",
+        "if ($LASTEXITCODE -ne 0) {",
+        '    throw "FLEET_RUNNER_RECOVERY_REFUSED: sc.exe failureflag $ServiceName exited '
+        '$LASTEXITCODE"',
+        "}",
     ]
 
 

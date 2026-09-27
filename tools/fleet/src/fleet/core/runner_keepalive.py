@@ -17,19 +17,23 @@ run it at all (WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED).
 from __future__ import annotations
 
 from fleet.contracts.runners import HostRunnerSpec
+from fleet.core.powershell_text import system32_parameter
 from fleet.core.script_values import scriptable
 
 
-def render_keepalive_lines(spec: HostRunnerSpec) -> list[str]:
-    """PowerShell lines that register and start the host's WSL keepalive.
+def render_keepalive_parameters(spec: HostRunnerSpec) -> list[str]:
+    """The Windows provision's param-block lines for the keepalive.
+
+    The task's name, the distro it holds open and wsl.exe are parameters so
+    the Pester suite over the committed provision registers a task under a
+    minted name whose action is a stand-in, and deletes it afterwards.
 
     Args:
         spec: The host's roster entry.
 
     Returns:
-        The lines, none when the roster declares no keepalive task. The
-        registration is ``-Force``, so a re-run replaces the Interactive
-        task the first recipe left.
+        ``$KeepaliveTask``, ``$Distro`` and ``$Wsl``, each ending in a comma;
+        none when the roster declares no keepalive task.
 
     Raises:
         ValueError: When the task or distro name cannot be embedded
@@ -41,20 +45,43 @@ def render_keepalive_lines(spec: HostRunnerSpec) -> list[str]:
     task = scriptable(raw_task, label="keepalive_task")
     distro = scriptable(spec["wsl_distro"], label="wsl_distro")
     return [
-        "$KeepaliveAction = New-ScheduledTaskAction -Execute 'C:\\Windows\\System32\\wsl.exe' "
-        f"-Argument '-d {distro} --exec /usr/bin/sleep infinity'",
+        f"    [string]$KeepaliveTask = '{task}',",
+        f"    [string]$Distro = '{distro}',",
+        "    " + system32_parameter("Wsl", "wsl.exe") + ",",
+    ]
+
+
+def render_keepalive_lines(spec: HostRunnerSpec) -> list[str]:
+    """Windows provision lines that register and start the host's WSL keepalive.
+
+    Args:
+        spec: The host's roster entry.
+
+    Returns:
+        The lines over :func:`render_keepalive_parameters`' parameters, none
+        when the roster declares no keepalive task. The registration is
+        ``-Force``, so a re-run replaces the Interactive task the first
+        recipe left, and the principal is the running account, read from
+        its token rather than from whoami.exe.
+    """
+    if spec["keepalive_task"] is None:
+        return []
+    return [
+        "$KeepaliveAction = New-ScheduledTaskAction -Execute $Wsl "
+        "-Argument ('-d ' + $Distro + ' --exec /usr/bin/sleep infinity')",
         "$KeepaliveTrigger = New-ScheduledTaskTrigger -AtStartup",
-        "$KeepalivePrincipal = New-ScheduledTaskPrincipal -UserId (whoami) -LogonType S4U "
+        "$KeepaliveUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name",
+        "$KeepalivePrincipal = New-ScheduledTaskPrincipal -UserId $KeepaliveUser -LogonType S4U "
         "-RunLevel Highest",
         "$KeepaliveSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries "
         "-DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 "
         "-RestartInterval (New-TimeSpan -Minutes 1)",
-        f"Register-ScheduledTask -TaskName '{task}' -Action $KeepaliveAction "
+        "Register-ScheduledTask -TaskName $KeepaliveTask -Action $KeepaliveAction "
         "-Trigger $KeepaliveTrigger -Principal $KeepalivePrincipal "
         "-Settings $KeepaliveSettings -Force | Out-Null",
-        f"Start-ScheduledTask -TaskName '{task}'",
-        f"Write-Output 'keepalive task {task} registered through S4U and started'",
+        "Start-ScheduledTask -TaskName $KeepaliveTask",
+        "Write-Output ('keepalive task ' + $KeepaliveTask + ' registered through S4U and started')",
     ]
 
 
-__all__ = ["render_keepalive_lines"]
+__all__ = ["render_keepalive_lines", "render_keepalive_parameters"]

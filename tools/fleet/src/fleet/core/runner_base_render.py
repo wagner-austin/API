@@ -2,7 +2,8 @@
 
 ``fleet-runners --rebuild`` (:mod:`fleet.core.runner_rebuild`) lays these,
 in this order, before the roster's own ``provision.ps1`` and
-``provision.sh`` (:mod:`fleet.core.runner_render`):
+``provision.sh`` (:mod:`fleet.core.runner_windows_provision`,
+:mod:`fleet.core.runner_render`):
 
   windows base   PowerShell on the host: the optional features WSL needs,
                  the pinned WSL release, the execution policy, the machine
@@ -27,7 +28,7 @@ thread, and on 9e5c7a17's, are the measurements.
 from __future__ import annotations
 
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core import runner_render
+from fleet.core import runner_windows_provision
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.runner_machine_env import (
     render_machine_environment_lines,
@@ -183,7 +184,7 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
         "    [string]$PathVariable = 'Path',",
         "    [string]$PathScope = 'Machine',",
         *render_machine_environment_parameters(spec),
-        *runner_render.render_wslconfig_parameters(spec),
+        *runner_windows_provision.render_wslconfig_parameters(spec),
         "    [string]$Git = 'git',",
         "    " + system32_parameter("Dism", "dism.exe") + ",",
         "    " + system32_parameter("Msiexec", "msiexec.exe") + ",",
@@ -275,7 +276,7 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
         "    }",
         "}",
         *render_machine_environment_lines(),
-        *runner_render.render_wslconfig_lines(spec),
+        *runner_windows_provision.render_wslconfig_lines(spec),
         "if ($Reboot) {",
         f"    Write-Output '{REBOOT_MARKER}'",
         "}",

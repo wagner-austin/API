@@ -35,6 +35,7 @@ from fleet.core import (
     runner_base_render,
     runner_distro,
     runner_rebuild,
+    runner_windows_provision,
     verdict,
 )
 from fleet.core.dialect_windows import WindowsDialect
@@ -181,7 +182,21 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
                 name=f"distro-driver-{host['name']}",
                 text=runner_distro.render_distro_driver(host, EXAMPLE_DISTRO_STEM),
             ),
+            RenderedScript(
+                name=f"provision-windows-{host['name']}",
+                text=runner_windows_provision.render_windows_provision_script(host, {}),
+            ),
         ]
+        windows_installs = [i for i in host["installs"] if i["side"] == "windows"]
+        if windows_installs:
+            scripts.append(
+                RenderedScript(
+                    name=f"onboard-windows-{host['name']}",
+                    text=runner_windows_provision.render_windows_onboard_script(
+                        windows_installs[0], {}
+                    ),
+                )
+            )
     names = [script["name"] for script in scripts]
     repeated = sorted({name for name in names if names.count(name) > 1})
     if repeated:
