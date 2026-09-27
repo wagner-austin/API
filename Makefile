@@ -4,7 +4,7 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: commit-tasks executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
+.PHONY: commit-tasks executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles check-powershell
 
 # ---------------------------------------------------------------------------
 # Infrastructure
@@ -120,8 +120,18 @@ logs:
 # ---------------------------------------------------------------------------
 # Development: lint and test across all libs/services/clients/tools
 # ---------------------------------------------------------------------------
-lint:
+lint: check-powershell
 	$(MAKETOOLS) fan-out lint libs services clients tools
+
+# EVERY POWERSHELL FILE THIS REPOSITORY TRACKS, GUARDED, ANALYSED AND RUN BY
+# ITS PESTER SUITE TO 100 PERCENT OF COMMANDS AND BRANCH ARMS (MCPs board
+# task d69786fa). The harness is MCPs' scripts/ps-harness as MCPs'
+# origin/main carries it, extracted by .githooks/published_maketools.py from
+# the MCPs checkout beside this one, so no copy of it or of its rules lives
+# here. It is repository-wide because it inventories through git ls-files,
+# which is why it runs from the root and not from each package's check.
+check-powershell:
+	$(PYTHON) .githooks/published_maketools.py ps-harness ../MCPs .
 
 test:
 	$(MAKETOOLS) fan-out test libs services clients tools
