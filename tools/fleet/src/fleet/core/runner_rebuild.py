@@ -52,6 +52,7 @@ from fleet.core import (
     runner_onboard,
     runner_render,
 )
+from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
 
 #: The deadline for one long stage, in seconds: the distro image is 357 MB
@@ -66,11 +67,71 @@ REBOOT_DEADLINE_SECONDS = 1200
 #: How long to wait between probes of a rebooting host, in seconds.
 REBOOT_POLL_SECONDS = 20
 
-#: The script that prints the host's last boot instant, the one fact that
-#: tells a host that has rebooted from one that has not gone down yet.
-BOOT_INSTANT_SCRIPT = (
-    "(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')\n"
-)
+#: The message the restart script's shutdown.exe call is given.
+RESTART_COMMENT = "fleet-runners --rebuild"
+
+
+def render_boot_instant_script() -> str:
+    """The script that prints the host's last boot instant.
+
+    Returns:
+        The PowerShell text. The instant is the one fact that tells a host
+        that has rebooted from one that has not gone down yet, printed in
+        UTC as round-trip ISO 8601.
+    """
+    lines = [
+        *STRICT_HEADER,
+        "(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render_restart_script() -> str:
+    """The script that restarts the host ten seconds after it runs.
+
+    Returns:
+        The PowerShell text. The ten seconds let the ssh session that ran it
+        return before the host goes down; a refused shutdown throws
+        ``FLEET_RESTART_REFUSED`` with shutdown.exe's exit code.
+    """
+    lines = [
+        "param(",
+        "    " + system32_parameter("Shutdown", "shutdown.exe"),
+        ")",
+        *STRICT_HEADER,
+        f"& $Shutdown /r /t 10 /c '{RESTART_COMMENT}'",
+        "if ($LASTEXITCODE -ne 0) {",
+        '    throw "FLEET_RESTART_REFUSED: $Shutdown exited $LASTEXITCODE"',
+        "}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render_terminate_script(distro: str) -> str:
+    """The script that stops one distro, so its next start reads wsl.conf.
+
+    Args:
+        distro: The distro's name, as the roster's ``wsl_distro`` gives it.
+
+    Returns:
+        The PowerShell text; a refused terminate throws
+        ``FLEET_TERMINATE_REFUSED`` with wsl.exe's exit code.
+
+    Raises:
+        ValueError: When the name cannot be embedded verbatim.
+    """
+    name = scriptable(distro, label="wsl_distro")
+    lines = [
+        "param(",
+        "    " + system32_parameter("Wsl", "wsl.exe"),
+        ")",
+        *STRICT_HEADER,
+        f"& $Wsl --terminate '{name}'",
+        "if ($LASTEXITCODE -ne 0) {",
+        f'    throw "FLEET_TERMINATE_REFUSED: $Wsl --terminate {name} exited $LASTEXITCODE"',
+        "}",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 class RebuildReport(TypedDict):
@@ -113,7 +174,7 @@ def _boot_instant(spec: HostRunnerSpec) -> str | None:
     outcome = remote.attempt_script(
         spec["host"],
         _script_path(spec, "fleet-rebuild-boot.ps1"),
-        BOOT_INSTANT_SCRIPT,
+        render_boot_instant_script(),
         platform=NodePlatform.WINDOWS,
     )
     if outcome["failure"] is not None:
@@ -139,13 +200,13 @@ def reboot_and_wait(spec: HostRunnerSpec) -> str:
     before = remote.run_script(
         spec["host"],
         _script_path(spec, "fleet-rebuild-boot.ps1"),
-        BOOT_INSTANT_SCRIPT,
+        render_boot_instant_script(),
         platform=NodePlatform.WINDOWS,
     ).strip()
     remote.run_script(
         spec["host"],
         _script_path(spec, "fleet-rebuild-restart.ps1"),
-        "shutdown.exe /r /t 10 /c 'fleet-runners --rebuild'\nexit $LASTEXITCODE\n",
+        render_restart_script(),
         platform=NodePlatform.WINDOWS,
     )
     deadline = _test_hooks.now() + REBOOT_DEADLINE_SECONDS
@@ -230,11 +291,10 @@ def _distro(spec: HostRunnerSpec, steps: list[str]) -> None:
         timeout_seconds=remote.SSH_TIMEOUT_SECONDS,
     )
     if runner_base_render.WSLCONF_CHANGED_MARKER in conf:
-        distro = scriptable(spec["wsl_distro"], label="wsl_distro")
         remote.run_script(
             spec["host"],
             _script_path(spec, "fleet-rebuild-terminate.ps1"),
-            f"wsl --terminate '{distro}'\nexit $LASTEXITCODE\n",
+            render_terminate_script(spec["wsl_distro"]),
             platform=NodePlatform.WINDOWS,
         )
         steps.append("wsl.conf: written, and the distro restarted into systemd")
@@ -343,11 +403,14 @@ def rebuild(spec: HostRunnerSpec) -> RebuildReport:
 
 
 __all__ = [
-    "BOOT_INSTANT_SCRIPT",
     "REBOOT_DEADLINE_SECONDS",
     "REBOOT_POLL_SECONDS",
+    "RESTART_COMMENT",
     "STAGE_TIMEOUT_SECONDS",
     "RebuildReport",
     "reboot_and_wait",
     "rebuild",
+    "render_boot_instant_script",
+    "render_restart_script",
+    "render_terminate_script",
 ]
