@@ -53,7 +53,7 @@ def test_the_deploy_asks_about_the_commit_it_ships_before_infra() -> None:
         "\ncommit-tasks:\n\t$(PYTHON) .githooks/published_maketools.py "
         "commit-tasks ../MCPs . HEAD^!\n" in makefile.replace("\r\n", "\n")
     )
-    assert "\ninfra: commit-tasks\n" in makefile.replace("\r\n", "\n")
+    assert "\ninfra: commit-tasks executed\n" in makefile.replace("\r\n", "\n")
 
 
 def test_commit_msg_asks_before_the_commit_exists_reading_only_the_repository() -> None:
