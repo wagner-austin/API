@@ -89,6 +89,8 @@ class TestTheCommittedCopies:
                     f"base-import-{host['name']}",
                     f"audit-{host['name']}",
                     f"distro-driver-{host['name']}",
+                    f"provision-windows-{host['name']}",
+                    f"onboard-windows-{host['name']}",
                 )
             ),
         ]
@@ -100,17 +102,26 @@ class TestTheRegistry:
         shared = (
             f"share a file name: audit-{host['name']}, base-import-{host['name']}, "
             f"base-windows-{host['name']}, distro-driver-{host['name']}, "
+            f"onboard-windows-{host['name']}, provision-windows-{host['name']}, "
             f"rebuild-terminate-{host['name']}"
         )
         with pytest.raises(ValueError, match=shared):
             rendered_powershell.render_all(RunnerSpec(hosts=[host, host]))
+
+    def test_a_host_with_no_windows_side_install_has_no_onboarding_render(self) -> None:
+        host = _roster()["hosts"][0]
+        host["installs"] = [i for i in host["installs"] if i["side"] == "wsl"]
+        rendered = rendered_powershell.render_all(RunnerSpec(hosts=[host]))
+        names = [script["name"] for script in rendered]
+        assert f"provision-windows-{host['name']}" in names
+        assert f"onboard-windows-{host['name']}" not in names
 
 
 class TestTheSharedLines:
     def test_every_render_opens_with_the_strict_header_after_its_parameters(self) -> None:
         for script in rendered_powershell.render_all(_roster()):
             lines = script["text"].splitlines()
-            start = lines.index(")") + 1 if lines[0] == "param(" else 0
+            start = lines.index(")", lines.index("param(")) + 1 if "param(" in lines else 0
             assert tuple(lines[start : start + 2]) == STRICT_HEADER, script["name"]
 
     def test_a_system32_parameter_names_the_binary_by_its_absolute_path(self) -> None:

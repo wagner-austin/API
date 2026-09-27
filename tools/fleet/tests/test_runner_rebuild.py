@@ -21,6 +21,7 @@ from fleet.core import (
     runner_base_render,
     runner_rebuild,
     runner_render,
+    runner_windows_provision,
 )
 from tests._runner_fixtures import a_base, quiet_rebuild_answers
 from tests.conftest import FakeClock, FakeRun, failed, ok
@@ -166,7 +167,9 @@ class TestAQuietRebuild:
         assert runner.calls[10][:3] == ("gh", "api", "-X")
         assert (
             runner.stdin[12]
-            == "\n".join(["$env:RUNNER_TOKEN_CHAT = 'TOKEN1'", rendered["windows_script"]]).encode()
+            == runner_windows_provision.render_windows_provision_script(
+                spec, {"RUNNER_TOKEN_CHAT": "TOKEN1"}
+            ).encode()
         )
         assert (
             runner.stdin[14]

@@ -12,7 +12,13 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import _test_hooks, runner_audit, runner_onboard, runner_render
+from fleet.core import (
+    _test_hooks,
+    runner_audit,
+    runner_onboard,
+    runner_render,
+    runner_windows_provision,
+)
 from tests._runner_fixtures import a_base
 from tests.conftest import FakeRun, failed, ok
 
@@ -200,14 +206,8 @@ class TestOnboard:
             ]
         ).encode("utf-8")
         assert runner.stdin[1] == expected_wsl
-        expected_windows = "\n".join(
-            [
-                "$ErrorActionPreference = 'Stop'",
-                "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
-                "$env:RUNNER_TOKEN_TREE_BOT = 'TOKENABC123'",
-                *runner_render.render_windows_install_lines(windows_install),
-                *runner_render.render_windows_python_toolcache_lines(windows_install),
-            ]
+        expected_windows = runner_windows_provision.render_windows_onboard_script(
+            windows_install, {"RUNNER_TOKEN_TREE_BOT": "TOKENABC123"}
         ).encode("utf-8")
         assert runner.stdin[4] == expected_windows
 
@@ -222,15 +222,11 @@ class TestOnboard:
         runner = FakeRun([ok("TOK1\n"), ok(""), ok("done"), ok(""), ok(_clean_transcript(grown))])
         _test_hooks.run = runner
         plan, _ = runner_onboard.onboard(spec, "wagner-austin/x", sides=("windows",))
-        expected = "\n".join(
-            [
-                "$ErrorActionPreference = 'Stop'",
-                "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
-                "$env:RUNNER_TOKEN_X = 'TOK1'",
-                *runner_render.render_windows_install_lines(plan["installs"][0]),
-            ]
+        expected = runner_windows_provision.render_windows_onboard_script(
+            plan["installs"][0], {"RUNNER_TOKEN_X": "TOK1"}
         ).encode("utf-8")
         assert runner.stdin[1] == expected
+        assert "Python = @() }" in expected.decode("utf-8")
 
     def test_an_unreachable_audit_names_the_staged_state(self) -> None:
         spec = _host()
