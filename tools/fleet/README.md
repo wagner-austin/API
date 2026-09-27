@@ -280,8 +280,8 @@ and the wiki page (`fleet-check-runner`, mcps-codebase) carries.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
-a CUDA device, `testdb` for a node whose `test_database` is true and `rust`
-for a node whose `rust` names a cargo version) and the
+a CUDA device, `testdb` for a node whose `test_database` is true, and `rust`
+or `cxx` for each toolchain the node declares a version of) and the
 queue's `required_tags <@ tags` containment returns
 only jobs the node satisfies. A job's `required_tags` are the project's from
 `fleet.json`; `dispatch_submit` takes them and the runner re-checks them
@@ -312,10 +312,23 @@ had cargo, so the project requires `rust`. A node's `rust` is the version
 at user scope, reversible by removing `~/.rustup` and `~/.cargo`), or null.
 The toolchain probe asks cargo on every runner tick, and a node whose answer
 differs from its declaration claims nothing, logging `NODE_RUST_MISMATCH`
-with the value that would match (`fleet.contracts.rust`), so the tag cannot
-outlive the toolchain. The Linux dialect puts `~/.cargo/bin` on every
+with the value that would match (`fleet.contracts.capability`), so the tag
+cannot outlive the toolchain. The Linux dialect puts `~/.cargo/bin` on every
 script's PATH beside `~/.local/bin`, so the probe and the build find the same
 cargo.
+
+**`cxx` is the same contract for node-gyp's C++ toolchain** (MCPs board task
+3f19c136). Every MCPs TypeScript project installs with a root `npm ci`, which
+rebuilds `hnswlib-node` under node-gyp, so every project in `fleet.json`
+whose install runs a plain `npm ci` requires `cxx` (`MCPs/execution`, which
+installs with `--ignore-scripts`, does not). A node's `cxx` is the VC tools
+component's `installationVersion` from vswhere on Windows, or
+`g++ -dumpfullversion` on Linux, and a mismatch refuses as
+`NODE_CXX_MISMATCH`. Measured 2026-09-27: diphtheria has g++ 13.3.0, and no
+Windows node has the VC tools (sedona has the Visual Studio installer without
+the component; serendipity and lavender have neither), so until one is given
+the Build Tools those projects queue for diphtheria instead of failing in
+`npm ci` on a Windows node.
 
 **The identity is derived, never configured.** The label is
 `fleet-node-<alias>` and the session id is the version-5 UUID of

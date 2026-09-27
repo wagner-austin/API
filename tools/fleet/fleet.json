@@ -21,7 +21,8 @@
       },
       "enabled": true,
       "test_database": false,
-      "rust": null
+      "rust": null,
+      "cxx": null
     },
     "lavender": {
       "host": "lavender",
@@ -44,7 +45,8 @@
       },
       "enabled": true,
       "test_database": false,
-      "rust": null
+      "rust": null,
+      "cxx": null
     },
     "loki": {
       "host": "loki",
@@ -62,7 +64,8 @@
       },
       "enabled": false,
       "test_database": false,
-      "rust": null
+      "rust": null,
+      "cxx": null
     },
     "diphtheria": {
       "host": "diphtheria",
@@ -85,7 +88,8 @@
       },
       "enabled": true,
       "test_database": true,
-      "rust": "1.98.1"
+      "rust": "1.98.1",
+      "cxx": "13.3.0"
     },
     "serendipity": {
       "host": "serendipity",
@@ -103,7 +107,8 @@
       },
       "enabled": true,
       "test_database": false,
-      "rust": null
+      "rust": null,
+      "cxx": null
     }
   },
   "not_dispatchable": {
@@ -204,7 +209,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,
       "expected_minutes": 6,
-      "required_tags": ["linux"],
+      "required_tags": ["linux", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/wiki-search",
@@ -244,7 +249,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "ballotpedia-mcp",
@@ -260,7 +265,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "cloudflared",
@@ -276,7 +281,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "coloring-book",
@@ -293,7 +298,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "constituent-crm",
@@ -311,7 +316,7 @@
       "minimum_workers": 2,
       "expected_minutes": 8,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "doc-extract-api",
@@ -329,7 +334,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "document-vault",
@@ -346,7 +351,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "dx-mod",
@@ -374,7 +379,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "fiesta",
@@ -390,7 +395,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "pc",
@@ -406,7 +411,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/stream-client",
@@ -423,7 +428,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "fleet-mcp",
@@ -474,7 +479,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "gitiles-mcp",
@@ -491,7 +496,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "google-calendar",
@@ -509,7 +514,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "google-drive",
@@ -527,7 +532,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "irvine-gis",
@@ -544,7 +549,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "irvine-parcel",
@@ -560,7 +565,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "legal-codes-mcp",
@@ -576,7 +581,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "marketplace-mcp",
@@ -593,7 +598,7 @@
       "minimum_workers": 2,
       "expected_minutes": 15,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "mcp-proxy",
@@ -610,7 +615,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 12,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "mcp-shared",
@@ -627,7 +632,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "meetings",
@@ -644,7 +649,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "netfile-mcp",
@@ -660,7 +665,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "ocrov-mcp",
@@ -676,7 +681,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "osm-mcp",
@@ -692,7 +697,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "outlook-mcp",
@@ -720,7 +725,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/crypto",
@@ -737,7 +742,7 @@
       "minimum_workers": 2,
       "expected_minutes": 25,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/db",
@@ -755,7 +760,7 @@
       "minimum_workers": 2,
       "expected_minutes": 8,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/db-python",
@@ -772,7 +777,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/embed",
@@ -801,7 +806,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/tenant",
@@ -818,7 +823,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/wiki-cli",
@@ -835,7 +840,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/wiki-jobs",
@@ -853,7 +858,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "pcsession-mcp",
@@ -871,7 +876,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "pg-backup-sidecar",
@@ -888,7 +893,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "phone-mcp",
@@ -904,7 +909,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "platform-probe",
@@ -921,7 +926,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "recap-generator",
@@ -939,7 +944,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "research-data",
@@ -956,7 +961,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "scholarly-mcp",
@@ -972,7 +977,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "search",
@@ -989,7 +994,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "slack",
@@ -1007,7 +1012,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "stick-ledger",
@@ -1025,7 +1030,7 @@
       "minimum_workers": 2,
       "expected_minutes": 12,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "taskboard-mcp",
@@ -1043,7 +1048,7 @@
       "minimum_workers": 2,
       "expected_minutes": 8,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "transcriber-api",
@@ -1061,7 +1066,7 @@
       "minimum_workers": 2,
       "expected_minutes": 8,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "voice-call",
@@ -1078,7 +1083,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "voice-tts",
@@ -1095,7 +1100,7 @@
       "minimum_workers": 2,
       "expected_minutes": 15,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "watcher",
@@ -1112,7 +1117,7 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": [],
+      "required_tags": ["cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "web-scraper",
@@ -1129,7 +1134,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "wiki-check-mcp",
@@ -1147,7 +1152,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "wiki-mcp",
@@ -1165,7 +1170,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "wiki-search",
