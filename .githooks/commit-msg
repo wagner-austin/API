@@ -1,0 +1,25 @@
+#!/bin/sh
+# Refuse a commit, before it exists, that names no board task it serves.
+#
+# EVERY COMMIT NAMES ITS TASK (MCPs board task 691b0067, b6eb30c8's R8).
+# Work nobody filed is refused rather than logged; the operator,
+# 2026-09-26: "no orphaned or unregistered tasks, no exemptions, no
+# exceptions. no relaxations, no escape hatches". pre-push refuses such a
+# commit too, and a refused commit cannot be repaired without rewriting it,
+# so the question is asked here first.
+#
+# THE LOGIC IS NOT IN THIS FILE, as in pre-commit: MCPs' maketools
+# commit-message-tasks reads the message git is about to record ('board task
+# <id>' names a task) and asks the board's task_registration, which resolves
+# every named id, so a made-up one is refused too. published-maketools.sh
+# runs it as MCPs' origin/main carries it, never as the MCPs checkout beside
+# this one holds it; that checkout supplies the board's credentials and
+# address. There is no variable that skips it and no author it exempts, and
+# a board that cannot be asked refuses the commit.
+#
+# INSTALLED PER CLONE: `make install-hooks`.
+
+set -eu
+
+REPO="$(git rev-parse --show-toplevel)"
+sh "$REPO/.githooks/published-maketools.sh" commit-message-tasks "$REPO/../MCPs" "$1"

@@ -64,9 +64,35 @@ if [ -n "$MIRROR_REMOTE" ] && [ "$REMOTE_NAME" = "$MIRROR_REMOTE" ]; then
     exit 0
 fi
 
-# Read git's lines once: the enrolment loop and the mirror push at the end
-# both need them, and stdin can be read once.
+# Read git's lines once: the task check, the enrolment loop and the mirror
+# push at the end all need them, and stdin can be read once.
 PUSH_INPUT="$(cat)"
+ZERO="0000000000000000000000000000000000000000"
+
+# EVERY COMMIT NAMES ITS TASK (MCPs board task 691b0067, b6eb30c8's R8).
+# Work nobody filed is refused rather than logged; the operator,
+# 2026-09-26: "no orphaned or unregistered tasks, no exemptions, no
+# exceptions. no relaxations, no escape hatches". MCPs' maketools
+# commit-tasks reads each pushed commit's message ('board task <id>' names
+# one) and asks the board's task_registration, which resolves every named
+# id, so a made-up one is refused too, run as MCPs' origin/main carries it
+# (published-maketools.sh), with the board's address from ../MCPs. It
+# runs FIRST, before the GitHub check below that ends a push to any other
+# remote, so no remote escapes it; the one push it never sees is the
+# mirror's own, which ended above. There is no variable that skips it and
+# no author it exempts, and a board that cannot be asked refuses the push.
+# The range is what the push adds to the remote ref: remote..local, or,
+# for a ref the remote lacks, everything origin/main lacks.
+MCPS="$REPO/../MCPs"
+printf '%s\n' "$PUSH_INPUT" | while read -r _ct_local_ref ct_local_sha _ct_remote_ref ct_remote_sha; do
+    [ -z "$ct_local_sha" ] && continue
+    [ "$ct_local_sha" = "$ZERO" ] && continue
+    if [ "$ct_remote_sha" = "$ZERO" ]; then
+        sh "$REPO/.githooks/published-maketools.sh" commit-tasks "$MCPS" "$REPO" "$ct_local_sha" "^origin/main" < /dev/null
+    else
+        sh "$REPO/.githooks/published-maketools.sh" commit-tasks "$MCPS" "$REPO" "$ct_remote_sha..$ct_local_sha" < /dev/null
+    fi
+done
 
 # The tool's own virtualenv, and NOTHING ELSE -- the interpreter its suite
 # ran against, so a green `make check` in that package is evidence about
@@ -106,8 +132,6 @@ case "$NWO" in
         exit 0
         ;;
 esac
-
-ZERO="0000000000000000000000000000000000000000"
 
 # stdin carries <local-ref> <local-sha> <remote-ref> <remote-sha> per tip.
 #
