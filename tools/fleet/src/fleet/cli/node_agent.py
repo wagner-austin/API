@@ -255,10 +255,9 @@ def claim_pass(
         return refuse(credentials, job, identity, detail=prepared)
 
     def build(run_id: str) -> dispatch.Payload:
-        data = export.archive_commit(
-            prepared["mirror"], sha, loaded.archives / f"{run_id}-{alias}.tgz", prepared["scope"]
-        )
-        return dispatch.Payload(data=data, description=f"git archive of {sha}")
+        path = loaded.archives / f"{run_id}-{alias}.tgz"
+        data = export.archive_commit(prepared["mirror"], sha, path, prepared["scope"])
+        return dispatch.Payload(path=path, data=data, description=f"git archive of {sha}")
 
     row = launch_claimed(loaded, job, alias=alias, node=node, prepared=prepared, build=build)
     if isinstance(row, str):
