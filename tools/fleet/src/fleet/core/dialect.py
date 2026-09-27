@@ -230,6 +230,28 @@ class Dialect(Protocol):
         """
         ...
 
+    def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
+        """The script that keeps a settled run's transcript and removes the rest.
+
+        Run once the runner has read the transcript's tail, when a run has
+        finished, been stopped past its lease or been cancelled (MCPs board
+        task bfca20e6): nothing reads the export again, and a stage root that
+        kept every one filled diphtheria's disk.
+
+        Args:
+            target: The dispatch's absolute remote directory, removed whole.
+            retained: Where its transcript is moved to first, under the stage
+                root's logs directory, which is created if absent.
+            scripts: The scripts the run left under the stage root, this one
+                included, each removed.
+
+        Returns:
+            The script's text. Every step tolerates what an earlier attempt
+            already did (no transcript, no directory, no script), so a retire
+            that failed part way succeeds when it is run again.
+        """
+        ...
+
     def digest_script(self, target: str) -> str:
         """The script that prints the digest of the archive scp landed.
 

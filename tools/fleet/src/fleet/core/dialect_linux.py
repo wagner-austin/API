@@ -28,6 +28,7 @@ hand is the one the build finds.
 
 from __future__ import annotations
 
+import posixpath
 import shlex
 
 from fleet.contracts.project import MAKE_TARGET
@@ -271,6 +272,29 @@ class LinuxDialect:
             made there.
         """
         return self.checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
+
+    def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
+        """Keep a settled run's transcript, then remove its directory and scripts.
+
+        Args:
+            target: The dispatch's absolute remote directory.
+            retained: Where its transcript is kept.
+            scripts: The scripts it left under the stage root.
+
+        Returns:
+            The script's text. ``mv`` is guarded because a run cancelled
+            before its build started wrote no transcript; ``rm -rf`` and
+            ``rm -f`` need no guard for what is already gone, and ``-f``
+            removes the read-only objects of the repository staged there.
+        """
+        log = shlex.quote(names.log_path(target))
+        lines = (
+            f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
+            f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
+            f"rm -rf {shlex.quote(target)}",
+            "rm -f " + " ".join(shlex.quote(script) for script in scripts),
+        )
+        return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
     def digest_script(self, target: str) -> str:
         """Print the landed archive's SHA-256, extracting nothing.

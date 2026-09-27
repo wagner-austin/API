@@ -335,6 +335,62 @@ class WindowsDialect:
             ),
         )
 
+    def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
+        """Keep a settled run's transcript, then remove its directory and scripts.
+
+        Every location is a parameter defaulting to the rendered path, so a
+        node runs it with no arguments and the Pester suite over its committed
+        render points it at a directory it laid out. Removing its own file is
+        safe: ``powershell -File`` has read the whole script before the first
+        statement runs.
+
+        Args:
+            target: The dispatch's absolute remote directory.
+            retained: Where its transcript is kept.
+            scripts: The scripts it left under the stage root.
+
+        Returns:
+            The script's text. Each removal is guarded by ``Test-Path``,
+            because ``Remove-Item`` of a path that is not there is an error and
+            a retire run a second time meets exactly that; ``-Force`` removes
+            the read-only objects of the repository staged there.
+
+        Raises:
+            ValueError: When a path cannot be embedded verbatim.
+        """
+        # One plain string parameter per script, gathered in the body: a
+        # list as a parameter's default is an expression the coverage harness
+        # counts as a command, reached only by a run that takes the default.
+        parameters = [f"$Script{index}" for index in range(len(scripts))]
+        declared = [
+            f"    [string]$Target = '{scriptable(target, label='target')}'",
+            f"    [string]$Log = '{scriptable(names.log_path(target), label='log')}'",
+            f"    [string]$Retained = '{scriptable(retained, label='retained')}'",
+            *(
+                f"    [string]{parameter} = '{scriptable(script, label='script')}'"
+                for parameter, script in zip(parameters, scripts, strict=True)
+            ),
+        ]
+        body = [
+            "param(",
+            ",\n".join(declared),
+            ")",
+            *STRICT_HEADER,
+            "[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Retained)) | Out-Null",
+            "if (Test-Path -LiteralPath $Log) {",
+            "    Move-Item -Force -LiteralPath $Log -Destination $Retained",
+            "}",
+            "if (Test-Path -LiteralPath $Target) {",
+            "    Remove-Item -Recurse -Force -LiteralPath $Target",
+            "}",
+            f"foreach ($script in @({', '.join(parameters)})) {{",
+            "    if (Test-Path -LiteralPath $script) {",
+            "        Remove-Item -Force -LiteralPath $script",
+            "    }",
+            "}",
+        ]
+        return "\n".join(body) + "\n"
+
     def digest_script(self, target: str) -> str:
         """Print the landed archive's SHA-256, extracting nothing.
 

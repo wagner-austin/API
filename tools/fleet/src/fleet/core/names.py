@@ -105,6 +105,16 @@ LOG_TAIL_STEM = "log-tail"
 #: alone.
 CACHE_DIRECTORY = "cache"
 
+#: The directory under a node's stage root that keeps every retired run's
+#: transcript, as ``<run_id>.log`` (MCPs board task bfca20e6). A run's own
+#: directory is removed once its runner has settled or stopped it, and the
+#: verdict line names the transcript's path here, so a reader following that
+#: line still finds it. Kept because it is small and the export is not:
+#: measured on diphtheria 2026-09-27, 126 transcripts came to 29 MB while the
+#: exports beside them came to 293 GB. Never a run id, for the reason
+#: :data:`CACHE_DIRECTORY` gives.
+LOGS_DIRECTORY = "logs"
+
 
 def cache_root(stage_root: str) -> str:
     """Where a node keeps the dependency caches its export runs share.
@@ -142,6 +152,19 @@ def log_path(target: str) -> str:
         and the collector reads.
     """
     return f"{target}/{RESULT_NAME}.log"
+
+
+def retained_log_path(stage_root: str, run_id: str) -> str:
+    """Where a retired run's transcript is kept on its node.
+
+    Args:
+        stage_root: The node's declared stage root.
+        run_id: The dispatch.
+
+    Returns:
+        ``<stage_root>/<LOGS_DIRECTORY>/<run_id>.log``.
+    """
+    return f"{stage_root}/{LOGS_DIRECTORY}/{run_id}.log"
 
 
 def companion_directory(stage_root: str, directory: str) -> str:
@@ -272,6 +295,38 @@ def stop_stem(run_id: str) -> str:
     return f"stop-{run_id}"
 
 
+def retire_stem(run_id: str) -> str:
+    """Name the script that retires one dispatch's directory.
+
+    It lives under the stage ROOT, like the stop script, because the
+    directory it removes is the dispatch's own.
+
+    Args:
+        run_id: The dispatch.
+
+    Returns:
+        The stem.
+    """
+    return f"retire-{run_id}"
+
+
+def root_script_stems(run_id: str) -> tuple[str, ...]:
+    """Every script one dispatch leaves under the stage root.
+
+    The directory maker, the stop and the retire itself: each is named after
+    the run so two runs cannot overwrite each other's, and so none of them
+    is inside the directory the retire removes. Measured on diphtheria
+    2026-09-27: 133 ``mkdir-`` scripts had outlived every tree they made.
+
+    Args:
+        run_id: The dispatch.
+
+    Returns:
+        Their stems, in the order the run writes them.
+    """
+    return (make_directory_stem(run_id), stop_stem(run_id), retire_stem(run_id))
+
+
 __all__ = [
     "ARCHIVE_NAME",
     "BUILD_STEM",
@@ -285,6 +340,7 @@ __all__ = [
     "INIT_REPOSITORY_STEM",
     "INSTALL_STEM",
     "LAUNCH_STEM",
+    "LOGS_DIRECTORY",
     "LOG_TAIL_STEM",
     "PID_NAME",
     "RESULT_NAME",
@@ -298,6 +354,9 @@ __all__ = [
     "make_directory_stem",
     "recipe_directory",
     "reset_directory_stem",
+    "retained_log_path",
+    "retire_stem",
+    "root_script_stems",
     "stop_stem",
     "task_name",
 ]

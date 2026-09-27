@@ -368,6 +368,11 @@ def launch(
         source=payload["path"],
         payload=payload["data"],
     )
+    # The node has verified the archive's digest and unpacked it, and the
+    # bytes the feed counts are held here, so the local file has no reader
+    # left. Kept, one per run, it filled the hub's temp directory: 245 of
+    # them, about 33 MB each, measured 2026-09-27 (MCPs board task bfca20e6).
+    payload["path"].unlink()
     run_lease.emit(
         loaded_feed,
         run_id=run_id,

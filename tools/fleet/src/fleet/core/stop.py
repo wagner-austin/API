@@ -23,7 +23,7 @@ import pathlib
 
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.core import dialect, dispatch, names, remote
+from fleet.core import dialect, dispatch, names, remote, retire
 
 
 def stop_on_node(node: NodeConfig, *, run_id: str) -> None:
@@ -64,7 +64,9 @@ def stop_and_finish(
     exit_code: int,
     detail: str,
 ) -> LedgerEntry:
-    """Stop a dispatch on its node, then close its row, emit it, free its lease.
+    """Stop a dispatch on its node, retire its directory, then close its row.
+
+    Closing the row emits it and frees its lease.
 
     Args:
         loaded_leases: The lease file.
@@ -81,9 +83,14 @@ def stop_and_finish(
         The closing row.
 
     Raises:
-        AppError: As :func:`stop_on_node` describes, with the row still live.
+        AppError: As :func:`stop_on_node` and
+            :func:`fleet.core.retire.retire_on_node` describe, with the row
+            still live.
     """
     stop_on_node(node, run_id=row["run_id"])
+    # After the stop, so nothing the build started still holds a file in
+    # the directory; before the row closes, for the same reason the stop is.
+    retire.retire_on_node(node, run_id=row["run_id"])
     return dispatch.finish(
         loaded_leases,
         loaded_ledger,

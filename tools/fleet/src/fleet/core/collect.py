@@ -145,11 +145,13 @@ def describe(node: NodeConfig, *, run_id: str, exit_code: int) -> str:
     Returns:
         One line carrying the status and the log's full remote path, so a
         subscriber reading only the feed can open the output without first
-        working out which node ran it and where a stage directory goes.
+        working out which node ran it and where a stage directory goes. The
+        path is the retained transcript's, where it stays once the run's
+        directory is retired (:mod:`fleet.core.retire`).
     """
     return (
         f"make {MAKE_TARGET} exited {exit_code}; log at "
-        f"{node['host']}:{node['stage_root']}/{run_id}/{names.RESULT_NAME}.log"
+        f"{node['host']}:{names.retained_log_path(node['stage_root'], run_id)}"
     )
 
 

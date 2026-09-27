@@ -25,10 +25,12 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import RunnerSpec
 from fleet.core import (
     dialect,
     names,
+    retire,
     runner_audit,
     runner_base_render,
     runner_distro,
@@ -102,6 +104,12 @@ def _dialect_scripts() -> list[RenderedScript]:
         ),
         RenderedScript(
             name="dialect-stop", text=spoken.stop_script(target=target, run_id=EXAMPLE_RUN_ID)
+        ),
+        RenderedScript(
+            name="dialect-retire",
+            text=retire.script_for(
+                NodePlatform.WINDOWS, stage_root=EXAMPLE_STAGE_ROOT, run_id=EXAMPLE_RUN_ID
+            ),
         ),
         RenderedScript(
             name="dialect-extract",
