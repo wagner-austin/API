@@ -14,6 +14,7 @@ BeforeAll {
     $scriptsRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'scripts'
     . (Join-Path $scriptsRoot 'FleetTick.ps1')
     . (Join-Path $scriptsRoot 'FleetSchedule.ps1')
+    . (Join-Path $PSScriptRoot 'task-fixtures.ps1')
     $script:hubTick = Join-Path $scriptsRoot 'run-agent-tick.ps1'
     $script:nodeTick = Join-Path $scriptsRoot 'run-node-agent-tick.ps1'
     $script:registerHub = Join-Path $scriptsRoot 'register-agent-schedule.ps1'
@@ -169,7 +170,7 @@ Describe 'The schedules' {
     }
     AfterEach {
         foreach ($task in @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '')) {
-            Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath -Confirm:$false
+            [void](Unregister-FleetTick $task.TaskName)
         }
     }
     It 'registers a tick every three minutes and at boot, as this account under S4U at Limited, and replaces it on a second run' {
@@ -178,16 +179,19 @@ Describe 'The schedules' {
         $said = @(Invoke-TestEntry $script:registerHub @{ TaskName = $name; Tick = $script:standIn.Path } 6>&1 | ForEach-Object { "$_" })
         $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
         $said | Should -Be @("Registered $name (every 3 minutes and at boot, $identity, S4U, Limited).")
-        $task = @(Get-FleetScheduledTask -Prefix $name -Suffix '')
-        $task.Count | Should -Be 1
-        $task[0].Actions[0].Execute | Should -BeExactly 'powershell.exe'
-        $task[0].Actions[0].Arguments | Should -BeExactly "-NoProfile -ExecutionPolicy Bypass -File `"$($script:standIn.Path)`""
-        $task[0].Principal.LogonType | Should -Be 'S4U'
-        $task[0].Principal.RunLevel | Should -Be 'Limited'
-        $task[0].Settings.MultipleInstances | Should -Be 'IgnoreNew'
-        $task[0].Settings.ExecutionTimeLimit | Should -BeExactly 'PT40M'
-        $task[0].Triggers.Count | Should -Be 2
-        $task[0].Triggers[1].Repetition.Interval | Should -BeExactly 'PT3M'
+        @(Get-FleetScheduledTask -Prefix $name -Suffix '').Count | Should -Be 1
+        # The definition as Task Scheduler stores it: Limited is the schema's
+        # default run level and is stored as no RunLevel element at all,
+        # where Highest would write HighestAvailable.
+        $task = (Get-TaskDefinition $name).Task
+        $task.Actions.Exec.Command | Should -BeExactly 'powershell.exe'
+        $task.Actions.Exec.Arguments | Should -BeExactly "-NoProfile -ExecutionPolicy Bypass -File `"$($script:standIn.Path)`""
+        $task.Principals.Principal.LogonType | Should -BeExactly 'S4U'
+        $task.Principals.Principal.PSObject.Properties['RunLevel'] | Should -BeNullOrEmpty
+        $task.Settings.MultipleInstancesPolicy | Should -BeExactly 'IgnoreNew'
+        $task.Settings.ExecutionTimeLimit | Should -BeExactly 'PT40M'
+        @($task.Triggers.BootTrigger).Count | Should -Be 1
+        $task.Triggers.TimeTrigger.Repetition.Interval | Should -BeExactly 'PT3M'
     }
     It 'unregisters the hub task, and says so when there is none' {
         $name = "${script:prefix}hub"
@@ -205,7 +209,7 @@ Describe 'The schedules' {
         $said[0] | Should -BeExactly "Unregistered ${script:prefix}delta-3min: delta is not an enabled node."
         $said[1] | Should -BeLike "Registered ${script:prefix}alpha-3min (every 3 minutes and at boot, *, S4U, Limited) and announced it."
         @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min').TaskName | Should -Be @("${script:prefix}alpha-3min")
-        (Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min')[0].Actions[0].Arguments | Should -BeLike '* -Node alpha'
+        (Get-TaskDefinition "${script:prefix}alpha-3min").Task.Actions.Exec.Arguments | Should -BeLike '* -Node alpha'
         [System.IO.File]::ReadAllText($script:standIn.Record).Trim() | Should -BeExactly 'alpha True'
     }
     It 'refuses a node whose announce fails, by name' {

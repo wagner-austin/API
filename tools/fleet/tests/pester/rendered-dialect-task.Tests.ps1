@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
+    . (Join-Path $PSScriptRoot 'task-fixtures.ps1')
 
     function Initialize-Dispatch {
         param([string]$Build)
@@ -32,20 +33,6 @@ BeforeAll {
     function Test-Alive {
         param([int]$Id)
         return $null -ne (Get-CimInstance Win32_Process -Filter "ProcessId=$Id")
-    }
-
-    # Through Task Scheduler's COM service, as the stop render does: the
-    # scheduled-task cmdlets read every task's definition and fail while
-    # another process deletes one (windows_task.stop_script's measurement).
-    function Get-TaskDefinition {
-        param([string]$Name)
-        $scheduler = New-Object -ComObject Schedule.Service
-        $scheduler.Connect()
-        $found = @($scheduler.GetFolder('\').GetTasks(1) | Where-Object { $_.Name -eq $Name })
-        if ($found.Count -eq 0) {
-            return $null
-        }
-        return [xml]$found[0].Xml
     }
 
     function Invoke-TaskCleanup {
