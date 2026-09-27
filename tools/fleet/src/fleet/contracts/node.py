@@ -31,6 +31,7 @@ from platform_core.members import find_member
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
+from fleet.contracts.rust import decode_rust
 
 
 #: The operating-system family a node runs, which decides every script a
@@ -130,6 +131,12 @@ class NodeConfig(TypedDict):
             global setup; a default of false would hide a provisioned node
             from those packages and a default of true would send them to
             nodes with no database, so the workspace says which.
+        rust: The version ``cargo --version`` printed on this node, e.g.
+            ``1.98.1``, or None for a node with no Rust toolchain. Non-null
+            gives the node the ``rust`` tag a crate-building project
+            requires, and the runner's probe re-measures it every tick
+            (:mod:`fleet.contracts.rust`, MCPs board task 1e2da299).
+            REQUIRED like ``gpu``, null spelled out, for the same reason.
         budget: What share of this machine a dispatch may take.
     """
 
@@ -141,6 +148,7 @@ class NodeConfig(TypedDict):
     gpu: NodeGpu | None
     enabled: bool
     test_database: bool
+    rust: str | None
     budget: NodeBudget
 
 
@@ -237,6 +245,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "gpu": None if gpu is None else encode_node_gpu(gpu),
         "enabled": node["enabled"],
         "test_database": node["test_database"],
+        "rust": node["rust"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -278,6 +287,12 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
             "database (corvis-fleet-testdb), false otherwise. A Postgres-backed package handed "
             "to a node without one fails its global setup, so neither default is safe."
         )
+    if "rust" not in value:
+        raise JSONTypeError(
+            "node must declare 'rust': the version cargo --version prints on it, or null for a "
+            "node with no Rust toolchain. A crate build handed to a node without cargo fails "
+            "in poetry sync, so an absent key is not a safe way to say none."
+        )
     logical_cores = require_int(value, "logical_cores")
     if logical_cores < 1:
         raise JSONTypeError(f"logical_cores must be at least 1, got {logical_cores}")
@@ -294,6 +309,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         gpu=None if gpu_value is None else decode_node_gpu(gpu_value),
         enabled=require_bool(value, "enabled"),
         test_database=require_bool(value, "test_database"),
+        rust=decode_rust(value["rust"]),
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 

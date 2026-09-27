@@ -2,15 +2,16 @@
 
 A project says what it needs (``required_tags``); a node never declares tags
 at all. Its tags are DERIVED from the fields the node contract already
-carries: its ``platform``, whether ``gpu`` is a device rather than None, and
-whether it runs the fleet test database (``test_database``). That is the
+carries: its ``platform``, whether ``gpu`` is a device rather than None,
+whether it runs the fleet test database (``test_database``), and whether it
+names a Rust toolchain (``rust``). That is the
 whole reason this module exists beside :mod:`node`: a declared ``tags``
 column on the node would be a second copy of those facts, and the copy is
 the one that drifts (a box whose card was pulled would keep its ``gpu`` tag
 until somebody remembered the list). Deriving means the tag is exactly as
 true as the declaration it comes from.
 
-WHY THESE FOUR. ``windows`` and ``linux`` because a suite may run on one
+WHY THESE FIVE. ``windows`` and ``linux`` because a suite may run on one
 dialect only: slime's browser project launches Chromium with ANGLE over
 Direct3D 11 and refuses every other platform by name
 (``slime/scripts/chromium-launch.ts``, MCPs board task 41f45bd7), so it needs
@@ -28,7 +29,12 @@ their suites from ``packages/db``'s global test setup, which needs a migrated
 database (MCPs board task 6bbfd171, measured 2026-09-26): the tag means the
 node runs ``corvis-fleet-testdb``, the loopback container MCPs
 ``scripts/testdb-setup.sh`` restarts empty and migrates before each run, so
-such a package lands only where its global setup can succeed.
+such a package lands only where its global setup can succeed. ``rust``
+because API ``services/covenant-radar-api`` builds the maturin crate
+``libs/cleargbm_rs`` from source in ``poetry sync``, and on 2026-09-26 no
+node carried cargo (MCPs board task 1e2da299): the tag means the node
+declares the version its cargo prints, which the runner's probe re-measures
+every tick (:mod:`fleet.contracts.rust`).
 
 A project naming both platforms is refused at decode: no node is both, so
 the declaration could never match anything, and the honest way to say "either"
@@ -49,14 +55,15 @@ from fleet.contracts.node import NodeConfig, NodePlatform
 class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
-    The dispatch queue's vocabulary CHECK (MCPs migrations 532 and 563) is
-    the same four words as these members' values, in this order.
+    The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563 and
+    569) is the same five words as these members' values, in this order.
     """
 
     WINDOWS = "windows"
     LINUX = "linux"
     GPU = "gpu"
     TESTDB = "testdb"
+    RUST = "rust"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -75,14 +82,17 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
         node: The node's declaration.
 
     Returns:
-        Its platform, plus ``gpu`` when the node declares a CUDA device and
-        ``testdb`` when it declares the fleet test database.
+        Its platform, plus ``gpu`` when the node declares a CUDA device,
+        ``testdb`` when it declares the fleet test database and ``rust`` when
+        it declares a Rust toolchain.
     """
     tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
         tags.add(NodeTag.GPU)
     if node["test_database"]:
         tags.add(NodeTag.TESTDB)
+    if node["rust"] is not None:
+        tags.add(NodeTag.RUST)
     return frozenset(tags)
 
 
@@ -107,8 +117,9 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         return tag
     raise JSONTypeError(
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
-        "the node contract carries (its platform, a CUDA device nvidia-smi reports, or the "
-        "fleet test database), and one it does not carry could never be satisfied"
+        "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
+        "fleet test database, or a Rust toolchain), and one it does not carry could never "
+        "be satisfied"
     )
 
 
