@@ -36,14 +36,15 @@ three `platform_core` modules used (`errors`, `error_codes_tooling`,
 ## The grammar
 
 A recipe line is one plain command. Allowed: the command and its arguments,
-`@echo "..."`, make's own `$(VAR)` and `$(MAKE)`, single or double quotes.
-Banned, and refused by `lint-makefiles`:
+`@echo "..."`, make's own `$(VAR)`, a plain `make -C <dir>`, single or double
+quotes. Banned, and refused by `lint-makefiles`:
 
 | banned | because |
 |---|---|
 | cmdlets (`Write-Host`, `Set-Location`, ...), `$env:`, `-ForegroundColor`, `.ps1`, backticks, `\` paths | PowerShell only |
 | `&&`, `\|\|`, `$$VAR`, `/dev/null`, `[ test ]`, `if`/`for` | sh only |
 | `;`, `>`, `<`, `\|`, `cd` | read differently by the two shells |
+| `$(MAKE)`, `${MAKE}` | an unquoted path that PowerShell splits at a space (`Program Files (x86)`) |
 | `SHELL :=`, `.SHELLFLAGS`, `$(shell ...)` outside `shell.mk` | the platform shell leaking into a Makefile |
 
 One fence is allowed: inside `ifeq ($(OS),Windows_NT)` ... `else` ... `endif`
