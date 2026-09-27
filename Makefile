@@ -4,7 +4,7 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: commit-tasks infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
+.PHONY: commit-tasks executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
 
 # ---------------------------------------------------------------------------
 # Infrastructure
@@ -19,8 +19,29 @@ MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 commit-tasks:
 	$(PYTHON) .githooks/published_maketools.py commit-tasks ../MCPs . HEAD^!
 
-infra: commit-tasks
+# A DEPLOY SHIPS A COMMIT ITS HOST CODE RAN AT (MCPs board task 465689f5,
+# b6eb30c8's R3). tools/fleet's rendered PowerShell and sh run on every
+# node, and API's CI is Linux, so its Windows half ran on no machine but the
+# hub. MCPs' maketools publish-executed asks the fleet queue for a passed run
+# of each execution project at exactly HEAD, and refuses a tree that differs
+# from HEAD: EXECUTION_UNRUN, EXECUTION_TREE_DIRTY or, when the queue cannot
+# be asked, EXECUTION_UNREADABLE. It reads no variable and has no override.
+executed:
+	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/fleet-execution .
+	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/fleet-execution-linux .
+
+infra: commit-tasks executed
 	docker compose up -d
+
+# THE FLEET RUNS WHAT WAS ROLLED, AND A ROLL NEEDS BOTH SUITES AT HEAD (MCPs
+# board task 465689f5). The hub's scheduled ticks run fleet-agent and every
+# fleet-node-agent from the commit refs/fleet/rolled names, extracted by
+# tools/fleet's fleet.cli.rolled, never from this checkout; this is the only
+# thing that moves the ref, and only after executed passed at HEAD. The ref
+# lives in the object store every worktree shares, so a roll from any of
+# them is what the next tick runs.
+fleet-roll: commit-tasks executed
+	git update-ref refs/fleet/rolled HEAD
 
 # ---------------------------------------------------------------------------
 # Individual Services (each starts infra first)
