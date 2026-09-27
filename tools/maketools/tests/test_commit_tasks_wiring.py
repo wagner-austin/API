@@ -50,7 +50,7 @@ def _variables_read(lines: list[str]) -> list[str]:
 def test_the_deploy_asks_about_the_commit_it_ships_before_infra() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert (
-        "\ncommit-tasks:\n\tsh .githooks/published-maketools.sh "
+        "\ncommit-tasks:\n\t$(PYTHON) .githooks/published_maketools.py "
         "commit-tasks ../MCPs . HEAD^!\n" in makefile.replace("\r\n", "\n")
     )
     assert "\ninfra: commit-tasks\n" in makefile.replace("\r\n", "\n")
@@ -59,21 +59,21 @@ def test_the_deploy_asks_about_the_commit_it_ships_before_infra() -> None:
 def test_commit_msg_asks_before_the_commit_exists_reading_only_the_repository() -> None:
     lines = _executable(".githooks/commit-msg")
     assert (
-        'sh "$REPO/.githooks/published-maketools.sh" commit-message-tasks "$REPO/../MCPs" "$1"'
+        'python "$REPO/.githooks/published_maketools.py" commit-message-tasks "$REPO/../MCPs" "$1"'
     ) in lines
     assert "set -eu" in lines
     assert _variables_read(lines) == ["REPO"]
 
 
-def test_published_maketools_runs_origin_main_reading_only_what_it_sets() -> None:
-    lines = _executable(".githooks/published-maketools.sh")
+def test_published_maketools_runs_origin_main_reading_no_environment() -> None:
+    text = (ROOT / ".githooks" / "published_maketools.py").read_text(encoding="utf-8")
+    lines = [line.strip() for line in text.splitlines()]
     assert (
-        'if ! git --git-dir="$MCPS/.git" archive -o "$EXTRACT/maketools.tar" origin/main '
-        "packages/maketools; then"
+        '["git", f"--git-dir={MCPS / \'.git\'}", "archive", "origin/main", "packages/maketools"],'
     ) in lines
-    assert 'python "$EXTRACT/packages/maketools/scripts/run.py" "$@"' in lines
-    assert "set -eu" in lines
-    assert _variables_read(lines) == ["EXTRACT", "HOOK_REPO", "MCPS"]
+    assert "[sys.executable, str(Path(extract) / LAUNCHER), *arguments], check=False" in lines
+    # Nothing a caller sets can change which command runs or skip it.
+    assert [word for word in ("environ", "getenv", "argv[0]") if word in text] == []
 
 
 def test_pre_push_asks_first_over_each_range_and_reads_only_what_git_hands_it() -> None:
@@ -82,11 +82,11 @@ def test_pre_push_asks_first_over_each_range_and_reads_only_what_git_hands_it() 
     end = text.index("\ndone\n", start)
     stanza = [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]
     assert (
-        '        sh "$REPO/.githooks/published-maketools.sh" commit-tasks "$MCPS" "$REPO" '
+        '        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" '
         '"$ct_remote_sha..$ct_local_sha" < /dev/null'
     ) in stanza
     assert (
-        '        sh "$REPO/.githooks/published-maketools.sh" commit-tasks "$MCPS" "$REPO" '
+        '        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" '
         '"$ct_local_sha" "^origin/main" < /dev/null'
     ) in stanza
     assert _variables_read(stanza) == [

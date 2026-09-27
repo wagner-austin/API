@@ -1,12 +1,13 @@
-"""``.githooks/published-maketools.sh`` runs MCPs' maketools as origin/main carries it.
+"""``.githooks/published_maketools.py`` runs MCPs' maketools as origin/main carries it.
 
 MCPs board task 691b0067. THE SCRIPT IS EXECUTED, NOT READ: what can be
 wrong in it is the binding, which MCPs it finds, which commit of it runs,
-whether the command's exit status reaches the hook that called it. So each
-case copies the shipped file byte for byte into a temporary layout, a
-repository beside a real MCPs git repository whose origin/main carries a
-maketools launcher that echoes its arguments and exits with the last one,
-and runs it with sh. The launcher is the fixture's own; the real
+whether the command's exit status reaches the hook or recipe that called
+it, and whether it needs a program its callers do not have. So each case
+copies the shipped file byte for byte into a temporary layout, a repository
+beside a real MCPs git repository whose origin/main carries a maketools
+launcher that echoes its arguments and exits with the last one, and runs it
+with this interpreter. The launcher is the fixture's own; the real
 commit-tasks is tested in MCPs against the board's answers.
 """
 
@@ -14,14 +15,17 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
+import pytest
+
 from maketools import _test_hooks
 from maketools.cli import repository_root
 
-SCRIPT: Final[Path] = repository_root() / ".githooks" / "published-maketools.sh"
+SCRIPT: Final[Path] = repository_root() / ".githooks" / "published_maketools.py"
 
 #: The launcher origin/main carries: it echoes and exits with its last argument.
 PUBLISHED: Final[str] = (
@@ -63,7 +67,7 @@ def _layout(parent: Path, *, published: bool) -> Path:
     """
     repo = parent / "repo"
     (repo / ".githooks").mkdir(parents=True)
-    shutil.copyfile(SCRIPT, repo / ".githooks" / "published-maketools.sh")
+    shutil.copyfile(SCRIPT, repo / ".githooks" / "published_maketools.py")
     launcher = parent / "MCPs" / "packages" / "maketools" / "scripts" / "run.py"
     launcher.parent.mkdir(parents=True)
     _git(parent / "MCPs", "init", "--quiet")
@@ -75,21 +79,21 @@ def _layout(parent: Path, *, published: bool) -> Path:
     return repo
 
 
-def _run(repo: Path, git_env: Mapping[str, str], *args: str) -> subprocess.CompletedProcess[str]:
-    """Run the copied script with sh.
+def _run(repo: Path, env: Mapping[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+    """Run the copied script with this interpreter.
 
     Args:
         repo: The repository holding it.
-        git_env: Variables git would export to a hook, laid over this environment.
+        env: Variables laid over this environment, as git or make would.
         args: The maketools command and its arguments.
 
     Returns:
         The finished child.
     """
     return subprocess.run(
-        ["sh", ".githooks/published-maketools.sh", *args],
+        [sys.executable, ".githooks/published_maketools.py", *args],
         cwd=repo,
-        env={**_test_hooks.environ(), **git_env},
+        env={**_test_hooks.environ(), **env},
         capture_output=True,
         text=True,
         timeout=PROBE_WALL_SECONDS,
@@ -127,24 +131,73 @@ def test_it_reads_mcps_inside_a_hook_where_git_exported_this_repositorys_git_dir
     assert finished.returncode == 5
 
 
+def _path_without_sh(parent: Path) -> str:
+    """A PATH on which git resolves and sh does not.
+
+    On Windows it is the first directory holding a git and no sh.exe (Git
+    for Windows keeps ``cmd`` apart from its sh), which is what a
+    PowerShell-launched make hands its recipes. Elsewhere git sits in
+    /usr/bin beside sh, so it is a directory holding only a link to git.
+
+    Args:
+        parent: Where a directory of links may be made.
+
+    Returns:
+        The PATH value.
+    """
+    git = shutil.which("git")
+    if git is None:
+        pytest.fail("the script runs git, and it is not on this machine's PATH")
+    if sys.platform == "win32":
+        found = subprocess.run(
+            ["where.exe", "git"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=PROBE_WALL_SECONDS,
+        ).stdout.splitlines()
+        dirs = [Path(line).parent for line in found if not (Path(line).parent / "sh.exe").exists()]
+        if not dirs:
+            pytest.fail("every git on this PATH sits beside an sh.exe")
+        return str(dirs[0])
+    link = parent / "bin" / "git"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(git)
+    return str(link.parent)
+
+
+def test_it_runs_where_no_sh_is_on_the_path(tmp_path: Path) -> None:
+    """A PowerShell-launched make hands its recipes a PATH with no sh on it.
+
+    The sh script this replaced died there with ``sh`` not found (MCPs board
+    task 465689f5), so the PATH here holds git and nothing else: the script
+    must need no other program, since this interpreter runs it by path.
+    """
+    path = _path_without_sh(tmp_path / "path")
+    assert shutil.which("sh", path=path) is None
+    assert Path(str(shutil.which("git", path=path))).stem.lower() == "git"
+    finished = _run(_layout(tmp_path, published=True), {"PATH": path}, "publish-executed", "6")
+    assert finished.stdout.strip() == "published publish-executed 6"
+    assert finished.returncode == 6
+
+
 def test_it_refuses_naming_what_did_not_run_when_mcps_has_no_origin_main(
     tmp_path: Path,
 ) -> None:
     repo = _layout(tmp_path, published=False)
     finished = _run(repo, {}, "commit-tasks", "0")
-    # The script names the directory as sh's pwd spells it, so that is what
-    # the expected line is built from.
-    shell_repo = subprocess.run(
-        ["sh", "-c", "pwd"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=PROBE_WALL_SECONDS,
-    ).stdout.strip()
     assert finished.stdout == ""
     assert finished.stderr.splitlines()[-1] == (
-        f"published-maketools: {shell_repo}/../MCPs has no origin/main carrying "
+        f"published-maketools: {(tmp_path / 'MCPs').resolve()} has no origin/main carrying "
         "packages/maketools, so commit-tasks did not run and what called it is refused"
     )
     assert finished.returncode == 1
+
+
+def test_it_refuses_a_call_naming_no_command(tmp_path: Path) -> None:
+    finished = _run(_layout(tmp_path, published=True), {})
+    assert finished.stdout == ""
+    assert finished.stderr == (
+        "published-maketools: usage: published_maketools.py <command> [args...]\n"
+    )
+    assert finished.returncode == 2
