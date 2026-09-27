@@ -21,7 +21,7 @@ test:
 	poetry lock
 	poetry sync --with dev
 	$(MAKETOOLS) test
-	$(MAKE) -C web test
+	make -C web test
 
 check: lint test
 	@echo "=== ALL CHECKS PASSED ==="
