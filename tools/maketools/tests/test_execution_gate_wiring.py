@@ -69,7 +69,7 @@ def test_every_scheduled_tick_runs_the_rolled_commit(script: str, agent: str) ->
     lines = [line.strip() for line in text.replace("\r\n", "\n").split("\n")]
     start = lines.index("$agentArguments = @(")
     assert lines[start + 1 : start + 5] == [
-        "'run', 'python', '-m', 'fleet.cli.rolled',",
+        "'run', '--', 'python', '-m', 'fleet.cli.rolled',",
         "'--repo-root', $apiRoot,",
         f"'--agent', '{agent}',",
         "'--',",
