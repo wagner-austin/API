@@ -428,9 +428,10 @@
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "execution",
         "install": [
-          ["npm", "ci"],
+          ["npm", "ci", "--ignore-scripts"],
+          ["npx", "patch-package"],
           ["node", "scripts/ci-build-consumed-workspaces.mjs"],
-          ["npm", "rebuild"]
+          ["npm", "rebuild", "mcp-shared"]
         ],
         "companions": []
       }
