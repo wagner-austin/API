@@ -131,6 +131,35 @@ Describe 'The tick entries' {
         $LASTEXITCODE | Should -Be 0
         [System.IO.File]::ReadAllText($world.Calls).Trim() | Should -BeLike '* -- --node beta'
     }
+    It 'dot-sources runs/env.ps1 under the API root it is given, running there, in the <Entry> entry' -ForEach @(
+        @{ Entry = 'hub'; Stem = 'fleet-agent'; Parameters = @{} },
+        @{ Entry = 'node'; Stem = 'fleet-node-gamma'; Parameters = @{ Node = 'gamma' } }
+    ) {
+        $world = Initialize-FleetTickWorld
+        $apiRoot = Join-Path $world.Root 'api'
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $apiRoot 'tools\hpc-wake\runs'))
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $apiRoot 'tools\fleet'))
+        [System.IO.File]::Copy($world.Environment, (Join-Path $apiRoot 'tools\hpc-wake\runs\env.ps1'))
+        $entry = @{ hub = $script:hubTick; node = $script:nodeTick }[$Entry]
+        Invoke-TestEntry $entry ($Parameters + @{ ApiRoot = $apiRoot; Poetry = $world.Poetry; LogDirectory = $world.Logs })
+        [System.IO.File]::ReadAllText($world.Calls).Trim() | Should -BeLike "run -- python -m fleet.cli.rolled --repo-root $apiRoot *"
+        (Read-FleetTickLog $world.Logs $Stem)[1..2] | Should -Be @("cwd=$apiRoot\tools\fleet", "mark=$($world.Mark)")
+    }
+    # Task Scheduler runs these with -File, where Windows PowerShell 5.1
+    # leaves $PSScriptRoot empty inside an advanced script's param default;
+    # only a real -File child sees that, since & sets it (every tick from
+    # 16:27Z on 2026-09-27 failed on it).
+    It 'finds this checkout''s roots when powershell runs the <Entry> entry with -File' -ForEach @(
+        @{ Entry = 'hub'; Arguments = @(); Expected = '--agent fleet-agent -- --agent fleet-runner-austinpc *' },
+        @{ Entry = 'node'; Arguments = @('-Node', 'delta'); Expected = '--agent fleet-node-agent -- --node delta' }
+    ) {
+        $world = Initialize-FleetTickWorld
+        $entry = @{ hub = $script:hubTick; node = $script:nodeTick }[$Entry]
+        & "$PSHOME\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $entry @Arguments `
+            -EnvironmentScript $world.Environment -Poetry $world.Poetry -LogDirectory $world.Logs | Out-Null
+        $LASTEXITCODE | Should -Be 0
+        [System.IO.File]::ReadAllText($world.Calls).Trim() | Should -BeLike "run -- python -m fleet.cli.rolled --repo-root $($script:apiRoot) $Expected"
+    }
 }
 
 Describe 'The schedules' {
@@ -194,6 +223,44 @@ Describe 'The schedules' {
         [System.IO.File]::WriteAllText($workspace, $Json)
         { Invoke-TestEntry $script:registerNodes @{ Workspace = $workspace; TaskPrefix = $script:prefix; Tick = $script:standIn.Path } 6>$null } |
             Should -Throw $Message
+    }
+    It 'registers the hub tick beside the entry when none is named' {
+        $record = Join-Path $TestDrive ('register-' + [guid]::NewGuid().ToString('N') + '.txt')
+        $register = {
+            param([string]$TaskName, [string]$Tick, [string]$TickArguments, [string]$Description)
+            [System.IO.File]::AppendAllText($record, "$TaskName|$Tick|$TickArguments|$Description`r`n")
+            'recorded'
+        }.GetNewClosure()
+        $said = @(Invoke-TestEntry $script:registerHub @{ TaskName = "${script:prefix}hub"; Register = $register } 6>&1 | ForEach-Object { "$_" })
+        $said | Should -Be @("Registered ${script:prefix}hub (every 3 minutes and at boot, recorded, S4U, Limited).")
+        [System.IO.File]::ReadAllLines($record) | Should -Be @("${script:prefix}hub|$(Split-Path -Parent $script:hubTick)\run-agent-tick.ps1||" +
+            'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.')
+    }
+    It 'registers and announces each node fleet.json enables with the tick beside the entry, when neither is named' {
+        $record = Join-Path $TestDrive ('register-' + [guid]::NewGuid().ToString('N') + '.txt')
+        $register = {
+            param([string]$TaskName, [string]$Tick, [string]$TickArguments, [string]$Description)
+            [System.IO.File]::AppendAllText($record, "$TaskName|$Tick|$TickArguments|$Description`r`n")
+            'recorded'
+        }.GetNewClosure()
+        $announced = Join-Path $TestDrive ('announced-' + [guid]::NewGuid().ToString('N') + '.txt')
+        $powerShell = Join-Path $TestDrive ('powershell-' + [guid]::NewGuid().ToString('N') + '.cmd')
+        [System.IO.File]::WriteAllText($powerShell, "@echo off`r`necho %*>>`"$announced`"`r`nexit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $scripts = Split-Path -Parent $script:nodeTick
+        $document = [System.IO.File]::ReadAllText((Join-Path $scripts '..\fleet.json')) | ConvertFrom-Json
+        $enabled = @($document.nodes.PSObject.Properties | Where-Object { $_.Value.PSObject.Properties['enabled'] -and $_.Value.enabled -eq $true } |
+            ForEach-Object { $_.Name })
+        $enabled.Count | Should -BeGreaterThan 0
+        Invoke-TestEntry $script:registerNodes @{ TaskPrefix = $script:prefix; PowerShell = $powerShell; Register = $register } 6>$null
+        $registered = [string[]][System.IO.File]::ReadAllLines($record)
+        $registered.Count | Should -Be $enabled.Count
+        foreach ($index in 0..($enabled.Count - 1)) {
+            $alias = $enabled[$index]
+            $registered[$index] | Should -BeExactly ("$($script:prefix)$alias-3min|$scripts\run-node-agent-tick.ps1| -Node $alias|One fleet-node-agent tick for " +
+                "${alias}: claim the node lane's jobs $alias carries the tags for (API tools/fleet). See register-node-agents.ps1.")
+        }
+        [System.IO.File]::ReadAllLines($announced) | Should -Be @($enabled | ForEach-Object {
+                "-NoProfile -ExecutionPolicy Bypass -File $scripts\run-node-agent-tick.ps1 -Node $_ -Announce" })
     }
     It 'unregisters every node task and registers none under -UnregisterAll' {
         foreach ($alias in 'alpha', 'beta') {
