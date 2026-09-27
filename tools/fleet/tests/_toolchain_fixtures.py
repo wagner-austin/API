@@ -148,7 +148,7 @@ SERENDIPITY_2026_09_25 = (
 #: What diphtheria answered the probe that also asks cargo, 2026-09-27
 #: 00:5xZ, verbatim, minutes after rustup installed 1.98.1 at user scope
 #: (MCPs board task 1e2da299). The trailing token is cargo's build date,
-#: which is why :func:`fleet.contracts.rust.measured_rust` reads the second.
+#: which is why :func:`fleet.contracts.capability.measured` reads the second.
 DIPHTHERIA_2026_09_27 = (
     "python=yes=Python 3.11.15\n"
     "poetry=yes=Poetry (version 2.5.1)\n"
@@ -161,16 +161,33 @@ DIPHTHERIA_2026_09_27 = (
     "pipx=yes=1.4.3\n"
 )
 
+#: What diphtheria answered the probe that also asks for the C++ toolchain,
+#: 2026-09-27 03:45Z, verbatim (MCPs board task 3f19c136): g++'s bare
+#: -dumpfullversion on the synthetic ``cxx`` line.
+DIPHTHERIA_2026_09_27_CXX = (
+    "python=yes=Python 3.11.15\n"
+    "poetry=yes=Poetry (version 2.5.1)\n"
+    "git=yes=git version 2.43.0\n"
+    "make=yes=GNU Make 4.3\n"
+    "node=yes=v24.21.0\n"
+    "tar=yes=tar (GNU tar) 1.35\n"
+    "cargo=yes=cargo 1.98.1 (797e8a9bc 2026-08-05)\n"
+    "cxx=yes=13.3.0\n"
+    "apt-get=yes=apt 2.8.3 (amd64)\n"
+    "pipx=yes=1.4.3\n"
+)
+
 #: A node carrying the wrong interpreter, which no probed Windows node did.
 WRONG_PYTHON = LOKI.replace("Python 3.11.9", "Python 3.12.4")
 
 
-def node(host: str = "lavender", *, rust: str | None = None) -> NodeConfig:
+def node(host: str = "lavender", *, rust: str | None = None, cxx: str | None = None) -> NodeConfig:
     """Build a Windows node declaration.
 
     Args:
         host: SSH alias.
         rust: The cargo version it declares, or None.
+        cxx: The C++ toolchain version it declares, or None.
 
     Returns:
         The node.
@@ -185,6 +202,7 @@ def node(host: str = "lavender", *, rust: str | None = None) -> NodeConfig:
         enabled=True,
         test_database=False,
         rust=rust,
+        cxx=cxx,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,
@@ -199,6 +217,7 @@ __all__ = [
     "DIPHTHERIA",
     "DIPHTHERIA_2026_09_23",
     "DIPHTHERIA_2026_09_27",
+    "DIPHTHERIA_2026_09_27_CXX",
     "LAVENDER",
     "LAVENDER_2026_09_23",
     "LAVENDER_STORE_STUB",

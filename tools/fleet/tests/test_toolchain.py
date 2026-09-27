@@ -31,7 +31,7 @@ from fleet.contracts.toolchain import (
     python_is_right,
     version_number,
 )
-from fleet.core import _test_hooks, dialect_linux, dialect_windows, toolchain
+from fleet.core import _test_hooks, dialect_linux, toolchain, windows_toolchain_probe
 from tests._toolchain_fixtures import (
     DIPHTHERIA,
     LAVENDER,
@@ -67,6 +67,7 @@ def _workspace_document() -> JSONObject:
         "enabled": True,
         "test_database": False,
         "rust": None,
+        "cxx": None,
         "budget": budget,
     }
     return {
@@ -272,7 +273,7 @@ class TestProbeToolchain:
         reports = toolchain.probe_toolchain(node("loki"))
 
         assert len(reports) == 8
-        assert runner.stdin[0] == dialect_windows.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
+        assert runner.stdin[0] == windows_toolchain_probe.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
         assert runner.calls[0][-1].endswith("C:/fleet/stage/fleet-toolchain.ps1' -Encoding utf8\"")
 
     def test_a_linux_node_is_asked_in_sh(self) -> None:

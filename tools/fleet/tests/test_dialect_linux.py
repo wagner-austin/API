@@ -287,6 +287,7 @@ class TestTransportShape:
         assert "report python python3\n" in body
         for tool in ("poetry", "git", "make", "node", "tar", "cargo", "apt-get", "pipx"):
             assert f"report {tool} {tool}\n" in body
+        assert "printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n" in body
         assert "winget" not in body
         assert "choco" not in body
 
@@ -420,12 +421,29 @@ class TestForRealUnderSh:
             "node",
             "tar",
             "cargo",
+            "cxx",
             "apt-get",
             "pipx",
         }
         assert fields["python"].startswith("yes=Python 3.")
         for value in fields.values():
             assert value.startswith(("yes=", "no="))
+
+    def test_the_cxx_line_carries_g_plus_plus_s_bare_version(self, tmp_path: pathlib.Path) -> None:
+        """A g++ ahead on PATH answers -dumpfullversion as diphtheria's did
+        (13.3.0, 2026-09-27), and the probe line carries exactly that, which
+        is the shape :func:`fleet.contracts.capability.measured` reads."""
+        tools = tmp_path / "tools"
+        tools.mkdir()
+        fake = tools / "g++"
+        fake.write_bytes(b'#!/bin/sh\n[ "$1" = "-dumpfullversion" ] && echo 13.3.0\n')
+        fake.chmod(0o755)
+        body = DIALECT.toolchain_probe_script().replace(
+            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
+        )
+        fields = fields_of(self.run_script(tmp_path, body))
+
+        assert fields["cxx"] == "yes=13.3.0"
 
     def test_the_digest_script_prints_the_landed_bytes_digest_and_leaves_them(
         self, tmp_path: pathlib.Path

@@ -68,6 +68,7 @@ def _workspace_document() -> JSONObject:
         "enabled": True,
         "test_database": False,
         "rust": None,
+        "cxx": None,
         "budget": budget,
     }
     return {

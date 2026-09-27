@@ -395,6 +395,7 @@ class TestProbesForReal:
             "winget",
             "choco",
             "pip",
+            "cxx",
         }
         assert fields["python"].startswith("yes=Python 3.")
         assert fields["pip"].startswith("yes=pip ")
