@@ -35,6 +35,16 @@
     A TASK IS FOUND BY ITS EXACT NAME from the full listing, never by
     `Get-ScheduledTask -TaskName <name> -ErrorAction SilentlyContinue`: that
     form turns every failure to read the scheduler into "not registered".
+
+    THE LISTING AND THE DELETE GO THROUGH TASK SCHEDULER'S COM SERVICE, not
+    Get-ScheduledTask and Unregister-ScheduledTask, which read every task's
+    definition and fail with "The system cannot find the file specified"
+    when ANY task is deleted while they run. Measured on the hub 2026-09-27
+    against a process registering and deleting tasks: 3 of 150
+    Get-ScheduledTask listings and 172 of 178 Unregister-ScheduledTask
+    -TaskName calls failed, while 0 of 1,873 COM name listings did, and
+    Register-ScheduledTask by name failed 0 of 178 times (MCPs board task
+    d69786fa).
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -42,18 +52,37 @@ $ErrorActionPreference = 'Stop'
 function Get-FleetScheduledTask {
     <#
     .SYNOPSIS
-        The registered tasks whose names start and end as given.
+        The registered tasks, in any folder, whose names start and end as
+        given.
     .PARAMETER Prefix
-        The name's start.
+        The name's start, compared ordinally.
     .PARAMETER Suffix
-        The name's end.
+        The name's end, compared ordinally.
     .OUTPUTS
-        CimInstance[]: the tasks, in the scheduler's order.
+        PSCustomObject[]: each task's TaskName and FolderPath (the folder as
+        the COM service names it, '\' or '\Folder'), in the scheduler's
+        order.
     #>
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance[]])]
+    [OutputType([pscustomobject[]])]
     param([Parameter(Mandatory)][string]$Prefix, [Parameter(Mandatory)][AllowEmptyString()][string]$Suffix)
-    return [Microsoft.Management.Infrastructure.CimInstance[]]@(Get-ScheduledTask |
-        Where-Object { $_.TaskName.StartsWith($Prefix, [System.StringComparison]::Ordinal) -and $_.TaskName.EndsWith($Suffix, [System.StringComparison]::Ordinal) })
+    $scheduler = New-Object -ComObject Schedule.Service
+    $scheduler.Connect()
+    $found = [System.Collections.Generic.List[pscustomobject]]::new()
+    $pending = [System.Collections.Generic.Queue[object]]::new()
+    $pending.Enqueue($scheduler.GetFolder('\'))
+    while ($pending.Count -gt 0) {
+        $folder = $pending.Dequeue()
+        foreach ($task in @($folder.GetTasks(1))) {
+            $name = [string]$task.Name
+            if ($name.StartsWith($Prefix, [System.StringComparison]::Ordinal) -and $name.EndsWith($Suffix, [System.StringComparison]::Ordinal)) {
+                $found.Add([pscustomobject]@{ TaskName = $name; FolderPath = [string]$folder.Path })
+            }
+        }
+        foreach ($child in @($folder.GetFolders(0))) {
+            $pending.Enqueue($child)
+        }
+    }
+    return [pscustomobject[]]$found.ToArray()
 }
 
 function Unregister-FleetTick {
@@ -68,8 +97,10 @@ function Unregister-FleetTick {
     [OutputType([bool])]
     param([Parameter(Mandatory)][string]$TaskName)
     $registered = @(Get-FleetScheduledTask -Prefix $TaskName -Suffix '' | Where-Object { $_.TaskName -ceq $TaskName })
+    $scheduler = New-Object -ComObject Schedule.Service
+    $scheduler.Connect()
     foreach ($task in $registered) {
-        Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath -Confirm:$false
+        $scheduler.GetFolder($task.FolderPath).DeleteTask($task.TaskName, 0)
     }
     return $registered.Count -gt 0
 }
