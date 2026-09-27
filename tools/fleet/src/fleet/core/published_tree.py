@@ -148,7 +148,7 @@ def extract_published_tree(mcps_root: pathlib.Path) -> PublishedTree | str:
         mcps_root,
         commit,
         ARCHIVED_PATHS,
-        directory=EXTRACTIONS_DIR,
+        destination=_test_hooks.temp_root() / EXTRACTIONS_DIR / commit,
         archive_code=ARCHIVE_FAILED_CODE,
         extract_code=EXTRACT_FAILED_CODE,
     )

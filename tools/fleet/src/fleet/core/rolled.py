@@ -27,6 +27,16 @@ or extraction, or an extraction lacking an entry point refuses the tick by
 code, and the agent does not start: running the checkout on the day the
 extraction fails is the defect this removes.
 
+ONE EXTRACTION PER LAUNCH, REMOVED WHEN THE AGENT EXITS. The hub's five
+scheduled ticks start in the same second. Extracting into one directory per
+commit, as the session verbs do, they ran five ``tar`` processes over one
+tree, and at 10:24Z on 2026-09-27 two of them failed on files another was
+writing (FLEET_ROLL_EXTRACT_FAILED on diphtheria's and sedona's ticks, each
+naming a different file). So each launch extracts under its own process id
+and :func:`discard_rolled_tree` removes the directory after the agent
+returns: no run writes a tree another reads, and no tick trusts a copy an
+earlier one left behind.
+
 NO DEADLOCK. The execution suites a roll needs are dispatched and collected
 by the agent already rolled, and each node runs the suite of the commit it
 was handed, so an older roll is what proves the next one.
@@ -36,9 +46,10 @@ from __future__ import annotations
 
 import os
 import pathlib
+import shutil
 from typing import Final, TypedDict
 
-from fleet.core import commit_tree
+from fleet.core import _test_hooks, commit_tree
 
 #: The ref ``make fleet-roll`` sets and every tick reads.
 ROLLED_REF: Final = "refs/fleet/rolled"
@@ -91,14 +102,42 @@ class RolledTree(TypedDict):
 
     Attributes:
         commit: The full commit id the extraction was taken from.
+        directory: This launch's own extraction, removed after the agent
+            exits.
         python_path: The ``PYTHONPATH`` value putting the four extracted
             source trees ahead of the checkout's editable installs.
         config: The extracted registry, passed as ``--config``.
     """
 
     commit: str
+    directory: str
     python_path: str
     config: str
+
+
+def launch_directory(commit: str) -> pathlib.Path:
+    """This launch's own extraction directory for a commit.
+
+    Args:
+        commit: The rolled commit.
+
+    Returns:
+        ``<scratch root>/fleet-rolled/<commit>/pid-<this process id>``.
+    """
+    return _test_hooks.temp_root() / EXTRACTIONS_DIR / commit / f"pid-{os.getpid()}"
+
+
+def discard_rolled_tree(tree: RolledTree) -> None:
+    """Remove a launch's extraction once its agent has exited.
+
+    Args:
+        tree: The extraction :func:`extract_rolled_tree` returned.
+
+    Raises:
+        OSError: When the directory cannot be removed; it propagates, so a
+            tick that could not clean up says so in its log.
+    """
+    shutil.rmtree(tree["directory"])
 
 
 def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
@@ -119,7 +158,7 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
         api_root,
         commit,
         ARCHIVED_PATHS,
-        directory=EXTRACTIONS_DIR,
+        destination=launch_directory(commit),
         archive_code=ARCHIVE_FAILED_CODE,
         extract_code=EXTRACT_FAILED_CODE,
     )
@@ -132,6 +171,7 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
         return incomplete
     return RolledTree(
         commit=commit,
+        directory=str(destination),
         python_path=os.pathsep.join(
             str(destination / pathlib.PurePosixPath(tree)) for tree in SOURCE_TREES
         ),
@@ -156,5 +196,7 @@ __all__ = [
     "ROLLED_REF",
     "SOURCE_TREES",
     "RolledTree",
+    "discard_rolled_tree",
     "extract_rolled_tree",
+    "launch_directory",
 ]

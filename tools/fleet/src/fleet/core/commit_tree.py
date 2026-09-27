@@ -16,9 +16,12 @@ returns a ``CODE: message`` refusal and the caller runs nothing; code run
 from a working tree on the one day the extraction fails is the defect both
 callers exist to remove.
 
-ONE DIRECTORY PER COMMIT. A repeated commit extracts over its own
-directory, which rewrites the same bytes; a new commit gets a fresh one, so
-a module deleted upstream can never be imported from an older extraction.
+EACH CALLER NAMES ITS DESTINATION. The session verbs extract one directory
+per commit, which a repeated commit rewrites with the same bytes, because
+only one verb extracts at a time. The scheduled ticks start five at once,
+so each extracts into a directory of its own (:mod:`fleet.core.rolled`).
+Either way a new commit gets a fresh directory, so a module deleted
+upstream can never be imported from an older extraction.
 """
 
 from __future__ import annotations
@@ -97,25 +100,28 @@ def extract_paths(
     commit: str,
     paths: Sequence[str],
     *,
-    directory: str,
+    destination: pathlib.Path,
     archive_code: str,
     extract_code: str,
 ) -> pathlib.Path | str:
-    """Archive ``paths`` of ``commit`` and extract them under the scratch root.
+    """Archive ``paths`` of ``commit`` and extract them into ``destination``.
 
     Args:
         repo_root: The repository holding the commit.
         commit: The full commit id.
         paths: The ``git archive`` pathspecs.
-        directory: The scratch-root subdirectory, named so a person who
-            finds it knows what left it there.
+        destination: The directory to extract into, created with its
+            parents. The caller decides whose it is: a caller that can run
+            concurrently with itself must name one no other run writes,
+            because two ``tar`` runs extracting over one tree collide on
+            each other's files (:mod:`fleet.core.rolled` carries the
+            incident).
         archive_code: The refusal's prefix when ``git archive`` fails.
         extract_code: The refusal's prefix when ``tar`` fails.
 
     Returns:
-        The per-commit directory the paths now sit in, or a refusal.
+        ``destination``, now holding the paths, or a refusal.
     """
-    destination = _test_hooks.temp_root() / directory / commit
     _test_hooks.make_directory(destination)
     tarball = destination / TARBALL_NAME
     archived = _test_hooks.run(
