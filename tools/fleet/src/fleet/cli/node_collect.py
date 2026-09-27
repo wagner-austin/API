@@ -54,6 +54,7 @@ from fleet.core import (
     names,
     queue,
     remote,
+    retire,
     stop,
     verdict,
 )
@@ -118,6 +119,10 @@ def settle(
         spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
         platform=node["platform"],
     )
+    # Retired once its tail is read and before anything is posted, so a
+    # retire that fails leaves the job held and the row live for the next
+    # tick, and the verdict names the transcript where it now stays.
+    retained = retire.retire_on_node(node, run_id=row["run_id"])
     judged = verdict.judge(
         job_id=job["job_id"],
         project=row["project"],
@@ -125,7 +130,7 @@ def settle(
         node=row["node"],
         exit_code=exit_code,
         tail=tail,
-        log_path=names.log_path(target),
+        log_path=retained,
         run_id=row["run_id"],
     )
     rendered = verdict.render_verdict(judged)
