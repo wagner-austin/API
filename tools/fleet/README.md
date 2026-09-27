@@ -280,7 +280,8 @@ and the wiki page (`fleet-check-runner`, mcps-codebase) carries.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
-a CUDA device and `testdb` for a node whose `test_database` is true) and the
+a CUDA device, `testdb` for a node whose `test_database` is true and `rust`
+for a node whose `rust` names a cargo version) and the
 queue's `required_tags <@ tags` containment returns
 only jobs the node satisfies. A job's `required_tags` are the project's from
 `fleet.json`; `dispatch_submit` takes them and the runner re-checks them
@@ -302,6 +303,19 @@ the setup can succeed. No Windows node can reach a test database (measured
 2026-09-26: sedona and serendipity both refuse the cluster's 6432), and no
 node is pointed at the production cluster's `corvis_test`, which would put the
 `corvis_app` credential on it.
+
+**`rust` is declared as a version and re-measured every tick** (MCPs board
+task 1e2da299). `services/covenant-radar-api` builds the maturin crate
+`libs/cleargbm_rs` from source in `poetry sync`, and on 2026-09-26 no node
+had cargo, so the project requires `rust`. A node's `rust` is the version
+`cargo --version` printed there (`1.98.1` on diphtheria, installed by rustup
+at user scope, reversible by removing `~/.rustup` and `~/.cargo`), or null.
+The toolchain probe asks cargo on every runner tick, and a node whose answer
+differs from its declaration claims nothing, logging `NODE_RUST_MISMATCH`
+with the value that would match (`fleet.contracts.rust`), so the tag cannot
+outlive the toolchain. The Linux dialect puts `~/.cargo/bin` on every
+script's PATH beside `~/.local/bin`, so the probe and the build find the same
+cargo.
 
 **The identity is derived, never configured.** The label is
 `fleet-node-<alias>` and the session id is the version-5 UUID of
