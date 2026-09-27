@@ -87,6 +87,7 @@ class TestTheCommittedCopies:
                     f"base-windows-{host['name']}",
                     f"base-import-{host['name']}",
                     f"audit-{host['name']}",
+                    f"distro-driver-{host['name']}",
                 )
             ),
         ]
@@ -97,7 +98,8 @@ class TestTheRegistry:
         host = _roster()["hosts"][0]
         shared = (
             f"share a file name: audit-{host['name']}, base-import-{host['name']}, "
-            f"base-windows-{host['name']}, rebuild-terminate-{host['name']}"
+            f"base-windows-{host['name']}, distro-driver-{host['name']}, "
+            f"rebuild-terminate-{host['name']}"
         )
         with pytest.raises(ValueError, match=shared):
             rendered_powershell.render_all(RunnerSpec(hosts=[host, host]))

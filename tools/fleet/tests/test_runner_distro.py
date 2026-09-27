@@ -71,13 +71,32 @@ class TestRunDistroScript:
         assert runner.calls[0][-1] == runner_distro.EXACT_WRITE_COMMAND.format(
             path="C:/fleet/stage/fleet-x.sh"
         )
-        assert runner.stdin[1] == (
-            b"$ErrorActionPreference = 'Stop'\n$env:WSL_UTF8 = '1'\n"
-            b"wsl -d 'Ubuntu' -u root -- bash '/mnt/c/fleet/stage/fleet-x.sh'\n"
-            b"exit $LASTEXITCODE"
-        )
+        assert runner.stdin[1] == runner_distro.render_distro_driver(_host(), "fleet-x").encode()
         assert runner.calls[2][-1] == "C:/fleet/stage/fleet-x-driver.ps1"
         assert runner.timeouts == [120, 120, 900]
+
+
+class TestRenderDistroDriver:
+    """The driver's text; the committed render is executed by
+    tests/pester/rendered-distro-driver.Tests.ps1."""
+
+    def test_the_distro_and_the_payload_are_parameters_with_the_rendered_defaults(
+        self,
+    ) -> None:
+        lines = runner_distro.render_distro_driver(_host(), "fleet-x").splitlines()
+        assert lines[:5] == [
+            "param(",
+            "    [string]$Distro = 'Ubuntu',",
+            "    [string]$Payload = '/mnt/c/fleet/stage/fleet-x.sh',",
+            '    [string]$Wsl = "$env:SystemRoot\\System32\\wsl.exe"',
+            ")",
+        ]
+
+    def test_a_scratch_directory_that_is_not_a_drive_path_is_refused(self) -> None:
+        spec = _host()
+        spec["scratch_dir"] = "/tmp/stage"
+        with pytest.raises(ValueError, match="drive path"):
+            runner_distro.render_distro_driver(spec, "fleet-x")
 
 
 #: A payload with everything the dialect's own write would change: a
