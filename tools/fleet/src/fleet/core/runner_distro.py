@@ -7,11 +7,12 @@ runner the same way. One implementation, so the route that survived the
 ssh->cmd->powershell->wsl->bash gauntlet is the only route.
 
 THE PAYLOAD IS A FILE, NEVER A COMMAND LINE. The bash text is sent to the
-host's ``scratch_dir`` and run by path through a one-line PowerShell driver,
-per :mod:`fleet.core.remote`'s rule. That also matters for one measured
-reason beyond quoting: ``bash -c`` through System32's WSL launcher
-re-expands its argument, which turned a ``sed`` expression's ``$`` into
-``0`` in the 2026-09-26 review re-run of this package.
+host's ``scratch_dir`` and run by path through a small rendered PowerShell
+driver (:func:`render_distro_driver`), per :mod:`fleet.core.remote`'s rule.
+That also matters for one measured reason beyond quoting: ``bash -c``
+through System32's WSL launcher re-expands its argument, which turned a
+``sed`` expression's ``$`` into ``0`` in the 2026-09-26 review re-run of
+this package.
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from __future__ import annotations
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
+from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
+from fleet.core.script_values import scriptable
 
 #: How a bash payload is written on the runner host, byte for byte.
 #:
@@ -62,6 +65,59 @@ def windows_to_wsl_path(path: str) -> str:
     return f"/mnt/{path[0].lower()}{path[2:]}"
 
 
+def payload_path(spec: HostRunnerSpec, stem: str) -> str:
+    """Where a payload lands on the runner host, as Windows names it.
+
+    Args:
+        spec: The host.
+        stem: The payload's file-name stem.
+
+    Returns:
+        ``<scratch_dir>/<stem>.sh``, forward-slashed.
+    """
+    return f"{spec['scratch_dir']}/{stem}.sh"
+
+
+def render_distro_driver(spec: HostRunnerSpec, stem: str) -> str:
+    """The PowerShell that runs one sent payload inside the distro as root.
+
+    The distro, the payload's path as the distro sees it and wsl.exe are
+    parameters defaulting to the rendered values, so a host runs it with no
+    arguments and the Pester suite over its committed render (MCPs board
+    task d69786fa) passes a stand-in wsl.exe. The payload's output reaches
+    the caller unchanged; a payload that exits non-zero throws
+    ``FLEET_DISTRO_PAYLOAD_FAILED`` naming its exit code, after its own
+    stderr, which the remote layer carries back.
+
+    Args:
+        spec: The host.
+        stem: The payload's file-name stem, as :func:`payload_path` places it.
+
+    Returns:
+        The script's text.
+
+    Raises:
+        ValueError: When the distro or the path cannot be embedded verbatim,
+            or the scratch directory is not a drive path.
+    """
+    distro = scriptable(spec["wsl_distro"], label="wsl_distro")
+    path = scriptable(windows_to_wsl_path(payload_path(spec, stem)), label="payload path")
+    lines = [
+        "param(",
+        f"    [string]$Distro = '{distro}',",
+        f"    [string]$Payload = '{path}',",
+        "    " + system32_parameter("Wsl", "wsl.exe"),
+        ")",
+        *STRICT_HEADER,
+        "$env:WSL_UTF8 = '1'",
+        "& $Wsl -d $Distro -u root -- bash $Payload",
+        "if ($LASTEXITCODE -ne 0) {",
+        '    throw "FLEET_DISTRO_PAYLOAD_FAILED: bash $Payload in $Distro exited $LASTEXITCODE"',
+        "}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def run_distro_script(spec: HostRunnerSpec, stem: str, body: str, *, timeout_seconds: int) -> str:
     """Send a bash payload to the host and run it inside the distro as root.
 
@@ -81,29 +137,26 @@ def run_distro_script(spec: HostRunnerSpec, stem: str, body: str, *, timeout_sec
             remote layer; a payload exiting non-zero surfaces as the latter
             with its own stderr.
     """
-    windows_payload_path = f"{spec['scratch_dir']}/{stem}.sh"
+    windows_payload_path = payload_path(spec, stem)
     remote.stream_to_command(
         spec["host"],
         EXACT_WRITE_COMMAND.format(path=windows_payload_path),
         body,
         what=f"sending {windows_payload_path}",
     )
-    driver = "\n".join(
-        [
-            "$ErrorActionPreference = 'Stop'",
-            "$env:WSL_UTF8 = '1'",
-            f"wsl -d '{spec['wsl_distro']}' -u root -- bash "
-            f"'{windows_to_wsl_path(windows_payload_path)}'",
-            "exit $LASTEXITCODE",
-        ]
-    )
     return remote.run_script_within(
         spec["host"],
         f"{spec['scratch_dir']}/{stem}-driver.ps1",
-        driver,
+        render_distro_driver(spec, stem),
         platform=NodePlatform.WINDOWS,
         timeout_seconds=timeout_seconds,
     )
 
 
-__all__ = ["EXACT_WRITE_COMMAND", "run_distro_script", "windows_to_wsl_path"]
+__all__ = [
+    "EXACT_WRITE_COMMAND",
+    "payload_path",
+    "render_distro_driver",
+    "run_distro_script",
+    "windows_to_wsl_path",
+]

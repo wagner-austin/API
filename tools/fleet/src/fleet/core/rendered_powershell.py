@@ -31,6 +31,7 @@ from fleet.core import (
     names,
     runner_audit,
     runner_base_render,
+    runner_distro,
     runner_rebuild,
     verdict,
 )
@@ -56,6 +57,9 @@ EXAMPLE_WORKERS = 4
 
 #: The example dispatch's install steps.
 EXAMPLE_INSTALL: tuple[tuple[str, ...], ...] = (("npm", "ci"),)
+
+#: The payload stem the example distro driver runs: the rebuild's Linux base.
+EXAMPLE_DISTRO_STEM = "fleet-rebuild-linux-base"
 
 
 class RenderedScript(TypedDict):
@@ -165,6 +169,10 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
             RenderedScript(
                 name=f"audit-{host['name']}", text=runner_audit.render_audit_script(host)
             ),
+            RenderedScript(
+                name=f"distro-driver-{host['name']}",
+                text=runner_distro.render_distro_driver(host, EXAMPLE_DISTRO_STEM),
+            ),
         ]
     names = [script["name"] for script in scripts]
     repeated = sorted({name for name in names if names.count(name) > 1})
@@ -175,6 +183,7 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
 
 __all__ = [
     "EXAMPLE_COMPANION_SHA",
+    "EXAMPLE_DISTRO_STEM",
     "EXAMPLE_INSTALL",
     "EXAMPLE_PROJECT",
     "EXAMPLE_RUN_ID",
