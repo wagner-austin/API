@@ -75,6 +75,7 @@ class TestTheCommittedCopies:
             "dialect-log-tail",
             "dialect-launch",
             "dialect-stop",
+            "dialect-retire",
             "dialect-extract",
             "dialect-init-repository",
             "dialect-companion-repository",

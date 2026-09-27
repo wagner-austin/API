@@ -31,7 +31,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, DEFAULT_SHA, FakeQueue, queue_job
-from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
+from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -41,7 +41,10 @@ class TestCollecting:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        _test_hooks.run = FakeRun([ok(""), ok("0 1757000060"), ok(""), ok(PASSING_TAIL), *PROBED])
+        node = FakeRun(
+            [ok(""), ok("0 1757000060"), ok(""), ok(PASSING_TAIL), *retire_replies(), *PROBED]
+        )
+        _test_hooks.run = node
         endpoint = FakeQueue(
             [
                 held_answer(taskId=VERDICT_TASK),
@@ -63,8 +66,19 @@ class TestCollecting:
         assert line == (
             f"FLEET-CHECK {DEFAULT_JOB_ID[:8]} {DEMO_PROJECT} sha={DEFAULT_SHA} node=lavender "
             "exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% "
-            f"log=lavender:C:/fleet/stage/{DEMO_RUN_ID}/result.txt.log run={DEMO_RUN_ID}"
+            f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
         )
+        # Retired after the tail was read and before the verdict was posted:
+        # the fifth and sixth calls send the retire to the stage root and run it.
+        retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+        assert [retire_path in " ".join(call) for call in node.calls[:6]] == [
+            False,
+            False,
+            False,
+            False,
+            True,
+            True,
+        ]
         closed = endpoint.arguments[2]
         assert closed["action"] == "close"
         assert closed["status"] == "passed"
@@ -78,7 +92,14 @@ class TestCollecting:
     ) -> None:
         launch(sourced_config)
         _test_hooks.run = FakeRun(
-            [ok(""), ok("2 1757000060"), ok(""), ok("3 failed, 100 passed\n"), *PROBED]
+            [
+                ok(""),
+                ok("2 1757000060"),
+                ok(""),
+                ok("3 failed, 100 passed\n"),
+                *retire_replies(),
+                *PROBED,
+            ]
         )
         endpoint = FakeQueue(
             [

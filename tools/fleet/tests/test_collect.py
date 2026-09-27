@@ -36,6 +36,7 @@ from tests.conftest import (
     dispatch_replies,
     ok,
     prebuilt_archive,
+    retire_replies,
 )
 
 #: When the node says a demo build finished: inside its lease, which the demo
@@ -169,9 +170,10 @@ class TestOutcome:
     def test_the_detail_names_the_log_a_reader_would_open(self) -> None:
         detail = core_collect.describe(_node(), run_id=DEMO_RUN_ID, exit_code=2)
 
-        assert "lavender:C:/fleet/stage" in detail
-        assert DEMO_RUN_ID in detail
-        assert "result.txt.log" in detail
+        # The retained transcript, which outlives the run's directory.
+        assert detail == (
+            f"make check exited 2; log at lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log"
+        )
 
 
 class TestTheWiring:
@@ -186,13 +188,18 @@ class TestTheWiring:
         """
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        node = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
+        _test_hooks.run = node
 
         assert collect.main([_config.CONFIG_FLAG, str(config_path)]) == 0
 
         rows = records.read_ledger(loaded.ledger)
         assert [row["outcome"] for row in rows] == ["running", "passed"]
         assert rows[-1]["exit_code"] == 0
+        # The run's directory is retired, by a script sent to the stage root
+        # and run there, before the row closes.
+        retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+        assert [retire_path in " ".join(call) for call in node.calls] == [False, False, True, True]
         assert [event["kind"] for event in records.read_feed(loaded.feed)] == [
             "leased",
             "staged",
@@ -207,7 +214,7 @@ class TestTheWiring:
         next dispatch of it is refused for a run that already finished."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
 
         collect.main([_config.CONFIG_FLAG, str(config_path)])
 
@@ -220,7 +227,7 @@ class TestTheWiring:
         the first red build -- that is the moment somebody wants reporting."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"2 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"2 {DEMO_FINISHED}\n"), *retire_replies()])
 
         assert collect.main([_config.CONFIG_FLAG, str(config_path)]) == 0
 
@@ -255,7 +262,7 @@ class TestTheWiring:
         """What makes the shell loop safe to run every thirty seconds."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
         collect.main([_config.CONFIG_FLAG, str(config_path)])
 
         # No replies scripted: a second collection must reach no node at all.
@@ -313,7 +320,7 @@ class TestTheWiring:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
         _test_hooks.now = FakeClock(DEMO_NOW + 86_400)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
 
         assert collect.main([_config.CONFIG_FLAG, str(config_path)]) == 0
 
@@ -327,7 +334,7 @@ class TestTheWiring:
         """The boundary is inclusive: the lease was live for that second."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_NOW + 600}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_NOW + 600}\n"), *retire_replies()])
 
         assert collect.main([_config.CONFIG_FLAG, str(config_path)]) == 0
 
@@ -337,7 +344,7 @@ class TestTheWiring:
 class TestEntryPoints:
     def test_the_entrypoint_exits_zero(self, config_path: pathlib.Path, repo: pathlib.Path) -> None:
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
         saved = sys.argv
         sys.argv = ["fleet-collect", _config.CONFIG_FLAG, str(config_path)]
         try:
@@ -356,7 +363,7 @@ class TestEntryPoints:
         dispatch open while looking like a clean collection."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.collect", None)
         sys.argv = ["x", _config.CONFIG_FLAG, str(config_path)]
@@ -381,7 +388,7 @@ class TestLiveRows:
         dispatches that ended hours ago."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
         collect.main([_config.CONFIG_FLAG, str(config_path)])
 
         assert collect.live_rows(loaded, run_id=None) == ()
@@ -399,7 +406,7 @@ class TestLiveRows:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
         assert records.live_runs(loaded.ledger, node="lavender") == 1
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
 
         collect.main([_config.CONFIG_FLAG, str(config_path)])
 
@@ -412,7 +419,7 @@ class TestLiveRows:
         lease, so reading the raw ledger would call it wedged forever."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         _dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
         collect.main([_config.CONFIG_FLAG, str(config_path)])
 
         assert watch.lost_runs(loaded, now_unix=DEMO_NOW) == ()

@@ -33,7 +33,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
-from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeClock, FakeRun, ok
+from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeClock, FakeRun, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -109,7 +109,18 @@ class TestPastItsLease:
     ) -> None:
         launch(sourced_config)
         _test_hooks.now = FakeClock(PAST_THE_LEASE)
-        runner = FakeRun([ok(""), ok(""), ok(""), ok("stopped"), ok(""), ok(PASSING_TAIL), *PROBED])
+        runner = FakeRun(
+            [
+                ok(""),
+                ok(""),
+                ok(""),
+                ok("stopped"),
+                ok(""),
+                ok(PASSING_TAIL),
+                *retire_replies(),
+                *PROBED,
+            ]
+        )
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -172,7 +183,7 @@ class TestCancelledUnderIt:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        runner = FakeRun([ok(""), ok("stopped"), *PROBED])
+        runner = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -193,6 +204,14 @@ class TestCancelledUnderIt:
             "limit": queue.LISTING_PAGE_LIMIT,
         }
         assert runner.stdin[0] == _stop_body(sourced_config).encode("utf-8")
+        # Stopped first, then retired, before the row closed.
+        retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+        assert [retire_path in " ".join(call) for call in runner.calls[:4]] == [
+            False,
+            False,
+            True,
+            True,
+        ]
         last = _ledger(sourced_config)[-1]
         assert last["outcome"] == "cancelled"
         assert last["detail"] == (
@@ -205,7 +224,7 @@ class TestCancelledUnderIt:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *PROBED])
+        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
         older = queue_job(status="cancelled", node="lavender", runId="libs-demo-1756000000")
         endpoint = FakeQueue(
             [
@@ -228,7 +247,7 @@ class TestCancelledUnderIt:
         """A further page is not asked for when nothing is left to find,
         however long the runner's cancelled history is."""
         launch(sourced_config)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *PROBED])
+        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": []}),

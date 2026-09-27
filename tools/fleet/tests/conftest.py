@@ -281,6 +281,22 @@ def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
     ]
 
 
+def retire_replies() -> list[_test_hooks.CommandResult]:
+    """Every command a retire runs, in order (:mod:`fleet.core.retire`).
+
+    Named for the same reason :func:`dispatch_replies` is: every settle and
+    every stop now ends with these two calls, and a bare pair of ``ok("")``
+    at the end of a list does not say which step it answers.
+
+    Returns:
+        One result per call.
+    """
+    return [
+        ok(""),  # retire: send the script
+        ok(""),  # retire: run it
+    ]
+
+
 def workspace_document() -> JSONObject:
     """Build a one-node, one-project workspace as JSON.
 

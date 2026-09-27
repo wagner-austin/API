@@ -23,7 +23,17 @@ from fleet.cli import _config, cancel, run
 from fleet.contracts.feed import FeedKind
 from fleet.contracts.ledger import LedgerOutcome, decode_ledger_entry
 from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, run_lease, staging
+from fleet.core import (
+    _test_hooks,
+    dialect,
+    dispatch,
+    leases,
+    names,
+    records,
+    retire,
+    run_lease,
+    staging,
+)
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -35,6 +45,7 @@ from tests.conftest import (
     failed,
     ok,
     prebuilt_archive,
+    retire_replies,
 )
 
 
@@ -106,7 +117,10 @@ class TestRun:
         )
 
         assert code == 0
-        assert (loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz").is_file()
+        # Read back from there, then removed once the node had verified and
+        # unpacked it: one left per run filled the hub's temp directory (MCPs
+        # board task bfca20e6).
+        assert not (loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz").exists()
         # The invariant that matters: not inside the tree being staged, so it
         # cannot be picked up by the next dispatch of it.
         assert repo not in loaded.archives.parents
@@ -291,7 +305,7 @@ class TestCancel:
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         self._dispatch(config_path, repo)
-        runner = FakeRun([ok(""), ok("stopped")])
+        runner = FakeRun([ok(""), ok("stopped"), *retire_replies()])
         _test_hooks.run = runner
 
         assert (
@@ -303,6 +317,10 @@ class TestCancel:
             target=names.dispatch_directory(node["stage_root"], DEMO_RUN_ID), run_id=DEMO_RUN_ID
         )
         assert runner.stdin[0] == stop_body.encode("utf-8")
+        retire_body = retire.script_for(
+            node["platform"], stage_root=node["stage_root"], run_id=DEMO_RUN_ID
+        )
+        assert runner.stdin[2] == retire_body.encode("utf-8")
         rows = records.read_ledger(loaded.ledger)
         assert [row["outcome"] for row in rows] == ["running", "cancelled"]
         assert rows[-1]["detail"] == "cancelled by fleet-cancel; was dispatched by opus-fleet-0904"
@@ -320,7 +338,7 @@ class TestCancel:
     ) -> None:
         """The LAST row wins, because a closing row supersedes its running one."""
         self._dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped")])
+        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies()])
         cancel.main([_config.CONFIG_FLAG, str(config_path), cancel.RUN_FLAG, DEMO_RUN_ID])
 
         with pytest.raises(AppError) as excinfo:
@@ -342,7 +360,7 @@ class TestCancel:
         self._dispatch(config_path, repo)
         later = FakeClock(DEMO_NOW + 100_000)
         _test_hooks.now = later
-        _test_hooks.run = FakeRun([ok(""), ok("stopped")])
+        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies()])
 
         assert (
             cancel.main([_config.CONFIG_FLAG, str(config_path), cancel.RUN_FLAG, DEMO_RUN_ID]) == 0
@@ -449,7 +467,7 @@ class TestInvocationForms:
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         TestCancel()._dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped")])
+        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies()])
         saved = sys.argv
         sys.argv = [
             "fleet-cancel",
@@ -532,7 +550,7 @@ class TestInvocationForms:
         leaves a suite running that somebody believes they stopped."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         TestCancel()._dispatch(config_path, repo)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped")])
+        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies()])
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.cancel", None)
         sys.argv = ["x", _config.CONFIG_FLAG, str(config_path), cancel.RUN_FLAG, DEMO_RUN_ID]
