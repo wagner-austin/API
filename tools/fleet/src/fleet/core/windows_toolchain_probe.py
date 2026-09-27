@@ -41,7 +41,10 @@ from __future__ import annotations
 #: read from vswhere as its installationVersion and collected whole, for the
 #: same PowerShell 5.1 reason as pip. A node without vswhere, or whose vswhere
 #: finds no VC tools (sedona on 2026-09-27: the installer present, the
-#: component absent), reports ``cxx=no=``.
+#: component absent), reports ``cxx=no=``. ``docker`` is always ``no`` here:
+#: the capability is the execution suite's rootless daemon under its own
+#: Linux user (MCPs board task 6c4516af), which no Windows node carries,
+#: and Docker Desktop is exactly the kind of shared daemon it excludes.
 TOOLCHAIN_PROBE_SCRIPT = """\
 $python = Get-Command python -ErrorAction SilentlyContinue
 if ($python -and $python.Source -like '*\\Microsoft\\WindowsApps\\*') { $python = $null }
@@ -78,6 +81,7 @@ if ($vc.Count -gt 0 -and $vc[0]) {
 } else {
   "cxx=no="
 }
+"docker=no="
 """
 
 

@@ -80,6 +80,12 @@ CAPACITY_PROBE_SCRIPT = (
 #: 18.19.1 where the fleet runs 24, and diphtheria's 24.21.0 came from the
 #: NodeSource repository (both read from ``apt-cache policy nodejs`` there,
 #: 2026-09-23), so a Linux node's Node is installed by hand.
+#:
+#: THE ``docker`` LINE ASKS ONE DAEMON BY ITS SOCKET, never ``docker`` on the
+#: runner's PATH, which is the stack's daemon on diphtheria. It is the
+#: execdocker user's rootless daemon (MCPs board task 6c4516af), asked as
+#: that user with ``sudo -n``, so a node without the user, without sudo for
+#: it or whose daemon does not say ``name=rootless`` answers ``docker=no=``.
 TOOLCHAIN_PROBE_SCRIPT = (
     PROLOGUE + "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -99,6 +105,16 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "  printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n"
     "else\n"
     "  printf 'cxx=no=\\n'\n"
+    "fi\n"
+    "if id execdocker > /dev/null 2>&1; then\n"
+    '  d="$(sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
+    " info --format '{{.ServerVersion}} {{json .SecurityOptions}}' 2>/dev/null)\"\n"
+    '  case "$d" in\n'
+    "    *name=rootless*) printf 'docker=yes=%s\\n' \"${d%% *}\" ;;\n"
+    "    *) printf 'docker=no=\\n' ;;\n"
+    "  esac\n"
+    "else\n"
+    "  printf 'docker=no=\\n'\n"
     "fi\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"
