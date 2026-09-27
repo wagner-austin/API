@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import pathlib
 import runpy
+import subprocess
 import sys
 
 import pytest
@@ -105,7 +106,7 @@ class TestLaunch:
         commit = "0" * 40
         scratch = tmp_path / "scratch"
         _test_hooks.temp_root = FakeTempRoot(scratch)
-        destination = scratch / "fleet-rolled" / commit
+        destination = scratch / "fleet-rolled" / commit / f"pid-{os.getpid()}"
         for required in rolled.REQUIRED_FILES:
             path = destination / pathlib.PurePosixPath(required)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,6 +139,9 @@ class TestLaunch:
         assert [record.getMessage() for record in caplog.records] == [
             f"fleet-roll: fleet.cli.agent runs from refs/fleet/rolled at {commit}"
         ]
+        # This launch's extraction is gone once its agent has exited.
+        assert not destination.exists()
+        assert (scratch / "fleet-rolled" / commit).is_dir()
 
     def test_the_rolled_package_shadows_the_checkouts_for_real(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -145,7 +149,8 @@ class TestLaunch:
         api = tmp_path / "api"
         commit = committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-        config = tmp_path / "scratch" / "fleet-rolled" / commit / "tools" / "fleet" / "fleet.json"
+        launch = tmp_path / "scratch" / "fleet-rolled" / commit / f"pid-{os.getpid()}"
+        config = launch / "tools" / "fleet" / "fleet.json"
 
         with caplog.at_level("INFO"):
             status = rolled_cli.main(
@@ -159,6 +164,39 @@ class TestLaunch:
             "--node sedona",
             "stand-in stderr",
         ]
+        assert not launch.exists()
+
+    def test_ticks_launched_together_each_reach_their_agent(self, tmp_path: pathlib.Path) -> None:
+        """The 10:24Z collision, re-run: the hub starts five ticks in one second.
+
+        Each launch is a real process with its own id, as each tick is, so
+        each extracts into a directory of its own. Extracting into one per
+        commit, two of five ticks were refused FLEET_ROLL_EXTRACT_FAILED on
+        a file another tick's tar was writing.
+        """
+        api = tmp_path / "api"
+        committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
+        command = (
+            sys.executable,
+            "-m",
+            "fleet.cli.rolled",
+            "--repo-root",
+            str(api),
+            "--agent",
+            "fleet-node-agent",
+            "--",
+            "--node",
+            "sedona",
+        )
+        launches = [
+            subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for _ in range(6)
+        ]
+        outputs = [launch.communicate(timeout=120)[0] for launch in launches]
+        outcomes = list(zip([launch.returncode for launch in launches], outputs, strict=True))
+
+        assert [status for status, _ in outcomes] == [5] * 6, outcomes
+        assert all("rolled stand-in --config" in output for _, output in outcomes), outcomes
 
 
 class TestInvocationForms:

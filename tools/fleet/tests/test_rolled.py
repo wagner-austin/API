@@ -30,9 +30,9 @@ def destination_of(scratch: pathlib.Path) -> pathlib.Path:
         scratch: The pinned scratch root.
 
     Returns:
-        The per-commit directory.
+        This process's own directory under the commit's.
     """
-    return scratch / "fleet-rolled" / COMMIT
+    return scratch / "fleet-rolled" / COMMIT / f"pid-{os.getpid()}"
 
 
 def scripted_calls(api: pathlib.Path, scratch: pathlib.Path) -> list[tuple[str, ...]]:
@@ -112,6 +112,7 @@ class TestScriptedExtraction:
         destination = destination_of(scratch)
         assert tree == rolled.RolledTree(
             commit=COMMIT,
+            directory=str(destination),
             python_path=os.pathsep.join(
                 (
                     str(destination / "tools" / "fleet" / "src"),
@@ -217,7 +218,8 @@ class TestRealExtraction:
         if isinstance(tree, str):
             raise AssertionError(f"expected an extraction, got the refusal {tree!r}")
         assert tree["commit"] == commit
-        destination = scratch / "fleet-rolled" / commit
+        destination = scratch / "fleet-rolled" / commit / f"pid-{os.getpid()}"
+        assert tree["directory"] == str(destination)
         agent = destination / "tools/fleet/src/fleet/cli/agent.py"
         assert agent.read_text(encoding="utf-8") == "ROLLED = True\n"
         assert pathlib.Path(tree["config"]).read_text(encoding="utf-8") == '{"rolled": true}\n'
