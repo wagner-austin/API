@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check
+.PHONY: lint test check execution
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -30,3 +30,14 @@ test:
 
 check: lint | test
 	@echo "=== ALL CHECKS PASSED ==="
+
+# The host cases, run on a host of their platform (board task 465689f5).
+# ``make check`` skips them wherever the platform differs, and API's CI is
+# Linux, so this target is where the Windows cases execute: the fleet runs
+# it as tools/fleet-execution on a Windows node and tools/fleet-execution-
+# linux on a Linux one. It keeps only this platform's host cases and fails
+# with HOST_EXECUTION_INCOMPLETE when any is skipped or none ran. Coverage
+# is off because the subset is not the suite; ``make check`` holds the 100.
+execution:
+	poetry sync --with dev
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov
