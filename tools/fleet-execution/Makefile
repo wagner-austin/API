@@ -18,8 +18,12 @@ include ../../scripts/make/shell.mk
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py lint-makefiles
 
+# `make`, never $(MAKE): on serendipity $(MAKE) is
+# C:/Program Files (x86)/GnuWin32/bin/make, which PowerShell splits at the
+# spaces, and the first fleet run (6b3249c7) exited 2 on "The term 'x86' is
+# not recognized" before any case ran.
 test:
-	$(MAKE) -C ../fleet execution
+	make -C ../fleet execution
 
 check: lint test
 	@echo "=== ALL CHECKS PASSED ==="
