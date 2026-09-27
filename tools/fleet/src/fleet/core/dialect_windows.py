@@ -117,10 +117,13 @@ $drive = Get-PSDrive C
 #: The real Store build lives under the same directory and is refused too,
 #: deliberately: it sandboxes ``%LOCALAPPDATA%`` writes and broke poetry's
 #: venv on sedona (:mod:`fleet.contracts.toolchain`).
+#:
+#: ``cargo`` is asked though no build requires it: its answer is compared
+#: with the node's ``rust`` declaration (:mod:`fleet.contracts.rust`).
 TOOLCHAIN_PROBE_SCRIPT = """\
 $python = Get-Command python -ErrorAction SilentlyContinue
 if ($python -and $python.Source -like '*\\Microsoft\\WindowsApps\\*') { $python = $null }
-foreach ($tool in @('python','poetry','git','make','node','tar','winget','choco')) {
+foreach ($tool in @('python','poetry','git','make','node','tar','cargo','winget','choco')) {
   $found = $python
   if ($tool -ne 'python') { $found = Get-Command $tool -ErrorAction SilentlyContinue }
   if ($found) {

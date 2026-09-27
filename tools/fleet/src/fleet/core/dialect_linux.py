@@ -45,7 +45,11 @@ SH_INVOCATION = ("/bin/sh",)
 WRITE_COMMAND = "mkdir -p \"$(dirname '{path}')\" && cat > '{path}'"
 
 #: The first lines of every script: fail fast, and find the user's tools.
-PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$PATH"\nexport PATH\n'
+#: ``~/.cargo/bin`` is where rustup puts cargo at user scope, and it is added
+#: for the same reason as ``~/.local/bin``: the probe that measures a node's
+#: ``rust`` declaration and the build that compiles a crate must find the
+#: one cargo the operator installed (MCPs board task 1e2da299).
+PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\nexport PATH\n'
 
 #: The capacity probe, verbatim. Nothing is substituted into it.
 #:
@@ -90,6 +94,7 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "report make make\n"
     "report node node\n"
     "report tar tar\n"
+    "report cargo cargo\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"
 )
