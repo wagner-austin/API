@@ -122,6 +122,21 @@ class TestLoadWorkspace:
         assert loaded.feed == config_path.parent / "feed.jsonl"
         assert loaded.leases == config_path.parent / "leases.json"
 
+    def test_a_records_directory_moves_the_records_and_not_the_document(
+        self, config_path: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """How a rolled tick reads the extracted registry against the checkout's records."""
+        records = tmp_path / "checkout" / "tools" / "fleet"
+        loaded = _config.load_workspace(
+            {_config.CONFIG_FLAG: str(config_path), _config.RECORDS_FLAG: str(records)}
+        )
+
+        assert loaded.directory == records.resolve()
+        assert loaded.ledger == records.resolve() / "ledger.jsonl"
+        assert loaded.feed == records.resolve() / "feed.jsonl"
+        assert loaded.leases == records.resolve() / "leases.json"
+        assert loaded.workspace["ledger"] == "ledger.jsonl"
+
     def test_the_config_flag_is_required(self) -> None:
         with pytest.raises(ValueError, match="--config"):
             _config.load_workspace({})

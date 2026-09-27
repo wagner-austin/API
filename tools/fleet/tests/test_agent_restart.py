@@ -16,7 +16,7 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, restart
-from fleet.core.published_tree import TREE_STEP_TIMEOUT_SECONDS
+from fleet.core.commit_tree import TREE_STEP_TIMEOUT_SECONDS
 from tests._published_tree_fixtures import (
     COMMIT,
     extraction_calls,

@@ -15,7 +15,7 @@ import pathlib
 import sys
 from typing import Final
 
-from fleet.core import _test_hooks, published_tree
+from fleet.core import _test_hooks, commit_tree, published_tree
 from fleet.core.published_tree import PublishedTree
 from tests.conftest import FakeTempRoot, ok
 
@@ -97,7 +97,7 @@ def extraction_calls(mcps: pathlib.Path, scratch: pathlib.Path) -> list[tuple[st
         generator, as argv tuples.
     """
     destination = extraction_dir(scratch)
-    tarball = destination / published_tree.TARBALL_NAME
+    tarball = destination / commit_tree.TARBALL_NAME
     return [
         ("git", "-C", str(mcps), "rev-parse", "--verify", "refs/remotes/origin/main^{commit}"),
         (

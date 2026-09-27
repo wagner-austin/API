@@ -14,7 +14,8 @@ import pathlib
 
 import pytest
 
-from fleet.core import _test_hooks, published_tree
+from fleet.core import _test_hooks, commit_tree, published_tree
+from tests._git_fixtures import committed_repository, git
 from tests._published_tree_fixtures import (
     COMMIT,
     extraction_calls,
@@ -53,7 +54,7 @@ class TestScriptedExtraction:
 
         assert published_tree.extract_published_tree(mcps) == tree
         assert runner.calls == extraction_calls(mcps, scratch)
-        assert runner.timeouts == [published_tree.TREE_STEP_TIMEOUT_SECONDS] * 4 == [120] * 4
+        assert runner.timeouts == [commit_tree.TREE_STEP_TIMEOUT_SECONDS] * 4 == [120] * 4
         # Nothing about the extraction touches the environment: only the
         # verb that runs afterwards is given PYTHONPATH.
         assert runner.unset_env == [(), (), (), ()]
@@ -144,35 +145,6 @@ COMMITTED: dict[str, str] = {
 }
 
 
-def git(repo: pathlib.Path, *arguments: str) -> str:
-    """Run one real git command in the repository and return its stdout.
-
-    Args:
-        repo: The repository.
-        arguments: The git arguments.
-
-    Returns:
-        Its standard output, stripped.
-    """
-    result = _test_hooks.run(
-        (
-            "git",
-            "-C",
-            str(repo),
-            "-c",
-            "user.name=fleet-test",
-            "-c",
-            "user.email=fleet-test@example.invalid",
-            "-c",
-            "core.autocrlf=false",
-            *arguments,
-        ),
-        timeout_seconds=60,
-    )
-    assert result["returncode"] == 0, result["stderr"]
-    return result["stdout"].strip()
-
-
 def published_repository(repo: pathlib.Path) -> str:
     """Commit :data:`COMMITTED`, point ``origin/main`` at it, then dirty the tree.
 
@@ -182,16 +154,7 @@ def published_repository(repo: pathlib.Path) -> str:
     Returns:
         The commit ``refs/remotes/origin/main`` names.
     """
-    repo.mkdir()
-    git(repo, "init", "--quiet")
-    for relative, body in COMMITTED.items():
-        path = repo / pathlib.PurePosixPath(relative)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(body, encoding="utf-8")
-    git(repo, "add", "--all")
-    git(repo, "commit", "--quiet", "-m", "published")
-    commit = git(repo, "rev-parse", "HEAD")
-    git(repo, "update-ref", "refs/remotes/origin/main", commit)
+    commit = committed_repository(repo, COMMITTED, "refs/remotes/origin/main")
     # The working tree moves on without publishing: an uncommitted edit that
     # the verb must never see.
     (repo / "packages/session-audit/src/session_audit/cli.py").write_text(
