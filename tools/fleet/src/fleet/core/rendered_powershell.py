@@ -74,6 +74,7 @@ def _dialect_scripts() -> list[RenderedScript]:
     companion = names.companion_directory(EXAMPLE_STAGE_ROOT, "MCPs")
     return [
         RenderedScript(name="dialect-capacity-probe", text=spoken.capacity_probe_script()),
+        RenderedScript(name="dialect-toolchain-probe", text=spoken.toolchain_probe_script()),
         RenderedScript(name="dialect-observe-sessions", text=spoken.observe_sessions_script()),
         RenderedScript(name="dialect-make-directory", text=spoken.make_directory_script(target)),
         RenderedScript(

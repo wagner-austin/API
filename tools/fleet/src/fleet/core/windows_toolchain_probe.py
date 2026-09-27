@@ -4,11 +4,23 @@ Split out of :mod:`fleet.core.dialect_windows` when the ``cxx`` line took
 that module past the 600-line ceiling (MCPs board task 3f19c136). It is one
 constant with its own history, and the dialect hands it out unchanged
 through :meth:`fleet.core.dialect_windows.WindowsDialect.toolchain_probe_script`.
+It is committed as a render under ``rendered/`` and executed by
+``tests/pester/rendered-dialect-toolchain.Tests.ps1`` with stand-in tools on
+a PATH the suite lays out (MCPs board task d69786fa).
 """
 
 from __future__ import annotations
 
 #: The toolchain probe, verbatim.
+#:
+#: UNDER THE STRICT HEADER, SO NOTHING IS ASKED WITH ``SilentlyContinue``. A
+#: tool is found by walking ``PATH`` and ``PATHEXT`` as cmd.exe resolves a
+#: name, which answers '' for an absent tool where ``Get-Command`` would
+#: throw, and every tool is run through cmd.exe with cmd's own ``2>&1``: a
+#: native's stderr redirected by PowerShell 5.1 is an error record, which
+#: ``Stop`` would end the probe on. ``cmd.exe`` and ``vswhere.exe`` are
+#: parameters whose defaults are plain strings, so the suite passes a
+#: stand-in vswhere.
 #:
 #: ``--version`` is asked of each tool and the first line kept, because git
 #: and poetry both print several. A tool that is present but declines to
@@ -16,13 +28,13 @@ from __future__ import annotations
 #: are different states, and only the first stops a dispatch.
 #:
 #: ``pip`` is the one manager that is not an executable on PATH but a module
-#: of the interpreter, so it is asked as ``python -m pip --version`` behind the
-#: same ``$python`` the tool loop reported: without the guard a node with no Python
-#: would print a CommandNotFound error where a line was expected. Its output
-#: is collected whole and the first line taken afterwards, NOT piped through
-#: ``Select-Object -First 1`` like the others: that stops the pipeline early,
-#: PowerShell 5.1 then reports the native process as exit -1, and a present
-#: pip read as absent (measured on the hub 2026-09-20).
+#: of the interpreter, so it is asked as ``python -m pip --version`` of the
+#: same interpreter the tool loop reported, and only when there is one. Its
+#: exit decides it: a python whose pip is missing exits non-zero and reads
+#: absent. The output is collected whole and the first line taken afterwards,
+#: never by stopping the pipeline early: under PowerShell 5.1 that reported
+#: the native process as exit -1, and a present pip read as absent (measured
+#: on the hub 2026-09-20).
 #:
 #: A ``python`` that resolves under ``Microsoft\\WindowsApps`` is reported
 #: ABSENT. On a node whose PATH has no real interpreter ahead of it, that is
@@ -45,43 +57,66 @@ from __future__ import annotations
 #: the capability is the execution suite's rootless daemon under its own
 #: Linux user (MCPs board task 6c4516af), which no Windows node carries,
 #: and Docker Desktop is exactly the kind of shared daemon it excludes.
-TOOLCHAIN_PROBE_SCRIPT = """\
-$python = Get-Command python -ErrorAction SilentlyContinue
-if ($python -and $python.Source -like '*\\Microsoft\\WindowsApps\\*') { $python = $null }
-foreach ($tool in @('python','poetry','git','make','node','tar','cargo','winget','choco')) {
-  $found = $python
-  if ($tool -ne 'python') { $found = Get-Command $tool -ErrorAction SilentlyContinue }
-  if ($found) {
-    $raw = (& $tool --version 2>&1 | Select-Object -First 1)
-    $text = ($raw | Out-String).Trim() -replace '[\\r\\n]', ' '
-    "$tool=yes=$text"
-  } else {
-    "$tool=no="
-  }
+TOOLCHAIN_PROBE_SCRIPT = r"""param(
+    [string]$Cmd = "$env:SystemRoot\System32\cmd.exe",
+    [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+function Find-Tool {
+    param([string]$Name)
+    foreach ($directory in @($env:PATH -split ';' | Where-Object { $_ -ne '' })) {
+        foreach ($extension in @($env:PATHEXT -split ';' | Where-Object { $_ -ne '' })) {
+            $candidate = [System.IO.Path]::Combine($directory.Trim('"'), "$Name$extension")
+            if ([System.IO.File]::Exists($candidate)) {
+                return $candidate
+            }
+        }
+    }
+    return ''
 }
-if ($python) {
-  $lines = @(& python -m pip --version 2>&1)
-  if ($LASTEXITCODE -eq 0) {
-    "pip=yes=" + (($lines[0] | Out-String).Trim() -replace '[\\r\\n]', ' ')
-  } else {
-    "pip=no="
-  }
+function Invoke-Answer {
+    param([string]$Shell, [string]$Path, [string]$Arguments)
+    $lines = & $Shell /d /s /c "`"$Path`" $Arguments 2>&1"
+    $succeeded = $LASTEXITCODE -eq 0
+    $first = [string](@(@($lines) + '') | Select-Object -First 1)
+    return [pscustomobject]@{ Succeeded = $succeeded; First = $first.Trim() }
+}
+$python = Find-Tool 'python'
+if ($python -like '*\Microsoft\WindowsApps\*') {
+    $python = ''
+}
+foreach ($tool in @('python', 'poetry', 'git', 'make', 'node', 'tar', 'cargo', 'winget', 'choco')) {
+    $found = $python
+    if ($tool -ne 'python') {
+        $found = Find-Tool $tool
+    }
+    if ($found -ne '') {
+        "$tool=yes=" + (Invoke-Answer $Cmd $found '--version').First
+    } else {
+        "$tool=no="
+    }
+}
+$pip = 'pip=no='
+if ($python -ne '') {
+    $answer = Invoke-Answer $Cmd $python '-m pip --version'
+    if ($answer.Succeeded) {
+        $pip = "pip=yes=$($answer.First)"
+    }
+}
+$pip
+$query = '-products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ' +
+    '-property installationVersion'
+$vc = ''
+if ([System.IO.File]::Exists($VsWhere)) {
+    $vc = (Invoke-Answer $Cmd $VsWhere $query).First
+}
+if ($vc -ne '') {
+    "cxx=yes=$vc"
 } else {
-  "pip=no="
+    'cxx=no='
 }
-$installer = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio'
-$vswhere = Join-Path $installer 'Installer\\vswhere.exe'
-$vcTools = 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
-$vc = @()
-if (Test-Path -LiteralPath $vswhere) {
-  $vc = @(& $vswhere -products * -requires $vcTools -property installationVersion)
-}
-if ($vc.Count -gt 0 -and $vc[0]) {
-  "cxx=yes=" + (($vc[0] | Out-String).Trim())
-} else {
-  "cxx=no="
-}
-"docker=no="
+'docker=no='
 """
 
 
