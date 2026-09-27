@@ -1321,6 +1321,22 @@ name appeared nowhere here — was mine, and another session bridged it.
     counts benchmark manifests, and a code change to an existing file moves
     no file count. That is the marker's stated boundary, not a defect in it,
     and this bullet is the case that shows the boundary is real.
+  - **Four result files under `services/covenant-radar-api/models/` came
+    from launchers that no longer exist, and carry no fingerprint at all.**
+    `grid_search/grid_search_results.jsonl` (864 records),
+    `grid_search_full/grid_search_full_results.jsonl` and
+    `grid_search_full/results_taiwan.jsonl` (327 each) and
+    `benchmark/benchmark_results.jsonl` (6 lines), all last written
+    2025-12-16, were produced by `scripts/benchmark_grid_search.ps1`,
+    `scripts/benchmark_grid_search_full.ps1` and
+    `scripts/benchmark_external.ps1`. Each piped inline Python to
+    `poetry run python -`, so the code that made the numbers lived in a
+    PowerShell string no test or guard read. They were never an entry point
+    of this project, and were deleted on 2026-09-27 (MCPs board task
+    `d69786fa`); their last version is commit `bdd5efa8c`. The rows predate
+    the `RunFingerprint` and record neither host nor package versions, so
+    they are not comparable with anything this entry's other surfaces
+    produce.
 - **Power:** audited 2026-09-09, board `1e4ab572`. The benchmark family's
   verdicts are stated as per-seed WIN COUNTS over five seeds, which is a sign
   test whose best attainable two-sided p is 0.0625 — **no outcome rejects at
