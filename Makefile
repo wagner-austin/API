@@ -4,12 +4,22 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
+.PHONY: commit-tasks infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
 
 # ---------------------------------------------------------------------------
 # Infrastructure
 # ---------------------------------------------------------------------------
-infra:
+# A DEPLOY SHIPS A COMMIT THAT NAMES ITS TASK (MCPs board task 691b0067,
+# b6eb30c8's R8). Every up-* target runs infra first, and what it builds is
+# HEAD's, so HEAD's message must name a board task it serves ('board task
+# <id>'), asked of the board by MCPs' maketools as MCPs' origin/main
+# carries it (.githooks/published-maketools.sh), with the MCPs checkout
+# beside this one supplying the board's credentials and address. It reads
+# no variable, and a board that cannot be asked stops the deploy.
+commit-tasks:
+	sh .githooks/published-maketools.sh commit-tasks ../MCPs . HEAD^!
+
+infra: commit-tasks
 	docker compose up -d
 
 # ---------------------------------------------------------------------------
