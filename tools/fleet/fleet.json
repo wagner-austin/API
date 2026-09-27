@@ -93,7 +93,7 @@
       "test_database": true,
       "rust": "1.98.1",
       "cxx": "13.3.0",
-      "docker": null
+      "docker": "29.8.1"
     },
     "serendipity": {
       "host": "serendipity",
