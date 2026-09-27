@@ -28,13 +28,13 @@ BeforeAll {
     }
 
     # A healthy host or a sick one: every probe answers, or every probe fails.
-    # A healthy host can differ in one answer: the disk df reports, the
-    # account a service runs as, the machine variable's value, git's
-    # core.longpaths.
+    # A healthy host can differ in one answer: the disk df reports, what du
+    # reports for every cache directory, the account a service runs as, the
+    # machine variable's value, git's core.longpaths.
     function Initialize-Host {
         param(
             [string]$Name, [switch]$Sick,
-            [string]$Used = '40G', [string]$StartName = 'LocalSystem', [string]$Held = '', [string]$GitAnswer = 'true'
+            [string]$Used = '40G', [string]$Cached = '4G', [string]$StartName = 'LocalSystem', [string]$Held = '', [string]$GitAnswer = 'true'
         )
         $registry = 'HKCU:\Software\fleet-test-' + [guid]::NewGuid().ToString('N')
         foreach ($key in 'Policy', 'FileSystem', 'Environment') {
@@ -55,6 +55,7 @@ BeforeAll {
             $wsl = Initialize-Batch 'wsl' @(
                 'echo %* | findstr /c:"free -m" >nul', 'if not errorlevel 1 goto free',
                 'echo %* | findstr /c:"df -BG" >nul', 'if not errorlevel 1 goto df',
+                'echo %* | findstr /c:"du -s -BG" >nul', 'if not errorlevel 1 goto du',
                 'echo %* | findstr /c:"nvidia-smi" >nul', 'if not errorlevel 1 goto gpu',
                 'echo %* | findstr /c:"is-enabled" >nul', 'if not errorlevel 1 goto enabled',
                 'echo %* | findstr /c:"is-active" >nul', 'if not errorlevel 1 goto active',
@@ -62,6 +63,7 @@ BeforeAll {
                 'exit /b 0',
                 ':free', 'echo               total        used', 'echo Mem:          64000        2000', 'exit /b 0',
                 ':df', 'echo  Used', "echo  $Used", 'exit /b 0',
+                ':du', "echo $Cached /the/directory", 'exit /b 0',
                 ':gpu', 'echo NVIDIA GeForce RTX 4090 Laptop GPU', 'exit /b 0',
                 ':enabled', 'echo enabled', 'exit /b 0',
                 ':active', 'echo active', 'exit /b 0',
@@ -127,6 +129,8 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         @($sick.Asked | Where-Object { $_ -like 'service *' }) | Should -Be $services
         @($sick.Asked | Where-Object { $_ -like 'workdir *' }).Count | Should -Be $services.Count
         @($said | Where-Object { $_ -like 'CHECK disk:* DRIFT the distro root uses -1 GB*There is no distribution with the supplied name. (exit 1)' }).Count | Should -Be 1
+        @($said | Where-Object { $_ -like 'CHECK cache:* DRIFT /* holds -1 GB against a ceiling of *There is no distribution with the supplied name. (exit 1)' }).Count |
+            Should -Be @($script:ids | Where-Object { $_ -like 'cache:*' }).Count
     }
     It 'asks each WSL runner''s own PATH for the GPU' {
         $healthy = Initialize-Host $script:name
@@ -139,6 +143,7 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
     }
     It 'drifts exactly the one row whose answer is <Case>' -ForEach @(
         @{ Case = 'a disk one GB past its ceiling'; Variant = @{ Used = '151G' }; Row = 'disk:*'; Detail = 'the distro root uses 151 GB against a ceiling of 150 GB*' }
+        @{ Case = 'a cache past every ceiling'; Variant = @{ Cached = '61G' }; Row = 'cache:*'; Detail = '/* holds 61 GB against a ceiling of *GB; du said: 61G /the/directory (exit 0)' }
         @{ Case = 'a service running as another account'; Variant = @{ StartName = 'NT AUTHORITY\NetworkService' }; Row = 'account:windows:*'
             Detail = 'Win32_Service StartName: NT AUTHORITY\NetworkService' }
         @{ Case = 'a machine variable differing only in case'; Variant = @{ Held = 'C:\FLEET\POETRY' }; Row = 'machine-env:*'
@@ -156,6 +161,13 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
     It 'holds a disk at its ceiling to it' {
         $full = Initialize-Host $script:name -Used '150G'
         @(Invoke-Rendered $script:name $full.Parameters | Where-Object { $_ -like 'CHECK disk:* OK' }).Count | Should -Be 1
+    }
+    It 'holds each cache directory at its ceiling to it, and asks du for every one' {
+        $full = Initialize-Host $script:name -Cached '15G'
+        $cache = @($script:ids | Where-Object { $_ -like 'cache:*' })
+        @(Invoke-Rendered $script:name $full.Parameters | Where-Object { $_ -like 'CHECK cache:* OK' }).Count | Should -Be $cache.Count
+        @(Read-CallRecord $full.Wsl | Where-Object { $_ -like '*du -s -BG*' } | ForEach-Object { ($_ -split "'")[1] }) |
+            Should -Be @($cache | ForEach-Object { $_.Substring(6, $_.LastIndexOf(':') - 6) })
     }
     It 'reads Windows services and workdirs through its own defaults, still one row each' {
         $sick = Initialize-Host $script:name -Sick
