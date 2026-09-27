@@ -70,7 +70,9 @@ class TestRendered:
 
     def test_no_variables_render_no_lines_and_no_rows(self) -> None:
         spec = _host([])
-        assert runner_machine_env.render_machine_environment_lines(spec) == []
+        assert runner_machine_env.render_machine_environment_parameters(spec)[1] == (
+            "    [string[]]$MachineVariables = @(),"
+        )
         assert runner_machine_env.render_machine_environment_check_lines(spec) == []
         assert [check["check_id"] for check in runner_audit.expected_checks(spec)] == [
             "disk:/:ceiling-150gb:baseline-46gb@2026-09-26",
@@ -86,23 +88,31 @@ class TestRendered:
             runner_audit.ExpectedCheck(check_id="machine-env:PIP_CACHE_DIR", reason="also"),
         ]
 
-    def test_the_base_writes_the_environment_key_and_asks_for_a_reboot(self) -> None:
-        assert runner_machine_env.render_machine_environment_lines(_host([_POETRY])) == [
-            "$EnvironmentKey = "
-            "'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'",
-            "if ((Get-ItemProperty -LiteralPath $EnvironmentKey).'POETRY_CACHE_DIR' "
-            "-cne 'C:\\fleet\\poetry') {",
-            "    Set-ItemProperty -LiteralPath $EnvironmentKey -Name 'POETRY_CACHE_DIR' "
-            "-Value 'C:\\fleet\\poetry'",
-            "    $Reboot = $true",
-            "    Write-Output 'set the machine variable POETRY_CACHE_DIR to C:\\fleet\\poetry'",
-            "}",
+    def test_the_base_takes_the_key_and_the_variables_as_parameters(self) -> None:
+        """The Pester suite over the committed base render passes a scratch
+        HKCU key and reads each variable back from it."""
+        other = MachineVariable(name="PIP_CACHE_DIR", value="C:\\fleet\\pip", reason="also")
+        assert runner_machine_env.render_machine_environment_parameters(
+            _host([_POETRY, other])
+        ) == [
+            "    [string]$EnvironmentKey = "
+            "'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment',",
+            "    [string[]]$MachineVariables = @('POETRY_CACHE_DIR=C:\\fleet\\poetry', "
+            "'PIP_CACHE_DIR=C:\\fleet\\pip'),",
         ]
+
+    def test_a_changed_variable_is_written_and_asks_for_a_reboot(self) -> None:
+        lines = runner_machine_env.render_machine_environment_lines()
+
+        assert "    $name, $value = $pair -split '=', 2" in lines
+        write = "        Set-ItemProperty -LiteralPath $EnvironmentKey -Name $name -Value $value"
+        assert write in lines
+        assert "        $Reboot = $true" in lines
 
     def test_a_value_the_script_cannot_carry_is_refused(self) -> None:
         bad = MachineVariable(name="X", value="C:\\it's", reason="why")
         with pytest.raises(ValueError) as refused:
-            runner_machine_env.render_machine_environment_lines(_host([bad]))
+            runner_machine_env.render_machine_environment_parameters(_host([bad]))
         assert str(refused.value) == (
             'machine variable X "C:\\\\it\'s" contains "\'", which cannot be embedded in a '
             "rendered script verbatim; rename the item rather than escaping it"

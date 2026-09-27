@@ -79,14 +79,25 @@ class TestTheCommittedCopies:
             "dialect-init-repository",
             "dialect-companion-repository",
             "dialect-build",
-            *(f"rebuild-terminate-{host['name']}" for host in roster["hosts"]),
+            *(
+                name
+                for host in roster["hosts"]
+                for name in (
+                    f"rebuild-terminate-{host['name']}",
+                    f"base-windows-{host['name']}",
+                    f"base-import-{host['name']}",
+                )
+            ),
         ]
 
 
 class TestTheRegistry:
     def test_two_scripts_sharing_a_file_name_are_refused(self) -> None:
         host = _roster()["hosts"][0]
-        shared = f"share a file name: rebuild-terminate-{host['name']}"
+        shared = (
+            f"share a file name: base-import-{host['name']}, base-windows-{host['name']}, "
+            f"rebuild-terminate-{host['name']}"
+        )
         with pytest.raises(ValueError, match=shared):
             rendered_powershell.render_all(RunnerSpec(hosts=[host, host]))
 
