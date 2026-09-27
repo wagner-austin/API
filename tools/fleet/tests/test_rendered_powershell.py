@@ -65,6 +65,7 @@ class TestTheCommittedCopies:
         assert names == [
             "rebuild-boot-instant",
             "rebuild-restart",
+            "load-forest",
             "dialect-capacity-probe",
             "dialect-toolchain-probe",
             "dialect-observe-sessions",
