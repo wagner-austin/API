@@ -296,14 +296,14 @@ class TestTransportShape:
         'LiteralPath'") and its ``-Path`` reads brackets as wildcards, so
         the only spelling that is both valid and literal is this one."""
         made = DIALECT.make_directory_script("C:/s/run-[1]")
-        rebuilt = DIALECT.reassemble_script("C:/s/run-1")
+        digested = DIALECT.digest_script("C:/s/run-1")
 
         assert "[IO.Directory]::CreateDirectory('C:/s/run-[1]')" in made
         assert "New-Item" not in made
-        assert f"C:/s/run-1/{names.ENCODED_NAME}" in rebuilt
-        assert f"C:/s/run-1/{names.ARCHIVE_NAME}" in rebuilt
-        assert "Get-FileHash -Algorithm SHA256" in rebuilt
-        assert "tar" not in rebuilt
+        assert digested == (
+            f"(Get-FileHash -Algorithm SHA256 -LiteralPath "
+            f"'C:/s/run-1/{names.ARCHIVE_NAME}').Hash.ToLower()\n"
+        )
 
     def test_echo_is_write_output_of_a_quoted_literal(self) -> None:
         assert DIALECT.echo_command("installing make") == "Write-Output 'installing make'"

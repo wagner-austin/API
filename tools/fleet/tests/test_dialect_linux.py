@@ -12,7 +12,6 @@ under ``sh``, which is every Linux node and never the Windows hub.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import pathlib
 import socket
@@ -98,7 +97,7 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
     non-interactive ssh command does not read the profile that adds it."""
     scripts = [
         DIALECT.make_directory_script(TARGET),
-        DIALECT.reassemble_script(TARGET),
+        DIALECT.digest_script(TARGET),
         _build(workers=4),
         DIALECT.log_tail_script(TARGET, 200),
         DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID),
@@ -272,13 +271,10 @@ class TestTransportShape:
     def test_the_directory_script_is_mkdir_p(self) -> None:
         assert DIALECT.make_directory_script("/s/run-1").endswith("mkdir -p '/s/run-1'\n")
 
-    def test_the_reassembly_decodes_digests_and_does_not_extract(self) -> None:
-        body = DIALECT.reassemble_script(TARGET)
+    def test_the_digest_script_digests_the_landed_archive_and_does_not_extract(self) -> None:
+        body = DIALECT.digest_script(TARGET)
 
-        encoded = f"{TARGET}/{names.ENCODED_NAME}"
-        assert f"base64 -d '{encoded}' > '{TARGET}/{names.ARCHIVE_NAME}'" in body
-        assert f"sha256sum '{TARGET}/{names.ARCHIVE_NAME}' | cut -d ' ' -f 1" in body
-        assert "tar" not in body
+        assert body == (f"{PROLOGUE}sha256sum '{TARGET}/{names.ARCHIVE_NAME}' | cut -d ' ' -f 1\n")
 
     def test_echo_is_printf_of_a_quoted_literal(self) -> None:
         assert DIALECT.echo_command("installing make") == "printf '%s\\n' 'installing make'"
@@ -421,17 +417,17 @@ class TestForRealUnderSh:
         for value in fields.values():
             assert value.startswith(("yes=", "no="))
 
-    def test_the_reassembly_reproduces_the_bytes_and_their_digest(
+    def test_the_digest_script_prints_the_landed_bytes_digest_and_leaves_them(
         self, tmp_path: pathlib.Path
     ) -> None:
         payload = b"\x1f\x8b" + bytes(range(256)) * 3
         target = tmp_path / "run-1"
         target.mkdir()
-        (target / names.ENCODED_NAME).write_text(base64.b64encode(payload).decode("ascii"))
+        (target / names.ARCHIVE_NAME).write_bytes(payload)
 
-        output = self.run_script(tmp_path, DIALECT.reassemble_script(str(target)))
+        output = self.run_script(tmp_path, DIALECT.digest_script(str(target)))
 
-        assert output.strip() == hashlib.sha256(payload).hexdigest()
+        assert output == f"{hashlib.sha256(payload).hexdigest()}\n"
         assert (target / names.ARCHIVE_NAME).read_bytes() == payload
 
     def test_the_observe_script_reports_the_records_under_the_home(

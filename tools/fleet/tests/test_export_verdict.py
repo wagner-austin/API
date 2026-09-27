@@ -391,7 +391,14 @@ class TestExportingCompanions:
             (ProjectCompanion(remote=REMOTE, ref="main", directory="MCPs"),),
         )
 
-        assert exported == (export.CompanionExport(directory="MCPs", sha=SHA, data=payload),)
+        assert exported == (
+            export.CompanionExport(
+                directory="MCPs",
+                sha=SHA,
+                path=archives / f"companion-wagner-austin-MCPs-{SHA}.tgz",
+                data=payload,
+            ),
+        )
         assert runner.calls[0][:2] == ("git", "init")
         assert runner.calls[1][3] == "fetch"
         assert runner.calls[2][3] == "rev-parse"

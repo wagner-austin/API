@@ -12,7 +12,6 @@ module that renders them.
 
 from __future__ import annotations
 
-import base64
 import pathlib
 
 import pytest
@@ -26,12 +25,32 @@ from fleet.core import (
     dialect_windows,
     manifest,
     names,
+    remote,
     staging,
 )
-from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
+from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok
 
 #: The commit a staged companion is the export of, in these tests.
 COMPANION_SHA = "9f1c0b7a2d3e4f5061728394a5b6c7d8e9f01234"
+
+#: The local archive file scp is handed, in these tests. Only its name
+#: reaches a message and only its path reaches the argv, so it need not exist
+#: under a faked runner.
+SOURCE = pathlib.Path("/hub/fleet-archives/demo-run.tgz")
+
+
+def _scp(host: str, remote_path: str) -> tuple[str, ...]:
+    """The argv staging hands scp for the archive.
+
+    Args:
+        host: SSH destination.
+        remote_path: Where the archive lands on the node.
+
+    Returns:
+        The argv :func:`fleet.core.remote.send_file` runs.
+    """
+    return ("scp", "-q", *remote.SSH_OPTIONS, str(SOURCE), f"{host}:{remote_path}")
+
 
 #: The deadline for the real tar calls these tests make over a tiny tree:
 #: no listing here comes near it, so a result is about the archive and
@@ -170,12 +189,6 @@ class TestArchive:
     def test_the_digest_is_a_full_length_sha256(self) -> None:
         assert len(staging.digest(b"payload")) == 64
 
-    def test_encoding_round_trips_through_base64(self) -> None:
-        """Base64 because raw bytes do not survive ssh into PowerShell."""
-        payload = bytes(range(256))
-
-        assert base64.b64decode(staging.encode(payload)) == payload
-
 
 class TestStage:
     def test_a_verified_archive_is_unpacked(self) -> None:
@@ -184,9 +197,9 @@ class TestStage:
             [
                 ok(""),  # send mkdir script
                 ok(""),  # run mkdir
-                ok(""),  # send the base64
-                ok(""),  # send reassemble script
-                ok(staging.digest(payload)),  # run reassemble -> digest
+                ok(""),  # scp the archive
+                ok(""),  # send digest script
+                ok(staging.digest(payload)),  # run digest
                 ok(""),  # send extract script
                 ok(""),  # run extract
                 ok(""),  # send the git-init script
@@ -200,6 +213,7 @@ class TestStage:
             platform=NodePlatform.WINDOWS,
             run_id=DEMO_RUN_ID,
             stage_root="C:/fleet/stage",
+            source=SOURCE,
             payload=payload,
         )
 
@@ -208,19 +222,26 @@ class TestStage:
         # Every script went out under the Windows dialect's name and runner.
         assert runner.calls[0][-1].endswith(f"mkdir-{DEMO_RUN_ID}.ps1' -Encoding utf8\"")
         assert runner.calls[1][-6:-1] == dialect_windows.POWERSHELL_INVOCATION
+        # The archive crosses as bytes over scp, with no stdin to re-encode,
+        # and lands under the name the digest and extract scripts read.
+        assert runner.calls[2] == _scp("lavender", f"{target}/{names.ARCHIVE_NAME}")
+        assert runner.stdin[2] is None
+        assert runner.stdin[3] == dialect_windows.WindowsDialect().digest_script(target).encode(
+            "utf-8"
+        )
 
     def test_a_linux_node_is_staged_in_sh(self) -> None:
         """The same five acts, in the other dialect: written through a
-        mkdir-and-cat command, run by /bin/sh, reassembled with base64 and
-        sha256sum, and the shared tar and git steps unchanged."""
+        mkdir-and-cat command, run by /bin/sh, digested with sha256sum, and
+        the shared scp, tar and git steps unchanged."""
         payload = b"archive-bytes"
         runner = FakeRun(
             [
                 ok(""),  # send mkdir script
                 ok(""),  # run mkdir
-                ok(""),  # send the base64
-                ok(""),  # send reassemble script
-                ok(staging.digest(payload)),  # run reassemble -> digest
+                ok(""),  # scp the archive
+                ok(""),  # send digest script
+                ok(staging.digest(payload)),  # run digest
                 ok(""),  # send extract script
                 ok(""),  # run extract
                 ok(""),  # send the git-init script
@@ -234,6 +255,7 @@ class TestStage:
             platform=NodePlatform.LINUX,
             run_id=DEMO_RUN_ID,
             stage_root="/home/corvis/fleet/stage",
+            source=SOURCE,
             payload=payload,
         )
 
@@ -244,8 +266,11 @@ class TestStage:
         )
         made = f"/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh"
         assert runner.calls[1][-2:] == ("/bin/sh", made)
-        assert runner.calls[3][-1].endswith(f"{target}/reassemble.sh'")
-        assert b"sha256sum" in (runner.stdin[3] or b"")
+        assert runner.calls[2] == _scp("diphtheria", f"{target}/{names.ARCHIVE_NAME}")
+        assert runner.calls[3][-1].endswith(f"{target}/digest.sh'")
+        assert runner.stdin[3] == (
+            f"{dialect_linux.PROLOGUE}sha256sum '{target}/tree.tgz' | cut -d ' ' -f 1\n".encode()
+        )
         # Both carry sh's prologue, whose `set -e` is what ends the script at
         # a command that failed -- the other dialect has to be asked for that
         # and was not, which is the silent stage this pair now pins.
@@ -274,9 +299,9 @@ class TestStage:
             [
                 ok(""),  # send mkdir script
                 ok(""),  # run mkdir
-                ok(""),  # send the base64
-                ok(""),  # send reassemble script
-                ok(staging.digest(payload)),  # run reassemble -> digest
+                ok(""),  # scp the archive
+                ok(""),  # send digest script
+                ok(staging.digest(payload)),  # run digest
                 ok(""),  # send extract script
                 ok(""),  # run extract
                 ok(""),  # send the git-init script
@@ -290,6 +315,7 @@ class TestStage:
             platform=NodePlatform.WINDOWS,
             run_id=DEMO_RUN_ID,
             stage_root="C:/fleet/stage",
+            source=SOURCE,
             payload=payload,
         )
 
@@ -312,6 +338,50 @@ class TestStage:
             )
         )
 
+    def test_a_node_that_refuses_the_copy_stops_the_stage_before_any_digest(self) -> None:
+        """scp exits 1 when the node refuses the write (measured: a directory
+        that does not exist) and 255 when it cannot be reached; the first is
+        the work's fault and the second the tailnet's, and nothing after the
+        copy runs either way."""
+        runner = FakeRun(
+            [ok(""), ok(""), failed(1, 'scp: dest open "C:/x/tree.tgz": No such file or directory')]
+        )
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as excinfo:
+            staging.stage(
+                "lavender",
+                platform=NodePlatform.WINDOWS,
+                run_id=DEMO_RUN_ID,
+                stage_root="C:/fleet/stage",
+                source=SOURCE,
+                payload=b"bytes",
+            )
+
+        target = f"C:/fleet/stage/{DEMO_RUN_ID}"
+        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
+        assert excinfo.value.message == (
+            f"copying {SOURCE.name} to {target}/{names.ARCHIVE_NAME} on lavender exited 1: "
+            'scp: dest open "C:/x/tree.tgz": No such file or directory'
+        )
+        assert len(runner.calls) == 3
+
+    def test_an_unreachable_node_is_unreachable_not_a_failed_copy(self) -> None:
+        runner = FakeRun([ok(""), ok(""), failed(255, "scp: Connection closed")])
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as excinfo:
+            staging.stage(
+                "lavender",
+                platform=NodePlatform.WINDOWS,
+                run_id=DEMO_RUN_ID,
+                stage_root="C:/fleet/stage",
+                source=SOURCE,
+                payload=b"bytes",
+            )
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+
     def test_the_extract_script_keeps_the_node_s_clock(self) -> None:
         """Without -m, a tree from a fast clock makes targets look fresh.
 
@@ -331,11 +401,15 @@ class TestStage:
                 platform=NodePlatform.WINDOWS,
                 run_id=DEMO_RUN_ID,
                 stage_root="C:/fleet/stage",
+                source=SOURCE,
                 payload=b"bytes",
             )
 
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
-        assert "nothing has been unpacked" in excinfo.value.message
+        assert excinfo.value.message == (
+            f"lavender received an archive digesting {'0' * 64} where "
+            f"{staging.digest(b'bytes')} was sent; nothing has been unpacked"
+        )
         assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
 
 
@@ -360,13 +434,15 @@ class TestStagingACompanion:
             stage_root="C:/fleet/stage",
             directory="MCPs",
             sha=COMPANION_SHA,
+            source=SOURCE,
             payload=payload,
         )
 
         sent = [body or b"" for body in runner.stdin]
         assert where == "C:/fleet/stage/MCPs"
         assert sent[0] == dialect_windows.WindowsDialect().reset_directory_script(where).encode()
-        assert sent[4] == staging.encode(payload).encode()
+        landed = f"C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}"
+        assert runner.calls[4] == _scp("lavender", landed)
         spoken = dialect.for_platform(NodePlatform.WINDOWS)
         assert (
             sent[7]
@@ -395,12 +471,13 @@ class TestStagingACompanion:
             stage_root="C:/fleet/stage",
             directory="MCPs",
             sha=COMPANION_SHA,
+            source=SOURCE,
             payload=payload,
         )
 
         written = [argument for call in runner.calls for argument in call]
-        assert not any(f"C:/fleet/stage/MCPs/{names.ENCODED_NAME}" in text for text in written)
-        assert any(f"C:/fleet/stage/MCPs.stage/{names.ENCODED_NAME}" in text for text in written)
+        assert not any(f"C:/fleet/stage/MCPs/{names.ARCHIVE_NAME}" in text for text in written)
+        assert f"lavender:C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}" in written
 
     def test_the_directory_is_replaced_rather_than_unpacked_over(self) -> None:
         """Every run carrying a companion writes the same directory, so a file
@@ -416,6 +493,7 @@ class TestStagingACompanion:
             stage_root="/home/corvis/fleet/stage",
             directory="MCPs",
             sha=COMPANION_SHA,
+            source=SOURCE,
             payload=payload,
         )
 
@@ -446,6 +524,7 @@ class TestStagingACompanion:
                 stage_root="C:/fleet/stage",
                 directory="MCPs",
                 sha=COMPANION_SHA,
+                source=SOURCE,
                 payload=b"bytes",
             )
 
