@@ -204,11 +204,18 @@ Describe 'The match service launchers' {
         }
         function Invoke-TestWorkerEnd {
             # Ends each cmd.exe whose command line carries this run's unique
-            # worker prefix, by pid and with its tree.
+            # worker prefix, by pid and with its tree. A launcher and the
+            # worker it started both carry the prefix, so one listing can
+            # name a process that ends before its turn: taskkill then exits
+            # 128 when nothing of it is left, and 255 when the root had gone
+            # but its tree was still ended ("SUCCESS" for each child, seen
+            # 2026-09-27 in the harness). Either way the pid must be gone
+            # afterwards, which is what is asserted.
             param([string]$Prefix)
             foreach ($process in @(Get-CimInstance -ClassName Win32_Process -Filter "Name='cmd.exe'" | Where-Object { $null -ne $_.CommandLine -and $_.CommandLine.Contains($Prefix) })) {
                 $said = & $script:taskkill /F /T /PID $process.ProcessId
-                $LASTEXITCODE | Should -BeIn @(0, 128) -Because "$said"
+                $LASTEXITCODE | Should -BeIn @(0, 128, 255) -Because "$said"
+                @(Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$($process.ProcessId)").Count | Should -Be 0 -Because "$said"
             }
         }
     }
