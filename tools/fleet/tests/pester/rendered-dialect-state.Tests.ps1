@@ -90,6 +90,54 @@ Describe 'A dispatch directory' {
     }
 }
 
+Describe 'Retiring a settled dispatch' {
+    BeforeAll {
+        function Initialize-SettledRun {
+            param([string]$Root, [switch]$Transcript)
+            $target = Join-Path $Root 'run-[1]'
+            $objects = Join-Path $target '.git\objects'
+            [void][System.IO.Directory]::CreateDirectory($objects)
+            $object = Join-Path $objects 'ab'
+            [System.IO.File]::WriteAllText($object, 'loose object')
+            [System.IO.File]::SetAttributes($object, [System.IO.FileAttributes]::ReadOnly)
+            $log = Join-Path $target 'result.txt.log'
+            if ($Transcript) {
+                [System.IO.File]::WriteAllText($log, '887 passed')
+            }
+            $scripts = @('mkdir-run.ps1', 'stop-run.ps1', 'retire-run.ps1') | ForEach-Object { Join-Path $Root $_ }
+            foreach ($script in $scripts) {
+                [System.IO.File]::WriteAllText($script, '# a root script')
+            }
+            [void][System.IO.Directory]::CreateDirectory((Join-Path $Root 'cache'))
+            return @{
+                Target = $target
+                Log = $log
+                Retained = Join-Path $Root 'logs\run-[1].log'
+                Script0 = $scripts[0]
+                Script1 = $scripts[1]
+                Script2 = $scripts[2]
+            }
+        }
+    }
+    It 'keeps the transcript, removes the tree read-only files and all, and removes only the run''s root scripts' {
+        $root = Join-Path $TestDrive 'kept'
+        $run = Initialize-SettledRun -Root $root -Transcript
+        Invoke-Rendered 'dialect-retire' $run
+        [System.IO.File]::ReadAllText($run.Retained) | Should -BeExactly '887 passed'
+        [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+        @([System.IO.Directory]::GetFileSystemEntries($root) | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object) |
+            Should -Be @('cache', 'logs')
+    }
+    It 'retires a run that wrote no transcript, and a second retire finds nothing left and is not an error' {
+        $root = Join-Path $TestDrive 'untranscribed'
+        $run = Initialize-SettledRun -Root $root
+        Invoke-Rendered 'dialect-retire' $run
+        Invoke-Rendered 'dialect-retire' $run
+        @([System.IO.Directory]::GetFileSystemEntries((Join-Path $root 'logs'))).Count | Should -Be 0
+        [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+    }
+}
+
 Describe 'What the node reports back' {
     It 'digests the landed archive in lower case' {
         $target = Join-Path $TestDrive 'digested'
