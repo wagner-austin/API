@@ -130,6 +130,30 @@
         "companions": []
       }
     },
+    "tools/fleet-execution": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 1,
+      "expected_minutes": 5,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/fleet-execution",
+        "install": [],
+        "companions": []
+      }
+    },
+    "tools/fleet-execution-linux": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 1,
+      "expected_minutes": 5,
+      "required_tags": ["linux"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/fleet-execution",
+        "install": [],
+        "companions": []
+      }
+    },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 4,
