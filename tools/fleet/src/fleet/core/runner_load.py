@@ -175,7 +175,8 @@ WINDOWS_FOREST_SCRIPT = (
         [
             *STRICT_HEADER,
             "foreach ($Process in @(Get-CimInstance -ClassName Win32_Process)) {",
-            "    '{0} {1} {2}' -f $Process.ProcessId, $Process.ParentProcessId, $Process.CommandLine",
+            "    '{0} {1} {2}' -f $Process.ProcessId, $Process.ParentProcessId, "
+            "$Process.CommandLine",
             "}",
         ]
     )
