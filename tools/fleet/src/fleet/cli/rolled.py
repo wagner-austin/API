@@ -147,6 +147,7 @@ def main(argv: Sequence[str]) -> int:
         timeout_seconds=AGENT_WALL_SECONDS,
         set_env=(("PYTHONPATH", tree["python_path"]),),
     )
+    rolled.discard_rolled_tree(tree)
     if result["stdout"]:
         _log.info("%s", result["stdout"].rstrip())
     if result["stderr"]:
