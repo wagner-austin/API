@@ -94,6 +94,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
                     enabled=True,
                     test_database=False,
                     rust=None,
+                    cxx=None,
                     budget=NodeBudget(
                         reserved_cores=2,
                         reserved_ram_gb=4.0,
