@@ -340,6 +340,11 @@ def render_wslconfig_lines(spec: HostRunnerSpec) -> list[str]:
     writes it BEFORE the distro is first started so the VM boots into the
     floor rather than needing a restart to take it.
 
+    The file is ``$WslConfigPath``, which the Windows base takes as a
+    parameter (:func:`render_wslconfig_parameters`) so the Pester suite over
+    its committed render writes under TestDrive, and ``provision.ps1`` sets
+    to the profile's own file.
+
     Args:
         spec: The host's roster entry.
 
@@ -355,9 +360,28 @@ def render_wslconfig_lines(spec: HostRunnerSpec) -> list[str]:
         f"  'memory={floor}GB',",
         "  'swap=8GB'",
         ")",
-        'Set-Content -LiteralPath "$env:USERPROFILE\\.wslconfig" -Value $WslConfig -Encoding ascii',
+        "Set-Content -LiteralPath $WslConfigPath -Value $WslConfig -Encoding ascii",
         "Write-Output 'wrote .wslconfig; the ceiling applies when the VM next starts'",
     ]
+
+
+#: Where ``.wslconfig`` lives: the running account's profile.
+WSLCONFIG_PATH = '"$env:USERPROFILE\\.wslconfig"'
+
+
+def render_wslconfig_parameters(spec: HostRunnerSpec) -> list[str]:
+    """The Windows base's param-block line naming ``.wslconfig``'s path.
+
+    Args:
+        spec: The host's roster entry.
+
+    Returns:
+        ``[string]$WslConfigPath = "$env:USERPROFILE\\.wslconfig",``, or
+        nothing when the roster declares no floor and so no file is written.
+    """
+    if spec["wslconfig_min_memory_gb"] is None:
+        return []
+    return [f"    [string]$WslConfigPath = {WSLCONFIG_PATH},"]
 
 
 def _render_windows_script(spec: HostRunnerSpec) -> str:
@@ -380,6 +404,8 @@ def _render_windows_script(spec: HostRunnerSpec) -> str:
         "$ErrorActionPreference = 'Stop'",
     ]
     floor = spec["wslconfig_min_memory_gb"]
+    if floor is not None:
+        lines.append(f"$WslConfigPath = {WSLCONFIG_PATH}")
     lines += render_wslconfig_lines(spec)
     keepalive = spec["keepalive_task"]
     lines += render_keepalive_lines(spec)
@@ -558,6 +584,7 @@ __all__ = [
     "LOCAL_BIN",
     "RUNNER_PATH_ENTRIES",
     "RUNNER_VERSION",
+    "WSLCONFIG_PATH",
     "WSL_LIB",
     "RenderedProvision",
     "render_provision",
@@ -565,5 +592,6 @@ __all__ = [
     "render_windows_python_toolcache_lines",
     "render_wsl_install_lines",
     "render_wslconfig_lines",
+    "render_wslconfig_parameters",
     "token_variable",
 ]

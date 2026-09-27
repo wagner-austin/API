@@ -43,37 +43,55 @@ def machine_variable_check_id(variable: MachineVariable) -> str:
     return f"machine-env:{variable['name']}"
 
 
-def render_machine_environment_lines(spec: HostRunnerSpec) -> list[str]:
-    """The Windows base's lines that set each declared machine variable.
+def render_machine_environment_parameters(spec: HostRunnerSpec) -> list[str]:
+    """The Windows base's param-block lines for the declared variables.
+
+    The key is a parameter so the Pester suite over the committed render
+    passes a scratch HKCU key; the variables are one ``name=value`` string
+    each, split at the first ``=``, which no variable name contains.
 
     Args:
         spec: The host's roster entry.
 
     Returns:
-        One block per variable. A variable already holding its value is
-        left alone; a changed one is written, printed, and sets the base's
-        ``$Reboot``, so the services start into it. Empty when the roster
-        declares none.
+        ``$EnvironmentKey`` and ``$MachineVariables``, each ending in a
+        comma; the array is empty when the roster declares none.
 
     Raises:
         ValueError: When a name or value cannot be embedded verbatim; see
             :func:`fleet.core.script_values.scriptable`.
     """
-    variables = spec["base"]["machine_environment"]
-    if not variables:
-        return []
-    lines = [f"$EnvironmentKey = '{MACHINE_ENVIRONMENT_KEY}'"]
-    for variable in variables:
+    pairs = []
+    for variable in spec["base"]["machine_environment"]:
         name = scriptable(variable["name"], label="machine variable name")
         value = scriptable(variable["value"], label=f"machine variable {name}")
-        lines += [
-            f"if ((Get-ItemProperty -LiteralPath $EnvironmentKey).'{name}' -cne '{value}') {{",
-            f"    Set-ItemProperty -LiteralPath $EnvironmentKey -Name '{name}' -Value '{value}'",
-            "    $Reboot = $true",
-            f"    Write-Output 'set the machine variable {name} to {value}'",
-            "}",
-        ]
-    return lines
+        pairs.append(f"'{name}={value}'")
+    return [
+        f"    [string]$EnvironmentKey = '{MACHINE_ENVIRONMENT_KEY}',",
+        f"    [string[]]$MachineVariables = @({', '.join(pairs)}),",
+    ]
+
+
+def render_machine_environment_lines() -> list[str]:
+    """The Windows base's lines that set each declared machine variable.
+
+    Returns:
+        One loop over ``$MachineVariables``. A variable already holding its
+        value is left alone; a changed one is written, printed, and sets the
+        base's ``$Reboot``, so the services start into it. The held value is
+        read with ``GetValue``, which answers ``$null`` for an absent one
+        where a property read fails under strict mode.
+    """
+    return [
+        "foreach ($pair in $MachineVariables) {",
+        "    $name, $value = $pair -split '=', 2",
+        "    if ([string](Get-Item -LiteralPath $EnvironmentKey).GetValue($name) -cne $value) {",
+        "        Set-ItemProperty -LiteralPath $EnvironmentKey -Name $name -Value $value",
+        "        $Reboot = $true",
+        "        Write-Output ('set the machine variable ' + $name + ' to ' + $value)",
+        "    }",
+        "}",
+    ]
 
 
 def render_machine_environment_check_lines(spec: HostRunnerSpec) -> list[str]:
@@ -110,4 +128,5 @@ __all__ = [
     "machine_variable_check_id",
     "render_machine_environment_check_lines",
     "render_machine_environment_lines",
+    "render_machine_environment_parameters",
 ]

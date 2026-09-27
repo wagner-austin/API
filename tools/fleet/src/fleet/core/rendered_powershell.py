@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import RunnerSpec
-from fleet.core import dialect, names, runner_rebuild, verdict
+from fleet.core import dialect, names, runner_base_render, runner_rebuild, verdict
 from fleet.core.dialect_windows import WindowsDialect
 
 #: Where the committed renders live, relative to tools/fleet.
@@ -142,12 +142,20 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
         *_dialect_scripts(),
     ]
     for host in roster["hosts"]:
-        scripts.append(
+        scripts += [
             RenderedScript(
                 name=f"rebuild-terminate-{host['name']}",
                 text=runner_rebuild.render_terminate_script(host["wsl_distro"]),
-            )
-        )
+            ),
+            RenderedScript(
+                name=f"base-windows-{host['name']}",
+                text=runner_base_render.render_windows_base_script(host),
+            ),
+            RenderedScript(
+                name=f"base-import-{host['name']}",
+                text=runner_base_render.render_import_script(host),
+            ),
+        ]
     names = [script["name"] for script in scripts]
     repeated = sorted({name for name in names if names.count(name) > 1})
     if repeated:

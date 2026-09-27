@@ -28,7 +28,11 @@ from __future__ import annotations
 
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_render
-from fleet.core.runner_machine_env import render_machine_environment_lines
+from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
+from fleet.core.runner_machine_env import (
+    render_machine_environment_lines,
+    render_machine_environment_parameters,
+)
 from fleet.core.script_values import scriptable
 
 #: The line the Windows base stage prints when Windows must restart first.
@@ -42,12 +46,22 @@ WSLCONF_CHANGED_MARKER = "FLEET-WSLCONF-CHANGED"
 #: and the audit's ``wsl -d`` calls expect.
 WSL_CONF = "[boot]\nsystemd=true\n\n[user]\ndefault=root\n"
 
-#: msiexec's exit code for "installed; a restart completes it".
-MSI_REBOOT_EXIT = 3010
+#: ERROR_SUCCESS_REBOOT_REQUIRED: the exit code msiexec and dism both give
+#: for "done; a restart completes it".
+REBOOT_REQUIRED_EXIT = 3010
 
 #: The registry key whose ``LongPathsEnabled`` lifts Win32's 260-character
 #: path limit, read by the Windows base and by the audit.
 LONG_PATHS_KEY = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\FileSystem"
+
+#: The registry key whose ``ExecutionPolicy`` value is the LocalMachine
+#: execution policy, the value ``Set-ExecutionPolicy -Scope LocalMachine``
+#: writes.
+EXECUTION_POLICY_KEY = "HKLM:\\SOFTWARE\\Microsoft\\PowerShell\\1\\ShellIds\\Microsoft.PowerShell"
+
+#: The registry key WSL registers each distro under, one subkey carrying
+#: its ``DistributionName``, for the account that registered it.
+LXSS_KEY = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss"
 
 
 def _file_name(url: str) -> str:
@@ -62,34 +76,84 @@ def _file_name(url: str) -> str:
     return url.rsplit("/", 1)[1]
 
 
+def _parameter(name: str, value: str, label: str) -> str:
+    """A param-block line whose default is a single-quoted roster value.
+
+    Args:
+        name: The parameter's name.
+        value: The roster value.
+        label: What the value is, for a refusal.
+
+    Returns:
+        ``[string]$<name> = '<value>',``.
+
+    Raises:
+        ValueError: When the value cannot be embedded verbatim.
+    """
+    return f"    [string]${name} = '{scriptable(value, label=label)}',"
+
+
+def _array_parameter(name: str, values: list[str], label: str) -> str:
+    """A param-block line whose default is an array of roster values.
+
+    Args:
+        name: The parameter's name.
+        values: The roster values, in order.
+        label: What each value is, for a refusal.
+
+    Returns:
+        ``[string[]]$<name> = @('<a>', '<b>'),``.
+
+    Raises:
+        ValueError: When a value cannot be embedded verbatim.
+    """
+    quoted = ", ".join(f"'{scriptable(value, label=label)}'" for value in values)
+    return f"    [string[]]${name} = @({quoted}),"
+
+
 def _verified_download_lines(url: str, sha256: str, target: str, label: str) -> list[str]:
     """PowerShell lines that download a pinned file and refuse wrong bytes.
 
     Args:
-        url: The pinned URL.
-        sha256: The pinned digest, lowercase.
-        target: The Windows path to save to, already validated.
+        url: The variable holding the pinned URL, such as ``$MsiUrl``.
+        sha256: The variable holding the pinned digest, lowercase.
+        target: The variable holding the Windows path to save to.
         label: What the file is, for the refusal.
 
     Returns:
-        The lines. A file already at ``target`` is re-verified rather than
+        The lines. A file already at the target is re-verified rather than
         re-downloaded, so an interrupted rebuild resumes without fetching
         the image twice, and a corrupt leftover is refused by its digest.
     """
     return [
-        f"if (-not (Test-Path '{target}')) {{",
-        f"    Invoke-WebRequest -Uri '{url}' -OutFile '{target}' -UseBasicParsing",
+        f"if (-not (Test-Path -LiteralPath {target})) {{",
+        f"    Invoke-WebRequest -Uri {url} -OutFile {target} -UseBasicParsing",
         "}",
-        f"$Digest = (Get-FileHash -Algorithm SHA256 -LiteralPath '{target}').Hash.ToLower()",
-        f"if ($Digest -ne '{sha256}') {{",
-        f"    Remove-Item -LiteralPath '{target}'",
-        f"    throw ('{label} sha256 ' + $Digest + ' does not match the pin {sha256}')",
+        f"$Digest = (Get-FileHash -Algorithm SHA256 -LiteralPath {target}).Hash.ToLower()",
+        f"if ($Digest -ne {sha256}) {{",
+        f"    Remove-Item -LiteralPath {target}",
+        f"    throw ('{label} sha256 ' + $Digest + ' does not match the pin ' + {sha256})",
         "}",
     ]
 
 
 def render_windows_base_script(spec: HostRunnerSpec) -> str:
     """The Windows base stage for one host.
+
+    Args:
+        spec: The host's roster entry.
+
+    UNDER THE STRICT HEADER, EVERY EFFECT A PARAMETER (MCPs board task
+    d69786fa). The roster's values are the defaults, so the rebuild runs the
+    script with no arguments; a Pester suite over the committed render
+    passes stand-ins for ``dism.exe``, ``msiexec.exe``, ``wsl.exe`` and
+    ``git``, scratch HKCU keys for the three HKLM ones, a PATH variable of
+    its own and a ``file://`` download whose digest it computed. The
+    features are read and enabled through ``dism.exe /english`` rather than
+    the optional-feature cmdlets, which need elevation and cannot be stood
+    in for; ``dism`` exits 3010 when a restart completes the change. Every
+    registry value is read with ``GetValue``, which answers ``$null`` for an
+    absent value where a property read fails under strict mode.
 
     Args:
         spec: The host's roster entry.
@@ -103,59 +167,80 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
         ValueError: When a roster value cannot be embedded verbatim.
     """
     base = spec["base"]
-    scratch = scriptable(spec["scratch_dir"], label="scratch_dir")
+    msi = base["wsl_msi"]
     lines: list[str] = [
-        "$ErrorActionPreference = 'Stop'",
+        "param(",
+        _parameter("Scratch", spec["scratch_dir"], "scratch_dir"),
+        _array_parameter("Features", base["windows_features"], "windows feature"),
+        _parameter("WslVersion", msi["version"], "wsl_msi version"),
+        _parameter("MsiUrl", msi["url"], "wsl_msi url"),
+        _parameter("MsiSha256", msi["sha256"], "wsl_msi sha256"),
+        _parameter("MsiFile", _file_name(msi["url"]), "wsl_msi file"),
+        _parameter("Policy", base["execution_policy"], "execution_policy"),
+        _parameter("PolicyKey", EXECUTION_POLICY_KEY, "policy key"),
+        _parameter("FileSystemKey", LONG_PATHS_KEY, "file system key"),
+        _array_parameter("PathEntries", base["machine_path_entries"], "machine PATH entry"),
+        "    [string]$PathVariable = 'Path',",
+        "    [string]$PathScope = 'Machine',",
+        *render_machine_environment_parameters(spec),
+        *runner_render.render_wslconfig_parameters(spec),
+        "    [string]$Git = 'git',",
+        "    " + system32_parameter("Dism", "dism.exe") + ",",
+        "    " + system32_parameter("Msiexec", "msiexec.exe") + ",",
+        "    " + system32_parameter("Wsl", "wsl.exe"),
+        ")",
+        *STRICT_HEADER,
         "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
         "$ProgressPreference = 'SilentlyContinue'",
         "$env:WSL_UTF8 = '1'",
         "$Reboot = $false",
-        f"New-Item -ItemType Directory -Force -Path '{scratch}' | Out-Null",
-    ]
-    for raw_feature in base["windows_features"]:
-        feature = scriptable(raw_feature, label="windows feature")
-        lines += [
-            f"$Feature = Get-WindowsOptionalFeature -Online -FeatureName '{feature}'",
-            "if ($Feature.State -ne 'Enabled') {",
-            f"    $Enabled = Enable-WindowsOptionalFeature -Online -FeatureName '{feature}' "
-            "-All -NoRestart",
-            "    if ($Enabled.RestartNeeded) { $Reboot = $true }",
-            f"    Write-Output 'enabled Windows feature {feature}'",
-            "}",
-        ]
-    msi = base["wsl_msi"]
-    version = scriptable(msi["version"], label="wsl_msi version")
-    msi_path = f"{scratch}/{scriptable(_file_name(msi['url']), label='wsl_msi file')}"
-    lines += [
-        # wsl --version is absent or different on a stock install; the MSI's
-        # own wsl.exe reports 'WSL version: <version>.0'.
-        "$WslVersion = (@(wsl --version 2>$null) -join ' ')",
-        f"if ($WslVersion -notmatch ('WSL[^:]*:\\s*' + [regex]::Escape('{version}'))) {{",
+        "[void][System.IO.Directory]::CreateDirectory($Scratch)",
+        "foreach ($feature in $Features) {",
+        "    $info = & $Dism /online /english /get-featureinfo /featurename:$feature",
+        "    if ($LASTEXITCODE -ne 0) {",
+        "        throw ('dism could not read the Windows feature ' + $feature + ', exit ' "
+        "+ $LASTEXITCODE)",
+        "    }",
+        "    if (@($info | Where-Object { $_ -match '^State : Enabled' }).Count -eq 0) {",
+        "        $null = & $Dism /online /english /enable-feature /featurename:$feature /all "
+        "/norestart",
+        f"        if ($LASTEXITCODE -eq {REBOOT_REQUIRED_EXIT}) {{",
+        "            $Reboot = $true",
+        "        } elseif ($LASTEXITCODE -ne 0) {",
+        "            throw ('dism could not enable the Windows feature ' + $feature + ', exit ' "
+        "+ $LASTEXITCODE)",
+        "        }",
+        "        Write-Output ('enabled Windows feature ' + $feature)",
+        "    }",
+        "}",
+        # wsl --version is absent or different on a stock install, where it
+        # exits non-zero; the MSI's own wsl.exe reports 'WSL version: <v>.0'.
+        "$answer = & $Wsl --version",
+        "$installed = ($LASTEXITCODE -eq 0) -and "
+        "((@($answer) -join ' ') -match ('WSL[^:]*:\\s*' + [regex]::Escape($WslVersion)))",
+        "if (-not $installed) {",
+        "    $msiPath = Join-Path $Scratch $MsiFile",
         *(
             "    " + line
-            for line in _verified_download_lines(
-                scriptable(msi["url"], label="wsl_msi url"), msi["sha256"], msi_path, "WSL MSI"
-            )
+            for line in _verified_download_lines("$MsiUrl", "$MsiSha256", "$msiPath", "WSL MSI")
         ),
-        f"    $Install = Start-Process msiexec.exe -ArgumentList @('/i', '{msi_path}', "
-        "'/qn', '/norestart') -Wait -PassThru",
-        f"    if ($Install.ExitCode -eq {MSI_REBOOT_EXIT}) {{ $Reboot = $true }}",
-        f"    elseif ($Install.ExitCode -ne 0) {{ throw ('msiexec for WSL {version} exited ' "
-        "+ $Install.ExitCode) }",
-        f"    Remove-Item -LiteralPath '{msi_path}'",
-        f"    Write-Output 'installed WSL {version}'",
+        "    $install = Start-Process -FilePath $Msiexec -ArgumentList @('/i', "
+        "\"`\"$msiPath`\"\", '/qn', '/norestart') -Wait -PassThru -NoNewWindow",
+        f"    if ($install.ExitCode -eq {REBOOT_REQUIRED_EXIT}) {{",
+        "        $Reboot = $true",
+        "    } elseif ($install.ExitCode -ne 0) {",
+        "        throw ('msiexec for WSL ' + $WslVersion + ' exited ' + $install.ExitCode)",
+        "    }",
+        "    Remove-Item -LiteralPath $msiPath",
+        "    Write-Output ('installed WSL ' + $WslVersion)",
         "}",
-    ]
-    policy = scriptable(base["execution_policy"], label="execution_policy")
-    lines += [
         # The registry value Set-ExecutionPolicy -Scope LocalMachine writes,
-        # written directly: under this script's own Process-scope Bypass the
-        # cmdlet reports the LocalMachine change as overridden and, with
-        # ErrorActionPreference Stop, throws after succeeding.
-        "$PolicyKey = 'HKLM:\\SOFTWARE\\Microsoft\\PowerShell\\1\\ShellIds\\Microsoft.PowerShell'",
-        f"if ((@(Get-ExecutionPolicy -Scope LocalMachine) -join '') -ne '{policy}') {{",
-        f"    Set-ItemProperty -LiteralPath $PolicyKey -Name ExecutionPolicy -Value '{policy}'",
-        f"    Write-Output 'set the LocalMachine execution policy to {policy}'",
+        # read and written directly: under this script's own Process-scope
+        # Bypass the cmdlet reports the LocalMachine change as overridden
+        # and, with ErrorActionPreference Stop, throws after succeeding.
+        "if ([string](Get-Item -LiteralPath $PolicyKey).GetValue('ExecutionPolicy') -ne $Policy) {",
+        "    Set-ItemProperty -LiteralPath $PolicyKey -Name ExecutionPolicy -Value $Policy",
+        "    Write-Output ('set the LocalMachine execution policy to ' + $Policy)",
         "}",
         # Long paths, which a fresh Windows install leaves off. Measured on
         # the reinstalled lavender, 2026-09-26: MCPs CI's supervisor Pester
@@ -163,38 +248,57 @@ def render_windows_base_script(spec: HostRunnerSpec) -> str:
         # paths pass 260 characters, and CreateDirectory failed with 'Could
         # not find a part of the path' until LongPathsEnabled was 1; git's
         # own checkout needs core.longpaths for the same trees.
-        f"$FileSystemKey = '{LONG_PATHS_KEY}'",
-        "if ((Get-ItemProperty -LiteralPath $FileSystemKey).LongPathsEnabled -ne 1) {",
+        "if ((Get-Item -LiteralPath $FileSystemKey).GetValue('LongPathsEnabled') -ne 1) {",
         "    Set-ItemProperty -LiteralPath $FileSystemKey -Name LongPathsEnabled -Value 1 "
         "-Type DWord",
         "    Write-Output 'enabled Win32 long paths'",
         "}",
-        "if ((@(git config --system --get core.longpaths) -join '') -ne 'true') {",
-        "    git config --system core.longpaths true",
+        # git exits 1 for a key that is not set, which is the stock answer.
+        "$held = & $Git config --system --get core.longpaths",
+        "if ($LASTEXITCODE -gt 1) {",
+        "    throw ('git config --system --get core.longpaths exited ' + $LASTEXITCODE)",
+        "}",
+        "if ((@($held) -join '') -ne 'true') {",
+        "    & $Git config --system core.longpaths true",
         "    if ($LASTEXITCODE -ne 0) {",
         "        throw ('git config --system core.longpaths exited ' + $LASTEXITCODE)",
         "    }",
         "    Write-Output 'set git core.longpaths for the system'",
         "}",
+        "foreach ($entry in $PathEntries) {",
+        "    $current = [string][Environment]::GetEnvironmentVariable($PathVariable, $PathScope)",
+        "    $parts = @($current -split ';' | Where-Object { $_ -ne '' })",
+        "    if ($parts -notcontains $entry) {",
+        "        [Environment]::SetEnvironmentVariable($PathVariable, "
+        "((@($parts) + $entry) -join ';'), $PathScope)",
+        "        Write-Output ('added to the machine PATH: ' + $entry)",
+        "    }",
+        "}",
+        *render_machine_environment_lines(),
+        *runner_render.render_wslconfig_lines(spec),
+        "if ($Reboot) {",
+        f"    Write-Output '{REBOOT_MARKER}'",
+        "}",
     ]
-    for raw_entry in base["machine_path_entries"]:
-        entry = scriptable(raw_entry, label="machine PATH entry")
-        lines += [
-            "$MachinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')",
-            f"if (@($MachinePath -split ';') -notcontains '{entry}') {{",
-            "    [Environment]::SetEnvironmentVariable('Path', "
-            f"($MachinePath.TrimEnd(';') + ';{entry}'), 'Machine')",
-            f"    Write-Output 'added to the machine PATH: {entry}'",
-            "}",
-        ]
-    lines += render_machine_environment_lines(spec)
-    lines += runner_render.render_wslconfig_lines(spec)
-    lines += [f"if ($Reboot) {{ Write-Output '{REBOOT_MARKER}' }}", "exit 0"]
     return "\n".join(lines) + "\n"
 
 
 def render_import_script(spec: HostRunnerSpec) -> str:
     """The distro import stage for one host.
+
+    Args:
+        spec: The host's roster entry.
+
+    WHICH DISTROS ARE REGISTERED IS READ FROM THE REGISTRY, the ``Lxss`` key
+    each registration writes a ``DistributionName`` under, not from
+    ``wsl --list --quiet``: that answers in UTF-16 unless told otherwise and
+    exits non-zero on a host with none registered, which is exactly the host
+    this stage imports on, so the script piped it through ``2>$null`` and
+    ignored the exit. Under the strict header the key is read directly, and
+    an absent key is a host that has never registered one. The key, the
+    download and ``wsl.exe`` are parameters defaulting to the roster's, so
+    the Pester suite over the committed render passes a scratch key, a
+    ``file://`` image and a stand-in (MCPs board task d69786fa).
 
     Args:
         spec: The host's roster entry.
@@ -208,34 +312,42 @@ def render_import_script(spec: HostRunnerSpec) -> str:
         ValueError: When a roster value cannot be embedded verbatim.
     """
     base = spec["base"]
-    distro = scriptable(spec["wsl_distro"], label="wsl_distro")
-    scratch = scriptable(spec["scratch_dir"], label="scratch_dir")
-    distro_dir = scriptable(base["distro_dir"], label="distro_dir")
     rootfs = base["rootfs"]
-    image = f"{scratch}/{scriptable(_file_name(rootfs['url']), label='rootfs file')}"
-    version = scriptable(rootfs["version"], label="rootfs version")
     lines: list[str] = [
-        "$ErrorActionPreference = 'Stop'",
+        "param(",
+        _parameter("Distro", spec["wsl_distro"], "wsl_distro"),
+        _parameter("Scratch", spec["scratch_dir"], "scratch_dir"),
+        _parameter("DistroDir", base["distro_dir"], "distro_dir"),
+        _parameter("RootfsVersion", rootfs["version"], "rootfs version"),
+        _parameter("RootfsUrl", rootfs["url"], "rootfs url"),
+        _parameter("RootfsSha256", rootfs["sha256"], "rootfs sha256"),
+        _parameter("RootfsFile", _file_name(rootfs["url"]), "rootfs file"),
+        _parameter("LxssKey", LXSS_KEY, "lxss key"),
+        "    " + system32_parameter("Wsl", "wsl.exe"),
+        ")",
+        *STRICT_HEADER,
         "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
         "$ProgressPreference = 'SilentlyContinue'",
-        "$env:WSL_UTF8 = '1'",
-        "$Registered = @(wsl --list --quiet 2>$null | ForEach-Object { $_.Trim() })",
-        f"if ($Registered -notcontains '{distro}') {{",
+        "$registered = @()",
+        "if (Test-Path -LiteralPath $LxssKey) {",
+        "    $registered = @(Get-ChildItem -LiteralPath $LxssKey | "
+        "ForEach-Object { [string]$_.GetValue('DistributionName') })",
+        "}",
+        "if ($registered -notcontains $Distro) {",
+        "    [void][System.IO.Directory]::CreateDirectory($Scratch)",
+        "    $image = Join-Path $Scratch $RootfsFile",
         *(
             "    " + line
-            for line in _verified_download_lines(
-                scriptable(rootfs["url"], label="rootfs url"), rootfs["sha256"], image, "rootfs"
-            )
+            for line in _verified_download_lines("$RootfsUrl", "$RootfsSha256", "$image", "rootfs")
         ),
-        f"    New-Item -ItemType Directory -Force -Path '{distro_dir}' | Out-Null",
-        f"    wsl --import '{distro}' '{distro_dir}' '{image}' --version 2",
+        "    [void][System.IO.Directory]::CreateDirectory($DistroDir)",
+        "    & $Wsl --import $Distro $DistroDir $image --version 2",
         "    if ($LASTEXITCODE -ne 0) {",
-        f"        throw ('wsl --import {distro} exited ' + $LASTEXITCODE)",
+        "        throw ('wsl --import ' + $Distro + ' exited ' + $LASTEXITCODE)",
         "    }",
-        f"    Remove-Item -LiteralPath '{image}'",
-        f"    Write-Output 'imported {distro} {version}'",
+        "    Remove-Item -LiteralPath $image",
+        "    Write-Output ('imported ' + $Distro + ' ' + $RootfsVersion)",
         "}",
-        "exit 0",
     ]
     return "\n".join(lines) + "\n"
 
@@ -306,9 +418,11 @@ def render_linux_base_script(spec: HostRunnerSpec) -> str:
 
 
 __all__ = [
+    "EXECUTION_POLICY_KEY",
     "LONG_PATHS_KEY",
-    "MSI_REBOOT_EXIT",
+    "LXSS_KEY",
     "REBOOT_MARKER",
+    "REBOOT_REQUIRED_EXIT",
     "WSLCONF_CHANGED_MARKER",
     "WSL_CONF",
     "render_import_script",
