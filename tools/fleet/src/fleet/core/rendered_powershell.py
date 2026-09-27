@@ -34,6 +34,7 @@ from fleet.core import (
     runner_audit,
     runner_base_render,
     runner_distro,
+    runner_load,
     runner_rebuild,
     runner_windows_provision,
     verdict,
@@ -159,6 +160,7 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
             name="rebuild-boot-instant", text=runner_rebuild.render_boot_instant_script()
         ),
         RenderedScript(name="rebuild-restart", text=runner_rebuild.render_restart_script()),
+        RenderedScript(name="load-forest", text=runner_load.WINDOWS_FOREST_SCRIPT),
         *_dialect_scripts(),
     ]
     for host in roster["hosts"]:

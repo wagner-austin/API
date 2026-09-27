@@ -52,6 +52,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
+from fleet.core.powershell_text import STRICT_HEADER
 
 
 class InstallLoad(TypedDict):
@@ -166,11 +167,19 @@ def _install_marker(workdir: str, side: str) -> str:
 #: same three-column shape ``ps -eo pid=,ppid=,args=`` gives for the distro,
 #: so one parser scores both. Sent and run by path per the remote layer's
 #: rule; a null CommandLine formats as empty, which the parser accepts as a
-#: process with no args.
+#: process with no args. It is a read of this machine's own processes, so
+#: its Pester suite over the committed render (rendered/load-forest.ps1,
+#: MCPs board task d69786fa) runs it as it is and finds its own process.
 WINDOWS_FOREST_SCRIPT = (
-    "Get-CimInstance Win32_Process | ForEach-Object {\n"
-    "  '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, $_.CommandLine\n"
-    "}\n"
+    "\n".join(
+        [
+            *STRICT_HEADER,
+            "foreach ($Process in @(Get-CimInstance -ClassName Win32_Process)) {",
+            "    '{0} {1} {2}' -f $Process.ProcessId, $Process.ParentProcessId, $Process.CommandLine",
+            "}",
+        ]
+    )
+    + "\n"
 )
 
 #: File name the Windows forest script lands under in the host's scratch_dir.
