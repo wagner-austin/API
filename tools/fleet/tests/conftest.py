@@ -33,6 +33,10 @@ from fleet.cli import _config
 from fleet.cli import agent as agent_cli
 from fleet.core import _test_hooks, manifest, staging
 
+#: The host-case markers and the execution run (board task 465689f5), and
+#: pytester, which test_host_execution runs that plugin's own sessions with.
+pytest_plugins = ("tests._host", "pytester")
+
 
 class FakeRun:
     """A command runner that answers from a script and records the calls.

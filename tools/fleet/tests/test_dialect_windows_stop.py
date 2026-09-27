@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import pathlib
 import subprocess
-import sys
 import time
 
 import pytest
@@ -157,7 +156,7 @@ def _run_stop(tmp_path: pathlib.Path, target: str) -> subprocess.CompletedProces
     )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the stop is PowerShell; run it here")
+@pytest.mark.host_windows
 class TestTheStopForReal:
     def test_it_ends_the_build_and_the_child_it_is_waiting_on(self, tmp_path: pathlib.Path) -> None:
         """The case sedona measured: a build blocked on a native child. The

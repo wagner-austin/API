@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 
 import pytest
 
@@ -122,7 +121,7 @@ class TestRendered:
         )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the lines are PowerShell; run them here")
+@pytest.mark.host_windows
 class TestConvergenceRunsForReal:
     """The lines executed, not matched."""
 
@@ -173,7 +172,7 @@ class TestConvergenceRunsForReal:
         assert (tmp_path / "_work" / "checkout.txt").exists()
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the lines are PowerShell; run them here")
+@pytest.mark.host_windows
 class TestStartingRunsForReal:
     """A stopped service is started; a running one is left alone."""
 
@@ -260,7 +259,7 @@ def _audit(tmp_path: pathlib.Path, start_name: str | None) -> list[str]:
     return [line for line in ran.stdout.splitlines() if line.startswith("CHECK ")]
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the audit is PowerShell; run it here")
+@pytest.mark.host_windows
 class TestTheAccountRowRunsForReal:
     """The audit row executed: one line per Windows-side service, after its
     workdir row, whatever the service reports."""

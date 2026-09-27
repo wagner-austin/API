@@ -376,7 +376,7 @@ class TestObserveBodyForReal:
         assert document["platform"] == sys.platform
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the scripts are sh; run them where it exists")
+@pytest.mark.host_linux
 class TestForRealUnderSh:
     """The probes and the reassembly, executed by /bin/sh on this machine."""
 

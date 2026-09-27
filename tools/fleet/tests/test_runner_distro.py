@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 
 import pytest
 
@@ -106,7 +105,7 @@ def _write_locally(command: str, target: pathlib.Path, payload: bytes) -> bytes:
     return target.read_bytes()
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the write command is Windows PowerShell")
+@pytest.mark.host_windows
 class TestTheWriteIsByteExact:
     """What lands on the runner host is exactly what bash will read."""
 

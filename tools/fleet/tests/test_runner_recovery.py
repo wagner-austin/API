@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 from typing import Literal
 
 import pytest
@@ -65,7 +64,7 @@ class TestRendered:
             )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the lines are PowerShell; run them here")
+@pytest.mark.host_windows
 class TestTheWindowsLinesRunForReal:
     """sc.exe is handed the fleet's restart policy, and a failure throws."""
 

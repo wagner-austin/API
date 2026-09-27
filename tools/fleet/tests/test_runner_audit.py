@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
@@ -392,7 +391,7 @@ def _run_audit(
     return [line for line in ran.stdout.splitlines() if line.startswith("CHECK ")]
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the audit is PowerShell; run it here")
+@pytest.mark.host_windows
 class TestTheRenderedAuditRunsForReal:
     """The asset checks executed, not matched. Both defects the 2026-09-26
     lavender rebuild hit were runtime behaviour of Windows PowerShell 5.1

@@ -23,7 +23,6 @@ import pathlib
 import shutil
 import socket
 import subprocess
-import sys
 
 import pytest
 from platform_core.config import config_test_hooks
@@ -74,10 +73,8 @@ def _python_registered_here(prefix: str) -> bool:
     return False
 
 
-#: Where Windows puts the App Execution Alias for ``python``, per account.
-WINDOWSAPPS_PYTHON = (
-    pathlib.Path.home() / "AppData" / "Local" / "Microsoft" / "WindowsApps" / "python.exe"
-)
+#: Where an App Execution Alias for ``python`` sits, below any profile.
+WINDOWSAPPS_ALIAS = pathlib.Path("Microsoft", "WindowsApps", "python.exe")
 
 #: One registration document in the shape the harness writes on a Windows
 #: node: a drive-letter cwd and a named-pipe socket.
@@ -334,7 +331,7 @@ class TestTransportShape:
         assert "ConvertTo-Json -Depth 8 -Compress" in body
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the probes are PowerShell; run them here")
+@pytest.mark.host_windows
 class TestProbesForReal:
     """The two constant probes, executed on this hub and parsed by shape.
 
@@ -426,15 +423,20 @@ class TestProbesForReal:
             assert completed.returncode == 0, completed.stderr
             assert completed.stdout.strip() == "clear"
 
-    @pytest.mark.skipif(not WINDOWSAPPS_PYTHON.is_file(), reason="no WindowsApps python here")
     def test_a_python_only_under_windowsapps_is_absent_and_never_run(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """LAVENDER'S RUNNER, 2026-09-22/23, reproduced on this hub: with no
-        real interpreter ahead of it, ``python`` resolves to the WindowsApps
-        alias. The probe reports it absent, and pip with it, without running
-        it: here that alias is the Python Install Manager, which a run could
-        answer by installing something."""
+        """LAVENDER'S RUNNER, 2026-09-22/23, reproduced on any Windows host:
+        with no real interpreter ahead of it, ``python`` resolves to the
+        WindowsApps alias. The probe reports it absent, and pip with it,
+        without running it: on the hub that alias is the Python Install
+        Manager, which a run could answer by installing something. The alias
+        here is laid out by the test, an empty ``python.exe`` that fails if
+        anything runs it, so the case runs on a node that has none
+        (board task 465689f5)."""
+        alias = tmp_path / WINDOWSAPPS_ALIAS
+        alias.parent.mkdir(parents=True)
+        alias.write_bytes(b"")
         script = tmp_path / "probe.ps1"
         script.write_text(DIALECT.toolchain_probe_script(), encoding="utf-8")
         powershell = shutil.which(POWERSHELL_INVOCATION[0])
@@ -442,7 +444,7 @@ class TestProbesForReal:
             pytest.fail("the probes run through powershell, and it is not on this hub's PATH")
         shell_directory = pathlib.Path(powershell).parent
         system = shell_directory.parent.parent
-        path = (WINDOWSAPPS_PYTHON.parent, system, shell_directory)
+        path = (alias.parent, system, shell_directory)
         parent = config_test_hooks.get_environment()
         env = {
             **{key: value for key, value in parent.items() if key.upper() != "PATH"},
@@ -463,7 +465,7 @@ class TestProbesForReal:
         assert "pip=no=" in lines
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the script is PowerShell; run it here")
+@pytest.mark.host_windows
 class TestObserveScriptForReal:
     """The observe script, run by PowerShell 5.1 against a profile on disk.
 

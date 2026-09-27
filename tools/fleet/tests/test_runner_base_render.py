@@ -15,7 +15,6 @@ from __future__ import annotations
 import hashlib
 import pathlib
 import subprocess
-import sys
 
 import pytest
 
@@ -203,7 +202,7 @@ $script:MachineEnv = @{ 'POETRY_CACHE_DIR' = 'C:\\fleet\\poetry' }
 """
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the stages are PowerShell; run them here")
+@pytest.mark.host_windows
 class TestTheWindowsBaseRunsForReal:
     """Features, the WSL release, the policy, and the restart marker."""
 
@@ -262,7 +261,7 @@ class TestTheWindowsBaseRunsForReal:
         assert _thrown(ran, tmp_path) == "msiexec for WSL 2.7.14 exited 1603"
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the stages are PowerShell; run them here")
+@pytest.mark.host_windows
 class TestTheImportRunsForReal:
     """The pinned image imported once, and never over a registered distro."""
 

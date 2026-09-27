@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 
 import pytest
 
@@ -132,7 +131,7 @@ def _audit(tmp_path: pathlib.Path, held: str) -> list[str]:
     return [line for line in ran.stdout.splitlines() if line.startswith("CHECK machine-env:")]
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the audit is PowerShell; run it here")
+@pytest.mark.host_windows
 class TestTheRowRunsForReal:
     """The row executed: exact value passes, anything else drifts naming it."""
 

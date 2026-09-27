@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 import time
 
 import pytest
@@ -83,7 +82,7 @@ def _numbered(count: int) -> str:
     return "".join(f"line {index:07d} passed in the fixture\r\n" for index in range(count))
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="the tail is PowerShell; run it here")
+@pytest.mark.host_windows
 class TestTailForReal:
     """The script run by path under 5.1, the way the collector runs it on a node."""
 
