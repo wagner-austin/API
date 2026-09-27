@@ -84,27 +84,28 @@ def service_account_check_id(install: RunnerInstall) -> str:
 def render_service_account_check_lines(install: RunnerInstall) -> list[str]:
     """The audit driver's lines for one service's account row.
 
-    The StartName is JOINED from the pipeline, never cast: for a service
-    that is absent the pipeline emits nothing, and the row must still be
-    emitted, drifted, rather than the Emit statement dying and the
+    It reads the ``$Service`` rows the audit driver's service row read just
+    before it (:func:`fleet.core.runner_audit.render_audit_script`), so the
+    service is asked once. The StartName is JOINED from those rows, never
+    cast: for a service that is absent there are none, and the row must
+    still be emitted, drifted, rather than the Write-Check statement dying and the
     transcript coming up one line short.
 
     Args:
         install: A windows-side install.
 
     Returns:
-        Lines calling the driver's ``Emit`` once, with the StartName the
+        Lines calling the driver's ``Write-Check`` once, with the StartName the
         host reports as the drift detail.
 
     Raises:
         ValueError: When the service name cannot be embedded verbatim; see
             :func:`fleet.core.script_values.scriptable`.
     """
-    service = scriptable(install["service"], label="service")
+    scriptable(install["service"], label="service")
     return [
-        "$Account = (@(Get-CimInstance Win32_Service "
-        f"-Filter \"Name='{service}'\" | ForEach-Object {{ $_.StartName }}) -join '')",
-        f"Emit '{service_account_check_id(install)}' "
+        "$Account = (@($Service | ForEach-Object { [string]$_.StartName }) -join '')",
+        f"Write-Check '{service_account_check_id(install)}' "
         f"($Account -eq '{WINDOWS_SERVICE_START_NAME}') "
         "('Win32_Service StartName: ' + $Account)",
     ]

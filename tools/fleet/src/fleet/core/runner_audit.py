@@ -28,13 +28,15 @@ from typing_extensions import TypedDict
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
+from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.runner_account import (
     SERVICE_ACCOUNT_REASON,
     render_service_account_check_lines,
     service_account_check_id,
 )
-from fleet.core.runner_base_render import LONG_PATHS_KEY
+from fleet.core.runner_base_render import EXECUTION_POLICY_KEY, LONG_PATHS_KEY
 from fleet.core.runner_machine_env import (
+    MACHINE_ENVIRONMENT_KEY,
     machine_variable_check_id,
     render_machine_environment_check_lines,
 )
@@ -97,7 +99,7 @@ class AuditOutcome(TypedDict):
 def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
     """Every check the audit script for this host will report, in order.
 
-    The single source of both the script's Emit lines and the transcript
+    The single source of both the script's Write-Check lines and the transcript
     validator, so the two cannot disagree about what a complete audit is.
 
     Args:
@@ -218,38 +220,37 @@ def disk_check_id(spec: HostRunnerSpec) -> str:
     )
 
 
-def _disk_check_lines(spec: HostRunnerSpec, distro: str) -> list[str]:
+def _disk_check_lines(spec: HostRunnerSpec) -> list[str]:
     """Script lines that hold the distro's root to the roster's ceiling.
 
     Args:
         spec: The host.
-        distro: The WSL distribution, already validated.
 
     Returns:
         The lines: ``df -BG`` of ``/`` inside the distro, parsed to whole GB,
-        and the Emit. An unreadable answer parses to -1 and drifts with df's
-        own words, never passes. The output is joined, never cast, for the
-        reason the asset pin in :func:`render_audit_script` gives.
+        and the Write-Check. An unreadable answer parses to -1 and drifts with df's
+        own words and exit, never passes.
     """
     disk = spec["base"]["disk"]
     ceiling = disk["ceiling_gb"]
     return [
-        f"$DiskLine = (@(wsl -d '{distro}' -- df -BG --output=used / 2>$null "
-        "| Select-Object -Skip 1 -First 1) -join '')",
+        "$Probe = Invoke-InDistro $Cmd $Wsl $Distro 'df -BG --output=used /'",
+        "$DiskLine = (@($Probe.Lines | Select-Object -Skip 1 -First 1) -join '')",
         "$UsedGb = -1",
-        "if ($DiskLine -match '(\\d+)G') { $UsedGb = [int]$Matches[1] }",
-        f"Emit '{disk_check_id(spec)}' ($UsedGb -ge 0 -and $UsedGb -le {ceiling}) "
+        "if ($DiskLine -match '(\\d+)G') {",
+        "    $UsedGb = [int]$Matches[1]",
+        "}",
+        f"Write-Check '{disk_check_id(spec)}' ($UsedGb -ge 0 -and $UsedGb -le {ceiling}) "
         f"('the distro root uses ' + $UsedGb + ' GB against a ceiling of {ceiling} GB; an "
         f"idle rebuilt host used {disk['baseline_gb']} GB on {disk['baseline_measured']}; "
-        "df said: ' + $DiskLine)",
+        "df said: ' + $Probe.Text)",
     ]
 
 
-def _emit_wsl_state_check(distro: str, check_id: str, argv: str, expected: str) -> list[str]:
+def _emit_wsl_state_check(check_id: str, argv: str, expected: str) -> list[str]:
     """Script lines for a check that compares a WSL command's first line.
 
     Args:
-        distro: The WSL distribution to run inside.
         check_id: The check to report.
         argv: The command after ``wsl -d <distro> --``, already validated.
         expected: The exact first output line that means OK.
@@ -258,16 +259,16 @@ def _emit_wsl_state_check(distro: str, check_id: str, argv: str, expected: str) 
         The PowerShell lines.
     """
     return [
-        f"$State = (wsl -d '{distro}' -- {argv} 2>$null | Select-Object -First 1)",
-        f"Emit '{check_id}' ([string]$State -eq '{expected}') ('it said: ' + [string]$State)",
+        f'$Probe = Invoke-InDistro $Cmd $Wsl $Distro "{argv}"',
+        "$State = (@($Probe.Lines | Select-Object -First 1) -join '')",
+        f"Write-Check '{check_id}' ($State -eq '{expected}') ('it said: ' + $Probe.Text)",
     ]
 
 
-def _emit_wsl_test_check(distro: str, check_id: str, test_flag: str, path: str) -> list[str]:
+def _emit_wsl_test_check(check_id: str, test_flag: str, path: str) -> list[str]:
     """Script lines for a check driven by ``test`` inside the distro.
 
     Args:
-        distro: The WSL distribution to run inside.
         check_id: The check to report.
         test_flag: The ``test`` flag, e.g. ``-e`` or ``-w``.
         path: The path to test, already validated.
@@ -276,23 +277,27 @@ def _emit_wsl_test_check(distro: str, check_id: str, test_flag: str, path: str) 
         The PowerShell lines.
     """
     return [
-        f"wsl -d '{distro}' -- test {test_flag} '{path}' 2>$null | Out-Null",
-        f"Emit '{check_id}' ($LASTEXITCODE -eq 0) ('test {test_flag} exited ' + $LASTEXITCODE)",
+        f"$Probe = Invoke-InDistro $Cmd $Wsl $Distro \"test {test_flag} '{path}'\"",
+        f"Write-Check '{check_id}' ($Probe.Exit -eq 0) ('test {test_flag} exited ' + $Probe.Exit)",
     ]
 
 
-def _gpu_check_lines(spec: HostRunnerSpec, distro: str) -> list[str]:
+def _gpu_check_lines(spec: HostRunnerSpec) -> list[str]:
     """Script lines that ask each WSL runner's own PATH for the GPU.
+
+    The row asks for exit 0 as well as a name: the probe's words include
+    wsl's own stderr, so a distro that is not there answers "There is no
+    distribution with the supplied name.", which is not empty and passed the
+    row until the Pester suite's sick host showed it (MCPs board task
+    d69786fa).
 
     Args:
         spec: The host, with ``gpu_required`` set.
-        distro: The WSL distribution, already validated.
 
     Returns:
         Two lines per WSL install: nvidia-smi run with PATH read from the
         runner's ``.path`` (the PATH runsvc.sh gives its jobs), and the
-        Emit. The output is joined, never cast, for the reason the asset
-        pin in :func:`render_audit_script` gives.
+        Write-Check.
 
     Raises:
         ValueError: When a runner directory cannot be embedded verbatim.
@@ -302,17 +307,30 @@ def _gpu_check_lines(spec: HostRunnerSpec, distro: str) -> list[str]:
         runner_dir = scriptable(install["workdir"].rsplit("/", 1)[0], label="workdir")
         check_id = f"gpu:{install['repo']}:wsl:{install['runner_name']}"
         lines += [
-            f"$GpuName = (@(wsl -d '{distro}' -- sh -c 'PATH=$(cat {runner_dir}/.path) "
-            "nvidia-smi --query-gpu=name --format=csv,noheader' 2>$null "
-            "| Select-Object -First 1) -join '')",
-            f"Emit '{check_id}' ($GpuName.Trim().Length -gt 0) "
-            "('nvidia-smi on the runner PATH said: ' + $GpuName)",
+            f"$Probe = Invoke-InDistro $Cmd $Wsl $Distro \"sh -c 'PATH=`$(cat {runner_dir}/.path) "
+            "nvidia-smi --query-gpu=name --format=csv,noheader'\"",
+            "$GpuName = (@($Probe.Lines | Select-Object -First 1) -join '')",
+            f"Write-Check '{check_id}' ($Probe.Exit -eq 0 -and $GpuName.Trim().Length -gt 0) "
+            "('nvidia-smi on the runner PATH said: ' + $Probe.Text)",
         ]
     return lines
 
 
 def render_audit_script(spec: HostRunnerSpec) -> str:
     """The PowerShell audit driver for one host.
+
+    UNDER THE STRICT HEADER, EVERY PROBE A PARAMETER (MCPs board task
+    d69786fa). It ran under ``Continue`` with each ``wsl`` read piped
+    through ``2>$null``, so a probe that failed and a line that threw alike
+    left the transcript short. Every native now runs through one
+    ``Invoke-Probe``, cmd.exe carrying the ``2>&1``, and answers its exit
+    and its words, which a DRIFT row carries; nothing is suppressed and no
+    Write-Check can be skipped. ``cmd.exe``, ``wsl.exe``, ``schtasks.exe``, ``git``
+    and the three registry keys are parameters with plain-string defaults,
+    and the Windows-side reads (a service's state and account, a workdir's
+    presence) are script-block parameters whose defaults only read, so the
+    Pester suite over the committed render runs the defaults and stand-ins
+    alike.
 
     Args:
         spec: The host's roster entry.
@@ -327,24 +345,53 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
     """
     distro = scriptable(spec["wsl_distro"], label="wsl_distro")
     lines: list[str] = [
-        "$ErrorActionPreference = 'Continue'",
+        "param(",
+        f"    [string]$Distro = '{distro}',",
+        f"    [string]$PolicyKey = '{EXECUTION_POLICY_KEY}',",
+        f"    [string]$FileSystemKey = '{LONG_PATHS_KEY}',",
+        f"    [string]$EnvironmentKey = '{MACHINE_ENVIRONMENT_KEY}',",
+        "    [scriptblock]$GetService = { param([string]$Name) "
+        "@(Get-CimInstance Win32_Service -Filter \"Name='$Name'\") },",
+        "    [scriptblock]$TestWorkdir = { param([string]$Path) Test-Path -LiteralPath $Path },",
+        "    [string]$Git = 'git',",
+        "    " + system32_parameter("Schtasks", "schtasks.exe") + ",",
+        "    " + system32_parameter("Wsl", "wsl.exe") + ",",
+        "    " + system32_parameter("Cmd", "cmd.exe"),
+        ")",
+        *STRICT_HEADER,
         # wsl.exe writes UTF-16LE when redirected; forcing UTF-8 is what
         # makes every comparison below possible. See the module docstring.
         "$env:WSL_UTF8 = '1'",
-        "function Emit([string]$CheckId, [bool]$Ok, [string]$Detail) {",
-        "  if ($Ok) { Write-Output ('CHECK ' + $CheckId + ' OK') }",
-        "  else { Write-Output ('CHECK ' + $CheckId + ' DRIFT ' "
-        "+ ($Detail -replace \"[`r`n]+\", ' ')) }",
+        "function Write-Check {",
+        "    param([string]$CheckId, [bool]$Ok, [string]$Detail)",
+        "    if ($Ok) {",
+        "        Write-Output ('CHECK ' + $CheckId + ' OK')",
+        "    } else {",
+        "        $flat = $Detail -replace \"[`r`n]+\", ' '",
+        "        Write-Output ('CHECK ' + $CheckId + ' DRIFT ' + $flat)",
+        "    }",
+        "}",
+        "function Invoke-Probe {",
+        "    param([string]$Shell, [string]$Line)",
+        '    $said = & $Shell /d /s /c "$Line 2>&1"',
+        "    $exit = $LASTEXITCODE",
+        "    $all = [string[]]@($said | ForEach-Object { [string]$_ })",
+        "    return [pscustomobject]@{ Exit = $exit; Lines = $all; "
+        "Text = (($all -join ' ') + ' (exit ' + $exit + ')') }",
+        "}",
+        "function Invoke-InDistro {",
+        "    param([string]$Shell, [string]$WslPath, [string]$Name, [string]$Command)",
+        '    return Invoke-Probe $Shell "`"$WslPath`" -d $Name -- $Command"',
         "}",
     ]
     keepalive = spec["keepalive_task"]
     if keepalive is not None:
         task = scriptable(keepalive, label="keepalive_task")
         lines += [
-            f"$KeepaliveRow = [string](schtasks /query /tn '{task}' /fo csv 2>$null "
-            "| Select-Object -Skip 1 -First 1)",
-            f"Emit 'keepalive:{task}' ($KeepaliveRow -match '\"Running\"') "
-            "('schtasks row: ' + $KeepaliveRow)",
+            f'$Probe = Invoke-Probe $Cmd "`"$Schtasks`" /query /tn {task} /fo csv"',
+            "$KeepaliveRow = (@($Probe.Lines | Select-Object -Skip 1 -First 1) -join '')",
+            f"Write-Check 'keepalive:{task}' ($KeepaliveRow -match '\"Running\"') "
+            "('schtasks row: ' + $Probe.Text)",
         ]
     floor = spec["wslconfig_min_memory_gb"]
     if floor is not None:
@@ -354,31 +401,33 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         # jobs still swap.
         floor_mb = floor * 1000
         lines += [
-            f"$MemLine = [string](wsl -d '{distro}' -- free -m 2>$null | Select-String '^Mem:')",
+            "$Probe = Invoke-InDistro $Cmd $Wsl $Distro 'free -m'",
+            "$MemLine = (@($Probe.Lines | Where-Object { $_ -match '^Mem:' }) -join '')",
             "$TotalMb = 0",
-            "if ($MemLine -match 'Mem:\\s+(\\d+)') { $TotalMb = [int]$Matches[1] }",
-            f"Emit 'memory-floor:{floor}gb' ($TotalMb -ge {floor_mb}) "
-            "('the VM reports ' + $TotalMb + ' MB')",
+            "if ($MemLine -match 'Mem:\\s+(\\d+)') {",
+            "    $TotalMb = [int]$Matches[1]",
+            "}",
+            f"Write-Check 'memory-floor:{floor}gb' ($TotalMb -ge {floor_mb}) "
+            "('the VM reports ' + $TotalMb + ' MB; free said: ' + $Probe.Text)",
         ]
-    lines += _disk_check_lines(spec, distro)
+    lines += _disk_check_lines(spec)
     policy = scriptable(spec["base"]["execution_policy"], label="execution_policy")
     lines += [
-        "$Policy = (@(Get-ExecutionPolicy -Scope LocalMachine) -join '')",
-        f"Emit 'execution-policy:LocalMachine:{policy}' ($Policy -eq '{policy}') "
-        "('Get-ExecutionPolicy -Scope LocalMachine said: ' + $Policy)",
-        f"$LongPaths = (Get-ItemProperty -LiteralPath '{LONG_PATHS_KEY}').LongPathsEnabled",
-        "$GitLongPaths = (@(git config --system --get core.longpaths) -join '')",
-        f"Emit '{LONG_PATHS_CHECK_ID}' ($LongPaths -eq 1 -and $GitLongPaths -eq 'true') "
-        "('LongPathsEnabled=' + $LongPaths + ' git core.longpaths=' + $GitLongPaths)",
+        "$Policy = [string](Get-Item -LiteralPath $PolicyKey).GetValue('ExecutionPolicy')",
+        f"Write-Check 'execution-policy:LocalMachine:{policy}' ($Policy -eq '{policy}') "
+        "('the LocalMachine ExecutionPolicy value is: ' + $Policy)",
+        "$LongPaths = [string](Get-Item -LiteralPath $FileSystemKey).GetValue('LongPathsEnabled')",
+        '$Probe = Invoke-Probe $Cmd "`"$Git`" config --system --get core.longpaths"',
+        "$GitLongPaths = (@($Probe.Lines) -join '')",
+        f"Write-Check '{LONG_PATHS_CHECK_ID}' ($LongPaths -eq '1' -and $GitLongPaths -eq 'true') "
+        "('LongPathsEnabled=' + $LongPaths + ' git core.longpaths=' + $Probe.Text)",
         *render_machine_environment_check_lines(spec),
     ]
     if spec["gpu_required"]:
-        lines += _gpu_check_lines(spec, distro)
+        lines += _gpu_check_lines(spec)
     for timer in spec["systemd_timers"]:
         name = scriptable(timer, label="systemd timer")
-        lines += _emit_wsl_state_check(
-            distro, f"timer:{name}", f"systemctl is-enabled '{name}'", "enabled"
-        )
+        lines += _emit_wsl_state_check(f"timer:{name}", f"systemctl is-enabled '{name}'", "enabled")
     for install in spec["installs"]:
         service = scriptable(install["service"], label="service")
         workdir = scriptable(install["workdir"], label="workdir")
@@ -386,46 +435,44 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         runner_name = scriptable(install["runner_name"], label="runner_name")
         if install["side"] == "wsl":
             lines += _emit_wsl_state_check(
-                distro, f"service:wsl:{service}", f"systemctl is-active '{service}'", "active"
+                f"service:wsl:{service}", f"systemctl is-active '{service}'", "active"
             )
-            lines += _emit_wsl_test_check(
-                distro, f"workdir:{repo}:wsl:{runner_name}", "-d", workdir
-            )
+            lines += _emit_wsl_test_check(f"workdir:{repo}:wsl:{runner_name}", "-d", workdir)
         else:
             # Windows-side installs are checked NATIVELY: the driver already
             # runs in the host's PowerShell, so the service and the workdir
-            # are one cmdlet away rather than one wsl hop away.
+            # are one read away rather than one wsl hop away. The state is
+            # JOINED from the rows, so an absent service is '' and drifts.
             lines += [
-                f"$WinSvc = Get-Service '{service}' -ErrorAction SilentlyContinue",
-                f"Emit 'service:windows:{service}' "
-                "($null -ne $WinSvc -and $WinSvc.Status -eq 'Running') "
-                "('Get-Service said: ' + $(if ($null -eq $WinSvc) { 'absent' } "
-                "else { [string]$WinSvc.Status }))",
-                f"Emit 'workdir:{repo}:windows:{runner_name}' "
-                f"(Test-Path -LiteralPath '{workdir}') "
+                f"$Service = @(& $GetService '{service}')",
+                "$ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')",
+                f"Write-Check 'service:windows:{service}' ($ServiceState -eq 'Running') "
+                "('Win32_Service State: ' + $ServiceState)",
+                f"Write-Check 'workdir:{repo}:windows:{runner_name}' "
+                f"([bool](& $TestWorkdir '{workdir}')) "
                 f"('Test-Path {workdir}')",
                 *render_service_account_check_lines(install),
             ]
     for asset in spec["assets"]:
         path = scriptable(asset["path"], label="asset path")
-        lines += _emit_wsl_test_check(distro, f"asset:{path}", "-e", path)
+        lines += _emit_wsl_test_check(f"asset:{path}", "-e", path)
         pin = asset["sha256"]
         if pin is not None:
             # The output is JOINED, never cast. [string] over a pipeline that
             # emitted nothing is $null in Windows PowerShell 5.1, not '', so
-            # for a MISSING pinned asset $Sum.StartsWith threw, the whole
-            # Emit statement was skipped under 'Continue', and the transcript
-            # lacked this one line: the audit then refused to score the host
-            # at all, as a script that died midway, instead of reporting one
-            # drifted check (the 2026-09-26 lavender rebuild, board task
-            # 1aa6a021; reproduced there with the line alone).
+            # for a MISSING pinned asset $Sum.StartsWith threw and the
+            # transcript lacked this one line: the audit then refused to
+            # score the host at all, as a script that died midway, instead
+            # of reporting one drifted check (the 2026-09-26 lavender
+            # rebuild, board task 1aa6a021).
             lines += [
-                f"$Sum = (@(wsl -d '{distro}' -- sha256sum '{path}' 2>$null "
-                "| Select-Object -First 1) -join '')",
-                f"Emit 'sha256:{path}' ($Sum.StartsWith('{pin}')) ('sha256sum said: ' + $Sum)",
+                f"$Probe = Invoke-InDistro $Cmd $Wsl $Distro \"sha256sum '{path}'\"",
+                "$Sum = (@($Probe.Lines | Select-Object -First 1) -join '')",
+                f"Write-Check 'sha256:{path}' ($Sum.StartsWith('{pin}')) "
+                "('sha256sum said: ' + $Probe.Text)",
             ]
         if asset["writable"]:
-            lines += _emit_wsl_test_check(distro, f"writable:{path}", "-w", path)
+            lines += _emit_wsl_test_check(f"writable:{path}", "-w", path)
     lines.append("exit 0")
     return "\n".join(lines) + "\n"
 

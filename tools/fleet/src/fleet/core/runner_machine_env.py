@@ -97,14 +97,16 @@ def render_machine_environment_lines() -> list[str]:
 def render_machine_environment_check_lines(spec: HostRunnerSpec) -> list[str]:
     """The audit driver's lines for every declared variable's row.
 
-    The value is JOINED from the pipeline, never cast, so an absent
-    variable still emits its drifted row rather than a short transcript.
+    The value is read with ``GetValue`` from the driver's ``$EnvironmentKey``
+    parameter: an absent variable answers ``$null``, cast to '', so it
+    still emits its drifted row rather than a short transcript, and the
+    Pester suite over the committed audit passes a scratch key.
 
     Args:
         spec: The host's roster entry.
 
     Returns:
-        One ``Emit`` per variable, with the value the registry holds as the
+        One ``Write-Check`` per variable, with the value the registry holds as the
         drift detail.
 
     Raises:
@@ -115,9 +117,8 @@ def render_machine_environment_check_lines(spec: HostRunnerSpec) -> list[str]:
         name = scriptable(variable["name"], label="machine variable name")
         value = scriptable(variable["value"], label=f"machine variable {name}")
         lines += [
-            f"$Held = (@((Get-ItemProperty -LiteralPath '{MACHINE_ENVIRONMENT_KEY}').'{name}') "
-            "-join '')",
-            f"Emit '{machine_variable_check_id(variable)}' ($Held -ceq '{value}') "
+            f"$Held = [string](Get-Item -LiteralPath $EnvironmentKey).GetValue('{name}')",
+            f"Write-Check '{machine_variable_check_id(variable)}' ($Held -ceq '{value}') "
             f"('the machine environment holds {name}=' + $Held + '; the roster says {value}')",
         ]
     return lines

@@ -26,7 +26,14 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import RunnerSpec
-from fleet.core import dialect, names, runner_base_render, runner_rebuild, verdict
+from fleet.core import (
+    dialect,
+    names,
+    runner_audit,
+    runner_base_render,
+    runner_rebuild,
+    verdict,
+)
 from fleet.core.dialect_windows import WindowsDialect
 
 #: Where the committed renders live, relative to tools/fleet.
@@ -154,6 +161,9 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
             RenderedScript(
                 name=f"base-import-{host['name']}",
                 text=runner_base_render.render_import_script(host),
+            ),
+            RenderedScript(
+                name=f"audit-{host['name']}", text=runner_audit.render_audit_script(host)
             ),
         ]
     names = [script["name"] for script in scripts]
