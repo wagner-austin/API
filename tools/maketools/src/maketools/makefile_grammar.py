@@ -72,10 +72,16 @@ SH_ONLY: Final[Sequence[tuple[str, str]]] = (
 #: portable and is not: PowerShell continues after a failing native command
 #: inside ``a; b``, ``sh -e`` stops; ``>`` writes UTF-16 in PowerShell 5.1;
 #: ``cd`` failing is a non-terminating error in one and fatal in the other.
+#: ``$(MAKE)`` expands to the path make was started by, unquoted; where that
+#: path holds a space, as ``C:/Program Files (x86)/GnuWin32/bin/make`` does
+#: on serendipity, PowerShell reads it as several words and the recipe dies
+#: before running anything (tools/fleet-execution, 2026-09-27, MCPs board
+#: task 930f4c0c), while ``/bin/sh`` on a spaceless path never shows it.
 DIVERGENT: Final[Sequence[tuple[str, str]]] = (
     (r";", "; separator (one command per line)"),
     (r"[<>|]", "redirection or pipe"),
     (r"^cd\s", "cd (use make -C or a script)"),
+    (r"\$[({]MAKE[)}]", "$(MAKE) (use plain make -C)"),
 )
 
 #: make functions that run the shell, banned anywhere in the file.
