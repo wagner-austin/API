@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
+from fleet.core.powershell_text import STRICT_HEADER
+from fleet.core.script_values import scriptable
 from fleet.core.windows_log_tail import windows_log_tail_script
 from fleet.core.windows_toolchain_probe import TOOLCHAIN_PROBE_SCRIPT
 
@@ -85,6 +87,8 @@ WRITE_COMMAND = (
 #: message instead of a field name. Not positional, because a reordered
 #: script would silently swap two numbers.
 CAPACITY_PROBE_SCRIPT = """\
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 $os = Get-CimInstance Win32_OperatingSystem
 $drive = Get-PSDrive C
 "free_ram_gb={0:N3}" -f ($os.FreePhysicalMemory / 1MB)
@@ -103,13 +107,18 @@ $drive = Get-PSDrive C
 #: austinpc: ``$env:COMPUTERNAME`` is ``AUSTINPC``, the record says
 #: ``win32:austinpc``). Records are emitted UNTOUCHED so the decode on the
 #: hub sees exactly the bytes the harness wrote, and an absent directory is
-#: an empty array rather than an error.
+#: an empty array rather than an error. The directory is a parameter whose
+#: default is the profile's, so the Pester suite reads one it laid out
+#: (MCPs board task d69786fa).
 OBSERVE_SESSIONS_SCRIPT = """\
+param(
+    [string]$SessionsDirectory = "$HOME\\.claude\\sessions"
+)
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$dir = Join-Path $HOME '.claude\\sessions'
 $records = @()
-if (Test-Path -LiteralPath $dir) {
-    foreach ($file in Get-ChildItem -LiteralPath $dir -Filter '*.json' -File) {
+if (Test-Path -LiteralPath $SessionsDirectory) {
+    foreach ($file in Get-ChildItem -LiteralPath $SessionsDirectory -Filter '*.json' -File) {
         $records += , (Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json)
     }
 }
@@ -120,6 +129,30 @@ $document = [pscustomobject]@{
 }
 $document | ConvertTo-Json -Depth 8 -Compress
 """
+
+
+def _located_script(parameter: str, location: str, body: tuple[str, ...]) -> str:
+    """A script whose one remote location is a parameter.
+
+    The location is the parameter's default, a plain string, so a host runs
+    the script with no arguments exactly as before, and the Pester suite
+    that executes the committed render (:mod:`fleet.core.rendered_powershell`,
+    MCPs board task d69786fa) points it at a directory it laid out.
+
+    Args:
+        parameter: The parameter's name, PascalCase.
+        location: The absolute remote path it defaults to.
+        body: The statements after the strict header, reading the parameter.
+
+    Returns:
+        The script's text.
+
+    Raises:
+        ValueError: When the location cannot be embedded verbatim.
+    """
+    default = scriptable(location, label=parameter.lower())
+    lines = ["param(", f"    [string]${parameter} = '{default}'", ")", *STRICT_HEADER, *body]
+    return "\n".join(lines) + "\n"
 
 
 class WindowsDialect:
@@ -242,9 +275,13 @@ class WindowsDialect:
             target: Absolute remote directory for this dispatch.
 
         Returns:
-            The script's text.
+            The script's text. No exit-code check follows the call, because
+            nothing in it is a native program: a .NET failure throws, and the
+            strict header's Stop ends the script on it.
         """
-        return self.checked_script((f"[IO.Directory]::CreateDirectory('{target}') | Out-Null",))
+        return _located_script(
+            "Directory", target, ("[IO.Directory]::CreateDirectory($Directory) | Out-Null",)
+        )
 
     def reset_directory_script(self, target: str) -> str:
         """The script that empties a companion's directory and creates it.
@@ -263,12 +300,15 @@ class WindowsDialect:
             ``Remove-Item`` of a path that does not exist is an error and the
             first run on a node is exactly that case.
         """
-        return self.checked_script(
+        return _located_script(
+            "Directory",
+            target,
             (
-                f"if (Test-Path -LiteralPath '{target}') "
-                f"{{ Remove-Item -Recurse -Force -LiteralPath '{target}' }}",
-                f"[IO.Directory]::CreateDirectory('{target}') | Out-Null",
-            )
+                "if (Test-Path -LiteralPath $Directory) {",
+                "    Remove-Item -Recurse -Force -LiteralPath $Directory",
+                "}",
+                "[IO.Directory]::CreateDirectory($Directory) | Out-Null",
+            ),
         )
 
     def digest_script(self, target: str) -> str:
@@ -281,9 +321,13 @@ class WindowsDialect:
             The script's text. ``Get-FileHash`` reports upper case, lowered
             here so the output is exactly what the sender compares.
         """
-        return (
-            f"(Get-FileHash -Algorithm SHA256 -LiteralPath "
-            f"'{target}/{names.ARCHIVE_NAME}').Hash.ToLower()\n"
+        return _located_script(
+            "Target",
+            target,
+            (
+                "(Get-FileHash -Algorithm SHA256 -LiteralPath "
+                f'"$Target/{names.ARCHIVE_NAME}").Hash.ToLower()',
+            ),
         )
 
     def build_script(
@@ -445,14 +489,18 @@ class WindowsDialect:
         Returns:
             The script's text.
         """
-        result = f"{target}/{names.RESULT_NAME}"
-        return (
-            f"if (Test-Path -LiteralPath '{result}') {{\n"
-            f"  $file = Get-Item -LiteralPath '{result}'\n"
-            f"  $code = (Get-Content -Raw -LiteralPath '{result}').Trim()\n"
-            f"  $epoch = [int]($file.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds\n"
-            f'  "$code $epoch"\n'
-            f"}}\n"
+        return _located_script(
+            "Target",
+            target,
+            (
+                f'$result = "$Target/{names.RESULT_NAME}"',
+                "if (Test-Path -LiteralPath $result) {",
+                "    $file = Get-Item -LiteralPath $result",
+                "    $code = (Get-Content -Raw -LiteralPath $result).Trim()",
+                "    $epoch = [int]($file.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds",
+                '    "$code $epoch"',
+                "}",
+            ),
         )
 
     def stop_script(self, *, target: str, run_id: str) -> str:

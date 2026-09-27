@@ -14,7 +14,11 @@ tracked script like any other, and one no suite runs is PS-NO-SUITE.
 
 Scripts that depend on a host are rendered from the real roster,
 ``runners.json``, once per host, so the committed copy is the text that host
-receives.
+receives. Scripts that depend on a dispatch are rendered for one example
+dispatch (:data:`EXAMPLE_STAGE_ROOT`, :data:`EXAMPLE_RUN_ID`): every location
+they read is a parameter defaulting to the rendered path, so the suite runs
+the committed text against a directory it laid out, and a real dispatch's
+copy differs from the example only in those defaults.
 """
 
 from __future__ import annotations
@@ -22,10 +26,17 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import RunnerSpec
-from fleet.core import runner_rebuild
+from fleet.core import names, runner_rebuild
+from fleet.core.dialect_windows import WindowsDialect
 
 #: Where the committed renders live, relative to tools/fleet.
 RENDERED_DIRECTORY = "rendered"
+
+#: The example dispatch's stage root: the Windows nodes' own.
+EXAMPLE_STAGE_ROOT = "C:/fleet/stage"
+
+#: The example dispatch's id, in the shape fleet-run mints.
+EXAMPLE_RUN_ID = "MCPs-packages-maketools-1790000000"
 
 
 class RenderedScript(TypedDict):
@@ -38,6 +49,27 @@ class RenderedScript(TypedDict):
 
     name: str
     text: str
+
+
+def _dialect_scripts() -> list[RenderedScript]:
+    """The Windows dialect's scripts, for the example dispatch.
+
+    Returns:
+        One entry per script, named ``dialect-<act>``.
+    """
+    spoken = WindowsDialect()
+    target = names.dispatch_directory(EXAMPLE_STAGE_ROOT, EXAMPLE_RUN_ID)
+    companion = names.companion_directory(EXAMPLE_STAGE_ROOT, "MCPs")
+    return [
+        RenderedScript(name="dialect-capacity-probe", text=spoken.capacity_probe_script()),
+        RenderedScript(name="dialect-observe-sessions", text=spoken.observe_sessions_script()),
+        RenderedScript(name="dialect-make-directory", text=spoken.make_directory_script(target)),
+        RenderedScript(
+            name="dialect-reset-directory", text=spoken.reset_directory_script(companion)
+        ),
+        RenderedScript(name="dialect-digest", text=spoken.digest_script(target)),
+        RenderedScript(name="dialect-result", text=spoken.result_script(target)),
+    ]
 
 
 def render_all(roster: RunnerSpec) -> list[RenderedScript]:
@@ -58,6 +90,7 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
             name="rebuild-boot-instant", text=runner_rebuild.render_boot_instant_script()
         ),
         RenderedScript(name="rebuild-restart", text=runner_rebuild.render_restart_script()),
+        *_dialect_scripts(),
     ]
     for host in roster["hosts"]:
         scripts.append(
@@ -73,4 +106,10 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
     return scripts
 
 
-__all__ = ["RENDERED_DIRECTORY", "RenderedScript", "render_all"]
+__all__ = [
+    "EXAMPLE_RUN_ID",
+    "EXAMPLE_STAGE_ROOT",
+    "RENDERED_DIRECTORY",
+    "RenderedScript",
+    "render_all",
+]
