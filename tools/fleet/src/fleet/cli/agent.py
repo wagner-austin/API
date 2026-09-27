@@ -88,6 +88,7 @@ REGISTRY_FLAG = "--registry"
 
 _FLAGS = (
     _config.CONFIG_FLAG,
+    _config.RECORDS_FLAG,
     AGENT_FLAG,
     SESSION_FLAG,
     ROOT_FLAG,

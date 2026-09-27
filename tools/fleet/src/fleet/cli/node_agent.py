@@ -99,7 +99,7 @@ _log = get_logger(__name__)
 NODE_FLAG = "--node"
 ANNOUNCE_FLAG = "--announce"
 
-_FLAGS = (_config.CONFIG_FLAG, NODE_FLAG)
+_FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
 
 #: The namespace the runner's session UUID is derived in.
 IDENTITY_NAMESPACE = uuid.NAMESPACE_URL

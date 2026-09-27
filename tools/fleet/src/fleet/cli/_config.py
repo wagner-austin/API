@@ -24,6 +24,18 @@ from fleet.core import _test_hooks, export
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
 
+RECORDS_FLAG = "--records-dir"
+"""The directory the records resolve against, for a document read elsewhere.
+
+Given by :mod:`fleet.cli.rolled` and by nothing else (board task 465689f5).
+A tick runs the agents against the rolled commit's own ``fleet.json``,
+extracted to a scratch directory per commit, while the ledger, the feed and
+the leases are this machine's running state and stay beside the checkout's
+document: resolved against the extraction, every roll would start the fleet
+on empty records, forgetting every lease it holds. Without the flag the
+records resolve against the document's own directory, as they always have.
+"""
+
 
 class LoadedWorkspace:
     """A decoded workspace and the three paths it points at.
@@ -36,8 +48,8 @@ class LoadedWorkspace:
 
     Attributes:
         workspace: The validated document.
-        directory: The directory the document was read from, which its
-            relative paths resolve against.
+        directory: The directory its relative paths resolve against: the
+            one it was read from, or the one ``--records-dir`` named.
     """
 
     workspace: FleetWorkspace
@@ -143,7 +155,8 @@ def load_workspace(parsed: dict[str, str]) -> LoadedWorkspace:
         parsed: Flags already read from the command line.
 
     Returns:
-        The validated workspace and its resolved record paths.
+        The validated workspace, its record paths resolved against
+        ``--records-dir`` when given and the document's directory otherwise.
 
     Raises:
         ValueError: If ``--config`` was not given.
@@ -154,7 +167,9 @@ def load_workspace(parsed: dict[str, str]) -> LoadedWorkspace:
     """
     path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG)).resolve()
     value = load_json_str(_test_hooks.read_text(path))
-    return LoadedWorkspace(decode_fleet_workspace(value), path.parent)
+    records = parsed.get(RECORDS_FLAG)
+    directory = path.parent if records is None else pathlib.Path(records).resolve()
+    return LoadedWorkspace(decode_fleet_workspace(value), directory)
 
 
-__all__ = ["CONFIG_FLAG", "LoadedWorkspace", "load_workspace"]
+__all__ = ["CONFIG_FLAG", "RECORDS_FLAG", "LoadedWorkspace", "load_workspace"]
