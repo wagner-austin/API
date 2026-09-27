@@ -1,54 +1,53 @@
-# Build the agent jar, atomically.
-#
-# The body of the Makefile `agent` recipe. Two subtleties both live in the
-# Move-Item: the jar is assembled under a temporary name so a half-written
-# build can never be the jar a game attaches, and the final rename is
-# promoted to a terminating error (-ErrorAction Stop) because a jar held
-# open by a running JVM fails the move NON-terminatingly otherwise --
-# PowerShell prints the error, skips the catch, and the target reports a
-# successful build over a jar it never replaced. Observed live.
-
+<#
+.SYNOPSIS
+    Build the agent jar, atomically (make agent).
+.DESCRIPTION
+    Two subtleties both live in the final move. The jar is assembled under a
+    temporary name so a half-written build can never be the jar a game
+    attaches, and the rename is a terminating error because a jar held open
+    by a running JVM fails the move non-terminatingly otherwise: PowerShell
+    printed the error, skipped the catch, and the target reported a
+    successful build over a jar it never replaced. Observed live.
+.PARAMETER Javac
+    javac.
+.PARAMETER Jar
+    jar.
+.PARAMETER AgentJar
+    The jar to replace, relative to Root.
+.PARAMETER Release
+    The bytecode level. Required, never defaulted: it decides whether the
+    agent can load into the Linux depot's JRE 8 at all, and a default here
+    would be a second answer to a question rw_bot.harness.agent_build
+    already answers. It was hardcoded to 11 while that said 8, and the jar
+    this script writes is the one that ships.
+.PARAMETER Root
+    The RustedWarfareBot directory.
+#>
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Javac,
     [Parameter(Mandatory = $true)][string]$Jar,
     [Parameter(Mandatory = $true)][string]$AgentJar,
-    # Required, never defaulted. The bytecode level decides whether the agent
-    # can load into the Linux depot's JRE 8 at all, and a default here would
-    # be a second answer to a question rw_bot.harness.agent_build already
-    # answers. It was hardcoded to 11 while that said 8, and the jar this
-    # script writes is the one that ships.
-    [Parameter(Mandatory = $true)][string]$Release
+    [Parameter(Mandatory = $true)][string]$Release,
+    [string]$Root = '.'
 )
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'RwMake.ps1')
 
-$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0, 8)
-$classesDir = "agent/build/classes-$stamp"
+$base = (Resolve-Path -LiteralPath $Root).ProviderPath
+$stamp = [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+$classesDir = "agent\build\classes-$stamp"
 $tmpJar = "$AgentJar.$stamp.new"
-$failed = ""
 try {
-    New-Item -ItemType Directory -Force $classesDir | Out-Null
-    & $Javac --release $Release -Xlint:all -Werror -d $classesDir (
-        Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $_.FullName })
-    if ($LASTEXITCODE -ne 0) {
-        $failed = "javac failed"
+    Invoke-RwAgentCompile $base $Javac $Release $classesDir
+    Invoke-RwAgentJar $base $Jar $tmpJar $classesDir
+    try {
+        Move-Item -Force -LiteralPath (Join-Path $base $tmpJar) -Destination (Join-Path $base $AgentJar)
+    } catch {
+        throw "RW_AGENT_JAR_LOCKED: cannot replace ${AgentJar}: a JVM has it attached with -javaagent. Stop the running game, then retry. ($($_.Exception.Message))"
     }
-    else {
-        & $Jar cfm $tmpJar agent/manifest.mf -C $classesDir .
-        if ($LASTEXITCODE -ne 0) {
-            $failed = "jar failed"
-        }
-        else {
-            try {
-                Move-Item -Force -ErrorAction Stop -LiteralPath $tmpJar -Destination $AgentJar
-            }
-            catch {
-                $failed = "cannot replace ${AgentJar}: a JVM has it attached with -javaagent. " +
-                    "Stop the running game, then retry."
-            }
-        }
-    }
+} finally {
+    Remove-RwBuildPath (Join-Path $base $classesDir)
+    Remove-RwBuildPath (Join-Path $base $tmpJar)
 }
-finally {
-    if (Test-Path $classesDir) { Remove-Item -Recurse -Force $classesDir }
-    if (Test-Path $tmpJar) { Remove-Item -Force $tmpJar }
-}
-if ($failed) { Write-Host "[agent] $failed" -ForegroundColor Red; exit 1 }
