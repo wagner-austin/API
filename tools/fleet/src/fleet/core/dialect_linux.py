@@ -95,6 +95,11 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "report node node\n"
     "report tar tar\n"
     "report cargo cargo\n"
+    "if command -v g++ > /dev/null 2>&1; then\n"
+    "  printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n"
+    "else\n"
+    "  printf 'cxx=no=\\n'\n"
+    "fi\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"
 )

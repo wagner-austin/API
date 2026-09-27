@@ -22,6 +22,7 @@ from __future__ import annotations
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
 from fleet.core.windows_log_tail import windows_log_tail_script
+from fleet.core.windows_toolchain_probe import TOOLCHAIN_PROBE_SCRIPT
 
 #: Task Scheduler's ``SCHED_S_TASK_HAS_NOT_RUN``, 0x00041303.
 #:
@@ -89,61 +90,6 @@ $drive = Get-PSDrive C
 "free_ram_gb={0:N3}" -f ($os.FreePhysicalMemory / 1MB)
 "free_disk_gb={0:N3}" -f ($drive.Free / 1GB)
 "logical_cores={0}" -f (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
-"""
-
-#: The toolchain probe, verbatim.
-#:
-#: ``--version`` is asked of each tool and the first line kept, because git
-#: and poetry both print several. A tool that is present but declines to
-#: answer yields an empty version rather than a failure: absence and silence
-#: are different states, and only the first stops a dispatch.
-#:
-#: ``pip`` is the one manager that is not an executable on PATH but a module
-#: of the interpreter, so it is asked as ``python -m pip --version`` behind the
-#: same ``$python`` the tool loop reported: without the guard a node with no Python
-#: would print a CommandNotFound error where a line was expected. Its output
-#: is collected whole and the first line taken afterwards, NOT piped through
-#: ``Select-Object -First 1`` like the others: that stops the pipeline early,
-#: PowerShell 5.1 then reports the native process as exit -1, and a present
-#: pip read as absent (measured on the hub 2026-09-20).
-#:
-#: A ``python`` that resolves under ``Microsoft\\WindowsApps`` is reported
-#: ABSENT. On a node whose PATH has no real interpreter ahead of it, that is
-#: the App Execution Alias stub, which answers ``--version`` with "Python was
-#: not found; run without arguments to install from the Microsoft Store" and
-#: exit 9009. Read as present, that sentence became the version, the node was
-#: offered no install, and every slime check lavender took died at its
-#: Makefile's first python call (fleet board task e62c8120, 2026-09-22/23).
-#: The real Store build lives under the same directory and is refused too,
-#: deliberately: it sandboxes ``%LOCALAPPDATA%`` writes and broke poetry's
-#: venv on sedona (:mod:`fleet.contracts.toolchain`).
-#:
-#: ``cargo`` is asked though no build requires it: its answer is compared
-#: with the node's ``rust`` declaration (:mod:`fleet.contracts.rust`).
-TOOLCHAIN_PROBE_SCRIPT = """\
-$python = Get-Command python -ErrorAction SilentlyContinue
-if ($python -and $python.Source -like '*\\Microsoft\\WindowsApps\\*') { $python = $null }
-foreach ($tool in @('python','poetry','git','make','node','tar','cargo','winget','choco')) {
-  $found = $python
-  if ($tool -ne 'python') { $found = Get-Command $tool -ErrorAction SilentlyContinue }
-  if ($found) {
-    $raw = (& $tool --version 2>&1 | Select-Object -First 1)
-    $text = ($raw | Out-String).Trim() -replace '[\\r\\n]', ' '
-    "$tool=yes=$text"
-  } else {
-    "$tool=no="
-  }
-}
-if ($python) {
-  $lines = @(& python -m pip --version 2>&1)
-  if ($LASTEXITCODE -eq 0) {
-    "pip=yes=" + (($lines[0] | Out-String).Trim() -replace '[\\r\\n]', ' ')
-  } else {
-    "pip=no="
-  }
-} else {
-  "pip=no="
-}
 """
 
 
@@ -574,7 +520,7 @@ class WindowsDialect:
         """The constant toolchain probe.
 
         Returns:
-            :data:`TOOLCHAIN_PROBE_SCRIPT`.
+            :data:`fleet.core.windows_toolchain_probe.TOOLCHAIN_PROBE_SCRIPT`.
         """
         return TOOLCHAIN_PROBE_SCRIPT
 
@@ -585,7 +531,6 @@ __all__ = [
     "OBSERVE_SESSIONS_SCRIPT",
     "POWERSHELL_INVOCATION",
     "TASK_HAS_NOT_RUN",
-    "TOOLCHAIN_PROBE_SCRIPT",
     "WRITE_COMMAND",
     "WindowsDialect",
 ]

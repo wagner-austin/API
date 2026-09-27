@@ -22,8 +22,14 @@ from __future__ import annotations
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodePlatform
-from fleet.contracts.rust import CARGO, measured_rust, rust_gap
+from fleet.contracts.capability import (
+    MISMATCH_CODE,
+    PROBE_NAME,
+    Capability,
+    capability_gap,
+    measured,
+)
+from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
     REQUIRED_NODE_MAJOR,
@@ -48,11 +54,14 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
         output: The probe script's standard output.
 
     Returns:
-        One report per line naming a required tool, a package manager or
-        cargo, in the order the node emitted them. Empty when no line did.
+        One report per line naming a required tool, a package manager or a
+        declared toolchain's probe line (``cargo``, ``cxx``), in the order
+        the node emitted them. Empty when no line did.
     """
     reports: list[ToolReport] = []
-    wanted = {tool["name"] for tool in REQUIRED_TOOLS} | set(PACKAGE_MANAGERS) | {CARGO}
+    wanted = (
+        {tool["name"] for tool in REQUIRED_TOOLS} | set(PACKAGE_MANAGERS) | set(PROBE_NAME.values())
+    )
     for line in output.splitlines():
         parts = line.strip().split("=", 2)
         if len(parts) != 3 or parts[0] not in wanted:
@@ -183,11 +192,12 @@ def readiness_gap(
         ``NODE_PYTHON_MISMATCH`` when everything is present but the
         interpreter is the wrong minor version, or ``NODE_NODEJS_MISMATCH``
         when Node.js is older than :data:`REQUIRED_NODE_MAJOR`, or
-        ``NODE_RUST_MISMATCH`` when the node declares a Rust toolchain its
-        cargo does not report (:func:`fleet.contracts.rust.rust_gap`).
-        Separate codes because the fixes differ: one is a package manager,
-        the others are a decision about which runtime that machine should
-        carry, and the last is a declaration to correct.
+        ``NODE_RUST_MISMATCH`` / ``NODE_CXX_MISMATCH`` when the node declares
+        a toolchain version its probe does not report
+        (:func:`fleet.contracts.capability.capability_gap`). Separate codes
+        because the fixes differ: one is a package manager, the others are
+        a decision about which runtime that machine should carry, and the
+        last are declarations to correct.
     """
     absent = missing(reports)
     if absent:
@@ -219,9 +229,10 @@ def readiness_gap(
             "required; the TypeScript projects declare that engine, and native modules they "
             "install fail to build under an older one",
         )
-    rust = rust_gap(node["rust"], reports)
-    if rust is not None:
-        return AppError(FleetErrorCode.NODE_RUST_MISMATCH, f"{node_name} ({node['host']}) {rust}")
+    for capability in Capability:
+        gap = capability_gap(capability, declared_capability(node, capability), reports)
+        if gap is not None:
+            return AppError(MISMATCH_CODE[capability], f"{node_name} ({node['host']}) {gap}")
     return None
 
 
@@ -243,8 +254,9 @@ def ready_summary(reports: tuple[ToolReport, ...]) -> str:
         ``python <number>; node <number>; <tool>, <tool> present``, the other
         required tools in the contract's order, e.g. ``python 3.11.9; node
         v24.20.0; poetry, git, make, tar present``, followed by ``; cargo
-        <answer>`` when the probe found a cargo, so a node that has one and
-        declares none is visible on every tick.
+        <answer>`` and ``; cxx <answer>`` for each declared toolchain the
+        probe found, so a node that has one and declares none is visible on
+        every tick.
     """
     judged = {"python", "node"}
     present = [
@@ -253,11 +265,15 @@ def ready_summary(reports: tuple[ToolReport, ...]) -> str:
         if tool["name"] not in judged
         and any(report["name"] == tool["name"] and report["present"] for report in reports)
     ]
-    cargo = measured_rust(reports)
+    found = "".join(
+        f"; {PROBE_NAME[capability]} {version}"
+        for capability in Capability
+        if (version := measured(capability, reports)) is not None
+    )
     return (
         f"python {version_number(reported_version(reports, 'python'))}; "
         f"node {version_number(reported_version(reports, 'node'))}; "
-        f"{', '.join(present)} present" + ("" if cargo is None else f"; cargo {cargo}")
+        f"{', '.join(present)} present{found}"
     )
 
 
