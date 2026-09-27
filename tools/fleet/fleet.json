@@ -258,6 +258,18 @@
         "companions": []
       }
     },
+    "chat/execution": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 1,
+      "expected_minutes": 20,
+      "required_tags": ["windows", "gpu"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/chat.git",
+        "path": "execution",
+        "install": [],
+        "companions": []
+      }
+    },
     "MCPs/packages/wiki-search": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,
