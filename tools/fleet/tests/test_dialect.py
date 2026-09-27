@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from fleet.contracts.node import NodePlatform
+from fleet.contracts.project import MAKE_TARGET
 from fleet.core import dialect, dialect_linux, names
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
@@ -30,7 +31,7 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
         assert "/s/run" in spoken.make_directory_script("/s/run")
         assert "/s/run" in spoken.digest_script("/s/run")
         assert names.ARCHIVE_NAME in spoken.digest_script("/s/run")
-        assert "make check" in spoken.build_script(
+        assert MAKE_TARGET in spoken.build_script(
             target="/s/run", path="libs/x", workers=2, install=(), cache_root="/s/cache"
         )
         assert names.RESULT_NAME in spoken.log_tail_script("/s/run", 5)

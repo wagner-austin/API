@@ -45,9 +45,10 @@ class TestTheBuildRecordsItself:
             target="C:/s/run-1", path="", workers=2, install=(("npm", "ci"),), cache_root="C:/c"
         )
 
-        assert body.splitlines()[0] == (
-            f"$PID | Set-Content -LiteralPath 'C:/s/run-1/{names.PID_NAME}'"
-        )
+        lines = body.splitlines()
+        header = lines.index("$ErrorActionPreference = 'Stop'")
+
+        assert lines[header + 1] == f'$PID | Set-Content -LiteralPath "$Target/{names.PID_NAME}"'
 
 
 class TestTheStopScriptText:

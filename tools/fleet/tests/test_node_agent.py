@@ -242,7 +242,7 @@ class TestCompanions:
 
         sent = [body or b"" for body in runner.stdin]
         committed = sent.index(_companion_commit_script().encode())
-        built = next(index for index, body in enumerate(sent) if b"make check" in body)
+        built = next(index for index, body in enumerate(sent) if b"[string[]]$Install" in body)
         assert committed < built
 
     def test_the_feed_names_the_commit_the_companion_was_measured_with(
@@ -357,11 +357,10 @@ class TestClaiming:
             cache_root="C:/fleet/stage/cache",
         )
         assert runner.stdin[-3] == expected.encode("utf-8")
-        assert "npm ci *>> 'C:/fleet/stage/libs-demo-1757000000/result.txt.log'" in expected
-        assert "$env:npm_config_cache = 'C:/fleet/stage/cache/npm'" in expected
+        assert "[string[]]$Install = @('npm ci')," in expected
+        assert "[string]$CacheRoot = 'C:/fleet/stage/cache'," in expected
         assert (
-            f"Set-Location -LiteralPath 'C:/fleet/stage/libs-demo-1757000000/{DEMO_PROJECT}'"
-            in expected
+            f"[string]$Recipe = 'C:/fleet/stage/libs-demo-1757000000/{DEMO_PROJECT}'," in expected
         )
 
     def test_a_commit_the_mirror_lacks_is_fetched_from_the_declared_remote(

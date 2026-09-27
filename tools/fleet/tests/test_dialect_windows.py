@@ -97,66 +97,74 @@ def _build(
 
 
 class TestBuildScript:
-    def test_it_runs_the_recipe_in_the_project(self) -> None:
+    """The text's parameters and order. The Pester suite over the committed
+    render (tests/pester/rendered-dialect-build.Tests.ps1) runs it against
+    stand-in tools, which is where the transcript and the statuses are
+    measured."""
+
+    def test_the_locations_are_parameters_defaulting_to_the_dispatch(self) -> None:
         body = _build()
 
-        assert f"Set-Location -LiteralPath 'C:/s/run-1/{DEMO_PROJECT}'" in body
-        assert "make check *>> 'C:/s/run-1/result.txt.log'" in body
+        assert "[string]$Target = 'C:/s/run-1'," in body
+        assert f"[string]$Recipe = 'C:/s/run-1/{DEMO_PROJECT}'," in body
+        assert "[string]$CacheRoot = 'C:/s/cache'," in body
+        assert "[string]$Make = 'make'," in body
+        assert '[string]$Cmd = "$env:SystemRoot\\System32\\cmd.exe"' in body
 
     def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:
-        body = _build(path="")
-
-        assert body.count("Set-Location -LiteralPath 'C:/s/run-1'") == 2
+        assert "[string]$Recipe = 'C:/s/run-1'," in _build(path="")
 
     def test_it_pins_the_worker_count(self) -> None:
         body = _build()
 
-        assert "PYTEST_XDIST_AUTO_NUM_WORKERS = '6'" in body
+        assert "[int]$Workers = 6," in body
+        assert '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"' in body
 
     def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
         """A clean export carries no dependencies; the node's cache is where
         they are restored from, and every run on the node shares it."""
         body = _build()
 
-        assert "$env:npm_config_cache = 'C:/s/cache/npm'" in body
-        assert "$env:POETRY_CACHE_DIR = 'C:/s/cache/pypoetry'" in body
-        assert "$env:PLAYWRIGHT_BROWSERS_PATH = 'C:/s/cache/ms-playwright'" in body
+        assert '$env:npm_config_cache = "$CacheRoot/npm"' in body
+        assert '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"' in body
+        assert '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"' in body
 
-    def test_install_steps_run_at_the_root_before_the_recipe_and_end_it_when_they_fail(
-        self,
-    ) -> None:
+    def test_the_install_steps_are_one_string_each_in_order(self) -> None:
         body = _build(install=(("npm", "ci"), ("npx", "playwright", "install", "chromium")))
-        lines = body.splitlines()
 
-        root = lines.index("Set-Location -LiteralPath 'C:/s/run-1'")
-        first = lines.index("npm ci *>> 'C:/s/run-1/result.txt.log'")
-        second = lines.index("npx playwright install chromium *>> 'C:/s/run-1/result.txt.log'")
-        recipe = lines.index(f"Set-Location -LiteralPath 'C:/s/run-1/{DEMO_PROJECT}'")
-        assert root < first < second < recipe
-        assert lines[first - 1] == "Write-Output '$ npm ci' *>> 'C:/s/run-1/result.txt.log'"
-        assert lines[first + 1] == (
-            "if ($LASTEXITCODE -ne 0) { $LASTEXITCODE | Set-Content -LiteralPath "
-            "'C:/s/run-1/result.txt'; exit 0 }"
-        )
+        assert "[string[]]$Install = @('npm ci', 'npx playwright install chromium')," in body
+        assert "[string[]]$Install = @()," in _build(install=())
 
-    def test_it_records_the_status_last(self) -> None:
+    def test_an_install_token_that_cannot_be_embedded_is_refused(self) -> None:
+        with pytest.raises(ValueError, match='install token "it\'s"'):
+            _build(install=(("npm", "it's"),))
+
+    def test_every_native_run_is_cmd_exes_redirection_under_the_strict_header(self) -> None:
+        """So a tool's stderr never reaches PowerShell, and ``Stop`` holds."""
+        body = _build()
+
+        assert "$ErrorActionPreference = 'Stop'" in body
+        assert "Continue" not in body
+        assert "*>>" not in body
+        assert '    & $Shell /d /s /c "$Command >> `"$log`" 2>&1"' in body
+        assert f'$log = "$Target/{names.RESULT_NAME}.log"' in body
+        assert '    $status = Invoke-Logged $Cmd "`"$Make`" check"' in body
+
+    def test_it_records_the_status_last_and_exits_0(self) -> None:
         """The result file's absence is how a run is known to be unfinished.
 
         Written after the recipe, so it can never exist while make is still
         going -- which is what lets `fleet-collect` treat absence as running.
         """
-        body = _build()
-        lines = [line for line in body.splitlines() if line.strip()]
+        lines = _build().splitlines()
 
-        assert lines[-1].startswith("$LASTEXITCODE")
-        assert names.RESULT_NAME in lines[-1]
+        assert lines[-2] == "$status | Set-Content -LiteralPath $result"
+        assert lines[-1] == "exit 0"
 
     def test_it_reads_the_exit_code_and_not_the_success_flag(self) -> None:
-        """`make` writes to stderr on a passing run; under redirection that
-        sets $? false in PS 5.1 while $LASTEXITCODE stays correct."""
         body = _build()
 
-        assert "$LASTEXITCODE" in body
+        assert "    return $LASTEXITCODE" in body
         assert "$?" not in body
 
 

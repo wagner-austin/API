@@ -77,6 +77,7 @@ class TestTheCommittedCopies:
             "dialect-extract",
             "dialect-init-repository",
             "dialect-companion-repository",
+            "dialect-build",
             *(f"rebuild-terminate-{host['name']}" for host in roster["hosts"]),
         ]
 
