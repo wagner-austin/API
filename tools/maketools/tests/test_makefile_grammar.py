@@ -90,6 +90,8 @@ def test_the_recipe_body_drops_make_prefixes() -> None:
         ("cmd > out.txt", "redirection or pipe"),
         ("cmd | tail", "redirection or pipe"),
         ("cd libs/platform_core", "cd (use make -C or a script)"),
+        ("$(MAKE) -C web test", "$(MAKE) (use plain make -C)"),
+        ("@${MAKE} -C ../fleet execution", "$(MAKE) (use plain make -C)"),
     ],
 )
 def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -> None:
@@ -103,7 +105,7 @@ def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -
         '@echo "=== ALL CHECKS PASSED ==="',
         "$(PYTHON) ../../tools/maketools/scripts/run.py test",
         "poetry run pytest -n auto -v --cov-branch --cov=src",
-        "$(MAKE) -C libs/platform_core check",
+        "make -C libs/platform_core check",
         "docker compose --project-directory services/qr-api up -d --build",
         "@# a recipe comment",
         "",
