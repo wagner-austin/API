@@ -9,11 +9,11 @@ disk.
 from __future__ import annotations
 
 import pathlib
-import shutil
 import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import runner_account, runner_keepalive, runner_recovery, runner_render
+from tests._host_bash import host_bash
 from tests._runner_fixtures import a_base
 
 
@@ -253,9 +253,7 @@ class TestLinuxScript:
         resolves bash to System32's WSL launcher, that launcher re-expands
         its argument and turns ``s#$#`` into ``s#0#``, which the 2026-09-26
         review re-run hit and production never can."""
-        bash = shutil.which("bash")
-        if bash is None:
-            raise AssertionError("bash is required to execute the rendered provision lines")
+        bash = host_bash()
         install = RunnerInstall(
             repo="wagner-austin/MCPs",
             runner_name="lavender-wsl",

@@ -12,7 +12,6 @@ all run as rendered.
 from __future__ import annotations
 
 import pathlib
-import shutil
 import subprocess
 import sys
 from typing import Literal
@@ -22,6 +21,7 @@ import pytest
 from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_recovery
 from fleet.core.dialect_windows import POWERSHELL_INVOCATION
+from tests._host_bash import host_bash
 
 _UNIT = "actions.runner.wagner-austin-MCPs.lavender-wsl.service"
 _SERVICE = "actions.runner.wagner-austin-MCPs.lavender"
@@ -102,9 +102,7 @@ class TestTheSystemdLinesRunForReal:
     """The drop-in lands once, byte for byte, and reloads systemd once."""
 
     def test_the_drop_in_is_written_once_and_reloaded_once(self, tmp_path: pathlib.Path) -> None:
-        bash = shutil.which("bash")
-        if bash is None:
-            raise AssertionError("bash is required to execute the rendered provision lines")
+        bash = host_bash()
         lines = runner_recovery.render_wsl_recovery_lines(_install("wsl", _UNIT))
         body = "\n".join(lines).replace("/etc/systemd/system", "units")
         script = 'systemctl() { echo "$*" >> reloads.log; }\n' + body + "\n"
