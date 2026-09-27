@@ -26,8 +26,12 @@ PowerShell-launched make: on Windows every recipe runs under PowerShell
 and only a make started from Git Bash, which hands its PATH down, worked.
 Python is on the PATH of every caller: the recipes run it as ``$(PYTHON)``
 and the hooks as ``python``, as the command itself always required. The
-archive is unpacked with :mod:`tarfile` rather than a ``tar`` binary, which
-differs between Git Bash and Windows.
+archive is unpacked with :mod:`zipfile` rather than a ``tar`` binary, which
+differs between Git Bash and Windows. It is a zip and not a tar because
+``TarFile.extractall`` confines its members only through a ``filter`` that
+exists from Python 3.11.4, and a 3.11.1 node failed on it (MCPs board task
+b61e9fdb); ``ZipFile.extractall`` has always dropped absolute paths and
+``..`` from member names.
 
 Arguments: the maketools command and its arguments. Exit status: the
 command's own; 1 when MCPs' origin/main could not supply it, and 2 when no
@@ -39,8 +43,8 @@ from __future__ import annotations
 import io
 import subprocess
 import sys
-import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 #: The repository whose hooks and Makefile call this, and MCPs beside it.
@@ -65,7 +69,7 @@ def main(arguments: list[str]) -> int:
         sys.stderr.write("published-maketools: usage: published_maketools.py <command> [args...]\n")
         return 2
     archived = subprocess.run(
-        ["git", f"--git-dir={MCPS / '.git'}", "archive", "origin/main", "packages/maketools"],
+        ["git", f"--git-dir={MCPS / '.git'}", "archive", "--format=zip", "origin/main", "packages/maketools"],
         capture_output=True,
         check=False,
     )
@@ -77,8 +81,8 @@ def main(arguments: list[str]) -> int:
         )
         return 1
     with tempfile.TemporaryDirectory(prefix="published-maketools-") as extract:
-        with tarfile.open(fileobj=io.BytesIO(archived.stdout)) as archive:
-            archive.extractall(extract, filter="data")
+        with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:
+            archive.extractall(extract)
         return subprocess.run(
             [sys.executable, str(Path(extract) / LAUNCHER), *arguments], check=False
         ).returncode
