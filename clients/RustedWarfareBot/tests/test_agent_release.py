@@ -71,10 +71,18 @@ def test_the_recipe_and_the_module_agree() -> None:
 
 def test_the_recipe_passes_it_rather_than_hardcoding_one() -> None:
     """``agent.ps1`` took no release parameter and hardcoded 11, so making the
-    Makefile declare a variable would have changed nothing on its own."""
-    script = (_ROOT / "scripts" / "make" / "agent.ps1").read_text(encoding="utf-8")
-    assert "--release $Release" in script
-    assert "--release 11" not in script
+    Makefile declare a variable would have changed nothing on its own.
+
+    The entry hands its -Release to the shared compile, which puts it after
+    javac's --release; tests/pester/make-scripts.Tests.ps1 runs the entry
+    against a stand-in javac and reads ``--release 8`` off its command line.
+    """
+    make = _ROOT / "scripts" / "make"
+    script = (make / "agent.ps1").read_text(encoding="utf-8")
+    assert "Invoke-RwAgentCompile $base $Javac $Release " in script
+    assert "'11'" not in script
+    library = (make / "RwMake.ps1").read_text(encoding="utf-8")
+    assert "@('--release', $Release, " in library
 
 
 def test_the_recipe_forwards_the_variable() -> None:
