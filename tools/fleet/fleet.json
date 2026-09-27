@@ -419,6 +419,22 @@
         "companions": []
       }
     },
+    "MCPs/execution": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 1,
+      "expected_minutes": 10,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "execution",
+        "install": [
+          ["npm", "ci"],
+          ["node", "scripts/ci-build-consumed-workspaces.mjs"],
+          ["npm", "rebuild"]
+        ],
+        "companions": []
+      }
+    },
     "MCPs/gitiles-mcp": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
