@@ -33,14 +33,17 @@ function Initialize-StandIn {
         A .cmd that records its arguments and exits with a chosen code.
     .PARAMETER ExitCode
         What it exits with.
+    .PARAMETER Append
+        Record every call, one line each, instead of the last one only.
     .OUTPUTS
         PSCustomObject: Path (the .cmd) and Record (where its arguments land).
     #>
-    param([int]$ExitCode)
+    param([int]$ExitCode, [switch]$Append)
     $root = Join-Path $TestDrive ('standin-' + [guid]::NewGuid().ToString('N'))
     [void][System.IO.Directory]::CreateDirectory($root)
     $record = Join-Path $root 'arguments.txt'
     $path = Join-Path $root 'tool.cmd'
-    [System.IO.File]::WriteAllText($path, "@echo off`r`necho %*>`"$record`"`r`nexit /b $ExitCode`r`n", [System.Text.Encoding]::ASCII)
+    $redirect = @{ $true = '>>'; $false = '>' }[$Append.IsPresent]
+    [System.IO.File]::WriteAllText($path, "@echo off`r`necho %*$redirect`"$record`"`r`nexit /b $ExitCode`r`n", [System.Text.Encoding]::ASCII)
     return [pscustomobject]@{ Path = $path; Record = $record }
 }
