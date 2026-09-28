@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Final, Protocol
+from typing import Final, Protocol, TypedDict
 
 from platform_core.logging import LogLevel
 
@@ -22,6 +22,11 @@ from tankpit_bot.decoder import DecodedCommand, DecodedLobbyMessage
 #: git as None; what it had no answer for was a git that never returns at all
 #: (board task 0d891468).
 GIT_REV_PARSE_WALL_SECONDS: Final[int] = 60
+
+#: Wall-clock bound on one command :data:`run_command` runs. Thirty
+#: minutes: the slowest command it carries is a first build of the fleet
+#: image on sedona, which takes minutes, and a command past this is hung.
+COMMAND_WALL_SECONDS: Final[int] = 1800
 
 
 class PathExistsProtocol(Protocol):
@@ -271,13 +276,80 @@ def _real_sleep_seconds(seconds: float) -> None:
 sleep_seconds: SleepSecondsProtocol = _real_sleep_seconds
 
 
+class CommandResult(TypedDict):
+    """What one finished command answered.
+
+    Attributes:
+        returncode: The process exit code.
+        stdout: Everything it wrote to standard output.
+        stderr: Everything it wrote to standard error.
+    """
+
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+class RunCommandProtocol(Protocol):
+    """Runs one command to completion and reports what it answered."""
+
+    def __call__(self, argv: list[str], cwd: Path) -> CommandResult:
+        """Run a command.
+
+        Args:
+            argv: The program and its arguments, never through a shell.
+            cwd: The directory to run it in.
+
+        Returns:
+            Its exit code and both streams; a non-zero exit is reported,
+            not raised, so the caller names what failed.
+        """
+        ...
+
+
+def _real_run_command(argv: list[str], cwd: Path) -> CommandResult:
+    """Real implementation using :func:`subprocess.run`.
+
+    Args:
+        argv: The program and its arguments, never through a shell.
+        cwd: The directory to run it in.
+
+    Returns:
+        Its exit code and both streams, decoded as UTF-8.
+
+    Raises:
+        FileNotFoundError: When the program is not on the PATH.
+        subprocess.TimeoutExpired: When it runs past
+            :data:`COMMAND_WALL_SECONDS`.
+    """
+    import subprocess
+
+    completed = subprocess.run(
+        argv,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=COMMAND_WALL_SECONDS,
+    )
+    return CommandResult(
+        returncode=completed.returncode, stdout=completed.stdout, stderr=completed.stderr
+    )
+
+
+run_command: RunCommandProtocol = _real_run_command
+
+
 __all__ = [
+    "CommandResult",
     "HttpGetProtocol",
     "HttpGetResponseProtocol",
     "LogLevel",
     "PathExistsProtocol",
     "ReadTextProtocol",
     "ResolveTreeHashProtocol",
+    "RunCommandProtocol",
     "SessionDecoderProtocol",
     "SetupRichLoggingProtocol",
     "SleepSecondsProtocol",
@@ -286,6 +358,7 @@ __all__ = [
     "path_exists",
     "read_text",
     "resolve_tree_hash",
+    "run_command",
     "setup_rich_logging",
     "sleep_seconds",
 ]
