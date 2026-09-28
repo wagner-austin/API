@@ -69,7 +69,14 @@ def main(arguments: list[str]) -> int:
         sys.stderr.write("published-maketools: usage: published_maketools.py <command> [args...]\n")
         return 2
     archived = subprocess.run(
-        ["git", f"--git-dir={MCPS / '.git'}", "archive", "--format=zip", "origin/main", "packages/maketools"],
+        [
+            "git",
+            f"--git-dir={MCPS / '.git'}",
+            "archive",
+            "--format=zip",
+            "origin/main",
+            "packages/maketools",
+        ],
         capture_output=True,
         check=False,
     )
