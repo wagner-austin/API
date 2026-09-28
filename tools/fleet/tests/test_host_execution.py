@@ -16,7 +16,7 @@ from typing import Final
 
 import pytest
 
-from tests._host import HOST_PLATFORM, MARKERS, PROJECTS
+from tests._host import EXECUTION_ONLY_MARKER, HOST_PLATFORM, MARKERS, PROJECTS
 
 #: The platform this machine is not.
 OTHER_PLATFORM: Final[str] = "linux" if HOST_PLATFORM == "windows" else "windows"
@@ -104,6 +104,36 @@ def test_the_ordinary_run_skips_the_other_platform_naming_its_project(
         f"SKIPPED [1] test_cases.py:5: {reason}"
     ]
     assert not any(line.startswith("host execution on") for line in result.outlines)
+
+
+#: A module with one case that needs the node's rootless daemon.
+DOCKER_CASE: Final[str] = (
+    f"import pytest\n@pytest.mark.{EXECUTION_ONLY_MARKER}\ndef test_isolated():\n    pass\n"
+)
+
+
+def test_the_ordinary_run_skips_a_docker_case_on_every_platform(
+    pytester: pytest.Pytester,
+) -> None:
+    """Even on Linux: API's CI is Linux and has no execdocker user, so only
+    the execution run on a docker node may run it."""
+    result = _session(pytester, DOCKER_CASE, "-rs")
+
+    assert result.ret == pytest.ExitCode.OK
+    result.assert_outcomes(skipped=1)
+    reason = (
+        f"needs a node's execdocker user and its rootless daemon; {PROJECTS['linux']} runs it there"
+    )
+    assert [line for line in result.outlines if line.startswith("SKIPPED")] == [
+        f"SKIPPED [1] test_cases.py:2: {reason}"
+    ]
+
+
+def test_the_execution_run_keeps_a_docker_case_only_on_linux(pytester: pytest.Pytester) -> None:
+    result = _session(pytester, DOCKER_CASE, "--host-execution")
+
+    kept = {"linux": {"passed": 1}, "windows": {"deselected": 1}}[HOST_PLATFORM]
+    result.assert_outcomes(**kept)
 
 
 def test_the_tally_counts_on_the_controller_under_xdist(pytester: pytest.Pytester) -> None:

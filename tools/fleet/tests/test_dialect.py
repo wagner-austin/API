@@ -32,7 +32,12 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
         assert "/s/run" in spoken.digest_script("/s/run")
         assert names.ARCHIVE_NAME in spoken.digest_script("/s/run")
         assert MAKE_TARGET in spoken.build_script(
-            target="/s/run", path="libs/x", workers=2, install=(), cache_root="/s/cache"
+            target="/s/run",
+            path="libs/x",
+            workers=2,
+            install=(),
+            cache_root="/s/cache",
+            isolated_docker=False,
         )
         assert names.RESULT_NAME in spoken.log_tail_script("/s/run", 5)
         assert names.task_name("r") in spoken.launch_script(target="/s/run", run_id="r")

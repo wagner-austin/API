@@ -355,6 +355,7 @@ class TestClaiming:
             workers=rows[0]["workers"],
             install=(("npm", "ci"),),
             cache_root="C:/fleet/stage/cache",
+            isolated_docker=False,
         )
         assert runner.stdin[-3] == expected.encode("utf-8")
         assert "[string[]]$Install = @('npm ci')," in expected

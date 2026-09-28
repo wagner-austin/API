@@ -127,7 +127,12 @@ def _build(
         The script's text.
     """
     return DIALECT.build_script(
-        target=TARGET, path=path, workers=workers, install=install, cache_root="/s/cache"
+        target=TARGET,
+        path=path,
+        workers=workers,
+        install=install,
+        cache_root="/s/cache",
+        isolated_docker=False,
     )
 
 

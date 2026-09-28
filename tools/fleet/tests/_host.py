@@ -23,6 +23,14 @@ are two ways to run the suite:
 Two markers rather than one with an argument, because a marker's arguments
 are untyped and this package's mypy settings refuse an expression of type
 Any in tests as in src.
+
+A THIRD, ``host_linux_docker``, binds a case to Linux like ``host_linux`` but
+runs it ONLY in the execution run: it executes a docker project's build as
+the node's execdocker user against that user's rootless daemon (MCPs board
+task a8ee9b21), which exists on a node carrying the ``docker`` tag and on no
+CI runner. The ordinary run skips it on every platform, naming the project
+that runs it, and the Linux execution run requires it like any host case,
+which is why ``tools/fleet-execution-linux`` requires the ``docker`` tag.
 """
 
 from __future__ import annotations
@@ -37,6 +45,10 @@ HOST_PLATFORM: Final[str] = "windows" if sys.platform == "win32" else "linux"
 
 #: The marker binding a case to each platform.
 MARKERS: Final[dict[str, str]] = {"windows": "host_windows", "linux": "host_linux"}
+
+#: The marker for a Linux host case that needs the node's rootless daemon,
+#: run only by the execution run.
+EXECUTION_ONLY_MARKER: Final[str] = "host_linux_docker"
 
 #: The fleet project that runs each platform's host cases.
 PROJECTS: Final[dict[str, str]] = {
@@ -57,6 +69,8 @@ def bound_platform(item: pytest.Item) -> str | None:
     Returns:
         ``"windows"`` or ``"linux"`` for a host case, else None.
     """
+    if item.get_closest_marker(EXECUTION_ONLY_MARKER) is not None:
+        return "linux"
     for platform, marker in MARKERS.items():
         if item.get_closest_marker(marker) is not None:
             return platform
@@ -128,6 +142,11 @@ def pytest_configure(config: pytest.Config) -> None:
         config.addinivalue_line(
             "markers", f"{marker}: executes this package's scripts on a {platform} host"
         )
+    config.addinivalue_line(
+        "markers",
+        f"{EXECUTION_ONLY_MARKER}: executes a docker project's build as execdocker on a "
+        "linux node carrying the docker tag; only the execution run runs it",
+    )
     execution: bool = config.getoption(EXECUTION_OPTION)
     if execution and not hasattr(config, "workerinput"):
         config.pluginmanager.register(ExecutionTally(), "host-execution-tally")
@@ -148,6 +167,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         items[:] = kept
         return
     for item in items:
+        if item.get_closest_marker(EXECUTION_ONLY_MARKER) is not None:
+            item.add_marker(
+                pytest.mark.skip(
+                    reason="needs a node's execdocker user and its rootless daemon; "
+                    f"{PROJECTS['linux']} runs it there"
+                )
+            )
+            continue
         platform = bound_platform(item)
         if platform is not None and platform != HOST_PLATFORM:
             item.add_marker(

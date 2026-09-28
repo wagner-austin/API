@@ -42,7 +42,12 @@ class TestTheBuildRecordsItself:
         the id; a build that recorded it later would be unstoppable for as
         long as ``npm ci`` ran."""
         body = DIALECT.build_script(
-            target="C:/s/run-1", path="", workers=2, install=(("npm", "ci"),), cache_root="C:/c"
+            target="C:/s/run-1",
+            path="",
+            workers=2,
+            install=(("npm", "ci"),),
+            cache_root="C:/c",
+            isolated_docker=False,
         )
 
         lines = body.splitlines()
