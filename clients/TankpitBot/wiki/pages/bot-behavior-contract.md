@@ -61,6 +61,27 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 | MUST NOT | Lose events emitted in the final tick. |
 | Verified by | `tests/bot/test_interrupt_handling.py` (flag API, `SIGINT`+`SIGTERM` registration by the real installer, `main()` wires `install_signal_handlers(request_interrupt)`); `tests/bot/test_tick_loop_coverage.py::TestInterruptedExitReason::test_pre_set_interrupt_records_interrupted_row` (interrupt flag → graceful tick-boundary exit with the `interrupted` index row AND the `latest.summary.txt` scorecard pinned byte-for-byte with `Exit: interrupted`). TBD closed 2026-07-31: the planned `tests/integration/test_signal_handler.py` was never written under that name; the signal path is pinned in these files. **`crashed` implemented 2026-07-31** — the audit found the 2026-06-20 row had promised `exit_reason="crashed"` with NO writer anywhere in the tree (a crashed session simply vanished from `_index.tsv`); `run_tick_loop` now carries a crash boundary that finalizes the scorecard, `latest.summary.txt`, and the index row as `crashed` and then RE-RAISES so the process still fails loudly. Pinned byte-for-byte in `tests/bot/test_tick_loop_crash.py::TestCrashedExitReason` (protocol-complete exploding frame bus through the constructor DI seam). |
 
+### 1.4 Control verbs (steering a running fleet bot)
+
+The operator's need, carried from 95e5da95 into board task 97975b5d: peel one bot off a long human fight without taking it out of the world. `STOP` ends the session, so a running bot takes verbs short of it.[^4]
+
+| Verb | What it writes | Effect |
+|---|---|---|
+| `hold HUNT` / `hold COLLECT` | `manual_mode` | Pins the durable owner. This is the same pin the single-session service's mode picker writes, so it skips auto-arbitration, including the hunt-only-when-full gate (§3.1). That was already true of the pin; the verb adds no new hunt path. |
+| `disengage` | `clear_combat_target` + `manual_mode = COLLECT` | Drops the combat lock and forages until `release`. The bot stays in the world. |
+| `wind_down` | `wind_down = True` + `manual_mode = None` | The same flag the session clock and the kill target raise (§1.2): no new engagements, top off, exit `session_complete`. It clears the pin because a pinned owner skips the arbitration that holds the stocked exit. A live locked fight still finishes first, as it does for the clock, so `disengage` then `wind_down` leaves one immediately. |
+| `release` | `manual_mode = None` | Auto-arbitration again. |
+| `doctrine <skirmish\|swarm\|duelist\|passive>` | `config.doctrine` | Rewrites the doctrine in place, because a bot reads its environment config once at `Bot.__init__`. The fleet row and the spawn record take the new doctrine too, so an adopting manager and a restart see what now runs. |
+
+| Aspect | Contract |
+|---|---|
+| MUST | Ride ONE channel: a `CONTROL` file beside `STOP` in `runs/bot/<instance>/`, written atomically by the fleet manager, taken at the top of every tick and removed on ingest. The in-process mode bridge steers only the single-session service; it is not a second fleet channel. |
+| MUST | Validate every command with the one decoder, at the manager (`POST /bots/{instance}/control?verb=&argument=` answers 400) and again at the bot. An unknown verb, a missing argument, or an argument on a verb that takes none is a hard error at both ends. A file that is not JSON raises, and it is consumed first so the error does not repeat every tick. |
+| MUST | Refuse a second verb while the first is still pending (HTTP 409), so no verb is overwritten between two ticks. Refuse an unknown instance (404) and one that is not running (409). |
+| MUST NOT | Add a hunt gate or bypass one. Every verb writes a field an existing path already reads. |
+| Known gap | A GATHERER never winds down, from the verb or from the session clock: `_select_owner_mode` returns COLLECT for the role before the wind-down branch, `should_exit_collect` is never true for it (its hunt gate is always closed), and its exhausted cascade holds rather than exits. This predates the verbs and is tracked on the board. |
+| Verified by | `tests/bot/test_control.py` (codec round trip, every refusal, the file taken once, each verb's state, and the pinned-stocked wind-down through the real `decide()`: the flag alone still hunts, the verb exits `session_complete`); `tests/service/test_fleet_control_verbs.py` (the manager's write, pending, unknown and finished refusals, doctrine on the row and the record, and the route's 200/400/404/409); `tests/bot/test_tick_loop_lifecycle.py::TestControlFile` (a real file written by the manager's writer changes the AI state at the next tick and is consumed). Live observation on a running bot is open under board task 97975b5d. |
+
 ## 2. Perception (world state)
 
 ### 2.1 Tank tracking
@@ -263,3 +284,4 @@ None at end of 2026-06-20. The last decoder gap (#72 13-byte 0x43) was a 3-recor
 [^1]: project instruction file `CLAUDE.md` (repo root, on disk): "The wiki is the single source of truth for game mechanics, wire protocol, combat strategy, and architecture decisions" — this page is the bot-obligations slice of that policy.
 [^2]: presence checked 2026-07-23 against the blob-pinned `src/tankpit_bot/bot` tree (frontmatter): patrol/waypoint types in `bot/ai/types.py`/`types_codecs.py`, 0x2B rank handling in `sniffer/world_state_dispatch.py` and `state/self_mutations.py` (the rank field's owner since `state/mutations.py` was split by entity); the block-decision item was the exception and is corrected inline.
 [^3]: standing instruments on disk: `Makefile` targets `check:` (line 88) and `smoke:` (line 102), verified 2026-07-23; the `smoke[N]` indices map to assertions in the smoke script the target runs.
+[^4]: `src/tankpit_bot/bot/control.py`, functions `apply_control`, `take_pending_control` and `write_control`; `src/tankpit_bot/bot/tick_loop.py`, function `run_tick_loop` (the `apply_pending_control` call beside `_apply_pending_mode_override`); `src/tankpit_bot/service/fleet_manager.py`, method `FleetManager.control`; `src/tankpit_bot/service/fleet_routes.py`, function `_add_control_route`; `src/tankpit_bot/bot/ai_strategy.py`, functions `_resolve_owner_mode` (the pin skips arbitration) and `_select_owner_mode` (the gatherer return precedes the wind-down branch); `src/tankpit_bot/bot/ai/mode_gates.py`, function `hunt_entry_permitted` (always False for a gatherer). Read 2026-09-28.

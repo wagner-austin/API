@@ -1,6 +1,6 @@
 """Fleet domain: the instance registry behind the HTTP surface.
 
-Owns spawn/adopt/stop/restart/remove/drain over one bot child process
+Owns spawn/adopt/stop/control/restart/remove/drain over one bot process
 per instance name, and nothing about HTTP. Each bot is a CHILD
 PROCESS, so an orchestrator dying can never kill a live tank -- and
 because they outlive it, the manager both drains them on the way out
@@ -17,6 +17,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.bot.control import ControlCommandDict, ControlVerb, control_pending, write_control
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.constants import FLEET_CHILD_PORT_BASE, FLEET_CHILD_PORT_COUNT
@@ -336,6 +337,36 @@ class FleetManager:
         if bot is None:
             raise FleetError(f"unknown instance {instance!r}")
         self._request_stop(bot)
+        return bot.report()
+
+    def control(self, instance: str, command: ControlCommandDict) -> FleetBotDict:
+        """Hand a running bot a control verb through its ``CONTROL`` file.
+
+        One verb at a time, so none is overwritten between two ticks. A
+        doctrine verb also becomes the row's and the spawn record's, so
+        the page, an adopting manager and a restart see what now runs.
+
+        Args:
+            instance: Registered instance name.
+            command: A command validated by ``make_control_command``.
+
+        Returns:
+            The instance's report row after the request.
+
+        Raises:
+            FleetError: If the instance is unknown or not running, or its
+                previous verb has not been taken yet.
+        """
+        self.require_running(instance)
+        run_dir = bot_run_dir(instance)
+        if control_pending(run_dir):
+            raise FleetError(f"instance {instance!r} has not taken its previous control verb yet")
+        write_control(run_dir, command)
+        bot = self._bots[instance]
+        if command["verb"] is ControlVerb.DOCTRINE:
+            bot.doctrine = command["argument"]
+            self._record_spawn(bot)
+        log.info("Fleet: control %s %r for %r", command["verb"], command["argument"], instance)
         return bot.report()
 
     def _request_stop(self, bot: _ManagedBot) -> None:

@@ -64,6 +64,32 @@ class TestStopFileDetection:
         assert removed_files == [stop_path]
 
 
+class TestControlFile:
+    """A control verb beside STOP lands at the top of a tick."""
+
+    def test_control_verb_is_taken_before_the_tick(self, tmp_path: Path) -> None:
+        """The verb the manager wrote reaches the AI state and the file is consumed.
+
+        Real files in ``tmp_path``: the manager's writer puts the verb
+        where the loop looks, and a STOP beside it ends the session
+        after the one tick.
+        """
+        from tankpit_bot.bot.control import ControlVerb, make_control_command, write_control
+        from tankpit_bot.bot.tick_loop import run_tick_loop
+        from tankpit_bot.types.modes import AIMode
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        stop_path = tmp_path / "STOP"
+        stop_path.write_text("", encoding="utf-8")
+        write_control(tmp_path, make_control_command(ControlVerb.HOLD, "COLLECT"))
+
+        run_tick_loop(bot, _FakePage(), session_seconds=0, stop_file_path=stop_path)
+
+        assert bot._ai_state["manual_mode"] is AIMode.COLLECT
+        assert not (tmp_path / "CONTROL").exists()
+        assert not stop_path.exists()
+
+
 class TestWindDown:
     """Tests for the session wind-down flag."""
 

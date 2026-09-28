@@ -10,7 +10,9 @@ Served at ``GET /`` on the fleet port (default 27300). Two layers:
   renders. Mode band, fuel meter, stocks, do/why/tgt, K/H/M/RJ — all
   identical to what a human sees over the live game.
 * **The fleet table** — lifecycle: status, limits, kills/deaths/rank
-  totals from the digest, stop/restart/remove, and the launch form.
+  totals from the digest, the control verbs for a live bot (hold hunt,
+  hold collect, disengage, wind down, release, doctrine), stop/restart/
+  remove, and the launch form.
   Every selector on that form is a dropdown, never free text:
   accounts come from ``GET /accounts`` (accounts.json), rooms from
   ``GET /rooms`` (:mod:`tankpit_bot.types.rooms`), roles from the
@@ -295,15 +297,25 @@ function row(bot) {
       ? ' <span class="lb">#' + s.leaderboard_position + "</span>" : "") + "</td>" +
     "<td>" + fmtDuration(up) + "</td>";
   const actions = document.createElement("td");
+  // The control verbs steer a LIVE bot through its CONTROL file; the
+  // doctrine button applies whatever the launch form's picker shows.
+  const chosenDoctrine = () => "/control?verb=doctrine&argument=" +
+    encodeURIComponent(document.getElementById("doctrine").value);
   for (const [label, method, path, disabled] of [
-    ["stop", "POST", "/stop", !bot.alive],
-    ["restart", "POST", "/restart", bot.alive],
-    ["remove", "DELETE", "", bot.alive],
+    ["hold hunt", "POST", () => "/control?verb=hold&argument=HUNT", !bot.alive],
+    ["hold collect", "POST", () => "/control?verb=hold&argument=COLLECT", !bot.alive],
+    ["disengage", "POST", () => "/control?verb=disengage", !bot.alive],
+    ["wind down", "POST", () => "/control?verb=wind_down", !bot.alive],
+    ["release", "POST", () => "/control?verb=release", !bot.alive],
+    ["doctrine", "POST", chosenDoctrine, !bot.alive],
+    ["stop", "POST", () => "/stop", !bot.alive],
+    ["restart", "POST", () => "/restart", bot.alive],
+    ["remove", "DELETE", () => "", bot.alive],
   ]) {
     const button = document.createElement("button");
     button.textContent = label;
     button.disabled = disabled;
-    button.onclick = () => act(method, "/bots/" + bot.instance + path);
+    button.onclick = () => act(method, "/bots/" + bot.instance + path());
     actions.appendChild(button);
   }
   tr.appendChild(actions);
