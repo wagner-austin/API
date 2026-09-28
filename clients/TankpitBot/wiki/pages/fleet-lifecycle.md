@@ -14,6 +14,7 @@ source_paths:
   - "src/tankpit_bot/service/serving.py"
   - "scripts/fleet_host.py"
   - "docker-compose.yml"
+  - "Makefile"
 source_git_blobs:
   "src/tankpit_bot/service/fleet.py": "c2aee830aeefa47e937cc0b92609112c308a4291"
   "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
@@ -23,6 +24,7 @@ source_git_blobs:
   "src/tankpit_bot/service/serving.py": "02f70d54653b438e885bf88e1aa1bd52209fd596"
   "scripts/fleet_host.py": "d6b33832c471344d9677134f98334f7acf09f891"
   "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
+  "Makefile": "bf8521b096bdca7b59861fb762513f11765295ac"
 fact_checked: "2026-09-28"
 confidence: high
 hubs: [architecture]
@@ -76,7 +78,7 @@ Since 2026-09-03 the record also carries the child's engagement
 and its **service_port** (so a restarted manager knows which loopback
 port each child's video/frame surface holds — without it,
 `_allocate_service_port` could hand a live child's port to a new
-spawn).
+spawn).[^11]
 
 A record names an **identity, not a pid**. Windows recycles pids, so a
 manager restarted minutes later could otherwise adopt an unrelated
@@ -130,7 +132,7 @@ container manager cannot adopt HOST processes, so any pre-container
 host fleet must be drained (`poetry run tankpit-fleet-down` from its
 release folder) before the first containerized `make up`. Record
 adoption (above) stays too — it is how a restarted manager of EITHER
-kind finds its own children.
+kind finds its own children.[^12]
 
 ## Port 27300 is arbitrated, because Windows loopback is not
 
@@ -204,3 +206,11 @@ child console to a file. The path constant died with the launcher on
       staged and from where; the `public` and `tunnel` services under
       profile `edge` in `docker-compose.yml`. The move is MCPs board task
       `077204e8`.
+[^11]: The `doctrine` and `service_port` fields of the spawn record and
+      its encoder and decoder in `src/tankpit_bot/service/fleet_record.py`;
+      `_allocate_service_port` in `service/fleet_manager.py` reserves the
+      ports of running children only.
+[^12]: `Makefile` § the comment on the retired host-mode targets (fleet /
+      fleet-dev / up-docker / down-docker / image, 2026-09-02);
+      `tankpit-fleet-down` is the `pyproject.toml` console script for
+      `down` in `src/tankpit_bot/service/fleet_control.py`.
