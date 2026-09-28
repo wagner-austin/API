@@ -18,8 +18,10 @@ WHAT ``up`` STAGES, AND FROM WHERE. The host directory on sedona,
   which no repository holds;
 * ``host.env``, naming the release's image for compose to run.
 
-The image is built on sedona, from the release snapshot on the hub, only
-when that tag is not there yet. Compose then runs ON sedona over ssh,
+The edge's images are pulled onto sedona through the hub's docker client
+(:func:`pull_edge` says why not by compose there). The fleet's image is
+built on sedona, from the release snapshot on the hub, only when that tag
+is not there yet. Compose then runs ON sedona over ssh,
 since the mounts are paths on sedona. Last, the public origin is asked
 for the filter's health and the fleet's demo roster, so an ``up`` that
 exits 0 has been seen serving from the internet.
@@ -35,6 +37,7 @@ Usage::
 
 from __future__ import annotations
 
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -188,7 +191,11 @@ def _compose(*args: str) -> list[str]:
 
 
 def stage(project_root: Path, release: Path, secrets_file: Path, scratch: Path) -> None:
-    """Put everything the compose file mounts into sedona's host directory.
+    """Assemble the host directory in ``scratch``, then copy it to sedona's.
+
+    The scratch copy is the host directory without its runtime state, so
+    :func:`pull_edge` can hand the same compose project to the hub's docker
+    client.
 
     Args:
         project_root: This package's directory, inside the git checkout.
@@ -206,13 +213,17 @@ def stage(project_root: Path, release: Path, secrets_file: Path, scratch: Path) 
             f"FLEET_SECRETS_MISSING: {secrets_file} is absent; "
             "it holds the tankpit tunnel's TUNNEL_TOKEN"
         )
+    (scratch / "edge").mkdir()
     for name in COMMITTED_FILES:
         committed = _run(["git", "show", f"HEAD:./{name}"], project_root, "FLEET_NOT_COMMITTED")
-        (scratch / Path(name).name).write_text(committed, encoding="utf-8", newline="")
+        (scratch / name).write_text(committed, encoding="utf-8", newline="")
     (scratch / "host.env").write_text(
         f"FLEET_IMAGE={image_tag(release)}\n", encoding="utf-8", newline=""
     )
+    shutil.copyfile(secrets_file, scratch / "edge.env")
     inputs = release / "clients" / "TankpitBot"
+    for name in RELEASE_FILES:
+        shutil.copyfile(inputs / name, scratch / name)
     # Assigned to $null rather than piped to Out-Null: ssh hands the line
     # to sedona's cmd.exe first, which would take the pipe for its own.
     directories = ", ".join(f"{HOST_DIR}/{name}" for name in ("edge", "data", "runs"))
@@ -221,19 +232,11 @@ def stage(project_root: Path, release: Path, secrets_file: Path, scratch: Path) 
         project_root,
         "FLEET_STAGE_FAILED",
     )
-    top = [
-        str(scratch / "docker-compose.yml"),
-        str(scratch / "host.env"),
-        *[str(inputs / name) for name in RELEASE_FILES],
-    ]
+    top = [str(scratch / name) for name in ("docker-compose.yml", "host.env", "edge.env")]
+    top += [str(scratch / name) for name in RELEASE_FILES]
     _run(["scp", "-q", *top, f"{SEDONA_SSH}:{HOST_DIR}/"], project_root, "FLEET_STAGE_FAILED")
     _run(
-        ["scp", "-q", str(secrets_file), f"{SEDONA_SSH}:{HOST_DIR}/edge.env"],
-        project_root,
-        "FLEET_STAGE_FAILED",
-    )
-    _run(
-        ["scp", "-q", str(scratch / "nginx.conf"), f"{SEDONA_SSH}:{HOST_DIR}/edge/"],
+        ["scp", "-q", str(scratch / "edge" / "nginx.conf"), f"{SEDONA_SSH}:{HOST_DIR}/edge/"],
         project_root,
         "FLEET_STAGE_FAILED",
     )
@@ -247,6 +250,43 @@ def stage(project_root: Path, release: Path, secrets_file: Path, scratch: Path) 
             project_root,
             "FLEET_STAGE_FAILED",
         )
+
+
+def pull_edge(project_root: Path, scratch: Path) -> None:
+    """Pull the edge's images onto sedona through the hub's docker client.
+
+    Not by compose on sedona: Docker Desktop's credential helper cannot
+    reach the Windows credential store from an ssh logon session, so a
+    pull there fails with "A specified logon session does not exist"
+    (measured 2026-09-28). Through ``--host`` the daemon on sedona pulls
+    while the hub answers for credentials, and the image names stay in
+    the compose file alone.
+
+    Args:
+        project_root: Where to run docker from.
+        scratch: The host directory :func:`stage` assembled.
+
+    Raises:
+        FleetHostError: FLEET_PULL_FAILED when a pull fails.
+    """
+    pull = [
+        "docker",
+        "--host",
+        SEDONA_DOCKER_HOST,
+        "compose",
+        "-f",
+        str(scratch / "docker-compose.yml"),
+    ]
+    pull += [
+        "--env-file",
+        str(scratch / "host.env"),
+        "--profile",
+        "edge",
+        "pull",
+        "public",
+        "tunnel",
+    ]
+    _run(pull, project_root, "FLEET_PULL_FAILED")
 
 
 def ensure_image(project_root: Path, release: Path) -> bool:
@@ -321,12 +361,13 @@ def up(project_root: Path, releases_dir: Path, secrets_file: Path) -> list[str]:
 
     Raises:
         FleetHostError: As :func:`newest_release`, :func:`stage`,
-            :func:`ensure_image` and :func:`smoke`; FLEET_COMPOSE_FAILED when
-            compose refuses.
+            :func:`pull_edge`, :func:`ensure_image` and :func:`smoke`;
+            FLEET_COMPOSE_FAILED when compose refuses.
     """
     release = newest_release(releases_dir)
     with tempfile.TemporaryDirectory() as scratch:
         stage(project_root, release, secrets_file, Path(scratch))
+        pull_edge(project_root, Path(scratch))
     built = ensure_image(project_root, release)
     _run(
         _compose("--profile", "edge", "up", "-d", "--no-build", "fleet", "public", "tunnel"),
@@ -416,6 +457,7 @@ __all__ = [
     "image_tag",
     "main",
     "newest_release",
+    "pull_edge",
     "run",
     "smoke",
     "stage",
