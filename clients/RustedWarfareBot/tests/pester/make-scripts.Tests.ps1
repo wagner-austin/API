@@ -267,6 +267,25 @@ Describe 'The match service launchers' {
         } finally { Invoke-TestWorkerEnd $world.Prefix }
         Get-RwWorkerName 'cmd.exe' $world.Prefix | Should -Be @()
     }
+    It 'names no process of the image whose command line is not a worker''s' {
+        # A cmd.exe of this case's own, not left to chance. On the hub some
+        # other cmd.exe is always running and took this arm by accident; on a
+        # clean CI runner the only ones were the workers above, so API's
+        # powershell job (run 36476858256) found the arm untaken.
+        $prefix = 'rwtest' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '-'
+        $other = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\cmd.exe') -ArgumentList '/d', '/c', 'ping -n 60 127.0.0.1 >nul' -WindowStyle Hidden -PassThru
+        try {
+            @(Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$($other.Id)").Count | Should -Be 1
+            Get-RwWorkerName 'cmd.exe' $prefix | Should -Be @()
+        } finally {
+            # The exit codes Invoke-TestWorkerEnd documents: taskkill /T ends
+            # the tree and can report 255 for a root it reached last. The pid
+            # being gone afterwards is what is asserted.
+            $said = & $script:taskkill /F /T /PID $other.Id
+            $LASTEXITCODE | Should -BeIn @(0, 128, 255) -Because "$said"
+            @(Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$($other.Id)").Count | Should -Be 0 -Because "$said"
+        }
+    }
 }
 
 Describe 'Scratch cleanup' {
