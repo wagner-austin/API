@@ -26,6 +26,7 @@ from scripts.fleet_host import (
     ensure_image,
     image_tag,
     newest_release,
+    pull_edge,
     run,
     smoke,
     stage,
@@ -193,12 +194,12 @@ def test_stage_sends_committed_files_release_inputs_and_the_token(
             "-q",
             str(scratch / "docker-compose.yml"),
             str(scratch / "host.env"),
-            str(inputs / ".env"),
-            str(inputs / "accounts.json"),
+            str(scratch / "edge.env"),
+            str(scratch / ".env"),
+            str(scratch / "accounts.json"),
             f"{SEDONA_SSH}:{HOST_DIR}/",
         ],
-        ["scp", "-q", str(secrets), f"{SEDONA_SSH}:{HOST_DIR}/edge.env"],
-        ["scp", "-q", str(scratch / "nginx.conf"), f"{SEDONA_SSH}:{HOST_DIR}/edge/"],
+        ["scp", "-q", str(scratch / "edge" / "nginx.conf"), f"{SEDONA_SSH}:{HOST_DIR}/edge/"],
         [
             "ssh",
             SEDONA_SSH,
@@ -222,6 +223,9 @@ def test_stage_sends_committed_files_release_inputs_and_the_token(
     assert recorder.staged["nginx.conf"] == "server {}\n"
     assert recorder.staged["host.env"] == "FLEET_IMAGE=tankpit-fleet:v0.1.0-cccccccc\n"
     assert recorder.staged["edge.env"] == "TUNNEL_TOKEN=t\n"
+    assert recorder.staged[".env"] == "TANKPIT_URL=x\n"
+    assert recorder.staged["accounts.json"] == "[]\n"
+    assert secrets.read_text(encoding="utf-8") == "TUNNEL_TOKEN=t\n"
 
 
 def test_stage_skips_a_registry_the_release_does_not_carry(tmp_path: Path) -> None:
@@ -269,12 +273,36 @@ def test_stage_refuses_when_sedona_refuses_a_copy(tmp_path: Path) -> None:
     script_hooks.run_command = Recorder({"scp": _fail("scp: permission denied")})
     with pytest.raises(FleetHostError) as raised:
         stage(tmp_path, release, _secrets(tmp_path), scratch)
-    inputs = release / "clients" / "TankpitBot"
-    sent = [scratch / "docker-compose.yml", scratch / "host.env", inputs / ".env"]
-    sent.append(inputs / "accounts.json")
+    sent = [scratch / name for name in ("docker-compose.yml", "host.env", "edge.env", ".env")]
+    sent.append(scratch / "accounts.json")
     assert str(raised.value) == (
         f"FLEET_STAGE_FAILED: scp -q {' '.join(str(path) for path in sent)} "
         f"{SEDONA_SSH}:{HOST_DIR}/ exited 1: scp: permission denied"
+    )
+
+
+def test_pull_edge_pulls_through_the_hubs_client(tmp_path: Path) -> None:
+    """The edge's images are pulled by the staged compose file, against sedona's daemon."""
+    recorder = Recorder({})
+    script_hooks.run_command = recorder
+    pull_edge(tmp_path, tmp_path / "scratch")
+    assert recorder.calls == [
+        ["docker", "--host", SEDONA_DOCKER_HOST, "compose",
+         "-f", str(tmp_path / "scratch" / "docker-compose.yml"),
+         "--env-file", str(tmp_path / "scratch" / "host.env"),
+         "--profile", "edge", "pull", "public", "tunnel"],
+    ]  # fmt: skip
+
+
+def test_pull_edge_refuses_a_failed_pull(tmp_path: Path) -> None:
+    """A pull the registry refuses is refused with the pull's error."""
+    script_hooks.run_command = Recorder({" pull ": _fail("manifest unknown")})
+    with pytest.raises(FleetHostError) as raised:
+        pull_edge(tmp_path, tmp_path)
+    assert str(raised.value) == (
+        f"FLEET_PULL_FAILED: docker --host {SEDONA_DOCKER_HOST} compose "
+        f"-f {tmp_path / 'docker-compose.yml'} --env-file {tmp_path / 'host.env'} "
+        "--profile edge pull public tunnel exited 1: manifest unknown"
     )
 
 
@@ -383,6 +411,9 @@ def test_up_stages_builds_composes_and_smokes(tmp_path: Path) -> None:
     script_hooks.run_command = recorder
     script_hooks.http_get = _serving
     lines = up(tmp_path, tmp_path / "ladder", _secrets(tmp_path))
+    verbs = [call[3] if call[0] == "docker" else call[0] for call in recorder.calls]
+    assert verbs == ["git", "git", "ssh", "scp", "scp", "ssh", "compose", "image", "build", "ssh"]
+    assert recorder.calls[6][-5:] == ["--profile", "edge", "pull", "public", "tunnel"]
     assert recorder.calls[-1] == [
         "ssh",
         SEDONA_SSH,
