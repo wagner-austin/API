@@ -6,8 +6,10 @@ related:
   - "[[adding-a-probe]]"
 source_paths:
   - "Makefile"
+  - "scripts/fleet_host.py"
 source_git_blobs:
   "Makefile": "2905309654f1591c40bc20b5e861670ebdcc36f0"
+  "scripts/fleet_host.py": "d6b33832c471344d9677134f98334f7acf09f891"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]
@@ -37,7 +39,7 @@ hubs: [codebase]
 | `make sim-run` | Production bot vs the simulator on real field01 terrain — no server, no browser, no fuel spent. Artifacts: `runs/probe/latest.sim.*` + `runs/sim/sim-<stamp>.capture_session.json` (standard CaptureSession — `tankpit-audit --runs-dir` can price it). `tankpit-sim-run --rounds N --no-opponent` for variants. See [[physics-module-roadmap]]. |
 | `make sim-run-practice` | Production bot vs a REAL practice room (2026-07-25 rework): a stamp-selected mined layout seeds the full 36-bot roster (ids 500-535, 9/team) at archive-observed positions plus the client's real join spawn, on a static container field (~620-dot exposure atlas at the live ~40% hold rate + measured hidden population (840 fuel, half drained + 180 equipment); no runtime spawning — the respawn law was falsified). Bots driven by the certified `sim/bot_policy`. The fidelity soak: 150/150 rounds sustainably, kills across the map, exposure law 18/18 on the sim's own capture. `tankpit-sim-run --practice`. |
 | `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
-| `make up` / `make down` / `make dev` | THE fleet lifecycle (consolidated 2026-09-02 by operator order — one command, one system). `up`: newest release → build its image if missing (`tankpit-fleet:v<ver>-<sha>`) → run the fleet CONTAINER (manager + N bot children, page on `127.0.0.1:27300`[^3], release's `runs/` + `accounts.json` mounted). `down`: SIGTERM drain, every bot to the lobby, 10 m grace. `dev`: hot-tree foreground manager, development only. Replaced `make fleet`/`fleet-dev` and the host-mode detached pair — see [[fleet-lifecycle]] operator surface for the transition note. Also replaced **`make service`**, the standalone SPA-driven HTTP+SSE server on `0.0.0.0:27100`, deleted 2026-09-03 in `10f97042` along with the config flag that only it justified; `src/tankpit_bot/service/` itself remains and now serves the fleet. |
+| `make up` / `make down` / `make dev` | THE fleet lifecycle (consolidated 2026-09-02 by operator order — one command, one system). Since 2026-09-28 `up` and `down` run on the hub and act on SEDONA, the game host, through `scripts/fleet_host.py`.[^4] `up`: newest release → stage the committed compose file and `edge/nginx.conf` plus the release's `.env` + `accounts.json` into `C:/fleet/tankpit` on sedona → build its image there if missing (`tankpit-fleet:v<ver>-<sha>`) → run the fleet CONTAINER (manager + N bot children, page on sedona's `127.0.0.1:27300`[^3]) with its public edge → wait for `https://tankpit.austinwagner.org` to serve. `down`: SIGTERM drain on sedona, every bot to the lobby, 10 m grace. `dev`: hot-tree foreground manager, development only. Replaced `make fleet`/`fleet-dev` and the host-mode detached pair — see [[fleet-lifecycle]] operator surface for the transition note. Also replaced **`make service`**, the standalone SPA-driven HTTP+SSE server on `0.0.0.0:27100`, deleted 2026-09-03 in `10f97042` along with the config flag that only it justified; `src/tankpit_bot/service/` itself remains and now serves the fleet. |
 | `make smoke` | Shortest live join-and-quit check (`scripts/smoke.py`) |
 | `make debug-run` | Live bot run with protocol frame logging turned up |
 
@@ -87,4 +89,5 @@ Bot runs save to `runs/bot/`, sniffer to `runs/sniff/`, probes to `runs/probe/`.
 
 [^1]: Makefile line 1 — `SHELL := powershell.exe`; Make handles PowerShell internally
 [^2]: `runtime_artifacts.py` — `build_bot_run_artifacts` / `build_sniff_run_artifacts` / `build_probe_run_artifacts` each return both an archive path and a `latest_*_path`; no symlink is created anywhere in the module
+[^4]: `up` and `down` in `scripts/fleet_host.py`, run by the Makefile's `up` and `down` as `poetry run python -m scripts.fleet_host up|down`; its module docstring lists what is staged on sedona and from where. MCPs board task `077204e8`.
 [^3]: `src/tankpit_bot/service/fleet.py:33-34` — `run_web_app(app, host="127.0.0.1", port=port)`, logged as "tankpit-fleet listening on 127.0.0.1:%d". The port default is `FLEET_PORT_DEFAULT = 27300` at `src/tankpit_bot/service/fleet_manager.py:24`, overridden by `TANKPIT_FLEET_PORT` and rejected outside `[1024, 65535]` at `:41`. **Found 2026-08-07:** the Makefile's own `fleet` banner claimed `0.0.0.0:27300`, which was never what the process bound — loopback only, unlike `make service`, which does bind `0.0.0.0`. The banner was corrected to match the code rather than this page to match the banner.

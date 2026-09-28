@@ -8,10 +8,14 @@ source_paths:
   - "src/tankpit_bot/service"
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/stream"
+  - "edge/nginx.conf"
+  - "docker-compose.yml"
 source_git_blobs:
   "src/tankpit_bot/service": "8fb55988f5c6b233fd3b9ab76b05e3c25ad6872f"
   "src/tankpit_bot/bot/config.py": "4d54f7e356112888c83a5788b923dfa1130b6ec8"
   "src/tankpit_bot/stream": "b24edbdd53f315d07737060e1b11fa8dfe003bbd"
+  "edge/nginx.conf": "c333d658863ec86f1ab76a585fe887b3d29169dc"
+  "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
 fact_checked: "2026-09-05"
 confidence: medium
 hubs: [architecture]
@@ -52,9 +56,11 @@ hubs: [architecture]
 > fleet manager, one per instance, on a port from
 > `FLEET_CHILD_PORT_BASE`), and the manager relays their video. A PUBLIC
 > DEMO reaches exactly three routes (`/demo/fleet`, `/demo/spawn`,
-> `/demo/video/{slot}`) through `tankpit-public`, an nginx filter that
-> forwards `/demo/` and 404s everything else so the operator surface on
-> the same port stays unpublished (MCPs `54925b6d`).[^7]
+> `/demo/video/{slot}`) through an nginx filter that forwards `/demo/`
+> and 404s everything else so the operator surface on the same port
+> stays unpublished: MCPs' `tankpit-public` from `54925b6d`, and since
+> 2026-09-28 this package's own `edge/nginx.conf`, the `public` service
+> beside the fleet on sedona.[^7][^9]
 >
 > Sections below marked with a date are kept as history. Where a
 > paragraph describes the SPA in the present tense, read it as "was true
@@ -220,9 +226,10 @@ with them in `10f97042`.[^7]
 FLEET runs it: every fleet child executes `service_main.main()` through
 the child bootstrap, which is why the service's own defaults are now
 fleet defaults. And a PUBLIC DEMO reaches three narrow routes through
-`tankpit-public`, an nginx filter that forwards `/demo/` and 404s
-everything else, so the operator surface on the same port is not
-published (MCPs `54925b6d`).[^7]
+an nginx filter that forwards `/demo/` and 404s everything else, so the
+operator surface on the same port is not published: MCPs'
+`tankpit-public` (`54925b6d`) until 2026-09-28, this package's
+`edge/nginx.conf` since, reached only through tankpit's own tunnel.[^7][^9]
 
 **The idle pin is gone (`ff1ac1be`).** A service session used to submit
 `"UNSET"` to the mode bridge before running the bot, pinning the AI to
@@ -423,3 +430,4 @@ See also: [[coding-standards]] (the strictness rules Phases A / B / C were writt
 [^4]: `Makefile:265-268` — the `service` target (`service: install`) starts the "long-running SPA-driven HTTP + SSE server", listening on `0.0.0.0:27100`. The Startup-folder `.cmd` described here is machine state on the operator's workstation, not a repo artifact, so it is not verifiable from this checkout; only the `make service` entry point it invokes is.
 [^7]: this repo, 2026-09-03: `10f97042` deleted the `service` Makefile target and the `tankpit-bot-service` console script; `ff1ac1be` removed the `_mode_bridge.submit("UNSET")` idle pin from `service/session_runner.py`; `dfdbf310` added `service/demo.py` + `service/demo_routes.py` (the three `/demo/` routes). Cross-repo in `~/PROJECTS/MCPs`: `02cfd967` deleted `fiesta/src/tankbot/`, `fiesta/src/boot/bot-overlay.ts`, `fiesta/profiles/tankpit.json`, the `location /api/tankbot/` block in `fiesta/nginx.conf`, and the `botCommand` / `botVideoUrl` / `botServerLaunchCommand` profile fields; `54925b6d` added `tankpit-public/nginx.conf` (forwards `/demo/`, returns 404 otherwise) and the `tankpit.austinwagner.org` ingress. Fleet children run this service via the child bootstrap in `service/_test_hooks/processes.py`.
 [^8]: measured 2026-09-03 in the fleet container, `tankpit-fleet:v0.1.0-76a0f62b`: a headless Chromium loaded `https://tankpit.com/` and issued five `fetch` POSTs to a loopback listener, counted server-side. 0 of 5 arrived under default launch args; 5 of 5 arrived when Chromium was launched with the Local Network Access and Private Network Access feature checks disabled. Frame delivery timing from the same session: binding frames arrive at 31.3/s during `page.wait_for_timeout`, which is how `bot/tick_loop.py` L 241 and L 246 actually wait, so a tick does not starve the stream.
+[^9]: `edge/nginx.conf` (moved from MCPs `tankpit-public/nginx.conf` with only its comments changed) and the `public` and `tunnel` services under profile `edge` in `docker-compose.yml`: the tunnel runs with `--url http://public:80` on a network the fleet is not on, so the filter is the only thing the internet reaches. MCPs board task `077204e8`.
