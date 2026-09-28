@@ -20,6 +20,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.bot.control import apply_pending_control
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
@@ -98,7 +99,10 @@ def run_tick_loop(
     The stop file is the external graceful-shutdown channel: creating
     it (``make bot-stop``) ends the run at the next tick boundary with
     the same clean teardown as a tick-budget exit. The sentinel is
-    consumed so the next run does not stop instantly.
+    consumed so the next run does not stop instantly. Its sibling,
+    the ``CONTROL`` file, carries the verbs short of stopping (hold,
+    disengage, wind down, release, doctrine; :mod:`tankpit_bot.bot.control`)
+    and is consumed at the top of each tick.
 
     Args:
         bot: Bot instance.
@@ -134,6 +138,8 @@ def run_tick_loop(
     while True:
         _publish_tick_context(bot, ticks_done + 1)
         _apply_pending_mode_override(bot)
+        # A control verb lives beside STOP and lands at the same boundary.
+        bot._ai_state = apply_pending_control(bot._ai_state, stop_file_path.parent)
         if wind_down_at_ms > 0 and waited_ms >= wind_down_at_ms and not bot._ai_state["wind_down"]:
             bot._ai_state["wind_down"] = True
             log.info(
