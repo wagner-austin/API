@@ -373,11 +373,21 @@ class TestStartEncoder:
 
     def test_encoder_with_a_dead_display_is_refused(self, tmp_path: Path) -> None:
         """A display that died between the two starts is reported."""
-        spawner = _SubstitutingSpawner([[sys.executable, "-c", "raise SystemExit(0)"]])
+        # The child lives until the test releases it, AFTER start_display
+        # returned: a child that exited on its own could be seen dead by
+        # start_display's first poll on a loaded machine, which failed
+        # this test there with "Xvfb exited 0 before display :91 came up"
+        # (MCPs board task 077204e8).
+        release = tmp_path / "release"
+        wait_for_release = (
+            f"import os, time\nwhile not os.path.exists({str(release)!r}): time.sleep(0.01)"
+        )
+        spawner = _SubstitutingSpawner([[sys.executable, "-c", wait_for_release]])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
         capture = DisplayCapture(_config(tmp_path / "hls"))
         capture.start_display()
+        release.touch()
         spawner.processes[0].wait(30.0)
 
         with pytest.raises(CaptureError, match="no display to record"):
