@@ -1,5 +1,8 @@
 runs/
 accounts.json
+# The edge's tunnel token, which docker-compose.yml's ``tunnel`` reads;
+# scripts/fleet_host.py stages it on sedona from ~/.tankpit-secrets.
+edge.env
 
 # Analysis / diagnostic byproducts -- regenerated from runs/
 wire_byte_analysis.json
