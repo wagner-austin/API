@@ -11,12 +11,12 @@ source_paths:
   - "edge/nginx.conf"
   - "docker-compose.yml"
 source_git_blobs:
-  "src/tankpit_bot/service": "8fb55988f5c6b233fd3b9ab76b05e3c25ad6872f"
+  "src/tankpit_bot/service": "bebfcf846003f6619ea2a44fd08bcdd1b2cfe407"
   "src/tankpit_bot/bot/config.py": "4d54f7e356112888c83a5788b923dfa1130b6ec8"
   "src/tankpit_bot/stream": "b24edbdd53f315d07737060e1b11fa8dfe003bbd"
   "edge/nginx.conf": "c333d658863ec86f1ab76a585fe887b3d29169dc"
   "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
-fact_checked: "2026-09-05"
+fact_checked: "2026-09-28"
 confidence: medium
 hubs: [architecture]
 ---
@@ -33,6 +33,12 @@ hubs: [architecture]
 > child at `/video/{file}` and by the fleet manager at
 > `/demo/video/{slot}/{file}` straight off the shared filesystem
 > (`service/video_files.py`), no relay and no per-child port dial.
+> The manager serves a slot's files only while its bot is running
+> (`FleetManager.require_running`), and a spawn deletes the slot's
+> previous `hls/` files first (`_clear_stale_stream` in
+> `service/fleet_manager.py`), so a reused slot answers 503 warming
+> until the new session's stream exists instead of replaying the dead
+> bot's last footage.
 > Capture rides the compositor: nothing about video touches the
 > page, the tick loop, or the CDP connection any more, which is the
 > failure class the whole 2026-09-04 slideshow session was spent
@@ -54,7 +60,8 @@ hubs: [architecture]
 > HTTP surface below is still accurate as a route table — what changed
 > is who reaches it. Every FLEET CHILD runs this service (spawned by the
 > fleet manager, one per instance, on a port from
-> `FLEET_CHILD_PORT_BASE`), and the manager relays their video. A PUBLIC
+> `FLEET_CHILD_PORT_BASE`), and the manager serves their video files
+> off the shared filesystem (the 2026-09-05 status above). A PUBLIC
 > DEMO reaches exactly three routes (`/demo/fleet`, `/demo/spawn`,
 > `/demo/video/{slot}`) through an nginx filter that forwards `/demo/`
 > and 404s everything else so the operator surface on the same port
@@ -298,7 +305,7 @@ Every dict that crosses either the HTTP boundary or the cross-thread boundary is
 - `LiveStatsDict{ kills, hits, misses, radars_used, teleports }` — SPA stats panel counters.
 - `SessionStatusDict{ running, manual_mode, active_mode, active_mode_state, session_started_ms, tick_timestamp_ms, stats }` — SSE frame.
 
-`WireMode = Literal["UNSET", "HUNT", "COLLECT", "AUTO"]` — the SPA vocabulary. `wire_mode_to_manual` translates it to the `AIMode | None` the tick loop's `manual_mode` field accepts. `"AUTO"` maps to `None` (restore auto-arbitration).[^1]
+`WireMode` — a `StrEnum` of `UNSET`, `HUNT`, `COLLECT`, `AUTO` in `bus/session_status.py` (a `Literal` until the 2026-09-26 StrEnum conversion) — is the SPA vocabulary, and `decode_mode_command` reads it with `require_member(data, "manual_mode", WireMode)`. `wire_mode_to_manual` translates it to the `AIMode | None` the tick loop's `manual_mode` field accepts: `WireMode.AUTO` maps to `None` (restore auto-arbitration), and the other three words are exactly the `AIMode` words.[^1]
 
 ## Session lifecycle
 

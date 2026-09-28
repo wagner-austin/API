@@ -15,15 +15,15 @@ source_paths:
   - "scripts/fleet_host.py"
   - "docker-compose.yml"
 source_git_blobs:
-  "src/tankpit_bot/service/fleet.py": "56d79de6501b66746acbe98912915e69844552b9"
+  "src/tankpit_bot/service/fleet.py": "c2aee830aeefa47e937cc0b92609112c308a4291"
   "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
-  "src/tankpit_bot/service/fleet_record.py": "5886d2a66b66087f421366aed051793f6154252c"
+  "src/tankpit_bot/service/fleet_record.py": "ca5367073005c0cd30227d51253762ae2e9a9705"
   "src/tankpit_bot/service/fleet_adoption.py": "32d4aaea0a2968db120498eef69b8c8c6d090883"
-  "src/tankpit_bot/service/fleet_manager.py": "2fd3050bcc019edaad12f5874e89c83dc8192826"
-  "src/tankpit_bot/service/serving.py": "5bc4eeb8e04acca18551ab9bb153b812f6b50dbf"
+  "src/tankpit_bot/service/fleet_manager.py": "fbfaad57ea88687ca4cc86ffd885d016db5eaf75"
+  "src/tankpit_bot/service/serving.py": "02f70d54653b438e885bf88e1aa1bd52209fd596"
   "scripts/fleet_host.py": "d6b33832c471344d9677134f98334f7acf09f891"
   "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
-fact_checked: "2026-09-03"
+fact_checked: "2026-09-28"
 confidence: high
 hubs: [architecture]
 ---
@@ -124,7 +124,8 @@ release manager), `make fleet-dev`, and the short-lived
 seam and `FLEET_LOG_PATH`) was deleted outright on 2026-09-03 under
 the same one-system ruling — old release folders keep their own copy
 for fleets started from them. What survives is `tankpit-fleet-down`,
-the transition DRAIN both `make` targets direct operators to: a
+the transition DRAIN both `make` targets directed operators to until
+the fleet moved to sedona on 2026-09-28: a
 container manager cannot adopt HOST processes, so any pre-container
 host fleet must be drained (`poetry run tankpit-fleet-down` from its
 release folder) before the first containerized `make up`. Record
@@ -147,15 +148,20 @@ socket `netstat` does not list, and a host bind gets `WinError
 10048`; the reservation releases seconds after `docker compose down`
 removes the container.
 
-Both `make` targets therefore check WHO owns the port. `up` refuses
-to start behind a non-Docker listener (names the process and pid,
-prints the drain command), then after composing verifies the page
-actually answers `/bots` and force-recreates once if the proxy is
-stale — the URL is printed only after a real response. `down` names
-any non-Docker survivor on the port after the container stops, so
-"still online" is never a mystery. The in-container manager needs no
-guard: it binds `0.0.0.0` in its own namespace, and the observed
-failure was never inside the container.
+From 2026-09-02 until 2026-09-28 both `make` targets therefore checked
+WHO owned the port on the hub. `up` refused to start behind a
+non-Docker listener (naming the process and pid and printing the drain
+command), then verified the page answered `/bots` and force-recreated
+once if the proxy was stale; `down` named any non-Docker survivor on
+the port after the container stopped. Those checks left with the
+fleet: on sedona no host-mode manager ever ran, so there is no
+squatter to arbitrate against, and `up` proves the fleet end to end
+instead, asking the public origin for the filter's `/healthz` (204)
+and the fleet's own `/demo/fleet` (200) and failing by name if either
+never answers.[^10] The Docker port reservation described above still
+applies on sedona, which is Windows too. The in-container manager
+needs no guard: it binds `0.0.0.0` in its own namespace, and the
+observed failure was never inside the container.
 
 A detached HOST manager had no terminal, so its console went to
 `runs/fleet/manager.log` — the same reasoning that sends each bot's
