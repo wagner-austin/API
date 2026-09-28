@@ -233,7 +233,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # projects in it read no second repository; the one that does is
         # dispatched from the queue, where the export lives.
         companions=(),
-        recipe=dispatch.working_tree_recipe(project),
+        recipe=dispatch.working_tree_recipe(project, plan),
     )
 
     _log.info(

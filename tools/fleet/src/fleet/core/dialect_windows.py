@@ -418,6 +418,7 @@ class WindowsDialect:
         workers: int,
         install: tuple[tuple[str, ...], ...],
         cache_root: str,
+        isolated_docker: bool,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -428,12 +429,28 @@ class WindowsDialect:
             workers: Test workers the capacity check granted.
             install: The project's declared install steps, argv each.
             cache_root: The node's cache directory.
+            isolated_docker: True for a project that declares the ``docker``
+                tag, which no Windows node carries.
 
         Returns:
             :func:`fleet.core.windows_build.build_script`'s text, which says
             why every native run goes through cmd.exe and why the caches are
             the node's.
+
+        Raises:
+            ValueError: When ``isolated_docker`` is True. No Windows node
+                declares a rootless daemon (its toolchain probe never answers
+                ``docker=yes``), so the capacity check places no docker
+                project here; a build rendered for one anyway would run its
+                containers as the runner, which is what the isolation exists
+                to prevent, so it is refused rather than rendered.
         """
+        if isolated_docker:
+            raise ValueError(
+                f"the project at {path!r} declares the docker tag, and a Windows node has no "
+                "rootless daemon to isolate its build on; it runs only on a node whose "
+                "execdocker user carries one"
+            )
         return windows_build.build_script(
             target=target, path=path, workers=workers, install=install, cache_root=cache_root
         )

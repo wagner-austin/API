@@ -137,6 +137,7 @@ def _dialect_scripts() -> list[RenderedScript]:
                 workers=EXAMPLE_WORKERS,
                 install=EXAMPLE_INSTALL,
                 cache_root=names.cache_root(EXAMPLE_STAGE_ROOT),
+                isolated_docker=False,
             ),
         ),
     ]

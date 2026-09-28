@@ -332,8 +332,10 @@ def launch_claimed(
             workers=prepared["workers"],
             build_payload=build,
             companions=prepared["companions"],
-            recipe=dispatch.Recipe(
-                path=prepared["source"]["path"], install=prepared["source"]["install"]
+            recipe=dispatch.recipe_for(
+                prepared["plan"],
+                path=prepared["source"]["path"],
+                install=prepared["source"]["install"],
             ),
         )
     except AppError as refusal:

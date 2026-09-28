@@ -33,6 +33,7 @@ import shlex
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
+from fleet.core.linux_isolated_build import isolated_build_lines
 
 #: How a script file is run by path.
 SH_INVOCATION = ("/bin/sh",)
@@ -317,6 +318,7 @@ class LinuxDialect:
         workers: int,
         install: tuple[tuple[str, ...], ...],
         cache_root: str,
+        isolated_docker: bool,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -327,18 +329,28 @@ class LinuxDialect:
         caches, the install steps and their order are the Windows dialect's,
         whose docstring carries the why.
 
+        A docker project's build is :mod:`fleet.core.linux_isolated_build`'s
+        instead: the same steps in the same order, run as execdocker against
+        its rootless daemon, with that user's caches rather than the node's.
+
         Args:
             target: Absolute remote directory holding the export, its root.
             path: The project's directory inside the export, ``""`` for the
                 root.
             workers: Test workers the capacity check granted.
             install: The project's declared install steps, argv each.
-            cache_root: The node's cache directory.
+            cache_root: The node's cache directory, unread by a docker
+                project's build, whose caches are execdocker's.
+            isolated_docker: True for a project that declares the ``docker``
+                tag.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
             to the result file.
         """
+        if isolated_docker:
+            lines = isolated_build_lines(target=target, path=path, workers=workers, install=install)
+            return PROLOGUE + "\n".join(lines) + "\n"
         log = names.log_path(target)
         result = f"{target}/{names.RESULT_NAME}"
         lines = [

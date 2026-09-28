@@ -273,6 +273,7 @@ class Dialect(Protocol):
         workers: int,
         install: tuple[tuple[str, ...], ...],
         cache_root: str,
+        isolated_docker: bool,
     ) -> str:
         """The script that readies the tree, runs the suite and records its
         status last.
@@ -286,10 +287,18 @@ class Dialect(Protocol):
                 before the recipe, each an argv in the source grammar.
             cache_root: The node's cache directory, which the package
                 managers are pointed at.
+            isolated_docker: True for a project that declares the ``docker``
+                tag, whose install steps and recipe then run as the node's
+                execdocker user against its rootless daemon, never as the
+                runner (:mod:`fleet.core.linux_isolated_build`).
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
             to the result file, so the file's absence means running.
+
+        Raises:
+            ValueError: From a dialect whose nodes carry no rootless daemon,
+                when ``isolated_docker`` is True.
         """
         ...
 

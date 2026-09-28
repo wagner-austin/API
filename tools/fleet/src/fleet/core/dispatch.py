@@ -49,6 +49,7 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig
+from fleet.contracts.tags import NodeTag
 from fleet.core import (
     _test_hooks,
     dialect,
@@ -186,10 +187,16 @@ class Recipe(TypedDict):
         install: The steps run at the tree's root before the recipe, each an
             argv in the source grammar; empty when the recipe installs its
             own dependencies.
+        isolated_docker: True when the project declares the ``docker`` tag,
+            so its build runs as the node's execdocker user against that
+            user's rootless daemon, never as the runner, whose own daemon on
+            diphtheria is the production stack's
+            (:mod:`fleet.core.linux_isolated_build`).
     """
 
     path: str
     install: tuple[tuple[str, ...], ...]
+    isolated_docker: bool
 
 
 def working_tree_payload(
@@ -235,7 +242,26 @@ def working_tree_payload(
     return build
 
 
-def working_tree_recipe(project: str) -> Recipe:
+def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[tuple[str, ...], ...]) -> Recipe:
+    """The recipe for one project, isolated when it declares the docker tag.
+
+    The one place the tag becomes the isolation, so the queue's lane and the
+    working-tree lane cannot disagree about which builds run as execdocker.
+
+    Args:
+        plan: The project's declaration, whose ``required_tags`` decide.
+        path: The project's directory inside the staged tree.
+        install: The steps run at the tree's root before the recipe.
+
+    Returns:
+        The recipe.
+    """
+    return Recipe(
+        path=path, install=install, isolated_docker=NodeTag.DOCKER in plan["required_tags"]
+    )
+
+
+def working_tree_recipe(project: str, plan: ProjectConfig) -> Recipe:
     """The recipe a working-tree dispatch runs: ``make check`` in the
     project's own directory, whose key IS its repo-relative path, with no
     install steps because every poetry project here installs inside its
@@ -243,11 +269,12 @@ def working_tree_recipe(project: str) -> Recipe:
 
     Args:
         project: Repo-relative project path.
+        plan: The project's declaration.
 
     Returns:
         The recipe.
     """
-    return Recipe(path=project, install=())
+    return recipe_for(plan, path=project, install=())
 
 
 def start(
@@ -427,6 +454,7 @@ def launch(
             workers=workers,
             install=recipe["install"],
             cache_root=names.cache_root(node["stage_root"]),
+            isolated_docker=recipe["isolated_docker"],
         ),
         platform=node["platform"],
     )
@@ -532,6 +560,7 @@ __all__ = [
     "closed_row",
     "finish",
     "launch",
+    "recipe_for",
     "start",
     "started_row",
     "working_tree_payload",
