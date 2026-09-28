@@ -1,0 +1,98 @@
+name: powershell
+
+# EVERY POWERSHELL FILE API TRACKS, RUN THROUGH MCPs' HARNESS ON WINDOWS
+# POWERSHELL 5.1 (MCPs board task d69786fa, criterion A3).
+#
+# `make check-powershell` is the target API's `make lint` depends on: it runs
+# MCPs' scripts/ps-harness, as MCPs' origin/main carries it, over this
+# repository through .githooks/published_maketools.py, which reads MCPs at
+# exactly ../MCPs. The harness guards and analyses every tracked .ps1 and runs
+# its Pester suite to 100 percent of commands and branch arms, and it prints
+# one pass line of N of N scripts, commands and branches. This job runs that
+# target, never a restatement of it, so the definition stays in the Makefile.
+#
+# Windows PowerShell 5.1, because the harness runs under the edition the
+# scripts run under, and every Windows node runs these scripts under 5.1.
+# Nothing else in API's CI runs on Windows PowerShell: packages.yml runs
+# tools/fleet on ubuntu-latest, which skips every Windows host case.
+#
+# MCPs BESIDE THIS CHECKOUT, read with a read-only deploy key (MCPs board card
+# c783c01a, decided 2026-09-28: the key is on wagner-austin/MCPs and its
+# private half is this repository's MCPS_READ_DEPLOY_KEY secret), the same two
+# steps corvis-stick's and chat's CI take. actions/checkout refuses a path
+# outside the workspace, so MCPs is checked out inside it and cloned from
+# there to ../MCPs, whose origin/main is then MCPs' main. The key never
+# touches the disk: checkout holds it for its own fetch and persists nothing.
+# The inner checkout is removed once cloned, because the harness inventories
+# this repository through git and must not meet MCPs' files inside it.
+#
+# The two modules are the versions MCPs' requirements file pins, saved from
+# the gallery as MCPs' own powershell job saves them, into a directory put
+# first on PSModulePath. make is installed at a pinned version, because the
+# hosted image does not promise GNU make on PATH.
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: powershell-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Check out MCPs, read-only
+        uses: actions/checkout@v7
+        with:
+          repository: wagner-austin/MCPs
+          ref: main
+          ssh-key: ${{ secrets.MCPS_READ_DEPLOY_KEY }}
+          persist-credentials: false
+          path: .mcps-source
+
+      - name: Lay MCPs beside this checkout
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE '.mcps-source'
+          $beside = Join-Path '${{ runner.workspace }}' 'MCPs'
+          if (Test-Path -LiteralPath $beside) { Remove-Item -LiteralPath $beside -Recurse -Force }
+          git clone --quiet --depth 1 ([Uri]$source).AbsoluteUri $beside
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -LiteralPath $source -Recurse -Force
+
+      - name: Install pinned PowerShell test dependencies
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
+          $moduleRoot = Join-Path $env:RUNNER_TEMP ('api-powershell-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $moduleRoot | Out-Null
+          $requirements = Import-PowerShellDataFile (Join-Path '${{ runner.workspace }}' 'MCPs\scripts\powershell-requirements.psd1')
+          foreach ($requirement in $requirements.GetEnumerator()) {
+            Save-Module -Name $requirement.Key -RequiredVersion $requirement.Value -Repository PSGallery -Path $moduleRoot
+          }
+          "PSModulePath=$moduleRoot;$env:PSModulePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install make
+        run: |
+          choco install make --version 4.4.1 -y --no-progress
+          exit $LASTEXITCODE
+
+      - name: The MCPs harness over every tracked PowerShell file
+        run: |
+          make check-powershell
+          exit $LASTEXITCODE
