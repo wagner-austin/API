@@ -21,6 +21,7 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.bot.control import decode_control_command
 from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.service.demo_routes import add_demo_routes
 from tankpit_bot.service.fleet_config import (
@@ -305,6 +306,41 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
     app.router.add_delete("/bots/{instance}", remove_bot)
 
 
+def _add_control_route(app: web.Application, manager: FleetManager) -> None:
+    """Wire the control verbs for a LIVE bot.
+
+    Its own registrar rather than one more branch of the lifecycle
+    group: those routes start and end a bot, this one steers one that
+    keeps running.
+
+    Args:
+        app: Application under construction.
+        manager: The fleet registry holding the bot.
+    """
+
+    async def control_bot(request: web.Request) -> web.Response:
+        """``POST /bots/{instance}/control?verb=...&argument=...`` — steer a live bot."""
+        try:
+            command = decode_control_command(
+                {
+                    "verb": request.query.get("verb", ""),
+                    "argument": request.query.get("argument", ""),
+                }
+            )
+        except JSONTypeError as error:
+            log.warning("Fleet: rejected control request (400): %s", error)
+            return web.Response(status=400, text=f"bad control request: {error}")
+        try:
+            row = manager.control(request.match_info["instance"], command)
+        except FleetError as error:
+            status = 404 if "unknown instance" in str(error) else 409
+            log.warning("Fleet: refused control (%d): %s", status, error)
+            return web.Response(status=status, text=str(error))
+        return _json_response(encode_fleet_bot(row))
+
+    app.router.add_post("/bots/{instance}/control", control_bot)
+
+
 def _add_shutdown_route(app: web.Application, manager: FleetManager) -> None:
     """Wire the manager's own shutdown.
 
@@ -348,6 +384,7 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
     _add_telemetry_routes(app, manager)
     _add_video_routes(app, manager)
     _add_lifecycle_routes(app, manager)
+    _add_control_route(app, manager)
     _add_shutdown_route(app, manager)
     add_demo_routes(app, manager)
     return app
