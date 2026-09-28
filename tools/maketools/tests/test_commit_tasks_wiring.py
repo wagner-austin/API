@@ -68,15 +68,25 @@ def test_commit_msg_asks_before_the_commit_exists_reading_only_the_repository() 
 def test_published_maketools_runs_origin_main_reading_no_environment() -> None:
     text = (ROOT / ".githooks" / "published_maketools.py").read_text(encoding="utf-8")
     lines = [line.strip() for line in text.splitlines()]
-    assert (
-        '["git", f"--git-dir={MCPS / \'.git\'}", "archive", "--format=zip", "origin/main", '
-        '"packages/maketools"],'
-    ) in lines
+    # One argument per line, as MCPs board task 51723beb wrote it for chat's
+    # line limit (chat 89520c8); the whole list, in order.
+    archive_arguments = [
+        '"git",',
+        "f\"--git-dir={MCPS / '.git'}\",",
+        '"archive",',
+        '"--format=zip",',
+        '"origin/main",',
+        '"packages/maketools",',
+    ]
+    start = lines.index(archive_arguments[0])
+    assert lines[start : start + len(archive_arguments)] == archive_arguments
     # A zip, unpacked by zipfile, which confines member paths on every
     # Python 3.11; tarfile needs a filter only 3.11.4 has (board task b61e9fdb).
-    assert "with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:" in lines
+    assert lines.count("with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:") == 1
     assert "tarfile" not in text
-    assert "[sys.executable, str(Path(extract) / LAUNCHER), *arguments], check=False" in lines
+    assert (
+        lines.count("[sys.executable, str(Path(extract) / LAUNCHER), *arguments], check=False") == 1
+    )
     # Nothing a caller sets can change which command runs or skip it.
     assert [word for word in ("environ", "getenv", "argv[0]") if word in text] == []
 
