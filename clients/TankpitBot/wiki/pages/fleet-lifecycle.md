@@ -12,6 +12,8 @@ source_paths:
   - "src/tankpit_bot/service/fleet_adoption.py"
   - "src/tankpit_bot/service/fleet_manager.py"
   - "src/tankpit_bot/service/serving.py"
+  - "scripts/fleet_host.py"
+  - "docker-compose.yml"
 source_git_blobs:
   "src/tankpit_bot/service/fleet.py": "56d79de6501b66746acbe98912915e69844552b9"
   "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
@@ -19,6 +21,8 @@ source_git_blobs:
   "src/tankpit_bot/service/fleet_adoption.py": "32d4aaea0a2968db120498eef69b8c8c6d090883"
   "src/tankpit_bot/service/fleet_manager.py": "2fd3050bcc019edaad12f5874e89c83dc8192826"
   "src/tankpit_bot/service/serving.py": "5bc4eeb8e04acca18551ab9bb153b812f6b50dbf"
+  "scripts/fleet_host.py": "d6b33832c471344d9677134f98334f7acf09f891"
+  "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
 fact_checked: "2026-09-03"
 confidence: high
 hubs: [architecture]
@@ -109,8 +113,8 @@ this work.
 
 | Command | Effect |
 |---|---|
-| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era): resolve the newest release, build its image if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, and compose the fleet CONTAINER up with the release's own `runs/` and `accounts.json` mounted. Prints the fleet page URL. |
-| `make down` | Drain: `docker stop`'s SIGTERM enters `drain_on_interrupt`, every bot quits to the lobby, the container exits after the last one (grace 10 m). |
+| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era), run on the hub against SEDONA, the game host, since 2026-09-28: resolve the newest release, stage the committed compose file, `edge/nginx.conf` and the release's `.env` and `accounts.json` into `C:/fleet/tankpit` on sedona, build the image there if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, compose the fleet CONTAINER up with its public edge (the `/demo/`-only filter and tankpit's own tunnel), and wait for `https://tankpit.austinwagner.org` to serve.[^10] |
+| `make down` | Drain on sedona: `docker stop`'s SIGTERM enters `drain_on_interrupt`, every bot quits to the lobby, the container exits after the last one (grace 10 m). The edge stays up and the demo reads offline.[^10] |
 | `make dev` | The only other manager: hot tree, foreground, development only — Ctrl+C drains. |
 
 Retired the same day, one system not two: `make fleet` (foreground
@@ -189,3 +193,8 @@ child console to a file. The path constant died with the launcher on
       `test_liveness_never_depends_on_recovering_an_exit_code`
       (`tests/service/test_fleet_process_hooks.py`). Diagnosed live
       2026-09-01, see `wiki/log.md`.
+[^10]: `up`, `stage`, `pull_edge`, `ensure_image`, `smoke` and `down`
+      in `scripts/fleet_host.py`, whose module docstring lists what is
+      staged and from where; the `public` and `tunnel` services under
+      profile `edge` in `docker-compose.yml`. The move is MCPs board task
+      `077204e8`.
