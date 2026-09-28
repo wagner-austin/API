@@ -5,12 +5,21 @@
 #     docker compose run --rm bot
 #
 # The FLEET (manager + N bot processes in ONE container — the spawner
-# forks `sys.executable -c` children, so it works unchanged inside):
-#     make image                # build from the newest release snapshot
-#     make up-docker            # start; fleet page http://127.0.0.1:27300/
-#     make down-docker          # graceful drain (docker stop -> SIGTERM ->
+# forks `sys.executable -c` children, so it works unchanged inside)
+# runs on sedona, the game host, with its public edge beside it:
+#     make release              # freeze a runnable snapshot on the hub
+#     make up                   # scripts/fleet_host.py: stage this file,
+#                               # edge/ and the release's inputs on
+#                               # sedona, build the release's image
+#                               # there, compose up fleet + edge
+#     make down                 # graceful drain (docker stop -> SIGTERM ->
 #                               # drain_on_interrupt; every bot quits to
 #                               # the lobby before the manager exits)
+#
+# The EDGE (profile ``edge``) is what makes the demo public:
+# ``public`` is the /demo/-only filter (edge/nginx.conf) and ``tunnel``
+# is tankpit's own Cloudflare tunnel, which can reach ``public`` and
+# nothing else. A fleet started without the profile is a private fleet.
 #
 # The capture lands in ./runs on the host, because the event log is what
 # the session exists to produce — and for the fleet the shared ./runs
@@ -25,6 +34,10 @@
 # builds with the newest RELEASE SNAPSHOT as the context instead, so
 # the image tag carries the same sha discipline as the `make fleet`
 # ladder; FLEET_IMAGE selects that tag here.
+
+# Named, so the containers keep their names (tankpitbot-fleet-1) in
+# whatever directory a host stages this file into.
+name: tankpitbot
 
 services:
   fleet:
@@ -64,20 +77,15 @@ services:
     ports:
       # Loopback only, and it stays that way. The demo at
       # austinwagner.org/tankpit does NOT reach the fleet through this
-      # mapping — it reaches ``tankpit-public`` on the network below,
-      # which forwards ``/demo/`` and 404s the operator surface. This
-      # port is the operator's own door and is not published.
+      # mapping — it reaches ``public`` below, which forwards
+      # ``/demo/`` and 404s the operator surface. This port is the
+      # operator's own door and is not published.
       - "127.0.0.1:27300:27300"
     networks:
-      # The manager's own network, so nothing here changes for a fleet
-      # run that is not being demoed.
+      # The project's own network, shared with ``public`` only. The
+      # tunnel is not on it, so nothing the internet reaches can
+      # resolve ``fleet``.
       - default
-      # The tunnel's network, joined as external. cloudflared and the
-      # public filter live in the MCPs workspace compose; this is the
-      # only way a container there can resolve ``fleet``. Joining a
-      # network is not publishing a port: the filter is still the only
-      # thing on that network that answers from the internet.
-      - mcp-network
     volumes:
       - ./runs:/app/runs
       - ./accounts.json:/app/accounts.json:ro
@@ -150,16 +158,61 @@ services:
     # both wrong for a demo and a way to hammer a third-party server.
     restart: "no"
 
+  # The public edge: a FILTER, not a proxy. It forwards /demo/ to the
+  # fleet and answers 404 to everything else, which is the entire reason
+  # tankpit.austinwagner.org is safe to publish without a login
+  # (edge/nginx.conf says why). Until 2026-09-28 this was
+  # mcp-tankpit-public in the MCPs workspace compose and the fleet joined
+  # mcp-network to be reached; the game host owns its own edge now.
+  public:
+    profiles: ["edge"]
+    image: nginx:1.27-alpine
+    volumes:
+      - ./edge/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      # Answers for the filter only, never for the fleet behind it: a
+      # host that simply is not running bots is not an outage of this
+      # container.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - default
+      - edge
+    init: true
+    restart: unless-stopped
+
+  # tankpit's own Cloudflare tunnel (tankpit, 171335a4), run by token.
+  # ``--url`` is its only origin, and it sits on the ``edge`` network
+  # alone, so the one thing the internet can reach is the filter.
+  tunnel:
+    profiles: ["edge"]
+    # Pinned: an unattended binary swap under a live demo is worse than a
+    # slightly old connector. Moved by hand, when someone is watching.
+    image: cloudflare/cloudflared:2026.6.1
+    # HTTP/2 to the edge, not QUIC: QUIC connections flapped on
+    # 2026-09-17 on this host's neighbours while http2 tunnels held.
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "run", "--url", "http://public:80"]
+    # TUNNEL_TOKEN, staged from the hub's ~/.tankpit-secrets/edge.env by
+    # scripts/fleet_host.py and never committed.
+    env_file:
+      - edge.env
+    depends_on:
+      public:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - edge
+    restart: unless-stopped
+
 networks:
-  # The fleet's own network, created per-project as compose always did.
+  # The fleet's own network, shared with the filter.
   default:
-  # The MCPs workspace's bridge, created by ITS compose (`name:
-  # mcp-network`). External because this compose must never be the one
-  # that creates it: a fleet started before the workspace would
-  # otherwise make an empty network of the same name, and cloudflared
-  # would come up on a different bridge with the same label and resolve
-  # nothing. Absent workspace means `make up` fails by name here, which
-  # is the honest failure — the demo edge genuinely is not there.
-  mcp-network:
-    external: true
-    name: mcp-network
+  # The filter and the tunnel. The fleet is not on it.
+  edge:

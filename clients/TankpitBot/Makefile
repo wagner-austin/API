@@ -51,8 +51,8 @@ help:
 	@echo "  make track                       enemy tracking probe (wire vs JS truth)"
 	@echo "  make bot                         live HFSM bot"
 	@echo "  make run                         5-min timed session + scorecard"
-	@echo "  make up                          THE fleet command: newest release to image to container, page on 27300 (Windows hub)"
-	@echo "  make down                        drain every bot to the lobby, then stop the container (Windows hub)"
+	@echo "  make up                          THE fleet command: newest release to image to container on sedona, with its public edge (run from the Windows hub)"
+	@echo "  make down                        drain every bot to the lobby, then stop the container on sedona (run from the Windows hub)"
 	@echo "  make dev                         fleet manager on the HOT TREE, foreground (development only)"
 	@echo "  make analyze                     issue report + run audit + cross-session stats"
 	@echo "  make digest                      compact per-run truth table (works on crashed runs)"
@@ -378,12 +378,16 @@ analyze-viewport:
 
 # THE fleet lifecycle is ONE pair (operator order 2026-09-02: "one
 # single command we use to start this ish"): ``make up`` runs the
-# fleet CONTAINER from the newest release -- it resolves the release,
-# builds its image if that exact tag does not exist yet
+# fleet CONTAINER from the newest release ON SEDONA, the game host
+# (since 2026-09-28, MCPs board task 077204e8; scripts/fleet_host.py
+# says what it stages there and from where) -- it resolves the release,
+# builds its image on sedona if that exact tag does not exist yet
 # (tankpit-fleet:v<ver>-<sha>, built FROM the snapshot so the tag
 # carries the ladder's sha and a hot-tree build can never masquerade
-# as a release), then composes it up with the release's own runs/ and
-# accounts.json mounted. ``make down`` is a DRAIN, never a kill:
+# as a release), then composes it up with its public edge (the
+# /demo/-only filter and tankpit's own tunnel) and asks
+# https://tankpit.austinwagner.org whether it serves. ``make down`` is
+# a DRAIN, never a kill:
 # docker stop's SIGTERM enters drain_on_interrupt, every bot quits to
 # the lobby, and the container exits after the last one lands
 # (stop_grace_period 10m -- interrupting the wait is safe, the manager
@@ -407,19 +411,9 @@ analyze-viewport:
 # its release folder) before the first containerized ``make up``, or
 # its spawn records on the shared runs/ volume will read as dead.
 #
-# Both targets check WHO holds 27300, because Windows loopback has no
-# exclusive bind by default: Docker's port proxy binds
-# 127.0.0.1:27300 without error while a host-mode manager already
-# holds it, and the page silently stays the host manager's (observed
-# 2026-09-02 -- a leftover host manager answered http://127.0.0.1:27300/
-# through a full container up/down cycle). A non-Docker owner means a
-# host-mode manager: ``up`` refuses to start behind one, ``down``
-# names it after the container stops so "still online" is never a
-# mystery.
-#
 # WINDOWS-ONLY, and fenced as such: the release ladder lives at a Windows
-# path on the hub, the port-owner check is Get-NetTCPConnection, and the
-# fleet container is operated from the hub. The else arm refuses with the
+# path on the hub, and the fleet on sedona is operated from the hub,
+# which holds the tunnel token (~/.tankpit-secrets). The else arm refuses with the
 # reason so a Linux checkout gets an answer rather than a parse error.
 ifeq ($(OS),Windows_NT)
 release:
@@ -429,13 +423,13 @@ release:
 
 up:
 	@Write-Host ""
-	@Write-Host "==> up (the fleet: newest release, containerized)" -ForegroundColor Cyan
-	$$own = Get-NetTCPConnection -LocalPort 27300 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($$null -ne $$own) { $$proc = Get-Process -Id $$own.OwningProcess; if ($$proc.ProcessName -notlike "*docker*") { Write-Host "[up] port 27300 is already held by $$($$proc.ProcessName) (pid $$($$own.OwningProcess)) -- a HOST-mode fleet manager, not the container." -ForegroundColor Red; Write-Host "[up] drain it first: poetry run tankpit-fleet-down" -ForegroundColor Red; exit 1 } }; $$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; $$tag = "tankpit-fleet:$$($$rel.Name)"; docker image inspect $$tag 2>&1 | Out-Null; if ($$LASTEXITCODE -ne 0) { Write-Host "  Image $$tag not built yet; building from the snapshot (first run takes minutes)" -ForegroundColor DarkGray; docker build -f (Join-Path $$rel.FullName "clients/TankpitBot/Dockerfile") -t $$tag --build-arg BUILD_REF=$$($$rel.Name) $$rel.FullName; if ($$LASTEXITCODE -ne 0) { Write-Host "[up] image build failed" -ForegroundColor Red; exit 1 } }; $$env:FLEET_IMAGE = $$tag; Write-Host "  Image $$tag; 'make down' to drain and stop." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose up -d --no-build fleet; $$code = $$LASTEXITCODE; if ($$code -eq 0) { $$ok = $$false; foreach ($$i in 1..5) { Start-Sleep -Seconds 2; try { Invoke-WebRequest -Uri "http://127.0.0.1:27300/bots" -UseBasicParsing -TimeoutSec 3 | Out-Null; $$ok = $$true; break } catch {} }; if (-not $$ok) { Write-Host "  Page unreachable; the host port proxy is stale (a container created behind a squatting host manager keeps a dead proxy) -- recreating once" -ForegroundColor Yellow; docker compose up -d --force-recreate --no-build fleet; foreach ($$i in 1..5) { Start-Sleep -Seconds 2; try { Invoke-WebRequest -Uri "http://127.0.0.1:27300/bots" -UseBasicParsing -TimeoutSec 3 | Out-Null; $$ok = $$true; break } catch {} } }; if ($$ok) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green } else { Write-Host "[up] container started but http://127.0.0.1:27300/ never answered -- inspect: docker logs tankpitbot-fleet-1" -ForegroundColor Red; $$code = 1 } }; Pop-Location; exit $$code
+	@Write-Host "==> up (the fleet on sedona: newest release, containerized, with its public edge)" -ForegroundColor Cyan
+	poetry run python -m scripts.fleet_host up
 
 down:
 	@Write-Host ""
-	@Write-Host "==> down (drain every bot, then stop the container)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the container exits; this waits for them (up to 10m)." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose stop fleet; $$code = $$LASTEXITCODE; Pop-Location; $$own = Get-NetTCPConnection -LocalPort 27300 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($$null -ne $$own) { $$proc = Get-Process -Id $$own.OwningProcess; if ($$proc.ProcessName -notlike "*docker*") { Write-Host "[down] the container is stopped, but 27300 is STILL held by $$($$proc.ProcessName) (pid $$($$own.OwningProcess)) -- a HOST-mode manager from before the container era. Drain it: poetry run tankpit-fleet-down" -ForegroundColor Yellow } }; exit $$code
+	@Write-Host "==> down (drain every bot on sedona, then stop the container)" -ForegroundColor Cyan
+	poetry run python -m scripts.fleet_host down
 else
 release:
 	@echo "release is Windows-only (the release ladder is C:/Users/Test/PROJECTS/tankpit-releases on the hub)"
