@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator
 from pathlib import Path
 
@@ -113,6 +114,15 @@ def test_load_and_decode_session_hook_is_callable(tmp_path: Path) -> None:
 def test_setup_rich_logging_hook_is_callable() -> None:
     """setup_rich_logging hook is callable."""
     _test_hooks.setup_rich_logging(_test_hooks.LogLevel.WARNING)
+
+
+def test_real_run_command_reports_exit_code_and_both_streams(tmp_path: Path) -> None:
+    """_real_run_command runs a real program where asked, and reports its failure."""
+    script = (
+        "import os, sys; sys.stdout.write(os.getcwd()); sys.stderr.write('refused'); sys.exit(3)"
+    )
+    result = _test_hooks._real_run_command([sys.executable, "-c", script], tmp_path)
+    assert result == _test_hooks.CommandResult(returncode=3, stdout=str(tmp_path), stderr="refused")
 
 
 def test_real_http_get_returns_response() -> None:
