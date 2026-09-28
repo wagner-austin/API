@@ -272,6 +272,7 @@ class TestAsyncMain:
             "/bots/{instance}/activity",
             "/bots/{instance}/video/{file}",
             "/bots/{instance}/stop",
+            "/bots/{instance}/control",
             "/bots/{instance}/restart",
             "/bots/{instance}",
             "/shutdown",
