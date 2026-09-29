@@ -62,6 +62,9 @@ EXAMPLE_WORKERS = 4
 #: The example dispatch's install steps.
 EXAMPLE_INSTALL: tuple[tuple[str, ...], ...] = (("npm", "ci"),)
 
+#: The submitting label an example build exports as ``BOARD_AGENT_LABEL``.
+EXAMPLE_AGENT = "opus-example-0929"
+
 #: The payload stem the example distro driver runs: the rebuild's Linux base.
 EXAMPLE_DISTRO_STEM = "fleet-rebuild-linux-base"
 
@@ -144,6 +147,7 @@ def _dialect_scripts() -> list[RenderedScript]:
                 cache_root=names.cache_root(EXAMPLE_STAGE_ROOT),
                 isolated_docker=False,
                 elevated=False,
+                agent=EXAMPLE_AGENT,
             ),
         ),
     ]
@@ -214,6 +218,7 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
 
 
 __all__ = [
+    "EXAMPLE_AGENT",
     "EXAMPLE_COMPANION_SHA",
     "EXAMPLE_DISTRO_STEM",
     "EXAMPLE_INSTALL",

@@ -464,6 +464,7 @@ def launch(
             cache_root=names.cache_root(node["stage_root"]),
             isolated_docker=recipe["isolated_docker"],
             elevated=recipe["elevated"],
+            agent=lease["agent"],
         ),
         platform=node["platform"],
     )

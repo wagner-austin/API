@@ -44,6 +44,7 @@ from __future__ import annotations
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
+from fleet.core.agent_label import AGENT_LABEL_VARIABLE
 
 #: The user whose rootless daemon a docker project's build runs against.
 EXEC_USER = "execdocker"
@@ -59,6 +60,7 @@ def isolated_build_lines(
     path: str,
     workers: int,
     install: tuple[tuple[str, ...], ...],
+    agent: str,
 ) -> list[str]:
     """The build's lines after the prologue, running every step as execdocker.
 
@@ -68,6 +70,10 @@ def isolated_build_lines(
         path: The project's directory inside the export, ``""`` for the root.
         workers: Test workers the capacity check granted.
         install: The project's declared install steps, argv each.
+        agent: The job's submitting agent label, already held to the board's
+            grammar, carried into the cleared environment as
+            ``BOARD_AGENT_LABEL``: MCPs' disposable deploy takes a fleet hold,
+            which refuses to run unattributed (MCPs board task 6c4516af A4).
 
     Returns:
         The lines, in order. The last writes the recipe's exit status to the
@@ -95,6 +101,7 @@ def isolated_build_lines(
         'POETRY_CACHE_DIR="$exec_cache/pypoetry" '
         'PLAYWRIGHT_BROWSERS_PATH="$exec_cache/ms-playwright" '
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
+        f"{AGENT_LABEL_VARIABLE}='{agent}' "
         'sh -eu -c "$1"',
         "}",
         "status=0",

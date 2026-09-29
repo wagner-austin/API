@@ -37,15 +37,11 @@ element is one make assignment, so no value can smuggle a second variable
 from __future__ import annotations
 
 import pathlib
-import re
 from typing import Final
 
 from fleet.core import _test_hooks
 from fleet.core._test_hooks import CommandResult
-
-#: The board's agent-label grammar, enforced runner-side because the queue
-#: only length-checks it (see module docstring).
-AGENT_LABEL_PATTERN: Final = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
+from fleet.core.agent_label import AGENT_LABEL_PATTERN
 
 #: How much captured output a closing detail keeps. The tail, because make
 #: failures end with the failing rule and its error.
@@ -148,7 +144,6 @@ def describe_result(result: CommandResult) -> str:
 
 
 __all__ = [
-    "AGENT_LABEL_PATTERN",
     "DETAIL_TAIL_CHARS",
     "LABEL_INVALID_CODE",
     "ROOT_MISSING_CODE",

@@ -420,6 +420,7 @@ class WindowsDialect:
         cache_root: str,
         isolated_docker: bool,
         elevated: bool,
+        agent: str,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -434,6 +435,8 @@ class WindowsDialect:
                 tag, which no Windows node carries.
             elevated: True for a project that declares the ``elevated`` tag,
                 launched at RunLevel Highest.
+            agent: The job's submitting agent label, exported as
+                ``BOARD_AGENT_LABEL``.
 
         Returns:
             :func:`fleet.core.windows_build.build_script`'s text, which says
@@ -461,6 +464,7 @@ class WindowsDialect:
             install=install,
             cache_root=cache_root,
             elevated=elevated,
+            agent=agent,
         )
 
     def log_tail_script(self, target: str, lines: int) -> str:

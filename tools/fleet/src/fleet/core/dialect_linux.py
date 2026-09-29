@@ -33,6 +33,7 @@ import shlex
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
+from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_isolated_build import isolated_build_lines
 
 #: How a script file is run by path.
@@ -324,6 +325,7 @@ class LinuxDialect:
         cache_root: str,
         isolated_docker: bool,
         elevated: bool,
+        agent: str,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -350,6 +352,8 @@ class LinuxDialect:
                 tag.
             elevated: True for a project that declares the ``elevated`` tag,
                 which no linux node carries.
+            agent: The job's submitting agent label, exported as
+                ``BOARD_AGENT_LABEL``.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
@@ -357,15 +361,19 @@ class LinuxDialect:
 
         Raises:
             ValueError: When ``elevated`` is True, refused for the reason
-                :meth:`launch_script` gives.
+                :meth:`launch_script` gives, or ``agent`` is outside the
+                board's label grammar.
         """
         if elevated:
             raise ValueError(
                 f"the project at {path!r} requires the elevated tag, and a linux node has no "
                 "elevated runner; it runs only on a Windows node that declares one"
             )
+        label = require_agent_label(agent)
         if isolated_docker:
-            lines = isolated_build_lines(target=target, path=path, workers=workers, install=install)
+            lines = isolated_build_lines(
+                target=target, path=path, workers=workers, install=install, agent=label
+            )
             return PROLOGUE + "\n".join(lines) + "\n"
         log = names.log_path(target)
         result = f"{target}/{names.RESULT_NAME}"
@@ -374,8 +382,9 @@ class LinuxDialect:
             f"POETRY_CACHE_DIR='{cache_root}/pypoetry'",
             f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
+            f"{AGENT_LABEL_VARIABLE}='{label}'",
             "export npm_config_cache POETRY_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH "
-            "PYTEST_XDIST_AUTO_NUM_WORKERS",
+            f"PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE}",
             f"cd '{target}'",
         ]
         for step in install:

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
+from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
 
@@ -36,6 +37,7 @@ def build_script(
     install: tuple[tuple[str, ...], ...],
     cache_root: str,
     elevated: bool,
+    agent: str,
 ) -> str:
     """Ready the tree, run the recipe in the project, write its status last.
 
@@ -65,6 +67,10 @@ def build_script(
     environment, MCPs' execution suite asserts that the token it holds is the
     token the fleet launched it with, in both directions.
 
+    THE BUILD SAYS WHO ASKED FOR IT, as ``BOARD_AGENT_LABEL``: the job's
+    submitter, held to the board's grammar (:mod:`fleet.core.agent_label`),
+    so a fleet hold the suite takes is attributed to that session.
+
     Args:
         target: Absolute remote directory holding the export, its root.
         path: The project's directory inside the export, ``""`` for the root.
@@ -72,6 +78,7 @@ def build_script(
         install: The project's declared install steps, argv each.
         cache_root: The node's cache directory.
         elevated: Whether the build was launched at RunLevel Highest.
+        agent: The job's submitting agent label.
 
     Returns:
         The script's text. Its first statement after the header records its
@@ -83,8 +90,9 @@ def build_script(
 
     Raises:
         ValueError: When a location or an install token cannot be embedded
-            verbatim.
+            verbatim, or ``agent`` is outside the board's label grammar.
     """
+    label = require_agent_label(agent)
     steps = ", ".join(
         "'" + " ".join(scriptable(word, label="install token") for word in step) + "'"
         for step in install
@@ -109,6 +117,7 @@ def build_script(
         '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',
         f"$env:CORVIS_FLEET_ELEVATED = '{1 if elevated else 0}'",
+        f"$env:{AGENT_LABEL_VARIABLE} = '{label}'",
         "function Invoke-Logged {",
         "    param([string]$Shell, [string]$Command)",
         '    & $Shell /d /s /c "$Command >> `"$log`" 2>&1"',

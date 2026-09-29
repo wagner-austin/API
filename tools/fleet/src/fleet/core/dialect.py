@@ -275,6 +275,7 @@ class Dialect(Protocol):
         cache_root: str,
         isolated_docker: bool,
         elevated: bool,
+        agent: str,
     ) -> str:
         """The script that readies the tree, runs the suite and records its
         status last.
@@ -295,6 +296,10 @@ class Dialect(Protocol):
             elevated: True for a project that declares the ``elevated`` tag,
                 whose build then says so in its environment beside the
                 administrator's token its launch gave it.
+            agent: The job's submitting agent label, which the build exports
+                as ``BOARD_AGENT_LABEL`` so a hold the suite takes is
+                attributed to whoever asked for the run
+                (:mod:`fleet.core.agent_label`).
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
@@ -303,7 +308,8 @@ class Dialect(Protocol):
         Raises:
             ValueError: From a dialect whose nodes carry no rootless daemon,
                 when ``isolated_docker`` is True, or no elevated runner, when
-                ``elevated`` is True.
+                ``elevated`` is True; and from every dialect when ``agent``
+                is outside the board's label grammar.
         """
         ...
 
