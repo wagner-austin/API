@@ -101,7 +101,12 @@
       "stage_root": "/home/corvis/fleet/stage",
       "logical_cores": 16,
       "ram_gb": 25.4,
-      "gpu": null,
+      "gpu": {
+        "model": "NVIDIA GeForce GTX 1630",
+        "vram_mib": 4096,
+        "compute_capability": "7.5",
+        "driver_version": "591.86"
+      },
       "budget": {
         "reserved_cores": 8,
         "reserved_ram_gb": 12.0,
