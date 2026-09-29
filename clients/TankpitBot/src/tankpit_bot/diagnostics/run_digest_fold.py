@@ -122,15 +122,21 @@ def _bucket(rows: list[TimelineRowDict], start_s: float, t_s: float) -> Timeline
     return rows[index]
 
 
-def _track_radar_yield(kind: str, digest: RunDigestDict, radar_pending: bool) -> bool:
+def _track_radar_yield(
+    kind: str, own_pickup: bool, digest: RunDigestDict, radar_pending: bool
+) -> bool:
     """Advance the zero-yield radar window across one event.
 
-    A radar dispatch opens a window; a container pickup before the
-    next radar closes it as productive; a new radar while a window is
-    open counts the superseded scan as zero-yield.
+    A radar dispatch opens a window; this bot's own pickup command
+    before the next radar closes it as productive; a new radar while a
+    window is open counts the superseded scan as zero-yield. The window
+    closes on the bot's OWN pickup, never on a ``container_pickup_dispatched``
+    record, the 0x43 broadcast any tank in the room triggers (board task
+    7aa719fd).
 
     Args:
         kind: The event's diagnostic kind (``"None"`` for none).
+        own_pickup: Whether the event is this bot's own pickup command.
         digest: Digest under construction.
         radar_pending: Whether a radar window is currently open.
 
@@ -141,7 +147,7 @@ def _track_radar_yield(kind: str, digest: RunDigestDict, radar_pending: bool) ->
         if radar_pending:
             digest["zero_yield_radars"] += 1
         return True
-    if kind == "container_pickup_dispatched":
+    if own_pickup:
         return False
     return radar_pending
 
@@ -448,7 +454,10 @@ class RunDigestAccumulator:
 
         message = record["message"]
         kind_field = record["fields"].get("diagnostic_kind")
-        self._radar_pending = _track_radar_yield(str(kind_field), self._digest, self._radar_pending)
+        own_pickup = record["channel"] == "WIRE" and _PICKUP_WIRE.match(message) is not None
+        self._radar_pending = _track_radar_yield(
+            str(kind_field), own_pickup, self._digest, self._radar_pending
+        )
         if kind_field == "tank_deactivated":
             _apply_kill_receipt(record, self._digest, start_s, t_s)
         elif kind_field is not None:

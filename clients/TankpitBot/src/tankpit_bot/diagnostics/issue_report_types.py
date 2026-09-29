@@ -402,12 +402,6 @@ class SessionScorecardDict(TypedDict):
     career_deactivated_last: int
     career_score_last: int
     career_playtime_seconds_last: int
-    # Per-record container pickup tallies (each multi-record 0x43 body
-    # contributes N events). ``container_pickups_partial`` is records
-    # where the picker hit the fuel cap and left some fuel; everything
-    # else counts as ``container_pickups_full``.
-    container_pickups_full: int
-    container_pickups_partial: int
 
 
 class IssueReportDict(TypedDict):

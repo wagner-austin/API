@@ -320,8 +320,6 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         career_deactivated_last=accumulator["career_deactivated_last"],
         career_score_last=accumulator["career_score_last"],
         career_playtime_seconds_last=accumulator["career_playtime_seconds_last"],
-        container_pickups_full=accumulator["container_pickups_full"],
-        container_pickups_partial=accumulator["container_pickups_partial"],
     )
 
 

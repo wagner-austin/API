@@ -75,8 +75,6 @@ class TestRenderAndIssues:
             career_deactivated_last=-1,
             career_score_last=-1,
             career_playtime_seconds_last=-1,
-            container_pickups_full=0,
-            container_pickups_partial=0,
         )
 
     def test_render_includes_budget_and_aggregates(self) -> None:

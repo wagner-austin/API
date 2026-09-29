@@ -133,6 +133,10 @@ def _scan_record(scan: _EventScan, parsed: JSONObject, line_no: int) -> None:
             scan["fixes"].append(_AlignmentFix(line=line_no, x=x, y=y, fuel=fuel))
         return
     if diagnostic_kind == "container_pickup_dispatched":
+        # Any tank's pickup or deposit in the room sends this, so it is
+        # not this bot's action; it still marks the window foreign,
+        # which over-excludes (the safe direction for a cost check) and
+        # catches a fuel change no own command explains.
         scan["action_lines"].append(_ActionLine(line=line_no, kind="pickup"))
         return
     if isinstance(action_kind, str):

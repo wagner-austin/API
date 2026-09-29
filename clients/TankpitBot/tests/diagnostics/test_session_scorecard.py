@@ -135,8 +135,6 @@ class TestBuildScorecard:
             career_deactivated_last=-1,
             career_score_last=-1,
             career_playtime_seconds_last=-1,
-            container_pickups_full=0,
-            container_pickups_partial=0,
         )
 
     def test_state_budget_credits_interval_to_earlier_destination(self) -> None:

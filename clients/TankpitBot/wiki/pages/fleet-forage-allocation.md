@@ -72,12 +72,22 @@ The defect is WHEN. The claim is gated on `resource_target_kind != ""`
 select → write report → sibling reads → sibling replans, and two
 siblings planning in the same tick both see the tile unclaimed.
 
-Measured across the five-bot run: **1,499 pickup dispatches, 273 tiles
-where two different bots dispatched within 30 s, 1,160 such pairs, and
-a MEDIAN GAP OF ZERO SECONDS.**[^4] A median of zero says this is not a
-narrow race lost occasionally — siblings commit to the same tile inside
-the same second, continuously. A protocol whose message arrives after
-the decision cannot arbitrate a collision that happens before it.
+Measured across the five-bot run, from each bot's OWN pickup
+dispatches: **374 dispatches, 15 tiles where two different bots
+dispatched within 30 s, 44 such pairs, and a MEDIAN GAP OF ONE
+SECOND.**[^4] Siblings do commit to the same tile inside one server
+tick. A protocol whose message arrives after the decision cannot
+arbitrate a collision that happens before it.
+
+**Correction (2026-09-29, board task 7aa719fd).** This page first gave
+1,499 dispatches, 273 tiles and a median gap of zero seconds. Those
+figures counted `container_pickup_dispatched` records, and that
+diagnostic is the 0x43 CacheUpdate the server broadcasts to every tank
+in the room. It carries no tank id, so five bots logging one pickup
+wrote five identical records. Of the run's 641 distinct records, 354
+were logged by two or more bots and 73 by all five. The real
+contention was about eighteen times smaller than first measured. It
+was still same-tick, so the conclusion below stands.
 
 The claim is not the wrong idea; it is an **advisory,
 eventually-consistent** claim being asked to do an authoritative one's
@@ -144,9 +154,19 @@ thing peer-to-peer sensing has not been asked to carry.
       `fleetshare/merge.py` into `ws.fleet_claimed_containers`,
       consumed by `filter_fleet_claimed_containers`
       (`bot/ai/context.py`).
-[^4]: Counted 2026-09-02 over `container_pickup_dispatched` records in
+[^4]: Recounted 2026-09-29 over each bot's own `AI` lines
+      `dispatching <fuel|equipment> pickup at (x,y)` in
       `runs/bot/{artax,arterial,despair,malignant,yuppler}/latest.events.jsonl`
-      (release v0.1.0-293f1ad7, World, 4x swarm + 1x passive).
+      of release v0.1.0-293f1ad7 (the hub's
+      `tankpit-releases/v0.1.0-293f1ad7/clients/TankpitBot/runs/bot/`;
+      World, 4x swarm + 1x passive): 72, 79, 61, 87 and 75 dispatches,
+      pairs of different bots on one tile within 30 s. The same script
+      over `container_pickup_dispatched` reproduces the first figures
+      exactly (1,499 records, 273 tiles, median gap 0 s), which is how
+      the broadcast was identified as their source. The 2026-09-29 live
+      A2 run of board task 4184b3f7, after the mutex below, read 149 own
+      dispatches between two sibling gatherers, 3 shared tiles, and no
+      same-second pair.
       **Correction, recorded because the mistake is easy to repeat:**
       an earlier pass read `remaining_volume: 0` as "arrived at an
       empty container" and produced a 55%-wasted-trips figure. The

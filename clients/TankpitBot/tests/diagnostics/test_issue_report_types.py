@@ -256,8 +256,6 @@ def test_session_scorecard_decodes_pre_upgrade_artifacts() -> None:
         career_deactivated_last=-1,
         career_score_last=-1,
         career_playtime_seconds_last=-1,
-        container_pickups_full=0,
-        container_pickups_partial=0,
     )
     encoded = encode_session_scorecard(scorecard)
     for key in (

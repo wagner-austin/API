@@ -140,8 +140,6 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
             career_deactivated_last=-1,
             career_score_last=-1,
             career_playtime_seconds_last=-1,
-            container_pickups_full=0,
-            container_pickups_partial=0,
         ),
     )
 
@@ -208,8 +206,6 @@ def test_issue_report_round_trip_with_no_session_room() -> None:
             career_deactivated_last=-1,
             career_score_last=-1,
             career_playtime_seconds_last=-1,
-            container_pickups_full=0,
-            container_pickups_partial=0,
         ),
     )
 
@@ -300,8 +296,6 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
                 career_deactivated_last=-1,
                 career_score_last=-1,
                 career_playtime_seconds_last=-1,
-                container_pickups_full=0,
-                container_pickups_partial=0,
             )
         ),
     }

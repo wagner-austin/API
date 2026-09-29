@@ -182,17 +182,16 @@ class ScorecardAccumulatorDict(TypedDict):
     first_timestamp: str
     last_timestamp: str
     # Career totals from the wire's 0x56 broadcast (latest seen this
-    # run; ``-1`` when never sent during the session) and per-record
-    # container pickup tallies. These mirror the fields tracked by
+    # run; ``-1`` when never sent during the session). These mirror the
+    # fields tracked by
     # :class:`tankpit_bot.diagnostics.issue_report._ReportAccumulatorDict`
     # so both accumulator paths populate the same scorecard fields
-    # from the same diagnostic kinds.
+    # from the same diagnostic kinds. The bot's own pickups are its
+    # ``collect:*`` entries in ``action_outcome_counts``.
     career_destroyed_last: int
     career_deactivated_last: int
     career_score_last: int
     career_playtime_seconds_last: int
-    container_pickups_full: int
-    container_pickups_partial: int
 
 
 def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
@@ -201,9 +200,9 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
     Returns:
         Accumulator with empty collections and zeroed counters.
     """
-    # First six career/pickup fields are zero/sentinel until the wire's
-    # 0x56 Statistics or a 0x43 ContainerPickup fires during the run.
-    # See :class:`ScorecardAccumulatorDict` for the contract.
+    # The four career fields are -1 until the wire's 0x56 Statistics
+    # fires during the run. See :class:`ScorecardAccumulatorDict` for
+    # the contract.
     return ScorecardAccumulatorDict(
         map_open_completions_at=[],
         scope_shift_sends_at=[],
@@ -235,8 +234,6 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         career_deactivated_last=-1,
         career_score_last=-1,
         career_playtime_seconds_last=-1,
-        container_pickups_full=0,
-        container_pickups_partial=0,
     )
 
 

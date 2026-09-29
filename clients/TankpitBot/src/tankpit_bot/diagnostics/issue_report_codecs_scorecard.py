@@ -223,8 +223,6 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         "career_deactivated_last": scorecard["career_deactivated_last"],
         "career_score_last": scorecard["career_score_last"],
         "career_playtime_seconds_last": scorecard["career_playtime_seconds_last"],
-        "container_pickups_full": scorecard["container_pickups_full"],
-        "container_pickups_partial": scorecard["container_pickups_partial"],
     }
 
 
@@ -316,14 +314,6 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
             require_int(data, "career_playtime_seconds_last")
             if "career_playtime_seconds_last" in data
             else -1
-        ),
-        container_pickups_full=(
-            require_int(data, "container_pickups_full") if "container_pickups_full" in data else 0
-        ),
-        container_pickups_partial=(
-            require_int(data, "container_pickups_partial")
-            if "container_pickups_partial" in data
-            else 0
         ),
     )
 

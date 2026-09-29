@@ -397,10 +397,11 @@ def test_combat_and_radar_yield_counters(tmp_path: Path) -> None:
     """Hits, misses, zero-yield radars, and damage totals all count.
 
     Two radar dispatches with no pickup between them make the first
-    zero-yield; the second is still open at session end and counts
-    too, while the pickup-closed third stays productive. Damage
-    totals come from the teardown ledger emission's numeric fields
-    (2026-08-06 extension).
+    zero-yield; the bot's own pickup command closes the second as
+    productive; the third is still open at session end and counts too,
+    because a ``container_pickup_dispatched`` broadcast (any tank's pickup)
+    never closes a window. Damage totals come from the teardown ledger
+    emission's numeric fields (2026-08-06 extension).
     """
     lines = [
         _event(
@@ -415,17 +416,21 @@ def test_combat_and_radar_yield_counters(tmp_path: Path) -> None:
             "diagnostic_kind=radar_dispatch",
             diagnostic_kind="radar_dispatch",
         ),
-        _event(
-            "2026-08-06T21:00:04",
-            "DIAGNOSTIC",
-            "diagnostic_kind=container_pickup_dispatched",
-            diagnostic_kind="container_pickup_dispatched",
-        ),
+        _event("2026-08-06T21:00:04", "WIRE", "pickup_fuel"),
         _event(
             "2026-08-06T21:00:06",
             "DIAGNOSTIC",
             "diagnostic_kind=radar_dispatch",
             diagnostic_kind="radar_dispatch",
+        ),
+        _event(
+            "2026-08-06T21:00:07",
+            "DIAGNOSTIC",
+            "diagnostic_kind=container_pickup_dispatched",
+            diagnostic_kind="container_pickup_dispatched",
+            x=40,
+            y=41,
+            remaining_volume=0,
         ),
         _event(
             "2026-08-06T21:00:08",

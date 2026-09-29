@@ -350,7 +350,12 @@ the artifacts are complete regardless.
       in twice — landing displacement across block edges, not
       re-targets.
 [^v2]: `runs/bot/bot-20260902-195506.events.jsonl` — the same artifact as [^v1], named here rather than referred to, since a footnote that only points at another footnote carries no locator of its own. `container_pickup_dispatched` /
-      teleport `action_outcome` diagnostics paired by adjacency. By
+      teleport `action_outcome` diagnostics paired by adjacency.
+      `container_pickup_dispatched` is the room-wide 0x43 broadcast,
+      not this bot's own pickup (board task 7aa719fd). In this run 102
+      of its 117 records fall on tiles the bot itself dispatched a
+      pickup to (97 own dispatches), so at most 15 foreign records
+      could enter the pairing. By
       lane: 11 `forage_frontier_hop` (adjacent-block exploration
       geometry), 7 `equipment_hop` (walk-blocked near stock served by
       design under the 2026-09-02 walk-territory law), 3 combat
