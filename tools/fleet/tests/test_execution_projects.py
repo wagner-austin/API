@@ -46,3 +46,23 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
         install=(),
         companions=(),
     )
+
+
+def test_slimes_suite_runs_isolated_on_a_rootless_daemon() -> None:
+    """slime's make up refuses a commit slime/execution has not passed at.
+
+    Its suite builds, starts and deletes containers, so it must only ever
+    reach execdocker's rootless daemon: the ``docker`` tag is what makes
+    the runner isolate it (dispatch.recipe_for), and slime's own script
+    refuses any other daemon besides (MCPs board task a8ee9b21).
+    """
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    project = require_project(workspace, "slime/execution")
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/slime.git",
+        path="execution",
+        install=(("npm", "ci"),),
+        companions=(),
+    )
