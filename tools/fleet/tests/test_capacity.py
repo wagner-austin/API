@@ -312,31 +312,66 @@ class TestFirstFit:
         assert first_fit(candidates, _project(required_tags=(NodeTag.GPU,))) == ("lavender", 14)
 
 
+#: The tags diphtheria's runner claims with, and the roll gate it could not take.
+_DOCKER_LANE = frozenset({NodeTag.LINUX, NodeTag.DOCKER})
+
+
 class TestRoomForAny:
     """The node runner's gate before it claims (board task fd5cabfa): the
-    three project-independent checks on the node's own default tenant."""
+    three project-independent checks, on one worker of the smallest project
+    the runner could take (board task 865287f3)."""
 
-    def test_a_node_with_room_for_one_default_worker_passes(self) -> None:
+    def test_a_node_with_room_for_one_worker_passes(self) -> None:
         # 5.2 GB free: 1.2 GB past the 4.0 GB reservation, one 1.1 GB worker.
-        assert room_for_any(_node(), _state(free_ram_gb=5.2)) is None
+        assert room_for_any(_node(), _state(free_ram_gb=5.2), (_project(),), frozenset()) is None
 
     def test_the_owners_reservation_is_named_when_nothing_is_left(self) -> None:
         """lavender at 2.2 GB free on 2026-09-21T09:58Z."""
-        line = str(room_for_any(_node(), _state(free_ram_gb=2.2)))
+        line = str(room_for_any(_node(), _state(free_ram_gb=2.2), (_project(),), frozenset()))
 
         assert line.startswith("NODE_OWNER_RESERVED: lavender has 2.2 GB free against a reserv")
 
     def test_the_concurrency_limit_is_named(self) -> None:
-        line = str(room_for_any(_node(), _state(live_runs=2)))
+        line = str(room_for_any(_node(), _state(live_runs=2), (_project(),), frozenset()))
 
         assert line.startswith("NODE_OWNER_RESERVED: lavender already holds 2 fleet run(s)")
 
     def test_a_full_disk_is_named(self) -> None:
-        line = str(room_for_any(_node(), _state(free_disk_gb=3.0)))
+        line = str(room_for_any(_node(), _state(free_disk_gb=3.0), (_project(),), frozenset()))
 
         assert line.startswith("NODE_DISK_EXHAUSTED: lavender has 3 GB free")
 
-    def test_the_gate_never_asks_about_tags(self) -> None:
-        """A CPU-only linux node has room for something even though a gpu
-        project would be refused after the claim; tags are the project's."""
-        assert room_for_any(_node(gpu=None, platform=NodePlatform.LINUX), _state()) is None
+    def test_diphtheria_takes_the_small_roll_gate_it_used_to_refuse(self) -> None:
+        """16.6 GB free against 16.0 reserved: no room for a 1.1 GB worker,
+        room for the 0.25 GB gate, which the runner's tags can serve."""
+        node = _node(gpu=None, platform=NodePlatform.LINUX, reserved_ram_gb=16.0)
+        state = _state(free_ram_gb=16.6)
+        gate = _project(worker_ram_gb=0.25, required_tags=(NodeTag.LINUX, NodeTag.DOCKER))
+
+        assert room_for_any(node, state, (_project(), gate), _DOCKER_LANE) is None
+        refused = str(room_for_any(node, state, (_project(),), _DOCKER_LANE))
+        assert refused.startswith("NODE_OWNER_RESERVED: lavender has 16.6 GB free against a reserv")
+
+    def test_a_small_project_the_runner_cannot_serve_does_not_lower_the_bound(self) -> None:
+        node = _node(gpu=None, platform=NodePlatform.LINUX, reserved_ram_gb=16.0)
+        gate = _project(worker_ram_gb=0.25, required_tags=(NodeTag.LINUX, NodeTag.DOCKER))
+
+        line = str(
+            room_for_any(
+                node, _state(free_ram_gb=16.6), (_project(), gate), frozenset({NodeTag.LINUX})
+            )
+        )
+
+        assert line.startswith("NODE_OWNER_RESERVED: lavender has 16.6 GB free against a reserv")
+
+    def test_a_runner_no_registered_project_fits_is_refused_by_name(self) -> None:
+        gpu_only = _project(required_tags=(NodeTag.GPU,))
+
+        assert room_for_any(_node(), _state(), (gpu_only,), frozenset({NodeTag.WINDOWS})) == (
+            "NODE_LACKS_TAG: this runner carries windows, and no registered project's "
+            "required tags fit it"
+        )
+        assert room_for_any(_node(), _state(), (gpu_only,), frozenset()) == (
+            "NODE_LACKS_TAG: this runner carries no tags, and no registered project's "
+            "required tags fit it"
+        )
