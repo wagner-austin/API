@@ -18,7 +18,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.bot.control import ControlCommandDict, ControlVerb, control_pending, write_control
-from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
+from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir, bot_stop_file
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.constants import FLEET_CHILD_PORT_BASE, FLEET_CHILD_PORT_COUNT
 from tankpit_bot.service.fleet_adoption import adopt_recorded_bots
@@ -41,35 +41,10 @@ from tankpit_bot.service.fleet_record import (
     forget_process_record,
     write_process_record,
 )
+from tankpit_bot.service.fleet_slot import clear_reused_slot
 from tankpit_bot.service.fleet_telemetry import FleetTelemetry
 
 log = get_logger(__name__)
-
-
-def _clear_stale_stream(instance: str) -> None:
-    """Delete a predecessor session's HLS files before a child starts.
-
-    A fresh spawn registers as running immediately, but its encoder
-    only writes after login and game-ready — tens of seconds. For that
-    whole window the slot's ``hls/`` directory still holds the
-    PREVIOUS session's playlist and segments, and the liveness gate in
-    :func:`~tankpit_bot.service.video_files.instance_video_response`
-    passes, so a viewer spawning onto a reused slot watched a dead
-    bot's final footage until the new encoder overwrote it (operator
-    observation 2026-09-05: "it opened the previous session … then it
-    restarted the session"). Clearing at spawn makes the warmup
-    honest: the playlist reads 503 warming until THIS session's
-    stream exists.
-
-    Args:
-        instance: The instance namespace about to be spawned.
-    """
-    hls = bot_run_dir(instance) / "hls"
-    stale = top_hooks.glob_paths(hls, "*")
-    for path in stale:
-        top_hooks.remove_file(path)
-    if stale:
-        log.info("Fleet: cleared %d stale stream file(s) from %s", len(stale), hls)
 
 
 class FleetManager:
@@ -229,7 +204,7 @@ class FleetManager:
                 f"instance {instance!r} is already running (pid {existing.process.pid})"
             )
         service_port = self._allocate_service_port()
-        _clear_stale_stream(instance)
+        clear_reused_slot(instance)
         process = service_hooks.spawn_bot_process(
             _child_environment(
                 instance=instance,
@@ -378,7 +353,7 @@ class FleetManager:
         Returns:
             None.
         """
-        sentinel = bot_run_dir(bot.instance) / "STOP"
+        sentinel = bot_stop_file(bot.instance)
         top_hooks.write_text(sentinel, "")
         log.info("Fleet: stop requested for %r (sentinel %s)", bot.instance, sentinel)
 

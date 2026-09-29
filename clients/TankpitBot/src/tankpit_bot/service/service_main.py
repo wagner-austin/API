@@ -33,7 +33,7 @@ from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.bus.session_status import idle_session_status
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
-from tankpit_bot.runtime_artifacts import resolve_bot_instance
+from tankpit_bot.runtime_artifacts import bot_stop_file, resolve_bot_instance
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.config import resolve_idle_exit_seconds
 from tankpit_bot.service.constants import (
@@ -54,14 +54,14 @@ def resolve_service_stop_file() -> Path:
 
     Instance-scoped (2026-08-06, the two-bots-one-map lift): two
     services must not share one sentinel, or stopping one bot stops
-    both. The sole-bot namespace keeps ``runs/state/STOP``.
+    both. It is :func:`bot_stop_file`, the path the fleet manager
+    writes, so a fleet stop reaches a service child; the control verbs
+    ride the same directory.
 
     Returns:
         The sentinel path for this process's instance.
     """
-    instance = resolve_bot_instance()
-    state_dir = Path("runs/state") / instance if instance else Path("runs/state")
-    return state_dir / "STOP"
+    return bot_stop_file(resolve_bot_instance())
 
 
 async def exit_when_idle(
