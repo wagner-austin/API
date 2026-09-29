@@ -96,6 +96,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
                     rust=None,
                     cxx=None,
                     docker=None,
+                    stack=None,
                     elevated=False,
                     wsl_host=None,
                     budget=NodeBudget(
