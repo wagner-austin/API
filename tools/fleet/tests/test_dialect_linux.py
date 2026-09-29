@@ -507,6 +507,29 @@ class TestForRealUnderSh:
 
         assert fields["docker"] == expected
 
+    def test_a_sudo_that_refuses_reads_as_no_daemon_and_the_probe_goes_on(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A ``sudo`` that wants a password exits 1, as execdocker's own did
+        on diphtheria (MCPs board task a8ee9b21): the probe reports
+        ``docker=no=`` and still reaches its last line, where ``set -e``
+        once ended it at the assignment."""
+        tools = tmp_path / "tools"
+        tools.mkdir()
+        fake_id = tools / "id"
+        fake_id.write_bytes(b'#!/bin/sh\n[ "$1" = "-u" ] && echo 1001\nexit 0\n')
+        fake_id.chmod(0o755)
+        fake_sudo = tools / "sudo"
+        fake_sudo.write_bytes(b"#!/bin/sh\necho 'sudo: a password is required' >&2\nexit 1\n")
+        fake_sudo.chmod(0o755)
+        body = DIALECT.toolchain_probe_script().replace(
+            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
+        )
+        fields = fields_of(self.run_script(tmp_path, body))
+
+        assert fields["docker"] == "no="
+        assert list(fields)[-2:] == ["apt-get", "pipx"]
+
     def test_the_digest_script_prints_the_landed_bytes_digest_and_leaves_them(
         self, tmp_path: pathlib.Path
     ) -> None:
