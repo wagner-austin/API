@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    function New-Virtualenv {
+    function Write-Virtualenv {
         param([string]$Venvs, [string]$Name, [string[]]$Lines, [switch]$NoSitePackages)
         $venv = Join-Path $Venvs $Name
         [void][System.IO.Directory]::CreateDirectory($venv)
@@ -32,10 +32,10 @@ Describe 'The virtualenv sweep' {
         $alive = Join-Path $TestDrive 'stage\run-alive\src'
         [void][System.IO.Directory]::CreateDirectory($alive)
         $gone = Join-Path $TestDrive 'stage\run-retired\src'
-        $orphan = New-Virtualenv $venvs 'demo-orphan-py3.11' @($gone, 'import _virtualenv')
-        $serving = New-Virtualenv $venvs 'demo-alive-py3.11' @($gone, $alive)
-        $unknown = New-Virtualenv $venvs 'demo-unknown-py3.11' @('import _virtualenv', 'relative\path')
-        $creating = New-Virtualenv $venvs 'demo-creating-py3.11' @() -NoSitePackages
+        $orphan = Write-Virtualenv $venvs 'demo-orphan-py3.11' @($gone, 'import _virtualenv')
+        $serving = Write-Virtualenv $venvs 'demo-alive-py3.11' @($gone, $alive)
+        $unknown = Write-Virtualenv $venvs 'demo-unknown-py3.11' @('import _virtualenv', 'relative\path')
+        $creating = Write-Virtualenv $venvs 'demo-creating-py3.11' @() -NoSitePackages
 
         Invoke-Rendered 'dialect-venv-sweep' @{ Venvs = $venvs } | Should -BeExactly 'venv-sweep: removed 1 of 4 (2 MB)'
 
@@ -46,7 +46,7 @@ Describe 'The virtualenv sweep' {
     }
     It 'reads a source path written with forward slashes as absolute too' {
         $venvs = Join-Path $TestDrive 'slashes\virtualenvs'
-        $orphan = New-Virtualenv $venvs 'demo-py3.11' @('C:/fleet/stage/never-staged-here/src')
+        $orphan = Write-Virtualenv $venvs 'demo-py3.11' @('C:/fleet/stage/never-staged-here/src')
         Invoke-Rendered 'dialect-venv-sweep' @{ Venvs = $venvs } | Should -BeExactly 'venv-sweep: removed 1 of 1 (2 MB)'
         [System.IO.Directory]::Exists($orphan) | Should -BeFalse
     }
