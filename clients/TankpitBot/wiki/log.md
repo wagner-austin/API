@@ -6383,3 +6383,20 @@ was added. §5 #75 is RESOLVED. Footnotes 7 to 13 cite the tables.
 The audit also found that `make smoke` assertions 2 and 5 read a
 `WIRE_COMPLETE` channel and a `signal` field that nothing emits any
 more; that is filed on the board.
+
+## [2026-09-29] audit | session-state-deglobalisation re-read at HEAD
+
+Board task bd04807c. Five of the page's pins had gone stale (sniffer,
+ledger, runtime_context.py, runtime_logging.py, tests/conftest.py), and
+one citation (`scripts/guard.py:127-136`) pointed past the end of a
+file now 50 lines long. Both of the page's sweeps were re-run at API
+origin/main `7a4056b64` before the pins moved. Sweep one finds the
+same four process-level `global` sites, at moved lines. Sweep two
+finds 0 in-place mutations across 526 modules, from a walk first
+shown to fire on a planted mutation. The reset list is still the one
+`reset_static_key_cache` pair. Corrected:
+- the guard citation is now a statement about `7481cdca` (six local
+  rules) and `f94b3676a` (nine);
+- footnote 11's static-key path, which moved behind
+  `resources.static_key_file_path`, so `DEFAULT_STATIC_KEY_PATH` is gone;
+- three drifted line anchors.
