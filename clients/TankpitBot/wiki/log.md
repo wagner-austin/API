@@ -6342,3 +6342,15 @@ was `runs/state/<instance>/STOP`, while the manager wrote
 `runs/bot/<instance>/STOP`. Now both resolve `bot_stop_file`, and
 spawn clears a reused slot's untaken sentinels. Pages updated:
 [[fleet-lifecycle]] (the drain section), [[bot-behavior-contract]].
+
+## [2026-09-29] update | A gatherer winds down
+
+The §1.4 Known gap of [[bot-behavior-contract]] is closed (board task
+e956e3c8). A gatherer never wound down, from the verb or the session
+clock: the gatherer's fixed COLLECT return came before the wind-down
+branch, and the only stocked bar was the fighter's, which needs a hunt
+gate that is always closed for a gatherer. Now the wind-down branch
+comes first, "stocked" is per role (`wound_down_stocked`: fuel alone,
+at `hunt_fuel_floor`, for a gatherer), and a winding-down gatherer on
+an exhausted cascade exits `session_complete` instead of holding. The
+Known gap row becomes a MUST row. Pages updated: [[bot-behavior-contract]].
