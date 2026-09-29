@@ -224,7 +224,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             project_root,
             project=project,
             plan=plan,
-            node_name=node_name,
             archive_dir=loaded.archives,
         ),
         # None, and that is a statement about this lane rather than an

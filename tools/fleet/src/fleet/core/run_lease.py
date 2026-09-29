@@ -44,21 +44,33 @@ from fleet.core import _test_hooks, leases, records
 LEASE_SLACK = 2.0
 
 
-def run_id_for(project: str, *, started_unix: int) -> str:
+def run_id_for(project: str, *, node: str, started_unix: int) -> str:
     """Name a dispatch.
 
     Derived rather than random, so the identifier a person reads names the
     thing it identifies. The project's slashes become hyphens because the id
     is used as a directory name on the node.
 
+    THE NODE IS PART OF THE NAME because the run id is the ledger's identity
+    for a dispatch (:func:`fleet.core.records.latest_rows` keeps one row per
+    run id) and every node's runner ticks on the same wall-clock second. With
+    project and second alone, lavender and serendipity both named their
+    MCPs/mcp-shared runs ``MCPs-mcp-shared-1790638395`` on 2026-09-28 (MCPs
+    board task 97c2adad): the two dispatches collapsed into one ledger row,
+    serendipity's runner settled and retired lavender's run, and its own
+    passing check was left on the queue as running. Project, node and second
+    are enough: :func:`take` holds one lease per project per node, and a
+    launched run cannot start and end inside one second.
+
     Args:
         project: Repo-relative project path.
+        node: The workspace name of the node it is dispatched to.
         started_unix: When the dispatch began.
 
     Returns:
         The run id.
     """
-    return f"{project.replace('/', '-')}-{started_unix}"
+    return f"{project.replace('/', '-')}-{node}-{started_unix}"
 
 
 def open_lease(
@@ -177,7 +189,7 @@ def take(
     lease = open_lease(
         node=node_name,
         project=project,
-        run_id=run_id_for(project, started_unix=now_unix),
+        run_id=run_id_for(project, node=node_name, started_unix=now_unix),
         agent=agent,
         session_id=session_id,
         plan=plan,

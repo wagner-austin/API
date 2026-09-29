@@ -255,7 +255,7 @@ def claim_pass(
         return refuse(credentials, job, identity, detail=prepared)
 
     def build(run_id: str) -> dispatch.Payload:
-        path = loaded.archives / f"{run_id}-{alias}.tgz"
+        path = loaded.archives / f"{run_id}.tgz"
         data = export.archive_commit(prepared["mirror"], sha, path, prepared["scope"])
         return dispatch.Payload(path=path, data=data, description=f"git archive of {sha}")
 

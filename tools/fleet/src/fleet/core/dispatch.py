@@ -204,7 +204,6 @@ def working_tree_payload(
     *,
     project: str,
     plan: ProjectConfig,
-    node_name: str,
     archive_dir: pathlib.Path,
 ) -> PayloadBuilder:
     """The archive of the hub's working tree, as ``fleet-run`` dispatches it.
@@ -213,8 +212,6 @@ def working_tree_payload(
         project_root: Absolute path to the monorepo root.
         project: Repo-relative project path.
         plan: The project's declaration, for its external paths.
-        node_name: The node's workspace name, part of the scratch file's
-            name.
         archive_dir: Local directory to build the archive in, which must be
             run output rather than anywhere a build reads --
             :attr:`fleet.cli._config.LoadedWorkspace.archives` is where the
@@ -227,13 +224,10 @@ def working_tree_payload(
 
     def build(run_id: str) -> Payload:
         members = manifest.build_tree(project_root, project, external=plan["external_paths"])
-        # Named by run AND node. A run id is the project and the second it
-        # started, so two sessions dispatching one project to two nodes in
-        # the same second produce the same id -- and with archives in one
-        # scratch directory rather than one per workspace, that is two
-        # writers on one file. The lease stops them sharing a node, not a
-        # filename.
-        path = archive_dir / f"{run_id}-{node_name}.tgz"
+        # Named by the run alone: archives share one scratch directory, and a
+        # run id names its node (run_lease.run_id_for), so two dispatches of
+        # one project to two nodes in one second write two files.
+        path = archive_dir / f"{run_id}.tgz"
         data = staging.archive(project_root, members, path)
         return Payload(
             path=path, data=data, description=f"{len(members)} member(s) of the working tree"

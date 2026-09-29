@@ -101,8 +101,8 @@ LOG_TAIL_STEM = "log-tail"
 #: playwright's, pointed at by the build script's environment. A clean export
 #: has no dependencies of its own; these are where they are restored from,
 #: and they outlive every run directory beside them. Never a run id: run ids
-#: are ``<project>-<epoch>`` and the project grammar cannot spell this name
-#: alone.
+#: are ``<project>-<node>-<epoch>`` and the project grammar cannot spell this
+#: name alone.
 CACHE_DIRECTORY = "cache"
 
 #: The directory under a node's stage root that keeps every retired run's
@@ -260,8 +260,9 @@ def task_name(run_id: str) -> str:
 
     Returns:
         The name, valid as a Task Scheduler task name and as a systemd unit
-        name (a run id is a project path with its slashes replaced and an
-        epoch second, so it carries only word characters and hyphens).
+        name (a run id is a project path with its slashes replaced, a node
+        name and an epoch second, so it carries only word characters and
+        hyphens).
     """
     return f"fleet-{run_id}"
 
