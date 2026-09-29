@@ -176,6 +176,23 @@ class TestMalformedAnswers:
 
         assert "not a string or null" in raised.value.message
 
+    def test_the_claim_time_is_read_as_whole_seconds_and_null_before_any_claim(self) -> None:
+        """The one timestamp decoded (MCPs board task 5a4f9b3e), as the tool
+        renders it: toISOString, UTC, milliseconds."""
+        claimed = claimed_job(answer({"claimed": queue_job(claimedAt="2026-09-29T09:00:11.466Z")}))
+        assert claimed["claimed_unix"] == 1790672411
+        assert claimed_job(answer({"claimed": queue_job()}))["claimed_unix"] is None
+
+    @pytest.mark.parametrize(
+        "text", ["2026-09-29 09:00:11Z", "2026-09-29T09:00:11+00:00", "yesterday"]
+    )
+    def test_a_claim_time_that_is_not_a_utc_instant_is_refused(self, text: str) -> None:
+        with pytest.raises(AppError) as raised:
+            decode_claim(answer({"claimed": queue_job(claimedAt=text)}))
+
+        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
+        assert f"field 'claimedAt' is {text!r}, not a UTC instant" in raised.value.message
+
     def test_a_status_outside_the_vocabulary_is_refused(self) -> None:
         with pytest.raises(AppError) as raised:
             decode_claim(answer({"claimed": queue_job(status="exploded")}))

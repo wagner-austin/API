@@ -153,6 +153,7 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         "sha": DEFAULT_SHA,
         "requiredTags": [],
         "taskId": None,
+        "claimedAt": None,
     }
     row.update(overrides)
     return row

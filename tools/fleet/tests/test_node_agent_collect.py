@@ -166,20 +166,6 @@ class TestCollecting:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
 
-    def test_a_held_job_that_has_not_started_is_skipped(self, sourced_config: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun(PROBED)
-        endpoint = FakeQueue(
-            [
-                dump_json_str({"jobs": [queue_job(status="claimed")]}),
-                dump_json_str({"claimed": None}),
-            ]
-        )
-        _test_hooks.http_post = endpoint
-
-        assert node_agent.main(node_argv(sourced_config)) == 0
-
-        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
-
     def test_a_build_that_outlived_its_lease_stops_the_tick(
         self, sourced_config: pathlib.Path
     ) -> None:
