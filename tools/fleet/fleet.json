@@ -611,7 +611,7 @@
       }
     },
     "MCPs/execution-deploy": {
-      "worker_ram_gb": 4.0,
+      "worker_ram_gb": 0.5,
       "minimum_workers": 1,
       "expected_minutes": 90,
       "required_tags": ["linux", "docker"],
