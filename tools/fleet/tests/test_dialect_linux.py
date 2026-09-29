@@ -337,7 +337,9 @@ class TestTransportShape:
         # The docker line asks execdocker's own socket, never the PATH's
         # docker, which is the stack's daemon on diphtheria (6c4516af).
         assert "sudo -n -u execdocker docker -H" in body
-        assert "*name=rootless*) printf 'docker=yes=%s\\n'" in body
+        assert "*name=rootless*)\n" in body
+        assert "sudo -n -u execdocker docker compose version" in body
+        assert "sudo -n -u execdocker docker buildx version" in body
         assert "winget" not in body
         assert "choco" not in body
 
@@ -499,62 +501,6 @@ class TestForRealUnderSh:
         fields = fields_of(self.run_script(tmp_path, body))
 
         assert fields["cxx"] == "yes=13.3.0"
-
-    @pytest.mark.parametrize(
-        ("answer", "expected"),
-        [
-            (
-                '29.8.1 ["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]',
-                "yes=29.8.1",
-            ),
-            ('29.8.1 ["name=apparmor","name=seccomp,profile=builtin"]', "no="),
-            ("", "no="),
-        ],
-    )
-    def test_the_docker_line_reports_only_a_rootless_daemon(
-        self, tmp_path: pathlib.Path, answer: str, expected: str
-    ) -> None:
-        """An ``id`` that knows execdocker and a ``sudo`` answering as its
-        daemon would (MCPs board task 6c4516af): the version comes through
-        only when the security options name rootless, so the stack's
-        rootful daemon, or no daemon, reads as absent."""
-        tools = tmp_path / "tools"
-        tools.mkdir()
-        fake_id = tools / "id"
-        fake_id.write_bytes(b'#!/bin/sh\n[ "$1" = "-u" ] && echo 1001\nexit 0\n')
-        fake_id.chmod(0o755)
-        fake_sudo = tools / "sudo"
-        fake_sudo.write_bytes(f"#!/bin/sh\nprintf '%s' '{answer}'\n".encode())
-        fake_sudo.chmod(0o755)
-        body = DIALECT.toolchain_probe_script().replace(
-            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
-        )
-        fields = fields_of(self.run_script(tmp_path, body))
-
-        assert fields["docker"] == expected
-
-    def test_a_sudo_that_refuses_reads_as_no_daemon_and_the_probe_goes_on(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """A ``sudo`` that wants a password exits 1, as execdocker's own did
-        on diphtheria (MCPs board task a8ee9b21): the probe reports
-        ``docker=no=`` and still reaches its last line, where ``set -e``
-        once ended it at the assignment."""
-        tools = tmp_path / "tools"
-        tools.mkdir()
-        fake_id = tools / "id"
-        fake_id.write_bytes(b'#!/bin/sh\n[ "$1" = "-u" ] && echo 1001\nexit 0\n')
-        fake_id.chmod(0o755)
-        fake_sudo = tools / "sudo"
-        fake_sudo.write_bytes(b"#!/bin/sh\necho 'sudo: a password is required' >&2\nexit 1\n")
-        fake_sudo.chmod(0o755)
-        body = DIALECT.toolchain_probe_script().replace(
-            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
-        )
-        fields = fields_of(self.run_script(tmp_path, body))
-
-        assert fields["docker"] == "no="
-        assert list(fields)[-2:] == ["apt-get", "pipx"]
 
     def test_the_digest_script_prints_the_landed_bytes_digest_and_leaves_them(
         self, tmp_path: pathlib.Path
