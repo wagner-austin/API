@@ -204,6 +204,11 @@
           "cache_ceiling_gb": 60,
           "work_ceiling_gb": 15
         }
+      },
+      "ci_slice": {
+        "memory_high_gb": 16,
+        "memory_max_gb": 18,
+        "cpu_weight": 20
       }
     }
   ]
