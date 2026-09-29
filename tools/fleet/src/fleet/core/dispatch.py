@@ -283,6 +283,7 @@ def start(
     workers: int,
     agent: str,
     session_id: str,
+    node_local: tuple[str, ...],
     build_payload: PayloadBuilder,
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
@@ -306,6 +307,8 @@ def start(
         workers: Test workers the capacity check granted.
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
+        node_local: The workspace's node-local resource names, which the
+            lease holds as this node's copy.
         build_payload: Builds the archive once the lease is held.
         companions: The repositories staged beside the export.
         recipe: Where in the tree the recipe runs and what readies it.
@@ -326,6 +329,7 @@ def start(
         workers=workers,
         agent=agent,
         session_id=session_id,
+        node_local=node_local,
     )
     return launch(
         loaded_ledger,

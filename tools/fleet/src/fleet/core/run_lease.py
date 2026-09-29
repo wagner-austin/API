@@ -31,6 +31,7 @@ import pathlib
 from fleet.contracts.feed import FeedEvent, FeedKind
 from fleet.contracts.lease import Lease
 from fleet.contracts.project import ProjectConfig, lease_seconds
+from fleet.contracts.resources import scoped
 from fleet.core import _test_hooks, leases, records
 
 #: How much longer than its estimate a dispatch may hold its lease.
@@ -81,6 +82,7 @@ def open_lease(
     agent: str,
     session_id: str,
     plan: ProjectConfig,
+    node_local: tuple[str, ...],
     now_unix: int,
 ) -> Lease:
     """Build the claim a dispatch will hold for its run.
@@ -92,11 +94,14 @@ def open_lease(
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
         plan: The project, whose expected duration sizes the window.
+        node_local: The workspace's node-local resource names, which the
+            lease holds as this node's copy
+            (:func:`fleet.contracts.resources.scoped`).
         now_unix: Current time, whole seconds since the epoch.
 
     Returns:
         The lease, sized at :data:`LEASE_SLACK` times the estimate and
-        carrying whatever fleet-wide resources the project declared. Read
+        carrying whatever exclusive resources the project declared. Read
         from the plan rather than passed separately, so a caller cannot
         dispatch a project while forgetting what it contends for.
     """
@@ -108,7 +113,7 @@ def open_lease(
         session_id=session_id,
         acquired_unix=now_unix,
         expires_unix=now_unix + lease_seconds(plan, slack=LEASE_SLACK),
-        resources=plan["exclusive_resources"],
+        resources=scoped(plan["exclusive_resources"], node=node, node_local=node_local),
     )
 
 
@@ -164,6 +169,7 @@ def take(
     workers: int,
     agent: str,
     session_id: str,
+    node_local: tuple[str, ...],
 ) -> Lease:
     """Name the dispatch, acquire its lease, and announce it on the feed.
 
@@ -176,6 +182,7 @@ def take(
         workers: Test workers the capacity check granted, for the feed line.
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
+        node_local: The workspace's node-local resource names.
 
     Returns:
         The lease now held, which names the run.
@@ -193,6 +200,7 @@ def take(
         agent=agent,
         session_id=session_id,
         plan=plan,
+        node_local=node_local,
         now_unix=now_unix,
     )
     leases.acquire(loaded_leases, lease, now_unix=now_unix)
