@@ -78,8 +78,14 @@ class TestBotRunWithCapture:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.stream import _test_hooks as stream_hooks
-        from tankpit_bot.stream.capture import ffmpeg_command, x11_socket_path, xvfb_command
+        from tankpit_bot.stream.capture import (
+            PROCESS_END_TIMEOUT_SECONDS,
+            ffmpeg_command,
+            x11_socket_path,
+            xvfb_command,
+        )
         from tankpit_bot.stream.types import StreamConfigDict
+        from tests._capture_process import PatientCaptureProcess
         from tests.fakes.bot import FakeSyncPlaywrightContextManagerBot
 
         _ = (fake_env, fake_fs)
@@ -95,14 +101,18 @@ class TestBotRunWithCapture:
         )
 
         commands: list[list[str]] = []
-        processes: list[stream_hooks.CaptureProcessProtocol] = []
+        processes: list[PatientCaptureProcess] = []
 
         def substituting_spawner(
             command: list[str], log_path: Path
         ) -> stream_hooks.CaptureProcessProtocol:
             commands.append(command)
-            process = stream_hooks._real_spawn_capture_process(
-                [sys.executable, "-c", "import time; time.sleep(60)"], log_path
+            # Patient: run()'s stop waits with the production bound, which
+            # is recorded and asserted rather than bet against host load.
+            process = PatientCaptureProcess(
+                stream_hooks._real_spawn_capture_process(
+                    [sys.executable, "-c", "import time; time.sleep(60)"], log_path
+                )
             )
             processes.append(process)
             return process
@@ -153,3 +163,7 @@ class TestBotRunWithCapture:
         for name, process in zip(("Xvfb", "ffmpeg"), processes, strict=True):
             if process.poll() is None:
                 raise AssertionError(f"{name} stand-in still running after run()")
+        assert [process.wait_timeouts for process in processes] == [
+            [PROCESS_END_TIMEOUT_SECONDS],
+            [PROCESS_END_TIMEOUT_SECONDS],
+        ]
