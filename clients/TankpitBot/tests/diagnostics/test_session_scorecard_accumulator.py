@@ -105,45 +105,45 @@ class TestRouting:
         assert accumulator["career_score_last"] == 1003500
         assert accumulator["career_playtime_seconds_last"] == 12 * 3600 + 34 * 60 + 56
 
-    def test_routes_container_pickup_dispatched_to_full_and_partial(self) -> None:
-        """``container_pickup_dispatched`` splits records into full/partial tallies."""
-        accumulator = _routed(
-            [
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "container_pickup_dispatched",
-                        "x": 80,
-                        "y": 90,
-                        "remaining_volume": 0,
-                        "is_partial": False,
-                    },
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "container_pickup_dispatched",
-                        "x": 81,
-                        "y": 91,
-                        "remaining_volume": 881,
-                        "is_partial": True,
-                    },
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "container_pickup_dispatched",
-                        "x": 82,
-                        "y": 92,
-                        "remaining_volume": 0,
-                        "is_partial": False,
-                    },
-                ),
-            ]
+    def test_cache_update_broadcasts_are_not_counted_as_the_bots_pickups(self) -> None:
+        """A room-wide 0x43 broadcast changes nothing; the bot's own receipt counts.
+
+        Any tank's pickup or deposit sends ``container_pickup_dispatched`` to
+        every bot in the room, so routing only broadcasts leaves the
+        accumulator as fresh as it began (board task 7aa719fd). The bot's
+        own clamped fuel pickup is counted by its receipt.
+        """
+        broadcasts = [
+            _record(
+                channel="DIAGNOSTIC",
+                fields={
+                    "diagnostic_kind": "container_pickup_dispatched",
+                    "x": 80,
+                    "y": 90,
+                    "remaining_volume": remaining,
+                    "is_partial": remaining > 0,
+                },
+            )
+            for remaining in (0, 881)
+        ]
+        receipt = _record(
+            channel="DIAGNOSTIC",
+            fields={
+                "diagnostic_kind": "action_outcome",
+                "action_kind": "collect",
+                "outcome": "clamped_transfer",
+            },
         )
 
-        assert accumulator["container_pickups_full"] == 2
-        assert accumulator["container_pickups_partial"] == 1
+        only_broadcasts = _routed(broadcasts)
+        expected = new_scorecard_accumulator()
+        expected["first_timestamp"] = only_broadcasts["first_timestamp"]
+        expected["last_timestamp"] = only_broadcasts["last_timestamp"]
+
+        assert only_broadcasts == expected
+        assert _routed([*broadcasts, receipt])["action_outcome_counts"] == {
+            "collect:clamped_transfer": 1
+        }
 
     def test_ignores_irrelevant_diagnostics(self) -> None:
         """Unrelated diagnostic kinds leave the buckets untouched."""

@@ -109,7 +109,7 @@ def _row(
         action_kind: The action dispatched, if any.
         hop_declined: Declined hop lanes on the tick.
         radar_dispatch: Radar dispatches on the tick.
-        container_pickup_dispatched: Pickups dispatched on the tick.
+        container_pickup_dispatched: Cache updates observed on the tick.
         plan_released: Plan releases on the tick.
         command_error: Command errors on the tick.
         fleet_knowledge_merged: Fleet knowledge merges on the tick.
