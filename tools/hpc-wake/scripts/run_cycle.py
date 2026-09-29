@@ -24,7 +24,8 @@ not run). The task registration lives in the README's Scheduling section.
 
 Behaviour is the PowerShell script's, deliberately: source ``runs/env.ps1``
 (still PowerShell syntax so interactive sessions can keep dot-sourcing it —
-parsed here strictly, refusing any uncommented line that is not a plain
+parsed strictly by :mod:`platform_core.env_assignments`, the one parser the
+fleet ticks share, refusing any uncommented line that is not a plain
 ``$env:NAME = 'value'`` assignment), truncate ``runs/cycle.log`` past ~1 MB,
 stamp a UTC header, append the cycle's output, exit with the cycle's own
 status so the scheduler's task history stays the health record.
@@ -34,11 +35,11 @@ from __future__ import annotations
 
 import os
 import pathlib
-import re
 import sys
 from collections.abc import Sequence
 from typing import Final
 
+from platform_core.env_assignments import parse_env_assignments
 from typing_extensions import TypedDict
 
 from scripts import _test_hooks, pump_health
@@ -156,40 +157,7 @@ def package_root_from(tokens: Sequence[str]) -> pathlib.Path:
     return pathlib.Path(tokens[1])
 
 
-_ASSIGNMENT = re.compile(r"^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'([^']*)'\s*$")
 _LOG_LIMIT_BYTES = 1_000_000
-
-
-def load_env_assignments(env_file: pathlib.Path) -> dict[str, str]:
-    """Parse the untracked credentials file's assignments.
-
-    Args:
-        env_file: ``runs/env.ps1``, holding ``$env:NAME = 'value'`` lines
-            beside comments and blank lines.
-
-    Returns:
-        The assignments, in file order.
-
-    Raises:
-        ValueError: For any uncommented, non-blank line that is not a plain
-            single-quoted assignment — a credential this parser silently
-            skipped would surface later as an unauthenticated cycle, which
-            is the failure mode this refusal exists to prevent.
-    """
-    assignments: dict[str, str] = {}
-    for raw in env_file.read_text(encoding="utf-8-sig").splitlines():
-        line = raw.strip()
-        if line == "" or line.startswith("#"):
-            continue
-        matched = _ASSIGNMENT.match(line)
-        if matched is None:
-            raise ValueError(
-                f"unparseable line in {env_file}: {line!r} — this loader accepts only "
-                f"plain $env:NAME = 'value' assignments, and skipping one would run "
-                f"the cycle with a credential missing"
-            )
-        assignments[matched.group(1)] = matched.group(2)
-    return assignments
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -208,8 +176,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         per-publisher markers name which one went red.
 
     Raises:
-        ValueError: Propagated from :func:`package_root_from` or
-            :func:`load_env_assignments`.
+        ValueError: Propagated from :func:`package_root_from`.
+        AppError: ``CONFIG_ERROR`` from
+            :func:`platform_core.env_assignments.parse_env_assignments` when
+            ``runs/env.ps1`` holds a line that is not a plain assignment.
         OSError: When the log or the package tree is unwritable/unreadable,
             or a publisher's command cannot be spawned — a spawn failure is
             a broken pump, not a publisher outcome, and the header already
@@ -218,7 +188,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     package_root = package_root_from(tokens)
-    environment = load_env_assignments(package_root / "runs" / "env.ps1")
+    env_file = package_root / "runs" / "env.ps1"
+    environment = dict(
+        parse_env_assignments(env_file.read_text(encoding="utf-8"), source=str(env_file))
+    )
 
     log = package_root / "runs" / "cycle.log"
     if log.exists() and log.stat().st_size > _LOG_LIMIT_BYTES:
