@@ -16,12 +16,17 @@ closes a row (a cancel, by ``fleet-cancel`` or under a runner), and the hub's
 ``fleet-collect``. A failure propagates with the row still live, so the next
 tick settles the run again; every step of the script tolerates what an
 earlier attempt already did.
+
+AND THE RUN'S VIRTUALENV GOES WITH IT (MCPs board task 7b07c5d2). Poetry
+named it after the tree just removed, so right after the retire the node is
+sent :mod:`fleet.core.venv_sweep`, which removes every virtualenv in the
+node's fleet cache whose recorded source paths are all gone.
 """
 
 from __future__ import annotations
 
 from fleet.contracts.node import NodeConfig, NodePlatform
-from fleet.core import dialect, names, remote
+from fleet.core import dialect, names, remote, venv_sweep
 
 
 def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
@@ -71,6 +76,7 @@ def retire_on_node(node: NodeConfig, *, run_id: str) -> str:
         script_for(node["platform"], stage_root=stage_root, run_id=run_id),
         platform=node["platform"],
     )
+    venv_sweep.sweep_on_node(node)
     return names.retained_log_path(stage_root, run_id)
 
 

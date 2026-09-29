@@ -37,6 +37,7 @@ from fleet.core import (
     runner_load,
     runner_rebuild,
     runner_windows_provision,
+    venv_sweep,
     verdict,
 )
 from fleet.core.dialect_windows import WindowsDialect
@@ -120,6 +121,10 @@ def _dialect_scripts() -> list[RenderedScript]:
             text=retire.script_for(
                 NodePlatform.WINDOWS, stage_root=EXAMPLE_STAGE_ROOT, run_id=EXAMPLE_RUN_ID
             ),
+        ),
+        RenderedScript(
+            name="dialect-venv-sweep",
+            text=venv_sweep.script_for(NodePlatform.WINDOWS, stage_root=EXAMPLE_STAGE_ROOT),
         ),
         RenderedScript(
             name="dialect-extract",
