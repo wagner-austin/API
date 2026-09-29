@@ -6,7 +6,7 @@ to exercise live-probe control flow deterministically.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Protocol
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab.session import (
@@ -29,7 +29,7 @@ from tankpit_bot.action_lab.session import (
 from tankpit_bot.action_lab.session import (
     wait_for_world_sync as _real_wait_for_world_sync,
 )
-from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.action_lab.types import TeleportPageSnapshotDict, TeleportSnapshotPhase
 from tankpit_bot.bot.world_sync import drain_messages as _real_drain_buffered_messages
 from tankpit_bot.browser import get_current_time_ms as _real_get_current_time_ms
 from tankpit_bot.browser.lifecycle import (
@@ -236,13 +236,7 @@ class CaptureTeleportPageSnapshotProtocol(Protocol):
     def __call__(
         self,
         cdp: CDPSessionProtocol,
-        phase: Literal[
-            "before_map_open",
-            "before_teleport",
-            "after_map_data",
-            "landed",
-            "timeout",
-        ],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         """Capture the page-client state annotated with a teleport phase.
 

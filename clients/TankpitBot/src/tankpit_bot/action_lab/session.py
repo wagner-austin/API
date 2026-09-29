@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Protocol
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.action_lab.types import TeleportPageSnapshotDict, TeleportSnapshotPhase
 from tankpit_bot.bot.states import BotState
 from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.sniffer.world_service import WorldService
@@ -97,7 +97,7 @@ class StartupStateDriverProtocol(Protocol):
 
 def capture_teleport_page_snapshot(
     cdp: CDPSessionProtocol,
-    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    phase: TeleportSnapshotPhase,
 ) -> TeleportPageSnapshotDict:
     """Capture the current page-client state, annotated with a teleport phase.
 

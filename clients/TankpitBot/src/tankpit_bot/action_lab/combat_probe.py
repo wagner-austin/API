@@ -33,7 +33,7 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
 from tankpit_bot.action_lab.teleport_helpers import TeleportProbeError
 from tankpit_bot.action_lab.teleport_phase import run_tracked_teleport_command
-from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.action_lab.types import TeleportAttemptStatus, TeleportTargetDict
 from tankpit_bot.bot.ai.combat_landing import (
     choose_combat_landing_tile,
     has_cardinal_enemy_adjacency,
@@ -377,7 +377,7 @@ class CombatProbe(ProbeBase):
             dispatch_failure_error=TeleportProbeError,
         )
 
-        if teleport_result["status"] == "teleport_timeout":
+        if teleport_result["status"] is TeleportAttemptStatus.TELEPORT_TIMEOUT:
             log.warning("COMBAT: teleport timeout for %s", enemy["name"])
             return None
 

@@ -9,7 +9,7 @@ from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
-from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.action_lab.types import TeleportPageSnapshotDict, TeleportSnapshotPhase
 from tankpit_bot.runtime_logging import emit_diagnostic
 
 
@@ -22,7 +22,7 @@ def start_teleport_page_snapshots(
 ) -> tuple[
     list[TeleportPageSnapshotDict],
     Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+        [TeleportSnapshotPhase],
         TeleportPageSnapshotDict,
     ],
 ]:
@@ -46,14 +46,14 @@ def start_teleport_page_snapshots(
         raise unavailable_error(unavailable_message)
 
     def _capture_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         """Capture one page snapshot for the requested teleport phase."""
         return action_hooks.capture_teleport_page_snapshot(cdp, phase)
 
     page_snapshots: list[TeleportPageSnapshotDict] = []
     if capture_before_map_open:
-        page_snapshots.append(_capture_snapshot("before_map_open"))
+        page_snapshots.append(_capture_snapshot(TeleportSnapshotPhase.BEFORE_MAP_OPEN))
     return (page_snapshots, _capture_snapshot)
 
 
@@ -90,7 +90,7 @@ def run_tracked_acquisition_phase(
     int | None,
     list[TeleportPageSnapshotDict],
     Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+        [TeleportSnapshotPhase],
         TeleportPageSnapshotDict,
     ],
 ]:

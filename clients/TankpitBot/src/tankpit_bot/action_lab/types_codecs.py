@@ -15,11 +15,14 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.members import require_member
 
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
+    TeleportSnapshotPhase,
     TeleportStartupTimingDict,
     TeleportTargetDict,
 )
@@ -85,7 +88,7 @@ def encode_teleport_page_snapshot(snapshot: TeleportPageSnapshotDict) -> JSONObj
     Returns:
         JSON-serializable object representation.
     """
-    encoded: JSONObject = {"phase": snapshot["phase"]}
+    encoded: JSONObject = {"phase": snapshot["phase"].value}
     encoded.update(encode_page_client_snapshot(snapshot))
     return encoded
 
@@ -114,7 +117,7 @@ def encode_teleport_attempt_result(result: TeleportAttemptResultDict) -> JSONObj
     return {
         "target": encode_teleport_target(result["target"]),
         "teleport_cycle_id": result["teleport_cycle_id"],
-        "status": result["status"],
+        "status": result["status"].value,
         "map_open_started_ms": result["map_open_started_ms"],
         "map_sync_timestamp_ms": _encode_optional_int(result["map_sync_timestamp_ms"]),
         "teleport_started_ms": _encode_optional_int(result["teleport_started_ms"]),
@@ -155,36 +158,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
     return raw
 
 
-def _require_page_snapshot_phase(
-    data: JSONObject,
-    field: str,
-) -> Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]:
-    """Validate a teleport page snapshot phase literal.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Validated snapshot phase.
-
-    Raises:
-        JSONTypeError: If the phase is unsupported.
-    """
-    raw = require_str(data, field)
-    if raw == "before_map_open":
-        return "before_map_open"
-    if raw == "before_teleport":
-        return "before_teleport"
-    if raw == "after_map_data":
-        return "after_map_data"
-    if raw == "landed":
-        return "landed"
-    if raw == "timeout":
-        return "timeout"
-    raise JSONTypeError(f"Field '{field}' has invalid teleport page snapshot phase: {raw}")
-
-
 def decode_teleport_page_snapshot(data: JSONObject) -> TeleportPageSnapshotDict:
     """Decode a teleport page snapshot from JSON with validation.
 
@@ -197,7 +170,7 @@ def decode_teleport_page_snapshot(data: JSONObject) -> TeleportPageSnapshotDict:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
-    phase = _require_page_snapshot_phase(data, "phase")
+    phase = require_member(data, "phase", TeleportSnapshotPhase)
     base = decode_page_client_snapshot(data)
     return TeleportPageSnapshotDict(
         phase=phase,
@@ -240,34 +213,6 @@ def _decode_page_snapshot_list(raw: JSONValue) -> list[TeleportPageSnapshotDict]
             raise JSONTypeError("Field 'page_snapshots' must contain only objects")
         result.append(decode_teleport_page_snapshot(item_obj))
     return result
-
-
-def _require_attempt_status(
-    data: JSONObject,
-    field: str,
-) -> Literal["landed_exact", "landed_offset", "map_sync_timeout", "teleport_timeout"]:
-    """Validate a teleport attempt status literal.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Validated attempt status.
-
-    Raises:
-        JSONTypeError: If the status is not one of the supported literals.
-    """
-    raw = require_str(data, field)
-    if raw == "landed_exact":
-        return "landed_exact"
-    if raw == "landed_offset":
-        return "landed_offset"
-    if raw == "map_sync_timeout":
-        return "map_sync_timeout"
-    if raw == "teleport_timeout":
-        return "teleport_timeout"
-    raise JSONTypeError(f"Field '{field}' has invalid teleport attempt status: {raw}")
 
 
 def _require_teleport_strategy(
@@ -315,7 +260,7 @@ def decode_teleport_attempt_result(data: JSONObject) -> TeleportAttemptResultDic
     return TeleportAttemptResultDict(
         target=decode_teleport_target(target_raw),
         teleport_cycle_id=require_int(data, "teleport_cycle_id"),
-        status=_require_attempt_status(data, "status"),
+        status=require_member(data, "status", TeleportAttemptStatus),
         map_open_started_ms=require_int(data, "map_open_started_ms"),
         map_sync_timestamp_ms=_require_optional_int(data, "map_sync_timestamp_ms"),
         teleport_started_ms=_require_optional_int(data, "teleport_started_ms"),
