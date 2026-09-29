@@ -75,6 +75,7 @@ def _workspace_document() -> JSONObject:
         "nodes": {"lavender": node, "loki": {**node, "host": "loki"}},
         "not_dispatchable": {},
         "data_paths": {},
+        "node_local_resources": [],
         "projects": {
             "libs/demo": {
                 "worker_ram_gb": 1.1,

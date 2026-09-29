@@ -87,6 +87,7 @@ def _document(
             }
         },
         "data_paths": data_paths,
+        "node_local_resources": [],
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",

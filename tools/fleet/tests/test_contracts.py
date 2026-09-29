@@ -133,6 +133,7 @@ def _workspace() -> FleetWorkspace:
                 "services/covenant-radar-api/data/external",
             )
         },
+        node_local_resources=(),
         ledger="ledger.jsonl",
         feed="feed.jsonl",
         leases="leases.json",

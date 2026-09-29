@@ -329,6 +329,7 @@ def workspace_document() -> JSONObject:
         },
         "not_dispatchable": {},
         "data_paths": {},
+        "node_local_resources": [],
         "projects": {
             DEMO_PROJECT: {
                 "worker_ram_gb": 1.1,

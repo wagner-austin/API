@@ -79,6 +79,7 @@ def _workspace_document() -> JSONObject:
         },
         "not_dispatchable": {},
         "data_paths": {},
+        "node_local_resources": [],
         "projects": {
             "services/Model-Trainer": {
                 "worker_ram_gb": 1.1,

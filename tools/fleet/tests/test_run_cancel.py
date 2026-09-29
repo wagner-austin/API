@@ -87,6 +87,7 @@ class TestRunIdentity:
             agent="opus-fleet-0904",
             session_id="s",
             plan=_plan(),
+            node_local=(),
             now_unix=DEMO_NOW,
         )
 
@@ -389,6 +390,7 @@ class TestFinish:
             agent="opus-fleet-0904",
             session_id="s",
             plan=_plan(),
+            node_local=(),
             now_unix=DEMO_NOW,
         )
         leases.acquire(loaded.leases, lease, now_unix=DEMO_NOW)
