@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.threats import (
     analyze_threats,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.state.types import VIEWPORT_PRESENCE_TTL_MS
 from tankpit_bot.types.constants import EntitySource, TankLiveness
 from tests.bot.ai._threat_fixtures import (
     _self_at,
@@ -156,6 +157,28 @@ class TestAnalyzeThreats:
         threats = analyze_threats(WorldService(), world, _self_at(), now_ms=0)
         assert len(threats) == 1
         assert threats[0]["tank_id"] == 20
+
+    def test_filters_tanks_not_seen_in_the_viewport_within_the_ttl(self) -> None:
+        """Only a viewport sighting inside ``VIEWPORT_PRESENCE_TTL_MS`` makes a threat.
+
+        This is the ghost-firing guard ([[bot-behavior-contract]] section 5):
+        map answers and global syncs refresh ``timestamp_ms`` and
+        ``last_wire_seen_ms`` for every alive tank on the map, so only
+        the viewport stamp says the tank is actually in view. The enemy
+        sighted exactly at the TTL is kept; one millisecond older is not.
+        """
+        now_ms = 100_000
+        at_ttl = _tank("10", x=110, y=100, team=1)
+        at_ttl["last_viewport_observation_ms"] = now_ms - VIEWPORT_PRESENCE_TTL_MS
+        past_ttl = _tank("20", x=105, y=100, team=2)
+        past_ttl["last_viewport_observation_ms"] = now_ms - VIEWPORT_PRESENCE_TTL_MS - 1
+        past_ttl["timestamp_ms"] = now_ms
+        past_ttl["last_wire_seen_ms"] = now_ms
+        world = _world({"10": at_ttl, "20": past_ttl})
+
+        threats = analyze_threats(WorldService(), world, _self_at(), now_ms=now_ms)
+
+        assert [t["tank_id"] for t in threats] == [10]
 
     def test_mixed_allies_and_enemies(self) -> None:
         """Only enemy tanks appear in results."""
