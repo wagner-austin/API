@@ -24,6 +24,7 @@ from tankpit_bot.stream.capture import (
     HLS_LIST_SEGMENTS,
     HLS_PLAYLIST_FILENAME,
     HLS_SEGMENT_TEMPLATE,
+    PROCESS_END_TIMEOUT_SECONDS,
     CaptureError,
     DisplayCapture,
     ffmpeg_command,
@@ -137,7 +138,12 @@ def _noop_sleep(seconds: float) -> None:
 
 @pytest.fixture(autouse=True)
 def _reap() -> Generator[list[stream_hooks.CaptureProcessProtocol], None, None]:
-    """Kill every child a test's spawner left running.
+    """Kill every child a test's spawner left running, and wait for its end.
+
+    The wait has no timeout: after ``kill`` the child will end, and on a
+    loaded Windows host its rundown has outlasted a fixed ten seconds
+    (board task 06fc3195; ``scripts/killed_wait_rules.py`` records the
+    measurement and keeps the bound from coming back).
 
     Yields:
         The list the test's spawner should append processes to.
@@ -147,7 +153,7 @@ def _reap() -> Generator[list[stream_hooks.CaptureProcessProtocol], None, None]:
     for process in spawned:
         if process.poll() is None:
             process.kill()
-            process.wait(10.0)
+            process.wait()
 
 
 class TestCommandLines:
@@ -472,11 +478,12 @@ class _StuckProcess:
         self.kills += 1
         self._process.kill()
 
-    def wait(self, timeout: float) -> int:
+    def wait(self, timeout: float | None = None) -> int:
         """Time out once, then delegate.
 
         Args:
-            timeout: Forwarded to the real wait on the second call.
+            timeout: Forwarded to the real wait on the second call; the
+                reap fixture's unbounded wait forwards None.
 
         Returns:
             The real exit code, on the second call.
@@ -486,7 +493,7 @@ class _StuckProcess:
         """
         self._waits += 1
         if self._waits == 1:
-            raise subprocess.TimeoutExpired(cmd="stuck", timeout=timeout)
+            raise subprocess.TimeoutExpired(cmd="stuck", timeout=PROCESS_END_TIMEOUT_SECONDS)
         return self._process.wait(timeout)
 
 
