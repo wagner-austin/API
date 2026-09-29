@@ -150,6 +150,7 @@ class TestTheNextTick:
             [
                 dump_json_str({"jobs": [ORPHANED]}),
                 STARTED,
+                STARTED,
                 NO_CANCELS,
                 dump_json_str({"claimed": None}),
             ]
@@ -161,9 +162,16 @@ class TestTheNextTick:
         assert endpoint.tools == [
             "dispatch_list",
             "dispatch_report",
+            "dispatch_report",
             "dispatch_list",
             "dispatch_claim",
         ]
+        # The trail says why the start came a tick late (55f2cb0b, A2).
+        assert endpoint.arguments[2]["action"] == "progress"
+        assert endpoint.arguments[2]["note"] == (
+            f"adopted on lavender: {DEMO_RUN_ID} was launched by the claiming tick, whose start "
+            "report never reached the queue"
+        )
         assert endpoint.arguments[1] == {
             "jobId": DEFAULT_JOB_ID,
             "action": "start",
@@ -191,6 +199,7 @@ class TestTheNextTick:
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [stamped_late]}),
+                STARTED,
                 STARTED,
                 NO_CANCELS,
                 dump_json_str({"claimed": None}),
@@ -221,8 +230,9 @@ class TestTheNextTick:
         assert endpoint.arguments[1]["action"] == "close"
         assert endpoint.arguments[1]["status"] == "refused"
         assert endpoint.arguments[1]["detail"] == (
-            "DISPATCH_NOT_LAUNCHED: claimed by this runner in a tick that ended before it "
-            "launched anything; refused so the submitter can resubmit it"
+            f"DISPATCH_NOT_LAUNCHED: {DEFAULT_JOB_ID} was claimed on lavender, its start report "
+            "never reached the queue, and nothing was launched; refused so the submitter can "
+            "resubmit it"
         )
 
     def test_refuses_rather_than_guesses_between_two_runs_either_claim_could_have_launched(
