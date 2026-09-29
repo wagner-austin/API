@@ -159,4 +159,4 @@ def test_real_kill_browser_processes_spares_non_engine_children() -> None:
         assert child.poll() is None, "the sleeper must survive the sweep"
     finally:
         child.kill()
-        child.wait(timeout=10)
+        child.wait()
