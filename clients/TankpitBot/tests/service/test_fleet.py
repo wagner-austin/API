@@ -516,12 +516,12 @@ def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
         assert console.exists()
     finally:
         handle.kill()
-        handle.wait(timeout=30)
+        handle.wait()
         _unlink_accepting_handle_lag(console)
         console.parent.rmdir()
 
     assert process.is_running() is False
-    assert process.exit_code() == handle.wait(timeout=30)
+    assert process.exit_code() == handle.wait()
 
 
 def test_a_second_bot_on_a_live_account_is_refused(spawner: _FakeSpawner) -> None:

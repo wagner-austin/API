@@ -75,7 +75,7 @@ def sleeper() -> Generator[subprocess.Popen[bytes], None, None]:
         yield process
     finally:
         process.kill()
-        process.wait(timeout=30)
+        process.wait()
 
 
 def test_identity_reads_a_live_process_creation_time(
@@ -123,7 +123,7 @@ def test_an_adopted_process_reports_its_exit_code_after_it_dies(
     adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
 
     sleeper.kill()
-    expected = sleeper.wait(timeout=30)
+    expected = sleeper.wait()
 
     # The adopted handle agrees with the parent's own handle, and keeps
     # agreeing: neither answer is a one-shot reading.
@@ -155,7 +155,7 @@ def test_liveness_never_depends_on_recovering_an_exit_code(
     # waits on an already-exited process without complaint.
     victim = psutil.Process(sleeper.pid)
     victim.kill()
-    victim.wait(timeout=30)
+    victim.wait()
 
     assert adopted.is_running() is False
     # Whatever the code turns out to be -- recoverable or not -- it is
