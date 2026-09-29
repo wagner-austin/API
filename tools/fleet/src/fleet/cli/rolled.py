@@ -29,10 +29,11 @@ and the child's own timeout status when it outlives
 
 from __future__ import annotations
 
+import io
 import pathlib
 import sys
 from collections.abc import Sequence
-from typing import Final
+from typing import Final, TextIO
 
 from platform_core import cli_args
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
@@ -62,6 +63,34 @@ AGENT_WALL_SECONDS: Final[int] = 39 * 60
 
 #: The exit status when no rolled tree could be extracted.
 REFUSED_EXIT: Final[int] = 2
+
+#: How the launcher's own log stream encodes, whatever code page started it.
+#: It relays the agent's streams, and on 2026-09-29 (MCPs board task
+#: 88b8fe61) a traceback holding U+FFFD met a cp1252 stdout and logging
+#: printed ``--- Logging error ---`` in place of it. UTF-8 is what the tick
+#: decodes this process's output as; backslashreplace keeps a character no
+#: encoding could write as its escape rather than failing the line.
+LOG_ENCODING: Final = "utf-8"
+LOG_ERRORS: Final = "backslashreplace"
+
+
+def encode_log_stream(stream: TextIO) -> None:
+    """Make the stream the launcher logs to write any character it is given.
+
+    Args:
+        stream: The launcher's standard output, which
+            :func:`platform_core.logging.setup_logging` logs to.
+
+    Raises:
+        TypeError: ``FLEET_LOG_STREAM_UNCONFIGURABLE`` when the stream is not
+            a text wrapper over bytes, so its encoding cannot be set.
+    """
+    if not isinstance(stream, io.TextIOWrapper):
+        raise TypeError(
+            f"FLEET_LOG_STREAM_UNCONFIGURABLE: the launcher's output is a "
+            f"{type(stream).__name__}, whose encoding cannot be set to {LOG_ENCODING}"
+        )
+    stream.reconfigure(encoding=LOG_ENCODING, errors=LOG_ERRORS)
 
 
 def split_command_line(tokens: Sequence[str]) -> tuple[dict[str, str], list[str]]:
@@ -161,6 +190,18 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
+    configure_logging()
+    raise SystemExit(main(sys.argv[1:]))
+
+
+def configure_logging() -> None:
+    """Log to standard output as UTF-8, the launcher's one log stream.
+
+    Raises:
+        TypeError: ``FLEET_LOG_STREAM_UNCONFIGURABLE`` from
+            :func:`encode_log_stream`.
+    """
+    encode_log_stream(sys.stdout)
     setup_logging(
         level=LogLevel.INFO,
         format_mode=LogFormat.TEXT,
@@ -168,16 +209,19 @@ def entrypoint() -> None:
         instance_id=None,
         extra_fields=None,
     )
-    raise SystemExit(main(sys.argv[1:]))
 
 
 __all__ = [
     "AGENT_FLAG",
     "AGENT_MODULES",
     "AGENT_WALL_SECONDS",
+    "LOG_ENCODING",
+    "LOG_ERRORS",
     "REFUSED_EXIT",
     "REPO_ROOT_FLAG",
     "SEPARATOR",
+    "configure_logging",
+    "encode_log_stream",
     "entrypoint",
     "main",
     "require_module",
