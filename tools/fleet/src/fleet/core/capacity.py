@@ -80,6 +80,32 @@ class DispatchVerdict(TypedDict):
     reason: str
 
 
+#: How close to its ``memory.high`` a ``runners.slice`` must be to count as
+#: at it: the kernel throttles the slice there, so its current hovers just
+#: under the line rather than on it (measured 17179713536 of 17179869184).
+SLICE_AT_HIGH = 0.98
+
+
+def _who_holds_it(state: NodeState) -> str:
+    """Name what holds a node's memory in a reservation refusal.
+
+    Args:
+        state: What the node reported.
+
+    Returns:
+        The node's CI runners, with the slice's numbers, when its probe read
+        a ``runners.slice`` at its ``memory.high`` (MCPs board task
+        5d6e57e7); otherwise the owner, as before.
+    """
+    ci_slice = state["ci_slice"]
+    if ci_slice is None or ci_slice["current_gb"] < SLICE_AT_HIGH * ci_slice["high_gb"]:
+        return "somebody is on this machine"
+    return (
+        f"its CI runners hold it: runners.slice is at {ci_slice['current_gb']:.1f} GB of its "
+        f"{ci_slice['high_gb']:.1f} GB memory.high, so the lane waits for a CI job to end"
+    )
+
+
 def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> DispatchVerdict:
     """Weigh one node against one project without raising.
 
@@ -151,7 +177,7 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
                 f"{node['host']} has {state['free_ram_gb']:.1f} GB free against a reservation "
                 f"of {node['budget']['reserved_ram_gb']:.1f} GB for whoever is using it, and "
                 f"{node['logical_cores']} cores against {node['budget']['reserved_cores']} "
-                "reserved. Nothing is left for a dispatch; somebody is on this machine."
+                f"reserved. Nothing is left for a dispatch; {_who_holds_it(state)}."
             ),
         )
     if workers < project["minimum_workers"]:

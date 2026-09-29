@@ -33,6 +33,7 @@ import shlex
 
 from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.project import MAKE_TARGET
+from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_isolated_build import isolated_build_lines
@@ -66,11 +67,27 @@ PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\nexport PATH
 #: stage root lives on for every node declared so far; both are read in
 #: kibibytes and divided to gibibytes with three decimals so the parser sees
 #: one shape from both dialects.
+#:
+#: THE ``ci_slice_*`` PAIR is printed only on a node whose CI runners run in
+#: ``runners.slice`` and whose ``memory.high`` is a number rather than
+#: ``max`` (MCPs board task 5d6e57e7): a refusal on such a node can then say
+#: CI holds the lane. Measured on lavender-wsl, 2026-09-29 18:2xZ:
+#: memory.current 17179713536 against memory.high 17179869184, with 8.2 GB
+#: available; diphtheria has no such cgroup and prints neither.
 CAPACITY_PROBE_SCRIPT = (
     PROLOGUE
     + "awk '/^MemAvailable:/ { printf \"free_ram_gb=%.3f\\n\", $2 / 1048576 }' /proc/meminfo\n"
     "df -kP / | awk 'NR == 2 { printf \"free_disk_gb=%.3f\\n\", $4 / 1048576 }'\n"
     "printf 'logical_cores=%s\\n' \"$(nproc)\"\n"
+    f"s=/sys/fs/cgroup/{CI_SLICE_NAME}\n"
+    'if [ -r "$s/memory.current" ] && [ -r "$s/memory.high" ]; then\n'
+    '  h="$(cat "$s/memory.high")"\n'
+    '  case "$h" in\n'
+    "    ''|*[!0-9]*) ;;\n"
+    '    *) awk -v c="$(cat "$s/memory.current")" -v h="$h" \'BEGIN { printf '
+    '"ci_slice_current_gb=%.3f\\nci_slice_high_gb=%.3f\\n", c / 1073741824, h / 1073741824 }\' ;;\n'
+    "  esac\n"
+    "fi\n"
 )
 
 #: The toolchain probe, verbatim.

@@ -34,11 +34,15 @@ from typing import TypedDict
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.node import NodeConfig, NodeState, SliceMemory
 from fleet.core import dialect, names, remote
 
 #: The numeric fields a node must report before anything can be decided about it.
 REQUIRED_FIELDS = ("free_ram_gb", "free_disk_gb")
+
+#: The pair a node reports only when it runs a ``runners.slice`` (MCPs board
+#: task 5d6e57e7): both or neither, since one script line prints both.
+SLICE_FIELDS = ("ci_slice_current_gb", "ci_slice_high_gb")
 
 
 class ProbeOutcome(TypedDict):
@@ -76,17 +80,26 @@ def read_state(host: str, output: str, *, live_runs: int) -> ProbeOutcome:
     """
     fields = _read_fields(output)
     readings: dict[str, float] = {}
-    for key in REQUIRED_FIELDS:
+    sliced = any(key in fields for key in SLICE_FIELDS)
+    for key in REQUIRED_FIELDS + (SLICE_FIELDS if sliced else ()):
         value = _read_number(fields, key)
         if value is None:
             return ProbeOutcome(state=None, reason=_unreadable(host, fields, key, output))
         readings[key] = value
+    ci_slice = (
+        SliceMemory(
+            current_gb=readings["ci_slice_current_gb"], high_gb=readings["ci_slice_high_gb"]
+        )
+        if sliced
+        else None
+    )
     return ProbeOutcome(
         state=NodeState(
             host=host,
             free_ram_gb=readings["free_ram_gb"],
             free_disk_gb=readings["free_disk_gb"],
             live_runs=live_runs,
+            ci_slice=ci_slice,
         ),
         reason="",
     )

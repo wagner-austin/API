@@ -190,6 +190,18 @@ class NodeConfig(TypedDict):
     budget: NodeBudget
 
 
+class SliceMemory(TypedDict):
+    """A node's ``runners.slice`` as its capacity probe read it.
+
+    Attributes:
+        current_gb: ``memory.current``: what the slice's CI jobs hold now.
+        high_gb: ``memory.high``: where the kernel starts throttling them.
+    """
+
+    current_gb: float
+    high_gb: float
+
+
 class NodeState(TypedDict):
     """What a node reported when it was last probed.
 
@@ -206,12 +218,18 @@ class NodeState(TypedDict):
         live_runs: Fleet dispatches currently live on this node, counted from
             the ledger rather than from the process table -- a run is ours
             because we recorded it, not because a process looks like one.
+        ci_slice: The node's ``runners.slice`` memory, or None where the
+            node has no such cgroup (every Windows node, and every linux
+            node that hosts no CI runners). Read so a refusal can say CI
+            holds the lane rather than that somebody is on the machine
+            (MCPs board task 5d6e57e7).
     """
 
     host: str
     free_ram_gb: float
     free_disk_gb: float
     live_runs: int
+    ci_slice: SliceMemory | None
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:
@@ -517,6 +535,7 @@ __all__ = [
     "NodeGpu",
     "NodePlatform",
     "NodeState",
+    "SliceMemory",
     "declared_capability",
     "decode_node_config",
     "decode_node_gpu",
