@@ -96,6 +96,8 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
                     rust=None,
                     cxx=None,
                     docker=None,
+                    elevated=False,
+                    wsl_host=None,
                     budget=NodeBudget(
                         reserved_cores=2,
                         reserved_ram_gb=4.0,
@@ -112,6 +114,10 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
         # dispatch's ARCHIVE, and fleet-wake reads the workspace to find nodes
         # and projects, never to export one.
         "data_paths": {},
+        # Required by the workspace contract; empty for the same reason as
+        # data_paths: it scopes which exclusive resources each node runs its
+        # own copy of, which only a dispatch reads.
+        "node_local_resources": [],
         "projects": {
             project: encode_project_config(
                 ProjectConfig(
