@@ -9,6 +9,7 @@ proven in ``tests/test_test_hooks.py``.
 
 from __future__ import annotations
 
+import errno
 from pathlib import Path
 
 import pytest
@@ -176,6 +177,62 @@ class TestAcquire:
         assert not acquire_container_claim("6", 10, 20, instance="artax", tank_id=7, now_ms=_NOW)
 
         assert fake_fs.read_text(claim_path("6", 10, 20)) == ""
+
+    @pytest.mark.parametrize(
+        "window",
+        [
+            PermissionError(errno.EACCES, "Permission denied"),
+            OSError(errno.ENODATA, "No data available"),
+        ],
+    )
+    def test_a_refresh_mid_replace_denies_for_one_beat(
+        self, fake_fs: FakeFileSystem, window: OSError
+    ) -> None:
+        """The holder's refresh caught mid-replace is held, never lost.
+
+        On the container fleet's bind mount the replace window also
+        shows as ENODATA (board task b651224a); either form reads as
+        unreadable, and the retry create finds the file still there.
+        """
+        from tankpit_bot import _test_hooks
+
+        _plant(fake_fs, "6", 10, 20, _claim("yuppler"))
+        real_read = _test_hooks.read_text
+
+        def mid_replace(path: Path) -> str:
+            raise window
+
+        _test_hooks.read_text = mid_replace
+        try:
+            won = acquire_container_claim("6", 10, 20, instance="artax", tank_id=7, now_ms=_NOW)
+        finally:
+            _test_hooks.read_text = real_read
+
+        assert not won
+        assert _read_planted(fake_fs, "6", 10, 20)["instance"] == "yuppler"
+
+    def test_an_unexpected_read_failure_still_raises(self, fake_fs: FakeFileSystem) -> None:
+        """Only the replace window is absorbed; an I/O error is a fault."""
+        from tankpit_bot import _test_hooks
+
+        _plant(fake_fs, "6", 10, 20, _claim("yuppler"))
+        real_read = _test_hooks.read_text
+
+        def io_error(path: Path) -> str:
+            raise OSError(errno.EIO, "Input/output error")
+
+        _test_hooks.read_text = io_error
+        try:
+            with pytest.raises(OSError, match="Input/output error"):
+                acquire_container_claim("6", 10, 20, instance="artax", tank_id=7, now_ms=_NOW)
+        finally:
+            _test_hooks.read_text = real_read
+
+    def test_a_partly_written_claim_denies_for_one_beat(self, fake_fs: FakeFileSystem) -> None:
+        """Content landing mid-create, cut short, is the unreadable window too."""
+        fake_fs.write_text(claim_path("6", 10, 20), '{"instance": "yupp')
+
+        assert not acquire_container_claim("6", 10, 20, instance="artax", tank_id=7, now_ms=_NOW)
 
     def test_a_non_object_claim_body_denies_for_one_beat(self, fake_fs: FakeFileSystem) -> None:
         """Valid JSON that is not an object is still the unreadable window."""
