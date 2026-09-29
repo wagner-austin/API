@@ -44,7 +44,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.state import (
@@ -102,7 +104,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=kwargs["teleport_cycle_id"],
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=kwargs["map_open_started_ms"],
             map_sync_timestamp_ms=kwargs["map_sync_timestamp_ms"],
             teleport_started_ms=kwargs["teleport_started_ms"],
@@ -124,7 +126,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
     wait_for_teleport_outcome: TeleportOutcomeWaiterProtocol = _wait_for_teleport_outcome_adapter
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return TeleportPageSnapshotDict(
             phase=phase,
@@ -227,7 +229,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
                 teleport_result=TeleportAttemptResultDict(
                     target=target,
                     teleport_cycle_id=1,
-                    status="landed_exact",
+                    status=TeleportAttemptStatus.LANDED_EXACT,
                     map_open_started_ms=1000,
                     map_sync_timestamp_ms=1200,
                     teleport_started_ms=1300,
@@ -307,7 +309,7 @@ def test_resolve_fuel_target_builds_reposition_teleport_timeout_result() -> None
     resolution = _resolve_with_tracked_reposition(
         acquisition_sync_timestamp_ms=2200,
         reposition_teleport_started_ms=2300,
-        reposition_teleport_status="teleport_timeout",
+        reposition_teleport_status=TeleportAttemptStatus.TELEPORT_TIMEOUT,
     )
 
     if resolution.terminal_result is None:
@@ -320,7 +322,7 @@ def test_resolve_fuel_target_adopts_successful_reposition_teleport_result() -> N
     resolution = _resolve_with_tracked_reposition(
         acquisition_sync_timestamp_ms=2200,
         reposition_teleport_started_ms=2300,
-        reposition_teleport_status="landed_exact",
+        reposition_teleport_status=TeleportAttemptStatus.LANDED_EXACT,
     )
 
     assert resolution.terminal_result is None

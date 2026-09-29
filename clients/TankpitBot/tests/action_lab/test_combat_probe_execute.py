@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Literal
 
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
@@ -53,28 +52,15 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.state.types import make_tank_state
-
-_SnapshotPhase = Literal[
-    "before_map_open",
-    "before_teleport",
-    "after_map_data",
-    "landed",
-    "timeout",
-]
-
-_TeleportStatus = Literal[
-    "landed_exact",
-    "landed_offset",
-    "map_sync_timeout",
-    "teleport_timeout",
-]
 
 
 @pytest.fixture(autouse=True)
@@ -125,7 +111,7 @@ def _enemy(tank_id: int = 7, *, x: int = 101, y: int = 100) -> EnemyThreatDict:
 
 def _teleport_result(
     target: TeleportTargetDict,
-    status: _TeleportStatus,
+    status: TeleportAttemptStatus,
 ) -> TeleportAttemptResultDict:
     """Build a teleport outcome carrying the requested status."""
     return TeleportAttemptResultDict(
@@ -172,7 +158,7 @@ def _stub_acquisition(sync_ms: int | None) -> None:
         int,
         int | None,
         list[TeleportPageSnapshotDict],
-        Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
     ]:
         _ = (page, provider, cdp, send_command, command_name)
         _ = (capture_before_map_open, wait_for_sync, sync_timeout_ms)
@@ -183,7 +169,7 @@ def _stub_acquisition(sync_ms: int | None) -> None:
     combat_module.run_tracked_acquisition_phase = _phase
 
 
-def _stub_teleport(status: _TeleportStatus) -> None:
+def _stub_teleport(status: TeleportAttemptStatus) -> None:
     """Make the teleport phase resolve immediately with ``status``."""
 
     def _command(
@@ -199,7 +185,7 @@ def _stub_teleport(status: _TeleportStatus) -> None:
         world_timestamp_before: int,
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
-        capture_page_snapshot: Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
         dispatch_failure_message: str = "teleport command dispatch failed",
@@ -341,7 +327,7 @@ def test_acquire_gives_up_on_a_teleport_timeout() -> None:
     _stub_acquisition(1100)
     _stub_enemy_lookup(_enemy())
     _stub_landing(100, 100)
-    _stub_teleport("teleport_timeout")
+    _stub_teleport(TeleportAttemptStatus.TELEPORT_TIMEOUT)
     assert _acquire(probe) is None
 
 
@@ -351,7 +337,7 @@ def test_acquire_gives_up_when_the_enemy_vanishes_after_landing() -> None:
     _stub_acquisition(1100)
     _stub_enemy_lookup(_enemy())
     _stub_landing(100, 100)
-    _stub_teleport("landed_exact")
+    _stub_teleport(TeleportAttemptStatus.LANDED_EXACT)
 
     def _gone(probe_arg: ProbeBase, tank_id: int) -> EnemyThreatDict | None:
         _ = (probe_arg, tank_id)
@@ -373,7 +359,7 @@ def test_acquire_engages_and_warns_when_the_landing_is_not_adjacent() -> None:
     far = _enemy(x=110, y=110)
     _stub_enemy_lookup(far)
     _stub_landing(100, 100)
-    _stub_teleport("landed_exact")
+    _stub_teleport(TeleportAttemptStatus.LANDED_EXACT)
 
     assert require_engagement(_acquire(probe))["target_id"] == far["tank_id"]
     assert probe.engaged == [far]
@@ -386,7 +372,7 @@ def test_acquire_engages_without_warning_when_the_landing_is_adjacent() -> None:
     near = _enemy(x=101, y=100)
     _stub_enemy_lookup(near)
     _stub_landing(100, 100)
-    _stub_teleport("landed_exact")
+    _stub_teleport(TeleportAttemptStatus.LANDED_EXACT)
 
     assert require_engagement(_acquire(probe))["target_id"] == near["tank_id"]
     assert probe.engaged == [near]

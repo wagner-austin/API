@@ -35,6 +35,7 @@ from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
 )
 from tankpit_bot.action_lab.types import (
+    TeleportAttemptStatus,
     TeleportTargetDict,
 )
 from tankpit_bot.action_lab.types_codecs import decode_teleport_probe_session
@@ -124,7 +125,7 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ExecuteHarness()
-    probe.result_attempts = [_make_attempt("landed_exact") for _ in range(10)]
+    probe.result_attempts = [_make_attempt(TeleportAttemptStatus.LANDED_EXACT) for _ in range(10)]
     recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
     original_sync = core_hooks.sync_playwright
     original_wait_initial = action_hooks.wait_for_initial_self_state

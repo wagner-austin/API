@@ -40,7 +40,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.state import (
@@ -134,7 +136,7 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -155,7 +157,7 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="map_sync_timeout",
+            status=TeleportAttemptStatus.MAP_SYNC_TIMEOUT,
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
             teleport_started_ms=1300,
@@ -199,7 +201,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
     original_attempt_runner = fuel_probe_module.run_tracked_teleport_attempt
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return TeleportPageSnapshotDict(
             phase=phase,

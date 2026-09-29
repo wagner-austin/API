@@ -9,9 +9,6 @@ from __future__ import annotations
 from collections.abc import (
     Callable,
 )
-from typing import (
-    Literal,
-)
 
 import pytest
 from tests.action_lab._enemy_teleport_harness import (
@@ -32,7 +29,9 @@ from tankpit_bot.action_lab.enemy_teleport import EnemyTeleportProbe
 from tankpit_bot.action_lab.teleport import TeleportProbeError
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import (
@@ -210,7 +209,7 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -226,7 +225,7 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="teleport_timeout",
+            status=TeleportAttemptStatus.TELEPORT_TIMEOUT,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
             teleport_started_ms=teleport_started_ms,
@@ -319,7 +318,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -335,7 +334,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
             teleport_started_ms=teleport_started_ms,
@@ -455,7 +454,7 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -471,7 +470,7 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
             teleport_started_ms=teleport_started_ms,

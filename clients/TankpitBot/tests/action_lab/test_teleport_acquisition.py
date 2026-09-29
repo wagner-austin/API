@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 import pytest
 from platform_core.json_utils import JSONObject
@@ -14,7 +13,7 @@ from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab import teleport_acquisition
-from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.action_lab.types import TeleportPageSnapshotDict, TeleportSnapshotPhase
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -77,7 +76,7 @@ class _CDP:
 
 
 def _snapshot(
-    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    phase: TeleportSnapshotPhase,
 ) -> TeleportPageSnapshotDict:
     """Build a sample page snapshot."""
     return TeleportPageSnapshotDict(
@@ -108,7 +107,7 @@ def test_start_teleport_page_snapshots_captures_initial_snapshot() -> None:
 
     def _capture(
         cdp: CDPSessionProtocol,
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         assert cdp is expected_cdp
         return _snapshot(phase)
@@ -121,7 +120,10 @@ def test_start_teleport_page_snapshots_captures_initial_snapshot() -> None:
             unavailable_error=RuntimeError,
             unavailable_message="missing",
         )
-        assert capture_page_snapshot("landed")["phase"] == "landed"
+        assert (
+            capture_page_snapshot(TeleportSnapshotPhase.LANDED)["phase"]
+            is TeleportSnapshotPhase.LANDED
+        )
     finally:
         action_hooks.capture_teleport_page_snapshot = original_capture
 
@@ -163,7 +165,7 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
 
     def _capture(
         cdp: CDPSessionProtocol,
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         assert cdp is expected_cdp
         base = _snapshot(phase)
@@ -231,7 +233,7 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
 
     def _capture(
         cdp: CDPSessionProtocol,
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         assert cdp is expected_cdp
         return _snapshot(phase)
@@ -256,7 +258,10 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
                 unavailable_message="missing",
             )
         )
-        assert capture_page_snapshot("timeout")["phase"] == "timeout"
+        assert (
+            capture_page_snapshot(TeleportSnapshotPhase.TIMEOUT)["phase"]
+            is TeleportSnapshotPhase.TIMEOUT
+        )
     finally:
         action_hooks.get_current_time_ms = original_clock
         action_hooks.wait_for_world_sync = original_wait
@@ -292,7 +297,7 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
 
     def _capture(
         cdp: CDPSessionProtocol,
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         assert cdp is expected_cdp
         return _snapshot(phase)
@@ -344,7 +349,7 @@ def test_run_tracked_acquisition_phase_raises_on_dispatch_failure() -> None:
 
     def _capture(
         cdp: CDPSessionProtocol,
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         assert cdp is expected_cdp
         return _snapshot(phase)

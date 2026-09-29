@@ -35,7 +35,9 @@ from tankpit_bot.action_lab.fuel_probe import FuelProbe
 from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
@@ -82,7 +84,7 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -111,7 +113,7 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
             teleport_started_ms=1300,
@@ -230,7 +232,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -251,7 +253,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
             teleport_started_ms=1300,
@@ -374,18 +376,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
             world_timestamp_before: int,
             timeout_ms: int,
             page_snapshots: list[TeleportPageSnapshotDict],
-            capture_page_snapshot: Callable[
-                [
-                    Literal[
-                        "before_map_open",
-                        "before_teleport",
-                        "after_map_data",
-                        "landed",
-                        "timeout",
-                    ]
-                ],
-                TeleportPageSnapshotDict,
-            ],
+            capture_page_snapshot: Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
         ) -> TeleportAttemptResultDict:
             _ = (
                 page,
@@ -398,7 +389,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
             return TeleportAttemptResultDict(
                 target=target,
                 teleport_cycle_id=teleport_cycle_id,
-                status="landed_exact",
+                status=TeleportAttemptStatus.LANDED_EXACT,
                 map_open_started_ms=map_open_started_ms,
                 map_sync_timestamp_ms=map_sync_timestamp_ms,
                 teleport_started_ms=teleport_started_ms,

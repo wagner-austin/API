@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 import pytest
 from tests.action_lab._replay_page import ReplayClock
@@ -15,7 +14,9 @@ from tankpit_bot.action_lab import teleport_phase
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseName
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
@@ -72,7 +73,7 @@ def _target() -> TeleportTargetDict:
 
 
 def _snapshot(
-    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    phase: TeleportSnapshotPhase,
 ) -> TeleportPageSnapshotDict:
     """Build a sample page snapshot."""
     return TeleportPageSnapshotDict(
@@ -143,7 +144,7 @@ class _SuccessfulWaitForOutcome(teleport_phase.TeleportOutcomeWaiterProtocol):
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -162,7 +163,7 @@ class _SuccessfulWaitForOutcome(teleport_phase.TeleportOutcomeWaiterProtocol):
         assert provider is self._probe
         assert target_arg == self._target
         self._wait_calls.append(teleport_started_ms)
-        page_snapshots.append(_snapshot("landed"))
+        page_snapshots.append(_snapshot(TeleportSnapshotPhase.LANDED))
         return _result(self._target, teleport_started_ms)
 
 
@@ -185,7 +186,7 @@ class _FailingWaitForOutcome(teleport_phase.TeleportOutcomeWaiterProtocol):
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -213,7 +214,7 @@ def _result(target: TeleportTargetDict, teleport_started_ms: int) -> TeleportAtt
     return TeleportAttemptResultDict(
         target=target,
         teleport_cycle_id=4,
-        status="landed_exact",
+        status=TeleportAttemptStatus.LANDED_EXACT,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
         teleport_started_ms=teleport_started_ms,
@@ -229,7 +230,10 @@ def _result(target: TeleportTargetDict, teleport_started_ms: int) -> TeleportAtt
         landed_y=110,
         message_start_index=3,
         message_end_index=8,
-        page_snapshots=[_snapshot("before_teleport"), _snapshot("landed")],
+        page_snapshots=[
+            _snapshot(TeleportSnapshotPhase.BEFORE_TELEPORT),
+            _snapshot(TeleportSnapshotPhase.LANDED),
+        ],
     )
 
 
@@ -242,11 +246,11 @@ def test_run_tracked_teleport_command_waits_and_resets_state() -> None:
     probe = _Probe(dispatch_succeeds=True)
     target = _target()
     page_snapshots: list[TeleportPageSnapshotDict] = []
-    capture_calls: list[str] = []
+    capture_calls: list[TeleportSnapshotPhase] = []
     wait_calls: list[int] = []
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         capture_calls.append(phase)
         return _snapshot(phase)
@@ -285,7 +289,7 @@ def test_run_tracked_teleport_command_waits_and_resets_state() -> None:
         ActionPhaseCycleDict(phase=ActionPhaseName.TELEPORT, cycle_id=4, started_ms=1300)
     ]
     assert probe.reset_idle_calls == 1
-    assert capture_calls == ["before_teleport"]
+    assert capture_calls == [TeleportSnapshotPhase.BEFORE_TELEPORT]
     assert wait_calls == [1400]
 
 
@@ -299,7 +303,7 @@ def test_run_tracked_teleport_command_raises_on_dispatch_failure() -> None:
     target = _target()
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return _snapshot(phase)
 

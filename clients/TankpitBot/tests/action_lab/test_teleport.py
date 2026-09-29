@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import (
     Callable,
 )
-from typing import Literal
 
 import pytest
 from tests.action_lab._replay_page import (
@@ -44,7 +43,9 @@ from tankpit_bot.action_lab.teleport_helpers import (
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 
@@ -151,7 +152,7 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
 
     probe = _ProbeMethodHarness()
     page = probe._fake_page
-    expected = _make_attempt("landed_exact")
+    expected = _make_attempt(TeleportAttemptStatus.LANDED_EXACT)
     original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
 
@@ -179,7 +180,7 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -310,7 +311,7 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
 
     probe = _ProbeMethodHarness()
     page = probe._fake_page
-    expected = _make_attempt("landed_exact")
+    expected = _make_attempt(TeleportAttemptStatus.LANDED_EXACT)
     original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
 
@@ -338,7 +339,7 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -382,7 +383,7 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
     from tankpit_bot.action_lab import teleport as teleport_module
 
     probe = _ProbeMethodHarness()
-    expected = _make_attempt("landed_exact")
+    expected = _make_attempt(TeleportAttemptStatus.LANDED_EXACT)
     original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
     wait_sync_calls: list[int] = []
@@ -412,7 +413,7 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:

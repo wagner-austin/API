@@ -50,7 +50,9 @@ from tankpit_bot.action_lab.fuel_targeting import FuelTargetingError
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
@@ -128,7 +130,7 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -144,7 +146,7 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
             teleport_started_ms=teleport_started_ms,
@@ -205,7 +207,7 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -220,7 +222,7 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,
-            status="landed_exact",
+            status=TeleportAttemptStatus.LANDED_EXACT,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
             teleport_started_ms=teleport_started_ms,

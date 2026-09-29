@@ -41,7 +41,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
@@ -192,7 +194,7 @@ _ATTEMPT = EquipmentProbeAttemptResultDict(
 _TP_RESULT = TeleportAttemptResultDict(
     target=_TARGET,
     teleport_cycle_id=1,
-    status="landed_exact",
+    status=TeleportAttemptStatus.LANDED_EXACT,
     map_open_started_ms=1000,
     map_sync_timestamp_ms=1100,
     teleport_started_ms=1200,
@@ -371,15 +373,7 @@ def _noop_finalize(page: WaitPageProtocol, *, settle_delay_ms: int) -> None:
     pass
 
 
-def _snap(
-    label: Literal[
-        "before_map_open",
-        "before_teleport",
-        "after_map_data",
-        "landed",
-        "timeout",
-    ],
-) -> TeleportPageSnapshotDict:
+def _snap(label: TeleportSnapshotPhase) -> TeleportPageSnapshotDict:
     return TeleportPageSnapshotDict(
         phase=label,
         timestamp_ms=1000,

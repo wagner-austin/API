@@ -7,7 +7,6 @@ outcomes are now a sibling.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 from tests.action_lab._teleport_attempt_harness import (
     _Page,
@@ -29,7 +28,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 
@@ -49,7 +50,7 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         return True
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return _snapshot(phase)
 
@@ -72,7 +73,7 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         int | None,
         list[TeleportPageSnapshotDict],
         Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ]:
@@ -90,7 +91,8 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         assert page is expected_page
         assert provider is expected_probe
         assert send_command()
-        return (1500, 1700, [_snapshot("before_map_open")], _capture_page_snapshot)
+        before_map_open = _snapshot(TeleportSnapshotPhase.BEFORE_MAP_OPEN)
+        return (1500, 1700, [before_map_open], _capture_page_snapshot)
 
     def _run_teleport(
         page: action_session.WaitPageProtocol,
@@ -106,7 +108,7 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
@@ -129,7 +131,9 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         assert probe is expected_probe
         assert target == expected_target
         assert message_start_index == 1
-        assert [snapshot["phase"] for snapshot in page_snapshots] == ["before_map_open"]
+        assert [snapshot["phase"] for snapshot in page_snapshots] == [
+            TeleportSnapshotPhase.BEFORE_MAP_OPEN
+        ]
         teleport_calls.append(message_start_index)
         return (_result(target), 1800)
 
@@ -173,6 +177,7 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
     assert attempt.acquisition_sync_timestamp_ms == 1700
     assert attempt.teleport_started_ms == 1800
     assert attempt.teleport_result == _result(expected_target)
+    assert attempt.teleport_result["status"] is TeleportAttemptStatus.LANDED_EXACT
 
 
 def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> None:
@@ -187,7 +192,7 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         return True
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return _snapshot(phase)
 
@@ -210,7 +215,7 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         int | None,
         list[TeleportPageSnapshotDict],
         Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ]:
@@ -228,7 +233,8 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         assert page is expected_page
         assert provider is expected_probe
         assert send_command()
-        return (1500, None, [_snapshot("before_map_open")], _capture_page_snapshot)
+        before_map_open = _snapshot(TeleportSnapshotPhase.BEFORE_MAP_OPEN)
+        return (1500, None, [before_map_open], _capture_page_snapshot)
 
     def _run_teleport(
         page: action_session.WaitPageProtocol,
@@ -244,7 +250,7 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,

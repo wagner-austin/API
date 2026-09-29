@@ -8,7 +8,7 @@ built here once rather than three times.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal, Protocol
+from typing import Protocol
 
 from tests.action_lab._combat_probe_harness import (
     AcquisitionPhaseFn,
@@ -39,14 +39,6 @@ from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types.constants import TankLiveness
-
-_SnapshotPhase = Literal[
-    "before_map_open",
-    "before_teleport",
-    "after_map_data",
-    "landed",
-    "timeout",
-]
 
 
 class AnalyzeThreatsFn(Protocol):
