@@ -10,11 +10,21 @@ The five assertions (per HANDOFF.md Tier 1 spec):
 
   1. Login completed -- STATE ladder
      ``INITIALIZING -> WAITING_FOR_POSITION -> IDLE`` in order.
-  2. At least one ``map_open`` action cleared via the authoritative
-     ``map_data_processed`` signal.
+  2. At least one ``map_open`` action resolved with the authoritative
+     ``map_data_processed`` outcome.
   3. HUNT acquired a non-zero target at least once.
   4. At least one bot action attempted on the wire.
-  5. Zero ``stall_timeout`` events in the first 10 seconds of the run.
+  5. Zero ``stall_timeout`` outcomes in the first 10 seconds of the run,
+     judged over at least one recorded outcome.
+
+Assertions 2 and 5 read the ledger's ``action_outcome`` events (one
+per resolution, on the ``DIAGNOSTIC`` channel, the label in
+``outcome``), found through the ledger's own
+:func:`~tankpit_bot.ledger.outcomes.is_action_outcome_event`. Until
+2026-09-29 they read a ``WIRE_COMPLETE`` channel and a ``signal``
+field that nothing had written for months, so assertion 2 could not
+pass and assertion 5 passed over zero events (board task 14b91fb5).
+Each now names how many outcomes it examined.
 
 Architecture notes (per project strictness rules):
 
@@ -49,6 +59,8 @@ from platform_core.json_utils import (
 )
 
 from scripts import _test_hooks
+from tankpit_bot.ledger.events import ActionKind
+from tankpit_bot.ledger.outcomes import ActionOutcome, is_action_outcome_event
 
 #: Default JSONL path scanned by the CLI. Override by passing ``path``
 #: to :func:`run`. Tests pass their own temp paths directly.
@@ -112,7 +124,7 @@ class SmokeRecord:
     Attributes:
         line_no: 1-based source-file line number.
         raw: Original raw JSONL line, used for context dumps on failure.
-        channel: Event channel (``STATE``, ``WIRE``, ``WIRE_COMPLETE``,
+        channel: Event channel (``STATE``, ``WIRE``, ``DIAGNOSTIC``,
             ``AI``, etc.).
         message: Human-readable message body.
         timestamp: ISO timestamp string written by the runtime logger.
@@ -311,27 +323,49 @@ def assert_login_completed(records: list[SmokeRecord]) -> SmokeFailureDict | Non
     )
 
 
-def assert_map_open_cleared_via_map_data(
-    records: list[SmokeRecord],
-) -> SmokeFailureDict | None:
-    """Verify at least one map_open cleared via ``map_data_processed``.
+def action_outcome_indices(records: list[SmokeRecord]) -> list[int]:
+    """Return the indices of every recorded action outcome, in file order.
 
     Args:
         records: All loaded events in file order.
 
     Returns:
-        ``None`` on success, otherwise a :class:`SmokeFailureDict`.
+        Indices into ``records`` of the ledger's ``action_outcome`` events.
     """
-    for rec in records:
-        if rec.channel != "WIRE_COMPLETE":
-            continue
-        if optional_str(rec.fields, "action_kind") != "map_open":
-            continue
-        if optional_str(rec.fields, "signal") == "map_data_processed":
+    return [
+        index
+        for index, rec in enumerate(records)
+        if is_action_outcome_event(rec.channel, rec.fields)
+    ]
+
+
+def assert_map_open_cleared_via_map_data(
+    records: list[SmokeRecord],
+) -> SmokeFailureDict | None:
+    """Verify at least one map_open resolved ``map_data_processed``.
+
+    Args:
+        records: All loaded events in file order.
+
+    Returns:
+        ``None`` on success, otherwise a :class:`SmokeFailureDict` naming
+        how many outcomes, and how many map_open outcomes, it examined.
+    """
+    outcomes = action_outcome_indices(records)
+    map_opens = [
+        index
+        for index in outcomes
+        if optional_str(records[index].fields, "action_kind") == ActionKind.MAP_OPEN
+    ]
+    for index in map_opens:
+        if optional_str(records[index].fields, "outcome") == ActionOutcome.MAP_DATA_PROCESSED:
             return None
     return SmokeFailureDict(
-        message="2) no map_open action cleared via signal=map_data_processed",
-        pivot=0,
+        message=(
+            f"2) no map_open resolved {ActionOutcome.MAP_DATA_PROCESSED} "
+            f"({len(map_opens)} map_open of {len(outcomes)} action outcomes examined)"
+        ),
+        pivot=map_opens[-1] if map_opens else 0,
     )
 
 
@@ -387,7 +421,10 @@ def assert_action_attempted(records: list[SmokeRecord]) -> SmokeFailureDict | No
 
 
 def assert_no_early_stall(records: list[SmokeRecord]) -> SmokeFailureDict | None:
-    """Verify no ``stall_timeout`` signal fires in the first 10 seconds.
+    """Verify no ``stall_timeout`` outcome is recorded in the first 10 seconds.
+
+    A run with no recorded outcome at all fails too: nothing resolved,
+    so "no stalls" would be a verdict over zero events.
 
     Args:
         records: All loaded events in file order.
@@ -403,11 +440,19 @@ def assert_no_early_stall(records: list[SmokeRecord]) -> SmokeFailureDict | None
             message="5) no events at all -- session produced an empty JSONL",
             pivot=0,
         )
+    outcomes = action_outcome_indices(records)
+    if not outcomes:
+        return SmokeFailureDict(
+            message=(
+                f"5) 0 action outcomes among {len(records)} events -- "
+                "no action resolved, so stalls cannot be judged"
+            ),
+            pivot=len(records) - 1,
+        )
     start_seconds = parse_iso_timestamp_seconds(records[0].timestamp)
-    for index, rec in enumerate(records):
-        if rec.channel != "WIRE_COMPLETE":
-            continue
-        if optional_str(rec.fields, "signal") != "stall_timeout":
+    for index in outcomes:
+        rec = records[index]
+        if optional_str(rec.fields, "outcome") != ActionOutcome.STALL_TIMEOUT:
             continue
         elapsed = parse_iso_timestamp_seconds(rec.timestamp) - start_seconds
         if elapsed <= 10.0:
@@ -454,6 +499,7 @@ def _write_success(records: list[SmokeRecord]) -> None:
     """
     sys.stdout.write(
         f"SMOKE PASSED: {len(records)} events, "
+        f"{len(action_outcome_indices(records))} action outcomes, "
         "5/5 assertions green (login, map_data_processed, HUNT target, "
         "action attempted, no early stall).\n"
     )
