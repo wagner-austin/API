@@ -31,6 +31,29 @@ from fleet.core import queue
 from tests.conftest import DEMO_PROJECT
 
 
+class ToolRefusal:
+    """A scripted :class:`FakeQueue` reply that the tool threw, not answered.
+
+    Rendered the way :class:`FakeRefusingQueue` renders every reply, as a
+    successful result carrying ``isError: true``, so one script can hold a
+    refusal between ordinary answers: a start report refused after a claim
+    that succeeded, say (MCPs board task 88b8fe61).
+
+    Attributes:
+        message: What the tool would have raised.
+    """
+
+    message: str
+
+    def __init__(self, message: str) -> None:
+        """Hold the refusal's message.
+
+        Args:
+            message: What the tool would have raised.
+        """
+        self.message = message
+
+
 class FakeQueue:
     """A dispatch-queue endpoint that answers from a script and records calls.
 
@@ -46,16 +69,16 @@ class FakeQueue:
 
     tools: list[str]
     arguments: list[JSONObject]
-    _replies: list[str]
+    _replies: list[str | ToolRefusal]
 
-    def __init__(self, replies: Sequence[str]) -> None:
+    def __init__(self, replies: Sequence[str | ToolRefusal]) -> None:
         """Build a queue that will answer with these tool texts in order.
 
         Args:
-            replies: One rendered tool answer per expected call. Running out
-                is an error rather than a default: a test that made more
-                calls than it declared has changed behaviour it did not mean
-                to assert on.
+            replies: One rendered tool answer, or a :class:`ToolRefusal`, per
+                expected call. Running out is an error rather than a default:
+                a test that made more calls than it declared has changed
+                behaviour it did not mean to assert on.
         """
         self.tools = []
         self.arguments = []
@@ -88,11 +111,13 @@ class FakeQueue:
         self.tools.append(narrow_json_to_str(params["name"]))
         self.arguments.append(narrow_json_to_dict(params["arguments"]))
         assert self._replies, f"unscripted queue call: {self.tools[-1]}"
-        payload: JSONObject = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {"content": [{"text": self._replies.pop(0)}]},
-        }
+        reply = self._replies.pop(0)
+        result: JSONObject = (
+            {"isError": True, "content": [{"text": reply.message}]}
+            if isinstance(reply, ToolRefusal)
+            else {"content": [{"text": reply}]}
+        )
+        payload: JSONObject = {"jsonrpc": "2.0", "id": 1, "result": result}
         return McpHttpResponse(
             status=200,
             content_type="text/event-stream",

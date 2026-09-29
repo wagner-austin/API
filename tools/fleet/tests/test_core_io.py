@@ -176,6 +176,30 @@ class TestDefaultHooks:
         assert withheld["stdout"].split() == ["False", "True"]
         assert inherited["stdout"].split() == ["True", "True"]
 
+    def test_a_python_child_logs_text_outside_its_code_page_and_it_arrives_whole(self) -> None:
+        """A real child writes the queue's em dash through a real logging handler.
+
+        The shape that failed on 2026-09-29 (MCPs board task 88b8fe61): a
+        Python child on Windows wrote its pipes in cp1252, so the dash
+        arrived here as U+FFFD, and a child logging a character its stream
+        could not encode printed ``--- Logging error ---`` instead of the
+        line. Both streams must come back as the child meant them.
+        """
+        dash = "—"
+        probe = [
+            sys.executable,
+            "-c",
+            "import logging, sys; logging.basicConfig(stream=sys.stderr); "
+            f"logging.getLogger('probe').warning('stderr {dash} U+FFFD \\ufffd'); "
+            f"print('stdout {dash}')",
+        ]
+
+        result = _test_hooks._default_run(probe, timeout_seconds=GENEROUS_SECONDS)
+
+        assert result["returncode"] == 0
+        assert result["stdout"].strip() == f"stdout {dash}"
+        assert result["stderr"].strip() == f"WARNING:probe:stderr {dash} U+FFFD �"
+
     def test_run_sets_named_variables_after_withholding_and_keeps_the_rest(self) -> None:
         """A real child reads back what it was given (MCPs board task f4cd489f).
 
