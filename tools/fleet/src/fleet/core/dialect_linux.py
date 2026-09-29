@@ -90,6 +90,10 @@ CAPACITY_PROBE_SCRIPT = (
 #: execdocker user's rootless daemon (MCPs board task 6c4516af), asked as
 #: that user with ``sudo -n``, so a node without the user, without sudo for
 #: it or whose daemon does not say ``name=rootless`` answers ``docker=no=``.
+#: The ``sudo`` is an ``if`` condition because the prologue's ``set -e``
+#: does not fire there: as a bare assignment, a ``sudo`` refusing for want
+#: of a password ended the whole probe with exit 1 (measured as execdocker on
+#: diphtheria, 2026-09-29, MCPs board task a8ee9b21), not the ``no`` line.
 TOOLCHAIN_PROBE_SCRIPT = (
     PROLOGUE + "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -110,9 +114,9 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "else\n"
     "  printf 'cxx=no=\\n'\n"
     "fi\n"
-    "if id execdocker > /dev/null 2>&1; then\n"
-    '  d="$(sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
-    " info --format '{{.ServerVersion}} {{json .SecurityOptions}}' 2>/dev/null)\"\n"
+    "if id execdocker > /dev/null 2>&1 &&"
+    ' d="$(sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
+    " info --format '{{.ServerVersion}} {{json .SecurityOptions}}' 2>/dev/null)\"; then\n"
     '  case "$d" in\n'
     "    *name=rootless*) printf 'docker=yes=%s\\n' \"${d%% *}\" ;;\n"
     "    *) printf 'docker=no=\\n' ;;\n"
