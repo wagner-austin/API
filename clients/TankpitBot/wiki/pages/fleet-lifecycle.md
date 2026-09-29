@@ -11,6 +11,9 @@ source_paths:
   - "src/tankpit_bot/service/fleet_record.py"
   - "src/tankpit_bot/service/fleet_adoption.py"
   - "src/tankpit_bot/service/fleet_manager.py"
+  - "src/tankpit_bot/service/fleet_slot.py"
+  - "src/tankpit_bot/service/service_main.py"
+  - "src/tankpit_bot/runtime_artifacts.py"
   - "src/tankpit_bot/service/serving.py"
   - "scripts/fleet_host.py"
   - "docker-compose.yml"
@@ -20,12 +23,15 @@ source_git_blobs:
   "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
   "src/tankpit_bot/service/fleet_record.py": "ca5367073005c0cd30227d51253762ae2e9a9705"
   "src/tankpit_bot/service/fleet_adoption.py": "32d4aaea0a2968db120498eef69b8c8c6d090883"
-  "src/tankpit_bot/service/fleet_manager.py": "fbfaad57ea88687ca4cc86ffd885d016db5eaf75"
+  "src/tankpit_bot/service/fleet_manager.py": "45689875f78d5b31d62fae0824403a23cd8a8add"
+  "src/tankpit_bot/service/fleet_slot.py": "36057f6a8419373350e307feebcab0e49356a486"
+  "src/tankpit_bot/service/service_main.py": "9d85d62a5a1af8a39fd5d4064fd3f674e0cc0789"
+  "src/tankpit_bot/runtime_artifacts.py": "062e2e5984680df96a1d2e17e8897bd9899c6238"
   "src/tankpit_bot/service/serving.py": "02f70d54653b438e885bf88e1aa1bd52209fd596"
   "scripts/fleet_host.py": "d6b33832c471344d9677134f98334f7acf09f891"
   "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
   "Makefile": "bf8521b096bdca7b59861fb762513f11765295ac"
-fact_checked: "2026-09-28"
+fact_checked: "2026-09-29"
 confidence: high
 hubs: [architecture]
 ---
