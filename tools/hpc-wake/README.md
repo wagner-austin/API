@@ -73,10 +73,17 @@ an S4U principal**. Both halves of that are measured constraints from
   Docker-autostart work: stall at .NET assembly load, repeatable). A
   native binary does not.
 
-Registration, once, from any interactive session:
+The binary is this package's own `.venv\Scripts\python.exe`, never the
+python on PATH. `run_cycle.py` imports `platform_core`, and the venv holds
+it as the editable path dependency `pyproject.toml` declares, so the pump
+always runs the tree's `platform_core`. The system python held a copied,
+older one: when d46de80d0 (repo API) moved the env parser into
+`platform_core.env_assignments` on 2026-09-29, every tick from 08:25Z died
+on `ModuleNotFoundError` and the pump published nothing for eight hours
+(board task 25306d98). After `poetry install` here, register:
 
 ```powershell
-$py = (Get-Command python).Source
+$py = 'C:\Users\Test\PROJECTS\API\tools\hpc-wake\.venv\Scripts\python.exe'
 $action = New-ScheduledTaskAction -Execute $py `
   -Argument '-m scripts.run_cycle --package-root C:\Users\Test\PROJECTS\API\tools\hpc-wake' `
   -WorkingDirectory 'C:\Users\Test\PROJECTS\API\tools\hpc-wake'
