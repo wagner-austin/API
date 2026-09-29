@@ -23,7 +23,7 @@ from fleet.core import (
     runner_render,
     runner_windows_provision,
 )
-from tests._runner_fixtures import a_base, quiet_rebuild_answers
+from tests._runner_fixtures import a_base, a_ci_slice, quiet_rebuild_answers
 from tests.conftest import FakeClock, FakeRun, failed, ok
 
 
@@ -83,6 +83,7 @@ def _host() -> HostRunnerSpec:
             )
         ],
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 from platform_core.json_utils import JSONValue
 
 from fleet.contracts.runner_base import DiskCeiling, HostBase, MachineVariable, PinnedDownload
+from fleet.contracts.runner_slice import CiSlice
 from fleet.core import _test_hooks
 from tests.conftest import ok
 
@@ -137,4 +138,22 @@ def quiet_rebuild_answers(
     ]
 
 
-__all__ = ["a_base", "base_json", "quiet_rebuild_answers"]
+def a_ci_slice() -> CiSlice:
+    """Lavender's CI budget, as ``runners.json`` declares it.
+
+    Returns:
+        16 GB throttle, 18 GB ceiling, weight 20, under a 26 GB VM.
+    """
+    return CiSlice(memory_high_gb=16, memory_max_gb=18, cpu_weight=20)
+
+
+def ci_slice_json() -> dict[str, JSONValue]:
+    """The same budget as the roster's JSON spells it, built by hand.
+
+    Returns:
+        The mapping.
+    """
+    return {"memory_high_gb": 16, "memory_max_gb": 18, "cpu_weight": 20}
+
+
+__all__ = ["a_base", "a_ci_slice", "base_json", "ci_slice_json", "quiet_rebuild_answers"]

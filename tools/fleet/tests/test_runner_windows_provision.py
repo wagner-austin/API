@@ -11,7 +11,7 @@ import pytest
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_windows_provision
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 
 
 def _install(python: list[str]) -> RunnerInstall:
@@ -59,6 +59,7 @@ def _host(
         installs=installs,
         assets=[],
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 

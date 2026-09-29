@@ -23,7 +23,7 @@ from fleet.contracts.runners import (
     decode_runner_spec,
     encode_runner_spec,
 )
-from tests._runner_fixtures import base_json
+from tests._runner_fixtures import base_json, ci_slice_json
 
 #: The shipped roster, resolved from this file so the test runs from any cwd.
 SHIPPED_ROSTER = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
@@ -93,6 +93,7 @@ def _host(**overrides: JSONValue) -> dict[str, JSONValue]:
         "installs": [_install()],
         "assets": [_asset()],
         "base": base_json(),
+        "ci_slice": ci_slice_json(),
     }
     raw.update(overrides)
     return raw

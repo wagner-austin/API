@@ -13,7 +13,7 @@ import pytest
 
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_keepalive
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 
 
 def _host(keepalive: str | None) -> HostRunnerSpec:
@@ -37,6 +37,7 @@ def _host(keepalive: str | None) -> HostRunnerSpec:
         installs=[],
         assets=[],
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 

@@ -19,7 +19,7 @@ from fleet.core import (
     runner_render,
     runner_windows_provision,
 )
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -51,6 +51,7 @@ def _host() -> HostRunnerSpec:
         ],
         assets=[],
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 

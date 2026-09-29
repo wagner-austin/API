@@ -13,7 +13,7 @@ from platform_core.json_utils import JSONTypeError, load_json_str
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, remote, runner_load
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -54,6 +54,7 @@ def _host() -> HostRunnerSpec:
         ],
         assets=[],
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 

@@ -17,7 +17,7 @@ from fleet.contracts.runners import (
     RunnerInstall,
 )
 from fleet.core import _test_hooks, runner_audit
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -82,6 +82,7 @@ def _host(
         if assets is None
         else assets,
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 

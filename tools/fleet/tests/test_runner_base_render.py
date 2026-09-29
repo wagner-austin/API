@@ -20,7 +20,7 @@ import pytest
 from fleet.contracts.runner_base import PinnedDownload
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_base_render
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 
 #: A digest both pinned downloads carry.
 _PIN = "ab" * 32
@@ -66,6 +66,7 @@ def _host(scratch: pathlib.Path) -> HostRunnerSpec:
         ],
         assets=[],
         base=base,
+        ci_slice=a_ci_slice(),
     )
 
 

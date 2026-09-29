@@ -12,7 +12,7 @@ import pytest
 from fleet.contracts.runner_base import MachineVariable
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_audit, runner_machine_env
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 
 
 def _host(variables: list[MachineVariable]) -> HostRunnerSpec:
@@ -38,6 +38,7 @@ def _host(variables: list[MachineVariable]) -> HostRunnerSpec:
         installs=[],
         assets=[],
         base=base,
+        ci_slice=a_ci_slice(),
     )
 
 

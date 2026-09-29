@@ -16,7 +16,7 @@ import pytest
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_account, runner_audit
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 
 #: The service every case names.
 _SERVICE = "actions.runner.wagner-austin-MCPs.lavender"
@@ -117,6 +117,7 @@ class TestTheAccountRow:
                 installs=[_install(workdir)],
                 assets=[],
                 base=a_base(),
+                ci_slice=a_ci_slice(),
             )
         )
         assert [check["check_id"] for check in expected[-3:]] == [

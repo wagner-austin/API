@@ -17,7 +17,7 @@ from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
 from fleet.cli import runners
 from fleet.core import _test_hooks, runner_load
-from tests._runner_fixtures import base_json, quiet_rebuild_answers
+from tests._runner_fixtures import base_json, ci_slice_json, quiet_rebuild_answers
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -52,6 +52,7 @@ def _raw_host(name: str) -> dict[str, JSONValue]:
         ],
         "assets": [],
         "base": base_json(),
+        "ci_slice": ci_slice_json(),
     }
 
 

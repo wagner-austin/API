@@ -12,9 +12,15 @@ import pathlib
 import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
-from fleet.core import runner_install, runner_recovery, runner_render, runner_windows_provision
+from fleet.core import (
+    runner_install,
+    runner_recovery,
+    runner_render,
+    runner_slice_render,
+    runner_windows_provision,
+)
 from tests._host_bash import host_bash
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 
 
 def _host(
@@ -91,6 +97,7 @@ def _host(
         if assets is None
         else assets,
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 
@@ -259,14 +266,18 @@ class TestRerunsOverAHalfBuiltHost:
         assert "./config.sh" in lines[guard + 1]
         assert lines[guard + 2] == "fi"
         # The unit exists after svc.sh install and gets its restart policy
-        # before it starts.
+        # before it starts, and is moved into the CI slice after it starts,
+        # when its live cgroup can be read.
         recovery = runner_recovery.render_wsl_recovery_lines(install)
-        assert lines[-2 - len(recovery)] == (
+        placed = runner_slice_render.render_runner_slice_lines(install)
+        start = len(lines) - len(placed) - 1
+        assert lines[start - 1 - len(recovery)] == (
             "[ -f /home/gharunner/actions-runner/.service ] || "
             "(cd /home/gharunner/actions-runner && ./svc.sh install gharunner)"
         )
-        assert lines[-1 - len(recovery) : -1] == recovery
-        assert lines[-1] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
+        assert lines[start - len(recovery) : start] == recovery
+        assert lines[start] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
+        assert lines[start + 1 :] == placed
 
 
 class TestManualSteps:

@@ -10,7 +10,7 @@ import pytest
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, runner_distro
 from fleet.core.dialect_windows import WRITE_COMMAND
-from tests._runner_fixtures import a_base
+from tests._runner_fixtures import a_base, a_ci_slice
 from tests.conftest import FakeRun, ok
 
 
@@ -42,6 +42,7 @@ def _host() -> HostRunnerSpec:
         ],
         assets=[],
         base=a_base(),
+        ci_slice=a_ci_slice(),
     )
 
 
