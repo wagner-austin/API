@@ -23,7 +23,8 @@
       "test_database": false,
       "rust": null,
       "cxx": "17.14.37710.0",
-      "docker": null
+      "docker": null,
+      "elevated": false
     },
     "lavender": {
       "host": "lavender",
@@ -48,7 +49,8 @@
       "test_database": false,
       "rust": null,
       "cxx": "17.14.37710.0",
-      "docker": null
+      "docker": null,
+      "elevated": false
     },
     "loki": {
       "host": "loki",
@@ -68,7 +70,8 @@
       "test_database": false,
       "rust": null,
       "cxx": null,
-      "docker": null
+      "docker": null,
+      "elevated": false
     },
     "diphtheria": {
       "host": "diphtheria",
@@ -93,7 +96,8 @@
       "test_database": true,
       "rust": "1.98.1",
       "cxx": "13.3.0",
-      "docker": "29.8.1"
+      "docker": "29.8.1",
+      "elevated": false
     },
     "lavender-wsl": {
       "host": "lavender-wsl",
@@ -118,7 +122,8 @@
       "test_database": true,
       "rust": null,
       "cxx": "13.3.0",
-      "docker": null
+      "docker": null,
+      "elevated": false
     },
     "serendipity": {
       "host": "serendipity",
@@ -138,7 +143,8 @@
       "test_database": false,
       "rust": null,
       "cxx": "17.14.37710.0",
-      "docker": null
+      "docker": null,
+      "elevated": true
     }
   },
   "not_dispatchable": {
@@ -560,6 +566,23 @@
       "minimum_workers": 1,
       "expected_minutes": 10,
       "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "execution",
+        "install": [
+          ["npm", "ci", "--ignore-scripts"],
+          ["npx", "patch-package"],
+          ["node", "scripts/ci-build-consumed-workspaces.mjs"],
+          ["npm", "rebuild", "mcp-shared"]
+        ],
+        "companions": []
+      }
+    },
+    "MCPs/execution-elevated": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 1,
+      "expected_minutes": 10,
+      "required_tags": ["windows", "elevated"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "execution",
