@@ -158,7 +158,8 @@ class TestScriptedExtraction:
     def test_a_failed_step_refuses_by_its_own_code_and_stops_there(
         self, tmp_path: pathlib.Path, failing_step: int, code: str, step_words: str
     ) -> None:
-        _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
+        scratch = tmp_path / "scratch"
+        _test_hooks.temp_root = FakeTempRoot(scratch)
         replies = [ok(f"{COMMIT}\n"), ok("")][:failing_step]
         runner = FakeRun([*replies, failed(2, "  the step's own complaint  ")])
         _test_hooks.run = runner
@@ -169,6 +170,8 @@ class TestScriptedExtraction:
         assert step_words in refusal
         assert refusal.endswith(" exited 2: the step's own complaint")
         assert len(runner.calls) == failing_step + 1
+        # MCPs board task 94ac1c4f: a refused launch leaves no pid directory.
+        assert not destination_of(scratch).exists()
 
     def test_an_extraction_missing_an_entry_point_refuses_naming_each_file(
         self, tmp_path: pathlib.Path
@@ -186,6 +189,7 @@ class TestScriptedExtraction:
             "libs/monorepo_guards/src/monorepo_guards/__init__.py, "
             "tools/board-watch/src/board_watch/__init__.py, tools/fleet/fleet.json; nothing ran"
         )
+        assert not destination_of(scratch).exists()
 
 
 #: What the rolled commit carries, and one file the archive must leave out.
