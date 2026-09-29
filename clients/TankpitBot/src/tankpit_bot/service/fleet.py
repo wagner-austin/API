@@ -34,7 +34,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 
-from platform_core.logging import get_logger
+from platform_core.logging import LogLevel, get_logger
+from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.service import _test_hooks as service_hooks
@@ -170,9 +171,16 @@ async def _async_main() -> None:
 def main() -> None:
     """Run the ``tankpit-fleet`` manager until its bots are done.
 
+    Logging is configured before anything else runs. Without a root
+    handler every ``log.info`` the manager writes (spawns, adoptions,
+    cleared spawn records, drains) was dropped, and only warnings reached
+    stderr, so the container's log held none of what the fleet did to
+    which tank (board task 888c57af).
+
     Returns:
         None.
     """
+    setup_rich_logging(level=LogLevel.INFO)
     core_hooks.load_dotenv()
     try:
         service_hooks.serve_fleet()
