@@ -6354,3 +6354,32 @@ comes first, "stocked" is per role (`wound_down_stocked`: fuel alone,
 at `hunt_fuel_floor`, for a gatherer), and a winding-down gatherer on
 an exhausted cascade exits `session_complete` instead of holding. The
 Known gap row becomes a MUST row. Pages updated: [[bot-behavior-contract]].
+
+## [2026-09-29] audit | bot-behavior-contract re-audited against today's bot tree
+
+Board task b1eeb77d. The page's two directory pins had drifted since
+2026-08-07, so every named test and symbol in sections 1 to 5 was
+checked at HEAD before the pins moved: 55 of 368 references were
+missing. Most were file splits, now repointed. Six were claims the
+code no longer supports, now corrected in place:
+- §3.3 still listed the wire and position TTLs as shoot gates with a
+  block on failure. The wire gate was removed 2026-06-23, and the
+  position TTL gates only pursuit's in-view rung.
+- A stationary miss holds the lock and chases via the map (the
+  2026-07-26 never-drop ruling). It does not block.
+- Radar coverage is the world's `scanned_tiles`, written by the
+  wire-side handler, with radius `2 + rank // 3`. It is not
+  `AIStateDict.local_scan_tiles`.
+- Map freshness is `map_intel_horizon_ms`, split from the re-open
+  cooldown 2026-08-26.
+- Completion is the ledger's `action_outcome` event with an `outcome`
+  label. It is not `emit_wire_complete signal=`.
+- §2.1/2.2: MapData is position-authoritative, with the 2 s
+  map-position defer.
+The §5 ghost-firing row pointed at the removed gate, and no test
+pinned the real one (`analyze_threats`' viewport-presence gate), so
+`TestAnalyzeThreats::test_filters_tanks_not_seen_in_the_viewport_within_the_ttl`
+was added. §5 #75 is RESOLVED. Footnotes 7 to 13 cite the tables.
+The audit also found that `make smoke` assertions 2 and 5 read a
+`WIRE_COMPLETE` channel and a `signal` field that nothing emits any
+more; that is filed on the board.
