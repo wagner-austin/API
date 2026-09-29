@@ -597,10 +597,17 @@ registry is never reported, so nothing needs pre-silencing, and a box being
 onboarded (the Surface Go) must stay out of it so the check speaks up the day
 it comes online.
 
-A name in both `nodes` and `not_dispatchable` is refused at load. The document
-would be saying two opposite things about one machine, and the quiet guess —
-excluded wins — would silently drop a node somebody declared with full capacity
-numbers.
+A name that is an ENABLED node and also in `not_dispatchable` is refused at
+load. The document would be saying two opposite things about one machine, and
+the quiet guess — excluded wins — would silently drop a node somebody declared
+with full capacity numbers. A DISABLED node may carry its reason there, and
+then the reconciliation reads it as a decision rather than capacity nobody is
+using: lavender's Windows lane was retired that way on 2026-09-29 (MCPs board
+task 7e467416). It stays declared because lavender-wsl names it as its
+`wsl_host`, and stays enabled in the registry because the audit and the
+session observer still visit it. A runner whose scheduled task outlived the
+retirement logs `lavender is disabled in fleet.json; claiming nothing` and
+asks the node nothing.
 
 **The path is passed, never searched for.** Omitting the flag claims no
 reconciliation at all, and a version that hunted for the other repo would
