@@ -7,11 +7,16 @@ Usage:
         --lane node --node sedona
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane announce --node sedona
+    poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
+        --lane elevated --node serendipity
 
 The action behind every fleet task on the hub: ``API-FleetAgent-3min`` runs
 the hub lane and each ``API-FleetNode-<alias>-3min`` one node's lane
 (``tools/fleet/scripts/register-*.ps1``). ``announce`` is the node lane's
-one-time check-in, run by the registration.
+one-time check-in, run by the registration. A node declaring ``elevated``
+also has ``API-FleetNode-<alias>-elevated-3min``, whose ``elevated`` lane
+(and its ``elevated-announce``) runs that node's second, elevated runner
+under its own identity and log (MCPs board task a98d7083).
 
 WHY PYTHON AND NOT POWERSHELL (MCPs board task 94ac1c4f). The ticks ran
 ``powershell.exe`` over a script until 2026-09-29. On the hub,
@@ -70,8 +75,16 @@ LANE_FLAG: Final = "--lane"
 NODE_FLAG: Final = "--node"
 _FLAGS: Final = (API_ROOT_FLAG, LOG_DIRECTORY_FLAG, LANE_FLAG, NODE_FLAG)
 
-Lane = Literal["hub", "node", "announce"]
-_LANES: Final[tuple[Lane, ...]] = ("hub", "node", "announce")
+Lane = Literal["hub", "node", "announce", "elevated", "elevated-announce"]
+_LANES: Final[tuple[Lane, ...]] = ("hub", "node", "announce", "elevated", "elevated-announce")
+
+#: The node lanes that run a node's ELEVATED runner (MCPs board task
+#: a98d7083): its own identity and log, claiming only the jobs requiring the
+#: ``elevated`` tag.
+_ELEVATED_LANES: Final[tuple[Lane, ...]] = ("elevated", "elevated-announce")
+
+#: The node lanes that post the runner's check-in and claim nothing.
+_ANNOUNCE_LANES: Final[tuple[Lane, ...]] = ("announce", "elevated-announce")
 
 #: The hub runner's board identity: its label and the session it posts as.
 HUB_AGENT: Final = "fleet-runner-austinpc"
@@ -163,7 +176,9 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
         )
     if node is None:
         raise ValueError(f"FLEET_TICK_USAGE: the {lane} lane needs {NODE_FLAG}")
-    announce = ("--announce",) if lane == "announce" else ()
+    announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
+    elevated = lane in _ELEVATED_LANES
+    runner = f"{node}-elevated" if elevated else node
     return TickPlan(
         arguments=(
             rolled_cli.REPO_ROOT_FLAG,
@@ -173,10 +188,11 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
             rolled_cli.SEPARATOR,
             "--node",
             node,
+            *(("--elevated",) if elevated else ()),
             *announce,
         ),
-        stem=f"fleet-node-{node}",
-        header=f"{lane} {node}",
+        stem=f"fleet-node-{runner}",
+        header=f"{lane} {runner}",
     )
 
 
