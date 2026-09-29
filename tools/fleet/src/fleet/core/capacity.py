@@ -29,13 +29,15 @@ why.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import admissible_workers
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
-from fleet.contracts.tags import missing_tags, node_tags
+from fleet.contracts.tags import NodeTag, missing_tags, node_tags
 
 
 class Unassessed(TypedDict):
@@ -168,7 +170,12 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
     return DispatchVerdict(workers=workers, code=None, reason="")
 
 
-def room_for_any(node: NodeConfig, state: NodeState) -> str | None:
+def room_for_any(
+    node: NodeConfig,
+    state: NodeState,
+    projects: Sequence[ProjectConfig],
+    tags: frozenset[NodeTag],
+) -> str | None:
     """Whether a node could take SOME dispatch right now, before one is chosen.
 
     The node runner's gate before it claims (board task fd5cabfa): a runner
@@ -182,19 +189,41 @@ def room_for_any(node: NodeConfig, state: NodeState) -> str | None:
     project-dependent checks (its tags, its minimum workers) still run after
     the claim, on the same probe.
 
+    THE HYPOTHETICAL JOB IS THE SMALLEST ONE THIS RUNNER COULD TAKE (MCPs board
+    task 865287f3). It used to be sized at the node's own worker_ram_gb, 1.1
+    GB, so on 2026-09-29 diphtheria, with 16.2 GB free against a 16.0 GB
+    reservation, claimed nothing for hours while the 0.25 GB roll gate that
+    would have fitted waited, and every API roll waited behind it. A lower
+    bound has to be the least any claimable job needs: one worker of the
+    registered project with the smallest worker_ram_gb whose required tags
+    this runner carries. The per-project assess after the claim is unchanged.
+
     Args:
         node: The node's declaration.
         state: What it reported when probed this tick.
+        projects: Every registered project.
+        tags: The tags this runner claims with
+            (:func:`fleet.contracts.tags.runner_tags`).
 
     Returns:
-        None when the node could take a dispatch of its own default tenant
-        (concurrency under the limit, disk for a staged tree, memory for at
-        least one worker after the owner's reservation), else the
-        ``CODE: reason`` line saying why it can take nothing, worded as
-        :func:`assess` would word the same refusal.
+        None when the node could take one worker of the smallest project it
+        can serve (concurrency under the limit, disk for a staged tree,
+        memory after the owner's reservation), else the ``CODE: reason`` line
+        saying why it can take nothing, worded as :func:`assess` would word
+        the same refusal, or ``NODE_LACKS_TAG`` when no registered project's
+        tags fit this runner at all.
     """
+    servable = [
+        project["worker_ram_gb"] for project in projects if set(project["required_tags"]) <= tags
+    ]
+    if not servable:
+        carried = ", ".join(sorted(tag.value for tag in tags)) or "no tags"
+        return (
+            f"{FleetErrorCode.NODE_LACKS_TAG.value}: this runner carries {carried}, and no "
+            "registered project's required tags fit it"
+        )
     default_tenant = ProjectConfig(
-        worker_ram_gb=node["budget"]["worker_ram_gb"],
+        worker_ram_gb=min(servable),
         minimum_workers=1,
         expected_minutes=1,
         exclusive_resources=(),
