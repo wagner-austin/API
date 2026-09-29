@@ -24,7 +24,8 @@
       "rust": null,
       "cxx": "17.14.37710.0",
       "docker": null,
-      "elevated": false
+      "elevated": false,
+      "wsl_host": null
     },
     "lavender": {
       "host": "lavender",
@@ -50,7 +51,8 @@
       "rust": null,
       "cxx": "17.14.37710.0",
       "docker": null,
-      "elevated": false
+      "elevated": false,
+      "wsl_host": null
     },
     "loki": {
       "host": "loki",
@@ -71,7 +73,8 @@
       "rust": null,
       "cxx": null,
       "docker": null,
-      "elevated": false
+      "elevated": false,
+      "wsl_host": null
     },
     "diphtheria": {
       "host": "diphtheria",
@@ -97,7 +100,8 @@
       "rust": "1.98.1",
       "cxx": "13.3.0",
       "docker": "29.8.1",
-      "elevated": false
+      "elevated": false,
+      "wsl_host": null
     },
     "lavender-wsl": {
       "host": "lavender-wsl",
@@ -123,7 +127,8 @@
       "rust": null,
       "cxx": "13.3.0",
       "docker": "29.1.3",
-      "elevated": false
+      "elevated": false,
+      "wsl_host": "lavender"
     },
     "serendipity": {
       "host": "serendipity",
@@ -144,7 +149,8 @@
       "rust": null,
       "cxx": "17.14.37710.0",
       "docker": null,
-      "elevated": true
+      "elevated": true,
+      "wsl_host": null
     }
   },
   "not_dispatchable": {
