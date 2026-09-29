@@ -181,26 +181,21 @@ Describe 'The start entry' {
         } finally { $api.Stop(); $web.Stop() }
         $said | Should -Be @("Already running on ports $($world.ApiPort) and $($world.WebPort)")
     }
-    It 'reads the API on 8090 when PORT is unset, starting nothing there' {
-        # 8090 is held by this process when it is free; whatever else holds
-        # it is listening too. Either way nothing is started on the real
-        # port and nothing is stopped.
+    It 'reads the API on its default port when PORT is unset, starting nothing there' {
+        # The default is a parameter, so the case owns the port it reads.
+        # Binding 8090 itself failed on the hub, where mcp-search publishes
+        # it through WSL's mirrored networking and no listener check sees
+        # it (MCPs board task 0182ace7).
         $world = Initialize-GrandmaWorld
-        $api = $null
-        if (@(Get-GrandmaListener 8090).Count -eq 0) {
-            $api = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 8090)
-            $api.Start()
-        }
+        $api = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $world.ApiPort)
         $web = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $world.WebPort)
+        $api.Start()
         $web.Start()
         try {
-            $said = @(Invoke-TestEntry $script:startEntry @{ ProjectRoot = $world.Root; WebPort = $world.WebPort; Poetry = $world.Poetry; Npm = $world.Npm } 6>&1 |
+            $said = @(Invoke-TestEntry $script:startEntry @{ ProjectRoot = $world.Root; ApiPort = $world.ApiPort; WebPort = $world.WebPort; Poetry = $world.Poetry; Npm = $world.Npm } 6>&1 |
                 ForEach-Object { "$_" })
-        } finally {
-            $web.Stop()
-            if ($null -ne $api) { $api.Stop() }
-        }
-        $said | Should -Be @("Already running on ports 8090 and $($world.WebPort)")
+        } finally { $api.Stop(); $web.Stop() }
+        $said | Should -Be @("Already running on ports $($world.ApiPort) and $($world.WebPort)")
         [System.IO.File]::Exists($world.Calls) | Should -BeFalse
     }
     It 'starts both sides from the entry and says where they listen' {
