@@ -326,12 +326,28 @@ that day 17 queued jobs could land nowhere else, the tail about six hours
 behind, while diphtheria sat at load 42 to 57 on 8 cores. lavender-wsl is the
 WSL2 Ubuntu on lavender that already hosts the GitHub runners: 16 logical
 cores and 25.4 GB given to the distro, g++ 13.3.0, Node 24.21.0 from
-NodeSource. Its `docker` is null because its only daemon is the rootful one
-the runners' service containers use, not an execdocker user's rootless
-daemon, so it never takes the deploy suite. The hub reaches it as
-`Host lavender-wsl` with `ProxyJump lavender` to `127.0.0.1:2222`, so no port
-opens on the tailnet, and half its cores and memory are reserved for the
-runners beside it.
+NodeSource. The hub reaches it as `Host lavender-wsl` through lavender's own
+sshd, which runs `nc` to `127.0.0.1:2222` inside the distro over the
+session's stdin and stdout, so no port opens on the tailnet; the first way
+in, `ProxyJump lavender` through WSL's localhost relay, kept a dead mapping
+for the port after an sshd restart on 2026-09-29. Half its cores and memory
+are reserved for the runners beside it.
+
+**lavender-wsl is the second docker node** (MCPs board task c4fc4f3e). On
+2026-09-29 diphtheria's stack grew past the half of its memory the fleet
+leaves it (14.2 GB available against the 16 GB reservation after the 09:54Z
+reboot), so it claimed nothing, and every project requiring `docker`,
+`tools/fleet-execution-linux` among them and so every roll, had nowhere to
+run. lavender-wsl's system daemon is Ubuntu's docker.io, the runners' rootful
+one, which ships no rootless tooling, so MCPs
+`scripts/host/lib/fleet-exec-docker.sh`, the definition diphtheria's
+provisioning sources too, installs Docker's `docker-rootless-extras` archive
+of the same release (29.1.3, pinned by its sha256, since Docker publishes
+none), gives `execdocker` its own rootless daemon, grants the runner account
+the sudo the isolated build uses, and holds docker.io, because a node whose
+probe disagrees with its declared `docker` claims nothing and Ubuntu's
+unattended upgrades would otherwise move it. Its `docker` is `29.1.3`, the
+ServerVersion that daemon reports as rootless.
 
 **`rust` is declared as a version and re-measured every tick** (MCPs board
 task 1e2da299). `services/covenant-radar-api` builds the maturin crate
