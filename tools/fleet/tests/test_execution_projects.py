@@ -11,7 +11,8 @@ require.
 The Linux half also requires ``docker``: its host cases include one that runs
 a docker project's build as the node's execdocker user against that user's
 rootless daemon (MCPs board task a8ee9b21), which only a node carrying the
-tag has.
+tag has. slime/execution and idle/execution require it for the same
+reason: each builds and starts its game's containers.
 """
 
 from __future__ import annotations
@@ -48,20 +49,21 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
     )
 
 
-def test_slimes_suite_runs_isolated_on_a_rootless_daemon() -> None:
-    """slime's make up refuses a commit slime/execution has not passed at.
+@pytest.mark.parametrize("game", ["slime", "idle"])
+def test_each_games_suite_runs_isolated_on_a_rootless_daemon(game: str) -> None:
+    """A game's make up refuses a commit <game>/execution has not passed at.
 
-    Its suite builds, starts and deletes containers, so it must only ever
+    Each suite builds, starts and deletes containers, so it must only ever
     reach execdocker's rootless daemon: the ``docker`` tag is what makes
-    the runner isolate it (dispatch.recipe_for), and slime's own script
+    the runner isolate it (dispatch.recipe_for), and each game's own script
     refuses any other daemon besides (MCPs board task a8ee9b21).
     """
     path = Path(__file__).resolve().parents[1] / "fleet.json"
     workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
-    project = require_project(workspace, "slime/execution")
+    project = require_project(workspace, f"{game}/execution")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
     assert project["source"] == ProjectSource(
-        remote="https://github.com/wagner-austin/slime.git",
+        remote=f"https://github.com/wagner-austin/{game}.git",
         path="execution",
         install=(("npm", "ci"),),
         companions=(),
