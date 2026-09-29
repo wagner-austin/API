@@ -20,7 +20,8 @@ the whole tree and before any test runs:
   user outside the docker group (``execdocker``, provisioned by MCPs
   ``scripts/host/lib/fleet-exec-docker.sh`` on every docker node), never
   the daemon the node's own account uses. The version is that daemon's own
-  ``ServerVersion``, reported only when the daemon also says it is rootless.
+  ``ServerVersion``, reported only when the daemon also says it is rootless
+  and that user has the compose and buildx CLI plugins the lane runs.
 - ``stack`` (MCPs board task 554bffc1). doc-extract-api, transcriber-api
   and pg-backup-sidecar each run, inside their own ``make check``, a test
   that starts one of the corvis compose stack's images on its network

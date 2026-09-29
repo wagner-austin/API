@@ -109,6 +109,10 @@ CAPACITY_PROBE_SCRIPT = (
 #: execdocker user's rootless daemon (MCPs board task 6c4516af), asked as
 #: that user with ``sudo -n``, so a node without the user, without sudo for
 #: it or whose daemon does not say ``name=rootless`` answers ``docker=no=``.
+#: So does one whose user lacks the compose or buildx CLI plugin, since the
+#: lane the tag routes runs ``docker compose`` and builds images: lavender-wsl
+#: carried the tag with neither, and MCPs/execution-deploy job 7ad01613 died
+#: there at ``docker: unknown command: docker compose`` (2026-09-29).
 #: The ``sudo`` is an ``if`` condition because the prologue's ``set -e``
 #: does not fire there: as a bare assignment, a ``sudo`` refusing for want
 #: of a password ended the whole probe with exit 1 (measured as execdocker on
@@ -146,7 +150,13 @@ TOOLCHAIN_PROBE_SCRIPT = (
     ' d="$(sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
     " info --format '{{.ServerVersion}} {{json .SecurityOptions}}' 2>/dev/null)\"; then\n"
     '  case "$d" in\n'
-    "    *name=rootless*) printf 'docker=yes=%s\\n' \"${d%% *}\" ;;\n"
+    "    *name=rootless*)\n"
+    "      if sudo -n -u execdocker docker compose version > /dev/null 2>&1 &&"
+    " sudo -n -u execdocker docker buildx version > /dev/null 2>&1; then\n"
+    "        printf 'docker=yes=%s\\n' \"${d%% *}\"\n"
+    "      else\n"
+    "        printf 'docker=no=\\n'\n"
+    "      fi ;;\n"
     "    *) printf 'docker=no=\\n' ;;\n"
     "  esac\n"
     "else\n"
