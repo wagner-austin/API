@@ -18,9 +18,15 @@ gate or bypasses one; each verb writes a field an existing path reads:
 
 * ``hold <HUNT|COLLECT>`` pins ``AIStateDict.manual_mode``, which the
   mode controller already respects.
-* ``disengage`` drops the combat lock (:func:`clear_combat_target`) and
-  pins COLLECT until ``release``, so the bot stays in the world and
-  forages. The wartime floor composes with it unchanged.
+* ``disengage`` drops the combat lock (:func:`clear_combat_target`),
+  pins COLLECT until ``release``, and puts the dropped target in
+  ``blocked_combat_targets`` for the kill cooldown -- the block the
+  engage path already writes to walk away from a target. Without the
+  block the lock-free COLLECT tick re-fought the same enemy through
+  collect return fire (live on sedona 2026-09-29: six opportunity
+  shots at the target just disengaged from), the ``-1`` variant that
+  rung's own docstring records. The bot stays in the world and
+  forages; the wartime floor composes with it unchanged.
 * ``wind_down`` sets ``AIStateDict.wind_down``, the flag the session
   clock and the kill target already set: no new engagements, top off,
   exit ``session_complete``. It also clears any pin, because a pinned
@@ -226,12 +232,13 @@ def take_pending_control(run_dir: Path) -> ControlCommandDict | None:
     return decode_control_command(narrow_json_to_dict(load_json_str(raw)))
 
 
-def apply_control(ai_state: AIStateDict, command: ControlCommandDict) -> AIStateDict:
+def apply_control(ai_state: AIStateDict, command: ControlCommandDict, now_ms: int) -> AIStateDict:
     """The AI state after a verb, every field written one an existing path reads.
 
     Args:
         ai_state: The AI state before the verb.
         command: A validated command.
+        now_ms: The tick's clock, which stamps a disengage's block.
 
     Returns:
         The new AI state.
@@ -240,7 +247,16 @@ def apply_control(ai_state: AIStateDict, command: ControlCommandDict) -> AIState
     if verb is ControlVerb.HOLD:
         return AIStateDict(**{**ai_state, "manual_mode": AIMode(command["argument"])})
     if verb is ControlVerb.DISENGAGE:
-        return AIStateDict(**{**clear_combat_target(ai_state), "manual_mode": AIMode.COLLECT})
+        blocked = dict(ai_state["blocked_combat_targets"])
+        if ai_state["combat_target_id"] != -1:
+            blocked[str(ai_state["combat_target_id"])] = now_ms
+        return AIStateDict(
+            **{
+                **clear_combat_target(ai_state),
+                "blocked_combat_targets": blocked,
+                "manual_mode": AIMode.COLLECT,
+            }
+        )
     if verb is ControlVerb.WIND_DOWN:
         return AIStateDict(**{**ai_state, "wind_down": True, "manual_mode": None})
     if verb is ControlVerb.RELEASE:
@@ -251,7 +267,7 @@ def apply_control(ai_state: AIStateDict, command: ControlCommandDict) -> AIState
     return AIStateDict(**{**ai_state, "config": config})
 
 
-def apply_pending_control(ai_state: AIStateDict, run_dir: Path) -> AIStateDict:
+def apply_pending_control(ai_state: AIStateDict, run_dir: Path, now_ms: int) -> AIStateDict:
     """Take the pending verb, if any, and return the state after it.
 
     Called at the top of every tick, beside the stop-file check's
@@ -260,6 +276,7 @@ def apply_pending_control(ai_state: AIStateDict, run_dir: Path) -> AIStateDict:
     Args:
         ai_state: The AI state before the tick.
         run_dir: The bot's run directory.
+        now_ms: The tick's clock, passed to :func:`apply_control`.
 
     Returns:
         The AI state after the verb, or ``ai_state`` unchanged when none
@@ -273,7 +290,7 @@ def apply_pending_control(ai_state: AIStateDict, run_dir: Path) -> AIStateDict:
     if command is None:
         return ai_state
     log.info("Control verb %s %s applied", command["verb"].value, command["argument"])
-    return apply_control(ai_state, command)
+    return apply_control(ai_state, command, now_ms)
 
 
 __all__ = [
