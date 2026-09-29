@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import (
     JSONTypeError,
+    dump_json_str,
 )
 
 from scripts import (
@@ -16,12 +17,18 @@ from scripts import (
     smoke,
 )
 from tests._smoke_records import (
+    _emitted_outcome_object,
+    _emitted_outcome_record,
     _full_success_jsonl,
     _full_success_records,
     _install_fake_filesystem,
+    _map_open_resolved,
+    _map_open_stalled,
+    _move_stalled,
     _record_raw,
     _smoke_record,
 )
+from tests.conftest import FakeFileSystem
 
 
 class TestAssertActionAttempted:
@@ -73,32 +80,69 @@ class TestAssertActionAttempted:
 class TestAssertNoEarlyStall:
     """Tests for assertion 5 (zero stall_timeout in first 10s)."""
 
-    def test_passes_when_no_stall_events(self) -> None:
-        """No stall_timeout WIRE_COMPLETE events satisfy the gate."""
+    def test_passes_when_the_early_outcomes_hold_no_stall(self, fake_fs: FakeFileSystem) -> None:
+        """Resolved outcomes in the window, none a stall, satisfy the gate."""
+        records = [
+            _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
+            _emitted_outcome_record(fake_fs, 2, _map_open_resolved, "2026-06-20T15:00:03"),
+        ]
+        assert smoke.assert_no_early_stall(records) is None
+
+    def test_passes_when_stall_fires_after_10s(self, fake_fs: FakeFileSystem) -> None:
+        """A stall_timeout at t+11s does NOT trip the early-stall gate."""
+        records = [
+            _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
+            _emitted_outcome_record(fake_fs, 2, _map_open_stalled, "2026-06-20T15:00:11"),
+        ]
+        assert smoke.assert_no_early_stall(records) is None
+
+    def test_fails_when_stall_fires_in_first_10s(self, fake_fs: FakeFileSystem) -> None:
+        """The ledger's own stall line at t+5s trips the gate, naming it."""
+        records = [
+            _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
+            _emitted_outcome_record(fake_fs, 2, _move_stalled, "2026-06-20T15:00:05"),
+        ]
+        failure = smoke.assert_no_early_stall(records)
+        assert failure == {
+            "message": (
+                "5) stall_timeout fired at t+5.0s (action_kind='move') within the 10s window"
+            ),
+            "pivot": 1,
+        }
+
+    def test_fails_when_no_records(self) -> None:
+        """An empty JSONL fails the no-stall gate with a clear message."""
+        failure = smoke.assert_no_early_stall([])
+        if failure is None:
+            raise AssertionError("empty records must fail the gate")
+        assert "empty JSONL" in failure["message"]
+
+    def test_fails_when_no_action_resolved(self) -> None:
+        """Events with no outcome among them are no verdict on stalls.
+
+        Until 2026-09-29 this gate filtered on a channel nothing wrote,
+        so it passed every run while examining zero events (board task
+        14b91fb5). A run with nothing resolved now fails, saying so.
+        """
         records = [
             _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
             _smoke_record(2, "STATE", "IDLE", timestamp="2026-06-20T15:00:05"),
         ]
-        assert smoke.assert_no_early_stall(records) is None
-
-    def test_passes_when_stall_fires_after_10s(self) -> None:
-        """A stall_timeout at t+11s does NOT trip the early-stall gate."""
-        records = [
-            _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
-            _smoke_record(
-                2,
-                "WIRE_COMPLETE",
-                "map_open completed in 10000ms via stall_timeout",
-                timestamp="2026-06-20T15:00:11",
-                action_kind="map_open",
-                duration_ms=10000,
-                signal="stall_timeout",
+        failure = smoke.assert_no_early_stall(records)
+        assert failure == {
+            "message": (
+                "5) 0 action outcomes among 2 events -- "
+                "no action resolved, so stalls cannot be judged"
             ),
-        ]
-        assert smoke.assert_no_early_stall(records) is None
+            "pivot": 1,
+        }
 
-    def test_fails_when_stall_fires_in_first_10s(self) -> None:
-        """A stall_timeout at t+5s trips the gate."""
+    def test_the_retired_wire_complete_stall_is_not_an_outcome(self) -> None:
+        """A stall in the shape the gate read until 2026-09-29 is not counted.
+
+        The record is no outcome, so the run has none, and the gate
+        says so instead of either passing or blaming a stall.
+        """
         records = [
             _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
             _smoke_record(
@@ -113,33 +157,8 @@ class TestAssertNoEarlyStall:
         ]
         failure = smoke.assert_no_early_stall(records)
         if failure is None:
-            raise AssertionError("stall at t+5s must fail the gate")
-        assert "stall_timeout fired at t+5.0s" in failure["message"]
-        assert "action_kind='move'" in failure["message"]
-        assert failure["pivot"] == 1
-
-    def test_fails_when_no_records(self) -> None:
-        """An empty JSONL fails the no-stall gate with a clear message."""
-        failure = smoke.assert_no_early_stall([])
-        if failure is None:
-            raise AssertionError("empty records must fail the gate")
-        assert "empty JSONL" in failure["message"]
-
-    def test_ignores_non_stall_wire_complete_events(self) -> None:
-        """WIRE_COMPLETE events with other signals are ignored."""
-        records = [
-            _smoke_record(1, "STATE", "INITIALIZING", timestamp="2026-06-20T15:00:00"),
-            _smoke_record(
-                2,
-                "WIRE_COMPLETE",
-                "map_open completed in 250ms via map_data_processed",
-                timestamp="2026-06-20T15:00:03",
-                action_kind="map_open",
-                duration_ms=250,
-                signal="map_data_processed",
-            ),
-        ]
-        assert smoke.assert_no_early_stall(records) is None
+            raise AssertionError("the retired shape must not read as a clean run")
+        assert failure["message"].startswith("5) 0 action outcomes among 2 events")
 
 
 class TestLoadRecords:
@@ -218,9 +237,9 @@ class TestContextWindow:
 class TestEvaluate:
     """Tests for the ``evaluate`` aggregate."""
 
-    def test_returns_none_on_full_pass(self) -> None:
+    def test_returns_none_on_full_pass(self, fake_fs: FakeFileSystem) -> None:
         """Every assertion passing -> ``evaluate`` returns ``None``."""
-        assert smoke.evaluate(_full_success_records()) is None
+        assert smoke.evaluate(_full_success_records(fake_fs)) is None
 
     def test_returns_first_failure_only(self) -> None:
         """The first failing assertion short-circuits later ones."""
@@ -253,30 +272,33 @@ class TestRun:
         self,
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
+        fake_fs: FakeFileSystem,
     ) -> None:
-        """A JSONL with every signal present returns exit code 0."""
+        """A JSONL with every signal present returns exit code 0 and counts its outcomes."""
         path = tmp_path / "latest.events.jsonl"
-        self._fake.write_text(path, _full_success_jsonl())
+        self._fake.write_text(path, _full_success_jsonl(fake_fs))
+        # The emitter building the payload logs to the console; only
+        # the run's own output is under test.
+        capsys.readouterr()
         assert smoke.run(path) == 0
         out = capsys.readouterr().out
-        assert "SMOKE PASSED" in out
-        assert "5/5 assertions green" in out
+        assert out == (
+            "SMOKE PASSED: 6 events, 1 action outcomes, 5/5 assertions green "
+            "(login, map_data_processed, HUNT target, action attempted, no early stall).\n"
+        )
 
     def test_returns_one_on_first_assertion_failure(
         self,
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
+        fake_fs: FakeFileSystem,
     ) -> None:
         """Missing the login ladder returns exit code 1 with a clear message."""
         path = tmp_path / "latest.events.jsonl"
         # Strip the STATE login records.
         raws = [
-            _record_raw(
-                "WIRE_COMPLETE",
-                "map_open completed in 250ms via map_data_processed",
-                action_kind="map_open",
-                duration_ms=250,
-                signal="map_data_processed",
+            dump_json_str(
+                _emitted_outcome_object(fake_fs, _map_open_resolved, "2026-06-20T15:00:00")
             ),
             _record_raw(
                 "AI",
@@ -300,18 +322,19 @@ class TestRun:
     def test_run_uses_default_path_when_called_without_argument(
         self,
         tmp_path: Path,
+        fake_fs: FakeFileSystem,
     ) -> None:
         """The default ``path`` argument routes through ``LATEST_EVENTS_PATH``.
 
         We assert by registering the default path in the fake FS with
         a fully-passing payload; ``run()`` must read it and return 0.
         """
-        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
+        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl(fake_fs))
         assert smoke.run() == 0
 
-    def test_main_exits_with_run_code(self, tmp_path: Path) -> None:
+    def test_main_exits_with_run_code(self, tmp_path: Path, fake_fs: FakeFileSystem) -> None:
         """``main()`` propagates ``run()``'s exit code via SystemExit."""
-        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
+        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl(fake_fs))
         with pytest.raises(SystemExit) as exc:
             smoke.main()
         assert exc.value.code == 0
@@ -329,13 +352,14 @@ class TestRun:
         self,
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
+        fake_fs: FakeFileSystem,
     ) -> None:
         """``python -m scripts.smoke`` executes the ``if __name__`` block.
 
         This guards against regressions where ``main()`` exists but
         ``runpy``-style execution falls back to library-only behavior.
         """
-        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
+        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl(fake_fs))
         old_argv = sys.argv
         sys.argv = ["scripts.smoke"]
         try:
