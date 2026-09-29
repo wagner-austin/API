@@ -133,7 +133,7 @@ class TestBotRunWithCapture:
             for process in processes:
                 if process.poll() is None:
                     process.kill()
-                    process.wait(10.0)
+                    process.wait()
 
         assert commands == [xvfb_command(config), ffmpeg_command(config)]
         playwright = playwright_cm._playwright
