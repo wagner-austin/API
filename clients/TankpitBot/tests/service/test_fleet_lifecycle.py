@@ -10,7 +10,8 @@ a tank is still playing is how the fleet used to strand them.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,7 @@ from tankpit_bot.service.fleet import (
     main,
     resolve_fleet_host,
 )
+from tankpit_bot.service.fleet import log as fleet_log
 from tankpit_bot.service.fleet_manager import FleetManager
 from tests.conftest import FakeEnv
 from tests.service._fleet_fixtures import (
@@ -340,6 +342,46 @@ class TestRealServeFleet:
 
 class TestMain:
     """The ``tankpit-fleet`` console entry point."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_root_logging(self) -> Generator[None, None, None]:
+        """Put back the root logger's handlers and level ``main`` replaced.
+
+        Yields:
+            None, with the root logger restored after.
+        """
+        root = logging.getLogger()
+        handlers = list(root.handlers)
+        level = root.level
+        yield
+        root.handlers[:] = handlers
+        root.setLevel(level)
+
+    def test_manager_info_lines_reach_the_root_handler(self, restore_service_hooks: None) -> None:
+        """An INFO line the manager logs while serving reaches the handler main installed.
+
+        Before main configured logging the root logger had no handler, so
+        the same line was dropped without a trace.
+        """
+        _ = restore_service_hooks
+        handled: list[str] = []
+        line = "Fleet: instance 'a1a' finished while unsupervised (pid 716); record cleared"
+
+        def _record(record: logging.LogRecord) -> bool:
+            handled.append(record.getMessage())
+            return True
+
+        def _serve() -> None:
+            for handler in logging.getLogger().handlers:
+                handler.addFilter(_record)
+            fleet_log.info(line)
+
+        core_hooks.load_dotenv = lambda: None
+        service_hooks.serve_fleet = _serve
+
+        main()
+
+        assert handled == [line]
 
     def test_loads_env_then_serves(self, restore_service_hooks: None) -> None:
         """Happy path: dotenv loads, then the fleet serves."""
