@@ -320,6 +320,7 @@ def launch_claimed(
             workers=prepared["workers"],
             agent=job["submitted_by"],
             session_id=job["session_id"],
+            node_local=loaded.workspace["node_local_resources"],
         )
     except AppError as refusal:
         return f"{refusal.code}: {refusal.message}"

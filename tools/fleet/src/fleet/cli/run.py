@@ -43,6 +43,7 @@ from fleet.cli import _config
 from fleet.contracts.lease import describe_contention
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
+from fleet.contracts.resources import fleet_wide
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import _test_hooks, capacity, dispatch, leases, probe, records
 
@@ -147,6 +148,11 @@ def require_resources_free(loaded: _config.LoadedWorkspace, plan: ProjectConfig)
     re-checks through the same function, so a resource taken between here and
     there is still refused.
 
+    NODE-LOCAL RESOURCES ARE NOT ASKED ABOUT HERE. No node is chosen yet, and
+    one node's copy being held says nothing about another's
+    (:func:`fleet.contracts.resources.fleet_wide`); ``acquire`` asks about
+    the chosen node's copy.
+
     Args:
         loaded: The workspace and its resolved record paths.
         plan: The project being dispatched.
@@ -157,7 +163,9 @@ def require_resources_free(loaded: _config.LoadedWorkspace, plan: ProjectConfig)
     """
     contention = leases.contended_by(
         loaded.leases,
-        wanted=plan["exclusive_resources"],
+        wanted=fleet_wide(
+            plan["exclusive_resources"], node_local=loaded.workspace["node_local_resources"]
+        ),
         now_unix=_test_hooks.now(),
     )
     if contention is None:
@@ -220,6 +228,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         workers=workers,
         agent=agent,
         session_id=session_id,
+        node_local=loaded.workspace["node_local_resources"],
         build_payload=dispatch.working_tree_payload(
             project_root,
             project=project,
