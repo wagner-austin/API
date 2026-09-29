@@ -32,7 +32,8 @@ from platform_core.error_codes import (
     OAuthErrorCode,
     TranscriptErrorCode,
 )
-from platform_core.error_codes_tooling import FleetErrorCode, Hpc3ErrorCode
+from platform_core.error_codes_fleet import FleetErrorCode
+from platform_core.error_codes_tooling import Hpc3ErrorCode
 
 ErrorCodeType = TypeVar("ErrorCodeType", bound=ErrorCodeBase)
 
