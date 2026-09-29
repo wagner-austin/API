@@ -13,6 +13,7 @@ import subprocess
 from collections.abc import Generator, Mapping, Sequence
 
 import pytest
+from platform_core.errors import AppError, ErrorCode
 from scripts import _test_hooks, run_cycle
 from scripts.pump_health import HEALTH_FILENAME, PublisherHealth, read_health
 
@@ -156,30 +157,19 @@ GOOD_ENV = "\n".join(
 )
 
 
-class TestLoadEnvAssignments:
-    def test_parses_assignments_and_skips_comments_and_blanks(self, tmp_path: pathlib.Path) -> None:
-        root = _staged_root(tmp_path, GOOD_ENV)
-        assignments = run_cycle.load_env_assignments(root / "runs" / "env.ps1")
-        assert assignments == {
-            "TASKBOARD_MCP_API_KEY": "key-value",
-            "CORVIS_TENANT_ID": "tenant-value",
-            "HPC_WAKE_TASK_ID": "task-value",
-        }
-
-    def test_swallows_a_byte_order_mark(self, tmp_path: pathlib.Path) -> None:
-        # PowerShell writes UTF-8 files with a BOM; a parser that read it
-        # literally would refuse the first assignment as unparseable.
-        path = tmp_path / "env.ps1"
-        path.write_bytes(b"\xef\xbb\xbf$env:ONLY = 'value'\n")
-        assert run_cycle.load_env_assignments(path) == {"ONLY": "value"}
-
-    def test_refuses_a_line_it_cannot_parse(self, tmp_path: pathlib.Path) -> None:
-        # A skipped credential surfaces later as an unauthenticated cycle;
-        # the refusal is the whole point of the strict parse.
-        path = tmp_path / "env.ps1"
-        path.write_text('$env:DOUBLE = "quoted"\n', encoding="utf-8")
-        with pytest.raises(ValueError, match="unparseable line"):
-            run_cycle.load_env_assignments(path)
+class TestTheCredentialsFile:
+    def test_a_line_the_shared_parser_refuses_stops_the_cycle_before_any_publisher(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # The grammar is platform_core.env_assignments' and tested there;
+        # what this package owns is that main reads runs/env.ps1 through it
+        # and that a refusal lands before a publisher runs or a log is cut.
+        root = _staged_root(tmp_path, GOOD_ENV + '\n$env:DOUBLE = "quoted"\n')
+        with pytest.raises(AppError) as caught:
+            run_cycle.main(["--package-root", str(root)])
+        assert caught.value.code is ErrorCode.CONFIG_ERROR
+        assert caught.value.message.startswith(f"line 6 of {root / 'runs' / 'env.ps1'} ")
+        assert not (root / "runs" / "cycle.log").exists()
 
 
 class TestPackageRootFrom:
