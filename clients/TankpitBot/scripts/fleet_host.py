@@ -22,9 +22,11 @@ The edge's images are pulled onto sedona through the hub's docker client
 (:func:`pull_edge` says why not by compose there). The fleet's image is
 built on sedona, from the release snapshot on the hub, only when that tag
 is not there yet. Compose then runs ON sedona over ssh,
-since the mounts are paths on sedona. Last, the public origin is asked
-for the filter's health and the fleet's demo roster, so an ``up`` that
-exits 0 has been seen serving from the internet.
+since the mounts are paths on sedona. Then the public origin is asked
+for the filter's health and the fleet's demo roster, and last
+:func:`scripts.fleet_gate.gate` spawns one bounded Practice bot and waits
+for its first tick, so an ``up`` that exits 0 has been seen serving from
+the internet AND playing the game.
 
 ``down`` stops the fleet only. The edge keeps answering, and the demo page
 renders the fleet's absence as "offline", which is the truth.
@@ -44,10 +46,9 @@ from pathlib import Path
 from typing import Final
 
 from scripts import _test_hooks as script_hooks
+from scripts.fleet_gate import gate
+from scripts.fleet_remote import SEDONA_SSH, FleetHostError, on_sedona, run_checked
 from tankpit_bot import _test_hooks as core_hooks
-
-#: sedona's ssh destination, on the tailnet.
-SEDONA_SSH: Final[str] = "austi@100.95.76.122"
 
 #: The same host as a docker endpoint, for the image build.
 SEDONA_DOCKER_HOST: Final[str] = f"ssh://{SEDONA_SSH}"
@@ -79,10 +80,6 @@ RELEASE_FILES: Final[tuple[str, ...]] = (".env", "accounts.json")
 REGISTRY_FILE: Final[str] = "data/tank_registry.json"
 
 _USAGE: Final[str] = "usage: python -m scripts.fleet_host {up|down}\n"
-
-
-class FleetHostError(Exception):
-    """A step of operating the fleet on sedona failed; the message leads with its code."""
 
 
 def newest_release(releases_dir: Path) -> Path:
@@ -133,41 +130,6 @@ def image_tag(release: Path) -> str:
     return f"tankpit-fleet:{release.name}"
 
 
-def _run(argv: list[str], cwd: Path, code: str) -> str:
-    """Run a command and insist it succeeded.
-
-    Args:
-        argv: The command.
-        cwd: Where to run it.
-        code: The error code a failure is raised with.
-
-    Returns:
-        Its standard output.
-
-    Raises:
-        FleetHostError: ``code``, naming the command, its exit code and
-            its standard error.
-    """
-    result = script_hooks.run_command(argv, cwd)
-    if result["returncode"] != 0:
-        raise FleetHostError(
-            f"{code}: {' '.join(argv)} exited {result['returncode']}: {result['stderr'].strip()}"
-        )
-    return result["stdout"]
-
-
-def _on_sedona(command: str) -> list[str]:
-    """An ssh command line that runs one PowerShell command on sedona.
-
-    Args:
-        command: The PowerShell command.
-
-    Returns:
-        The argv.
-    """
-    return ["ssh", SEDONA_SSH, "powershell", "-NoProfile", "-Command", command]
-
-
 def _compose(*args: str) -> list[str]:
     """An ssh command line that runs compose on sedona against the host directory.
 
@@ -215,7 +177,9 @@ def stage(project_root: Path, release: Path, secrets_file: Path, scratch: Path) 
         )
     (scratch / "edge").mkdir()
     for name in COMMITTED_FILES:
-        committed = _run(["git", "show", f"HEAD:./{name}"], project_root, "FLEET_NOT_COMMITTED")
+        committed = run_checked(
+            ["git", "show", f"HEAD:./{name}"], project_root, "FLEET_NOT_COMMITTED"
+        )
         (scratch / name).write_text(committed, encoding="utf-8", newline="")
     (scratch / "host.env").write_text(
         f"FLEET_IMAGE={image_tag(release)}\n", encoding="utf-8", newline=""
@@ -227,25 +191,27 @@ def stage(project_root: Path, release: Path, secrets_file: Path, scratch: Path) 
     # Assigned to $null rather than piped to Out-Null: ssh hands the line
     # to sedona's cmd.exe first, which would take the pipe for its own.
     directories = ", ".join(f"{HOST_DIR}/{name}" for name in ("edge", "data", "runs"))
-    _run(
-        _on_sedona(f"$null = New-Item -ItemType Directory -Force -Path {directories}"),
+    run_checked(
+        on_sedona(f"$null = New-Item -ItemType Directory -Force -Path {directories}"),
         project_root,
         "FLEET_STAGE_FAILED",
     )
     top = [str(scratch / name) for name in ("docker-compose.yml", "host.env", "edge.env")]
     top += [str(scratch / name) for name in RELEASE_FILES]
-    _run(["scp", "-q", *top, f"{SEDONA_SSH}:{HOST_DIR}/"], project_root, "FLEET_STAGE_FAILED")
-    _run(
+    run_checked(
+        ["scp", "-q", *top, f"{SEDONA_SSH}:{HOST_DIR}/"], project_root, "FLEET_STAGE_FAILED"
+    )
+    run_checked(
         ["scp", "-q", str(scratch / "edge" / "nginx.conf"), f"{SEDONA_SSH}:{HOST_DIR}/edge/"],
         project_root,
         "FLEET_STAGE_FAILED",
     )
     registry = inputs / REGISTRY_FILE
-    held = _run(
-        _on_sedona(f"Test-Path {HOST_DIR}/{REGISTRY_FILE}"), project_root, "FLEET_STAGE_FAILED"
+    held = run_checked(
+        on_sedona(f"Test-Path {HOST_DIR}/{REGISTRY_FILE}"), project_root, "FLEET_STAGE_FAILED"
     ).strip()
     if held == "False" and registry.is_file():
-        _run(
+        run_checked(
             ["scp", "-q", str(registry), f"{SEDONA_SSH}:{HOST_DIR}/data/"],
             project_root,
             "FLEET_STAGE_FAILED",
@@ -286,7 +252,7 @@ def pull_edge(project_root: Path, scratch: Path) -> None:
         "public",
         "tunnel",
     ]
-    _run(pull, project_root, "FLEET_PULL_FAILED")
+    run_checked(pull, project_root, "FLEET_PULL_FAILED")
 
 
 def ensure_image(project_root: Path, release: Path) -> bool:
@@ -322,7 +288,7 @@ def ensure_image(project_root: Path, release: Path) -> bool:
         f"BUILD_REF={release.name}",
         str(release),
     ]
-    _run(build, project_root, "FLEET_IMAGE_BUILD_FAILED")
+    run_checked(build, project_root, "FLEET_IMAGE_BUILD_FAILED")
     return True
 
 
@@ -361,15 +327,16 @@ def up(project_root: Path, releases_dir: Path, secrets_file: Path) -> list[str]:
 
     Raises:
         FleetHostError: As :func:`newest_release`, :func:`stage`,
-            :func:`pull_edge`, :func:`ensure_image` and :func:`smoke`;
-            FLEET_COMPOSE_FAILED when compose refuses.
+            :func:`pull_edge`, :func:`ensure_image`, :func:`smoke` and
+            :func:`scripts.fleet_gate.gate`; FLEET_COMPOSE_FAILED when
+            compose refuses.
     """
     release = newest_release(releases_dir)
     with tempfile.TemporaryDirectory() as scratch:
         stage(project_root, release, secrets_file, Path(scratch))
         pull_edge(project_root, Path(scratch))
     built = ensure_image(project_root, release)
-    _run(
+    run_checked(
         _compose("--profile", "edge", "up", "-d", "--no-build", "fleet", "public", "tunnel"),
         project_root,
         "FLEET_COMPOSE_FAILED",
@@ -379,6 +346,7 @@ def up(project_root: Path, releases_dir: Path, secrets_file: Path) -> list[str]:
         f"release {release.name} staged into {SEDONA_SSH}:{HOST_DIR}",
         f"image {image_tag(release)} {'built on sedona' if built else 'already on sedona'}",
         f"fleet and edge up; {PUBLIC_ORIGIN} serves /healthz and /demo/fleet",
+        gate(project_root),
     ]
 
 
@@ -394,7 +362,7 @@ def down(project_root: Path) -> list[str]:
     Raises:
         FleetHostError: FLEET_COMPOSE_FAILED when compose refuses.
     """
-    _run(_compose("stop", "fleet"), project_root, "FLEET_COMPOSE_FAILED")
+    run_checked(_compose("stop", "fleet"), project_root, "FLEET_COMPOSE_FAILED")
     return [f"fleet stopped on {SEDONA_SSH}; the edge still answers, and the demo shows it offline"]
 
 
@@ -448,10 +416,8 @@ __all__ = [
     "RELEASE_FILES",
     "SECRETS_FILE",
     "SEDONA_DOCKER_HOST",
-    "SEDONA_SSH",
     "SMOKE_ATTEMPTS",
     "SMOKE_PAUSE_SECONDS",
-    "FleetHostError",
     "down",
     "ensure_image",
     "image_tag",

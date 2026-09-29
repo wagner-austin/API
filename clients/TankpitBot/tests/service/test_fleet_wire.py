@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONTypeError
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service.fleet_bot import FleetBotDict
+from tankpit_bot.service.fleet_routes import parse_spawn_request
 from tankpit_bot.service.fleet_wire import (
     FleetSnapshotDict,
+    SpawnRequestDict,
     decode_fleet_bot,
     decode_fleet_snapshot,
     encode_fleet_bot,
     encode_fleet_snapshot,
+    encode_spawn_request,
 )
 
 
@@ -48,6 +51,24 @@ def test_a_row_round_trips_through_the_wire() -> None:
     original = _bot()
 
     assert decode_fleet_bot(encode_fleet_bot(original)) == original
+
+
+def test_a_spawn_request_round_trips_through_the_servers_parser() -> None:
+    """An encoded spawn body parses back unchanged by the route's own parser."""
+    original = SpawnRequestDict(
+        instance="gate",
+        account="Yuppler",
+        kills=2,
+        seconds=30,
+        role="gatherer",
+        room="Practice",
+        troop="orange",
+        doctrine="skirmish",
+    )
+
+    body = dump_json_str(encode_spawn_request(original)).encode("utf-8")
+
+    assert parse_spawn_request(body) == original
 
 
 def test_a_finished_row_carries_its_exit_code() -> None:

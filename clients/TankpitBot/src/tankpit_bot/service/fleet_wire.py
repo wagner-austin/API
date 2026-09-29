@@ -169,6 +169,30 @@ def encode_fleet_snapshot(snapshot: FleetSnapshotDict) -> JSONObject:
     }
 
 
+def encode_spawn_request(request: SpawnRequestDict) -> JSONObject:
+    """Encode one ``POST /bots`` body, the form ``parse_spawn_request`` reads.
+
+    Every field is written, so the body states each selector and bound
+    rather than leaning on the parser's defaults.
+
+    Args:
+        request: The spawn request to encode.
+
+    Returns:
+        JSON-serializable object.
+    """
+    return {
+        "instance": request["instance"],
+        "account": request["account"],
+        "kills": request["kills"],
+        "seconds": request["seconds"],
+        "role": request["role"],
+        "room": request["room"],
+        "troop": request["troop"],
+        "doctrine": request["doctrine"],
+    }
+
+
 def decode_fleet_snapshot(data: JSONObject) -> FleetSnapshotDict:
     """Decode the whole ``GET /bots`` payload, validating every field.
 
@@ -195,4 +219,5 @@ __all__ = [
     "decode_fleet_snapshot",
     "encode_fleet_bot",
     "encode_fleet_snapshot",
+    "encode_spawn_request",
 ]
