@@ -342,8 +342,9 @@ def reconcile_claim(
     row = launched_by_claim(rows, job, alias=alias)
     if row is None:
         detail = (
-            f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: claimed by this runner in a tick that "
-            "ended before it launched anything; refused so the submitter can resubmit it"
+            f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: {job['job_id']} was claimed on "
+            f"{alias}, its start report never reached the queue, and nothing was launched; "
+            "refused so the submitter can resubmit it"
         )
         queue.report_close(
             credentials,
@@ -362,10 +363,20 @@ def reconcile_claim(
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
-    return (
-        f"{encode_job_line(job)}: adopted {row['run_id']}, which its claiming tick launched "
-        "before its start report failed"
+    # The start line alone would read like an ordinary start; the trail says
+    # why this one came a tick late (MCPs board task 55f2cb0b, A2).
+    adopted = (
+        f"adopted on {alias}: {row['run_id']} was launched by the claiming tick, whose start "
+        "report never reached the queue"
     )
+    queue.report_progress(
+        credentials,
+        job_id=job["job_id"],
+        note=adopted,
+        lease_seconds=CLAIM_LEASE_SECONDS,
+        identity=identity,
+    )
+    return f"{encode_job_line(job)}: {adopted}"
 
 
 def stop_cancelled(
