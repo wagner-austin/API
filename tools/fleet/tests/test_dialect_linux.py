@@ -473,6 +473,7 @@ class TestForRealUnderSh:
             "cargo",
             "cxx",
             "docker",
+            "stack",
             "apt-get",
             "pipx",
         }

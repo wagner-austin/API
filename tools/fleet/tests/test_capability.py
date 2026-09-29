@@ -20,6 +20,8 @@ from platform_core.json_utils import JSONTypeError
 from fleet.contracts.capability import (
     MISMATCH_CODE,
     PROBE_NAME,
+    STACK_IMAGES,
+    STACK_NETWORK,
     Capability,
     capability_gap,
     decode_capability,
@@ -42,6 +44,7 @@ SHIM_ERROR = "error: no default toolchain is configured"
 RUST = Capability.RUST
 CXX = Capability.CXX
 DOCKER = Capability.DOCKER
+STACK = Capability.STACK
 
 
 def _answered(name: str, present: bool, version: str) -> tuple[ToolReport, ...]:
@@ -63,13 +66,29 @@ def _answered(name: str, present: bool, version: str) -> tuple[ToolReport, ...]:
 
 class TestTheCapabilityTables:
     def test_each_capability_has_its_probe_line_and_refusal_code(self) -> None:
-        assert [capability.value for capability in Capability] == ["rust", "cxx", "docker"]
-        assert PROBE_NAME == {RUST: "cargo", CXX: "cxx", DOCKER: "docker"}
+        assert [capability.value for capability in Capability] == [
+            "rust",
+            "cxx",
+            "docker",
+            "stack",
+        ]
+        assert PROBE_NAME == {RUST: "cargo", CXX: "cxx", DOCKER: "docker", STACK: "stack"}
         assert MISMATCH_CODE == {
             RUST: FleetErrorCode.NODE_RUST_MISMATCH,
             CXX: FleetErrorCode.NODE_CXX_MISMATCH,
             DOCKER: FleetErrorCode.NODE_DOCKER_MISMATCH,
+            STACK: FleetErrorCode.NODE_STACK_MISMATCH,
         }
+
+    def test_the_stack_is_the_network_and_the_three_suites_images(self) -> None:
+        """What doc-extract-api, transcriber-api and pg-backup-sidecar start
+        in their own make check (MCPs board task 554bffc1)."""
+        assert STACK_NETWORK == "mcp-network"
+        assert STACK_IMAGES == (
+            "mcps-doc-extract-worker:latest",
+            "mcps-transcriber-worker:latest",
+            "mcps-pg-backup-sidecar:latest",
+        )
 
 
 class TestMeasured:
@@ -88,6 +107,12 @@ class TestMeasured:
         and only when the daemon says it is rootless."""
         assert measured(DOCKER, _answered("docker", True, "29.8.1")) == "29.8.1"
         assert measured(DOCKER, _answered("docker", False, "")) is None
+
+    def test_the_stack_line_carries_the_stack_daemon_s_bare_server_version(self) -> None:
+        """MCPs board task 554bffc1: diphtheria's answer of 2026-09-29, and
+        lavender-wsl's, whose daemon has no mcp-network."""
+        assert measured(STACK, _answered("stack", True, "29.8.1")) == "29.8.1"
+        assert measured(STACK, _answered("stack", False, "")) is None
 
     def test_an_absent_or_missing_line_measures_none(self) -> None:
         older = toolchain.read_reports(DIPHTHERIA_2026_09_23)
@@ -130,6 +155,12 @@ class TestCapabilityGap:
             "gives a node the docker tag, so a deploy suite claimed on it would have no daemon it "
             "may use, and must never use the stack's. Set docker to null, or install that "
             "toolchain"
+        )
+        assert capability_gap(STACK, "29.8.1", _answered("stack", False, "")) == (
+            "declares stack '29.8.1' but its probe reports no stack; the declaration is what "
+            "gives a node the stack tag, so a suite that starts the stack's images claimed on it "
+            "would fail where docker run finds neither the image nor the network. Set stack to "
+            "null, or install that toolchain"
         )
 
     def test_another_version_names_the_one_that_would_match(self) -> None:
@@ -181,18 +212,30 @@ class TestDecodeCapability:
         ):
             decode_capability(CXX, "msvc")
 
+    def test_the_stack_refusal_names_the_network_and_every_image(self) -> None:
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^stack must be null or the version the node account's docker daemon reports "
+            r"as its ServerVersion while it holds mcp-network and "
+            r"mcps-doc-extract-worker:latest, mcps-transcriber-worker:latest, "
+            r"mcps-pg-backup-sidecar:latest, e\.g\. '29\.8\.1', got True",
+        ):
+            decode_capability(STACK, True)
+
 
 class TestTheNodeContractCarriesBoth:
     def test_declared_toolchains_survive_encoding_and_read_back_by_capability(self) -> None:
-        declared = node("diphtheria", rust="1.98.1", cxx="13.3.0", docker="29.8.1")
+        declared = node("diphtheria", rust="1.98.1", cxx="13.3.0", docker="29.8.1", stack="29.8.2")
         assert decode_node_config(encode_node_config(declared)) == declared
         assert declared_capability(declared, RUST) == "1.98.1"
         assert declared_capability(declared, CXX) == "13.3.0"
         assert declared_capability(declared, DOCKER) == "29.8.1"
+        assert declared_capability(declared, STACK) == "29.8.2"
         assert encode_node_config(node())["cxx"] is None
         assert encode_node_config(node())["docker"] is None
+        assert encode_node_config(node())["stack"] is None
 
-    @pytest.mark.parametrize("key", ["rust", "cxx", "docker"])
+    @pytest.mark.parametrize("key", ["rust", "cxx", "docker", "stack"])
     def test_an_absent_key_is_refused(self, key: str) -> None:
         encoded = encode_node_config(node())
         del encoded[key]

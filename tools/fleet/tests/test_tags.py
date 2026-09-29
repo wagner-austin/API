@@ -39,9 +39,10 @@ def _node(
     rust: str | None = None,
     cxx: str | None = None,
     docker: str | None = None,
+    stack: str | None = None,
     elevated: bool = False,
 ) -> NodeConfig:
-    """Build a node declaration with the seven fields tags derive from.
+    """Build a node declaration with the eight fields tags derive from.
 
     Args:
         platform: The node's dialect.
@@ -50,6 +51,7 @@ def _node(
         rust: The cargo version it declares, or None.
         cxx: The C++ toolchain version it declares, or None.
         docker: The rootless execdocker daemon version it declares, or None.
+        stack: The stack daemon version it declares, or None.
         elevated: Whether it declares an elevated runner.
 
     Returns:
@@ -67,6 +69,7 @@ def _node(
         rust=rust,
         cxx=cxx,
         docker=docker,
+        stack=stack,
         elevated=elevated,
         wsl_host=None,
         budget=NodeBudget(
@@ -118,6 +121,31 @@ class TestNodeTags:
         )
         assert NodeTag.DOCKER not in node_tags(_node(platform=NodePlatform.LINUX))
 
+    def test_a_node_declaring_the_stack_carries_stack(self) -> None:
+        """diphtheria, whose own daemon holds mcp-network and the stack's
+        images, carries it; lavender-wsl, the second testdb node, declares
+        none and carries no stack (MCPs board task 554bffc1)."""
+        diphtheria = _node(
+            platform=NodePlatform.LINUX,
+            test_database=True,
+            cxx="13.3.0",
+            docker="29.8.1",
+            stack="29.8.1",
+        )
+        lavender_wsl = _node(
+            platform=NodePlatform.LINUX, test_database=True, cxx="13.3.0", docker="29.1.3"
+        )
+        assert node_tags(diphtheria) == frozenset(
+            {NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX, NodeTag.DOCKER, NodeTag.STACK}
+        )
+        assert node_tags(lavender_wsl) == frozenset(
+            {NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX, NodeTag.DOCKER}
+        )
+        required = (NodeTag.TESTDB, NodeTag.CXX, NodeTag.STACK)
+        assert missing_tags(lavender_wsl, required) == (NodeTag.STACK,)
+        assert missing_tags(diphtheria, required) == ()
+        assert missing_tags(lavender_wsl, (NodeTag.TESTDB, NodeTag.CXX)) == ()
+
     def test_a_node_declaring_an_elevated_runner_carries_elevated(self) -> None:
         """serendipity, whose ssh account is an administrator (MCPs board task
         a98d7083); a node declaring none carries no elevated."""
@@ -133,9 +161,9 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_platforms_and_six_capabilities(self) -> None:
-        """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571
-        and 615) is these eight words, so the members' values are pinned in
+    def test_the_vocabulary_is_the_platforms_and_seven_capabilities(self) -> None:
+        """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571,
+        615 and 622) is these nine words, so the members' values are pinned in
         order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
@@ -146,6 +174,7 @@ class TestNodeTags:
             "cxx",
             "docker",
             "elevated",
+            "stack",
         ]
 
 
@@ -207,9 +236,10 @@ class TestDecodeNodeTag:
     def test_a_word_outside_the_set_is_refused_with_the_set(self) -> None:
         with pytest.raises(
             JSONTypeError,
-            match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, got "
-            r"'podman'; .* a Rust or C\+\+ toolchain, the execution suite's rootless Docker "
-            r"daemon, or an elevated runner",
+            match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, "
+            r"stack, got 'podman'; .* a Rust or C\+\+ toolchain, the execution suite's rootless "
+            r"Docker daemon, an elevated runner, or the corvis compose stack\), and one it does "
+            r"not carry could never be satisfied$",
         ):
             decode_node_tag("podman", field="t")
 

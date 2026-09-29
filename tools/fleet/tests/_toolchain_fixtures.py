@@ -187,6 +187,7 @@ def node(
     rust: str | None = None,
     cxx: str | None = None,
     docker: str | None = None,
+    stack: str | None = None,
 ) -> NodeConfig:
     """Build a Windows node declaration.
 
@@ -195,6 +196,7 @@ def node(
         rust: The cargo version it declares, or None.
         cxx: The C++ toolchain version it declares, or None.
         docker: The rootless execdocker daemon version it declares, or None.
+        stack: The stack daemon version it declares, or None.
 
     Returns:
         The node.
@@ -211,6 +213,7 @@ def node(
         rust=rust,
         cxx=cxx,
         docker=docker,
+        stack=stack,
         elevated=False,
         wsl_host=None,
         budget=NodeBudget(

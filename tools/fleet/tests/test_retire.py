@@ -49,6 +49,7 @@ def _node(platform: NodePlatform) -> NodeConfig:
         rust=None,
         cxx=None,
         docker=None,
+        stack=None,
         elevated=False,
         wsl_host=None,
         budget={

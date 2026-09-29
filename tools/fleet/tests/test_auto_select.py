@@ -71,6 +71,7 @@ def _node(host: str) -> NodeConfig:
         rust=None,
         cxx=None,
         docker=None,
+        stack=None,
         elevated=False,
         wsl_host=None,
         budget=NodeBudget(

@@ -68,6 +68,7 @@ def _host() -> NodeConfig:
         rust=None,
         cxx=None,
         docker=None,
+        stack=None,
         elevated=False,
         wsl_host=None,
         budget=NodeBudget(
@@ -98,6 +99,7 @@ def _wsl_node() -> NodeConfig:
         rust=None,
         cxx=None,
         docker=None,
+        stack=None,
         elevated=False,
         wsl_host="lavender",
         budget=NodeBudget(
