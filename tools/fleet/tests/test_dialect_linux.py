@@ -458,7 +458,8 @@ class TestForRealUnderSh:
         fields = fields_of(self.run_script(tmp_path, DIALECT.capacity_probe_script()))
         sliced = {"ci_slice_current_gb", "ci_slice_high_gb"} <= set(fields)
 
-        assert set(fields) == {"free_ram_gb", "free_disk_gb", "logical_cores"} | (
+        reported = {"free_ram_gb", "promised_ram_gb", "free_disk_gb", "logical_cores"}
+        assert set(fields) == reported | (
             {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
         )
         assert float(fields["free_ram_gb"]) > 0.0
