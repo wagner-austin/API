@@ -289,6 +289,8 @@ class FleetErrorCode(ErrorCodeBase):
     # non-terminating error, PowerShell exited 0, and the ledger recorded a
     # run that did not exist.
     DISPATCH_NOT_LAUNCHED = "DISPATCH_NOT_LAUNCHED"
+    # An unstarted claim two live runs could be; refused, never guessed (MCPs task 5a4f9b3e).
+    DISPATCH_CLAIM_AMBIGUOUS = "DISPATCH_CLAIM_AMBIGUOUS"
     RUN_RESULT_UNREADABLE = "RUN_RESULT_UNREADABLE"
     RUN_UNKNOWN = "RUN_UNKNOWN"
     LEDGER_ROW_UNPARSABLE = "LEDGER_ROW_UNPARSABLE"
