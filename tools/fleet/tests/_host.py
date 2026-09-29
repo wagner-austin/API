@@ -25,12 +25,14 @@ are untyped and this package's mypy settings refuse an expression of type
 Any in tests as in src.
 
 A THIRD, ``host_linux_docker``, binds a case to Linux like ``host_linux`` but
-runs it ONLY in the execution run: it executes a docker project's build as
-the node's execdocker user against that user's rootless daemon (MCPs board
-task a8ee9b21), which exists on a node carrying the ``docker`` tag and on no
-CI runner. The ordinary run skips it on every platform, naming the project
-that runs it, and the Linux execution run requires it like any host case,
-which is why ``tools/fleet-execution-linux`` requires the ``docker`` tag.
+runs it ONLY in the execution run: it asserts, from inside the run, that the
+suite itself is running as the node's execdocker user against that user's
+rootless daemon and cannot reach the stack's (MCPs board task a8ee9b21).
+That is true only because ``tools/fleet-execution-linux`` requires the
+``docker`` tag, which makes the fleet build it through the isolated script,
+on a node that has execdocker and never on a CI runner. The ordinary run
+skips it on every platform, naming the project that runs it, and the Linux
+execution run requires it like any host case.
 """
 
 from __future__ import annotations
