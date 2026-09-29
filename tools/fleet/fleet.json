@@ -1298,6 +1298,7 @@
       }
     }
   },
+  "node_local_resources": ["corvis-fleet-testdb"],
   "data_paths": {
     "https://github.com/wagner-austin/API.git": [
       "services/covenant-radar-api/data/external",

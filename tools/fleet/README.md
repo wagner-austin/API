@@ -307,6 +307,16 @@ the setup can succeed. No Windows node can reach a test database (measured
 node is pointed at the production cluster's `corvis_test`, which would put the
 `corvis_app` credential on it.
 
+**`corvis-fleet-testdb` is node-local** (MCPs board task c4fc4f3e). The
+workspace's `node_local_resources` lists the exclusive resources each node
+runs its own copy of, and a lease holds such a name as `<name>@<node>`, so
+it contends only with a lease on the same node, while every other declared
+name stays one thing in the fleet (`fleet.contracts.resources.scoped`). The
+check made before a node is chosen asks only about fleet-wide names. Until
+this, the name read as fleet-wide, and on 2026-09-29 lavender-wsl closed
+every testdb job it claimed while diphtheria ran one as `RESOURCE_HELD ...
+held fleet-wide`, so two testdb nodes still ran one testdb suite at a time.
+
 **lavender-wsl is the second testdb node** (MCPs board task c4fc4f3e). Until
 2026-09-29 diphtheria was the only node carrying `linux` and `testdb`, and
 that day 17 queued jobs could land nowhere else, the tail about six hours
