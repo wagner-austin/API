@@ -12,10 +12,9 @@ link lost from that chain passes every other check and stops the gate.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Final
-
-import pytest
 
 #: The repository root: tools/maketools/tests/ is three levels below it.
 ROOT: Final[Path] = Path(__file__).resolve().parents[3]
@@ -60,23 +59,23 @@ def test_a_fleet_roll_moves_the_ref_only_after_both_suites_passed_at_head() -> N
     assert _recipe("Makefile", "fleet-roll") == ["git update-ref refs/fleet/rolled HEAD"]
 
 
-@pytest.mark.parametrize(
-    ("script", "agent"),
-    [("run-agent-tick.ps1", "fleet-agent"), ("run-node-agent-tick.ps1", "fleet-node-agent")],
-)
-def test_every_scheduled_tick_runs_the_rolled_commit(script: str, agent: str) -> None:
-    text = (ROOT / "tools" / "fleet" / "scripts" / script).read_text(encoding="utf-8")
-    lines = [line.strip() for line in text.replace("\r\n", "\n").split("\n")]
-    start = lines.index("$agentArguments = @(")
-    assert lines[start + 1 : start + 5] == [
-        "'run', '--', 'python', '-m', 'fleet.cli.rolled',",
-        "'--repo-root', $apiRoot,",
-        f"'--agent', '{agent}',",
-        "'--',",
-    ]
+def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
+    # Every fleet task's action is poetry running fleet.cli.tick (MCPs board
+    # task 94ac1c4f), and the tick runs its agent only through the rolled
+    # launcher, for both the hub's agent and a node's.
+    schedule = (ROOT / "tools" / "fleet" / "scripts" / "FleetSchedule.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert '$line = "run -- python -m fleet.cli.tick --api-root ' in schedule
+    tick = (ROOT / "tools" / "fleet" / "src" / "fleet" / "cli" / "tick.py").read_text(
+        encoding="utf-8"
+    )
+    assert '(sys.executable, "-m", "fleet.cli.rolled", *plan["arguments"])' in tick
+    for agent in ("fleet-agent", "fleet-node-agent"):
+        assert len(list(re.finditer(rf'rolled_cli\.AGENT_FLAG,\s+"{agent}",', tick))) == 1
     # The registry is the roll's own; a tick naming one would run pinned code
     # against an unpinned configuration.
-    assert "'--config'" not in text
+    assert "--config" not in tick
 
 
 def test_the_execution_project_runs_tools_fleet_host_cases() -> None:
