@@ -146,6 +146,18 @@ def _apply_container_pickups(
     Drops duplicate server broadcasts via :func:`_is_duplicate_pickup_broadcast`
     and forwards each unique record to the world-state mutator.
 
+    Each record is emitted as ``container_pickup_dispatched``, and the
+    name overstates it: the 0x43 CacheUpdate is broadcast to every tank
+    in the room, carries no tank id, and follows deposits as well as
+    pickups, so the event records that a cache changed, never that THIS
+    bot picked it up. ``is_partial`` means the cache still holds some.
+    Read it as a world observation. Five bots each logging the same
+    broadcast once read as five bots racing for one tile (board task
+    7aa719fd). The name stays because 412 archived event files carry
+    it, and renaming it would split the corpus into two vocabularies.
+    The bot's own pickups are its ``pickup_*`` wire commands and its
+    ``collect`` action outcomes.
+
     Args:
         ws: World service instance.
         pickups: Tuple of pickup records from one wire message.
