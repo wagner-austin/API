@@ -316,6 +316,29 @@ def held_by(credentials: McpCredentials, *, agent: str) -> tuple[DispatchJob, ..
     )
 
 
+def queued_for(credentials: McpCredentials, *, project: str) -> tuple[DispatchJob, ...]:
+    """List the first page of one project's jobs still waiting for a runner.
+
+    One page is enough for the question this answers, whether ANY job of the
+    project waits: the first page holds up to :data:`LISTING_PAGE_LIMIT`
+    jobs, and a project with more queued than that has one on it.
+
+    Args:
+        credentials: Endpoint and headers.
+        project: The project's key in the registry.
+
+    Returns:
+        Its queued jobs, newest first.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    arguments: JSONObject = {"project": project, "status": "queued", "limit": LISTING_PAGE_LIMIT}
+    return decode_listing(
+        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
+    )
+
+
 def cancelled_page(credentials: McpCredentials, *, agent: str, offset: int) -> ListingPage:
     """List one page of the jobs cancelled while this runner held them.
 

@@ -58,7 +58,9 @@ only jobs it takes and the one kind the ordinary runner never gets
 (:func:`fleet.contracts.tags.runner_tags`); and one more gate before the
 claim, the ssh session's token as this tick's probe measured it
 (:func:`fleet.contracts.elevation.elevation_gap`), because every build it
-launches registers at RunLevel Highest.
+launches registers at RunLevel Highest. The two share the node's capacity,
+so the ORDINARY runner claims nothing while an elevated job waits for the
+node (:mod:`fleet.core.elevated_yield`); it would take every freed slot.
 
 Exits 0 whenever the agent itself worked, refused jobs and failed suites
 included, for the reason :mod:`fleet.cli.agent` gives: the status is whether
@@ -98,6 +100,7 @@ from fleet.core import (
     archive_scope,
     capacity,
     dispatch,
+    elevated_yield,
     export,
     probe,
     queue,
@@ -291,7 +294,9 @@ def claim_pass(
             not recovery.
     """
     state = ready_state(loaded, alias=alias, node=node, elevated=elevated)
-    if state is None:
+    if state is None or elevated_yield.yields_to_elevated(
+        credentials, loaded.workspace, alias=alias, node=node, elevated=elevated
+    ):
         return None
     job = queue.claim_next(
         credentials,
