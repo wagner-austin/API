@@ -12,6 +12,13 @@
     this. Not a default naming $PSScriptRoot, which is empty in an advanced
     script's param default under -File in Windows PowerShell 5.1 (API
     tools/fleet/scripts/register-agent-schedule.ps1 carries the incident).
+.PARAMETER ApiPort
+    The API's port when PORT is set neither in .env nor in the caller's
+    environment, as stop.ps1 takes it. A parameter so the suite reads that
+    path against a port it owns: 8090 itself is published by the hub's
+    mcp-search container through WSL's mirrored networking, where no
+    listener check sees it and nothing can bind it (MCPs board task
+    0182ace7).
 .PARAMETER WebPort
     The web server's port.
 .PARAMETER Poetry
@@ -24,6 +31,7 @@
 [CmdletBinding()]
 param(
     [string]$ProjectRoot = '.',
+    [int]$ApiPort = 8090,
     [int]$WebPort = 8091,
     [string]$Poetry = 'poetry',
     [string]$Npm = 'npm.cmd',
@@ -36,13 +44,13 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $ProjectRoot).ProviderPath
 [void](Import-GrandmaEnvironment (Join-Path $root '.env'))
 # PORT comes from .env or the caller's environment, as the API reads it.
-$apiPort = 8090
+$listenPort = $ApiPort
 if ($null -ne $env:PORT) {
-    $apiPort = [int]$env:PORT
+    $listenPort = [int]$env:PORT
 }
-$started = @(Start-GrandmaService -ProjectRoot $root -ApiPort $apiPort -WebPort $WebPort -Poetry $Poetry -Npm $Npm -ReadySeconds $ReadySeconds)
+$started = @(Start-GrandmaService -ProjectRoot $root -ApiPort $listenPort -WebPort $WebPort -Poetry $Poetry -Npm $Npm -ReadySeconds $ReadySeconds)
 if ($started.Count -eq 0) {
-    Write-Information "Already running on ports $apiPort and $WebPort" -InformationAction Continue
+    Write-Information "Already running on ports $listenPort and $WebPort" -InformationAction Continue
 } else {
-    Write-Information "Started $($started -join ', '). API: https://localhost:$apiPort  Web: https://localhost:$WebPort" -InformationAction Continue
+    Write-Information "Started $($started -join ', '). API: https://localhost:$listenPort  Web: https://localhost:$WebPort" -InformationAction Continue
 }
