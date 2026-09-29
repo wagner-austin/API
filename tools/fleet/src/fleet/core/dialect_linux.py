@@ -78,9 +78,7 @@ PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\nexport PATH
 #: memory.current 17179713536 against memory.high 17179869184, with 8.2 GB
 #: available; diphtheria has no such cgroup and prints neither.
 CAPACITY_PROBE_SCRIPT = (
-    PROLOGUE
-    + CAPACITY_PROBE_BODY
-    + f"s=/sys/fs/cgroup/{CI_SLICE_NAME}\n"
+    PROLOGUE + CAPACITY_PROBE_BODY + f"s=/sys/fs/cgroup/{CI_SLICE_NAME}\n"
     'if [ -r "$s/memory.current" ] && [ -r "$s/memory.high" ]; then\n'
     '  h="$(cat "$s/memory.high")"\n'
     '  case "$h" in\n'
