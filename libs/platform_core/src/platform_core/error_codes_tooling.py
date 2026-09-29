@@ -230,6 +230,11 @@ class FleetErrorCode(ErrorCodeBase):
     # suite claimed on a node without it would have no daemon it may use, and
     # must never fall back to the stack's (MCPs board task 6c4516af).
     NODE_DOCKER_MISMATCH = "NODE_DOCKER_MISMATCH"
+    # A node's elevated runner whose ssh session does not hold an
+    # administrator's token: every build it launched at RunLevel Highest
+    # would fail to register, so it claims nothing (MCPs board task
+    # a98d7083).
+    NODE_NOT_ELEVATED = "NODE_NOT_ELEVATED"
 
     # Staging -- the bytes the node is entitled to run.
     STAGE_DIGEST_MISMATCH = "STAGE_DIGEST_MISMATCH"
