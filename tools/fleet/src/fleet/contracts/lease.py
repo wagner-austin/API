@@ -46,7 +46,12 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from fleet.contracts.resources import contended, decode_names, encode_names
+from fleet.contracts.resources import (
+    NODE_SCOPE_SEPARATOR,
+    contended,
+    decode_held_names,
+    encode_names,
+)
 
 
 class Lease(TypedDict):
@@ -149,16 +154,26 @@ def describe_contention(lease: Lease, *, names: tuple[str, ...], now_unix: int) 
         now_unix: Current time, whole seconds since the epoch.
 
     Returns:
-        One line naming the resources, the holder, and the fact that no other
-        node is an escape.
+        One line naming the resources and the holder, and whether another
+        node is an escape: never for a fleet-wide resource, and always when
+        only node-local copies (``<name>@<node>``) are contended.
     """
     remaining = lease["expires_unix"] - now_unix
     window = f"{remaining}s remaining" if remaining > 0 else f"expired {-remaining}s ago"
+    holder = (
+        f"by {lease['agent']} (run {lease['run_id']}, {lease['project']} on {lease['node']}, "
+        f"session {lease['session_id']}), {window}"
+    )
+    if all(NODE_SCOPE_SEPARATOR in name for name in names):
+        # Only node-local copies are contended: this node's copy is taken,
+        # and a node running its own copy is exactly the alternative.
+        return (
+            f"{', '.join(names)} is held on {lease['node']} {holder}; each node runs its own "
+            "copy, so another node carrying one is an alternative"
+        )
     return (
-        f"{', '.join(names)} is held fleet-wide by {lease['agent']} "
-        f"(run {lease['run_id']}, {lease['project']} on {lease['node']}, session "
-        f"{lease['session_id']}), {window}; there is one of it in the fleet, so no other "
-        "node is an alternative"
+        f"{', '.join(names)} is held fleet-wide {holder}; there is one of it in the fleet, "
+        "so no other node is an alternative"
     )
 
 
@@ -257,7 +272,7 @@ def decode_lease(value: JSONValue) -> Lease:
         session_id=require_str(value, "session_id"),
         acquired_unix=acquired_unix,
         expires_unix=expires_unix,
-        resources=decode_names(value.get("resources"), field="lease.resources"),
+        resources=decode_held_names(value.get("resources"), field="lease.resources"),
     )
 
 

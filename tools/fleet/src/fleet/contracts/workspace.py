@@ -34,6 +34,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodeConfig, decode_node_config, encode_node_config
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
+from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import decode_path, decode_remote
 
 
@@ -88,6 +89,15 @@ class FleetWorkspace(TypedDict):
             and ``../../tools/maketools/scripts/run.py``, which no
             dependency declaration names. The shape is cheap and the data is
             not, so the data is what goes.
+        node_local_resources: The exclusive resource names a project may
+            declare that each node runs its OWN copy of, so a lease on one
+            node's copy never contends with a lease on another's
+            (:func:`fleet.contracts.resources.scoped`). Every other declared
+            name stays one thing in the whole fleet. ``corvis-fleet-testdb``
+            is the first: a container every testdb node runs for itself,
+            which read as fleet-wide until lavender-wsl became a second
+            testdb node on 2026-09-29 and closed every testdb job it
+            claimed as held (MCPs board task c4fc4f3e).
         ledger: Path to the append-only dispatch record. Relative paths
             resolve against the workspace document's own directory, so a
             workspace can be moved without editing it.
@@ -99,6 +109,7 @@ class FleetWorkspace(TypedDict):
     not_dispatchable: dict[str, str]
     projects: dict[str, ProjectConfig]
     data_paths: dict[str, tuple[str, ...]]
+    node_local_resources: tuple[str, ...]
     ledger: str
     feed: str
     leases: str
@@ -172,6 +183,7 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
             path: encode_project_config(project) for path, project in workspace["projects"].items()
         },
         "data_paths": {remote: list(paths) for remote, paths in workspace["data_paths"].items()},
+        "node_local_resources": encode_names(workspace["node_local_resources"]),
         "ledger": workspace["ledger"],
         "feed": workspace["feed"],
         "leases": workspace["leases"],
@@ -202,6 +214,43 @@ def _decode_named(value: JSONObject, field: str) -> dict[str, JSONValue]:
             f"command would fail naming an empty list as though the caller had made a typo"
         )
     return found
+
+
+def _decode_node_local_resources(
+    value: JSONObject, projects: dict[str, ProjectConfig]
+) -> tuple[str, ...]:
+    """Read the node-local resource names, refusing one no project declares.
+
+    Args:
+        value: The workspace object.
+        projects: The decoded projects.
+
+    Returns:
+        The names, in declaration order.
+
+    Raises:
+        JSONTypeError: If the key is absent (a workspace written before the
+            field existed is refused rather than read as "every resource is
+            fleet-wide", which is the reading that serialised two testdb
+            nodes), if it is not a list of non-empty strings, or if a name
+            is exclusive to no project. That last one is a typo, and a typo
+            here would leave the resource it meant fleet-wide while the
+            workspace read as though it had been scoped.
+    """
+    if "node_local_resources" not in value:
+        raise JSONTypeError(
+            "workspace must declare node_local_resources, the exclusive resources each node "
+            "runs its own copy of; [] says every declared resource is one thing in the fleet"
+        )
+    names = decode_names(value["node_local_resources"], field="node_local_resources")
+    declared = {name for project in projects.values() for name in project["exclusive_resources"]}
+    for name in names:
+        if name not in declared:
+            raise JSONTypeError(
+                f"node_local_resources names {name!r}, which no project declares in "
+                f"exclusive_resources; a misspelt name would leave the real one fleet-wide"
+            )
+    return names
 
 
 def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) -> dict[str, str]:
@@ -358,8 +407,8 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, the node or project mapping is empty, a machine is both
-            declared and excluded, or a node or project fails its own
-            decoder.
+            declared and excluded, a node-local resource is declared by no
+            project, or a node or project fails its own decoder.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"workspace must be a JSON object, got {type(value).__name__}")
@@ -373,6 +422,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         not_dispatchable=_decode_not_dispatchable(value, nodes),
         projects=projects,
         data_paths=_decode_data_paths(value, projects),
+        node_local_resources=_decode_node_local_resources(value, projects),
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),
         leases=require_str(value, "leases"),
