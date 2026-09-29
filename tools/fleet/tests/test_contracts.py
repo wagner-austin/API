@@ -429,7 +429,7 @@ class TestWorkspace:
         """The document says two opposite things about one machine. Honouring
         either would be a guess, and the quiet guess -- excluded wins -- would
         remove a node somebody declared with full capacity numbers."""
-        with pytest.raises(JSONTypeError, match="both as a dispatchable node"):
+        with pytest.raises(JSONTypeError, match="both as an enabled node"):
             decode_fleet_workspace(
                 {
                     **encode_fleet_workspace(_workspace()),

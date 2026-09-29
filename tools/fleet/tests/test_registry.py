@@ -172,6 +172,25 @@ class TestTheDriftThatHappened:
         lines = registry.describe(drift, registry_path="/x/r.json")
         assert "Capacity that exists and is not being used" in lines[0]
 
+    def test_a_disabled_node_whose_exclusion_says_why_is_a_decision(self) -> None:
+        """lavender, 2026-09-29 (MCPs board task 7e467416): retired from
+        Windows dispatch here, kept declared for lavender-wsl's host report,
+        and kept enabled in the registry because it is audited and observed.
+        The reason is what separates this from unused capacity; the node
+        beside it disabled with no reason is still reported."""
+        workspace = _workspace(
+            excluding={"lavender": "its WSL VM starves the Windows lane"},
+            lavender=False,
+            sedona=False,
+        )
+
+        drift = registry.compare(
+            workspace,
+            registry.decode_registry_nodes(_registry_document(lavender=True, sedona=True)),
+        )
+
+        assert drift["disabled_here_enabled_there"] == ("sedona",)
+
     def test_a_node_the_registry_never_heard_of_is_drift(self) -> None:
         drift = registry.compare(
             _workspace(lavender=True, mystery=True),
