@@ -11,7 +11,7 @@ started would tear down production.
 
 So a docker project's build never runs as the runner. The tree the runner
 staged is copied into the home of ``execdocker``, a user MCPs'
-``scripts/host/diphtheria/provision.sh`` creates OUTSIDE the docker group
+``scripts/host/lib/fleet-exec-docker.sh`` creates OUTSIDE the docker group
 with a rootless daemon of its own, and every install step and the recipe
 run as that user through ``sudo -n -u execdocker`` with a cleared
 environment whose ``DOCKER_HOST`` is that user's rootless socket. Three

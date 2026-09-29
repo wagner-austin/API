@@ -18,9 +18,9 @@ the whole tree and before any test runs:
   real make deploy against a throwaway compose project, and on the
   operator's ruling of 2026-09-27 it may only use a ROOTLESS daemon under a
   user outside the docker group (``execdocker``, provisioned by MCPs
-  ``scripts/host/diphtheria/provision.sh``), never the daemon running the
-  stack. The version is that daemon's own ``ServerVersion``, reported only
-  when the daemon also says it is rootless.
+  ``scripts/host/lib/fleet-exec-docker.sh`` on every docker node), never
+  the daemon the node's own account uses. The version is that daemon's own
+  ``ServerVersion``, reported only when the daemon also says it is rootless.
 
 A project that needs one requires the tag of the same name
 (:mod:`fleet.contracts.tags`), and a node carries it when its declaration
