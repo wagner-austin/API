@@ -11,7 +11,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, NodeState
+from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, NodeState, SliceMemory
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
 from fleet.core.capacity import assess, first_fit, plan_dispatch, room_for_any
@@ -82,6 +82,7 @@ def _state(
     free_ram_gb: float = 27.0,
     free_disk_gb: float = 800.0,
     live_runs: int = 0,
+    ci_slice: SliceMemory | None = None,
 ) -> NodeState:
     """Build a probed state.
 
@@ -90,12 +91,17 @@ def _state(
         free_ram_gb: Memory free.
         free_disk_gb: Disk free.
         live_runs: Fleet dispatches already live.
+        ci_slice: Its runners.slice reading, or None for a node with none.
 
     Returns:
         The state.
     """
     return NodeState(
-        host=host, free_ram_gb=free_ram_gb, free_disk_gb=free_disk_gb, live_runs=live_runs
+        host=host,
+        free_ram_gb=free_ram_gb,
+        free_disk_gb=free_disk_gb,
+        live_runs=live_runs,
+        ci_slice=ci_slice,
     )
 
 
@@ -153,6 +159,25 @@ class TestAssess:
 
         assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert "somebody is on this machine" in verdict["reason"]
+
+    def test_a_node_whose_ci_slice_is_at_its_high_names_ci_not_the_owner(self) -> None:
+        """lavender-wsl at 18:2xZ on 2026-09-29 (MCPs board task 5d6e57e7):
+        8.2 GB available against its reservation, runners.slice at 16.0 of
+        16.0 GB. Just under the line still counts, since the kernel keeps it
+        there; well under it is the owner's case again."""
+        at_high = SliceMemory(current_gb=15.9, high_gb=16.0)
+        below = SliceMemory(current_gb=12.0, high_gb=16.0)
+        node = _node(reserved_ram_gb=12.0)
+
+        held = assess(node, _state(free_ram_gb=8.2, ci_slice=at_high), _project())
+        light = assess(node, _state(free_ram_gb=8.2, ci_slice=below), _project())
+
+        assert held["code"] is FleetErrorCode.NODE_OWNER_RESERVED
+        assert held["reason"].endswith(
+            "Nothing is left for a dispatch; its CI runners hold it: runners.slice is at 15.9 "
+            "GB of its 16.0 GB memory.high, so the lane waits for a CI job to end."
+        )
+        assert light["reason"].endswith("somebody is on this machine.")
 
     def test_a_node_too_small_for_the_suite_is_refused(self) -> None:
         """THE sedona CASE. 6 workers afforded, 8 declared as the minimum.

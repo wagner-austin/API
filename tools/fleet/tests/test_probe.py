@@ -60,7 +60,36 @@ class TestProbe:
             "free_ram_gb": 27.395,
             "free_disk_gb": 860.123,
             "live_runs": 2,
+            "ci_slice": None,
         }
+
+    def test_a_node_with_a_ci_slice_reports_its_current_and_high(self) -> None:
+        """lavender-wsl's answer to the new probe, 2026-09-29 (MCPs 5d6e57e7)."""
+        output = (
+            "free_ram_gb=8.161\nfree_disk_gb=824.306\nlogical_cores=16\n"
+            "ci_slice_current_gb=16.000\nci_slice_high_gb=16.000\n"
+        )
+
+        state = probe.parse_probe("lavender-wsl", output, live_runs=0)
+
+        assert state["ci_slice"] == {"current_gb": 16.0, "high_gb": 16.0}
+        assert state["free_ram_gb"] == 8.161
+
+    @pytest.mark.parametrize(
+        ("extra", "named"),
+        [
+            ("ci_slice_current_gb=16.000\n", "without a 'ci_slice_high_gb' field"),
+            ("ci_slice_current_gb=max\nci_slice_high_gb=16.000\n", "ci_slice_current_gb='max'"),
+        ],
+    )
+    def test_half_a_slice_reading_is_unreadable_not_ignored(self, extra: str, named: str) -> None:
+        output = "free_ram_gb=8.1\nfree_disk_gb=9.0\n" + extra
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("lavender-wsl", output, live_runs=0)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert named in excinfo.value.message
 
     def test_a_thousands_separator_is_read(self) -> None:
         """PowerShell's N3 format writes them; the value is still a number."""

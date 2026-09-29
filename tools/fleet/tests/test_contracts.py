@@ -300,19 +300,19 @@ class TestNodeConfig:
 
 
 class TestDescribeNode:
-    def test_it_names_the_architecture_for_a_gpu_node(self) -> None:
-        state = NodeState(host="lavender", free_ram_gb=27.4, free_disk_gb=860.0, live_runs=1)
+    STATE = NodeState(
+        host="lavender", free_ram_gb=27.4, free_disk_gb=860.0, live_runs=1, ci_slice=None
+    )
 
-        described = describe_node(_node(), state)
+    def test_it_names_the_architecture_for_a_gpu_node(self) -> None:
+        described = describe_node(_node(), self.STATE)
 
         assert "sm_7.5" in described
         assert "27.4/32.0 GB RAM free" in described
         assert "1 live run(s)" in described
 
     def test_a_cpu_only_node_says_so(self) -> None:
-        state = NodeState(host="loki", free_ram_gb=18.3, free_disk_gb=592.0, live_runs=0)
-
-        assert "cpu-only" in describe_node(_node(gpu=None), state)
+        assert "cpu-only" in describe_node(_node(gpu=None), self.STATE)
 
 
 class TestProject:

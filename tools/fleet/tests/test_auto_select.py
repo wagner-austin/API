@@ -94,7 +94,9 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
     Returns:
         The state.
     """
-    return NodeState(host=host, free_ram_gb=free_ram_gb, free_disk_gb=860.0, live_runs=0)
+    return NodeState(
+        host=host, free_ram_gb=free_ram_gb, free_disk_gb=860.0, live_runs=0, ci_slice=None
+    )
 
 
 def _project() -> ProjectConfig:
