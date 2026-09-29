@@ -49,6 +49,7 @@ def _isolated(
         cache_root="/s/cache",
         isolated_docker=True,
         elevated=False,
+        agent="opus-demo-0929",
     )
 
 
@@ -93,6 +94,9 @@ class TestIsolatedText:
         assert f"  sudo -n -u {EXEC_USER} env -i " in body
         assert f"PATH={EXEC_PATH} " in body
         assert 'DOCKER_HOST="unix:///run/user/$exec_uid/docker.sock" ' in body
+        # The submitter crosses the cleared environment, for the deploy
+        # suite's fleet hold (MCPs board task 6c4516af A4).
+        assert "BOARD_AGENT_LABEL='opus-demo-0929' " in body
         assert 'npm_config_cache="$exec_cache/npm" ' in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='3' " in body
         assert "/var/run/docker.sock" not in body
@@ -148,6 +152,7 @@ def test_a_windows_node_refuses_to_render_a_docker_project_s_build() -> None:
             cache_root="C:/s/cache",
             isolated_docker=True,
             elevated=False,
+            agent="opus-demo-0929",
         )
 
 

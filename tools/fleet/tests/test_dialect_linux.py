@@ -134,6 +134,7 @@ def _build(
         cache_root="/s/cache",
         isolated_docker=False,
         elevated=False,
+        agent="opus-demo-0929",
     )
 
 
@@ -145,9 +146,29 @@ class TestBuildScript:
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\n" in body
         assert (
             "export npm_config_cache POETRY_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH "
-            "PYTEST_XDIST_AUTO_NUM_WORKERS\n"
+            "PYTEST_XDIST_AUTO_NUM_WORKERS BOARD_AGENT_LABEL\n"
         ) in body
         assert f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body
+
+    def test_it_exports_the_submitter_s_label_and_refuses_one_outside_the_grammar(
+        self,
+    ) -> None:
+        """MCPs board task 6c4516af A4: a fleet hold the suite takes is
+        attributed to whoever asked for the run."""
+        body = _build()
+
+        assert "BOARD_AGENT_LABEL='opus-demo-0929'\n" in body
+        with pytest.raises(ValueError, match="'Opus Demo' is outside the board's kebab-case"):
+            DIALECT.build_script(
+                target=TARGET,
+                path=DEMO_PROJECT,
+                workers=1,
+                install=(),
+                cache_root="/s/cache",
+                isolated_docker=False,
+                elevated=False,
+                agent="Opus Demo",
+            )
 
     def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:
         body = _build(path="")
@@ -243,6 +264,7 @@ class TestLaunchScript:
                 cache_root="/s/cache",
                 isolated_docker=False,
                 elevated=True,
+                agent="opus-demo-0929",
             )
 
     def test_the_unit_name_is_the_one_the_stop_script_stops(self) -> None:

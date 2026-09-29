@@ -99,6 +99,7 @@ def _build(
         cache_root="C:/s/cache",
         isolated_docker=False,
         elevated=elevated,
+        agent="opus-demo-0929",
     )
 
 
@@ -131,6 +132,24 @@ class TestBuildScript:
         meant it to have (MCPs board task a98d7083)."""
         assert "$env:CORVIS_FLEET_ELEVATED = '0'" in _build()
         assert "$env:CORVIS_FLEET_ELEVATED = '1'" in _build(elevated=True)
+
+    def test_it_tells_the_suite_who_asked_for_it_and_refuses_an_unembeddable_label(
+        self,
+    ) -> None:
+        """So a fleet hold the suite takes is attributed to the submitter
+        (MCPs board task 6c4516af A4)."""
+        assert "$env:BOARD_AGENT_LABEL = 'opus-demo-0929'" in _build()
+        with pytest.raises(ValueError, match="\"o'brien-0929\" is outside the board's"):
+            DIALECT.build_script(
+                target="C:/s/run-1",
+                path="",
+                workers=1,
+                install=(),
+                cache_root="C:/s/cache",
+                isolated_docker=False,
+                elevated=False,
+                agent="o'brien-0929",
+            )
 
     def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
         """A clean export carries no dependencies; the node's cache is where

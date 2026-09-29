@@ -49,6 +49,7 @@ class TestTheBuildRecordsItself:
             cache_root="C:/c",
             isolated_docker=False,
             elevated=False,
+            agent="opus-demo-0929",
         )
 
         lines = body.splitlines()

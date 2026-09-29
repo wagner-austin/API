@@ -39,6 +39,7 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
             cache_root="/s/cache",
             isolated_docker=False,
             elevated=False,
+            agent="opus-demo-0929",
         )
         assert names.RESULT_NAME in spoken.log_tail_script("/s/run", 5)
         launched = spoken.launch_script(target="/s/run", run_id="r", elevated=False)

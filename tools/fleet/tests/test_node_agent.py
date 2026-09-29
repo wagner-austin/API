@@ -357,8 +357,12 @@ class TestClaiming:
             cache_root="C:/fleet/stage/cache",
             isolated_docker=False,
             elevated=False,
+            agent="opus-dispatch-0905",
         )
         assert runner.stdin[-3] == expected.encode("utf-8")
+        # The claimed job's submitter, exported so a hold the suite takes is
+        # attributed to that session (MCPs board task 6c4516af A4).
+        assert "$env:BOARD_AGENT_LABEL = 'opus-dispatch-0905'" in expected
         assert "[string[]]$Install = @('npm ci')," in expected
         assert "[string]$CacheRoot = 'C:/fleet/stage/cache'," in expected
         assert f"[string]$Recipe = 'C:/fleet/stage/{DEMO_RUN_ID}/{DEMO_PROJECT}'," in expected
