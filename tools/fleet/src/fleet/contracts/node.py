@@ -148,6 +148,16 @@ class NodeConfig(TypedDict):
             None. Gives the ``docker`` tag the MCPs deploy suite requires,
             so it runs on a daemon that cannot reach the stack's; required
             and re-measured like ``rust`` (MCPs board task 6c4516af).
+        elevated: Whether the node runs a second, ELEVATED runner, whose
+            builds launch at RunLevel Highest for suites that register what
+            only an administrator may (MCPs board task a98d7083). True gives
+            the ``elevated`` tag and a second hub task for the node
+            (``scripts/register-node-agents.ps1``); that runner re-reads its
+            ssh session's token every tick and claims nothing unless the
+            token is an administrator's (:mod:`fleet.contracts.elevation`).
+            REQUIRED like ``test_database``, and refused on a linux node,
+            where the equivalent would be a root build and no suite asks
+            for one.
         budget: What share of this machine a dispatch may take.
     """
 
@@ -162,6 +172,7 @@ class NodeConfig(TypedDict):
     rust: str | None
     cxx: str | None
     docker: str | None
+    elevated: bool
     budget: NodeBudget
 
 
@@ -261,6 +272,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "rust": node["rust"],
         "cxx": node["cxx"],
         "docker": node["docker"],
+        "elevated": node["elevated"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -310,6 +322,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
                 "without it fails during its install, so an absent key is not a safe way to "
                 "say none."
             )
+    elevated = _decode_elevated(value, platform)
     logical_cores = require_int(value, "logical_cores")
     if logical_cores < 1:
         raise JSONTypeError(f"logical_cores must be at least 1, got {logical_cores}")
@@ -329,6 +342,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         rust=decode_capability(Capability.RUST, value["rust"]),
         cxx=decode_capability(Capability.CXX, value["cxx"]),
         docker=decode_capability(Capability.DOCKER, value["docker"]),
+        elevated=elevated,
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 
@@ -372,6 +386,36 @@ def decode_node_platform(value: str) -> NodePlatform:
         f"platform must be one of {', '.join(NodePlatform)}, got {value!r}; each names the "
         "script dialect every remote act uses, and a value outside the set has none"
     )
+
+
+def _decode_elevated(obj: JSONObject, platform: NodePlatform) -> bool:
+    """Read whether a node runs a second, elevated runner.
+
+    Args:
+        obj: The node's declaration.
+        platform: Its already decoded platform.
+
+    Returns:
+        The declared value.
+
+    Raises:
+        JSONTypeError: If the key is absent or not a bool, or is true on a
+            node that is not Windows.
+    """
+    if "elevated" not in obj:
+        raise JSONTypeError(
+            "node must declare 'elevated': true only for a Windows node whose ssh account is an "
+            "administrator and which should run a second, elevated runner, false otherwise. "
+            "True registers a runner that launches builds as an administrator, so it is never a "
+            "default."
+        )
+    elevated = require_bool(obj, "elevated")
+    if elevated and platform is not NodePlatform.WINDOWS:
+        raise JSONTypeError(
+            f"elevated is true on a {platform.value} node; an elevated runner launches its "
+            "builds as a Task Scheduler task at RunLevel Highest, which only a Windows node has"
+        )
+    return elevated
 
 
 def _positive_float(obj: JSONObject, key: str) -> float:

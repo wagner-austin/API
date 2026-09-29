@@ -274,6 +274,7 @@ class Dialect(Protocol):
         install: tuple[tuple[str, ...], ...],
         cache_root: str,
         isolated_docker: bool,
+        elevated: bool,
     ) -> str:
         """The script that readies the tree, runs the suite and records its
         status last.
@@ -291,6 +292,9 @@ class Dialect(Protocol):
                 tag, whose install steps and recipe then run as the node's
                 execdocker user against its rootless daemon, never as the
                 runner (:mod:`fleet.core.linux_isolated_build`).
+            elevated: True for a project that declares the ``elevated`` tag,
+                whose build then says so in its environment beside the
+                administrator's token its launch gave it.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
@@ -298,7 +302,8 @@ class Dialect(Protocol):
 
         Raises:
             ValueError: From a dialect whose nodes carry no rootless daemon,
-                when ``isolated_docker`` is True.
+                when ``isolated_docker`` is True, or no elevated runner, when
+                ``elevated`` is True.
         """
         ...
 
@@ -314,16 +319,22 @@ class Dialect(Protocol):
         """
         ...
 
-    def launch_script(self, *, target: str, run_id: str) -> str:
+    def launch_script(self, *, target: str, run_id: str, elevated: bool) -> str:
         """The script that detaches the build from the ssh connection.
 
         Args:
             target: Absolute remote directory holding the staged tree.
             run_id: The dispatch, which names its own task or unit.
+            elevated: Whether the project requires the ``elevated`` tag, so
+                the build runs with an administrator's token.
 
         Returns:
             The script's text. It prints ``launched`` only once the build has
             actually begun, and exits non-zero otherwise.
+
+        Raises:
+            ValueError: From a dialect with no elevated launch, when
+                ``elevated`` is True.
         """
         ...
 

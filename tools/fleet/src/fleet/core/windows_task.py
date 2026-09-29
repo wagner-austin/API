@@ -31,7 +31,7 @@ from fleet.core.script_values import scriptable
 LAUNCH_TIMEOUT_SECONDS: Final = 30
 
 
-def launch_script(*, target: str, run_id: str) -> str:
+def launch_script(*, target: str, run_id: str, elevated: bool) -> str:
     """Register a scheduled task for the build, start it, and prove it began.
 
     ``-AllowStartIfOnBatteries`` and ``-DontStopIfGoingOnBatteries`` are not
@@ -53,10 +53,19 @@ def launch_script(*, target: str, run_id: str) -> str:
     its first act (:meth:`~fleet.core.dialect_windows.WindowsDialect.build_script`),
     so the file existing is the build running, and nothing less is.
 
+    AN ELEVATED BUILD REGISTERS AT ``-RunLevel Highest`` and nothing else
+    changes (MCPs board task a98d7083): the same S4U principal, so it still
+    survives the ssh connection, with the account's full administrator
+    token instead of its filtered one. Registering it needs the ssh session
+    itself to hold that token, which the elevated runner has measured this
+    tick (:mod:`fleet.contracts.elevation`) before it claimed.
+
     Args:
         target: Absolute remote directory holding the staged tree; a fresh
             directory per dispatch, so no earlier run's id is in it.
         run_id: The dispatch, which names its own task.
+        elevated: Whether the project requires the ``elevated`` tag, so its
+            build runs with an administrator's token.
 
     Returns:
         The script's text. It prints ``launched`` once the build has
@@ -66,6 +75,7 @@ def launch_script(*, target: str, run_id: str) -> str:
     Raises:
         ValueError: When the target cannot be embedded verbatim.
     """
+    run_level = " -RunLevel Highest" if elevated else ""
     lines = [
         "param(",
         f"    [string]$Target = '{scriptable(target, label='target')}',",
@@ -81,7 +91,8 @@ def launch_script(*, target: str, run_id: str) -> str:
         "-ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew "
         "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries",
         "$principal = New-ScheduledTaskPrincipal "
-        "-UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType S4U",
+        "-UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType S4U"
+        + run_level,
         "Register-ScheduledTask -TaskName $TaskName -Action $action -Settings $settings "
         "-Principal $principal -Force | Out-Null",
         "Start-ScheduledTask -TaskName $TaskName",

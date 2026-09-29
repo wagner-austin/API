@@ -57,12 +57,22 @@ from __future__ import annotations
 #: the capability is the execution suite's rootless daemon under its own
 #: Linux user (MCPs board task 6c4516af), which no Windows node carries,
 #: and Docker Desktop is exactly the kind of shared daemon it excludes.
+#: ``integrity`` is the ssh session's token (:mod:`fleet.contracts.elevation`):
+#: ``yes=administrator`` only when ``WindowsPrincipal.IsInRole`` finds the
+#: Administrators role, which a filtered token never reports, so a node's
+#: elevated runner knows every tick whether it can register a Highest task.
 TOOLCHAIN_PROBE_SCRIPT = r"""param(
     [string]$Cmd = "$env:SystemRoot\System32\cmd.exe",
-    [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
+    [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+function Test-Administrator {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
 function Find-Tool {
     param([string]$Name)
     foreach ($directory in @($env:PATH -split ';' | Where-Object { $_ -ne '' })) {
@@ -117,6 +127,11 @@ if ($vc -ne '') {
     'cxx=no='
 }
 'docker=no='
+if ([bool](& $Administrator)) {
+    'integrity=yes=administrator'
+} else {
+    'integrity=no=limited'
+}
 """
 
 

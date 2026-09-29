@@ -35,6 +35,7 @@ def build_script(
     workers: int,
     install: tuple[tuple[str, ...], ...],
     cache_root: str,
+    elevated: bool,
 ) -> str:
     """Ready the tree, run the recipe in the project, write its status last.
 
@@ -57,12 +58,20 @@ def build_script(
     ``$LASTEXITCODE`` is read in the statement after each cmd.exe run, never
     ``$?``, since the status is the tool's exit code.
 
+    THE BUILD SAYS WHICH LANE LAUNCHED IT, as ``CORVIS_FLEET_ELEVATED``
+    (``1`` or ``0``, MCPs board task a98d7083). The launch alone decides the
+    token (:mod:`fleet.core.windows_task`), and a suite cannot tell from its
+    token whether it was meant to have that one; with the lane in its
+    environment, MCPs' execution suite asserts that the token it holds is the
+    token the fleet launched it with, in both directions.
+
     Args:
         target: Absolute remote directory holding the export, its root.
         path: The project's directory inside the export, ``""`` for the root.
         workers: Test workers the capacity check granted.
         install: The project's declared install steps, argv each.
         cache_root: The node's cache directory.
+        elevated: Whether the build was launched at RunLevel Highest.
 
     Returns:
         The script's text. Its first statement after the header records its
@@ -99,6 +108,7 @@ def build_script(
         '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"',
         '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',
+        f"$env:CORVIS_FLEET_ELEVATED = '{1 if elevated else 0}'",
         "function Invoke-Logged {",
         "    param([string]$Shell, [string]$Command)",
         '    & $Shell /d /s /c "$Command >> `"$log`" 2>&1"',

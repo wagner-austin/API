@@ -192,11 +192,16 @@ class Recipe(TypedDict):
             user's rootless daemon, never as the runner, whose own daemon on
             diphtheria is the production stack's
             (:mod:`fleet.core.linux_isolated_build`).
+        elevated: True when the project declares the ``elevated`` tag, so its
+            build launches at RunLevel Highest with the ssh account's full
+            administrator token (:mod:`fleet.contracts.elevation`); only a
+            node's elevated runner ever claims such a job.
     """
 
     path: str
     install: tuple[tuple[str, ...], ...]
     isolated_docker: bool
+    elevated: bool
 
 
 def working_tree_payload(
@@ -237,10 +242,12 @@ def working_tree_payload(
 
 
 def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[tuple[str, ...], ...]) -> Recipe:
-    """The recipe for one project, isolated when it declares the docker tag.
+    """The recipe for one project, isolated when it declares the docker tag
+    and elevated when it declares the elevated tag.
 
-    The one place the tag becomes the isolation, so the queue's lane and the
-    working-tree lane cannot disagree about which builds run as execdocker.
+    The one place each tag becomes what the build does, so the queue's lane
+    and the working-tree lane cannot disagree about which builds run as
+    execdocker or as an administrator.
 
     Args:
         plan: The project's declaration, whose ``required_tags`` decide.
@@ -251,7 +258,10 @@ def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[tuple[str, ...]
         The recipe.
     """
     return Recipe(
-        path=path, install=install, isolated_docker=NodeTag.DOCKER in plan["required_tags"]
+        path=path,
+        install=install,
+        isolated_docker=NodeTag.DOCKER in plan["required_tags"],
+        elevated=NodeTag.ELEVATED in plan["required_tags"],
     )
 
 
@@ -453,13 +463,14 @@ def launch(
             install=recipe["install"],
             cache_root=names.cache_root(node["stage_root"]),
             isolated_docker=recipe["isolated_docker"],
+            elevated=recipe["elevated"],
         ),
         platform=node["platform"],
     )
     remote.run_script(
         node["host"],
         spoken.script_path(target, names.LAUNCH_STEM),
-        spoken.launch_script(target=target, run_id=run_id),
+        spoken.launch_script(target=target, run_id=run_id, elevated=recipe["elevated"]),
         platform=node["platform"],
     )
     row = started_row(lease=lease, host=node["host"], workers=workers, detail=f"staged to {target}")

@@ -419,6 +419,7 @@ class WindowsDialect:
         install: tuple[tuple[str, ...], ...],
         cache_root: str,
         isolated_docker: bool,
+        elevated: bool,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -431,6 +432,8 @@ class WindowsDialect:
             cache_root: The node's cache directory.
             isolated_docker: True for a project that declares the ``docker``
                 tag, which no Windows node carries.
+            elevated: True for a project that declares the ``elevated`` tag,
+                launched at RunLevel Highest.
 
         Returns:
             :func:`fleet.core.windows_build.build_script`'s text, which says
@@ -452,7 +455,12 @@ class WindowsDialect:
                 "execdocker user carries one"
             )
         return windows_build.build_script(
-            target=target, path=path, workers=workers, install=install, cache_root=cache_root
+            target=target,
+            path=path,
+            workers=workers,
+            install=install,
+            cache_root=cache_root,
+            elevated=elevated,
         )
 
     def log_tail_script(self, target: str, lines: int) -> str:
@@ -473,18 +481,20 @@ class WindowsDialect:
         """
         return windows_log_tail_script(names.log_path(target), lines)
 
-    def launch_script(self, *, target: str, run_id: str) -> str:
+    def launch_script(self, *, target: str, run_id: str, elevated: bool) -> str:
         """Register a scheduled task for the build, start it, and prove it began.
 
         Args:
             target: Absolute remote directory holding the staged tree.
             run_id: The dispatch, which names its own task.
+            elevated: Whether the task registers at RunLevel Highest.
 
         Returns:
             :func:`fleet.core.windows_task.launch_script`'s text, which says
-            why Task Scheduler and why it waits for the build's process id.
+            why Task Scheduler, why it waits for the build's process id, and
+            what an elevated build changes.
         """
-        return windows_task.launch_script(target=target, run_id=run_id)
+        return windows_task.launch_script(target=target, run_id=run_id, elevated=elevated)
 
     def result_script(self, target: str) -> str:
         """Print the status and the epoch second it was written, or nothing.

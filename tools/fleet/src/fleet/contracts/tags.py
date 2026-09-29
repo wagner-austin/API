@@ -43,7 +43,19 @@ operator's ruling of 2026-09-27, may only do so on a rootless daemon under a
 user outside the docker group, never the stack's (MCPs board task
 6c4516af): the tag means the node declares that daemon's version, which its
 probe reads only when the daemon says it is rootless. All three are
-:mod:`fleet.contracts.capability`.
+:mod:`fleet.contracts.capability`. ``elevated`` because MCPs' Task Scheduler
+installers register what only an administrator may register, and every
+build launches as an S4U task at RunLevel Limited (MCPs board task
+a98d7083): the tag means the node declares ``elevated`` and runs a SECOND
+runner whose builds launch at RunLevel Highest, and that runner re-measures
+its ssh session's token every tick (:mod:`fleet.contracts.elevation`).
+
+``elevated`` IS EXCLUSIVE. Every other tag is a floor, so a runner claims
+whatever it can satisfy; a node's ordinary runner claims without
+``elevated`` (:func:`runner_tags`), and the queue's claim gives an elevated
+job only to a runner carrying the tag and that runner only elevated jobs
+(MCPs ``FLEET_DISPATCH_EXCLUSIVE_TAGS``), so an ordinary suite never runs as
+an administrator and an elevated one never waits behind ordinary checks.
 
 A project naming both platforms is refused at decode: no node is both, so
 the declaration could never match anything, and the honest way to say "either"
@@ -66,8 +78,8 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570 and 571) is the same seven words as these members' values, in this
-    order.
+    570, 571 and 615) is the same eight words as these members' values, in
+    this order.
     """
 
     WINDOWS = "windows"
@@ -77,6 +89,7 @@ class NodeTag(StrEnum):
     RUST = "rust"
     CXX = "cxx"
     DOCKER = "docker"
+    ELEVATED = "elevated"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -103,20 +116,52 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
 
     Returns:
         Its platform, plus ``gpu`` when the node declares a CUDA device,
-        ``testdb`` when it declares the fleet test database, and ``rust``,
-        ``cxx`` or ``docker`` for each capability it declares a version of.
+        ``testdb`` when it declares the fleet test database, ``elevated``
+        when it declares an elevated runner, and ``rust``, ``cxx`` or
+        ``docker`` for each capability it declares a version of.
     """
     tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
         tags.add(NodeTag.GPU)
     if node["test_database"]:
         tags.add(NodeTag.TESTDB)
+    if node["elevated"]:
+        tags.add(NodeTag.ELEVATED)
     tags.update(
         tag
         for capability, tag in _CAPABILITY_TAG.items()
         if declared_capability(node, capability) is not None
     )
     return frozenset(tags)
+
+
+def runner_tags(node: NodeConfig, *, elevated: bool) -> frozenset[NodeTag]:
+    """The tags one of a node's runners claims with.
+
+    Args:
+        node: The node's declaration.
+        elevated: Whether this is the node's elevated runner.
+
+    Returns:
+        :func:`node_tags` for the elevated runner, and the same without
+        ``elevated`` for the ordinary one, so the queue's exclusive rule
+        hands each runner only its own lane's jobs.
+
+    Raises:
+        ValueError: For an elevated runner of a node that declares none; the
+            runner registration creates one only for a node that does, so
+            this is a runner started by hand against the wrong node.
+    """
+    carried = node_tags(node)
+    if not elevated:
+        return carried - {NodeTag.ELEVATED}
+    if NodeTag.ELEVATED not in carried:
+        raise ValueError(
+            f"{node['host']} declares no elevated runner, so an elevated runner may not claim "
+            "for it; set elevated to true only for a Windows node whose ssh account is an "
+            "administrator"
+        )
+    return carried
 
 
 def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
@@ -141,8 +186,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
     raise JSONTypeError(
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
-        "fleet test database, a Rust or C++ toolchain, or the execution suite's rootless "
-        "Docker daemon), and one it does not carry could "
+        "fleet test database, a Rust or C++ toolchain, the execution suite's rootless "
+        "Docker daemon, or an elevated runner), and one it does not carry could "
         "never be satisfied"
     )
 
@@ -219,4 +264,5 @@ __all__ = [
     "encode_tags",
     "missing_tags",
     "node_tags",
+    "runner_tags",
 ]

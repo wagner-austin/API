@@ -29,6 +29,7 @@ from fleet.contracts.capability import (
     capability_gap,
     measured,
 )
+from fleet.contracts.elevation import INTEGRITY_PROBE
 from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
@@ -54,13 +55,17 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
         output: The probe script's standard output.
 
     Returns:
-        One report per line naming a required tool, a package manager or a
-        declared toolchain's probe line (``cargo``, ``cxx``), in the order
-        the node emitted them. Empty when no line did.
+        One report per line naming a required tool, a package manager, a
+        declared toolchain's probe line (``cargo``, ``cxx``, ``docker``) or
+        the session's token (``integrity``, :mod:`fleet.contracts.elevation`),
+        in the order the node emitted them. Empty when no line did.
     """
     reports: list[ToolReport] = []
     wanted = (
-        {tool["name"] for tool in REQUIRED_TOOLS} | set(PACKAGE_MANAGERS) | set(PROBE_NAME.values())
+        {tool["name"] for tool in REQUIRED_TOOLS}
+        | set(PACKAGE_MANAGERS)
+        | set(PROBE_NAME.values())
+        | {INTEGRITY_PROBE}
     )
     for line in output.splitlines():
         parts = line.strip().split("=", 2)

@@ -3,6 +3,7 @@
 Usage:
     fleet-node-agent --config fleet.json --node sedona
     fleet-node-agent --config fleet.json --node sedona --announce
+    fleet-node-agent --config fleet.json --node serendipity --elevated
 
 ONE RUNNER PER ENABLED NODE, ALL OF THEM ON THE HUB (MCPs board task
 fd5cabfa, A1 and A5). Until this command the queue had one runner, the hub's
@@ -49,6 +50,16 @@ its own claims across ticks; a fresh UUID per tick would make every tick a
 stranger to the last. ``--announce`` posts the check-in that registers that
 session on the ledger (MCPs mig 530), once, from the registration script.
 
+A NODE THAT DECLARES ``elevated`` HAS A SECOND RUNNER (MCPs board task
+a98d7083), this command with ``--elevated``: a separate identity,
+``fleet-node-<alias>-elevated``, so it collects and stops only what it
+claimed; the ``elevated`` tag, which the queue's exclusive rule makes the
+only jobs it takes and the one kind the ordinary runner never gets
+(:func:`fleet.contracts.tags.runner_tags`); and one more gate before the
+claim, the ssh session's token as this tick's probe measured it
+(:func:`fleet.contracts.elevation.elevation_gap`), because every build it
+launches registers at RunLevel Highest.
+
 Exits 0 whenever the agent itself worked, refused jobs and failed suites
 included, for the reason :mod:`fleet.cli.agent` gives: the status is whether
 THE AGENT worked, and a loop that stopped on a red build would stop on the
@@ -75,11 +86,12 @@ from fleet.cli import _config
 from fleet.cli import run as run_cli
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchLane, encode_job_line
+from fleet.contracts.elevation import elevation_gap
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import ProjectSource
-from fleet.contracts.tags import node_tags
+from fleet.contracts.tags import runner_tags
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import (
     _test_hooks,
@@ -98,6 +110,7 @@ _log = get_logger(__name__)
 
 NODE_FLAG = "--node"
 ANNOUNCE_FLAG = "--announce"
+ELEVATED_FLAG = "--elevated"
 
 _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
 
@@ -105,17 +118,25 @@ _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
 IDENTITY_NAMESPACE = uuid.NAMESPACE_URL
 
 
-def node_identity(alias: str) -> tuple[str, str]:
+def node_identity(alias: str, *, elevated: bool) -> tuple[str, str]:
     """The label and session id a node's runner acts as.
 
     Args:
         alias: The node's workspace name.
+        elevated: Whether this is the node's elevated runner.
 
     Returns:
         ``fleet-node-<alias>`` and the version-5 UUID of
         ``fleet-node-agent/<alias>`` in :data:`IDENTITY_NAMESPACE`, lowercase
-        hyphenated as the board wants it.
+        hyphenated as the board wants it; for the elevated runner
+        ``fleet-node-<alias>-elevated`` and the UUID of
+        ``fleet-node-agent/<alias>/elevated``, a session of its own, since
+        each runner collects and stops only the jobs its label holds.
     """
+    if elevated:
+        return f"fleet-node-{alias}-elevated", str(
+            uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}/elevated")
+        )
     return f"fleet-node-{alias}", str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}"))
 
 
@@ -170,6 +191,59 @@ def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
     )
 
 
+def ready_state(
+    loaded: _config.LoadedWorkspace, *, alias: str, node: NodeConfig, elevated: bool
+) -> NodeState | None:
+    """Ask the node, in order, whether it may claim at all this tick.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        alias: This node's workspace name.
+        node: Its declaration.
+        elevated: Whether this is the node's elevated runner, which also
+            needs the probe to read an administrator's token.
+
+    Returns:
+        The node's measured state when it answered, has room for something,
+        has every tool, and (for the elevated runner) holds an
+        administrator's token; otherwise None, with the gate that closed
+        and its reason logged.
+    """
+    probed = probe.attempt_probe(node, live_runs=records.live_runs(loaded.ledger, node=alias))
+    state = probed["state"]
+    if state is None:
+        _log.info("%s did not answer; claiming nothing: %s", alias, probed["reason"])
+        return None
+    full = capacity.room_for_any(node, state)
+    if full is not None:
+        _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
+        return None
+    answered = toolchain.attempt_toolchain(node)
+    if not isinstance(answered, tuple):
+        _log.info(
+            "%s did not answer the toolchain probe; claiming nothing: %s: %s",
+            alias,
+            answered["code"],
+            answered["message"],
+        )
+        return None
+    gap = toolchain.readiness_gap(alias, node, answered)
+    if gap is not None:
+        _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
+        return None
+    _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
+    unelevated = elevation_gap(alias, node, answered) if elevated else None
+    if unelevated is not None:
+        _log.info(
+            "%s cannot launch elevated; claiming nothing: %s: %s",
+            alias,
+            unelevated.code,
+            unelevated.message,
+        )
+        return None
+    return state
+
+
 def claim_pass(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
@@ -177,6 +251,7 @@ def claim_pass(
     *,
     alias: str,
     node: NodeConfig,
+    elevated: bool,
 ) -> DispatchJob | None:
     """Take one job for this node and launch it, or report why it could not.
 
@@ -186,6 +261,9 @@ def claim_pass(
         identity: This runner's identity arguments.
         alias: This node's workspace name.
         node: Its declaration.
+        elevated: Whether this is the node's elevated runner, which claims
+            with the ``elevated`` tag and only once the probe has read an
+            administrator's token for its ssh session.
 
     THE NODE IS ASKED BEFORE THE QUEUE IS. A runner that claimed first and
     probed second took the oldest job off the lane and refused it while a
@@ -212,33 +290,13 @@ def claim_pass(
             code and message verbatim and does not propagate: transport,
             not recovery.
     """
-    probed = probe.attempt_probe(node, live_runs=records.live_runs(loaded.ledger, node=alias))
-    state = probed["state"]
+    state = ready_state(loaded, alias=alias, node=node, elevated=elevated)
     if state is None:
-        _log.info("%s did not answer; claiming nothing: %s", alias, probed["reason"])
         return None
-    full = capacity.room_for_any(node, state)
-    if full is not None:
-        _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
-        return None
-    answered = toolchain.attempt_toolchain(node)
-    if not isinstance(answered, tuple):
-        _log.info(
-            "%s did not answer the toolchain probe; claiming nothing: %s: %s",
-            alias,
-            answered["code"],
-            answered["message"],
-        )
-        return None
-    gap = toolchain.readiness_gap(alias, node, answered)
-    if gap is not None:
-        _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
-        return None
-    _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
     job = queue.claim_next(
         credentials,
         lane=DispatchLane.NODE,
-        tags=tuple(sorted(node_tags(node))),
+        tags=tuple(sorted(runner_tags(node, elevated=elevated))),
         node=alias,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
@@ -450,7 +508,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, or
-            a required one is absent.
+            a required one is absent, or when ``--elevated`` names a node
+            that declares no elevated runner.
         AppError: When the queue or the board cannot be reached or answered
             a shape this runner cannot read, when the node is not declared,
             or when this machine's records and the fleet disagree about a
@@ -458,12 +517,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     announce = ANNOUNCE_FLAG in tokens
-    remaining = [token for token in tokens if token != ANNOUNCE_FLAG]
+    elevated = ELEVATED_FLAG in tokens
+    remaining = [token for token in tokens if token not in (ANNOUNCE_FLAG, ELEVATED_FLAG)]
     parsed = cli_args.parse_single_flags(remaining, _FLAGS)
     loaded = _config.load_workspace(parsed)
     alias = cli_args.require_flag(parsed, NODE_FLAG)
     node = require_node(loaded.workspace, alias)
-    agent, session_id = node_identity(alias)
+    tags = runner_tags(node, elevated=elevated)
+    agent, session_id = node_identity(alias, elevated=elevated)
     identity = queue.identity_arguments(agent, session_id, str(loaded.directory))
     board = board_config.load_credentials()
     if announce:
@@ -473,8 +534,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 board,
                 machine=f"{sys.platform}:{_test_hooks.hostname()}",
                 body=(
-                    f"fleet-node-agent for {alias}: claims the queue's node lane for jobs "
-                    f"naming {alias} or no node, carrying {', '.join(sorted(node_tags(node)))}"
+                    f"{agent} for {alias}: claims the queue's node lane for jobs "
+                    f"naming {alias} or no node, carrying {', '.join(sorted(tags))}"
                 ),
                 identity=identity,
             ),
@@ -482,7 +543,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     credentials = queue.load_credentials()
     collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
-    if claim_pass(loaded, credentials, identity, alias=alias, node=node) is None:
+    if claim_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated) is None:
         _log.info("nothing in the node lane for %s", alias)
     return 0
 
@@ -511,6 +572,7 @@ if __name__ == "__main__":
 
 __all__ = [
     "ANNOUNCE_FLAG",
+    "ELEVATED_FLAG",
     "IDENTITY_NAMESPACE",
     "NODE_FLAG",
     "Prepared",

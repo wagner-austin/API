@@ -102,7 +102,12 @@ def _dialect_scripts() -> list[RenderedScript]:
             text=spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
         ),
         RenderedScript(
-            name="dialect-launch", text=spoken.launch_script(target=target, run_id=EXAMPLE_RUN_ID)
+            name="dialect-launch",
+            text=spoken.launch_script(target=target, run_id=EXAMPLE_RUN_ID, elevated=False),
+        ),
+        RenderedScript(
+            name="dialect-launch-elevated",
+            text=spoken.launch_script(target=target, run_id=EXAMPLE_RUN_ID, elevated=True),
         ),
         RenderedScript(
             name="dialect-stop", text=spoken.stop_script(target=target, run_id=EXAMPLE_RUN_ID)
@@ -138,6 +143,7 @@ def _dialect_scripts() -> list[RenderedScript]:
                 install=EXAMPLE_INSTALL,
                 cache_root=names.cache_root(EXAMPLE_STAGE_ROOT),
                 isolated_docker=False,
+                elevated=False,
             ),
         ),
     ]

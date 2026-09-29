@@ -319,6 +319,7 @@ class LinuxDialect:
         install: tuple[tuple[str, ...], ...],
         cache_root: str,
         isolated_docker: bool,
+        elevated: bool,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -343,11 +344,22 @@ class LinuxDialect:
                 project's build, whose caches are execdocker's.
             isolated_docker: True for a project that declares the ``docker``
                 tag.
+            elevated: True for a project that declares the ``elevated`` tag,
+                which no linux node carries.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
             to the result file.
+
+        Raises:
+            ValueError: When ``elevated`` is True, refused for the reason
+                :meth:`launch_script` gives.
         """
+        if elevated:
+            raise ValueError(
+                f"the project at {path!r} requires the elevated tag, and a linux node has no "
+                "elevated runner; it runs only on a Windows node that declares one"
+            )
         if isolated_docker:
             lines = isolated_build_lines(target=target, path=path, workers=workers, install=install)
             return PROLOGUE + "\n".join(lines) + "\n"
@@ -394,7 +406,7 @@ class LinuxDialect:
         log = names.log_path(target)
         return f"{PROLOGUE}if [ -f '{log}' ]; then tail -n {lines} '{log}'; fi\n"
 
-    def launch_script(self, *, target: str, run_id: str) -> str:
+    def launch_script(self, *, target: str, run_id: str, elevated: bool) -> str:
         """Start the build as a transient user unit, and prove it began.
 
         ``systemd-run`` returns once the manager has accepted and started the
@@ -410,10 +422,24 @@ class LinuxDialect:
         Args:
             target: Absolute remote directory holding the staged tree.
             run_id: The dispatch, which names its own unit.
+            elevated: Whether the project requires the ``elevated`` tag.
 
         Returns:
             The script's text.
+
+        Raises:
+            ValueError: When ``elevated`` is True. A linux node never
+                declares an elevated runner (the node decoder refuses one),
+                so the capacity check places no elevated project here; a
+                build rendered for one anyway would run without the rights
+                its suite was written for, so it is refused rather than
+                rendered.
         """
+        if elevated:
+            raise ValueError(
+                f"the dispatch {run_id!r} requires the elevated tag, and a linux node has no "
+                "elevated runner; it runs only on a Windows node that declares one"
+            )
         unit = names.task_name(run_id)
         build = f"{target}/{names.BUILD_STEM}.sh"
         return (
