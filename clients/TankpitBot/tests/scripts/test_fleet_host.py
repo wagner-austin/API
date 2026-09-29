@@ -14,14 +14,13 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from scripts.fleet_gate import FLEET_URL, GATE_INSTANCE
 from scripts.fleet_host import (
     HOST_DIR,
     PUBLIC_ORIGIN,
     SEDONA_DOCKER_HOST,
-    SEDONA_SSH,
     SMOKE_ATTEMPTS,
     SMOKE_PAUSE_SECONDS,
-    FleetHostError,
     down,
     ensure_image,
     image_tag,
@@ -32,10 +31,12 @@ from scripts.fleet_host import (
     stage,
     up,
 )
+from scripts.fleet_remote import SEDONA_SSH, FleetHostError
 
 from scripts import _test_hooks as script_hooks
 from scripts import fleet_host
 from tankpit_bot import _test_hooks as core_hooks
+from tests.scripts._fleet_answers import passing_gate
 
 COMPOSE = f"{HOST_DIR}/docker-compose.yml"
 HOST_ENV = f"{HOST_DIR}/host.env"
@@ -44,12 +45,16 @@ HOST_ENV = f"{HOST_DIR}/host.env"
 class Recorder:
     """A command runner that answers from a script and records every argv."""
 
-    def __init__(self, answers: dict[str, script_hooks.CommandResult]) -> None:
+    def __init__(
+        self,
+        answers: dict[str, script_hooks.CommandResult | list[script_hooks.CommandResult]],
+    ) -> None:
         """Hold the answers.
 
         Args:
             answers: Keyed by a word the command line contains; the first
-                key found in the joined argv answers. Unmatched commands
+                key found in the joined argv answers. A list is answered
+                in order, its last answer repeating. Unmatched commands
                 succeed with empty output.
         """
         self.answers = answers
@@ -72,8 +77,11 @@ class Recorder:
                 self.staged[Path(source).name] = Path(source).read_text(encoding="utf-8")
         line = " ".join(argv)
         for word, answer in self.answers.items():
-            if word in line:
+            if word not in line:
+                continue
+            if not isinstance(answer, list):
                 return answer
+            return answer.pop(0) if len(answer) > 1 else answer[0]
         return script_hooks.CommandResult(returncode=0, stdout="", stderr="")
 
 
@@ -404,17 +412,43 @@ def test_smoke_gives_up_naming_the_last_answers() -> None:
     assert pauses.taken == [SMOKE_PAUSE_SECONDS] * (SMOKE_ATTEMPTS - 1)
 
 
-def test_up_stages_builds_composes_and_smokes(tmp_path: Path) -> None:
-    """Up runs the newest release with its edge on sedona and reports each step."""
+def test_up_stages_builds_composes_smokes_and_gates(tmp_path: Path) -> None:
+    """Up runs the newest release with its edge on sedona, sees a bot tick, and reports it all."""
     release = _release(tmp_path / "ladder", "v0.1.0-12345678", registry=False)
-    recorder = Recorder({"image inspect": _fail("No such image"), "Test-Path": _ok("True\r\n")})
+    recorder = Recorder(
+        {"image inspect": _fail("No such image"), "Test-Path": _ok("True\r\n"), **passing_gate()}
+    )
     script_hooks.run_command = recorder
     script_hooks.http_get = _serving
+    script_hooks.sleep_seconds = Pauses()
     lines = up(tmp_path, tmp_path / "ladder", _secrets(tmp_path))
     verbs = [call[3] if call[0] == "docker" else call[0] for call in recorder.calls]
-    assert verbs == ["git", "git", "ssh", "scp", "scp", "ssh", "compose", "image", "build", "ssh"]
+    assert verbs[:10] == [
+        "git",
+        "git",
+        "ssh",
+        "scp",
+        "scp",
+        "ssh",
+        "compose",
+        "image",
+        "build",
+        "ssh",
+    ]
+    gate_requests = [
+        "spawn" if call[2] == "powershell" else call[-1].removeprefix(FLEET_URL)
+        for call in recorder.calls[10:]
+    ]
+    assert gate_requests == [
+        "/accounts",
+        "/bots",
+        "spawn",
+        f"/bots/{GATE_INSTANCE}/stats",
+        "/bots",
+        f"/bots/{GATE_INSTANCE}/activity",
+    ]
     assert recorder.calls[6][-5:] == ["--profile", "edge", "pull", "public", "tunnel"]
-    assert recorder.calls[-1] == [
+    assert recorder.calls[9] == [
         "ssh",
         SEDONA_SSH,
         "docker",
@@ -436,6 +470,7 @@ def test_up_stages_builds_composes_and_smokes(tmp_path: Path) -> None:
         f"release {release.name} staged into {SEDONA_SSH}:{HOST_DIR}",
         "image tankpit-fleet:v0.1.0-12345678 built on sedona",
         f"fleet and edge up; {PUBLIC_ORIGIN} serves /healthz and /demo/fleet",
+        "gate bot 'gate' on Arterial reached tick 2 at fuel 942 in Practice",
     ]
 
 
@@ -490,8 +525,9 @@ def test_main_runs_down_and_prints_its_lines(capsys: pytest.CaptureFixture[str])
 def test_run_up_reads_the_ladder_and_secrets_it_is_given(tmp_path: Path) -> None:
     """``up`` on the command line runs the newest release of the ladder it is handed."""
     _release(tmp_path / "ladder", "v0.1.0-abcdef12", registry=False)
-    script_hooks.run_command = Recorder({"Test-Path": _ok("True\r\n")})
+    script_hooks.run_command = Recorder({"Test-Path": _ok("True\r\n"), **passing_gate()})
     script_hooks.http_get = _serving
+    script_hooks.sleep_seconds = Pauses()
     lines = run(["up"], tmp_path, tmp_path / "ladder", _secrets(tmp_path))
     assert lines[1] == "image tankpit-fleet:v0.1.0-abcdef12 already on sedona"
 
