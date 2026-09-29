@@ -691,6 +691,16 @@ so the shapes had to live somewhere neither imports.[^guard]
       "means": "consecutive UNDISPATCHED replans of one kind that mean a livelock - since 2026-08-21 the counter is dispatch-gated (a superseded close of a decision whose command reached the wire RESETS the streak; the ungated counter's first live catch was a false positive on 12 dispatched-and-echoed clearance shots). Empirical: 459-run archive sweep 2026-08-20 measured a pre-gate healthy ceiling of 7 (dispatched combat re-aims, which no longer count) and one livelock at 93 genuinely undispatched replans (the gatherer full-inventory wedge)"
     },
     {
+      "id": "outcomes-action-outcome-diagnostic-kind",
+      "code": "tankpit_bot.ledger.outcomes:ACTION_OUTCOME_DIAGNOSTIC_KIND",
+      "law": "The diagnostic_kind, 'action_outcome', of the one events-file line written per resolution, on the DIAGNOSTIC channel, with the label in 'outcome' and the kind in 'action_kind'. The emitter writes it and every reader finds it through is_action_outcome_event, so the two cannot drift apart. The smoke gate's own reader did drift: until 2026-09-29 it read a WIRE_COMPLETE channel and a 'signal' field that nothing wrote any more, so one assertion could not pass and another passed over zero events (board task 14b91fb5)."
+    },
+    {
+      "id": "outcomes-is-action-outcome-event",
+      "code": "tankpit_bot.ledger.outcomes:is_action_outcome_event",
+      "law": "An events-file record is a recorded action outcome iff its channel is DIAGNOSTIC and its diagnostic_kind is ACTION_OUTCOME_DIAGNOSTIC_KIND. It is the one predicate the smoke gate and bot-query share, and it is tested against lines the real emitter writes, never against hand-built records."
+    },
+    {
       "id": "outcome-shoot-emit-fired",
       "code": "tankpit_bot.ledger.outcome.shoot:emit_shoot_fired",
       "law": "Record a ground-aimed shot whose own 0x53 echo arrived - the echo is the server's receipt (accepted, billed, fired; weapon byte, never hit/miss), and it is a tile-aimed clearance shot's final resolution. Before it existed, shoot was the only action kind with no completion path for ground aims: 13 wire dispatches / 12 superseded / 0 completions in soak bot-20260821-013519."
