@@ -139,7 +139,9 @@ def run_tick_loop(
         _publish_tick_context(bot, ticks_done + 1)
         _apply_pending_mode_override(bot)
         # A control verb lives beside STOP and lands at the same boundary.
-        bot._ai_state = apply_pending_control(bot._ai_state, stop_file_path.parent)
+        bot._ai_state = apply_pending_control(
+            bot._ai_state, stop_file_path.parent, get_current_time_ms()
+        )
         if wind_down_at_ms > 0 and waited_ms >= wind_down_at_ms and not bot._ai_state["wind_down"]:
             bot._ai_state["wind_down"] = True
             log.info(
