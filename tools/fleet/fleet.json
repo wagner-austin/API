@@ -392,7 +392,7 @@
       "minimum_workers": 2,
       "expected_minutes": 10,
       "exclusive_resources": ["corvis-fleet-testdb"],
-      "required_tags": ["testdb", "cxx", "docker"],
+      "required_tags": ["testdb", "cxx"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "cloudflared",
