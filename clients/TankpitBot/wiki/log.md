@@ -6327,3 +6327,18 @@ boundary consequences). The frontier tests' fixture blind spot — the
 default world centers the window on the tank, so no test could ever
 place the tank on an edge — is closed by `TestFrontierPan`, which
 rewrites the viewport placement directly.
+
+## [2026-09-29] update | Control verbs for a running bot, and the fleet stop that never reached a child
+
+Board task 97975b5d added control verbs short of STOP (hold, disengage,
+wind_down, release, doctrine), carried by a `CONTROL` file beside
+`STOP`; [[bot-behavior-contract]] §1.4 is their contract. The first
+live run on sedona (release v0.1.0-0d6ac1fad, instance `verbs`,
+Practice) found the file written and never taken. The fleet's own
+`POST /bots/verbs/stop` behaved the same way: a minute later the bot
+was still playing, with `runs/bot/verbs/STOP` unconsumed. The cause
+predates the verbs. A fleet child runs the service, whose stop path
+was `runs/state/<instance>/STOP`, while the manager wrote
+`runs/bot/<instance>/STOP`. Now both resolve `bot_stop_file`, and
+spawn clears a reused slot's untaken sentinels. Pages updated:
+[[fleet-lifecycle]] (the drain section), [[bot-behavior-contract]].
