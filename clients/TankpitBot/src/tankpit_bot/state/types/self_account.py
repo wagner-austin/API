@@ -11,8 +11,8 @@ feature could consult.
 
 Two writers fill it: the 0x21 TankInfo dispatch (name, persistent id,
 decoration) and the startup stats-panel scrape (rank_name, the
-countdown ``leaderboard_position`` — [[tank-registry]] § rank number —
-promotion points, lifetime totals). Anything rank-aware or
+``leaderboard_position`` — [[tank-registry]] § Leaderboard position
+behavior — promotion points, lifetime totals). Anything rank-aware or
 identity-aware plugs in HERE instead of re-fishing event streams.
 """
 
@@ -30,12 +30,16 @@ class SelfAccountDict(TypedDict):
             self 0x21 TankInfo arrives.
         persistent_tank_id: Cross-session account id (JS ``a.aa``);
             -1 until observed.
-        decoration_state_hex: Cosmetic skin bytes, hex-encoded; empty
-            until observed.
+        decoration_state_hex: The tank's packed award state, the four
+            0x21 TankInfo bytes that the client's ``yg`` unpacks into
+            the nine decoration slots of JS ``a.v``
+            ([[decoration-encoding]]), hex-encoded; empty until
+            observed.
         rank_name: Stats-panel rank label (e.g. ``private``); empty
             until scraped.
-        leaderboard_position: The countdown rank in parentheses after the rank
-            name — descends toward 1 as promotion points accumulate
+        leaderboard_position: The number in parentheses after the rank
+            name: the tank's place in the room's standings, 1 being
+            the top, measured 2026-09-01 not to be a countdown
             ([[tank-registry]]); -1 until scraped.
         promotion_points: Lifetime promotion points; -1 until scraped.
         destroyed_enemies: Lifetime kills; -1 until scraped.
