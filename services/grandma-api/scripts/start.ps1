@@ -11,7 +11,7 @@
     services\grandma-api, relative to the current location, where make runs
     this. Not a default naming $PSScriptRoot, which is empty in an advanced
     script's param default under -File in Windows PowerShell 5.1 (API
-    tools/fleet/scripts/run-agent-tick.ps1 carries the incident).
+    tools/fleet/scripts/register-agent-schedule.ps1 carries the incident).
 .PARAMETER WebPort
     The web server's port.
 .PARAMETER Poetry
