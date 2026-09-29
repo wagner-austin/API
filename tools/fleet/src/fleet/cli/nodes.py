@@ -17,6 +17,16 @@ message is printed on its line, so the reason is visible without a second
 command -- and the exit status is non-zero, so a script cannot read a partial
 fleet as a whole one.
 
+EACH LINE SAYS WHETHER THE NODE'S RUNNERS CAN CLAIM, AND WHY NOT (MCPs board
+task 7e467416). On 2026-09-29 thirty checks sat queued with one running and
+the reasons were only in each runner's daily log on the hub: sedona held 2.9 GB
+free against its 4.0 GB reservation, lavender 2.2 GB against 6.0 GB. So a
+reachable node's line ends with every runner's own pre-claim verdict,
+:func:`fleet.core.capacity.room_for_any` on the same probe (the owner's
+reservation against free memory, the concurrency its live runs hold, disk),
+for its node lane and, where it declares one, its elevated lane; and an
+unreachable node inside another machine's WSL adds what that host reports.
+
 A DISABLED NODE IS NOT PROBED, and says so. Nobody expects it to answer, and
 asking costs a ten-second ssh timeout per node per run.
 
@@ -57,8 +67,10 @@ from platform_core.errors import AppError
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from fleet.cli import _config
-from fleet.contracts.node import NodeConfig, describe_node
-from fleet.core import probe, records, registry
+from fleet.contracts.node import NodeConfig, NodeState, describe_node
+from fleet.contracts.project import ProjectConfig
+from fleet.contracts.tags import runner_tags
+from fleet.core import capacity, host_report, probe, records, registry
 
 _log = get_logger(__name__)
 
@@ -97,16 +109,38 @@ def describe_fleet(loaded: _config.LoadedWorkspace) -> tuple[list[str], int]:
         if not node["enabled"]:
             # Not probed, and not counted against the exit status. A machine
             # nobody expects to answer has not failed to.
-            lines.append(f"{name}: DISABLED -- declared off in this workspace, not probed")
+            explained = name in loaded.workspace["not_dispatchable"]
+            why = "; not_dispatchable gives the reason" if explained else ""
+            lines.append(f"{name}: DISABLED -- declared off in this workspace, not probed{why}")
             continue
-        live = records.live_runs(loaded.ledger, node=name)
-        verdict = _probe_line(name, node, live)
+        verdict = _probe_line(loaded, name, node)
         lines.append(verdict[0])
         unreachable += verdict[1]
     return lines, unreachable
 
 
-def _probe_line(name: str, node: NodeConfig, live: int) -> tuple[str, int]:
+def lane_verdicts(node: NodeConfig, state: NodeState, projects: tuple[ProjectConfig, ...]) -> str:
+    """Whether each of a node's runners could claim on this probe, and why not.
+
+    Args:
+        node: The node's declaration.
+        state: What it reported just now.
+        projects: Every registered project, as the runners size a claim.
+
+    Returns:
+        One clause per runner, the node lane and (where the node declares
+        one) the elevated lane, each ``<lane> can claim`` or ``<lane> claims
+        nothing: CODE: reason`` in the runner's own words.
+    """
+    lanes = [("node lane", False)] + ([("elevated lane", True)] if node["elevated"] else [])
+    clauses: list[str] = []
+    for label, elevated in lanes:
+        full = capacity.room_for_any(node, state, projects, runner_tags(node, elevated=elevated))
+        clauses.append(f"{label} can claim" if full is None else f"{label} claims nothing: {full}")
+    return "; ".join(clauses)
+
+
+def _probe_line(loaded: _config.LoadedWorkspace, name: str, node: NodeConfig) -> tuple[str, int]:
     """Probe one node and render it, or render why it could not be probed.
 
     THE ONE PLACE THIS PACKAGE CATCHES, and the exception is re-raised as
@@ -116,18 +150,24 @@ def _probe_line(name: str, node: NodeConfig, live: int) -> tuple[str, int]:
     softening a failure, which is why it is confined to this function.
 
     Args:
+        loaded: The workspace and its resolved record paths.
         name: The node's workspace name.
         node: Its declaration.
-        live: Fleet dispatches currently live on it.
 
     Returns:
         The line to print, and 1 when the node did not answer.
     """
+    live = records.live_runs(loaded.ledger, node=name)
     try:
         state = probe.probe_node(node, live_runs=live)
     except AppError as unreachable:
-        return f"{name}: UNREACHABLE -- {unreachable.message}", 1
-    return f"{name}: {describe_node(node, state)}", 0
+        line = f"{name}: UNREACHABLE -- {unreachable.message}"
+        if node["wsl_host"] is not None:
+            seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
+            line = f"{line}; {seen}"
+        return line, 1
+    projects = tuple(loaded.workspace["projects"].values())
+    return f"{name}: {describe_node(node, state)}; {lane_verdicts(node, state, projects)}", 0
 
 
 def probe_mode(parsed: dict[str, str], registry_path: str | None) -> str:
