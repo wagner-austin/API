@@ -269,8 +269,11 @@ queues behind a check because no runner ever asks for both at once
 --config fleet.json --node <alias>` is one tick for one node
 (`fleet.cli.node_agent`; `scripts/register-node-agents.ps1` registers one
 `API-FleetNode-<alias>-3min` scheduled task per node `fleet.json` enables,
-with exactly the hub task's registration: the operator's account, S4U at
-RunLevel Limited, boot plus a 3-minute repetition, `IgnoreNew`, a 40-minute
+with exactly the hub task's registration: `poetry.exe` running
+`python -m fleet.cli.tick` as the action, never `powershell.exe`, which can
+stall before its engine loads under S4U on the hub (MCPs board task
+94ac1c4f); the operator's account, S4U at RunLevel Limited, boot plus a
+3-minute repetition, priority 4, `IgnoreNew`, a 40-minute
 `ExecutionTimeLimit`, one log per node per day under `%LOCALAPPDATA%\Temp\claude`).
 The runners live on the hub and not on the nodes because the hub holds the
 git credentials and the ssh keys, and the tailnet policy lets a
