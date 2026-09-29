@@ -72,6 +72,7 @@ def _node(host: str) -> NodeConfig:
         cxx=None,
         docker=None,
         elevated=False,
+        wsl_host=None,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

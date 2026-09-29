@@ -63,6 +63,7 @@ def _document(
                 "cxx": None,
                 "docker": None,
                 "elevated": False,
+                "wsl_host": None,
                 "budget": {
                     "reserved_cores": 4,
                     "reserved_ram_gb": 8.0,

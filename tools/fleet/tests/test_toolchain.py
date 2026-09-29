@@ -70,6 +70,7 @@ def _workspace_document() -> JSONObject:
         "cxx": None,
         "docker": None,
         "elevated": False,
+        "wsl_host": None,
         "budget": budget,
     }
     return {

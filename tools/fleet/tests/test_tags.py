@@ -68,6 +68,7 @@ def _node(
         cxx=cxx,
         docker=docker,
         elevated=elevated,
+        wsl_host=None,
         budget=NodeBudget(
             reserved_cores=4,
             reserved_ram_gb=4.0,

@@ -212,6 +212,7 @@ def node(
         cxx=cxx,
         docker=docker,
         elevated=False,
+        wsl_host=None,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,
