@@ -36,6 +36,7 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
+from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import isolated_build_lines
 
 #: How a script file is run by path.
@@ -62,11 +63,13 @@ PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\nexport PATH
 #:
 #: ``MemAvailable`` rather than ``MemFree``: the kernel's own estimate of
 #: what a new process can take without swapping, which counts reclaimable
-#: cache the way Windows' ``FreePhysicalMemory`` does not have to. ``df`` of
-#: the root filesystem mirrors the PowerShell probe's drive C, the disk the
-#: stage root lives on for every node declared so far; both are read in
-#: kibibytes and divided to gibibytes with three decimals so the parser sees
-#: one shape from both dialects.
+#: cache the way Windows' ``FreePhysicalMemory`` does not have to, net of
+#: what the node's memory-capped containers may still grow into
+#: (:mod:`fleet.core.linux_capacity_probe` says why, MCPs board task
+#: a282400d). ``df`` of the root filesystem mirrors the PowerShell probe's
+#: drive C, the disk the stage root lives on for every node declared so far;
+#: both are read in kibibytes or bytes and divided to gibibytes with three
+#: decimals so the parser sees one shape from both dialects.
 #:
 #: THE ``ci_slice_*`` PAIR is printed only on a node whose CI runners run in
 #: ``runners.slice`` and whose ``memory.high`` is a number rather than
@@ -76,10 +79,8 @@ PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\nexport PATH
 #: available; diphtheria has no such cgroup and prints neither.
 CAPACITY_PROBE_SCRIPT = (
     PROLOGUE
-    + "awk '/^MemAvailable:/ { printf \"free_ram_gb=%.3f\\n\", $2 / 1048576 }' /proc/meminfo\n"
-    "df -kP / | awk 'NR == 2 { printf \"free_disk_gb=%.3f\\n\", $4 / 1048576 }'\n"
-    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n"
-    f"s=/sys/fs/cgroup/{CI_SLICE_NAME}\n"
+    + CAPACITY_PROBE_BODY
+    + f"s=/sys/fs/cgroup/{CI_SLICE_NAME}\n"
     'if [ -r "$s/memory.current" ] && [ -r "$s/memory.high" ]; then\n'
     '  h="$(cat "$s/memory.high")"\n'
     '  case "$h" in\n'
