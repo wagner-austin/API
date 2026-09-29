@@ -132,6 +132,29 @@ def should_exit_collect(ctx: DecideCtx) -> bool:
     return hunt_entry_permitted(ctx)
 
 
+def wound_down_stocked(ctx: DecideCtx) -> bool:
+    """Return True when a winding-down session may end ``session_complete``.
+
+    A fighter ends fully restocked, the same bar that releases COLLECT
+    (:func:`should_exit_collect`), so the next session opens combat-ready.
+    A gatherer never fights ([[fleet-coordination]]): its inventory is no
+    combat bar, and :func:`hunt_entry_permitted` is False for it by design,
+    so the fighter's bar could never be met and a bounded gatherer session
+    ended only on the hard tick budget, mid-action (board task e956e3c8).
+    Its bar is a full tank of fuel alone, :func:`hunt_fuel_floor`, the same
+    physics number the collect cascade tops fuel up to.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when the tank is stocked for its role.
+    """
+    if ctx.config["role"] is FleetRole.GATHERER:
+        return ctx.fuel >= hunt_fuel_floor(ctx)
+    return should_exit_collect(ctx)
+
+
 def held_human_combat_lock(ctx: DecideCtx) -> bool:
     """Return True when the held combat lock is on a human-classified target.
 
@@ -423,4 +446,5 @@ __all__ = [
     "should_exit_collect",
     "should_exit_hunt",
     "weapon_reserves_below_break",
+    "wound_down_stocked",
 ]

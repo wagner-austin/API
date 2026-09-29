@@ -7,12 +7,16 @@ lines; locked targets and search fallbacks are now siblings.
 
 from __future__ import annotations
 
+import pytest
+
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.combat_feedback import CombatFeedback
+from tankpit_bot.bot.session_exit import SessionExitError, SessionExitReason
 from tankpit_bot.fleetshare.types import FleetRole
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -297,3 +301,51 @@ class TestGathererRouting:
 
         assert decision["command"]["cmd_type"] == "hold"
         assert decision["behavior"]["mode"] == "COLLECT"
+
+    def test_winding_down_gatherer_with_a_full_tank_ends_session_complete(self) -> None:
+        """A gatherer's stocked bar is fuel alone (board task e956e3c8).
+
+        Its weapons sit far below any combat bar, which a gatherer
+        never needs; before the fix the fighter's bar was the only one,
+        so the gatherer collected until the hard tick budget killed it.
+        """
+        world, self_state = _make_world(fuel=fuel_capacity(0))
+        state = AIStateDict(**{**self._gatherer_state(), "wind_down": True})
+
+        with pytest.raises(SessionExitError) as exc_info:
+            decide(world, self_state, state, _make_inventory(0, 0, 0), 100000, None, ws=self.ws)
+
+        assert exc_info.value.reason is SessionExitReason.SESSION_COMPLETE
+        assert str(exc_info.value) == (
+            f"session_complete: wound down fully stocked at fuel={fuel_capacity(0)}"
+        )
+
+    def test_winding_down_gatherer_short_of_a_full_tank_keeps_collecting(self) -> None:
+        """One unit short of the tank, the wind-down keeps working the
+        fuel cascade: with no dot atlas yet, it opens the map for dots."""
+        world, self_state = _make_world(fuel=fuel_capacity(0) - 1)
+        state = AIStateDict(**{**self._gatherer_state(), "wind_down": True})
+
+        decision = decide(world, self_state, state, _make_inventory(), 100000, None, ws=self.ws)
+
+        assert decision["command"] == {"cmd_type": "map_open"}
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["behavior"]["reason_kind"] == "map_for_dots"
+
+    def test_winding_down_gatherer_with_nothing_to_collect_ends_instead_of_holding(
+        self,
+    ) -> None:
+        """The exhausted cascade that holds a working gatherer ends a
+        winding-down one: nothing it could wait for moves its exit."""
+        world, self_state = _make_world(fuel=fuel_capacity(0) - 1)
+        state = AIStateDict(
+            **{**self._gatherer_state(), "last_map_open_ms": 99000, "wind_down": True}
+        )
+
+        with pytest.raises(SessionExitError) as exc_info:
+            decide(world, self_state, state, _make_inventory(), 100000, None, ws=self.ws)
+
+        assert exc_info.value.reason is SessionExitReason.SESSION_COMPLETE
+        assert str(exc_info.value) == (
+            f"session_complete: wound down; collect exhausted at fuel={fuel_capacity(0) - 1}"
+        )

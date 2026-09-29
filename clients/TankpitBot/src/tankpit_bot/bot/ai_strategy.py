@@ -27,6 +27,7 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_enter_hunt,
     should_exit_collect,
     should_exit_hunt,
+    wound_down_stocked,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -220,7 +221,10 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
     instead of the program killing it mid action"). Ending stocked is
     also what makes the NEXT session open combat-ready (run
     bot-20260726-002554 scored its first kill at t+30 s on the prior
-    session's leftover stock).
+    session's leftover stock). "Stocked" is per role
+    (:func:`wound_down_stocked`): a gatherer's bar is a full tank of
+    fuel, so it winds down like every other role instead of
+    collecting until the hard tick budget kills it.
 
     Args:
         ctx: Decision context.
@@ -232,13 +236,9 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
         SessionExitError: ``session_complete`` when winding down and
             fully stocked — the clean exit.
     """
-    if ctx.config["role"] is FleetRole.GATHERER:
-        # A gatherer never hunts ([[fleet-coordination]], fleet ruling
-        # 2026-08-14): its ticks belong to the COLLECT cascade — scan,
-        # sweep, hop — roaming the map and publishing what it finds
-        # for the fighters of its color.
-        return AIMode.COLLECT
     if ctx.ai_state["wind_down"]:
+        # Ahead of the gatherer's fixed COLLECT below, so a gatherer
+        # winds down too (board task e956e3c8).
         target = ctx.world["tanks"].get(str(ctx.ai_state["combat_target_id"]))
         finishing_kill = (
             ctx.mode is AIMode.HUNT
@@ -251,11 +251,17 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
             # and 2026-07-26): the current kill completes; the break
             # thresholds still protect, and no NEW target is acquired.
             return AIMode.HUNT
-        if should_exit_collect(ctx):
+        if wound_down_stocked(ctx):
             raise SessionExitError(
                 SessionExitReason.SESSION_COMPLETE,
                 f"wound down fully stocked at fuel={ctx.fuel}",
             )
+        return AIMode.COLLECT
+    if ctx.config["role"] is FleetRole.GATHERER:
+        # A gatherer never hunts ([[fleet-coordination]], fleet ruling
+        # 2026-08-14): its ticks belong to the COLLECT cascade — scan,
+        # sweep, hop — roaming the map and publishing what it finds
+        # for the fighters of its color.
         return AIMode.COLLECT
     current_mode = ctx.mode
     if current_mode is AIMode.COLLECT and not should_exit_collect(ctx):
