@@ -6400,3 +6400,24 @@ shown to fire on a planted mutation. The reset list is still the one
 - footnote 11's static-key path, which moved behind
   `resources.static_key_file_path`, so `DEFAULT_STATIC_KEY_PATH` is gone;
 - three drifted line anchors.
+
+## [2026-09-29] update | The contention baseline was a broadcast, counted five times
+
+Board task 7aa719fd. `container_pickup_dispatched` is emitted for every
+0x43 CacheUpdate, and the server sends that to every tank in the room
+with no tank id. So it records that a cache changed, not that the bot
+picked it up. On sedona two sibling gatherers, 34 tiles apart at the
+median, logged 146 identical records.
+- [[fleet-forage-allocation]]'s "1,499 dispatches, 273 contested
+  tiles, median gap 0 s" counted those records across five bots.
+  Recounted over each bot's own dispatch lines in the same five files:
+  374 dispatches, 15 tiles, 44 pairs, median gap 1 s. The contention
+  was about eighteen times smaller, and still same-tick, so the mutex
+  it justified stands.
+- [[flag-triage-20260902]]'s `[^v2]` gains the bound for its single-bot
+  pairing: 102 of 117 records fall on tiles that bot dispatched to.
+The diagnostic keeps its name: 412 archived event files (18 GB) carry
+it, and a rename would split the corpus into two vocabularies. In code,
+the scorecard's broadcast-derived pickup tallies are deleted (the
+bot's own receipts are its `collect:*` outcome counts), and the digest's
+radar-yield window now closes on the bot's own `pickup_*` command.
