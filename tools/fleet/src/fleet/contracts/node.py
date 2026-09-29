@@ -158,6 +158,12 @@ class NodeConfig(TypedDict):
             REQUIRED like ``test_database``, and refused on a linux node,
             where the equivalent would be a root build and no suite asks
             for one.
+        wsl_host: The workspace name of the Windows node whose WSL runs
+            this node's distro, or None for a machine of its own. A tick
+            that cannot reach such a node asks that host what it sees (MCPs
+            board task 45a4f22b: lavender-wsl read 'did not answer' for
+            hours while lavender itself answered with 0.3 GB free). REQUIRED,
+            null spelled out, and refused on a Windows node.
         budget: What share of this machine a dispatch may take.
     """
 
@@ -173,6 +179,7 @@ class NodeConfig(TypedDict):
     cxx: str | None
     docker: str | None
     elevated: bool
+    wsl_host: str | None
     budget: NodeBudget
 
 
@@ -273,6 +280,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "cxx": node["cxx"],
         "docker": node["docker"],
         "elevated": node["elevated"],
+        "wsl_host": node["wsl_host"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -343,6 +351,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         cxx=decode_capability(Capability.CXX, value["cxx"]),
         docker=decode_capability(Capability.DOCKER, value["docker"]),
         elevated=elevated,
+        wsl_host=_decode_wsl_host(value, platform),
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 
@@ -416,6 +425,42 @@ def _decode_elevated(obj: JSONObject, platform: NodePlatform) -> bool:
             "builds as a Task Scheduler task at RunLevel Highest, which only a Windows node has"
         )
     return elevated
+
+
+def _decode_wsl_host(obj: JSONObject, platform: NodePlatform) -> str | None:
+    """Read which Windows node runs this node's distro.
+
+    Whether the name is another Windows node of the same workspace is the
+    workspace decoder's check, since one node cannot see the others.
+
+    Args:
+        obj: The node's declaration.
+        platform: Its already decoded platform.
+
+    Returns:
+        The host's workspace name, or None.
+
+    Raises:
+        JSONTypeError: If the key is absent, is neither a non-empty string
+            nor null, or names a host on a Windows node, which runs no
+            distro of its own that the fleet dispatches to.
+    """
+    if "wsl_host" not in obj:
+        raise JSONTypeError(
+            "node must declare 'wsl_host': the workspace name of the Windows node whose WSL runs "
+            "this node's distro, or null for a machine of its own"
+        )
+    value = obj["wsl_host"]
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise JSONTypeError(f"wsl_host must be a non-empty string or null, got {value!r}")
+    if platform is NodePlatform.WINDOWS:
+        raise JSONTypeError(
+            f"wsl_host {value!r} is set on a windows node; only a linux node runs inside another "
+            "machine's WSL"
+        )
+    return value
 
 
 def _positive_float(obj: JSONObject, key: str) -> float:

@@ -32,7 +32,12 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from fleet.contracts.node import NodeConfig, decode_node_config, encode_node_config
+from fleet.contracts.node import (
+    NodeConfig,
+    NodePlatform,
+    decode_node_config,
+    encode_node_config,
+)
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import decode_path, decode_remote
@@ -377,6 +382,37 @@ def _decode_data_paths(
     return paths
 
 
+def _check_wsl_hosts(nodes: dict[str, NodeConfig]) -> dict[str, NodeConfig]:
+    """Refuse a ``wsl_host`` that is not another Windows node of this workspace.
+
+    Args:
+        nodes: The decoded nodes.
+
+    Returns:
+        The same nodes.
+
+    Raises:
+        JSONTypeError: If a node's ``wsl_host`` names no declared node, or a
+            node that is not Windows: the tick that asks the host what it sees
+            would ask a machine it cannot reach, or one with no WSL to report.
+    """
+    for name in sorted(nodes):
+        host = nodes[name]["wsl_host"]
+        if host is None:
+            continue
+        declared = nodes.get(host)
+        if declared is None:
+            raise JSONTypeError(
+                f"nodes[{name!r}].wsl_host names {host!r}, which is not a node of this workspace"
+            )
+        if declared["platform"] is not NodePlatform.WINDOWS:
+            raise JSONTypeError(
+                f"nodes[{name!r}].wsl_host names {host!r}, a {declared['platform'].value} node; "
+                "only a windows node runs WSL"
+            )
+    return nodes
+
+
 def _encloses(data_path: str, project_path: str) -> bool:
     """Whether a data directory contains a project's own tree.
 
@@ -408,11 +444,14 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, the node or project mapping is empty, a machine is both
             declared and excluded, a node-local resource is declared by no
-            project, or a node or project fails its own decoder.
+            project, a node's ``wsl_host`` is not another Windows node, or a
+            node or project fails its own decoder.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"workspace must be a JSON object, got {type(value).__name__}")
-    nodes = {name: decode_node_config(node) for name, node in _decode_named(value, "nodes").items()}
+    nodes = _check_wsl_hosts(
+        {name: decode_node_config(node) for name, node in _decode_named(value, "nodes").items()}
+    )
     projects = {
         path: decode_project_config(project)
         for path, project in _decode_named(value, "projects").items()
