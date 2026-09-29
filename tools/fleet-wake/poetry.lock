@@ -336,6 +336,7 @@ files = []
 develop = true
 
 [package.dependencies]
+board-watch = {path = "../board-watch", develop = true}
 monorepo-guards = {path = "../../libs/monorepo_guards", develop = true}
 platform-core = {path = "../../libs/platform_core", develop = true}
 typing-extensions = "^4.12.2"
