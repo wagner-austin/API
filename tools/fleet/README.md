@@ -294,7 +294,10 @@ runners claim by are the tags the roster agrees on.
 **`testdb` is the one tag the roster does not measure** (MCPs board task
 6bbfd171). A node declares `test_database: true` when it runs
 `corvis-fleet-testdb`, the loopback postgres container on tmpfs that MCPs
-`scripts/host/diphtheria/provision.sh` creates and MCPs
+`scripts/host/lib/fleet-testdb.sh` defines once and both testdb nodes'
+provisioning sources (diphtheria's `scripts/host/diphtheria/provision.sh`, and
+lavender-wsl's `scripts/host/lavender/provision-fleet-node.sh`, MCPs board
+task c4fc4f3e), and that MCPs
 `scripts/testdb-setup.sh --container corvis-fleet-testdb` restarts empty and
 migrates before a run, as a CI job's service container is fresh. Every MCPs
 project whose suite starts from `packages/db`'s global test setup names that
@@ -303,6 +306,19 @@ the setup can succeed. No Windows node can reach a test database (measured
 2026-09-26: sedona and serendipity both refuse the cluster's 6432), and no
 node is pointed at the production cluster's `corvis_test`, which would put the
 `corvis_app` credential on it.
+
+**lavender-wsl is the second testdb node** (MCPs board task c4fc4f3e). Until
+2026-09-29 diphtheria was the only node carrying `linux` and `testdb`, and
+that day 17 queued jobs could land nowhere else, the tail about six hours
+behind, while diphtheria sat at load 42 to 57 on 8 cores. lavender-wsl is the
+WSL2 Ubuntu on lavender that already hosts the GitHub runners: 16 logical
+cores and 25.4 GB given to the distro, g++ 13.3.0, Node 24.21.0 from
+NodeSource. Its `docker` is null because its only daemon is the rootful one
+the runners' service containers use, not an execdocker user's rootless
+daemon, so it never takes the deploy suite. The hub reaches it as
+`Host lavender-wsl` with `ProxyJump lavender` to `127.0.0.1:2222`, so no port
+opens on the tailnet, and half its cores and memory are reserved for the
+runners beside it.
 
 **`rust` is declared as a version and re-measured every tick** (MCPs board
 task 1e2da299). `services/covenant-radar-api` builds the maturin crate
