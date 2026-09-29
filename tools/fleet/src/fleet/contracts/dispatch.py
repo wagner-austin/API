@@ -23,6 +23,8 @@ carry ``None`` into a state machine.
 
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from enum import StrEnum
 
 from platform_core.error_codes_tooling import FleetErrorCode
@@ -136,6 +138,11 @@ class DispatchJob(TypedDict):
         task_id: The board task whose thread receives the verdict, or None
             when the submitter named none, in which case the verdict is a
             note addressed to the submitting label.
+        claimed_unix: When the claim was taken, whole seconds since the
+            epoch, or None while nothing holds the job. The one timestamp
+            decoded, because the collect pass decides from it (MCPs board
+            task 5a4f9b3e): a claim whose start never reached the queue is
+            matched to the run its tick launched by when that run began.
     """
 
     job_id: str
@@ -152,6 +159,11 @@ class DispatchJob(TypedDict):
     sha: str | None
     required_tags: tuple[NodeTag, ...]
     task_id: str | None
+    claimed_unix: int | None
+
+
+#: How the tool renders an instant: JavaScript's ``toISOString``, always UTC.
+_INSTANT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z")
 
 
 def _malformed(detail: str, *, answer: str) -> AppError[FleetErrorCode]:
@@ -224,6 +236,29 @@ def _require_optional_str(row: dict[str, JSONValue], key: str, *, answer: str) -
             f"field {key!r} is {type(value).__name__}, not a string or null", answer=answer
         )
     return value
+
+
+def _require_optional_instant(row: dict[str, JSONValue], key: str, *, answer: str) -> int | None:
+    """Read one nullable instant field as whole seconds since the epoch.
+
+    Args:
+        row: The decoded object.
+        key: The field name.
+        answer: The whole answer, for the error message.
+
+    Returns:
+        The instant, or None when the field is present and null.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when absent, neither a string nor
+            null, or a string that is not a UTC instant as the tool renders one.
+    """
+    text = _require_optional_str(row, key, answer=answer)
+    if text is None:
+        return None
+    if _INSTANT.fullmatch(text) is None:
+        raise _malformed(f"field {key!r} is {text!r}, not a UTC instant", answer=answer)
+    return int(datetime.fromisoformat(text).timestamp())
 
 
 def _require_status(row: dict[str, JSONValue], *, answer: str) -> DispatchStatus:
@@ -330,6 +365,7 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         sha=_require_optional_str(value, "sha", answer=answer),
         required_tags=_require_tags(value, answer=answer),
         task_id=_require_optional_str(value, "taskId", answer=answer),
+        claimed_unix=_require_optional_instant(value, "claimedAt", answer=answer),
     )
 
 
