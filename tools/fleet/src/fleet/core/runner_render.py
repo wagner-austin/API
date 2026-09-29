@@ -33,6 +33,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core.runner_install import RUNNER_VERSION, install_root_for, token_variable
 from fleet.core.runner_recovery import render_wsl_recovery_lines
+from fleet.core.runner_slice_render import render_runner_slice_lines, render_slice_unit_lines
 from fleet.core.runner_windows_provision import render_windows_provision_script
 
 #: Where ``pipx install`` puts its shims for the runner account, appended to
@@ -255,6 +256,7 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         f"[ -f {directory}/.service ] || (cd {directory} && ./svc.sh install gharunner)",
         *render_wsl_recovery_lines(install),
         f"(cd {directory} && ./svc.sh start)",
+        *render_runner_slice_lines(install),
     ]
 
 
@@ -296,6 +298,8 @@ def _render_linux_script(spec: HostRunnerSpec) -> str:
     for asset in spec["assets"]:
         if not asset["manual"]:
             lines += _render_asset_lines(asset)
+    lines += ["", "# --- the runners' share of the VM (MCPs board task 45a4f22b) ---"]
+    lines += render_slice_unit_lines(spec["ci_slice"])
     lines += ["", "# --- runner installs ---"]
     # wsl-side installs only: windows-side ones are provision.ps1's, in
     # their own execution environment.
