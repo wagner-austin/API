@@ -55,6 +55,17 @@ from typing_extensions import TypedDict
 #: process can exit with on its own; the fact itself is ``timed_out``.
 TIMED_OUT_RETURNCODE = -1
 
+#: The variable, and its value, every child is started with, so a Python
+#: child writes its streams in the UTF-8 :func:`_decode_captured` reads them
+#: in. On Windows a Python process writes a pipe in the ANSI code page, so
+#: the two disagreed on every character outside ASCII (MCPs board task
+#: 88b8fe61): on 2026-09-29 a node agent's traceback carried the queue's em
+#: dash as cp1252 byte 0x97, this decode turned it into U+FFFD, and the
+#: launcher's own cp1252 log stream could not encode that and printed a
+#: logging error in place of the traceback. A child that is not Python
+#: ignores the variable.
+CHILD_IO_ENCODING = ("PYTHONIOENCODING", "utf-8")
+
 
 class CommandResult(TypedDict):
     """What running a command produced.
@@ -142,4 +153,4 @@ def _awaited(
     )
 
 
-__all__ = ["TIMED_OUT_RETURNCODE", "CommandResult"]
+__all__ = ["CHILD_IO_ENCODING", "TIMED_OUT_RETURNCODE", "CommandResult"]

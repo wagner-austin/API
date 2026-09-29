@@ -49,7 +49,7 @@ from typing import Protocol
 from platform_core.config import _optional_env_str, config_test_hooks
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
-from fleet.core._command import TIMED_OUT_RETURNCODE, CommandResult, _awaited
+from fleet.core._command import CHILD_IO_ENCODING, TIMED_OUT_RETURNCODE, CommandResult, _awaited
 
 
 class EnvProtocol(Protocol):
@@ -341,6 +341,7 @@ def _default_run(
     # hands back is filtered here, never mutated.
     parent = config_test_hooks.get_environment()
     environment = {name: value for name, value in parent.items() if name not in withheld}
+    environment[CHILD_IO_ENCODING[0]] = CHILD_IO_ENCODING[1]
     environment.update(set_env)
     if stdin_bytes is None:
         return _awaited(

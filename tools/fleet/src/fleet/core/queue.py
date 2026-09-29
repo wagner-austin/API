@@ -293,6 +293,25 @@ def report_close(
     )
 
 
+def get_job(credentials: McpCredentials, *, job_id: str) -> DispatchJob:
+    """Read one job as the queue holds it now.
+
+    Args:
+        credentials: Endpoint and headers.
+        job_id: The job to read.
+
+    Returns:
+        The job; its trail, which ``dispatch_get`` also answers, is not read.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    arguments: JSONObject = {"jobId": job_id}
+    return decode_reported(
+        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_get", arguments)
+    )
+
+
 def held_by(credentials: McpCredentials, *, agent: str) -> tuple[DispatchJob, ...]:
     """List the live jobs this runner is holding.
 
@@ -497,6 +516,7 @@ __all__ = [
     "announce",
     "cancelled_page",
     "claim_next",
+    "get_job",
     "held_by",
     "identity_arguments",
     "load_credentials",

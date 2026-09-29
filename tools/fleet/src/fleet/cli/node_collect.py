@@ -433,23 +433,51 @@ def stop_cancelled(
             row = candidates.pop(job["run_id"] if launched is None else launched["run_id"], None)
             if row is None:
                 continue
-            stop.stop_and_finish(
-                loaded.leases,
-                loaded.ledger,
-                loaded.feed,
-                node=node,
-                row=row,
-                outcome=LedgerOutcome.CANCELLED,
-                exit_code=NO_EXIT_CODE,
-                detail=(
-                    f"queue job {job['job_id']} was cancelled while it ran; stopped by "
-                    f"{agent}; was dispatched by {row['agent']}"
-                ),
-            )
-            _log.info("stopped %s: %s", row["run_id"], encode_job_line(job))
+            stop_cancelled_run(loaded, node=node, row=row, job=job, agent=agent)
             stopped += 1
         offset = page["next_offset"]
     return stopped
+
+
+def stop_cancelled_run(
+    loaded: _config.LoadedWorkspace,
+    *,
+    node: NodeConfig,
+    row: LedgerEntry,
+    job: DispatchJob,
+    agent: str,
+) -> None:
+    """Stop one run whose queue job was cancelled, and close its row cancelled.
+
+    The one stop for a cancel, whichever tick finds it: a later tick's
+    :func:`stop_cancelled`, or the claiming tick itself when the cancel landed
+    between the launch and the start report
+    (:func:`fleet.cli.node_start.report_started`).
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        node: The node the run is on.
+        row: The run's live ledger row.
+        job: The cancelled queue job.
+        agent: This runner's label.
+
+    Raises:
+        AppError: A node failure from the stop, which leaves the row live.
+    """
+    stop.stop_and_finish(
+        loaded.leases,
+        loaded.ledger,
+        loaded.feed,
+        node=node,
+        row=row,
+        outcome=LedgerOutcome.CANCELLED,
+        exit_code=NO_EXIT_CODE,
+        detail=(
+            f"queue job {job['job_id']} was cancelled while it ran; stopped by "
+            f"{agent}; was dispatched by {row['agent']}"
+        ),
+    )
+    _log.info("stopped %s: %s", row["run_id"], encode_job_line(job))
 
 
 def collect_pass(
@@ -525,4 +553,5 @@ __all__ = [
     "require_sha",
     "settle",
     "stop_cancelled",
+    "stop_cancelled_run",
 ]

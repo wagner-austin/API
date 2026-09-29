@@ -416,7 +416,10 @@ def decode_claim(answer: str) -> DispatchJob | None:
 
 
 def decode_reported(answer: str) -> DispatchJob:
-    """Decode a ``dispatch_report`` answer.
+    """Decode a ``dispatch_report`` or ``dispatch_get`` answer's job.
+
+    Both answer the job under ``job``; ``dispatch_get``'s trail beside it is
+    not read.
 
     Args:
         answer: The tool's text.

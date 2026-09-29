@@ -87,6 +87,7 @@ from typing_extensions import TypedDict
 from fleet.cli import _config
 from fleet.cli import run as run_cli
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
+from fleet.cli.node_start import report_started
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchLane, encode_job_line
 from fleet.contracts.elevation import elevation_gap
 from fleet.contracts.ledger import LedgerEntry
@@ -334,15 +335,10 @@ def claim_pass(
     row = launch_claimed(loaded, job, alias=alias, node=node, prepared=prepared, build=build)
     if isinstance(row, str):
         return refuse(credentials, job, identity, detail=row)
-    queue.report_start(
-        credentials,
-        job_id=job["job_id"],
-        node=alias,
-        run_id=row["run_id"],
-        lease_seconds=CLAIM_LEASE_SECONDS,
-        identity=identity,
+    agent = node_identity(alias, elevated=elevated)[0]
+    report_started(
+        loaded, credentials, identity, job=job, row=row, alias=alias, node=node, agent=agent
     )
-    _log.info("started %s on %s as %s at %s", job["job_id"], alias, row["run_id"], sha)
     return job
 
 
