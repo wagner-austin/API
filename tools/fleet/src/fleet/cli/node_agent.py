@@ -102,6 +102,7 @@ from fleet.core import (
     dispatch,
     elevated_yield,
     export,
+    host_report,
     probe,
     queue,
     records,
@@ -210,12 +211,16 @@ def ready_state(
         The node's measured state when it answered, has room for something,
         has every tool, and (for the elevated runner) holds an
         administrator's token; otherwise None, with the gate that closed
-        and its reason logged.
+        and its reason logged, and for a node with a ``wsl_host`` what that
+        host reports (:mod:`fleet.core.host_report`).
     """
     probed = probe.attempt_probe(node, live_runs=records.live_runs(loaded.ledger, node=alias))
     state = probed["state"]
     if state is None:
         _log.info("%s did not answer; claiming nothing: %s", alias, probed["reason"])
+        if node["wsl_host"] is not None:
+            seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
+            _log.info("%s did not answer, and %s", alias, seen)
         return None
     full = capacity.room_for_any(node, state)
     if full is not None:
