@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 from tests.action_lab._replay_cdp import StubSnapshotCDPSession
 from tests.action_lab._replay_core import (
@@ -40,6 +40,7 @@ from tankpit_bot.action_lab.teleport_phase import (
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
@@ -55,14 +56,6 @@ from tankpit_bot.state.types import make_viewport_state
 #: A real recorded session, replayed so the bootstrap path runs against
 #: bytes the server actually sent rather than a hand-rolled fixture.
 _CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
-
-_SnapshotPhase = Literal[
-    "before_map_open",
-    "before_teleport",
-    "after_map_data",
-    "landed",
-    "timeout",
-]
 
 
 class AcquisitionPhaseFn(Protocol):
@@ -87,7 +80,7 @@ class AcquisitionPhaseFn(Protocol):
         int,
         int | None,
         list[TeleportPageSnapshotDict],
-        Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
     ]:
         """Run the phase and report when the map synced."""
 
@@ -109,7 +102,7 @@ class TeleportCommandFn(Protocol):
         world_timestamp_before: int,
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
-        capture_page_snapshot: Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
         dispatch_failure_message: str = ...,

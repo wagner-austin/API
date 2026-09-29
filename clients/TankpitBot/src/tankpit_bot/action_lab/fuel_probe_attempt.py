@@ -44,7 +44,11 @@ from tankpit_bot.action_lab.pickup_phase import (
     PickupTimeoutSizerProtocol,
 )
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportAttemptStatus,
+    TeleportTargetDict,
+)
 from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     capture_page_client_snapshot,
@@ -360,7 +364,7 @@ def run_single_fuel_target_attempt(
     teleport_started_ms = attempt.teleport_started_ms
     if teleport_result is None or teleport_started_ms is None:
         raise missing_dispatch_error(missing_dispatch_message)
-    if teleport_result["status"] == "teleport_timeout":
+    if teleport_result["status"] is TeleportAttemptStatus.TELEPORT_TIMEOUT:
         snapshot_after = capture_snapshot()
         result = build_teleport_timeout_result(
             target=target,

@@ -31,8 +31,10 @@ from tankpit_bot.action_lab.teleport_helpers import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.command_service import CommandService
@@ -116,7 +118,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
 
 
 def _make_attempt(
-    status: Literal["landed_exact", "landed_offset", "map_sync_timeout", "teleport_timeout"],
+    status: TeleportAttemptStatus,
 ) -> TeleportAttemptResultDict:
     return TeleportAttemptResultDict(
         target=TeleportTargetDict(label=status, x=150, y=171),
@@ -142,7 +144,7 @@ def _make_attempt(
 
 
 def _make_page_snapshot(
-    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    phase: TeleportSnapshotPhase,
 ) -> TeleportPageSnapshotDict:
     """Build a sample teleport page snapshot."""
     return TeleportPageSnapshotDict(

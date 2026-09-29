@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from tests.action_lab._combat_probe_harness import _CAPTURE_PATH, _SnapshotPhase
+from tests.action_lab._combat_probe_harness import _CAPTURE_PATH
 from tests.action_lab._enemy_tracking_harness import (
     _ExecuteHarness,
     _make_shot,
@@ -49,7 +49,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
@@ -213,7 +215,7 @@ def _stub_acquisition(sync_ms: int | None) -> None:
         int,
         int | None,
         list[TeleportPageSnapshotDict],
-        Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
     ]:
         _ = (page, provider, cdp, send_command, command_name)
         _ = (capture_before_map_open, wait_for_sync, sync_timeout_ms)
@@ -226,13 +228,13 @@ def _stub_acquisition(sync_ms: int | None) -> None:
 
 def _teleport_result(
     target: TeleportTargetDict,
-    status: str,
+    status: TeleportAttemptStatus,
 ) -> TeleportAttemptResultDict:
     """Build a teleport outcome carrying the requested status."""
     return TeleportAttemptResultDict(
         target=target,
         teleport_cycle_id=1,
-        status="teleport_timeout" if status == "teleport_timeout" else "landed_exact",
+        status=status,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1100,
         teleport_started_ms=1200,
@@ -252,7 +254,7 @@ def _teleport_result(
     )
 
 
-def _stub_teleport(status: str) -> None:
+def _stub_teleport(status: TeleportAttemptStatus) -> None:
     """Make the teleport phase resolve immediately with ``status``."""
 
     def _command(
@@ -268,7 +270,7 @@ def _stub_teleport(status: str) -> None:
         world_timestamp_before: int,
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
-        capture_page_snapshot: Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
         dispatch_failure_message: str = "teleport command dispatch failed",

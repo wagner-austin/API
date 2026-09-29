@@ -25,7 +25,9 @@ from tankpit_bot.action_lab.teleport_helpers import (
     format_teleport_probe_summary,
 )
 from tankpit_bot.action_lab.types import (
+    TeleportAttemptStatus,
     TeleportProbeSessionDict,
+    TeleportSnapshotPhase,
 )
 from tankpit_bot.types import (
     CapturedMessage,
@@ -238,7 +240,7 @@ def test_start_teleport_page_snapshots_can_skip_initial_capture() -> None:
     )
 
     assert snapshots == []
-    snapshot = capture_page_snapshot("timeout")
+    snapshot = capture_page_snapshot(TeleportSnapshotPhase.TIMEOUT)
     assert snapshot["phase"] == "timeout"
 
 
@@ -271,10 +273,10 @@ def test_format_teleport_probe_summary_counts_statuses() -> None:
         settle_delay_ms=500,
         targets=[],
         attempts=[
-            _make_attempt("landed_exact"),
-            _make_attempt("landed_offset"),
-            _make_attempt("map_sync_timeout"),
-            _make_attempt("teleport_timeout"),
+            _make_attempt(TeleportAttemptStatus.LANDED_EXACT),
+            _make_attempt(TeleportAttemptStatus.LANDED_OFFSET),
+            _make_attempt(TeleportAttemptStatus.MAP_SYNC_TIMEOUT),
+            _make_attempt(TeleportAttemptStatus.TELEPORT_TIMEOUT),
         ],
     )
     assert format_teleport_probe_summary(session) == (

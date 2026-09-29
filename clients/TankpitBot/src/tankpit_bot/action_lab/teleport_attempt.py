@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal, NamedTuple, Protocol
+from typing import NamedTuple, Protocol
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import session as action_session
@@ -16,7 +16,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 
@@ -42,7 +44,7 @@ class TrackedTeleportAttempt(NamedTuple):
     acquisition_sync_timestamp_ms: int | None
     page_snapshots: list[TeleportPageSnapshotDict]
     capture_page_snapshot: Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+        [TeleportSnapshotPhase],
         TeleportPageSnapshotDict,
     ]
     teleport_result: TeleportAttemptResultDict | None
@@ -164,7 +166,7 @@ def run_tracked_teleport_attempt(
         dispatch_failure_error=dispatch_failure_error,
         dispatch_failure_message=teleport_dispatch_failure_message,
     )
-    if teleport_result["status"] == "map_sync_timeout":
+    if teleport_result["status"] is TeleportAttemptStatus.MAP_SYNC_TIMEOUT:
         raise unexpected_result_error(unexpected_result_message)
     return TrackedTeleportAttempt(
         message_start_index=message_start_index,

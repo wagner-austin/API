@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 import pytest
 from platform_core.json_utils import JSONTypeError
 
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
+    TeleportSnapshotPhase,
     TeleportStartupTimingDict,
     TeleportTargetDict,
 )
@@ -34,9 +34,7 @@ def _sample_target() -> TeleportTargetDict:
 
 
 def _sample_attempt(
-    status: Literal["landed_exact", "landed_offset", "map_sync_timeout", "teleport_timeout"] = (
-        "landed_exact"
-    ),
+    status: TeleportAttemptStatus = TeleportAttemptStatus.LANDED_EXACT,
 ) -> TeleportAttemptResultDict:
     """Build a sample teleport attempt result."""
     return TeleportAttemptResultDict(
@@ -65,7 +63,7 @@ def _sample_attempt(
 def _sample_page_snapshot() -> TeleportPageSnapshotDict:
     """Build a sample teleport page snapshot."""
     return TeleportPageSnapshotDict(
-        phase="after_map_data",
+        phase=TeleportSnapshotPhase.AFTER_MAP_DATA,
         timestamp_ms=1350,
         client_present=True,
         map_visible=True,
@@ -142,7 +140,7 @@ def test_attempt_round_trip_with_null_fields() -> None:
     attempt = TeleportAttemptResultDict(
         target=_sample_target(),
         teleport_cycle_id=2,
-        status="map_sync_timeout",
+        status=TeleportAttemptStatus.MAP_SYNC_TIMEOUT,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=None,
         teleport_started_ms=None,
@@ -175,7 +173,13 @@ def test_decode_attempt_rejects_invalid_status() -> None:
     """Attempt decode rejects unsupported status strings."""
     encoded = encode_teleport_attempt_result(_sample_attempt())
     encoded["status"] = "bad"
-    with pytest.raises(JSONTypeError, match="invalid teleport attempt status"):
+    with pytest.raises(
+        JSONTypeError,
+        match=(
+            r"^Invalid status 'bad': must be one of 'landed_exact', 'landed_offset', "
+            r"'map_sync_timeout', 'teleport_timeout'$"
+        ),
+    ):
         decode_teleport_attempt_result(encoded)
 
 
@@ -183,7 +187,13 @@ def test_decode_page_snapshot_rejects_invalid_phase() -> None:
     """Page snapshot decode rejects unsupported phases."""
     encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
     encoded["phase"] = "bad"
-    with pytest.raises(JSONTypeError, match="invalid teleport page snapshot phase"):
+    with pytest.raises(
+        JSONTypeError,
+        match=(
+            r"^Invalid phase 'bad': must be one of 'before_map_open', 'before_teleport', "
+            r"'after_map_data', 'landed', 'timeout'$"
+        ),
+    ):
         decode_teleport_page_snapshot(encoded)
 
 
@@ -192,7 +202,7 @@ def test_decode_page_snapshot_accepts_before_map_open_phase() -> None:
     encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
     encoded["phase"] = "before_map_open"
     decoded = decode_teleport_page_snapshot(encoded)
-    assert decoded["phase"] == "before_map_open"
+    assert decoded["phase"] is TeleportSnapshotPhase.BEFORE_MAP_OPEN
 
 
 def test_decode_page_snapshot_accepts_before_teleport_phase() -> None:
@@ -200,7 +210,7 @@ def test_decode_page_snapshot_accepts_before_teleport_phase() -> None:
     encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
     encoded["phase"] = "before_teleport"
     decoded = decode_teleport_page_snapshot(encoded)
-    assert decoded["phase"] == "before_teleport"
+    assert decoded["phase"] is TeleportSnapshotPhase.BEFORE_TELEPORT
 
 
 def test_decode_page_snapshot_accepts_landed_phase() -> None:
@@ -208,7 +218,7 @@ def test_decode_page_snapshot_accepts_landed_phase() -> None:
     encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
     encoded["phase"] = "landed"
     decoded = decode_teleport_page_snapshot(encoded)
-    assert decoded["phase"] == "landed"
+    assert decoded["phase"] is TeleportSnapshotPhase.LANDED
 
 
 def test_decode_page_snapshot_accepts_timeout_phase() -> None:
@@ -216,7 +226,7 @@ def test_decode_page_snapshot_accepts_timeout_phase() -> None:
     encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
     encoded["phase"] = "timeout"
     decoded = decode_teleport_page_snapshot(encoded)
-    assert decoded["phase"] == "timeout"
+    assert decoded["phase"] is TeleportSnapshotPhase.TIMEOUT
 
 
 def test_decode_page_snapshot_accepts_null_optional_bool() -> None:
@@ -237,16 +247,20 @@ def test_decode_page_snapshot_accepts_non_null_optional_str() -> None:
 
 def test_decode_attempt_accepts_landed_offset_status() -> None:
     """Attempt decode accepts landed_offset status values."""
-    encoded = encode_teleport_attempt_result(_sample_attempt("landed_offset"))
+    encoded = encode_teleport_attempt_result(_sample_attempt(TeleportAttemptStatus.LANDED_OFFSET))
+    assert encoded["status"] == "landed_offset"
     decoded = decode_teleport_attempt_result(encoded)
-    assert decoded["status"] == "landed_offset"
+    assert decoded["status"] is TeleportAttemptStatus.LANDED_OFFSET
 
 
 def test_decode_attempt_accepts_teleport_timeout_status() -> None:
     """Attempt decode accepts teleport_timeout status values."""
-    encoded = encode_teleport_attempt_result(_sample_attempt("teleport_timeout"))
+    encoded = encode_teleport_attempt_result(
+        _sample_attempt(TeleportAttemptStatus.TELEPORT_TIMEOUT)
+    )
+    assert encoded["status"] == "teleport_timeout"
     decoded = decode_teleport_attempt_result(encoded)
-    assert decoded["status"] == "teleport_timeout"
+    assert decoded["status"] is TeleportAttemptStatus.TELEPORT_TIMEOUT
 
 
 def test_decode_attempt_rejects_invalid_optional_int() -> None:

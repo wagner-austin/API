@@ -33,6 +33,7 @@ from tankpit_bot.action_lab.teleport_helpers import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportProbeSessionDict,
     TeleportTargetDict,
 )
@@ -113,7 +114,7 @@ class TeleportProbe(ProbeBase):
             result = TeleportAttemptResultDict(
                 target=target,
                 teleport_cycle_id=teleport_cycle["cycle_id"],
-                status="map_sync_timeout",
+                status=TeleportAttemptStatus.MAP_SYNC_TIMEOUT,
                 map_open_started_ms=map_open_started_ms,
                 map_sync_timestamp_ms=None,
                 teleport_started_ms=None,
@@ -135,7 +136,7 @@ class TeleportProbe(ProbeBase):
                 self,
                 target=target,
                 teleport_cycle_id=teleport_cycle["cycle_id"],
-                status="map_sync_timeout",
+                status=TeleportAttemptStatus.MAP_SYNC_TIMEOUT,
                 message_start_index=message_start_index,
                 page_snapshots=page_snapshots,
             )

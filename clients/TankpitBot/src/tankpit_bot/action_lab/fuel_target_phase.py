@@ -15,7 +15,11 @@ from tankpit_bot.action_lab.teleport_attempt import (
     run_tracked_teleport_attempt,
 )
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportAttemptStatus,
+    TeleportTargetDict,
+)
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 
@@ -248,7 +252,7 @@ def _run_blocked_fuel_reposition(
     reposition_teleport_started_ms = reposition_attempt.teleport_started_ms
     if reposition_teleport_result is None or reposition_teleport_started_ms is None:
         raise dispatch_failure_error("fuel reposition ended before teleport dispatch")
-    if reposition_teleport_result["status"] == "teleport_timeout":
+    if reposition_teleport_result["status"] is TeleportAttemptStatus.TELEPORT_TIMEOUT:
         return BlockedFuelRepositionResult(
             teleport_result=None,
             terminal_result=build_reposition_teleport_timeout_result(

@@ -31,7 +31,11 @@ from tankpit_bot.action_lab.pickup_phase import (
     PickupPhaseProbeProtocol,
     PickupTimeoutSizerProtocol,
 )
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportAttemptStatus,
+    TeleportTargetDict,
+)
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import make_container_state
 
@@ -66,7 +70,7 @@ def _target() -> TeleportTargetDict:
 def _teleport_result(
     target: TeleportTargetDict,
     *,
-    status: Literal["landed_exact", "teleport_timeout"] = "landed_exact",
+    status: TeleportAttemptStatus = TeleportAttemptStatus.LANDED_EXACT,
 ) -> TeleportAttemptResultDict:
     """Build a typed teleport result for helper tests."""
     return TeleportAttemptResultDict(
@@ -83,7 +87,7 @@ def _teleport_result(
         fuel_after=620,
         world_timestamp_before=950,
         world_timestamp_after=1450,
-        landed_signal_received=status != "teleport_timeout",
+        landed_signal_received=status is not TeleportAttemptStatus.TELEPORT_TIMEOUT,
         landed_x=124,
         landed_y=100,
         message_start_index=0,
@@ -161,7 +165,7 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         map_sync_timestamp_ms=1200,
         teleport_started_ms=1300,
         fuel_before=700,
-        teleport_result=_teleport_result(target, status="teleport_timeout"),
+        teleport_result=_teleport_result(target, status=TeleportAttemptStatus.TELEPORT_TIMEOUT),
         message_start_index=0,
         teleport_cycle_ids=[1],
         snapshot_before=snapshot_before,

@@ -59,7 +59,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.state import (
@@ -172,7 +174,7 @@ def _original_teleport_result(target: TeleportTargetDict) -> TeleportAttemptResu
     return TeleportAttemptResultDict(
         target=target,
         teleport_cycle_id=1,
-        status="landed_exact",
+        status=TeleportAttemptStatus.LANDED_EXACT,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
         teleport_started_ms=1300,
@@ -196,7 +198,7 @@ def _resolve_with_tracked_reposition(
     *,
     acquisition_sync_timestamp_ms: int | None,
     reposition_teleport_started_ms: int | None,
-    reposition_teleport_status: Literal["landed_exact", "teleport_timeout"] | None,
+    reposition_teleport_status: TeleportAttemptStatus | None,
 ) -> FuelTargetResolution:
     """Drive the real post-radar resolution through a faked reposition attempt.
 
@@ -224,7 +226,7 @@ def _resolve_with_tracked_reposition(
     original_attempt_runner = fuel_target_phase_module.run_tracked_teleport_attempt
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return TeleportPageSnapshotDict(
             phase=phase,
@@ -248,7 +250,7 @@ def _resolve_with_tracked_reposition(
 
     def _reposition_teleport_result(
         reposition_target: TeleportTargetDict,
-        status: Literal["landed_exact", "teleport_timeout"],
+        status: TeleportAttemptStatus,
     ) -> TeleportAttemptResultDict:
         return TeleportAttemptResultDict(
             target=reposition_target,
@@ -264,7 +266,7 @@ def _resolve_with_tracked_reposition(
             fuel_after=800,
             world_timestamp_before=2100,
             world_timestamp_after=2450,
-            landed_signal_received=status == "landed_exact",
+            landed_signal_received=status is TeleportAttemptStatus.LANDED_EXACT,
             landed_x=102,
             landed_y=100,
             message_start_index=0,

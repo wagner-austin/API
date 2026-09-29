@@ -2,9 +2,37 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal, TypedDict
 
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+
+
+class TeleportAttemptStatus(StrEnum):
+    """How one teleport probe attempt resolved, written as recorded.
+
+    One definition for a vocabulary that was spelled as an inline
+    ``Literal`` at every signature that carried it (board task f554c1a4).
+    """
+
+    LANDED_EXACT = "landed_exact"
+    LANDED_OFFSET = "landed_offset"
+    MAP_SYNC_TIMEOUT = "map_sync_timeout"
+    TELEPORT_TIMEOUT = "teleport_timeout"
+
+
+class TeleportSnapshotPhase(StrEnum):
+    """Where in a teleport attempt a page-client snapshot was captured.
+
+    One definition for a vocabulary that was spelled as an inline
+    ``Literal`` at every snapshot callback (board task f554c1a4).
+    """
+
+    BEFORE_MAP_OPEN = "before_map_open"
+    BEFORE_TELEPORT = "before_teleport"
+    AFTER_MAP_DATA = "after_map_data"
+    LANDED = "landed"
+    TIMEOUT = "timeout"
 
 
 class TeleportTargetDict(TypedDict):
@@ -49,7 +77,7 @@ class TeleportAttemptResultDict(TypedDict):
 
     target: TeleportTargetDict
     teleport_cycle_id: int
-    status: Literal["landed_exact", "landed_offset", "map_sync_timeout", "teleport_timeout"]
+    status: TeleportAttemptStatus
     map_open_started_ms: int
     map_sync_timestamp_ms: int | None
     teleport_started_ms: int | None
@@ -80,7 +108,7 @@ class TeleportPageSnapshotDict(PageClientSnapshotDict):
         phase: Attempt phase when the snapshot was captured.
     """
 
-    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]
+    phase: TeleportSnapshotPhase
 
 
 class TeleportStartupTimingDict(TypedDict):

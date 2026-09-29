@@ -46,6 +46,7 @@ from tankpit_bot.action_lab.pickup_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportTargetDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
@@ -471,7 +472,7 @@ def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
                 teleport_result=TeleportAttemptResultDict(
                     target=target,
                     teleport_cycle_id=1,
-                    status="landed_exact",
+                    status=TeleportAttemptStatus.LANDED_EXACT,
                     map_open_started_ms=1000,
                     map_sync_timestamp_ms=1200,
                     teleport_started_ms=1300,

@@ -38,7 +38,7 @@ from tankpit_bot.action_lab.teleport_helpers import (
     _wait_for_teleport_outcome,
 )
 from tankpit_bot.action_lab.teleport_phase import run_tracked_teleport_command
-from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.action_lab.types import TeleportAttemptStatus, TeleportTargetDict
 from tankpit_bot.bot.ai.combat_landing import choose_combat_landing_tile
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
@@ -176,7 +176,7 @@ class EnemyTrackingProbe(ProbeBase):
             wait_for_outcome=_wait_for_teleport_outcome,
             dispatch_failure_error=TeleportProbeError,
         )
-        if teleport_result["status"] == "teleport_timeout":
+        if teleport_result["status"] is TeleportAttemptStatus.TELEPORT_TIMEOUT:
             return None
         return target_enemy
 

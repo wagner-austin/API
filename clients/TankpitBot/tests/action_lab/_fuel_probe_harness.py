@@ -57,7 +57,9 @@ from tankpit_bot.action_lab.pickup_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.command_service import CommandService
@@ -157,7 +159,7 @@ class _WaitForTeleportOutcomeProtocol(Protocol):
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict: ...
@@ -337,7 +339,7 @@ def _make_teleport_outcome_callback(
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict:
@@ -351,20 +353,15 @@ def _make_teleport_outcome_callback(
             capture_page_snapshot,
         )
         if teleport_status == "teleport_timeout":
-            resolved_status: Literal[
-                "landed_exact",
-                "landed_offset",
-                "map_sync_timeout",
-                "teleport_timeout",
-            ] = "teleport_timeout"
+            resolved_status = TeleportAttemptStatus.TELEPORT_TIMEOUT
         elif teleport_status == "reposition_teleport_timeout":
             resolved_status = (
-                "teleport_timeout"
+                TeleportAttemptStatus.TELEPORT_TIMEOUT
                 if target["label"].startswith("fuel_reposition_")
-                else "landed_exact"
+                else TeleportAttemptStatus.LANDED_EXACT
             )
         else:
-            resolved_status = "landed_exact"
+            resolved_status = TeleportAttemptStatus.LANDED_EXACT
         return TeleportAttemptResultDict(
             target=target,
             teleport_cycle_id=teleport_cycle_id,

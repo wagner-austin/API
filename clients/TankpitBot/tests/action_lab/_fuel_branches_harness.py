@@ -30,6 +30,7 @@ from tankpit_bot.action_lab.fuel_probe_types import (
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportStartupTimingDict,
     TeleportTargetDict,
 )
@@ -80,7 +81,7 @@ class _WaitForTeleportOutcomeProtocol(Protocol):
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ) -> TeleportAttemptResultDict: ...

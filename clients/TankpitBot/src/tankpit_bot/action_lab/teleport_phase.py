@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal, Protocol
+from typing import Protocol
 
 from platform_core.json_utils import JSONObject, require_str
 from platform_core.logging import get_logger
@@ -15,6 +15,7 @@ from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.runtime_logging import emit_diagnostic
@@ -91,7 +92,7 @@ class TeleportOutcomeWaiterKwargs(TypedDict):
     timeout_ms: int
     page_snapshots: list[TeleportPageSnapshotDict]
     capture_page_snapshot: Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+        [TeleportSnapshotPhase],
         TeleportPageSnapshotDict,
     ]
 
@@ -148,7 +149,7 @@ def run_tracked_teleport_command(
     timeout_ms: int,
     page_snapshots: list[TeleportPageSnapshotDict],
     capture_page_snapshot: Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+        [TeleportSnapshotPhase],
         TeleportPageSnapshotDict,
     ],
     wait_for_outcome: TeleportOutcomeWaiterProtocol,
@@ -182,7 +183,7 @@ def run_tracked_teleport_command(
             fails to dispatch.
     """
     teleport_started_ms = action_hooks.get_current_time_ms()
-    page_snapshots.append(capture_page_snapshot("before_teleport"))
+    page_snapshots.append(capture_page_snapshot(TeleportSnapshotPhase.BEFORE_TELEPORT))
     if not probe.teleport_to(target["x"], target["y"]):
         emit_command_dispatch_failure_diagnostic("teleport", dispatch_failure_message)
         probe._end_action_phase(teleport_cycle)

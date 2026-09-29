@@ -17,23 +17,6 @@ from platform_core.json_utils import (
     JSONValue,
 )
 
-#: Element type of every container this rule can verify. The bound
-#: modules hold enum members, ints and strings; ``object`` is banned in
-#: annotations by the ``typing`` guard, so the union is spelled out.
-_MemberItem = IntEnum | int | str
-
-#: Container shapes a ``members`` claim can bind. The read site
-#: annotates ``getattr`` with this and then re-checks by ``isinstance``,
-#: the same narrow-then-verify idiom :func:`_check_value_claim` uses for
-#: ``constant: int``.
-_MemberSymbol = (
-    type[IntEnum]
-    | dict[_MemberItem, _MemberItem]
-    | set[_MemberItem]
-    | frozenset[_MemberItem]
-    | tuple[_MemberItem, ...]
-)
-
 
 class _AnnotatedRecord(Protocol):
     """A symbol whose annotated fields a ``keys`` claim states.
@@ -134,8 +117,12 @@ def _check_bytes_claim(
     return []
 
 
-def _unwrap(item: _MemberItem) -> JSONValue:
+def _unwrap(item: IntEnum | int | str) -> JSONValue:
     """Reduce one container element to its JSON-comparable value.
+
+    The bound modules hold enum members, ints and strings; ``object`` is
+    banned in annotations by the ``typing`` guard, so the union is spelled
+    out here and at every container annotation below.
 
     Args:
         item: A container element, possibly an ``IntEnum`` member.
@@ -149,7 +136,13 @@ def _unwrap(item: _MemberItem) -> JSONValue:
     return item
 
 
-def _normalize_members(value: _MemberSymbol) -> tuple[JSONValue | None, bool]:
+def _normalize_members(
+    value: type[IntEnum]
+    | dict[IntEnum | int | str, IntEnum | int | str]
+    | set[IntEnum | int | str]
+    | frozenset[IntEnum | int | str]
+    | tuple[IntEnum | int | str, ...],
+) -> tuple[JSONValue | None, bool]:
     """Project a container symbol into a JSON-comparable shape.
 
     Four container shapes carry game facts the wiki states literally,
@@ -217,7 +210,16 @@ def _check_members_claim(
     expected = claim.get("members")
     if not isinstance(expected, (dict, list)):
         return [f"{prefix}: 'members' must be a JSON object or array"]
-    symbol: _MemberSymbol = getattr(module, symbol_name)
+    # Annotated at the read and re-checked by ``isinstance`` inside
+    # :func:`_normalize_members`, the same narrow-then-verify idiom
+    # :func:`_check_value_claim` uses for ``constant: int``.
+    symbol: (
+        type[IntEnum]
+        | dict[IntEnum | int | str, IntEnum | int | str]
+        | set[IntEnum | int | str]
+        | frozenset[IntEnum | int | str]
+        | tuple[IntEnum | int | str, ...]
+    ) = getattr(module, symbol_name)
     actual, ordered = _normalize_members(symbol)
     if actual is None:
         return [f"{prefix}: symbol is not an enum, mapping, sequence or set"]

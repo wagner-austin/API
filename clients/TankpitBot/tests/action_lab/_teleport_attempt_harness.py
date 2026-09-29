@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from typing_extensions import Unpack
 
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
@@ -15,7 +13,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
@@ -106,7 +106,7 @@ def _target() -> TeleportTargetDict:
 
 
 def _snapshot(
-    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    phase: TeleportSnapshotPhase,
 ) -> TeleportPageSnapshotDict:
     """Build one sample page snapshot."""
     return TeleportPageSnapshotDict(
@@ -135,7 +135,7 @@ def _result(target: TeleportTargetDict) -> TeleportAttemptResultDict:
     return TeleportAttemptResultDict(
         target=target,
         teleport_cycle_id=7,
-        status="landed_exact",
+        status=TeleportAttemptStatus.LANDED_EXACT,
         map_open_started_ms=1500,
         map_sync_timestamp_ms=1700,
         teleport_started_ms=1800,
@@ -151,7 +151,10 @@ def _result(target: TeleportTargetDict) -> TeleportAttemptResultDict:
         landed_y=110,
         message_start_index=1,
         message_end_index=5,
-        page_snapshots=[_snapshot("before_map_open"), _snapshot("landed")],
+        page_snapshots=[
+            _snapshot(TeleportSnapshotPhase.BEFORE_MAP_OPEN),
+            _snapshot(TeleportSnapshotPhase.LANDED),
+        ],
     )
 
 

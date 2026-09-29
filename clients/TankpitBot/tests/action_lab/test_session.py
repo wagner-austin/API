@@ -22,6 +22,7 @@ from tankpit_bot.action_lab.session import (
     wait_for_radar_sync,
     wait_for_world_sync,
 )
+from tankpit_bot.action_lab.types import TeleportSnapshotPhase
 from tankpit_bot.bot.states import BotState
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
@@ -343,9 +344,9 @@ def test_capture_teleport_page_snapshot_returns_validated_state() -> None:
         }
     )
 
-    snapshot = capture_teleport_page_snapshot(cdp, "after_map_data")
+    snapshot = capture_teleport_page_snapshot(cdp, TeleportSnapshotPhase.AFTER_MAP_DATA)
 
-    assert snapshot["phase"] == "after_map_data"
+    assert snapshot["phase"] is TeleportSnapshotPhase.AFTER_MAP_DATA
     assert snapshot["client_state"] == 13
     assert snapshot["last_page_client_send_age_ms"] == 75
 
@@ -355,7 +356,7 @@ def test_capture_teleport_page_snapshot_rejects_invalid_payload() -> None:
     cdp: CDPSessionProtocol = StubSnapshotCDPSession({"timestamp_ms": "bad"})
 
     with pytest.raises(JSONTypeError, match=r"timestamp_ms|client_present"):
-        capture_teleport_page_snapshot(cdp, "timeout")
+        capture_teleport_page_snapshot(cdp, TeleportSnapshotPhase.TIMEOUT)
 
 
 def test_capture_teleport_page_snapshot_rejects_missing_value_field() -> None:
@@ -375,7 +376,7 @@ def test_capture_teleport_page_snapshot_rejects_missing_value_field() -> None:
     cdp: CDPSessionProtocol = _MissingValueCDPSession()
 
     with pytest.raises(ValueError, match="missing value"):
-        capture_teleport_page_snapshot(cdp, "before_map_open")
+        capture_teleport_page_snapshot(cdp, TeleportSnapshotPhase.BEFORE_MAP_OPEN)
 
 
 def test_capture_teleport_page_snapshot_reads_injected_active_game_handle() -> None:
@@ -401,7 +402,7 @@ def test_capture_teleport_page_snapshot_reads_injected_active_game_handle() -> N
         }
     )
 
-    capture_teleport_page_snapshot(cdp, "timeout")
+    capture_teleport_page_snapshot(cdp, TeleportSnapshotPhase.TIMEOUT)
 
     assert "window.__tankpitActiveGame" in cdp.expression
     assert "typeof W !== 'undefined'" not in cdp.expression

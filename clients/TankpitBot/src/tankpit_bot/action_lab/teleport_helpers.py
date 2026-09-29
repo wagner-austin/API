@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 from platform_core.logging import get_logger
 
@@ -12,8 +11,10 @@ from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.probe_base import ProbeError
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.runtime_logging import emit_diagnostic
@@ -94,7 +95,7 @@ def _log_teleport_attempt_diagnostic(
     *,
     target: TeleportTargetDict,
     teleport_cycle_id: int,
-    status: str,
+    status: TeleportAttemptStatus,
     message_start_index: int,
     page_snapshots: list[TeleportPageSnapshotDict],
 ) -> None:
@@ -104,7 +105,7 @@ def _log_teleport_attempt_diagnostic(
         target_x=target["x"],
         target_y=target["y"],
         cycle=teleport_cycle_id,
-        status=status,
+        status=status.value,
         sent=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
@@ -279,7 +280,7 @@ def _wait_for_teleport_outcome(
     timeout_ms: int,
     page_snapshots: list[TeleportPageSnapshotDict],
     capture_page_snapshot: Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+        [TeleportSnapshotPhase],
         TeleportPageSnapshotDict,
     ],
 ) -> TeleportAttemptResultDict:
@@ -315,7 +316,7 @@ def _wait_for_teleport_outcome(
             next_scan_index = len(provider.messages)
             if map_data_index is not None:
                 _ = map_data_index
-                page_snapshots.append(capture_page_snapshot("after_map_data"))
+                page_snapshots.append(capture_page_snapshot(TeleportSnapshotPhase.AFTER_MAP_DATA))
                 map_data_snapshot_captured = True
         if action_hooks.check_and_clear_teleport_landed(provider.world):
             completion_timestamp_ms = action_hooks.get_current_time_ms()
@@ -323,12 +324,12 @@ def _wait_for_teleport_outcome(
             self_state = world["self_state"]
             if self_state is None:
                 raise TeleportProbeError("self state disappeared after teleport landed")
-            page_snapshots.append(capture_page_snapshot("landed"))
-            status: Literal["landed_exact", "landed_offset", "map_sync_timeout", "teleport_timeout"]
-            if self_state["x"] == target["x"] and self_state["y"] == target["y"]:
-                status = "landed_exact"
-            else:
-                status = "landed_offset"
+            page_snapshots.append(capture_page_snapshot(TeleportSnapshotPhase.LANDED))
+            status = (
+                TeleportAttemptStatus.LANDED_EXACT
+                if self_state["x"] == target["x"] and self_state["y"] == target["y"]
+                else TeleportAttemptStatus.LANDED_OFFSET
+            )
             result = TeleportAttemptResultDict(
                 target=target,
                 teleport_cycle_id=teleport_cycle_id,
@@ -369,11 +370,11 @@ def _wait_for_teleport_outcome(
     self_state = world["self_state"]
     if self_state is None:
         raise TeleportProbeError("self state disappeared while waiting for teleport timeout")
-    page_snapshots.append(capture_page_snapshot("timeout"))
+    page_snapshots.append(capture_page_snapshot(TeleportSnapshotPhase.TIMEOUT))
     result = TeleportAttemptResultDict(
         target=target,
         teleport_cycle_id=teleport_cycle_id,
-        status="teleport_timeout",
+        status=TeleportAttemptStatus.TELEPORT_TIMEOUT,
         map_open_started_ms=map_open_started_ms,
         map_sync_timestamp_ms=map_sync_timestamp_ms,
         teleport_started_ms=teleport_started_ms,
@@ -397,7 +398,7 @@ def _wait_for_teleport_outcome(
         provider,
         target=target,
         teleport_cycle_id=teleport_cycle_id,
-        status="teleport_timeout",
+        status=TeleportAttemptStatus.TELEPORT_TIMEOUT,
         message_start_index=message_start_index,
         page_snapshots=page_snapshots,
     )
@@ -418,11 +419,11 @@ def format_teleport_probe_summary(session: TeleportProbeSessionDict) -> str:
     map_timeouts = 0
     teleport_timeouts = 0
     for attempt in session["attempts"]:
-        if attempt["status"] == "landed_exact":
+        if attempt["status"] is TeleportAttemptStatus.LANDED_EXACT:
             exact += 1
-        elif attempt["status"] == "landed_offset":
+        elif attempt["status"] is TeleportAttemptStatus.LANDED_OFFSET:
             offset += 1
-        elif attempt["status"] == "map_sync_timeout":
+        elif attempt["status"] is TeleportAttemptStatus.MAP_SYNC_TIMEOUT:
             map_timeouts += 1
         else:
             teleport_timeouts += 1

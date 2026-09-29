@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections.abc import Callable, Generator
 
 import pytest
-from tests.action_lab._combat_probe_harness import _SnapshotPhase
 from tests.action_lab._enemy_tracking_harness import (
     _make_snapshot,
     _make_tracked,
@@ -40,7 +39,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
@@ -204,7 +205,7 @@ def _stub_acquisition(sync_ms: int | None) -> None:
         int,
         int | None,
         list[TeleportPageSnapshotDict],
-        Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
     ]:
         _ = (page, provider, cdp, send_command, command_name)
         _ = (capture_before_map_open, wait_for_sync, sync_timeout_ms)
@@ -217,13 +218,13 @@ def _stub_acquisition(sync_ms: int | None) -> None:
 
 def _teleport_result(
     target: TeleportTargetDict,
-    status: str,
+    status: TeleportAttemptStatus,
 ) -> TeleportAttemptResultDict:
     """Build a teleport outcome carrying the requested status."""
     return TeleportAttemptResultDict(
         target=target,
         teleport_cycle_id=1,
-        status="teleport_timeout" if status == "teleport_timeout" else "landed_exact",
+        status=status,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1100,
         teleport_started_ms=1200,
@@ -243,7 +244,7 @@ def _teleport_result(
     )
 
 
-def _stub_teleport(status: str) -> None:
+def _stub_teleport(status: TeleportAttemptStatus) -> None:
     """Make the teleport phase resolve immediately with ``status``."""
 
     def _command(
@@ -259,7 +260,7 @@ def _stub_teleport(status: str) -> None:
         world_timestamp_before: int,
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
-        capture_page_snapshot: Callable[[_SnapshotPhase], TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[[TeleportSnapshotPhase], TeleportPageSnapshotDict],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
         dispatch_failure_message: str = "teleport command dispatch failed",
@@ -368,7 +369,7 @@ def test_teleport_to_closest_enemy_returns_none_on_timeout() -> None:
     probe = _ProbeHarness()
     _install_common_stubs([_enemy()])
     _stub_landing(100, 100)
-    _stub_teleport("teleport_timeout")
+    _stub_teleport(TeleportAttemptStatus.TELEPORT_TIMEOUT)
 
     assert (
         probe._teleport_to_closest_enemy(
@@ -387,7 +388,7 @@ def test_teleport_to_closest_enemy_returns_the_closest_target() -> None:
     closest = _enemy(77)
     _install_common_stubs([closest])
     _stub_landing(100, 100)
-    _stub_teleport("landed_exact")
+    _stub_teleport(TeleportAttemptStatus.LANDED_EXACT)
 
     target = probe._teleport_to_closest_enemy(
         cdp=probe.stub_cdp,

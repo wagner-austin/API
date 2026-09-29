@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 import pytest
 from tests.action_lab._teleport_attempt_harness import (
@@ -26,7 +25,9 @@ from tankpit_bot.action_lab.teleport_phase import (
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportAttemptStatus,
     TeleportPageSnapshotDict,
+    TeleportSnapshotPhase,
     TeleportTargetDict,
 )
 
@@ -43,7 +44,7 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         return True
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return _snapshot(phase)
 
@@ -66,7 +67,7 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         int | None,
         list[TeleportPageSnapshotDict],
         Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ]:
@@ -84,7 +85,8 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         assert page is expected_page
         assert provider is expected_probe
         assert send_command()
-        return (1500, 1700, [_snapshot("before_map_open")], _capture_page_snapshot)
+        before_map_open = _snapshot(TeleportSnapshotPhase.BEFORE_MAP_OPEN)
+        return (1500, 1700, [before_map_open], _capture_page_snapshot)
 
     def _run_teleport(
         page: action_session.WaitPageProtocol,
@@ -100,7 +102,7 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
@@ -125,7 +127,7 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
             dispatch_failure_message,
         )
         impossible_result = _result(target)
-        impossible_result["status"] = "map_sync_timeout"
+        impossible_result["status"] = TeleportAttemptStatus.MAP_SYNC_TIMEOUT
         return (impossible_result, 1800)
 
     teleport_attempt_module.run_tracked_acquisition_phase = _run_acquisition
@@ -172,7 +174,7 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         return True
 
     def _capture_page_snapshot(
-        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+        phase: TeleportSnapshotPhase,
     ) -> TeleportPageSnapshotDict:
         return _snapshot(phase)
 
@@ -195,7 +197,7 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         int | None,
         list[TeleportPageSnapshotDict],
         Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
     ]:
@@ -213,7 +215,8 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         assert page is expected_page
         assert provider is expected_probe
         assert send_command()
-        return (1500, None, [_snapshot("before_map_open")], _capture_page_snapshot)
+        before_map_open = _snapshot(TeleportSnapshotPhase.BEFORE_MAP_OPEN)
+        return (1500, None, [before_map_open], _capture_page_snapshot)
 
     def _run_teleport(
         page: action_session.WaitPageProtocol,
@@ -229,7 +232,7 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         timeout_ms: int,
         page_snapshots: list[TeleportPageSnapshotDict],
         capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            [TeleportSnapshotPhase],
             TeleportPageSnapshotDict,
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,

@@ -20,7 +20,11 @@ from tankpit_bot.action_lab.equipment_targeting import (
     find_visible_equipment_landing_tile,
     visible_equipment_requires_reposition,
 )
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportAttemptStatus,
+    TeleportTargetDict,
+)
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
@@ -74,7 +78,7 @@ def _teleport_result() -> TeleportAttemptResultDict:
     return TeleportAttemptResultDict(
         target=_target(),
         teleport_cycle_id=1,
-        status="landed_exact",
+        status=TeleportAttemptStatus.LANDED_EXACT,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1100,
         teleport_started_ms=1200,

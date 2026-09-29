@@ -45,7 +45,7 @@ from tankpit_bot.action_lab.teleport_helpers import (
 from tankpit_bot.action_lab.teleport_phase import (
     run_tracked_teleport_command,
 )
-from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.action_lab.types import TeleportAttemptStatus, TeleportTargetDict
 from tankpit_bot.bot.ai.combat_landing import (
     choose_combat_landing_tile,
     has_cardinal_enemy_adjacency,
@@ -322,7 +322,7 @@ class EnemyTeleportProbe(ProbeBase):
         )
         current_enemy = enemy_teleport_targeting._enemy_by_id(self, enemy["tank_id"])
         self_state_after = self._require_self_state()
-        if teleport_result["status"] == "teleport_timeout":
+        if teleport_result["status"] is TeleportAttemptStatus.TELEPORT_TIMEOUT:
             status: Literal[
                 "landed_adjacent",
                 "landed_not_adjacent",

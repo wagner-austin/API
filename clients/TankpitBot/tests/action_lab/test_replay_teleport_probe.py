@@ -20,7 +20,12 @@ from tests.action_lab._replay_core import ReplayResult
 from tests.action_lab._replay_teleport import replay_teleport_attempt
 
 from tankpit_bot.action_lab.teleport import TeleportProbeError
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportAttemptStatus,
+    TeleportSnapshotPhase,
+    TeleportTargetDict,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TELEPORT_CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
@@ -65,13 +70,8 @@ def test_replay_attempt_records_target(
 def test_replay_attempt_reports_a_resolved_status(
     teleport_attempt: ReplayResult[TeleportAttemptResultDict],
 ) -> None:
-    """The production attempt body reaches one of its declared terminal statuses."""
-    assert teleport_attempt.attempt["status"] in (
-        "landed_exact",
-        "landed_offset",
-        "map_sync_timeout",
-        "teleport_timeout",
-    )
+    """The production attempt body lands exactly on the recorded capture's target."""
+    assert teleport_attempt.attempt["status"] is TeleportAttemptStatus.LANDED_EXACT
 
 
 def test_replay_attempt_records_fuel_before(
@@ -94,13 +94,7 @@ def test_replay_attempt_carries_real_snapshots(
         )
     assert all(s["client_present"] is True for s in snapshots)
     first_phase = snapshots[0]["phase"]
-    assert first_phase in (
-        "before_map_open",
-        "before_teleport",
-        "after_map_data",
-        "landed",
-        "timeout",
-    )
+    assert first_phase is TeleportSnapshotPhase.BEFORE_MAP_OPEN
 
 
 def test_replay_raises_when_cdp_session_unavailable() -> None:
