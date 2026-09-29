@@ -2,10 +2,12 @@
 
 The DI seam chooses WHICH process runs, never whether one does: every
 handle the tests hand the capture code wraps a real ``sys.executable``
-child, so terminate/kill/wait/poll semantics are the operating
-system's own. Only the clocks are injected, because a test that spent
-the real ten-second readiness deadline would cost ten seconds to
-prove one branch.
+child, so terminate/kill/poll semantics are the operating system's own.
+Only the clocks are injected, because a test that spent the real
+ten-second readiness deadline would cost ten seconds to prove one
+branch. Waits are the one exception: a bounded wait is recorded, and
+asserted, instead of spent against the host's load
+(``tests/_capture_process.py`` says why).
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from tankpit_bot.stream.capture import (
 )
 from tankpit_bot.stream.hls import SEGMENT_NAME_PATTERN
 from tankpit_bot.stream.types import StreamConfigDict
+from tests._capture_process import PatientCaptureProcess
 
 
 def _config(hls_dir: Path) -> StreamConfigDict:
@@ -71,7 +74,9 @@ class _SubstitutingSpawner:
     The capture code asks for ``Xvfb``/``ffmpeg``, which do not exist
     on the test host; this seam records that request and runs a
     ``sys.executable`` stand-in through the REAL spawner, so log-file
-    plumbing and process semantics stay production code.
+    plumbing and process semantics stay production code. Each handle
+    is a :class:`PatientCaptureProcess`, so the bound of every wait is
+    recorded for the test to assert.
     """
 
     def __init__(self, argv_per_call: list[list[str]]) -> None:
@@ -83,7 +88,7 @@ class _SubstitutingSpawner:
         self._argv_per_call = argv_per_call
         self.commands: list[list[str]] = []
         self.log_paths: list[Path] = []
-        self.processes: list[stream_hooks.CaptureProcessProtocol] = []
+        self.processes: list[PatientCaptureProcess] = []
 
     def __call__(self, command: list[str], log_path: Path) -> stream_hooks.CaptureProcessProtocol:
         """Record the request and spawn the substitute.
@@ -97,8 +102,10 @@ class _SubstitutingSpawner:
         """
         self.commands.append(command)
         self.log_paths.append(log_path)
-        process = stream_hooks._real_spawn_capture_process(
-            self._argv_per_call[len(self.processes)], log_path
+        process = PatientCaptureProcess(
+            stream_hooks._real_spawn_capture_process(
+                self._argv_per_call[len(self.processes)], log_path
+            )
         )
         self.processes.append(process)
         return process
@@ -444,9 +451,10 @@ class _StuckProcess:
 
     Models a helper stuck past SIGTERM: ``terminate`` does nothing and
     the first ``wait`` reports the timeout the real call would spend
-    five seconds discovering. ``kill`` and the second ``wait`` are the
-    real operations against the real child, so the escalation being
-    tested actually ends a process.
+    five seconds discovering. ``kill`` and the second ``wait`` reach the
+    real child through a :class:`PatientCaptureProcess`, so the
+    escalation being tested actually ends a process, and the bound the
+    second wait carries is recorded for the test to assert.
     """
 
     def __init__(self, process: stream_hooks.CaptureProcessProtocol) -> None:
@@ -517,7 +525,17 @@ class TestStop:
         for name, process in zip(("Xvfb", "ffmpeg"), spawner.processes, strict=True):
             if process.poll() is None:
                 raise AssertionError(f"{name} stand-in still running after stop()")
+        # Each helper was waited on once, with the production bound: the
+        # polite end, never the escalation.
+        assert [process.wait_timeouts for process in spawner.processes] == [
+            [PROCESS_END_TIMEOUT_SECONDS],
+            [PROCESS_END_TIMEOUT_SECONDS],
+        ]
         capture.stop()  # nothing to do, nothing to raise
+        assert [process.wait_timeouts for process in spawner.processes] == [
+            [PROCESS_END_TIMEOUT_SECONDS],
+            [PROCESS_END_TIMEOUT_SECONDS],
+        ]
 
     def test_stop_with_nothing_started_is_a_noop(self, tmp_path: Path) -> None:
         """A capture that never started stops cleanly."""
@@ -530,25 +548,31 @@ class TestStop:
         root_hooks.path_exists = lambda path: True
         capture = DisplayCapture(_config(tmp_path / "hls"))
         capture.start_display()
-        spawner.processes[0].wait(30.0)
+        spawner.processes[0].wait()
 
         capture.stop()
 
         assert spawner.processes[0].poll() == 0
+        # The test's own wait is the only one: stop neither signalled
+        # nor waited on a helper that had already ended.
+        assert spawner.processes[0].wait_timeouts == [None]
 
     def test_a_helper_that_ignores_terminate_is_killed(
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """SIGTERM refusal escalates to SIGKILL and still ends the child."""
         real_holder: list[_StuckProcess] = []
+        inner_holder: list[PatientCaptureProcess] = []
 
         def stuck_spawner(
             command: list[str], log_path: Path
         ) -> stream_hooks.CaptureProcessProtocol:
             del command
-            stuck = _StuckProcess(
+            inner = PatientCaptureProcess(
                 stream_hooks._real_spawn_capture_process(_sleeper_argv(), log_path)
             )
+            stuck = _StuckProcess(inner)
+            inner_holder.append(inner)
             real_holder.append(stuck)
             return stuck
 
@@ -564,3 +588,6 @@ class TestStop:
         assert real_holder[0].kills == 1
         if real_holder[0].poll() is None:
             raise AssertionError("the stuck helper survived the kill escalation")
+        # The wait after the kill reached the real child with the
+        # production bound, recorded rather than spent.
+        assert inner_holder[0].wait_timeouts == [PROCESS_END_TIMEOUT_SECONDS]
