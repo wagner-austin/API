@@ -286,8 +286,10 @@ def retire_replies() -> list[_test_hooks.CommandResult]:
     """Every command a retire runs, in order (:mod:`fleet.core.retire`).
 
     Named for the same reason :func:`dispatch_replies` is: every settle and
-    every stop now ends with these two calls, and a bare pair of ``ok("")``
-    at the end of a list does not say which step it answers.
+    every stop now ends with these calls, the retire script and then the
+    virtualenv sweep (:mod:`fleet.core.venv_sweep`), each sent and run, and
+    a bare run of ``ok("")`` at the end of a list does not say which step it
+    answers.
 
     Returns:
         One result per call.
@@ -295,6 +297,8 @@ def retire_replies() -> list[_test_hooks.CommandResult]:
     return [
         ok(""),  # retire: send the script
         ok(""),  # retire: run it
+        ok(""),  # venv sweep: send the script (MCPs board task 7b07c5d2)
+        ok("venv-sweep: removed 0 of 0 (0 MB)\n"),  # venv sweep: run it
     ]
 
 

@@ -77,7 +77,9 @@ def test_a_job_cancelled_while_it_launched_is_stopped_and_the_tick_succeeds(
     assert endpoint.arguments[3] == {"jobId": DEFAULT_JOB_ID}
     # Every scripted reply was consumed: the launch, then the stop and the
     # retire of the run it launched.
-    assert len(runner.calls) == len(claim_replies("x", commit_present=True)) + 4
+    assert len(runner.calls) == len(claim_replies("x", commit_present=True)) + 2 + len(
+        retire_replies()
+    )
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
     last = records.read_ledger(loaded.ledger)[-1]
     assert (last["run_id"], last["outcome"]) == (DEMO_RUN_ID, "cancelled")

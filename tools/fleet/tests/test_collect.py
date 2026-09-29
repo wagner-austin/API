@@ -200,9 +200,21 @@ class TestTheWiring:
         assert [row["outcome"] for row in rows] == ["running", "passed"]
         assert rows[-1]["exit_code"] == 0
         # The run's directory is retired, by a script sent to the stage root
-        # and run there, before the row closes.
+        # and run there, then the orphaned virtualenvs are swept by a second
+        # (MCPs board task 7b07c5d2), both before the row closes.
         retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
-        assert [retire_path in " ".join(call) for call in node.calls] == [False, False, True, True]
+        sweep_path = "C:/fleet/stage/fleet-venv-sweep.ps1"
+        touched = [
+            (retire_path in " ".join(call), sweep_path in " ".join(call)) for call in node.calls
+        ]
+        assert touched == [
+            (False, False),
+            (False, False),
+            (True, False),
+            (True, False),
+            (False, True),
+            (False, True),
+        ]
         assert [event["kind"] for event in records.read_feed(loaded.feed)] == [
             "leased",
             "staged",
