@@ -105,13 +105,18 @@ def exhausted_collect_outcome(
         base_state: Base AI state to rewrite for a walk decision.
 
     Returns:
-        ``None`` to hand the tick to hunt, or a walk decision.
+        ``None`` to hand the tick to hunt (or, winding down, to end
+        the session), or a walk decision.
 
     Raises:
         SessionExitError: When the session has no productive action.
     """
     if ctx.fuel > ctx.fuel_low_floor:
         if ctx.config["role"] is FleetRole.GATHERER:
+            if ctx.ai_state["wind_down"]:
+                # Nothing to wait for: the owner ends the session
+                # session_complete (board task e956e3c8).
+                return None
             # A gatherer CANNOT hunt by role, not by shortage
             # ([[fleet-coordination]]) -- an exhausted cascade is
             # "done here", never "marooned". Hold one window as a
