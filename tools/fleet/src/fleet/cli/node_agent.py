@@ -225,7 +225,8 @@ def ready_state(
             seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
             _log.info("%s did not answer, and %s", alias, seen)
         return None
-    full = capacity.room_for_any(node, state)
+    projects = tuple(loaded.workspace["projects"].values())
+    full = capacity.room_for_any(node, state, projects, runner_tags(node, elevated=elevated))
     if full is not None:
         _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
         return None
