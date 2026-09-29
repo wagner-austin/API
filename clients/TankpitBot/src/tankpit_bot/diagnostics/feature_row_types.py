@@ -53,7 +53,9 @@ class FeatureRowDict(TypedDict):
             a retry.
         hop_declined: Count of declined hop lanes on the tick.
         radar_dispatch: Count of radar dispatches on the tick.
-        container_pickup_dispatched: Count of pickups dispatched.
+        container_pickup_dispatched: Count of 0x43 cache updates observed,
+            from any tank's pickup or deposit in the room, not this
+            bot's own pickups.
         plan_released: Count of plan releases.
         command_error: Count of command errors.
         fleet_knowledge_merged: Count of fleet knowledge merges.

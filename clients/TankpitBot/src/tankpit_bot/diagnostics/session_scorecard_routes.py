@@ -188,7 +188,12 @@ def _route_metrics_diagnostic(
     record: RuntimeEventRecordDict,
     accumulator: ScorecardAccumulatorDict,
 ) -> None:
-    """Route career-stats and pickup-tally diagnostics into the scorecard accumulator.
+    """Route scope-shift and career-stats diagnostics into the scorecard accumulator.
+
+    The bot's own pickups are counted by their receipts in
+    ``action_outcome_counts`` (``collect:*``). A ``container_pickup_dispatched``
+    record is not routed here: it is the 0x43 broadcast any tank in the
+    room triggers (board task 7aa719fd).
 
     Split out of :func:`route_scorecard_diagnostic` to keep the
     primary router under the C901 complexity ceiling.
@@ -208,12 +213,6 @@ def _route_metrics_diagnostic(
         accumulator["career_playtime_seconds_last"] = require_int_field(
             record["fields"], "playtime_seconds_total"
         )
-        return
-    if kind == "container_pickup_dispatched":
-        if record["fields"].get("is_partial") is True:
-            accumulator["container_pickups_partial"] += 1
-        else:
-            accumulator["container_pickups_full"] += 1
 
 
 def _route_combat_diagnostic(
