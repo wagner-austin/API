@@ -77,7 +77,7 @@ from collections.abc import Sequence
 
 from board_watch import config as board_config
 from platform_core import cli_args
-from platform_core.error_codes_tooling import FleetErrorCode
+from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging

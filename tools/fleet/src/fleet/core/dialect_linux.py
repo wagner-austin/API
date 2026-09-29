@@ -31,6 +31,7 @@ from __future__ import annotations
 import posixpath
 import shlex
 
+from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.project import MAKE_TARGET
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
@@ -95,6 +96,15 @@ CAPACITY_PROBE_SCRIPT = (
 #: does not fire there: as a bare assignment, a ``sudo`` refusing for want
 #: of a password ended the whole probe with exit 1 (measured as execdocker on
 #: diphtheria, 2026-09-29, MCPs board task a8ee9b21), not the ``no`` line.
+#:
+#: THE ``stack`` LINE ASKS THE PATH's DAEMON, the one the stack suites'
+#: ``docker run`` reaches, and answers its ServerVersion only when that
+#: daemon holds :data:`fleet.contracts.capability.STACK_NETWORK` and every
+#: one of the images in ``STACK_IMAGES`` (MCPs board task 554bffc1). Its
+#: three asks are one ``if`` condition for the same ``set -e`` reason, so a
+#: node with no docker, no network or one image missing answers
+#: ``stack=no=``. Measured 2026-09-29: diphtheria holds all four on 29.8.1,
+#: and lavender-wsl's daemon has no ``mcp-network``.
 TOOLCHAIN_PROBE_SCRIPT = (
     PROLOGUE + "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -124,6 +134,13 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "  esac\n"
     "else\n"
     "  printf 'docker=no=\\n'\n"
+    "fi\n"
+    f"if docker network inspect {STACK_NETWORK} > /dev/null 2>&1 &&"
+    f" docker image inspect {' '.join(STACK_IMAGES)} > /dev/null 2>&1 &&"
+    " v=\"$(docker version --format '{{.Server.Version}}' 2>/dev/null)\"; then\n"
+    "  printf 'stack=yes=%s\\n' \"$v\"\n"
+    "else\n"
+    "  printf 'stack=no=\\n'\n"
     "fi\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"

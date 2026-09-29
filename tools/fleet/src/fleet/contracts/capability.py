@@ -21,6 +21,16 @@ the whole tree and before any test runs:
   ``scripts/host/lib/fleet-exec-docker.sh`` on every docker node), never
   the daemon the node's own account uses. The version is that daemon's own
   ``ServerVersion``, reported only when the daemon also says it is rootless.
+- ``stack`` (MCPs board task 554bffc1). doc-extract-api, transcriber-api
+  and pg-backup-sidecar each run, inside their own ``make check``, a test
+  that starts one of the corvis compose stack's images on its network
+  (:data:`STACK_IMAGES`, :data:`STACK_NETWORK`). They passed only while
+  diphtheria, which builds and runs that stack, was the one testdb node; on
+  2026-09-29 lavender-wsl became the second, ran doc-extract-api at MCPs
+  b55aa8ce8 and failed two such tests where ``docker run`` exited 125 for
+  want of the image and the network. The version is the ServerVersion of
+  the daemon the node's own account reaches, reported only when that daemon
+  has the network and every one of the images.
 
 A project that needs one requires the tag of the same name
 (:mod:`fleet.contracts.tags`), and a node carries it when its declaration
@@ -55,18 +65,35 @@ class Capability(StrEnum):
     RUST = "rust"
     CXX = "cxx"
     DOCKER = "docker"
+    STACK = "stack"
 
+
+#: The network the stack's containers share, which the three suites'
+#: ``docker run --network`` names.
+STACK_NETWORK: Final = "mcp-network"
+
+#: The stack images a suite starts in its own ``make check``: doc-extract-api's
+#: ``tests/test_docker_integration/_helpers.py``, transcriber-api's
+#: ``tests/test_docker_integration.py`` and pg-backup-sidecar's
+#: ``tests/entry.docker.integration.test.ts``, in that order.
+STACK_IMAGES: Final[tuple[str, ...]] = (
+    "mcps-doc-extract-worker:latest",
+    "mcps-transcriber-worker:latest",
+    "mcps-pg-backup-sidecar:latest",
+)
 
 #: The probe line each capability is read from. ``cargo`` is the tool's own
 #: name because maturin builds with it; ``cxx`` is a synthetic line, since the
 #: toolchain node-gyp finds is not one executable on both platforms (vswhere's
 #: VC tools component on Windows, ``g++ -dumpfullversion`` on Linux); so is
 #: ``docker``, whose answer is the rootless execdocker daemon's, not whatever
-#: ``docker`` on the runner's PATH would reach.
+#: ``docker`` on the runner's PATH would reach; and so is ``stack``, whose
+#: answer is that PATH daemon's, and only when it holds the stack.
 PROBE_NAME: Final[dict[Capability, str]] = {
     Capability.RUST: "cargo",
     Capability.CXX: "cxx",
     Capability.DOCKER: "docker",
+    Capability.STACK: "stack",
 }
 
 #: What refuses a node whose declaration disagrees with its probe.
@@ -74,6 +101,7 @@ MISMATCH_CODE: Final[dict[Capability, FleetErrorCode]] = {
     Capability.RUST: FleetErrorCode.NODE_RUST_MISMATCH,
     Capability.CXX: FleetErrorCode.NODE_CXX_MISMATCH,
     Capability.DOCKER: FleetErrorCode.NODE_DOCKER_MISMATCH,
+    Capability.STACK: FleetErrorCode.NODE_STACK_MISMATCH,
 }
 
 #: Where a declared version is read, for the decode refusal.
@@ -86,6 +114,10 @@ _SOURCE: Final[dict[Capability, str]] = {
     Capability.DOCKER: (
         "the execdocker user's rootless daemon reports as its ServerVersion, e.g. '29.8.1'"
     ),
+    Capability.STACK: (
+        f"the node account's docker daemon reports as its ServerVersion while it holds "
+        f"{STACK_NETWORK} and {', '.join(STACK_IMAGES)}, e.g. '29.8.1'"
+    ),
 }
 
 #: What goes wrong when a node carries a tag it cannot honour.
@@ -95,6 +127,10 @@ _CONSEQUENCE: Final[dict[Capability, str]] = {
     Capability.DOCKER: (
         "a deploy suite claimed on it would have no daemon it may use, and must never use the "
         "stack's"
+    ),
+    Capability.STACK: (
+        "a suite that starts the stack's images claimed on it would fail where docker run "
+        "finds neither the image nor the network"
     ),
 }
 
@@ -113,7 +149,7 @@ def _version_in(capability: Capability, answer: str) -> str | None:
     Returns:
         The version, or None when the answer is not of the expected shape.
         cargo's is its SECOND word, because the last is its build date;
-        the ``cxx`` and ``docker`` lines carry the bare version.
+        the ``cxx``, ``docker`` and ``stack`` lines carry the bare version.
     """
     words = answer.split()
     if capability is Capability.RUST:
@@ -201,6 +237,8 @@ def decode_capability(capability: Capability, value: JSONValue) -> str | None:
 __all__ = [
     "MISMATCH_CODE",
     "PROBE_NAME",
+    "STACK_IMAGES",
+    "STACK_NETWORK",
     "VERSION",
     "Capability",
     "capability_gap",

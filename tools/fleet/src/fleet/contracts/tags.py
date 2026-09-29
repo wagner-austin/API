@@ -42,8 +42,14 @@ because MCPs/execution-deploy runs the real make deploy and, on the
 operator's ruling of 2026-09-27, may only do so on a rootless daemon under a
 user outside the docker group, never the stack's (MCPs board task
 6c4516af): the tag means the node declares that daemon's version, which its
-probe reads only when the daemon says it is rootless. All three are
-:mod:`fleet.contracts.capability`. ``elevated`` because MCPs' Task Scheduler
+probe reads only when the daemon says it is rootless. ``stack`` because
+three MCPs suites start the corvis compose stack's own images on its network
+inside their ``make check``, and on 2026-09-29 lavender-wsl, the second
+testdb node, failed them where ``docker run`` found neither (MCPs board task
+554bffc1): the tag means the node declares the version of the daemon its own
+account reaches, which its probe reads only while that daemon holds the
+network and the images. All four are :mod:`fleet.contracts.capability`.
+``elevated`` because MCPs' Task Scheduler
 installers register what only an administrator may register, and every
 build launches as an S4U task at RunLevel Limited (MCPs board task
 a98d7083): the tag means the node declares ``elevated`` and runs a SECOND
@@ -78,8 +84,8 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571 and 615) is the same eight words as these members' values, in
-    this order.
+    570, 571, 615 and 622) is the same nine words as these members' values,
+    in this order.
     """
 
     WINDOWS = "windows"
@@ -90,6 +96,7 @@ class NodeTag(StrEnum):
     CXX = "cxx"
     DOCKER = "docker"
     ELEVATED = "elevated"
+    STACK = "stack"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -105,6 +112,7 @@ _CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.RUST: NodeTag.RUST,
     Capability.CXX: NodeTag.CXX,
     Capability.DOCKER: NodeTag.DOCKER,
+    Capability.STACK: NodeTag.STACK,
 }
 
 
@@ -117,8 +125,8 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
     Returns:
         Its platform, plus ``gpu`` when the node declares a CUDA device,
         ``testdb`` when it declares the fleet test database, ``elevated``
-        when it declares an elevated runner, and ``rust``, ``cxx`` or
-        ``docker`` for each capability it declares a version of.
+        when it declares an elevated runner, and ``rust``, ``cxx``,
+        ``docker`` or ``stack`` for each capability it declares a version of.
     """
     tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
@@ -187,7 +195,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
         "fleet test database, a Rust or C++ toolchain, the execution suite's rootless "
-        "Docker daemon, or an elevated runner), and one it does not carry could "
+        "Docker daemon, an elevated runner, or the corvis compose stack), and one it does "
+        "not carry could "
         "never be satisfied"
     )
 

@@ -44,7 +44,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Final, TypedDict
 
-from platform_core.error_codes_tooling import FleetErrorCode
+from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials

@@ -27,7 +27,7 @@ import re
 from datetime import datetime
 from enum import StrEnum
 
-from platform_core.error_codes_tooling import FleetErrorCode
+from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_core.members import find_member

@@ -56,7 +56,8 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
 
     Returns:
         One report per line naming a required tool, a package manager, a
-        declared toolchain's probe line (``cargo``, ``cxx``, ``docker``) or
+        declared toolchain's probe line (``cargo``, ``cxx``, ``docker``,
+        ``stack``) or
         the session's token (``integrity``, :mod:`fleet.contracts.elevation`),
         in the order the node emitted them. Empty when no line did.
     """
@@ -197,8 +198,9 @@ def readiness_gap(
         ``NODE_PYTHON_MISMATCH`` when everything is present but the
         interpreter is the wrong minor version, or ``NODE_NODEJS_MISMATCH``
         when Node.js is older than :data:`REQUIRED_NODE_MAJOR`, or
-        ``NODE_RUST_MISMATCH`` / ``NODE_CXX_MISMATCH`` when the node declares
-        a toolchain version its probe does not report
+        ``NODE_RUST_MISMATCH`` / ``NODE_CXX_MISMATCH`` /
+        ``NODE_DOCKER_MISMATCH`` / ``NODE_STACK_MISMATCH`` when the node
+        declares a toolchain version its probe does not report
         (:func:`fleet.contracts.capability.capability_gap`). Separate codes
         because the fixes differ: one is a package manager, the others are
         a decision about which runtime that machine should carry, and the

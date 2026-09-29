@@ -148,6 +148,12 @@ class NodeConfig(TypedDict):
             None. Gives the ``docker`` tag the MCPs deploy suite requires,
             so it runs on a daemon that cannot reach the stack's; required
             and re-measured like ``rust`` (MCPs board task 6c4516af).
+        stack: The ServerVersion of the daemon the node's own account
+            reaches, read only while that daemon holds the corvis stack's
+            network and images (:data:`fleet.contracts.capability.STACK_IMAGES`),
+            or None. Gives the ``stack`` tag the suites that start those
+            images require; required and re-measured like ``rust`` (MCPs
+            board task 554bffc1).
         elevated: Whether the node runs a second, ELEVATED runner, whose
             builds launch at RunLevel Highest for suites that register what
             only an administrator may (MCPs board task a98d7083). True gives
@@ -178,6 +184,7 @@ class NodeConfig(TypedDict):
     rust: str | None
     cxx: str | None
     docker: str | None
+    stack: str | None
     elevated: bool
     wsl_host: str | None
     budget: NodeBudget
@@ -279,6 +286,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "rust": node["rust"],
         "cxx": node["cxx"],
         "docker": node["docker"],
+        "stack": node["stack"],
         "elevated": node["elevated"],
         "wsl_host": node["wsl_host"],
         "budget": encode_node_budget(node["budget"]),
@@ -350,6 +358,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         rust=decode_capability(Capability.RUST, value["rust"]),
         cxx=decode_capability(Capability.CXX, value["cxx"]),
         docker=decode_capability(Capability.DOCKER, value["docker"]),
+        stack=decode_capability(Capability.STACK, value["stack"]),
         elevated=elevated,
         wsl_host=_decode_wsl_host(value, platform),
         budget=decode_node_budget(require_dict(value, "budget")),
@@ -370,7 +379,9 @@ def declared_capability(node: NodeConfig, capability: Capability) -> str | None:
         return node["rust"]
     if capability is Capability.CXX:
         return node["cxx"]
-    return node["docker"]
+    if capability is Capability.DOCKER:
+        return node["docker"]
+    return node["stack"]
 
 
 def decode_node_platform(value: str) -> NodePlatform:
