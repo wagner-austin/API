@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
 from tankpit_bot.runtime_artifacts import (
+    bot_stop_file,
     build_bot_run_artifacts,
     build_probe_run_artifacts,
     build_sniff_run_artifacts,
@@ -41,6 +44,14 @@ def test_instance_namespaces_every_bot_artifact() -> None:
     assert artifacts["latest_log_path"] == "runs\\bot\\alpha\\latest.log"
     assert artifacts["archive_log_path"] == "runs\\bot\\alpha\\bot-20260331-230405.log"
     assert artifacts["latest_capture_path"] == "runs\\bot\\alpha\\latest.capture_session.json"
+
+
+def test_the_stop_sentinel_sits_beside_the_run_log() -> None:
+    """One stop file per instance, in the directory the bot's own log names."""
+    for instance in ("", "alpha"):
+        artifacts = build_bot_run_artifacts("20260331-230405", instance)
+        assert bot_stop_file(instance) == Path(artifacts["latest_log_path"]).parent / "STOP"
+    assert bot_stop_file("alpha") == Path("runs/bot/alpha/STOP")
 
 
 def test_resolve_bot_instance_env_contract() -> None:
