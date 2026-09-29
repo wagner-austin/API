@@ -10,6 +10,8 @@ source_git_blobs:
   "src/tankpit_bot/state": "3d5819f5304e97e195d8f0fa44ae930ced2ce573"
 provenance:
   - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/probe -- gitignored probe capture artifacts (the page snapshots behind the bookkeeping-field table)"
+  - "tpclient.js -- gitignored copy of the game client, build saved 2026-09-02 (the bookkeeping-field readings)"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [protocol]
@@ -79,11 +81,35 @@ them only fit it:
 
 Dead or departed tanks keep their last drawn state for minutes. Not distinguishable by any captured field. Working defense: shot-response check (miss on stationary target at range → block on kill cooldown; miss on mover → re-aim). Open crack: wire-traffic presence (live tanks generate wire messages; stale entries don't).[^3]
 
-## Unverified fields
+## Client bookkeeping fields
 
-`o.x/o.y/o.w/o.h` (viewport bounds?), `v.0..v.8`, `aa` (self constant 62913), `$`/`active` (flip on live self), `direction` (values 0-32; facing?), `W`/`Y`/`m` (inert). Wire-score path (0x3E) is CLOSED — never sent by practice server.[^3]
+The rest of an entry's fields belong to the client's tank class `Xc`. Each
+reading below comes from the code that writes the field, and each was then
+checked against 6,358 registry entries in 86 page snapshots from three probe
+runs.[^fields]
+
+| Field | Meaning | Evidence |
+|-------|---------|----------|
+| `aa` | **persistent tank id**, the website's profile id; it outlives the per-session tank id | `zg` links a name to `/tanks/profile?tank_id=` + `aa` only when `aa` ≥ 500, and TankInfo (0x21) and TankStatusFull (0x3E) set it from a 24-bit id (see [[v-table-complete]]). Captured: Artax is 62913 under session ids 601 and 1301, Arterial 63008, another player 104156, practice bots 1-36 by colour slot, and no id ever carried two values[^fields] |
+| `v.0`..`v.8` | **decoration slots**, one award level 0-3 each | `Xc.v` is a 9-byte array; `ed` draws the ribbons and `Ff` names slot c at level d as `nb[3c+d-1]`. Captured values: only 0, 1, 2 and 3[^fields] |
+| `o.x`, `o.y`, `o.w`, `o.h` (and `o.j`) | **erase rectangle**: the canvas pixels the tank was last drawn into, -1 with `o.j` false when nothing is drawn. Not viewport bounds | `$e` and `ef` merge each sprite into it through `Ic`, with a 1 px margin; `Xc.prototype.ra` clears exactly that rectangle and resets it through `Jc`. Captured: 159 of 161 drawn rectangles were exactly 30x22 at (24(j-1)-3, 16(i-1)-5), the 28x20 sprite plus that margin; the other 2 were larger merged rectangles (30x29)[^fields] |
+| `$` | **drawn on the canvas** | set by the tank's draw (`Xc.prototype.sa`, and `Re.prototype.sa` mid-move), cleared by the erase, whose error text prints it ("Bad erase (d ..."). Captured: equal to `o.j` in all 6,358 entries[^fields] |
+| `active` | **a movement animation is running** for this tank | `Re.start` sets it and `Re.Ma` clears it. The `G` handler (`Lg.prototype.h`) creates an `Re` per move for any tank, and the redraw pass `qd` refuses an active tank ("Tried to draw active tank."). Captured: true in 2 of 6,358 entries, both drawn[^fields] |
+| `m` | **needs a static redraw** | set when the facing changes and on deactivation; `qd` erases, redraws and clears it in the same frame. Captured: false in all 6,358 entries, as a flag cleared within its own frame would read[^fields] |
+| `direction` | **facing**: low nibble is a 16-point compass index; 32 or 33 is the corpse sprite; -1 is unset | the move animation writes `(direction & 240) + (heading & 15)`, and the deactivation handler (`V.A`, `Pg.prototype.h`) writes 33 when the high nibble was set, else 32. Captured: -1, 3, 4, 5 and 8, all with high nibble 0[^fields] |
+| `W` | **direction of the carried obstacle**: 0 for none, or ASCII 110/101/115/119 for n/e/s/w | `We` sets it and flags the neighbouring tile in that direction; deactivation zeroes it. Captured: 0 in all 6,358 entries[^fields] |
+| `Y` | **carrying an obstacle** | set from byte 11 of the `G` move message (`1 === a[11]`). Captured: false in all 6,358 entries[^fields] |
+
+The captures confirm the rectangle, the drawn flag, the animation flag and the
+persistent id. No captured tank was carrying, dead, or caught between a
+facing change and its redraw. So `W`, `Y`, `m` and the corpse values 32/33 of
+`direction` were never seen set, and those four readings rest on the client
+code alone.[^fields]
+
+The wire-score path (0x3E) is closed: the practice server never sends it.[^3]
 
 [^1]: run 20260611-004505 — full registry field verification; damage tier matched 5/5 transitions; viewport position matched motion
 [^2]: run 20260611-004505 — panel rank_points exact match; persistence across death verified on purple-3
 [^3]: run 20260611-110445 + 013801 + 003415 — P/U, l, practice-bot theories tested and retracted
+[^fields]: Decoded 2026-09-29 for board task 8b8e5725 from `tpclient.js` (the client build saved 2026-09-02; beautified, its 7,664 lines are identical to the 2026-06-19 copy `tpclient.pretty.js`). Functions: `Xc` (constructor), `Hc`/`Ic`/`Jc` (rectangle), `Xc.prototype.ra` (erase), `Xc.prototype.sa` (draw at 24(j-1)-2, 16(i-1)-4), `$e`/`ef` (sprite helpers), `qd` (redraw pass), `Re.start`/`Re.Ma` (movement animation), `Lg.h`/`Lg.prototype.h` (`V.G`), `Pg.prototype.h` (`V.A`, deactivation), `We` (carry), `ed`/`Ff` (decorations), `zg` (profile link). Measured on every `world_collections["P.j"]` entry of `runs/bot/enemy_teleport_probe.json` (40 snapshots, 2026-06-13), `runs/probe/burst-probe2-20260826.json` (40, 2026-08-26) and `runs/probe/coast_test.movement_probe.json` (6, 2026-07-26): 6,358 entries across 112 tank ids.
 [^leaderboard]: Measured 2026-09-01 from `runs/bot/*/*.events.jsonl` `session_account_stats` records across seven instances. The identical-state pair is artax recruit 0 kills / 0 promo → 28946 (20:30:33) and arterial recruit 0 kills / 0 promo → 28952 (20:30:50), both 2026-08-28. The worsening-with-kills pair is arterial sergeant 148 kills → 12055 (2026-08-28) and 149 kills → 12060 (2026-09-01). Per-tank spread on one account, same day: artax private 1933 kills → 18, artax captain 691 kills → 4562, artax recruit 0 kills → 28946. Supersedes the 2026-08-05 countdown reading this page carried; the operator named it a leaderboard the same day the measurement was taken. The registry writer that consumes `s` is `apply_tank_observation` at `src/tankpit_bot/state/tank_mutations.py:28`. Field renamed `rank_number` → `leaderboard_position` across the code the same day.
