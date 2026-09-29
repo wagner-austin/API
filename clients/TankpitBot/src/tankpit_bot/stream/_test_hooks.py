@@ -37,11 +37,14 @@ class CaptureProcessProtocol(Protocol):
         """End the process unconditionally (SIGKILL)."""
         ...
 
-    def wait(self, timeout: float) -> int:
+    def wait(self, timeout: float | None = None) -> int:
         """Block until exit and return the exit code.
 
         Args:
-            timeout: Seconds to wait before giving up.
+            timeout: Seconds to wait before giving up, or None to wait
+                until the process ends. A test reaping a child it killed
+                passes None, because the kill guarantees the end and only
+                the host's load sets how long it takes.
 
         Returns:
             The exit code.
