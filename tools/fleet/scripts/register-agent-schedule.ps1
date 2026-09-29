@@ -20,10 +20,10 @@
     within one bake-length of being asked for. A tick against an empty
     queue is two HTTP calls.
 
-    The account, logon type, triggers, IgnoreNew and the forty-minute limit
-    are FleetSchedule.ps1's, with the incidents behind each. mcps-manager-audit
-    has run PowerShell as an S4U task every 30 minutes since 2026-09-05 and
-    exits 0, which is the precedent for the action.
+    The action (poetry.exe running fleet.cli.tick's hub lane, never
+    powershell.exe), the account, logon type, triggers, priority, IgnoreNew
+    and the forty-minute limit are FleetSchedule.ps1's, with the incidents
+    behind each.
 
     Idempotent: re-running unregisters + re-registers, so this serves as
     both install and refresh.
@@ -33,8 +33,16 @@
 .PARAMETER TaskName
     The task's name.
 
-.PARAMETER Tick
-    The script the task runs; empty means run-agent-tick.ps1 beside this one.
+.PARAMETER ApiRoot
+    The API checkout the tick runs from; empty means the one this script is
+    in.
+
+.PARAMETER LogDirectory
+    Where the tick's daily log goes.
+
+.PARAMETER Poetry
+    The poetry the action runs: a name on this console's PATH or a path,
+    registered as its absolute path.
 
 .PARAMETER Register
     Registers the task: FleetSchedule.ps1's Register-FleetTick. The suite
@@ -44,25 +52,32 @@
 .NOTES
     The default is resolved in the body, not the param block, because
     $PSScriptRoot is empty in an advanced script's param default under -File
-    in Windows PowerShell 5.1; run-agent-tick.ps1 carries the incident.
+    in Windows PowerShell 5.1: the scheduled ticks' old PowerShell entry
+    lost its root that way, and every tick from 16:27Z on 2026-09-27 exited
+    1 (MCPs board task d69786fa).
 #>
 [CmdletBinding()]
 param(
     [string]$TaskName = 'API-FleetAgent-3min',
-    [string]$Tick = '',
+    [string]$ApiRoot = '',
+    [string]$LogDirectory = "$env:LOCALAPPDATA\Temp\claude",
+    [string]$Poetry = 'poetry',
     [scriptblock]$Register = {
-        param([string]$TaskName, [string]$Tick, [string]$TickArguments, [string]$Description)
-        Register-FleetTick -TaskName $TaskName -Tick $Tick -TickArguments $TickArguments -Description $Description
+        param([string]$TaskName, [string]$Poetry, [string]$FleetRoot, [string]$Arguments, [string]$Description)
+        Register-FleetTick -TaskName $TaskName -Poetry $Poetry -FleetRoot $FleetRoot -Arguments $Arguments -Description $Description
     }
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'FleetSchedule.ps1')
 
-if ($Tick -eq '') {
-    $Tick = "$PSScriptRoot\run-agent-tick.ps1"
+if ($ApiRoot -eq '') {
+    $ApiRoot = "$PSScriptRoot\..\..\.."
 }
+$apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
+$poetry = Resolve-FleetPoetry $Poetry
+$arguments = Get-FleetTickCommandLine -ApiRoot $apiRoot -LogDirectory $LogDirectory -Lane hub -Node ''
 
-$identity = & $Register $TaskName $Tick '' `
+$identity = & $Register $TaskName $poetry (Join-Path $apiRoot 'tools\fleet') $arguments `
     'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.'
 Write-Information "Registered $TaskName (every 3 minutes and at boot, $identity, S4U, Limited)." -InformationAction Continue

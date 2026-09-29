@@ -15,13 +15,14 @@
     tags it carries. Two checks submitted together are claimed by two
     runners within one tick.
 
-    THE SAME REGISTRATION AS THE HUB'S, DELIBERATELY: the operator's account
-    (ssh keys, docker credentials, poetry), S4U at RunLevel Limited (the
-    reasons are in register-agent-schedule.ps1 and hold unchanged), boot plus
-    an indefinite 3-minute repetition, IgnoreNew, and an ExecutionTimeLimit
-    in minutes that ends a tick which escaped every command's own deadline.
-    Forty minutes, as the hub's: a node tick's longest command is a
-    ten-minute fetch, then staging and the ssh calls at 120 s each.
+    THE SAME REGISTRATION AS THE HUB'S, DELIBERATELY, and FleetSchedule.ps1
+    carries each part's reason: poetry.exe running fleet.cli.tick (here its
+    node lane), never powershell.exe; the operator's account (ssh keys,
+    docker credentials, poetry) under S4U at RunLevel Limited; boot plus an
+    indefinite 3-minute repetition; priority 4; IgnoreNew; and an
+    ExecutionTimeLimit that ends a tick which escaped every command's own
+    deadline. Forty minutes, as the hub's: a node tick's longest command is
+    a ten-minute fetch, then staging and the ssh calls at 120 s each.
 
     THE LIST IS READ FROM fleet.json, NOT WRITTEN HERE. A node enabled in the
     registry gets a task; a task whose node is no longer enabled (or no
@@ -41,7 +42,7 @@
 
     EACH NEW RUNNER ANNOUNCES ITSELF ONCE: the first thing a freshly
     registered task's runner needs is a session on the board's ledger (MCPs
-    mig 530), so this script runs the tick with -Announce for every node it
+    mig 530), so this script runs the tick's announce lane for every node it
     registers, synchronously, before the schedule's first fire. The check-in
     names the node and the tags it carries.
 
@@ -58,12 +59,16 @@
 .PARAMETER TaskPrefix
     What every node task's name starts with, before the alias.
 
-.PARAMETER Tick
-    The script each node task runs, and the announce runs once; empty means
-    run-node-agent-tick.ps1 beside this one.
+.PARAMETER ApiRoot
+    The API checkout the ticks run from; empty means the one this script is
+    in.
 
-.PARAMETER PowerShell
-    The powershell.exe the announce runs in.
+.PARAMETER LogDirectory
+    Where each tick's daily log goes.
+
+.PARAMETER Poetry
+    The poetry the actions and the announce run: a name on this console's
+    PATH or a path, registered as its absolute path.
 
 .PARAMETER Register
     Registers one node's task: FleetSchedule.ps1's Register-FleetTick. The
@@ -74,18 +79,19 @@
     The defaults naming this script's directory are resolved in the body,
     not the param block, because $PSScriptRoot is empty in an advanced
     script's param default under -File in Windows PowerShell 5.1;
-    run-agent-tick.ps1 carries the incident.
+    register-agent-schedule.ps1 carries the incident.
 #>
 [CmdletBinding()]
 param(
     [string]$Workspace = '',
     [switch]$UnregisterAll,
     [string]$TaskPrefix = 'API-FleetNode-',
-    [string]$Tick = '',
-    [string]$PowerShell = "$PSHOME\powershell.exe",
+    [string]$ApiRoot = '',
+    [string]$LogDirectory = "$env:LOCALAPPDATA\Temp\claude",
+    [string]$Poetry = 'poetry',
     [scriptblock]$Register = {
-        param([string]$TaskName, [string]$Tick, [string]$TickArguments, [string]$Description)
-        Register-FleetTick -TaskName $TaskName -Tick $Tick -TickArguments $TickArguments -Description $Description
+        param([string]$TaskName, [string]$Poetry, [string]$FleetRoot, [string]$Arguments, [string]$Description)
+        Register-FleetTick -TaskName $TaskName -Poetry $Poetry -FleetRoot $FleetRoot -Arguments $Arguments -Description $Description
     }
 )
 Set-StrictMode -Version Latest
@@ -95,9 +101,11 @@ $ErrorActionPreference = 'Stop'
 if ($Workspace -eq '') {
     $Workspace = "$PSScriptRoot\..\fleet.json"
 }
-if ($Tick -eq '') {
-    $Tick = "$PSScriptRoot\run-node-agent-tick.ps1"
+if ($ApiRoot -eq '') {
+    $ApiRoot = "$PSScriptRoot\..\..\.."
 }
+$apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
+$fleetRoot = Join-Path $apiRoot 'tools\fleet'
 
 $taskSuffix = '-3min'
 
@@ -160,26 +168,29 @@ foreach ($task in $registered) {
     }
 }
 
+$poetry = Resolve-FleetPoetry $Poetry
 foreach ($runner in $runners) {
     $alias = $runner.Node
     $taskName = "$TaskPrefix$($runner.Runner)$taskSuffix"
-    $tickArguments = " -Node $alias"
-    $lane = "claim the node lane's jobs ${alias} carries the tags for"
+    $lane = 'node'
+    $announceLane = 'announce'
+    $what = "claim the node lane's jobs ${alias} carries the tags for"
     if ($runner.Elevated) {
-        $tickArguments += ' -Elevated'
-        $lane = "claim only the jobs requiring the elevated tag, and launch them at RunLevel Highest"
+        $lane = 'elevated'
+        $announceLane = 'elevated-announce'
+        $what = 'claim only the jobs requiring the elevated tag, and launch them at RunLevel Highest'
     }
-    $identity = & $Register $taskName $Tick $tickArguments `
-        "One fleet-node-agent tick for $($runner.Runner): $lane (API tools/fleet). See register-node-agents.ps1."
-    # The announce runs in this console, synchronously, so a refused
-    # check-in is seen here rather than in a log nobody reads yet.
-    $announce = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Tick, '-Node', $alias)
-    if ($runner.Elevated) {
-        $announce += '-Elevated'
-    }
-    & $PowerShell @announce -Announce
-    if ($LASTEXITCODE -ne 0) {
-        throw "FLEET_NODE_ANNOUNCE_FAILED: the announce tick for $($runner.Runner) exited $LASTEXITCODE; see the fleet-node-$($runner.Runner)-*.log under $env:LOCALAPPDATA\Temp\claude"
+    $arguments = Get-FleetTickCommandLine -ApiRoot $apiRoot -LogDirectory $LogDirectory -Lane $lane -Node $alias
+    $identity = & $Register $taskName $poetry $fleetRoot $arguments `
+        "One fleet-node-agent tick for $($runner.Runner): $what (API tools/fleet). See register-node-agents.ps1."
+    # The announce runs from this console, synchronously, so a refused
+    # check-in is seen here rather than in a log nobody reads yet. The
+    # process object's exit code is read directly: no redirection or pipe
+    # stands between it and this check.
+    $announce = Get-FleetTickCommandLine -ApiRoot $apiRoot -LogDirectory $LogDirectory -Lane $announceLane -Node $alias
+    $announced = Start-Process -FilePath $poetry -ArgumentList $announce -WorkingDirectory $fleetRoot -NoNewWindow -Wait -PassThru
+    if ($announced.ExitCode -ne 0) {
+        throw "FLEET_NODE_ANNOUNCE_FAILED: the announce tick for $($runner.Runner) exited $($announced.ExitCode); see fleet-node-$($runner.Runner)-*.log under $LogDirectory"
     }
     Write-Information "Registered $taskName (every 3 minutes and at boot, $identity, S4U, Limited) and announced it." -InformationAction Continue
 }
