@@ -48,6 +48,7 @@ class TestTheBuildRecordsItself:
             install=(("npm", "ci"),),
             cache_root="C:/c",
             isolated_docker=False,
+            elevated=False,
         )
 
         lines = body.splitlines()
@@ -90,7 +91,7 @@ class TestTheStopScriptText:
     def test_the_task_name_is_the_one_the_launch_registers(self) -> None:
         """Both come from names.task_name, so a rename cannot make a stop
         report success having stopped nothing."""
-        launched = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        launched = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
 
         assert names.task_name(DEMO_RUN_ID) in launched
         assert names.task_name(DEMO_RUN_ID) in _stop("C:/s/run-1")

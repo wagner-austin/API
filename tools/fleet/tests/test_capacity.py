@@ -63,6 +63,7 @@ def _node(
         rust=None,
         cxx=None,
         docker=None,
+        elevated=False,
         budget=NodeBudget(
             reserved_cores=reserved_cores,
             reserved_ram_gb=reserved_ram_gb,

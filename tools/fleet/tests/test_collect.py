@@ -63,6 +63,7 @@ def _node() -> NodeConfig:
         rust=None,
         cxx=None,
         docker=None,
+        elevated=False,
         budget={
             "reserved_cores": 2,
             "reserved_ram_gb": 4.0,

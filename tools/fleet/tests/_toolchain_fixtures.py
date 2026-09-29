@@ -211,6 +211,7 @@ def node(
         rust=rust,
         cxx=cxx,
         docker=docker,
+        elevated=False,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

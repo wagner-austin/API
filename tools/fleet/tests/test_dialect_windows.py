@@ -74,7 +74,11 @@ def _python_registered_here(prefix: str) -> bool:
 
 
 def _build(
-    *, path: str = DEMO_PROJECT, install: tuple[tuple[str, ...], ...] = (), workers: int = 6
+    *,
+    path: str = DEMO_PROJECT,
+    install: tuple[tuple[str, ...], ...] = (),
+    workers: int = 6,
+    elevated: bool = False,
 ) -> str:
     """Render the Windows build script for one run under the fixture's roots.
 
@@ -82,6 +86,7 @@ def _build(
         path: The recipe's directory inside the export.
         install: The install steps.
         workers: The worker count.
+        elevated: Whether the build was launched at RunLevel Highest.
 
     Returns:
         The script's text.
@@ -93,6 +98,7 @@ def _build(
         install=install,
         cache_root="C:/s/cache",
         isolated_docker=False,
+        elevated=elevated,
     )
 
 
@@ -119,6 +125,12 @@ class TestBuildScript:
 
         assert "[int]$Workers = 6," in body
         assert '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"' in body
+
+    def test_it_tells_the_suite_which_lane_launched_it(self) -> None:
+        """So MCPs' execution suite can assert its token is the one the fleet
+        meant it to have (MCPs board task a98d7083)."""
+        assert "$env:CORVIS_FLEET_ELEVATED = '0'" in _build()
+        assert "$env:CORVIS_FLEET_ELEVATED = '1'" in _build(elevated=True)
 
     def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
         """A clean export carries no dependencies; the node's cache is where
@@ -172,7 +184,7 @@ class TestLaunchScript:
     def test_it_registers_and_starts_a_scheduled_task(self) -> None:
         """Not an ssh child. Windows OpenSSH puts that in a job object that
         dies with the connection, and this command returns immediately."""
-        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
 
         assert "Register-ScheduledTask" in body
         assert "Start-ScheduledTask" in body
@@ -183,11 +195,24 @@ class TestLaunchScript:
         A run that inherits it crawls, and the symptom reads as a slow node
         rather than a misconfigured launch.
         """
-        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
 
         assert "-Priority 4" in body
         assert "[TimeSpan]::Zero" in body
         assert "-LogonType S4U" in body
+
+    def test_an_elevated_build_registers_at_run_level_highest_and_an_ordinary_one_limited(
+        self,
+    ) -> None:
+        """The one difference an elevated build makes (MCPs board task
+        a98d7083): the same S4U principal with the account's full token, so
+        the task still outlives the ssh connection."""
+        elevated = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=True)
+        ordinary = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
+
+        assert "-LogonType S4U -RunLevel Highest" in elevated
+        assert "RunLevel" not in ordinary
+        assert elevated.replace(" -RunLevel Highest", "") == ordinary
 
     def test_it_runs_the_build_by_path_and_never_inlines_it(self) -> None:
         """THE REGRESSION. Interpolating the build into -Argument split the
@@ -195,7 +220,7 @@ class TestLaunchScript:
         inner quote and bound the rest to -WorkingDirectory. Measured on
         sedona 2026-09-04; the task could not be started at all.
         """
-        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
 
         assert "[string]$Target = 'C:/s/run-1'" in body
         assert f'$build = "$Target/{names.BUILD_STEM}.ps1"' in body
@@ -209,7 +234,7 @@ class TestLaunchScript:
         interpolation is the build's path, so no quote from the tree can end
         it early.
         """
-        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
         argument = body.split('-Argument "', 1)[1].split('"\n', 1)[0]
 
         assert argument == '-NoProfile -ExecutionPolicy Bypass -File `"$build`"'
@@ -220,7 +245,7 @@ class TestLaunchScript:
         default to refusing: without these a dispatch to an unplugged sedona
         registers a task that never runs, and reports nothing.
         """
-        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
 
         assert "-AllowStartIfOnBatteries" in body
         assert "-DontStopIfGoingOnBatteries" in body
@@ -233,7 +258,7 @@ class TestLaunchScript:
         build's own process id and throws by name when it never appears; the
         Pester suite over its render runs both outcomes against real tasks.
         """
-        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target="C:/s/run-1", run_id=DEMO_RUN_ID, elevated=False)
 
         assert f"[int]$LaunchSeconds = {LAUNCH_TIMEOUT_SECONDS}" in body
         assert f'$recorded = "$Target/{names.PID_NAME}"' in body

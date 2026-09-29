@@ -19,6 +19,7 @@ from fleet.contracts.tags import (
     encode_tags,
     missing_tags,
     node_tags,
+    runner_tags,
 )
 
 #: sedona's card as fleet.json declares it.
@@ -38,8 +39,9 @@ def _node(
     rust: str | None = None,
     cxx: str | None = None,
     docker: str | None = None,
+    elevated: bool = False,
 ) -> NodeConfig:
-    """Build a node declaration with the six fields tags derive from.
+    """Build a node declaration with the seven fields tags derive from.
 
     Args:
         platform: The node's dialect.
@@ -48,6 +50,7 @@ def _node(
         rust: The cargo version it declares, or None.
         cxx: The C++ toolchain version it declares, or None.
         docker: The rootless execdocker daemon version it declares, or None.
+        elevated: Whether it declares an elevated runner.
 
     Returns:
         The node.
@@ -64,6 +67,7 @@ def _node(
         rust=rust,
         cxx=cxx,
         docker=docker,
+        elevated=elevated,
         budget=NodeBudget(
             reserved_cores=4,
             reserved_ram_gb=4.0,
@@ -113,6 +117,14 @@ class TestNodeTags:
         )
         assert NodeTag.DOCKER not in node_tags(_node(platform=NodePlatform.LINUX))
 
+    def test_a_node_declaring_an_elevated_runner_carries_elevated(self) -> None:
+        """serendipity, whose ssh account is an administrator (MCPs board task
+        a98d7083); a node declaring none carries no elevated."""
+        assert node_tags(_node(cxx="17.14.37710.0", elevated=True)) == (
+            frozenset({NodeTag.WINDOWS, NodeTag.CXX, NodeTag.ELEVATED})
+        )
+        assert NodeTag.ELEVATED not in node_tags(_node())
+
     def test_every_platform_carries_the_tag_spelled_as_its_own_word(self) -> None:
         """The platform-to-tag table has a row for every platform, so a third
         platform fails here before a node of it could be tagged."""
@@ -120,9 +132,10 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_two_platforms_gpu_testdb_rust_cxx_and_docker(self) -> None:
-        """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570 and
-        571) is these seven words, so the members' values are pinned in order."""
+    def test_the_vocabulary_is_the_platforms_and_six_capabilities(self) -> None:
+        """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571
+        and 615) is these eight words, so the members' values are pinned in
+        order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
             "linux",
@@ -131,7 +144,27 @@ class TestNodeTags:
             "rust",
             "cxx",
             "docker",
+            "elevated",
         ]
+
+
+class TestRunnerTags:
+    def test_the_ordinary_runner_of_an_elevated_node_never_carries_elevated(self) -> None:
+        """So the queue's exclusive rule never hands it an elevated job."""
+        node = _node(cxx="17.14.37710.0", elevated=True)
+        assert runner_tags(node, elevated=False) == frozenset({NodeTag.WINDOWS, NodeTag.CXX})
+        assert runner_tags(_node(), elevated=False) == frozenset({NodeTag.WINDOWS})
+
+    def test_the_elevated_runner_carries_every_tag_the_node_does(self) -> None:
+        node = _node(cxx="17.14.37710.0", elevated=True)
+        assert runner_tags(node, elevated=True) == node_tags(node)
+
+    def test_an_elevated_runner_for_a_node_that_declares_none_is_refused(self) -> None:
+        with pytest.raises(
+            ValueError,
+            match=r"^sedona declares no elevated runner, so an elevated runner may not claim",
+        ):
+            runner_tags(_node(), elevated=True)
 
 
 class TestMissingTags:
@@ -173,8 +206,9 @@ class TestDecodeNodeTag:
     def test_a_word_outside_the_set_is_refused_with_the_set(self) -> None:
         with pytest.raises(
             JSONTypeError,
-            match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, got 'podman'; "
-            r".* a Rust or C\+\+ toolchain, or the execution suite's rootless Docker daemon",
+            match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, got "
+            r"'podman'; .* a Rust or C\+\+ toolchain, the execution suite's rootless Docker "
+            r"daemon, or an elevated runner",
         ):
             decode_node_tag("podman", field="t")
 

@@ -47,6 +47,7 @@ def _isolated(
         install=install,
         cache_root="/s/cache",
         isolated_docker=True,
+        elevated=False,
     )
 
 
@@ -145,6 +146,7 @@ def test_a_windows_node_refuses_to_render_a_docker_project_s_build() -> None:
             install=(),
             cache_root="C:/s/cache",
             isolated_docker=True,
+            elevated=False,
         )
 
 
@@ -162,7 +164,7 @@ def test_the_recipe_is_isolated_exactly_when_the_project_declares_docker(
     recipe = dispatch.recipe_for(_plan(tags), path="slime", install=(("npm", "ci"),))
 
     assert recipe == dispatch.Recipe(
-        path="slime", install=(("npm", "ci"),), isolated_docker=isolated
+        path="slime", install=(("npm", "ci"),), isolated_docker=isolated, elevated=False
     )
     assert dispatch.working_tree_recipe("libs/x", _plan(tags))["isolated_docker"] is isolated
 

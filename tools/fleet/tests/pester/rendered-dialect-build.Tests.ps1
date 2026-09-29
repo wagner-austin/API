@@ -7,13 +7,13 @@ $ErrorActionPreference = 'Stop'
 # stand-ins for the install steps and make that record where they ran and
 # write to both streams, so what reaches the transcript, the order the steps
 # run in and the status written last are all measured. The render runs in
-# this process and sets its location and four environment variables, which
+# this process and sets its location and five environment variables, which
 # every case restores.
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'PATH')
+    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_FLEET_ELEVATED', 'PATH')
 
     # A .cmd that records the directory it ran in and its arguments, writes
     # one line to each stream, and exits with the case's code. It lands in a
@@ -77,6 +77,8 @@ Describe 'The build' {
         $env:POETRY_CACHE_DIR | Should -BeExactly "$($export.Cache)/pypoetry"
         $env:PLAYWRIGHT_BROWSERS_PATH | Should -BeExactly "$($export.Cache)/ms-playwright"
         $env:PYTEST_XDIST_AUTO_NUM_WORKERS | Should -BeExactly '3'
+        # The render is the ordinary lane's (MCPs board task a98d7083).
+        $env:CORVIS_FLEET_ELEVATED | Should -BeExactly '0'
     }
     It 'ends at the first install step that fails, with its status, and never runs the recipe' {
         $export = Initialize-Export

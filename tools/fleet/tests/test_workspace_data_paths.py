@@ -62,6 +62,7 @@ def _document(
                 "rust": None,
                 "cxx": None,
                 "docker": None,
+                "elevated": False,
                 "budget": {
                     "reserved_cores": 4,
                     "reserved_ram_gb": 8.0,

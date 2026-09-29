@@ -93,6 +93,7 @@ def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
         rust=None,
         cxx=None,
         docker=None,
+        elevated=False,
         budget=_BUDGET,
     )
 

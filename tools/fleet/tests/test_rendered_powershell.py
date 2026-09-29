@@ -75,6 +75,7 @@ class TestTheCommittedCopies:
             "dialect-result",
             "dialect-log-tail",
             "dialect-launch",
+            "dialect-launch-elevated",
             "dialect-stop",
             "dialect-retire",
             "dialect-extract",

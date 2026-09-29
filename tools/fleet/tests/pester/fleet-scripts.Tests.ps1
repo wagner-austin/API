@@ -62,7 +62,7 @@ BeforeAll {
         param([string]$Name, [int]$ExitCode)
         $path = Join-Path $TestDrive "$Name.ps1"
         $record = Join-Path $TestDrive "$Name-announced.txt"
-        $body = "param([string]`$Node, [switch]`$Announce)`r`n[System.IO.File]::AppendAllText('$record', `"`$Node `$Announce`r`n`")`r`nexit $ExitCode`r`n"
+        $body = "param([string]`$Node, [switch]`$Announce, [switch]`$Elevated)`r`n[System.IO.File]::AppendAllText('$record', `"`$Node `$Announce `$Elevated`r`n`")`r`nexit $ExitCode`r`n"
         [System.IO.File]::WriteAllText($path, $body)
         return [pscustomobject]@{ Path = $path; Record = $record }
     }
@@ -124,6 +124,15 @@ Describe 'The tick entries' {
         [System.IO.File]::ReadAllText($world.Calls).Trim() | Should -BeExactly ("run -- python -m fleet.cli.rolled --repo-root $($script:apiRoot) " +
             '--agent fleet-node-agent -- --node alpha --announce')
         (Read-FleetTickLog $world.Logs 'fleet-node-alpha')[0] | Should -Match '^TICK START \S+ node alpha pid '
+    }
+    It 'runs one node''s elevated runner into a log of its own' {
+        $world = Initialize-FleetTickWorld
+        $global:LASTEXITCODE = 0
+        & $script:nodeTick -Node 'alpha' -Elevated -EnvironmentScript $world.Environment -Poetry $world.Poetry -LogDirectory $world.Logs
+        $LASTEXITCODE | Should -Be 0
+        [System.IO.File]::ReadAllText($world.Calls).Trim() | Should -BeExactly ("run -- python -m fleet.cli.rolled --repo-root $($script:apiRoot) " +
+            '--agent fleet-node-agent -- --node alpha --elevated')
+        (Read-FleetTickLog $world.Logs 'fleet-node-alpha-elevated')[0] | Should -Match '^TICK START \S+ node alpha-elevated pid '
     }
     It 'claims without announcing by default' {
         $world = Initialize-FleetTickWorld
@@ -206,11 +215,33 @@ Describe 'The schedules' {
         [void](Register-FleetTick -TaskName "${script:prefix}alpha-3min" -Tick $script:standIn.Path -TickArguments ' -Node old' -Description 'older')
         $said = @(Invoke-TestEntry $script:registerNodes @{ Workspace = $workspace; TaskPrefix = $script:prefix; Tick = $script:standIn.Path } 6>&1 |
             ForEach-Object { "$_" })
-        $said[0] | Should -BeExactly "Unregistered ${script:prefix}delta-3min: delta is not an enabled node."
+        $said[0] | Should -BeExactly "Unregistered ${script:prefix}delta-3min: fleet.json asks for no such runner."
         $said[1] | Should -BeLike "Registered ${script:prefix}alpha-3min (every 3 minutes and at boot, *, S4U, Limited) and announced it."
         @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min').TaskName | Should -Be @("${script:prefix}alpha-3min")
         (Get-TaskDefinition "${script:prefix}alpha-3min").Task.Actions.Exec.Arguments | Should -BeLike '* -Node alpha'
-        [System.IO.File]::ReadAllText($script:standIn.Record).Trim() | Should -BeExactly 'alpha True'
+        [System.IO.File]::ReadAllText($script:standIn.Record).Trim() | Should -BeExactly 'alpha True False'
+    }
+    # MCPs board task a98d7083: a node declaring elevated has a second runner,
+    # and its task name reads as an alias no node carries, so the cleanup
+    # compares whole task names; a second run must keep it, and a node that
+    # stops declaring elevated loses it.
+    It 'registers a second, elevated runner for a node declaring elevated, keeps it on a second run, and retires it once undeclared' {
+        $workspace = Join-Path $TestDrive 'fleet-elevated.json'
+        [System.IO.File]::WriteAllText($workspace, '{"nodes": {"alpha": {"enabled": true, "elevated": true}, "beta": {"enabled": false, "elevated": true}}}')
+        $parameters = @{ Workspace = $workspace; TaskPrefix = $script:prefix; Tick = $script:standIn.Path }
+        Invoke-TestEntry $script:registerNodes $parameters 6>$null
+        $said = @(Invoke-TestEntry $script:registerNodes $parameters 6>&1 | ForEach-Object { "$_" })
+        $said.Count | Should -Be 2
+        $said[1] | Should -BeLike "Registered ${script:prefix}alpha-elevated-3min (every 3 minutes and at boot, *, S4U, Limited) and announced it."
+        @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min').TaskName | Sort-Object |
+            Should -Be @("${script:prefix}alpha-3min", "${script:prefix}alpha-elevated-3min")
+        (Get-TaskDefinition "${script:prefix}alpha-elevated-3min").Task.Actions.Exec.Arguments | Should -BeLike '* -Node alpha -Elevated'
+        [System.IO.File]::ReadAllLines($script:standIn.Record) |
+            Should -Be @('alpha True False', 'alpha True True', 'alpha True False', 'alpha True True')
+        [System.IO.File]::WriteAllText($workspace, '{"nodes": {"alpha": {"enabled": true, "elevated": false}}}')
+        $retired = @(Invoke-TestEntry $script:registerNodes $parameters 6>&1 | ForEach-Object { "$_" })
+        $retired[0] | Should -BeExactly "Unregistered ${script:prefix}alpha-elevated-3min: fleet.json asks for no such runner."
+        @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min').TaskName | Should -Be @("${script:prefix}alpha-3min")
     }
     It 'refuses a node whose announce fails, by name' {
         $workspace = Join-Path $TestDrive 'fleet-one.json'
@@ -252,19 +283,28 @@ Describe 'The schedules' {
         [System.IO.File]::WriteAllText($powerShell, "@echo off`r`necho %*>>`"$announced`"`r`nexit /b 0`r`n", [System.Text.Encoding]::ASCII)
         $scripts = Split-Path -Parent $script:nodeTick
         $document = [System.IO.File]::ReadAllText((Join-Path $scripts '..\fleet.json')) | ConvertFrom-Json
-        $enabled = @($document.nodes.PSObject.Properties | Where-Object { $_.Value.PSObject.Properties['enabled'] -and $_.Value.enabled -eq $true } |
-            ForEach-Object { $_.Name })
+        $enabled = @($document.nodes.PSObject.Properties | Where-Object { $_.Value.PSObject.Properties['enabled'] -and $_.Value.enabled -eq $true })
         $enabled.Count | Should -BeGreaterThan 0
-        Invoke-TestEntry $script:registerNodes @{ TaskPrefix = $script:prefix; PowerShell = $powerShell; Register = $register } 6>$null
-        $registered = [string[]][System.IO.File]::ReadAllLines($record)
-        $registered.Count | Should -Be $enabled.Count
-        foreach ($index in 0..($enabled.Count - 1)) {
-            $alias = $enabled[$index]
-            $registered[$index] | Should -BeExactly ("$($script:prefix)$alias-3min|$scripts\run-node-agent-tick.ps1| -Node $alias|One fleet-node-agent tick for " +
+        $expected = [System.Collections.Generic.List[string]]::new()
+        $expectedAnnounce = [System.Collections.Generic.List[string]]::new()
+        foreach ($node in $enabled) {
+            $alias = $node.Name
+            $expected.Add("$($script:prefix)$alias-3min|$scripts\run-node-agent-tick.ps1| -Node $alias|One fleet-node-agent tick for " +
                 "${alias}: claim the node lane's jobs $alias carries the tags for (API tools/fleet). See register-node-agents.ps1.")
+            $expectedAnnounce.Add("-NoProfile -ExecutionPolicy Bypass -File $scripts\run-node-agent-tick.ps1 -Node $alias -Announce")
+            if ($node.Value.elevated -eq $true) {
+                $expected.Add("$($script:prefix)$alias-elevated-3min|$scripts\run-node-agent-tick.ps1| -Node $alias -Elevated|One fleet-node-agent " +
+                    "tick for $alias-elevated: claim only the jobs requiring the elevated tag, and launch them at RunLevel Highest (API tools/fleet). " +
+                    'See register-node-agents.ps1.')
+                $expectedAnnounce.Add("-NoProfile -ExecutionPolicy Bypass -File $scripts\run-node-agent-tick.ps1 -Node $alias -Elevated -Announce")
+            }
         }
-        [System.IO.File]::ReadAllLines($announced) | Should -Be @($enabled | ForEach-Object {
-                "-NoProfile -ExecutionPolicy Bypass -File $scripts\run-node-agent-tick.ps1 -Node $_ -Announce" })
+        # serendipity declares elevated (MCPs board task a98d7083), so the
+        # real registry yields one runner more than it has enabled nodes.
+        $expected.Count | Should -BeGreaterThan $enabled.Count
+        Invoke-TestEntry $script:registerNodes @{ TaskPrefix = $script:prefix; PowerShell = $powerShell; Register = $register } 6>$null
+        [string[]][System.IO.File]::ReadAllLines($record) | Should -Be @($expected)
+        [System.IO.File]::ReadAllLines($announced) | Should -Be @($expectedAnnounce)
     }
     It 'unregisters every node task and registers none under -UnregisterAll' {
         foreach ($alias in 'alpha', 'beta') {

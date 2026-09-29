@@ -90,6 +90,23 @@ Describe 'The launch' {
         { Invoke-Rendered 'dialect-launch' @{ Target = $target; TaskName = $script:taskName; LaunchSeconds = 3 } } |
             Should -Throw "FLEET_LAUNCH_NOT_STARTED: $($script:taskName) registered, but its build had not recorded itself after 3 s"
     }
+    # The elevated runner's launch (MCPs board task a98d7083): registering at
+    # RunLevel Highest needs an administrator's full token, which the hub's
+    # sessions and CI's Windows runners hold, as an elevated fleet runner's
+    # ssh session does.
+    It 'registers an elevated build at RunLevel Highest and starts it like any other' {
+        $target = Initialize-Dispatch "`$PID | Set-Content -LiteralPath `"`$PSScriptRoot/build.pid`"`r`n"
+        Invoke-Rendered 'dialect-launch-elevated' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly 'launched'
+        $task = (Get-TaskDefinition $script:taskName).Task
+        $task.Principals.Principal.LogonType | Should -BeExactly 'S4U'
+        $task.Principals.Principal.RunLevel | Should -BeExactly 'HighestAvailable'
+        $task.Settings.Priority | Should -BeExactly '4'
+    }
+    It 'refuses by name an elevated build that never records itself' {
+        $target = Initialize-Dispatch "exit 0`r`n"
+        { Invoke-Rendered 'dialect-launch-elevated' @{ Target = $target; TaskName = $script:taskName; LaunchSeconds = 3 } } |
+            Should -Throw "FLEET_LAUNCH_NOT_STARTED: $($script:taskName) registered, but its build had not recorded itself after 3 s"
+    }
 }
 
 Describe 'The stop' {

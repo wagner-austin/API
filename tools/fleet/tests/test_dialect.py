@@ -38,9 +38,11 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
             install=(),
             cache_root="/s/cache",
             isolated_docker=False,
+            elevated=False,
         )
         assert names.RESULT_NAME in spoken.log_tail_script("/s/run", 5)
-        assert names.task_name("r") in spoken.launch_script(target="/s/run", run_id="r")
+        launched = spoken.launch_script(target="/s/run", run_id="r", elevated=False)
+        assert names.task_name("r") in launched
         assert names.RESULT_NAME in spoken.result_script("/s/run")
         assert names.task_name("r") in spoken.stop_script(target="/s/run", run_id="r")
         assert "free_ram_gb" in spoken.capacity_probe_script()

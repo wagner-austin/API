@@ -279,13 +279,13 @@ class TestCompanions:
 
 class TestIdentity:
     def test_the_label_and_session_are_derived_from_the_node(self) -> None:
-        label, session = node_agent.node_identity("sedona")
+        label, session = node_agent.node_identity("sedona", elevated=False)
 
         assert label == "fleet-node-sedona"
         assert session == str(uuid.uuid5(uuid.NAMESPACE_URL, "fleet-node-agent/sedona"))
         assert uuid.UUID(session).version == 5
         # Stable across calls, so every tick is one session on the ledger.
-        assert node_agent.node_identity("sedona") == (label, session)
+        assert node_agent.node_identity("sedona", elevated=False) == (label, session)
 
 
 class TestClaiming:
@@ -356,6 +356,7 @@ class TestClaiming:
             install=(("npm", "ci"),),
             cache_root="C:/fleet/stage/cache",
             isolated_docker=False,
+            elevated=False,
         )
         assert runner.stdin[-3] == expected.encode("utf-8")
         assert "[string[]]$Install = @('npm ci')," in expected

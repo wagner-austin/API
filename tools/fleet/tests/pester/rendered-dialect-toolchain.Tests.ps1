@@ -61,10 +61,18 @@ Describe 'The toolchain probe' {
         $vswhereCalls = Initialize-Answer (Join-Path $script:root 'vs') 'vswhere' @('17.11.35312.102') 0
         $env:PATH = "$first;;`"$quoted`""
         $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'vs\vswhere.cmd') })
+        # The default seam asks this session's own token, so the expected
+        # line is read here the same way, independently of the script.
+        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        $integrity = 'integrity=no=limited'
+        if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            $integrity = 'integrity=yes=administrator'
+        }
         $said | Should -Be @(
             'python=yes=Python 3.11.9', 'poetry=yes=Poetry (version 1.8.3)', 'git=yes=git version 2.46.0.windows.1',
             'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
-            'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'docker=no=')
+            'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'docker=no=',
+            $integrity)
         [System.IO.File]::ReadAllLines($pythonCalls) | Should -Be @('--version', '-m pip --version')
         [System.IO.File]::ReadAllText($vswhereCalls).Trim() |
             Should -BeExactly '-products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion'
@@ -88,5 +96,13 @@ Describe 'The toolchain probe' {
         $said[0] | Should -BeExactly 'python=yes=Python 3.11.9'
         $said[9] | Should -BeExactly 'pip=no='
         $said[10] | Should -BeExactly 'cxx=no='
+    }
+    It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {
+        $env:PATH = Join-Path $script:root 'empty'
+        $absent = Join-Path $script:root 'absent\vswhere.exe'
+        $admin = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Administrator = { $true } })
+        $admin[-1] | Should -BeExactly 'integrity=yes=administrator'
+        $limited = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Administrator = { $false } })
+        $limited[-1] | Should -BeExactly 'integrity=no=limited'
     }
 }

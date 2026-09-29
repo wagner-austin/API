@@ -100,7 +100,7 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         DIALECT.digest_script(TARGET),
         _build(workers=4),
         DIALECT.log_tail_script(TARGET, 200),
-        DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID),
+        DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False),
         DIALECT.result_script(TARGET),
         DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID),
         DIALECT.capacity_probe_script(),
@@ -133,6 +133,7 @@ def _build(
         install=install,
         cache_root="/s/cache",
         isolated_docker=False,
+        elevated=False,
     )
 
 
@@ -208,7 +209,7 @@ class TestLaunchScript:
     def test_it_refuses_before_starting_when_lingering_is_off(self) -> None:
         """A --user unit dies with the session that started it unless the
         user lingers, so the script checks first and names the fix."""
-        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
         lines = body.splitlines()
 
         check = next(index for index, line in enumerate(lines) if "loginctl show-user" in line)
@@ -218,7 +219,7 @@ class TestLaunchScript:
         assert "exit 1" in body
 
     def test_it_starts_a_transient_user_unit_named_for_the_run_and_proves_it(self) -> None:
-        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
+        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
         unit = names.task_name(DEMO_RUN_ID)
 
         assert f"systemd-run --user --unit='{unit}' --collect --quiet" in body
@@ -227,10 +228,27 @@ class TestLaunchScript:
         assert body.rstrip().endswith("printf 'launched\\n'")
         assert "make check" not in body
 
+    def test_an_elevated_launch_or_build_is_refused_rather_than_rendered(self) -> None:
+        """No linux node declares an elevated runner (MCPs board task
+        a98d7083), and a build rendered anyway would lack the rights its
+        suite was written for."""
+        with pytest.raises(ValueError, match=r"requires the elevated tag, and a linux node has no"):
+            DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=True)
+        with pytest.raises(ValueError, match=r"requires the elevated tag, and a linux node has no"):
+            DIALECT.build_script(
+                target=TARGET,
+                path="execution",
+                workers=1,
+                install=(),
+                cache_root="/s/cache",
+                isolated_docker=False,
+                elevated=True,
+            )
+
     def test_the_unit_name_is_the_one_the_stop_script_stops(self) -> None:
         unit = names.task_name(DEMO_RUN_ID)
 
-        assert unit in DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
+        assert unit in DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
         stopped = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
 
         assert f"systemctl --user is-active --quiet '{unit}'" in stopped
