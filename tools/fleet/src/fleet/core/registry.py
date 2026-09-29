@@ -113,7 +113,9 @@ class RegistryDrift(TypedDict):
             dispatch pays an ssh timeout for each.
         disabled_here_enabled_there: Nodes this workspace is skipping that the
             registry says are live. Quiet, and worse in its way: capacity that
-            exists and is not being used, with nothing to notice it.
+            exists and is not being used, with nothing to notice it. A node
+            whose ``not_dispatchable`` entry gives the reason is a decision
+            and is not listed.
         missing_from_registry: Nodes this workspace dispatches to that the
             registry has never heard of. Unprovisioned, or renamed.
         enabled_there_absent_here: Machines the registry says are live that
@@ -250,7 +252,10 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
     24 logical cores, and invisible to the scheduler, with no way to tell a
     deliberate exclusion from an oversight. So the workspace's
     ``not_dispatchable`` map answers it, and only an undecided machine is
-    reported.
+    reported. The same map answers a node declared here but disabled while
+    the registry keeps it live: lavender stays enabled there because it is
+    audited and observed, and is retired here from Windows dispatch (MCPs
+    board task 7e467416), so its reason makes the difference a decision.
 
     Args:
         workspace: The dispatch workspace.
@@ -273,7 +278,8 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
             continue
         if node["enabled"] and not declared["enabled"]:
             enabled_here_disabled_there.append(name)
-        if not node["enabled"] and declared["enabled"]:
+        explained = name in workspace["not_dispatchable"]
+        if not node["enabled"] and declared["enabled"] and not explained:
             disabled_here_enabled_there.append(name)
         if node["platform"] is not declared["platform"]:
             platform_disagrees.append((name, node["platform"].value, declared["platform"].value))

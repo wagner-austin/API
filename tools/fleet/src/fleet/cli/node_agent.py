@@ -208,12 +208,15 @@ def ready_state(
             needs the probe to read an administrator's token.
 
     Returns:
-        The node's measured state when it answered, has room for something,
-        has every tool, and (for the elevated runner) holds an
-        administrator's token; otherwise None, with the gate that closed
-        and its reason logged, and for a node with a ``wsl_host`` what that
-        host reports (:mod:`fleet.core.host_report`).
+        The node's measured state when it is enabled (a stale task for a
+        retired node asks nothing), answered, has room, has every tool and
+        (elevated) holds an administrator's token; otherwise None, with the
+        gate that closed and its reason logged, and for a node with a
+        ``wsl_host`` what that host reports (:mod:`fleet.core.host_report`).
     """
+    if not node["enabled"]:
+        _log.info("%s is disabled in fleet.json; claiming nothing", alias)
+        return None
     probed = probe.attempt_probe(node, live_runs=records.live_runs(loaded.ledger, node=alias))
     state = probed["state"]
     if state is None:

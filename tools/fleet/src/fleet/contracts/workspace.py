@@ -267,6 +267,14 @@ def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) ->
     tell "we decided against this machine, here is why" from "nobody has got
     round to it".
 
+    A DISABLED NODE MAY CARRY ITS REASON HERE. A node that stays declared
+    because something else reads its declaration (lavender, the ``wsl_host``
+    of lavender-wsl, retired from Windows dispatch on 2026-09-29 by MCPs
+    board task 7e467416) and sets ``enabled: false`` says the same thing as
+    its exclusion, and the reason is what lets the registry reconciliation
+    (:func:`fleet.core.registry.compare`) tell that decision from capacity
+    nobody is using. Only an ENABLED node named here is a contradiction.
+
     Args:
         value: The workspace object.
         nodes: The already-decoded dispatch targets.
@@ -278,9 +286,9 @@ def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) ->
 
     Raises:
         JSONTypeError: If the field is missing, is not an object, a reason is
-            not a non-empty string, or a name is BOTH declared as a node and
-            excluded. That last one is a document that says two opposite
-            things, and picking either would be a guess.
+            not a non-empty string, or a name is BOTH declared as an enabled
+            node and excluded. That last one is a document that says two
+            opposite things, and picking either would be a guess.
     """
     declared = require_dict(value, "not_dispatchable")
     excluded: dict[str, str] = {}
@@ -292,9 +300,9 @@ def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) ->
                 "says no more than leaving the machine out entirely, which is the ambiguity "
                 "this field exists to remove."
             )
-        if name in nodes:
+        if name in nodes and nodes[name]["enabled"]:
             raise JSONTypeError(
-                f"{name!r} is declared both as a dispatchable node and as not_dispatchable. "
+                f"{name!r} is declared both as an enabled node and as not_dispatchable. "
                 "The workspace says two opposite things about the same machine and neither "
                 "reading is safe to pick."
             )
