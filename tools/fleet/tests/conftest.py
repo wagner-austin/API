@@ -149,7 +149,7 @@ class FakeTempRoot:
     WITHOUT THIS THE SUITE RACES ITSELF. Archives live outside the repository
     now, in one shared scratch directory, and every dispatch test uses the
     same pinned clock -- so under ``-n auto`` several workers write one
-    ``libs-demo-1757000000-lavender.tgz`` and each reads back another's bytes.
+    ``libs-demo-lavender-1757000000.tgz`` and each reads back another's bytes.
     The symptom is a digest mismatch in whichever test lost the race, which is
     the intermittent failure the hook reset exists to prevent.
 
@@ -238,8 +238,9 @@ DEMO_PROJECT = "libs/demo"
 #: shipped, and what the first dispatch to a real node found could not build.
 DEMO_DEPENDENCY = "libs/base"
 
-#: The run id a dispatch of :data:`DEMO_PROJECT` gets at :data:`DEMO_NOW`.
-DEMO_RUN_ID = f"libs-demo-{DEMO_NOW}"
+#: The run id a dispatch of :data:`DEMO_PROJECT` gets at :data:`DEMO_NOW` on
+#: lavender, the node every demo dispatch lands on.
+DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 
 #: What a healthy capacity probe answers.
 PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\n"
@@ -431,7 +432,7 @@ def prebuilt_archive(config_path: pathlib.Path, repo: pathlib.Path) -> bytes:
     return staging.archive(
         repo,
         manifest.build_tree(repo, DEMO_PROJECT),
-        loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz",
+        loaded.archives / f"{DEMO_RUN_ID}.tgz",
     )
 
 

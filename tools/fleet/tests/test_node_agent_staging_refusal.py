@@ -65,7 +65,7 @@ UP_TO_THE_LEASE: tuple[_test_hooks.CommandResult, ...] = (
 )
 
 #: The run that already holds the demo project on lavender, a minute older.
-HOLDER_RUN_ID = f"libs-demo-{DEMO_NOW - 60}"
+HOLDER_RUN_ID = f"libs-demo-lavender-{DEMO_NOW - 60}"
 
 
 class TestAStagingFaultIsReported:

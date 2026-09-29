@@ -141,7 +141,7 @@ def prebuilt_export(config_path: pathlib.Path) -> bytes:
         The archive bytes.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    destination = loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz"
+    destination = loaded.archives / f"{DEMO_RUN_ID}.tgz"
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = b"\x1f\x8b" + b"export-of-" + DEFAULT_SHA.encode("ascii")
     destination.write_bytes(payload)

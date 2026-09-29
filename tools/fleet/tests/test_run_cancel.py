@@ -67,8 +67,17 @@ def _plan() -> ProjectConfig:
 
 
 class TestRunIdentity:
-    def test_a_run_id_names_its_project_and_time(self) -> None:
-        assert run_lease.run_id_for(DEMO_PROJECT, started_unix=DEMO_NOW) == DEMO_RUN_ID
+    def test_a_run_id_names_its_project_node_and_time(self) -> None:
+        minted = run_lease.run_id_for(DEMO_PROJECT, node="lavender", started_unix=DEMO_NOW)
+        assert minted == DEMO_RUN_ID
+
+    def test_two_nodes_starting_one_project_in_one_second_get_two_ids(self) -> None:
+        # Board task 97c2adad: lavender and serendipity both minted
+        # MCPs-mcp-shared-1790638395, and the shared ledger kept one row.
+        lavender = run_lease.run_id_for(DEMO_PROJECT, node="lavender", started_unix=DEMO_NOW)
+        serendipity = run_lease.run_id_for(DEMO_PROJECT, node="serendipity", started_unix=DEMO_NOW)
+        assert lavender == "libs-demo-lavender-1757000000"
+        assert serendipity == "libs-demo-serendipity-1757000000"
 
     def test_the_lease_is_sized_at_twice_the_estimate(self) -> None:
         lease = run_lease.open_lease(

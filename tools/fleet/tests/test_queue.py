@@ -206,7 +206,7 @@ class TestReport:
             QUEUE_CREDENTIALS,
             job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
             node="lavender",
-            run_id="libs-demo-1757000000",
+            run_id="libs-demo-lavender-1757000000",
             lease_seconds=3600,
             identity=RUNNER_IDENTITY,
         )
@@ -214,7 +214,7 @@ class TestReport:
         assert job["status"] == "running"
         assert endpoint.tools == ["dispatch_report"]
         assert endpoint.arguments[0]["action"] == "start"
-        assert endpoint.arguments[0]["runId"] == "libs-demo-1757000000"
+        assert endpoint.arguments[0]["runId"] == "libs-demo-lavender-1757000000"
         assert endpoint.arguments[0]["node"] == "lavender"
 
     def test_close_sends_an_exit_code_when_there_is_one(self) -> None:

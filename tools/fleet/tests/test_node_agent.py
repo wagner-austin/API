@@ -40,7 +40,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_PROJECT, FakeRun, failed, ok
+from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -315,7 +315,7 @@ class TestClaiming:
         started = endpoint.arguments[2]
         assert started["action"] == "start"
         assert started["node"] == "lavender"
-        assert started["runId"] == "libs-demo-1757000000"
+        assert started["runId"] == DEMO_RUN_ID
         # The node's two probes, capacity then toolchain (two ssh calls each),
         # BEFORE the claim, then the mirror, the commit probe and the archive,
         # then the fleet's own sequence: no tar of any working tree anywhere,
@@ -350,7 +350,7 @@ class TestClaiming:
         rows = records.read_ledger(loaded.ledger)
         assert len(rows) == 1
         expected = dialect.for_platform(NodePlatform.WINDOWS).build_script(
-            target="C:/fleet/stage/libs-demo-1757000000",
+            target=f"C:/fleet/stage/{DEMO_RUN_ID}",
             path=DEMO_PROJECT,
             workers=rows[0]["workers"],
             install=(("npm", "ci"),),
@@ -360,9 +360,7 @@ class TestClaiming:
         assert runner.stdin[-3] == expected.encode("utf-8")
         assert "[string[]]$Install = @('npm ci')," in expected
         assert "[string]$CacheRoot = 'C:/fleet/stage/cache'," in expected
-        assert (
-            f"[string]$Recipe = 'C:/fleet/stage/libs-demo-1757000000/{DEMO_PROJECT}'," in expected
-        )
+        assert f"[string]$Recipe = 'C:/fleet/stage/{DEMO_RUN_ID}/{DEMO_PROJECT}'," in expected
 
     def test_a_commit_the_mirror_lacks_is_fetched_from_the_declared_remote(
         self, sourced_config: pathlib.Path

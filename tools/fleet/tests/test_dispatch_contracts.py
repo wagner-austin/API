@@ -298,7 +298,9 @@ class TestRendering:
                 answer(
                     {
                         "job": queue_job(
-                            status="running", node="lavender", runId="libs-demo-1757000000"
+                            status="running",
+                            node="lavender",
+                            runId="libs-demo-lavender-1757000000",
                         )
                     }
                 )
@@ -307,7 +309,7 @@ class TestRendering:
 
         assert line == (
             "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa running make check libs/demo at 4e3c6bc1d9f0 "
-            "@lavender run=libs-demo-1757000000"
+            "@lavender run=libs-demo-lavender-1757000000"
         )
 
     def test_a_hub_verb_with_no_sha_names_none(self) -> None:
