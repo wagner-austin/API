@@ -392,8 +392,8 @@ def requester_refusal(requested_by: str) -> str | None:
 
 
 #: Environment variables a session-audit invocation must not inherit from
-#: this agent. The agent runs under ``poetry run fleet-agent``
-#: (scripts/run-agent-tick.ps1), which exports ``VIRTUAL_ENV`` naming the
+#: this agent. The agent runs under ``poetry run`` (the scheduled action
+#: runs :mod:`fleet.cli.tick` that way), which exports ``VIRTUAL_ENV`` naming the
 #: FLEET venv, and poetry prefers an activated venv to the ``-C`` project's
 #: own: with it inherited, ``poetry -C packages/session-audit run
 #: session-audit`` executed in the fleet venv and died on

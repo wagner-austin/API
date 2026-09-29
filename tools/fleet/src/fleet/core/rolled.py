@@ -1,8 +1,9 @@
 """The fleet code a scheduled tick runs: the rolled commit, never the checkout.
 
 THE GAP (board task 465689f5, b6eb30c8's R3). The hub's scheduled ticks,
-``run-agent-tick.ps1`` and ``run-node-agent-tick.ps1``, ran ``poetry run
-fleet-agent`` in ``C:/Users/Test/PROJECTS/API/tools/fleet``. So the fleet ran
+then ``run-agent-tick.ps1`` and ``run-node-agent-tick.ps1`` and since
+2026-09-29 :mod:`fleet.cli.tick`, ran ``poetry run fleet-agent`` in
+``C:/Users/Test/PROJECTS/API/tools/fleet``. So the fleet ran
 whatever that checkout held: every commit anyone pulled into it went live at
 the next three-minute tick, and so did every uncommitted edit a session left
 there. No step between a change and the fleet running it asked whether its
@@ -154,20 +155,29 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
     if isinstance(resolved, str):
         return resolved
     commit = resolved["commit"]
+    directory = launch_directory(commit)
     destination = commit_tree.extract_paths(
         api_root,
         commit,
         ARCHIVED_PATHS,
-        destination=launch_directory(commit),
+        destination=directory,
         archive_code=ARCHIVE_FAILED_CODE,
         extract_code=EXTRACT_FAILED_CODE,
     )
+    # A REFUSED LAUNCH REMOVES ITS OWN DIRECTORY, which extract_paths made
+    # before either step could fail. Until 2026-09-29 only a launch whose
+    # agent ran removed it, and the refused ones stayed: 23 pid directories
+    # under one commit on the hub after the 2026-09-28 extraction timeouts
+    # (MCPs board task 94ac1c4f). Nothing reads one again, since each launch
+    # extracts under its own process id.
     if isinstance(destination, str):
+        shutil.rmtree(directory)
         return destination
     incomplete = commit_tree.incompleteness(
         destination, commit, REQUIRED_FILES, code=INCOMPLETE_CODE
     )
     if incomplete is not None:
+        shutil.rmtree(directory)
         return incomplete
     return RolledTree(
         commit=commit,
