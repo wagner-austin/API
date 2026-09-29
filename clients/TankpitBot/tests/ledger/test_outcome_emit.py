@@ -380,3 +380,51 @@ def test_liveness_stall_diagnostic_fires_once_at_the_crossing(
     for _ in range(LIVENESS_STALL_STREAK):
         register_pending_decision(ledger, ActionKind.SCAN, ledger.next_event_id())
     assert stall_events() == 2
+
+
+def test_every_outcome_line_the_emitter_writes_reads_as_an_outcome(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """The emitter and ``is_action_outcome_event`` agree, line for line.
+
+    Every reader of the events file finds outcomes through the one
+    predicate, so it is checked against what the emitter writes rather
+    than against a hand-built record: the smoke gate read a shape the
+    bot had stopped writing for months while its hand-built fixtures
+    stayed green (board task 14b91fb5). Another diagnostic on the same
+    channel, and the retired ``WIRE_COMPLETE`` shape, are not outcomes.
+    """
+    from pathlib import Path
+
+    from platform_core.json_utils import (
+        JSONObject,
+        load_json_str,
+        narrow_json_to_dict,
+        require_str,
+    )
+
+    from tankpit_bot.ledger.outcomes import is_action_outcome_event
+    from tankpit_bot.runtime_logging import configure_probe_runtime_logging, emit_diagnostic
+
+    artifacts = configure_probe_runtime_logging("fuel", "20260929-000000")
+    ledger = LedgerService()
+    emit_map_open_data_processed(ledger, duration_ms=250)
+    emit_move_stall_timeout(ledger, duration_ms=5000, target_x=1, target_y=2, timeout_ms=5000)
+    emit_diagnostic(diagnostic_kind="session_build", instance="smoke")
+
+    lines = [
+        narrow_json_to_dict(load_json_str(line))
+        for line in fake_fs.read_text(Path(artifacts["latest_events_path"])).splitlines()
+        if line
+    ]
+    verdicts = [
+        (line.get("outcome"), is_action_outcome_event(require_str(line, "channel"), line))
+        for line in lines[-3:]
+    ]
+    assert verdicts == [
+        ("map_data_processed", True),
+        ("stall_timeout", True),
+        (None, False),
+    ]
+    retired: JSONObject = {"diagnostic_kind": "action_outcome", "signal": "map_data_processed"}
+    assert is_action_outcome_event("WIRE_COMPLETE", retired) is False

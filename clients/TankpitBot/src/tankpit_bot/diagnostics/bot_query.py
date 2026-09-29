@@ -7,11 +7,11 @@ Four canned queries, each printed to stdout in a stable format that
     DIAGNOSTIC event, in file order. The smallest useful "what
     happened?" view.
   - ``stalls``           -- ``action_outcome`` events with
-    ``signal=stall_timeout``, including the surrounding ``tick_n`` and
+    ``outcome=stall_timeout``, including the surrounding ``tick_n`` and
     ``bot_state`` (Tier 3.2 fields).
   - ``action-spans``     -- pairs WIRE dispatch events with their
     matching ``action_outcome`` events; one line per action lifecycle with
-    duration_ms and signal.
+    duration_ms and outcome.
   - ``target-decisions`` -- HUNT score events with the target tile and
     score so reviewers can scan acquisition history without grepping.
 
@@ -36,6 +36,7 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.ledger.outcomes import ActionOutcome, is_action_outcome_event
 
 #: Default JSONL path the queries read when none is passed in.
 DEFAULT_EVENTS_PATH: Path = Path("runs/bot/latest.events.jsonl")
@@ -58,7 +59,7 @@ class BotQueryRecord:
             ``STATE`` / ``DIAGNOSTIC`` / ``SYNC`` / ``WORLD``).
         message: Human-readable message body.
         fields: Structured-field view with reserved record-level keys
-            stripped (e.g. ``tick_n``, ``bot_state``, ``signal``,
+            stripped (e.g. ``tick_n``, ``bot_state``, ``outcome``,
             ``action_kind``, ``combat_target_x`` ...).
     """
 
@@ -177,21 +178,6 @@ def query_timeline(records: list[BotQueryRecord], write: Callable[[str], int]) -
         write(f"{rec.timestamp}\ttick={tick_str}\t{rec.channel}\t{rec.message}\n")
 
 
-def _is_action_outcome(rec: BotQueryRecord) -> bool:
-    """Report whether a record is an ``action_outcome`` diagnostic.
-
-    Args:
-        rec: Loaded event record.
-
-    Returns:
-        True for DIAGNOSTIC records carrying the unified outcome kind.
-    """
-    return (
-        rec.channel == "DIAGNOSTIC"
-        and optional_str(rec.fields, "diagnostic_kind") == "action_outcome"
-    )
-
-
 def query_stalls(records: list[BotQueryRecord], write: Callable[[str], int]) -> None:
     """Print every ``action_outcome`` event with ``outcome=stall_timeout``.
 
@@ -204,9 +190,9 @@ def query_stalls(records: list[BotQueryRecord], write: Callable[[str], int]) -> 
         write: Stream writer.
     """
     for rec in records:
-        if not _is_action_outcome(rec):
+        if not is_action_outcome_event(rec.channel, rec.fields):
             continue
-        if optional_str(rec.fields, "outcome") != "stall_timeout":
+        if optional_str(rec.fields, "outcome") != ActionOutcome.STALL_TIMEOUT:
             continue
         tick = optional_int(rec.fields, "tick_n")
         tick_str = str(tick) if tick is not None else "-"
@@ -247,7 +233,7 @@ def query_action_spans(records: list[BotQueryRecord], write: Callable[[str], int
             if action_kind is not None:
                 open_spans[action_kind] = rec
             continue
-        if not _is_action_outcome(rec):
+        if not is_action_outcome_event(rec.channel, rec.fields):
             continue
         action_kind = optional_str(rec.fields, "action_kind")
         if action_kind is None:

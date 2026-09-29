@@ -15,6 +15,38 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from platform_core.json_utils import JSONObject, optional_str
+
+ACTION_OUTCOME_DIAGNOSTIC_KIND = "action_outcome"
+"""The ``diagnostic_kind`` every recorded outcome carries in the events file.
+
+Each resolution is written once, on the ``DIAGNOSTIC`` channel that
+``runtime_logging.emit_diagnostic`` writes to, with the label in its
+``outcome`` field and the kind in ``action_kind``. Every reader of the
+events file finds outcomes through :func:`is_action_outcome_event`, so
+the writer and its readers cannot drift apart. The smoke gate's own
+reader drifted once: it read a ``WIRE_COMPLETE`` channel and a
+``signal`` field long after both were gone, so one of its assertions
+could never pass and another passed over zero events (board task
+14b91fb5)."""
+
+
+def is_action_outcome_event(channel: str, fields: JSONObject) -> bool:
+    """Report whether one events-file record is a recorded action outcome.
+
+    Args:
+        channel: The record's ``channel``.
+        fields: The record's structured fields.
+
+    Returns:
+        True for a ``DIAGNOSTIC`` record whose ``diagnostic_kind`` is
+        :data:`ACTION_OUTCOME_DIAGNOSTIC_KIND`.
+    """
+    return (
+        channel == "DIAGNOSTIC"
+        and optional_str(fields, "diagnostic_kind") == ACTION_OUTCOME_DIAGNOSTIC_KIND
+    )
+
 
 class ActionOutcome(StrEnum):
     """Every outcome label, one member per label, written as recorded.
@@ -128,6 +160,8 @@ pathology. Consumed live (``liveness_stall`` diagnostic at the
 crossing) and post-run (the issue report's streak scan)."""
 
 __all__ = [
+    "ACTION_OUTCOME_DIAGNOSTIC_KIND",
     "LIVENESS_STALL_STREAK",
     "ActionOutcome",
+    "is_action_outcome_event",
 ]

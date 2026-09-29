@@ -16,10 +16,14 @@ from scripts import (
     smoke,
 )
 from tests._smoke_records import (
+    _emitted_outcome_record,
     _login_records,
-    _map_data_processed_record,
+    _map_open_resolved,
+    _map_open_stalled,
+    _move_reached,
     _smoke_record,
 )
+from tests.conftest import FakeFileSystem
 
 
 class TestDecodeSmokeRecord:
@@ -145,57 +149,76 @@ class TestAssertLoginCompleted:
 
 
 class TestAssertMapOpenClearedViaMapData:
-    """Tests for assertion 2 (map_open cleared via map_data_processed)."""
+    """Tests for assertion 2 (map_open resolved map_data_processed)."""
 
-    def test_passes_when_one_map_open_clears_via_map_data(self) -> None:
-        """One matching WIRE_COMPLETE event satisfies the gate."""
-        records = [_map_data_processed_record(1, "2026-06-20T15:00:05")]
+    def test_passes_on_the_line_the_ledger_writes(self, fake_fs: FakeFileSystem) -> None:
+        """The emitter's own map_data_processed line satisfies the gate."""
+        records = [_emitted_outcome_record(fake_fs, 1, _map_open_resolved)]
         assert smoke.assert_map_open_cleared_via_map_data(records) is None
 
     def test_fails_when_no_map_open_events_at_all(self) -> None:
-        """No map_open WIRE_COMPLETE events fails the gate."""
+        """No outcomes at all fails the gate and says it examined none."""
         failure = smoke.assert_map_open_cleared_via_map_data([])
         if failure is None:
             raise AssertionError("empty records must fail the map_open gate")
-        assert "map_open" in failure["message"]
+        assert failure == {
+            "message": (
+                "2) no map_open resolved map_data_processed "
+                "(0 map_open of 0 action outcomes examined)"
+            ),
+            "pivot": 0,
+        }
 
-    def test_fails_when_map_open_clears_via_stall_timeout(self) -> None:
-        """A map_open that cleared via stall_timeout fails the gate.
+    def test_fails_when_map_open_resolves_stall_timeout(self, fake_fs: FakeFileSystem) -> None:
+        """A map_open that stalled out fails the gate, pointing at it.
 
         Regression: this is exactly the failure mode the 2026-06-20 fix
         cured -- the dispatcher wasn't marking map_data_processed, so
         every map_open cleared via the 10s stall_timeout instead.
         """
         records = [
-            _smoke_record(
-                1,
-                "WIRE_COMPLETE",
-                "map_open completed in 10000ms via stall_timeout",
-                action_kind="map_open",
-                duration_ms=10000,
-                signal="stall_timeout",
-            )
+            _emitted_outcome_record(fake_fs, 1, _move_reached),
+            _emitted_outcome_record(fake_fs, 2, _map_open_stalled),
         ]
         failure = smoke.assert_map_open_cleared_via_map_data(records)
-        if failure is None:
-            raise AssertionError("stall-cleared map_open must fail the gate")
-        assert "map_data_processed" in failure["message"]
+        assert failure == {
+            "message": (
+                "2) no map_open resolved map_data_processed "
+                "(1 map_open of 2 action outcomes examined)"
+            ),
+            "pivot": 1,
+        }
 
-    def test_ignores_wire_complete_for_other_action_kinds(self) -> None:
-        """Non-map_open WIRE_COMPLETE events do not satisfy the gate."""
+    def test_ignores_outcomes_of_other_action_kinds(self, fake_fs: FakeFileSystem) -> None:
+        """A walk's outcome does not stand in for a map open."""
+        records = [_emitted_outcome_record(fake_fs, 1, _move_reached)]
+        failure = smoke.assert_map_open_cleared_via_map_data(records)
+        if failure is None:
+            raise AssertionError("a walk-only outcome must fail the gate")
+        assert "(0 map_open of 1 action outcomes examined)" in failure["message"]
+
+    def test_the_retired_wire_complete_shape_does_not_count(self) -> None:
+        """The shape the gate read until 2026-09-29 is no outcome at all.
+
+        Nothing has written a ``WIRE_COMPLETE`` channel or a ``signal``
+        field for months; a record in that shape must not satisfy the
+        gate, or the gate is back to judging a stream the bot no longer
+        writes (board task 14b91fb5).
+        """
         records = [
             _smoke_record(
                 1,
                 "WIRE_COMPLETE",
-                "teleport completed in 250ms via teleport_landed",
-                action_kind="teleport",
+                "map_open completed in 250ms via map_data_processed",
+                action_kind="map_open",
                 duration_ms=250,
-                signal="teleport_landed",
+                signal="map_data_processed",
             )
         ]
         failure = smoke.assert_map_open_cleared_via_map_data(records)
         if failure is None:
-            raise AssertionError("teleport-only completion must fail the gate")
+            raise AssertionError("the retired WIRE_COMPLETE shape must not satisfy the gate")
+        assert "(0 map_open of 0 action outcomes examined)" in failure["message"]
 
 
 class TestAssertHuntScoredTarget:

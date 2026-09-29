@@ -206,6 +206,11 @@ def emit_action_outcome(
         detail=dict(detail),
     )
     append_outcome_record(ledger, record)
+    # A literal, not ACTION_OUTCOME_DIAGNOSTIC_KIND: the diagnostic-kind
+    # wiring guard (scripts/diagnostic_kind_rules.py) reads each emit
+    # site's kind as a string constant. The reader-side constant is
+    # pinned to this line by the emitter/predicate agreement test in
+    # tests/ledger/test_outcome_emit.py.
     emit_diagnostic(
         diagnostic_kind="action_outcome",
         action_kind=action_kind,
