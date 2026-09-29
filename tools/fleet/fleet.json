@@ -385,14 +385,16 @@
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
       "expected_minutes": 10,
-      "required_tags": ["cxx"],
+      "exclusive_resources": ["corvis-fleet-testdb"],
+      "required_tags": ["testdb", "cxx", "docker"],
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "cloudflared",
         "install": [
           ["npm", "ci"],
           ["node", "scripts/ci-build-consumed-workspaces.mjs"],
-          ["npm", "rebuild"]
+          ["npm", "rebuild"],
+          ["bash", "scripts/testdb-setup.sh", "--container", "corvis-fleet-testdb"]
         ],
         "companions": []
       }
