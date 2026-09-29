@@ -57,7 +57,7 @@ to answer one question.
 ## Commands
 
 ```bash
-fleet-nodes     --config fleet.json                 # what is free right now
+fleet-nodes     --config fleet.json                 # what is free right now, and why each lane claims nothing
 fleet-preflight --config fleet.json --project P     # would it run, and where
 fleet-preflight --config fleet.json --project P --node lavender
 fleet-run       --config fleet.json --project P \
