@@ -493,6 +493,22 @@ the owner's reservation — never the other way round.
 `reserved_cores` and `reserved_ram_gb` have no cluster analogue at all. Slurm
 never has to leave a core for the person sitting at the node.
 
+**On the stack host, free memory is net of what capped containers are
+promised, and the reservation is only the uncapped stack's margin** (MCPs board
+task a282400d). diphtheria reserved 16 GB from 2026-09-20, sized when it read
+26.4 GB free; once the stack's backends moved in, `MemAvailable` already
+excluded them and the reservation counted them a second time, so the node
+refused every dispatch (179 `NODE_OWNER_RESERVED` ticks by 18:30Z on
+2026-09-29). A smaller constant is not the answer, because four of its
+containers are capped at 4 GiB and may grow to their caps at any moment:
+about 10.3 GB was outstanding at 22:1xZ that day, about 16 when they idle.
+So the Linux capacity probe (`fleet.core.linux_capacity_probe`) reports
+`free_ram_gb` as `MemAvailable` minus each capped docker container's
+`memory.max` less its `anon`, prints that total as `promised_ram_gb`, and
+diphtheria's `reserved_ram_gb` is 2.0: 15.3 GB available, 10.3 promised and
+2.0 reserved left 3.0 GB, enough for `idle/execution`'s 2.0 GB worker. A node
+with no capped container reads the same `MemAvailable` it always did.
+
 **lavender is at `max_concurrent_runs: 1`, and that is not a typo.** It became
 a CI runner on 2026-09-06, so the "other user" the reservations protect is no
 longer just the person at the keyboard — a second *system* now competes for the
