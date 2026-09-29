@@ -59,6 +59,17 @@ loses its rank ([[bot-behavior-contract]]).[^3] The wait therefore has
 **no deadline**: hurrying a teardown to meet a timeout is precisely
 how a tank gets left exposed.
 
+**That sentinel is one path, and until 2026-09-29 it was two.** A
+child runs the service, and the service pointed its tick loop at
+`runs/state/<instance>/STOP` while the manager wrote
+`runs/bot/<instance>/STOP`. So a row stop or a drain never reached a
+running child. On sedona a stopped bot kept playing with the file
+still on disk, and this drain would have waited on it forever. Both
+sides now resolve `bot_stop_file(instance)`, and spawn clears an
+untaken `STOP` or `CONTROL` a predecessor left in a reused slot, so
+the next session neither ends at its first tick nor takes a stale
+verb.[^13]
+
 `make down` is a CLIENT of that drain, not the thing performing it.[^4]
 It posts the shutdown and watches the port; interrupting it changes
 nothing, because the manager owns the drain and still exits only when
@@ -214,3 +225,11 @@ child console to a file. The path constant died with the launcher on
       fleet-dev / up-docker / down-docker / image, 2026-09-02);
       `tankpit-fleet-down` is the `pyproject.toml` console script for
       `down` in `src/tankpit_bot/service/fleet_control.py`.
+[^13]: `bot_stop_file` in `src/tankpit_bot/runtime_artifacts.py`;
+      `resolve_service_stop_file` in `service/service_main.py`;
+      `FleetManager._request_stop` in `service/fleet_manager.py`;
+      `clear_reused_slot` in `service/fleet_slot.py`. Observed live on
+      sedona 2026-09-29 00:06Z, release v0.1.0-0d6ac1fad, instance
+      `verbs`: after `POST /bots/verbs/stop` the bot was still alive
+      a minute later with `runs/bot/verbs/STOP` unconsumed (MCPs board
+      task `97975b5d`).

@@ -167,6 +167,25 @@ def bot_run_dir(instance: str) -> Path:
     return _BOT_DIR / instance if instance else _BOT_DIR
 
 
+def bot_stop_file(instance: str) -> Path:
+    """Return the one stop sentinel for a bot instance, beside its run log.
+
+    ONE path for every writer and reader: the fleet manager writes it,
+    and the bare bot and the service child both watch it. Until
+    2026-09-29 the service child watched ``runs/state/<instance>/STOP``
+    while the manager wrote here, so a fleet stop never reached a child
+    (live on sedona: a stopped bot kept playing, board task 97975b5d).
+
+    Args:
+        instance: Validated instance name, or ``""`` for the sole-bot
+            namespace.
+
+    Returns:
+        ``runs/bot/STOP`` or ``runs/bot/<instance>/STOP``.
+    """
+    return bot_run_dir(instance) / "STOP"
+
+
 def build_bot_run_artifacts(stamp: str, instance: str) -> BotRunArtifactsDict:
     """Build canonical artifact paths for a bot run.
 
@@ -383,6 +402,7 @@ __all__ = [
     "ProbeRunArtifactsDict",
     "SniffRunArtifactsDict",
     "bot_run_dir",
+    "bot_stop_file",
     "build_bot_run_artifacts",
     "build_probe_run_artifacts",
     "build_sniff_run_artifacts",

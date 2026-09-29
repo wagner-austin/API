@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.runtime_artifacts import bot_stop_file
 from tankpit_bot.service.constants import (
     FLEET_CHILD_PORT_BASE,
     FLEET_CHILD_PORT_COUNT,
@@ -70,13 +71,19 @@ def test_health_url_carries_the_port() -> None:
     assert health_url(27200) == "http://127.0.0.1:27200/health"
 
 
-def test_stop_file_is_instance_scoped() -> None:
-    """Two services must never share one stop sentinel."""
+def test_stop_file_is_instance_scoped_and_the_one_the_fleet_writes() -> None:
+    """Two services never share one sentinel, and a child reads the manager's.
+
+    The child's path used to be ``runs/state/<instance>/STOP`` while
+    the manager wrote ``runs/bot/<instance>/STOP``, so a fleet stop
+    never reached a service child (sedona, 2026-09-29).
+    """
     original_get_env = _test_hooks.get_env
     try:
         _test_hooks.get_env = FakeEnv({})
-        assert resolve_service_stop_file() == Path("runs/state/STOP")
+        assert resolve_service_stop_file() == Path("runs/bot/STOP")
         _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_INSTANCE": "alpha"})
-        assert resolve_service_stop_file() == Path("runs/state/alpha/STOP")
+        assert resolve_service_stop_file() == Path("runs/bot/alpha/STOP")
+        assert resolve_service_stop_file() == bot_stop_file("alpha")
     finally:
         _test_hooks.get_env = original_get_env
