@@ -40,6 +40,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from fleet.contracts.runner_base import HostBase, decode_host_base, encode_host_base
+from fleet.contracts.runner_slice import CiSlice, decode_ci_slice, encode_ci_slice
 
 
 class RunnerInstall(TypedDict):
@@ -170,6 +171,9 @@ class HostRunnerSpec(TypedDict):
         base: What a stock Windows install needs before any runner can
             register, and the distro's disk ceiling
             (:mod:`fleet.contracts.runner_base`).
+        ci_slice: The memory and CPU the host's WSL runners may take
+            together, beside the fleet's own lane on the same VM
+            (:mod:`fleet.contracts.runner_slice`).
     """
 
     name: str
@@ -183,6 +187,7 @@ class HostRunnerSpec(TypedDict):
     installs: list[RunnerInstall]
     assets: list[FileAsset]
     base: HostBase
+    ci_slice: CiSlice
 
 
 class RunnerSpec(TypedDict):
@@ -389,6 +394,7 @@ def encode_host_runner_spec(spec: HostRunnerSpec) -> JSONObject:
         "installs": [encode_runner_install(install) for install in spec["installs"]],
         "assets": [encode_file_asset(asset) for asset in spec["assets"]],
         "base": encode_host_base(spec["base"]),
+        "ci_slice": encode_ci_slice(spec["ci_slice"]),
     }
 
 
@@ -474,6 +480,7 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
         installs=installs,
         assets=[decode_file_asset(entry) for entry in require_list(value, "assets")],
         base=decode_host_base(require_dict(value, "base")),
+        ci_slice=decode_ci_slice(require_dict(value, "ci_slice"), vm_memory_gb=memory),
     )
 
 
