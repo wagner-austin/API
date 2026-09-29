@@ -16,6 +16,7 @@ $env:npm_config_cache = "$CacheRoot/npm"
 $env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"
 $env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"
 $env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"
+$env:CORVIS_FLEET_ELEVATED = '0'
 function Invoke-Logged {
     param([string]$Shell, [string]$Command)
     & $Shell /d /s /c "$Command >> `"$log`" 2>&1"
