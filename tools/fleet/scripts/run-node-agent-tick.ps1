@@ -44,6 +44,11 @@
 .PARAMETER Announce
     Post the check-in that registers the runner's session on the board's
     ledger, and claim nothing. Used once, by register-node-agents.ps1.
+.PARAMETER Elevated
+    Run the node's ELEVATED runner (MCPs board task a98d7083): the
+    ``fleet-node-<alias>-elevated`` identity, claiming only the jobs that
+    require the ``elevated`` tag and launching them at RunLevel Highest,
+    behind ``API-FleetNode-<alias>-elevated-3min``. Its log is its own.
 
 .PARAMETER ApiRoot
     The API checkout; empty means the one this script is in.
@@ -70,6 +75,7 @@ param(
     [string]$Node,
 
     [switch]$Announce,
+    [switch]$Elevated,
     [string]$ApiRoot = '',
     [string]$EnvironmentScript = '',
     [string]$Poetry = 'poetry',
@@ -105,6 +111,11 @@ $agentArguments = @(
 if ($Announce) {
     $agentArguments += '--announce'
 }
+$runner = $Node
+if ($Elevated) {
+    $agentArguments += '--elevated'
+    $runner = "$Node-elevated"
+}
 exit (Invoke-FleetTick -EnvironmentScript $EnvironmentScript -Poetry $Poetry -WorkingDirectory $fleetRoot `
-    -AgentArguments $agentArguments -LogDirectory $LogDirectory -LogStem "fleet-node-$Node" `
-    -Header "node $Node" -RetentionDays 14)
+    -AgentArguments $agentArguments -LogDirectory $LogDirectory -LogStem "fleet-node-$runner" `
+    -Header "node $runner" -RetentionDays 14)

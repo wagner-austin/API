@@ -31,6 +31,14 @@
     tags derive from, so the set registered here is the set the queue can
     match.
 
+    A NODE DECLARING ``elevated`` GETS A SECOND TASK (MCPs board task
+    a98d7083), ``API-FleetNode-<alias>-elevated-3min``, whose tick runs with
+    ``-Elevated``: it claims only the jobs requiring the ``elevated`` tag and
+    launches them on the node at RunLevel Highest. The hub task itself is
+    registered exactly like the first, S4U at Limited, because the elevation
+    happens on the node, through the ssh account's own administrator token,
+    which that runner re-measures every tick.
+
     EACH NEW RUNNER ANNOUNCES ITSELF ONCE: the first thing a freshly
     registered task's runner needs is a session on the board's ledger (MCPs
     mig 530), so this script runs the tick with -Announce for every node it
@@ -93,27 +101,36 @@ if ($Tick -eq '') {
 
 $taskSuffix = '-3min'
 
-function Get-EnabledFleetNode {
+function Get-FleetNodeRunner {
     <#
     .SYNOPSIS
-        The aliases fleet.json enables, in its order.
+        One runner per node fleet.json enables, and a second, elevated one for
+        each enabled node that declares ``elevated`` (MCPs board task
+        a98d7083), in the file's order.
     .PARAMETER Path
         fleet.json.
     .OUTPUTS
-        String[].
+        PSCustomObject[] with Node (the alias), Runner (the name inside the
+        task name: the alias, or ``<alias>-elevated``) and Elevated.
     #>
-    [OutputType([string[]])]
+    [OutputType([pscustomobject[]])]
     param([Parameter(Mandatory)][string]$Path)
     $document = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
     $nodes = $document.PSObject.Properties['nodes']
     if ($null -eq $nodes) {
         throw "FLEET_NODES_MISSING: $Path has no nodes object"
     }
-    $enabled = foreach ($node in $nodes.Value.PSObject.Properties) {
+    $runners = foreach ($node in $nodes.Value.PSObject.Properties) {
         $flag = $node.Value.PSObject.Properties['enabled']
-        if ($null -ne $flag -and $flag.Value -eq $true) { $node.Name }
+        if ($null -ne $flag -and $flag.Value -eq $true) {
+            [pscustomobject]@{ Node = $node.Name; Runner = $node.Name; Elevated = $false }
+            $elevated = $node.Value.PSObject.Properties['elevated']
+            if ($null -ne $elevated -and $elevated.Value -eq $true) {
+                [pscustomobject]@{ Node = $node.Name; Runner = "$($node.Name)-elevated"; Elevated = $true }
+            }
+        }
     }
-    return [string[]]@($enabled)
+    return [pscustomobject[]]@($runners)
 }
 
 $registered = @(Get-FleetScheduledTask -Prefix $TaskPrefix -Suffix $taskSuffix)
@@ -125,30 +142,44 @@ if ($UnregisterAll) {
     return
 }
 
-$enabled = @(Get-EnabledFleetNode $Workspace)
-if ($enabled.Count -eq 0) {
+$runners = @(Get-FleetNodeRunner $Workspace)
+if ($runners.Count -eq 0) {
     throw "FLEET_NODES_NONE_ENABLED: fleet.json at $Workspace enables no node; nothing to register"
 }
 
-# Tasks whose node is no longer enabled (or declared) are removed first, so
-# the set of tasks after this script equals the set of enabled nodes.
+# Tasks naming no runner fleet.json asks for (a node no longer enabled or
+# declared, or an elevated runner its node no longer declares) are removed
+# first, so the set of tasks after this script equals the set of runners.
+# The comparison is by whole task name: an elevated runner's name reads as
+# an alias ending in -elevated, which no node carries.
+$expected = @($runners | ForEach-Object { "$TaskPrefix$($_.Runner)$taskSuffix" })
 foreach ($task in $registered) {
-    $alias = $task.TaskName.Substring($TaskPrefix.Length, $task.TaskName.Length - $TaskPrefix.Length - $taskSuffix.Length)
-    if ($enabled -notcontains $alias) {
+    if ($expected -notcontains $task.TaskName) {
         [void](Unregister-FleetTick $task.TaskName)
-        Write-Information "Unregistered $($task.TaskName): $alias is not an enabled node." -InformationAction Continue
+        Write-Information "Unregistered $($task.TaskName): fleet.json asks for no such runner." -InformationAction Continue
     }
 }
 
-foreach ($alias in $enabled) {
-    $taskName = "$TaskPrefix$alias$taskSuffix"
-    $identity = & $Register $taskName $Tick " -Node $alias" `
-        "One fleet-node-agent tick for ${alias}: claim the node lane's jobs ${alias} carries the tags for (API tools/fleet). See register-node-agents.ps1."
+foreach ($runner in $runners) {
+    $alias = $runner.Node
+    $taskName = "$TaskPrefix$($runner.Runner)$taskSuffix"
+    $tickArguments = " -Node $alias"
+    $lane = "claim the node lane's jobs ${alias} carries the tags for"
+    if ($runner.Elevated) {
+        $tickArguments += ' -Elevated'
+        $lane = "claim only the jobs requiring the elevated tag, and launch them at RunLevel Highest"
+    }
+    $identity = & $Register $taskName $Tick $tickArguments `
+        "One fleet-node-agent tick for $($runner.Runner): $lane (API tools/fleet). See register-node-agents.ps1."
     # The announce runs in this console, synchronously, so a refused
     # check-in is seen here rather than in a log nobody reads yet.
-    & $PowerShell -NoProfile -ExecutionPolicy Bypass -File $Tick -Node $alias -Announce
+    $announce = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Tick, '-Node', $alias)
+    if ($runner.Elevated) {
+        $announce += '-Elevated'
+    }
+    & $PowerShell @announce -Announce
     if ($LASTEXITCODE -ne 0) {
-        throw "FLEET_NODE_ANNOUNCE_FAILED: the announce tick for $alias exited $LASTEXITCODE; see the fleet-node-$alias-*.log under $env:LOCALAPPDATA\Temp\claude"
+        throw "FLEET_NODE_ANNOUNCE_FAILED: the announce tick for $($runner.Runner) exited $LASTEXITCODE; see the fleet-node-$($runner.Runner)-*.log under $env:LOCALAPPDATA\Temp\claude"
     }
     Write-Information "Registered $taskName (every 3 minutes and at boot, $identity, S4U, Limited) and announced it." -InformationAction Continue
 }
