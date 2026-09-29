@@ -48,6 +48,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.fleetshare.replace_window import read_once
 from tankpit_bot.runtime_artifacts import bot_run_dir
 
 CLAIM_TTL_MS = 30_000
@@ -175,16 +176,22 @@ def _read_claim(path: Path) -> ContainerClaimDict | None:
 
     Returns:
         The decoded claim; ``None`` when the file is gone (released
-        between the caller's create failure and this read) or its
+        between the caller's create failure and this read), its
         content has not landed yet (the documented non-atomic window
-        after the holder's exclusive create). ``None`` never means
-        "unclaimed" — the caller re-arbitrates with the file's
-        existence, where creation is the only atomic truth.
+        after the holder's exclusive create), or the holder's refresh
+        was mid-replace (any form
+        :class:`~tankpit_bot.fleetshare.replace_window.ReplaceWindow`
+        names). ``None`` never means "unclaimed" — the caller
+        re-arbitrates with the file's existence, where creation is the
+        only atomic truth.
+
+    Raises:
+        OSError: Any read failure that is not a replace window.
     """
-    try:
-        text = _test_hooks.read_text(path)
-    except FileNotFoundError:
+    read = read_once(path)
+    if read["window"] is not None:
         return None
+    text = read["text"]
     try:
         parsed = load_json_str(text)
     except InvalidJsonError:

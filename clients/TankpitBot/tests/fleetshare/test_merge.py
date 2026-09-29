@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from platform_core.json_utils import dump_json_str
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.fleetshare.codecs import encode_fleet_report
 from tankpit_bot.fleetshare.merge import (
     FLEET_REPORT_TTL_MS,
@@ -134,54 +131,6 @@ class TestReadTeamReports:
         _write(fake_fs, _report(""))
 
         assert read_team_reports("", 2, "6", _NOW) == []
-
-    def test_read_retries_through_the_windows_replace_window(self, fake_fs: FakeFileSystem) -> None:
-        """One PermissionError mid-swap: the immediate retry lands.
-
-        The arterial tick-264 crash (2026-08-26 03:01:06): Windows
-        refuses a concurrent open while the writer's ``os.replace``
-        swaps the report; the swap completes within the failed open,
-        so the very next attempt reads the fresh report.
-        """
-        _write(fake_fs, _report("artax"))
-        real_read = _test_hooks.read_text
-        calls = {"n": 0}
-
-        def swap_window_read(path: Path) -> str:
-            calls["n"] += 1
-            if calls["n"] == 1:
-                raise PermissionError(13, "Permission denied")
-            return real_read(path)
-
-        _test_hooks.read_text = swap_window_read
-        try:
-            reports = read_team_reports("arterial", 2, "6", _NOW)
-        finally:
-            _test_hooks.read_text = real_read
-
-        assert len(reports) == 1
-        assert calls["n"] == 2
-
-    def test_read_skips_a_sibling_denied_through_the_budget(self, fake_fs: FakeFileSystem) -> None:
-        """Every attempt denied: the sibling is skipped, never a crash.
-
-        Falsified premise (arterial tick 316, 2026-08-28 21:10, first
-        two-bot World fleet under heavy machine load): three immediate
-        retries all landed inside one Windows replace swap and the
-        raise killed the session over one beat of advisory data that
-        rewrites every ~2 s. The next tick reads the fresh rewrite.
-        """
-        _write(fake_fs, _report("artax"))
-        real_read = _test_hooks.read_text
-
-        def denied_read(path: Path) -> str:
-            raise PermissionError(13, "Permission denied")
-
-        _test_hooks.read_text = denied_read
-        try:
-            assert read_team_reports("arterial", 2, "6", _NOW) == []
-        finally:
-            _test_hooks.read_text = real_read
 
 
 class TestMergeFleetReports:

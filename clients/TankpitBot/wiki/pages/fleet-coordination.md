@@ -49,10 +49,22 @@ Every tick, after the HUD mirror, each bot:
    assembles fresh beliefs and `write_fleet_report` **atomically
    replaces** `knowledge.json` beside `hud.json` in the bot's run
    directory (`runs/bot/<instance>/`, or `runs/bot/` for the sole-bot
-   namespace). Atomicity (temp file + `os.replace`, the
-   `replace_text` hook) is what makes the reader's strict
-   decode-and-raise sound: a torn read is impossible, so a malformed
-   file is a genuine bug.
+   namespace). The write is a temp file plus `os.replace` (the
+   `replace_text` hook), so a reader never sees a PARTIAL report, and a
+   non-empty malformed file is a genuine bug that raises. A reader can
+   still land inside the swap. On a Windows host that refuses the open
+   (`PermissionError`). On the container fleet's runs mount (sedona's
+   Windows directory bind-mounted by Docker Desktop) the report is
+   briefly missing, briefly EMPTY, or unreadable with `ENODATA`,
+   measured 2026-09-29 in the fleet container as 52 missing and 10
+   empty reads in 120 s against 0 on the container's own `/tmp`, and
+   an `ENODATA` read killed a live bot (board task b651224a).
+   `fleetshare.replace_window.read_once` names those four forms, and
+   the reader skips a sibling hidden by them for the whole retry
+   budget, naming each in `fleet_report_read_denied`. Exclusive-create
+   claims were probed on the same mount and hold: 400 of 400 four-way
+   races had one winner, and 0 of 76,150 rival creates won during a
+   holder's refreshes.
 2. **Merges** siblings: `fleetshare.merge.read_team_reports` lists
    `runs/bot/*/knowledge.json` plus the sole-namespace file, skips its
    own, drops reports older than `FLEET_REPORT_TTL_MS` (10 s — a dead

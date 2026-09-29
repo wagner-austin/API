@@ -22,6 +22,7 @@ from typing_extensions import TypedDict
 from tankpit_bot import _test_hooks
 from tankpit_bot.facts.source import FactSource
 from tankpit_bot.fleetshare.codecs import decode_fleet_report
+from tankpit_bot.fleetshare.replace_window import ReplaceWindow, read_once
 from tankpit_bot.fleetshare.report import FLEET_REPORT_FILENAME
 from tankpit_bot.fleetshare.types import FleetReportDict
 from tankpit_bot.runtime_artifacts import bot_run_dir
@@ -79,34 +80,46 @@ landed inside one swap and the raise KILLED the session over one
 beat of advisory data that rewrites every ~2 s. A denied sibling is
 now skipped for this exchange -- the diagnostic keeps a genuinely
 wedged permission fault visible as a repeating beacon instead of a
-dead bot."""
+dead bot.
+
+The window has three more forms on the container fleet's runs mount
+(missing, empty, ``ENODATA``; :mod:`tankpit_bot.fleetshare.replace_window`
+gives the measurement). All four are absorbed the same way; a NON-empty
+report that fails to decode is still a genuine bug and raises."""
 
 
 def _read_report_text(path: Path) -> str | None:
-    """Read a sibling report, absorbing the Windows replace window.
+    """Read a sibling report, absorbing the writer's replace window.
 
     Args:
         path: The report file.
 
     Returns:
         The file text, or ``None`` when every attempt in the budget
-        was denied -- the caller skips this sibling for the exchange
-        and the next tick reads its fresh rewrite.
+        fell inside a replace window -- the caller skips this sibling
+        for the exchange and the next tick reads its fresh rewrite. The
+        ``fleet_report_read_denied`` diagnostic names each window seen.
+
+    Raises:
+        OSError: Any read failure other than the four replace-window
+            forms :class:`~tankpit_bot.fleetshare.replace_window.ReplaceWindow`
+            names.
     """
-    attempt = 0
-    while True:
-        try:
-            return _test_hooks.read_text(path)
-        except PermissionError:
-            attempt += 1
-            if attempt >= _REPORT_READ_ATTEMPTS:
-                emit_diagnostic(
-                    diagnostic_kind="fleet_report_read_denied",
-                    origin="fleetshare.merge.read_team_reports",
-                    report_path=str(path),
-                    attempts=attempt,
-                )
-                return None
+    seen: list[ReplaceWindow] = []
+    while len(seen) < _REPORT_READ_ATTEMPTS:
+        read = read_once(path)
+        window = read["window"]
+        if window is None:
+            return read["text"]
+        seen.append(window)
+    emit_diagnostic(
+        diagnostic_kind="fleet_report_read_denied",
+        origin="fleetshare.merge.read_team_reports",
+        report_path=str(path),
+        attempts=len(seen),
+        windows=",".join(window.value for window in seen),
+    )
+    return None
 
 
 def read_team_reports(
