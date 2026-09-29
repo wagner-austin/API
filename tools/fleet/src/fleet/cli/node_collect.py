@@ -24,6 +24,18 @@ runner holds and settles every run it launched in one of four ways:
   slime-1790104328 was cancelled on the queue at 2026-09-22 20:22Z and closed
   on this machine only at 00:49Z, after its processes had been killed by hand.
 
+* CLAIMED, NEVER STARTED (MCPs board task 5a4f9b3e). A claim tick launches
+  a run and only then reports its start, so a queue that refuses that one
+  call ends the tick with the job claimed, no run id on it, and a live
+  ledger row that nothing names. Measured 2026-09-29: serendipity's tick
+  died on report_start's ConnectionRefused at 09:00:58Z while diphtheria's
+  services were recreated, and the orphan row held its one run slot until
+  10:18Z while every tick logged NODE_OWNER_RESERVED. Collect runs before
+  claim in a tick, so a claimed job it sees was left by an earlier tick: it
+  ADOPTS the run that claim launched, found by :func:`launched_by_claim`,
+  by reporting its start, or REFUSES the claim when nothing was launched.
+  A cancel of such a job reaches its run the same way.
+
 A stop ends the build's whole process tree
 (:meth:`fleet.core.dialect.Dialect.stop_script`) and then closes the row
 (:func:`fleet.core.stop.stop_and_finish`), in that order, so a stop that
@@ -73,6 +85,11 @@ CLAIM_LEASE_SECONDS: Final = 3600
 #: ``timeout`` gives a command it ended for running too long, which is what
 #: happened, rather than a number a reader would have to look up.
 TIMED_OUT_EXIT_CODE: Final = 124
+
+#: How far the queue's clock and this machine's may disagree when a claim is
+#: matched to the run it launched: the claim is stamped by the database host
+#: and the ledger row by the hub.
+CLAIM_CLOCK_SLACK_SECONDS: Final = 60
 
 
 def settle(
@@ -247,6 +264,110 @@ def collect_one_job(
     return f"{encode_job_line(job)}: {line}"
 
 
+def launched_by_claim(
+    rows: tuple[LedgerEntry, ...], job: DispatchJob, *, alias: str
+) -> LedgerEntry | None:
+    """The live run on this node that a claim launched before its start was reported.
+
+    The queue row carries no run id until the start lands, so the run is
+    found from what the ledger row does carry: the submitter and session the
+    lease was taken for (:func:`fleet.cli.node_agent.launch_claimed` takes
+    both from the job), the project, and a start within the claim's lease of
+    the claim, since the claiming tick launches seconds after it claims.
+
+    Args:
+        rows: Live ledger rows that no running job names.
+        job: The claimed, or cancelled, job whose start never landed.
+        alias: This node's workspace name.
+
+    Returns:
+        The run, or None when the claim launched nothing on this node.
+
+    Raises:
+        AppError: With ``DISPATCH_CLAIM_AMBIGUOUS`` when more than one row
+            could be the run, which is refused rather than guessed at.
+    """
+    claimed = job["claimed_unix"]
+    matches = [
+        row
+        for row in rows
+        if claimed is not None
+        and row["node"] == alias
+        and row["project"] == job["project"]
+        and row["agent"] == job["submitted_by"]
+        and row["session_id"] == job["session_id"]
+        and claimed - CLAIM_CLOCK_SLACK_SECONDS
+        <= row["started_unix"]
+        <= claimed + CLAIM_LEASE_SECONDS
+    ]
+    if len(matches) > 1:
+        raise AppError(
+            FleetErrorCode.DISPATCH_CLAIM_AMBIGUOUS,
+            f"{encode_job_line(job)} never reported a start, and {len(matches)} live runs on "
+            f"{alias} could be the one it launched: {', '.join(row['run_id'] for row in matches)}",
+        )
+    return matches[0] if matches else None
+
+
+def reconcile_claim(
+    loaded: _config.LoadedWorkspace,
+    credentials: McpCredentials,
+    job: DispatchJob,
+    identity: JSONObject,
+    *,
+    alias: str,
+    running: frozenset[str],
+) -> str:
+    """Adopt the run a claim launched, or refuse a claim that launched nothing.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        credentials: The queue's endpoint and headers.
+        job: A job this runner holds in status claimed, left by an earlier tick.
+        identity: This runner's identity arguments.
+        alias: This node's workspace name.
+        running: The run ids of the running jobs this runner holds, whose
+            rows are theirs and not this claim's.
+
+    Returns:
+        One line saying what happened, for the log.
+
+    Raises:
+        AppError: ``DISPATCH_CLAIM_AMBIGUOUS`` from :func:`launched_by_claim`,
+            or a queue failure. Not caught: the next tick meets the same job.
+    """
+    rows = tuple(
+        row for row in collect_cli.live_rows(loaded, run_id=None) if row["run_id"] not in running
+    )
+    row = launched_by_claim(rows, job, alias=alias)
+    if row is None:
+        detail = (
+            f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: claimed by this runner in a tick that "
+            "ended before it launched anything; refused so the submitter can resubmit it"
+        )
+        queue.report_close(
+            credentials,
+            job_id=job["job_id"],
+            status=ClosingStatus.REFUSED,
+            exit_code=None,
+            detail=detail,
+            identity=identity,
+        )
+        return f"{encode_job_line(job)}: refused, {detail}"
+    queue.report_start(
+        credentials,
+        job_id=job["job_id"],
+        node=alias,
+        run_id=row["run_id"],
+        lease_seconds=CLAIM_LEASE_SECONDS,
+        identity=identity,
+    )
+    return (
+        f"{encode_job_line(job)}: adopted {row['run_id']}, which its claiming tick launched "
+        "before its start report failed"
+    )
+
+
 def stop_cancelled(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
@@ -291,7 +412,14 @@ def stop_cancelled(
     while offset is not None and candidates:
         page = queue.cancelled_page(credentials, agent=agent, offset=offset)
         for job in page["jobs"]:
-            row = candidates.pop(job["run_id"], None)
+            # A job cancelled before its start landed names no run; its run
+            # is found as a claim's is (:func:`launched_by_claim`).
+            launched = (
+                None
+                if job["run_id"]
+                else launched_by_claim(tuple(candidates.values()), job, alias=alias)
+            )
+            row = candidates.pop(job["run_id"] if launched is None else launched["run_id"], None)
             if row is None:
                 continue
             stop.stop_and_finish(
@@ -322,7 +450,8 @@ def collect_pass(
     agent: str,
     alias: str,
 ) -> None:
-    """Settle every job this runner is holding, then stop what was cancelled.
+    """Settle every running job this runner holds, reconcile every claim an
+    earlier tick left without a start, then stop what was cancelled.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -333,14 +462,18 @@ def collect_pass(
         alias: This node's workspace name.
 
     Raises:
-        AppError: As :func:`collect_one_job` and :func:`stop_cancelled`
-            describe.
+        AppError: As :func:`collect_one_job`, :func:`reconcile_claim` and
+            :func:`stop_cancelled` describe.
     """
     held = queue.held_by(credentials, agent=agent)
+    running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     for job in held:
-        if job["status"] is not DispatchStatus.RUNNING:
-            continue
-        _log.info("%s", collect_one_job(loaded, credentials, board, job, identity))
+        # Live is claimed or running; a claimed one is an earlier tick's.
+        if job["status"] is DispatchStatus.RUNNING:
+            _log.info("%s", collect_one_job(loaded, credentials, board, job, identity))
+        else:
+            line = reconcile_claim(loaded, credentials, job, identity, alias=alias, running=running)
+            _log.info("%s", line)
     stop_cancelled(
         loaded,
         credentials,
