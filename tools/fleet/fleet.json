@@ -203,6 +203,18 @@
         "companions": []
       }
     },
+    "tools/maketools": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/maketools",
+        "install": [],
+        "companions": []
+      }
+    },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 4,
@@ -247,6 +259,18 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "services/Model-Trainer",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/grandma-api": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 4,
+      "expected_minutes": 10,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/grandma-api",
         "install": [],
         "companions": []
       }
