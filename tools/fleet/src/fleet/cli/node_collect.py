@@ -52,7 +52,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config
+from fleet.cli import _config, node_lost
 from fleet.cli import collect as collect_cli
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
@@ -70,14 +70,9 @@ from fleet.core import (
     stop,
     verdict,
 )
+from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
 
 _log = get_logger(__name__)
-
-#: How long a claim survives without a report: the same hour the hub runner
-#: takes, covering the fetch, the staging and the wait until the next tick's
-#: collect renews it (:func:`collect_pass` renews every running job it holds,
-#: so the lease is never sized for the slowest suite in advance).
-CLAIM_LEASE_SECONDS: Final = 3600
 
 #: The exit status a run stopped past its lease is closed with. The build
 #: wrote none, and the queue refuses ``failed`` without a non-zero status
@@ -85,11 +80,6 @@ CLAIM_LEASE_SECONDS: Final = 3600
 #: ``timeout`` gives a command it ended for running too long, which is what
 #: happened, rather than a number a reader would have to look up.
 TIMED_OUT_EXIT_CODE: Final = 124
-
-#: How far the queue's clock and this machine's may disagree when a claim is
-#: matched to the run it launched: the claim is stamped by the database host
-#: and the ledger row by the hub.
-CLAIM_CLOCK_SLACK_SECONDS: Final = 60
 
 
 def settle(
@@ -296,9 +286,7 @@ def launched_by_claim(
         and row["project"] == job["project"]
         and row["agent"] == job["submitted_by"]
         and row["session_id"] == job["session_id"]
-        and claimed - CLAIM_CLOCK_SLACK_SECONDS
-        <= row["started_unix"]
-        <= claimed + CLAIM_LEASE_SECONDS
+        and launched_within(claimed_unix=claimed, started_unix=row["started_unix"])
     ]
     if len(matches) > 1:
         raise AppError(
@@ -390,9 +378,10 @@ def stop_cancelled(
     """Stop every run on this node whose queue job was cancelled under it.
 
     A candidate is a run this machine's ledger still calls running on this
-    node that no job this runner holds names. Only a candidate the queue
-    lists as cancelled while THIS runner held it is stopped; any other, a
-    ``fleet-run`` dispatched by hand, say, is left alone, because a runner
+    node that no job this runner holds names. A candidate the queue lists
+    as cancelled while THIS runner held it is stopped, and so is one whose
+    launching job has since left this runner (:mod:`fleet.cli.node_lost`);
+    any other, a ``fleet-run`` dispatched by hand, say, is left alone, because a runner
     that stopped what it could not account for would be the sweep
     ``fleet-cancel``'s header refuses to be. With no candidate the queue is
     not asked at all, which is every ordinary tick.
@@ -436,7 +425,12 @@ def stop_cancelled(
             stop_cancelled_run(loaded, node=node, row=row, job=job, agent=agent)
             stopped += 1
         offset = page["next_offset"]
-    return stopped
+    # What no cancel accounts for may be a run whose job was taken over by
+    # another runner (board task fd402617); what nothing accounts for stays.
+    lost = node_lost.stop_lost(
+        loaded, credentials, node=node, rows=tuple(candidates.values()), agent=agent
+    )
+    return stopped + lost
 
 
 def stop_cancelled_run(
