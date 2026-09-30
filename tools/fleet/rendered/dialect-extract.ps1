@@ -10,4 +10,4 @@ function Invoke-Step {
         exit $LASTEXITCODE
     }
 }
-Invoke-Step $Tar @('-xzmf', 'C:/fleet/stage/MCPs-packages-maketools-1790000000/tree.tgz', '-C', 'C:/fleet/stage/MCPs-packages-maketools-1790000000')
+Invoke-Step $Tar @('-xzmf', 'C:/fleet/stage/MCPs-packages-maketools-1790000000.stage/tree.tgz', '-C', 'C:/fleet/stage/MCPs-packages-maketools-1790000000')

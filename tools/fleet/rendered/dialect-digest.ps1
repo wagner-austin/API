@@ -1,5 +1,5 @@
 param(
-    [string]$Target = 'C:/fleet/stage/MCPs-packages-maketools-1790000000'
+    [string]$Target = 'C:/fleet/stage/MCPs-packages-maketools-1790000000.stage'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
