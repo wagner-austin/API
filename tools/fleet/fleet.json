@@ -348,6 +348,60 @@
         "companions": []
       }
     },
+    "idle": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 15,
+      "required_tags": ["gpu", "windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/idle.git",
+        "path": "",
+        "install": [["npm", "ci"], ["npx", "playwright", "install", "chromium"]],
+        "companions": []
+      }
+    },
+    "chat": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 2,
+      "expected_minutes": 20,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/chat.git",
+        "path": "",
+        "install": [["npm", "ci"]],
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/MCPs.git", "ref": "main", "directory": "MCPs"}
+        ]
+      }
+    },
+    "hardware-wiki": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 1,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/hardware-wiki.git",
+        "path": "",
+        "install": [],
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/MCPs.git", "ref": "main", "directory": "MCPs"}
+        ]
+      }
+    },
+    "metabolomics-dashboard": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 1,
+      "expected_minutes": 10,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/metabolomics-dashboard.git",
+        "path": "",
+        "install": [],
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/MCPs.git", "ref": "main", "directory": "MCPs"}
+        ]
+      }
+    },
     "corvis-stick/execution": {
       "worker_ram_gb": 1.0,
       "minimum_workers": 1,
