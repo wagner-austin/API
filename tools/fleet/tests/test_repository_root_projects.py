@@ -2,8 +2,9 @@
 
 The review pass gathers a PASSED check for every repository a closure
 touches, and a repository whose check can run only on a workstation shows as
-FAILED there. hardware-wiki's, metabolomics-dashboard's and chat's checks run
-MCPs' published maketools, which reads ``../MCPs`` at ``origin/main``, so each
+FAILED there. hardware-wiki's, metabolomics-dashboard's, chat's and
+corvis-stick's checks run MCPs' published maketools, which reads ``../MCPs``
+at ``origin/main``, so each
 carries MCPs as a companion at ``main``: the fleet stages it beside the export
 and names its commit ``origin/main`` (fleet.core.dialect,
 companion_repository_commands). idle's check reads nothing beside it, and its
@@ -39,6 +40,7 @@ MCPS_COMPANION = ProjectCompanion(
         ("chat", (NodeTag.WINDOWS,), (("npm", "ci"),), (MCPS_COMPANION,)),
         ("hardware-wiki", (), (), (MCPS_COMPANION,)),
         ("metabolomics-dashboard", (NodeTag.WINDOWS,), (), (MCPS_COMPANION,)),
+        ("corvis-stick", (NodeTag.WINDOWS,), (("npm", "ci"),), (MCPS_COMPANION,)),
     ],
 )
 def test_each_repository_s_root_check_is_declared_with_what_it_reads(
