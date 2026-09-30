@@ -13,6 +13,7 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.core.remote import (
     MAX_COMMAND_CHARS,
+    SSH_OPTIONS,
     make_directory,
     put_bytes,
     remote_digest,
@@ -28,9 +29,39 @@ class TestRunRemote:
         fake_run.add("hostname", stdout="login-i16\n")
         assert run_remote("hpc3", "hostname") == "login-i16\n"
 
-    def test_it_invokes_ssh_in_batch_mode(self, fake_run: FakeRun) -> None:
+    def test_it_invokes_ssh_in_batch_mode_with_the_route_bounded(self, fake_run: FakeRun) -> None:
+        """A prompt fails instead of waiting, and a stalled leg of the jump
+        route ends by ssh's own timeout instead of hanging the caller (board
+        task 465689f5)."""
         run_remote("hpc3", "hostname")
-        assert fake_run.calls[0].argv == ("ssh", "-o", "BatchMode=yes", "hpc3", "hostname")
+        assert fake_run.calls[0].argv == (
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=30",
+            "-o",
+            "ServerAliveInterval=15",
+            "-o",
+            "ServerAliveCountMax=4",
+            "hpc3",
+            "hostname",
+        )
+
+    def test_a_route_timeout_surfaces_as_a_named_failure(self, fake_run: FakeRun) -> None:
+        """What ssh prints when ServerAliveCountMax runs out is the diagnostic;
+        it reaches the caller under REMOTE_COMMAND_FAILED."""
+        fake_run.add(
+            "hostname",
+            returncode=255,
+            stderr="Timeout, server hpc3.rcic.uci.edu not responding.\n",
+        )
+        with pytest.raises(AppError) as excinfo:
+            run_remote("hpc3", "hostname")
+        assert excinfo.value.code is Hpc3ErrorCode.REMOTE_COMMAND_FAILED
+        assert excinfo.value.message == (
+            "`hostname` on hpc3 exited 255: Timeout, server hpc3.rcic.uci.edu not responding."
+        )
 
     def test_a_non_zero_exit_carries_the_clusters_stderr(self, fake_run: FakeRun) -> None:
         fake_run.add("sbatch", returncode=1, stderr="Invalid account\n")
@@ -138,6 +169,11 @@ class TestPutBytes:
         payload = b"\x00\x01binary\r\nnot-text\n"
         put_bytes("hpc3", "/pub/x/armB.txt", payload)
         assert fake_run.calls[0].stdin_bytes == payload
+
+    def test_the_transfer_carries_the_same_bounded_options(self, fake_run: FakeRun) -> None:
+        """A write over a stalled route must end as fast as a command does."""
+        put_bytes("hpc3", "/pub/x/armB.txt", b"data")
+        assert fake_run.calls[0].argv == ("ssh", *SSH_OPTIONS, "hpc3", "cat > '/pub/x/armB.txt'")
 
     def test_it_redirects_into_the_quoted_destination(self, fake_run: FakeRun) -> None:
         put_bytes("hpc3", "/pub/x/armB.txt", b"data")
