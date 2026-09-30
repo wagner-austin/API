@@ -49,6 +49,26 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
     )
 
 
+def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:
+    """tools/maketools' deploy cases reach only execdocker's daemon.
+
+    Each case builds a service's image and starts and removes its container
+    through the real compose path (board task 465689f5), so the project
+    requires ``docker``, which makes the runner isolate it, and ``linux``,
+    the only platform that tag is carried on.
+    """
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    project = require_project(workspace, "tools/maketools-execution")
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path="tools/maketools-execution",
+        install=(),
+        companions=(),
+    )
+
+
 @pytest.mark.parametrize("game", ["slime", "idle"])
 def test_each_games_suite_runs_isolated_on_a_rootless_daemon(game: str) -> None:
     """A game's make up refuses a commit <game>/execution has not passed at.

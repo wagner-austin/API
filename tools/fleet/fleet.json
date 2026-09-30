@@ -225,6 +225,18 @@
         "companions": []
       }
     },
+    "tools/maketools-execution": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 1,
+      "expected_minutes": 30,
+      "required_tags": ["linux", "docker"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/maketools-execution",
+        "install": [],
+        "companions": []
+      }
+    },
     "tools/maketools": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
