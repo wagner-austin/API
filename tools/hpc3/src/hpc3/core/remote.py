@@ -45,6 +45,43 @@ from hpc3.core import _test_hooks
 #: splitting well inside every limit it can meet.
 MAX_COMMAND_CHARS = 4000
 
+#: The ssh options every remote call carries. ``BatchMode`` turns a prompt
+#: into a failure instead of a wait. The other three bound the ROUTE, which
+#: runs hub -> cloudflared -> sedona -> hpc3 and whose legs can stall without
+#: closing: ``ConnectTimeout`` bounds the TCP connect and the banner exchange,
+#: and ``ServerAliveInterval`` with ``ServerAliveCountMax`` ends a session
+#: whose far side stops answering after four unanswered 15-second probes.
+#: Measured 2026-09-30 (board task 465689f5): with only ``BatchMode``, the
+#: image probe of an execution run sat on a stalled route until pytest-timeout
+#: killed the worker at 300 s, in 2 of 6 runs between 23:03Z and 23:20Z while
+#: the same probe answered in 3.3 s in 15 of 15 runs afterwards. A stalled leg
+#: now exits ssh with its own named timeout on stderr, which
+#: :func:`run_remote` and :func:`put_bytes` carry into
+#: ``REMOTE_COMMAND_FAILED``, instead of hanging the caller.
+SSH_OPTIONS: tuple[str, ...] = (
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=30",
+    "-o",
+    "ServerAliveInterval=15",
+    "-o",
+    "ServerAliveCountMax=4",
+)
+
+
+def ssh_argv(host: str, command: str) -> list[str]:
+    """Build the argv for one remote command.
+
+    Args:
+        host: SSH destination, an alias from the user's ssh config.
+        command: Command line to execute remotely.
+
+    Returns:
+        ``ssh``, :data:`SSH_OPTIONS`, the host and the command, as one list.
+    """
+    return ["ssh", *SSH_OPTIONS, host, command]
+
 
 def token_batches(tokens: Sequence[str], *, overhead: int, separator: str) -> list[list[str]]:
     """Group a command's variable part so each group fits one command line.
@@ -131,7 +168,7 @@ def run_remote(host: str, command: str) -> str:
             cluster's stderr. The message is the diagnostic; discarding it
             would send the reader back to the cluster to rediscover it.
     """
-    result = _test_hooks.run(["ssh", "-o", "BatchMode=yes", host, command])
+    result = _test_hooks.run(ssh_argv(host, command))
     if result["returncode"] != 0:
         raise AppError(
             Hpc3ErrorCode.REMOTE_COMMAND_FAILED,
@@ -192,7 +229,7 @@ def put_bytes(host: str, remote_path: str, payload: bytes) -> None:
     """
     quoted = _shell_single_quote(remote_path)
     result = _test_hooks.run(
-        ["ssh", "-o", "BatchMode=yes", host, f"cat > {quoted}"],
+        ssh_argv(host, f"cat > {quoted}"),
         stdin_bytes=payload,
     )
     if result["returncode"] != 0:
@@ -238,10 +275,12 @@ def remote_digest(host: str, remote_path: str) -> str:
 
 __all__ = [
     "MAX_COMMAND_CHARS",
+    "SSH_OPTIONS",
     "make_directory",
     "put_bytes",
     "remote_digest",
     "run_remote",
     "run_remote_batched",
+    "ssh_argv",
     "token_batches",
 ]
