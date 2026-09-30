@@ -4,7 +4,7 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: commit-tasks executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles check-powershell
+.PHONY: commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles check-powershell
 
 # ---------------------------------------------------------------------------
 # Infrastructure
@@ -30,7 +30,17 @@ executed:
 	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/fleet-execution .
 	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/fleet-execution-linux .
 
-infra: commit-tasks executed
+# A SERVICE DEPLOY SHIPS A COMMIT ITS SERVICES WERE DEPLOYED AT (MCPs board
+# task 465689f5). tools/maketools-execution builds each covered service's
+# image through the real compose_up, requires the compose file's own
+# healthcheck to pass and runs the real compose_down, on a node's rootless
+# daemon; the first such run found grandma-api's healthcheck calling a curl
+# its image never carried. It gates infra, which every up-* target runs
+# first, and not fleet-roll, since the fleet's own code is not what it runs.
+services-executed:
+	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/maketools-execution .
+
+infra: commit-tasks executed services-executed
 	docker compose up -d
 
 # THE FLEET RUNS WHAT WAS ROLLED, AND A ROLL NEEDS BOTH SUITES AT HEAD (MCPs
