@@ -113,7 +113,7 @@ def _companion_commit_script() -> str:
         Its text, as the dialect renders it for a Windows node.
     """
     return dialect.for_platform(NodePlatform.WINDOWS).checked_script(
-        dialect.companion_repository_commands("C:/fleet/stage/MCPs", COMPANION_SHA)
+        dialect.companion_repository_commands("C:/fleet/stage/MCPs", COMPANION_SHA, "main")
     )
 
 

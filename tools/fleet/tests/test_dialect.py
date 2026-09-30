@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import io
+import pathlib
+import subprocess
+import zipfile
+
 import pytest
 
 from fleet.contracts.node import NodePlatform
@@ -98,13 +103,51 @@ def test_a_companion_is_committed_so_the_check_reading_it_has_a_head() -> None:
     an uncommitted edit in the workspace is not mistaken for the code. On a
     node there is no HEAD until one is made, and the identity is passed rather
     than configured so nothing is left behind on the machine."""
-    commands = dialect.companion_repository_commands("/s/MCPs", "a" * 40)
+    commands = dialect.companion_repository_commands("/s/MCPs", "a" * 40, "main")
 
     assert commands[:2] == (
         ("git", "-C", "/s/MCPs", "init", "--quiet"),
         ("git", "-C", "/s/MCPs", "add", "--all", "--force"),
     )
     assert commands[2][-1] == f"fleet companion export {'a' * 40}"
+    assert commands[3] == ("git", "-C", "/s/MCPs", "update-ref", "refs/remotes/origin/main", "HEAD")
+
+
+@pytest.mark.parametrize("ref", ["main", "refs/heads/main"])
+def test_a_staged_companion_serves_origin_main_to_a_git_dir_archive(
+    tmp_path: pathlib.Path, ref: str
+) -> None:
+    """MCPs board task a8ee9b21. hardware-wiki's, metabolomics-dashboard's
+    and chat's checks run MCPs' published maketools, which reads
+    ``git --git-dir=../MCPs/.git archive origin/main`` and refused on a node
+    with 'has no origin/main carrying packages/maketools'. The commands run
+    here for real, over a tree shaped like the export, and the same archive
+    call then reads the staged file back."""
+    target = tmp_path / "MCPs"
+    (target / "packages" / "maketools").mkdir(parents=True)
+    (target / "packages" / "maketools" / "run.py").write_bytes(b"print(1)\n")
+    for command in dialect.companion_repository_commands(target.as_posix(), "b" * 40, ref):
+        subprocess.run(command, check=True, capture_output=True, timeout=60)
+
+    archived = subprocess.run(
+        [
+            "git",
+            f"--git-dir={target / '.git'}",
+            "archive",
+            "--format=zip",
+            "origin/main",
+            "packages/maketools",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+
+    # The node's own core.autocrlf decides the archive's line endings (CRLF
+    # on a Windows node), which is the checkout's business, not the ref's.
+    with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:
+        content = archive.read("packages/maketools/run.py")
+    assert content.replace(b"\r\n", b"\n") == b"print(1)\n"
 
 
 class TestCheckedScript:

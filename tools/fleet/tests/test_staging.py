@@ -433,6 +433,7 @@ class TestStagingACompanion:
             platform=NodePlatform.WINDOWS,
             stage_root="C:/fleet/stage",
             directory="MCPs",
+            ref="main",
             sha=COMPANION_SHA,
             source=SOURCE,
             payload=payload,
@@ -453,7 +454,7 @@ class TestStagingACompanion:
         assert (
             sent[9]
             == spoken.checked_script(
-                dialect.companion_repository_commands(where, COMPANION_SHA)
+                dialect.companion_repository_commands(where, COMPANION_SHA, "main")
             ).encode()
         )
 
@@ -470,6 +471,7 @@ class TestStagingACompanion:
             platform=NodePlatform.WINDOWS,
             stage_root="C:/fleet/stage",
             directory="MCPs",
+            ref="main",
             sha=COMPANION_SHA,
             source=SOURCE,
             payload=payload,
@@ -492,6 +494,7 @@ class TestStagingACompanion:
             platform=NodePlatform.LINUX,
             stage_root="/home/corvis/fleet/stage",
             directory="MCPs",
+            ref="main",
             sha=COMPANION_SHA,
             source=SOURCE,
             payload=payload,
@@ -523,6 +526,7 @@ class TestStagingACompanion:
                 platform=NodePlatform.WINDOWS,
                 stage_root="C:/fleet/stage",
                 directory="MCPs",
+                ref="main",
                 sha=COMPANION_SHA,
                 source=SOURCE,
                 payload=b"bytes",

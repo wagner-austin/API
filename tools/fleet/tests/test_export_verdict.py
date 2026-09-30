@@ -394,6 +394,7 @@ class TestExportingCompanions:
         assert exported == (
             export.CompanionExport(
                 directory="MCPs",
+                ref="main",
                 sha=SHA,
                 path=archives / f"companion-wagner-austin-MCPs-{SHA}.tgz",
                 data=payload,
