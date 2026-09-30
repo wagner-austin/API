@@ -125,13 +125,21 @@ lint: check-powershell
 
 # EVERY POWERSHELL FILE THIS REPOSITORY TRACKS, GUARDED, ANALYSED AND RUN BY
 # ITS PESTER SUITE TO 100 PERCENT OF COMMANDS AND BRANCH ARMS (MCPs board
-# task d69786fa). The harness is MCPs' scripts/ps-harness as MCPs'
-# origin/main carries it, extracted by .githooks/published_maketools.py from
-# the MCPs checkout beside this one, so no copy of it or of its rules lives
-# here. It is repository-wide because it inventories through git ls-files,
-# which is why it runs from the root and not from each package's check.
+# task d69786fa). The harness is MCPs' scripts/ps-harness at the MCPs commit
+# .githooks/mcps-harness.sha records, extracted by
+# .githooks/published_maketools.py from the MCPs checkout beside this one, so
+# no copy of it or of its rules lives here. It is repository-wide because it
+# inventories through git ls-files, which is why it runs from the root and
+# not from each package's check.
+#
+# PINNED, not origin/main (d69786fa A3): a verdict at an API commit is then
+# the verdict of the harness that commit names, however far MCPs has moved
+# when a review re-runs it, and moving the harness is a commit here. The CI
+# job reads the same file.
+MCPS_HARNESS_REF := $(file <.githooks/mcps-harness.sha)
+
 check-powershell:
-	$(PYTHON) .githooks/published_maketools.py ps-harness ../MCPs .
+	$(PYTHON) .githooks/published_maketools.py ps-harness --ref $(MCPS_HARNESS_REF) ../MCPs .
 
 test:
 	$(MAKETOOLS) fan-out test libs services clients tools
