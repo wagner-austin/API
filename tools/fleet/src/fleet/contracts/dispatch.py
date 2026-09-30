@@ -74,6 +74,10 @@ class DispatchCommand(StrEnum):
     # MCPs mig 564, board task 01f31e4a: compacting a working session that
     # got too big; the same hub pins, target and reason as a kill.
     COMPACT_SESSION = "compact-session"
+    # MCPs board task 5aa8ed06: a session's own approved exit. The runner
+    # performs it exactly as a graceful kill; the verb is what tells the
+    # ledger the session ended itself rather than being ended.
+    EXIT_SESSION = "exit-session"
 
 
 class DispatchLane(StrEnum):
