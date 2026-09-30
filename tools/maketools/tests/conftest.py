@@ -26,6 +26,9 @@ from maketools.commands import CommandResult
 from maketools.job import JobApi
 from maketools.processes import ProcessRow
 
+#: The deploy cases bound to a rootless execution daemon (board task 465689f5).
+pytest_plugins = ("tests._host",)
+
 
 class InheritingCall(TypedDict):
     """One recorded :func:`maketools._test_hooks.run_inheriting` call.

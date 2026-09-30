@@ -1,0 +1,24 @@
+# Laid over a service's own docker-compose.yml by the container-entry cases
+# (tests/test_service_entry.py, board task 465689f5), through compose's own
+# COMPOSE_FILE, so maketools' real compose_up and compose_down run the
+# service's real build, environment and healthcheck.
+#
+# It takes away only what would collide with the stack on the node that runs
+# it: the fixed container name, the published host port (production holds
+# those ports on diphtheria) and the restart policy. The external network is
+# renamed to one the case creates for the run and removes after it, so two
+# runs never share it. env_file is emptied because the service's .env is
+# untracked and never in a fleet export; the case sets each variable the
+# compose file interpolates instead.
+
+services:
+  api:
+    container_name: !reset null
+    ports: !reset []
+    env_file: !reset []
+    restart: !reset null
+
+networks:
+  platform-network:
+    name: ${EXECUTION_NETWORK:?the container-entry case names the run's network}
+    external: true
