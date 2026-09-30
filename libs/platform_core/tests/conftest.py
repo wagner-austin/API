@@ -9,6 +9,9 @@ import pytest
 from platform_core import json_utils as json_utils_mod
 from platform_core.config import _test_hooks
 
+#: pytester, which test_host_execution runs real pytest sessions with.
+pytest_plugins = ("pytester",)
+
 
 @pytest.fixture(autouse=True)
 def _restore_config_hooks() -> Generator[None, None, None]:
