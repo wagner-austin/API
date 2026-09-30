@@ -104,22 +104,29 @@ Describe 'Retiring a settled dispatch' {
             if ($Transcript) {
                 [System.IO.File]::WriteAllText($log, '887 passed')
             }
-            $scripts = @('mkdir-run.ps1', 'stop-run.ps1', 'retire-run.ps1') | ForEach-Object { Join-Path $Root $_ }
+            # The staging directory beside the export: the archive and the
+            # scripts that staged it, none of them inside the tree.
+            $staging = Join-Path $Root 'run-[1].stage'
+            [void][System.IO.Directory]::CreateDirectory($staging)
+            [System.IO.File]::WriteAllText((Join-Path $staging 'tree.tgz'), 'archive')
+            $scripts = @('mkdir-run.ps1', 'mkdir-run.stage.ps1', 'stop-run.ps1', 'retire-run.ps1') | ForEach-Object { Join-Path $Root $_ }
             foreach ($script in $scripts) {
                 [System.IO.File]::WriteAllText($script, '# a root script')
             }
             [void][System.IO.Directory]::CreateDirectory((Join-Path $Root 'cache'))
             return @{
                 Target = $target
+                Staging = $staging
                 Log = $log
                 Retained = Join-Path $Root 'logs\run-[1].log'
                 Script0 = $scripts[0]
                 Script1 = $scripts[1]
                 Script2 = $scripts[2]
+                Script3 = $scripts[3]
             }
         }
     }
-    It 'keeps the transcript, removes the tree read-only files and all, and removes only the run''s root scripts' {
+    It 'keeps the transcript, removes the tree read-only files and all and its staging directory, and removes only the run''s root scripts' {
         $root = Join-Path $TestDrive 'kept'
         $run = Initialize-SettledRun -Root $root -Transcript
         Invoke-Rendered 'dialect-retire' $run
@@ -135,6 +142,7 @@ Describe 'Retiring a settled dispatch' {
         Invoke-Rendered 'dialect-retire' $run
         @([System.IO.Directory]::GetFileSystemEntries((Join-Path $root 'logs'))).Count | Should -Be 0
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+        [System.IO.Directory]::Exists($run.Staging) | Should -BeFalse
     }
 }
 

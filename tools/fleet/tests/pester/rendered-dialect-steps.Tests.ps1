@@ -21,10 +21,10 @@ BeforeAll {
 }
 
 Describe 'The extract' {
-    It 'unpacks the landed archive into the dispatch with the node''s clock' {
+    It 'unpacks the archive landed beside the dispatch into it, with the node''s clock' {
         $tar = Initialize-StandIn 0 -Append
         Invoke-Rendered 'dialect-extract' @{ Tar = $tar.Path }
-        Read-Record $tar.Record | Should -Be @("-xzmf $($script:target)/tree.tgz -C $($script:target)")
+        Read-Record $tar.Record | Should -Be @("-xzmf $($script:target).stage/tree.tgz -C $($script:target)")
     }
     It 'ends with tar''s own status when tar refuses' {
         $tar = Initialize-StandIn 2 -Append
