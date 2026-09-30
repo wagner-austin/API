@@ -12,7 +12,6 @@ ssh runner, starting from that state or from the cancel that followed it.
 from __future__ import annotations
 
 import pathlib
-from datetime import UTC, datetime
 from urllib.error import URLError
 
 import pytest
@@ -22,7 +21,7 @@ from platform_core.mcp_client import McpHttpResponse
 
 from fleet.cli import _config, node_agent, node_collect
 from fleet.contracts.ledger import LedgerEntry
-from fleet.core import _test_hooks, leases, records, staging
+from fleet.core import _test_hooks, claim_window, leases, records, staging
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -33,22 +32,17 @@ from tests._node_agent_fixtures import (
     node_argv,
     prebuilt_export,
 )
-from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
+from tests._queue_fakes import (
+    DEFAULT_JOB_ID,
+    FakeQueue,
+    listing_page,
+    queue_instant,
+    queue_job,
+    trail_answer,
+)
 from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
-
-
-def _instant(unix: int) -> str:
-    """An instant as the queue renders one.
-
-    Args:
-        unix: Whole seconds since the epoch.
-
-    Returns:
-        JavaScript's ``toISOString`` of it.
-    """
-    return datetime.fromtimestamp(unix, UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
 #: The demo job as the queue holds it after its start report was lost:
@@ -56,15 +50,39 @@ def _instant(unix: int) -> str:
 ORPHANED = queue_job(
     status="claimed",
     claimedBy="fleet-node-lavender",
-    claimedAt=_instant(DEMO_NOW),
+    claimedAt=queue_instant(DEMO_NOW),
     taskId=VERDICT_TASK,
 )
 
+#: The job once adopted: running under lavender's runner, naming the run.
+ADOPTED = queue_job(
+    status="running", node="lavender", runId=DEMO_RUN_ID, claimedBy="fleet-node-lavender"
+)
+
 #: The queue's answer to the adopting start report.
-STARTED = dump_json_str({"job": queue_job(status="running", node="lavender", runId=DEMO_RUN_ID)})
+STARTED = dump_json_str({"job": ADOPTED})
 
 #: An empty page of the cancelled listing.
-NO_CANCELS = dump_json_str({"jobs": [], "pagination": {"nextOffset": None}})
+NO_CANCELS = listing_page([], None)
+
+
+def _adopted_and_asked_about(claimed_unix: int) -> list[str]:
+    """What the lost-run pass hears about an adopted run (board task fd402617).
+
+    The held set was read before the adoption, so the adopted row is still a
+    candidate; the queue lists its job running under this runner, which the
+    pass leaves alone.
+
+    Args:
+        claimed_unix: When the job's trail says lavender claimed it.
+
+    Returns:
+        The submitter's page and the job's trail.
+    """
+    return [
+        listing_page([ADOPTED], None),
+        trail_answer(ADOPTED, [("fleet-node-lavender", claimed_unix)]),
+    ]
 
 
 class RefusedAt:
@@ -152,6 +170,7 @@ class TestTheNextTick:
                 STARTED,
                 STARTED,
                 NO_CANCELS,
+                *_adopted_and_asked_about(DEMO_NOW),
                 dump_json_str({"claimed": None}),
             ]
         )
@@ -164,6 +183,8 @@ class TestTheNextTick:
             "dispatch_report",
             "dispatch_report",
             "dispatch_list",
+            "dispatch_list",
+            "dispatch_get",
             "dispatch_claim",
         ]
         # The trail says why the start came a tick late (55f2cb0b, A2).
@@ -194,14 +215,15 @@ class TestTheNextTick:
         so a row up to a minute older than the claim still matches."""
         launch(sourced_config)
         _test_hooks.run = FakeRun(list(PROBED))
-        late = _instant(DEMO_NOW + node_collect.CLAIM_CLOCK_SLACK_SECONDS)
-        stamped_late = {**ORPHANED, "claimedAt": late}
+        late = DEMO_NOW + claim_window.CLAIM_CLOCK_SLACK_SECONDS
+        stamped_late = {**ORPHANED, "claimedAt": queue_instant(late)}
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [stamped_late]}),
                 STARTED,
                 STARTED,
                 NO_CANCELS,
+                *_adopted_and_asked_about(late),
                 dump_json_str({"claimed": None}),
             ]
         )
@@ -285,28 +307,31 @@ class TestACancelBeforeTheStart:
         "claimed_at",
         [
             pytest.param(
-                _instant(DEMO_NOW + 2 * node_collect.CLAIM_CLOCK_SLACK_SECONDS),
+                DEMO_NOW + 2 * claim_window.CLAIM_CLOCK_SLACK_SECONDS,
                 id="claimed-after-it-began",
             ),
-            pytest.param(
-                _instant(DEMO_NOW - node_collect.CLAIM_LEASE_SECONDS - 1), id="an-older-claim"
-            ),
+            pytest.param(DEMO_NOW - claim_window.CLAIM_LEASE_SECONDS - 1, id="an-older-claim"),
             pytest.param(None, id="never-claimed"),
         ],
     )
     def test_never_stops_a_run_its_claim_cannot_have_launched(
-        self, sourced_config: pathlib.Path, claimed_at: str | None
+        self, sourced_config: pathlib.Path, claimed_at: int | None
     ) -> None:
         """An old cancelled job of the same submitter, session and project is
-        not the orphan's: the run began outside that claim's window."""
+        not the orphan's: the run began outside that claim's window, and the
+        lost-run pass reads the same window off the job's trail."""
         launch(sourced_config)
         runner = FakeRun(list(PROBED))
         _test_hooks.run = runner
-        cancelled = {**ORPHANED, "status": "cancelled", "claimedAt": claimed_at}
+        instant = None if claimed_at is None else queue_instant(claimed_at)
+        cancelled = {**ORPHANED, "status": "cancelled", "claimedAt": instant}
+        claims = [] if claimed_at is None else [("fleet-node-lavender", claimed_at)]
         _test_hooks.http_post = FakeQueue(
             [
                 dump_json_str({"jobs": []}),
-                dump_json_str({"jobs": [cancelled], "pagination": {"nextOffset": None}}),
+                listing_page([cancelled], None),
+                listing_page([cancelled], None),
+                trail_answer(cancelled, claims),
                 dump_json_str({"claimed": None}),
             ]
         )

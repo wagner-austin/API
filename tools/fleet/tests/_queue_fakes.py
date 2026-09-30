@@ -15,6 +15,7 @@ a patching library's call-recording API.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from platform_core.json_utils import (
     JSONObject,
@@ -182,6 +183,54 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
     }
     row.update(overrides)
     return row
+
+
+def queue_instant(unix: int) -> str:
+    """An instant as the queue renders one: JavaScript's ``toISOString``.
+
+    Args:
+        unix: Whole seconds since the epoch.
+
+    Returns:
+        The rendered instant, in UTC with milliseconds.
+    """
+    return datetime.fromtimestamp(unix, UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def listing_page(jobs: list[JSONObject], next_offset: int | None) -> str:
+    """One page of a ``dispatch_list`` answer, with its pagination block.
+
+    Args:
+        jobs: The page's wire rows.
+        next_offset: Where the next page begins, or None on the last.
+
+    Returns:
+        The rendered answer.
+    """
+    return dump_json_str({"jobs": jobs, "pagination": {"nextOffset": next_offset}})
+
+
+def trail_answer(job: JSONObject, claims: list[tuple[str, int]]) -> str:
+    """A ``dispatch_get`` answer: the job, and a trail holding these claims.
+
+    Each claim is preceded by the submission and followed by a progress
+    entry, as the real trail interleaves them, so a decoder that read any
+    entry but a claim as one would be caught.
+
+    Args:
+        job: The job's wire row.
+        claims: ``(actor, claimed_unix)`` per claim, oldest first.
+
+    Returns:
+        The rendered answer.
+    """
+    trail: list[JSONValue] = [
+        {"kind": "submitted", "actor": "opus-dispatch-0905", "createdAt": queue_instant(0)}
+    ]
+    for actor, claimed_unix in claims:
+        trail.append({"kind": "claimed", "actor": actor, "createdAt": queue_instant(claimed_unix)})
+        trail.append({"kind": "progress", "actor": actor, "createdAt": queue_instant(claimed_unix)})
+    return dump_json_str({"job": job, "trail": trail})
 
 
 class FakeRefusingQueue:

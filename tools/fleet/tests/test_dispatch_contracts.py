@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.contracts.dispatch import (
     DispatchCommand,
@@ -21,6 +21,7 @@ from fleet.contracts.dispatch import (
     decode_listing,
     decode_listing_page,
     decode_reported,
+    decode_trail_claims,
     encode_job_line,
 )
 from tests._queue_fakes import queue_job
@@ -306,6 +307,48 @@ class TestListingPages:
             decode_listing_page(answer({"jobs": [], "pagination": [100]}))
 
         assert "'pagination' is list, not an object" in raised.value.message
+
+
+class TestTrailClaims:
+    """``dispatch_get``'s trail, read for its claims (board task fd402617)."""
+
+    def test_reads_only_the_claims_oldest_first(self) -> None:
+        trail: list[JSONValue] = [
+            {"kind": "submitted", "actor": "opus-a-0930", "createdAt": "2026-09-30T13:36:33.446Z"},
+            {"kind": "claimed", "actor": "fleet-node-a", "createdAt": "2026-09-30T13:36:57.396Z"},
+            {"kind": "progress", "actor": "fleet-node-a", "createdAt": "2026-09-30T13:38:10.731Z"},
+            {"kind": "claimed", "actor": "fleet-node-b", "createdAt": "2026-09-30T14:51:15.636Z"},
+        ]
+
+        claims = decode_trail_claims(answer({"job": queue_job(), "trail": trail}))
+
+        assert claims == (
+            {"actor": "fleet-node-a", "claimed_unix": 1790775417},
+            {"actor": "fleet-node-b", "claimed_unix": 1790779875},
+        )
+
+    @pytest.mark.parametrize(
+        ("trail", "complaint"),
+        [
+            ({"kind": "claimed"}, "'trail' is dict, not an array"),
+            (["claimed"], "a trail entry is str"),
+            (
+                [{"kind": "claimed", "actor": "fleet-node-a", "createdAt": None}],
+                "a claim on the trail has a null 'createdAt'",
+            ),
+            (
+                [{"kind": "claimed", "createdAt": "2026-09-30T13:36:57.396Z"}],
+                "field 'actor' is NoneType, not a string",
+            ),
+            ([{"actor": "fleet-node-a"}], "field 'kind' is NoneType, not a string"),
+        ],
+    )
+    def test_a_trail_this_cannot_read_is_refused(self, trail: JSONValue, complaint: str) -> None:
+        with pytest.raises(AppError) as raised:
+            decode_trail_claims(answer({"job": queue_job(), "trail": trail}))
+
+        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
+        assert complaint in raised.value.message
 
 
 class TestRendering:

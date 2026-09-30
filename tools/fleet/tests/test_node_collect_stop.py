@@ -273,6 +273,7 @@ class TestCancelledUnderIt:
             [
                 dump_json_str({"jobs": []}),
                 _cancelled_page([], None),
+                _cancelled_page([], None),
                 dump_json_str({"claimed": None}),
             ]
         )
@@ -280,6 +281,13 @@ class TestCancelledUnderIt:
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
+        # The lost-run pass asked for the submitter's jobs and found none.
+        assert endpoint.arguments[2] == {
+            "project": "libs/demo",
+            "submittedBy": "opus-dispatch-0905",
+            "offset": 0,
+            "limit": queue.LISTING_PAGE_LIMIT,
+        }
         assert len(runner.calls) == len(PROBED)
         assert _ledger(sourced_config)[-1]["outcome"] == "running"
         assert not _lease_released(sourced_config, now_unix=DEMO_NOW)
