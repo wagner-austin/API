@@ -96,6 +96,7 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
             spoken.script_path(root, f"stop-{DEMO_RUN_ID}"),
             script_path,
         ),
+        task=f"fleet-{DEMO_RUN_ID}",
     ).encode("utf-8")
     assert script_path in " ".join(runner.calls[0])
     assert runner.calls[1][-1].endswith(script_path)
@@ -152,6 +153,7 @@ class TestTheShScriptRunsForReal:
                     spoken.script_path(stage_root, stem)
                     for stem in names.root_script_stems(DEMO_RUN_ID)
                 ),
+                task=names.task_name(DEMO_RUN_ID),
             ),
             encoding="utf-8",
         )

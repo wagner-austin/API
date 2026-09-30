@@ -144,6 +144,19 @@ Describe 'Retiring a settled dispatch' {
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         [System.IO.Directory]::Exists($run.Staging) | Should -BeFalse
     }
+    It 'deletes the run''s own scheduled task, which nothing else ever removed, and a second retire finds none' {
+        # A real root-folder task under a name no fleet run can carry, the
+        # way launch_script leaves one behind for every finished run.
+        $name = "fleet-pester-retire-$([guid]::NewGuid().ToString('N'))"
+        & schtasks.exe /Create /TN $name /TR 'cmd.exe /c exit 0' /SC ONCE /ST 23:59 /F | Out-Null
+        $LASTEXITCODE | Should -Be 0
+        $run = Initialize-SettledRun -Root (Join-Path $TestDrive 'tasked')
+        $run.TaskName = $name
+        Invoke-Rendered 'dialect-retire' $run
+        @(Get-ScheduledTask -TaskPath '\' | Where-Object { $_.TaskName -eq $name }).Count | Should -Be 0
+        Invoke-Rendered 'dialect-retire' $run
+        @(Get-ScheduledTask -TaskPath '\' | Where-Object { $_.TaskName -eq $name }).Count | Should -Be 0
+    }
 }
 
 Describe 'What the node reports back' {
