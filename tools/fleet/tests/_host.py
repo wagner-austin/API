@@ -8,8 +8,9 @@ show. Each is bound to one platform, and until this module each carried a
 case was skipped there, and the hub is Windows, so every Linux case was
 skipped at home. No run recorded both halves green at one commit.
 
-So the binding is a marker, ``host_windows`` or ``host_linux``, and there
-are two ways to run the suite:
+So the binding is a marker, ``host_windows`` or ``host_linux``, and the two
+ways to run the suite are platform_core's :mod:`~platform_core.host_execution`
+(lifted from this module so tools/hpc3 binds its cluster case the same way):
 
 - The ORDINARY run (``make check``) behaves as the ``skipif`` did: a host
   case bound to the other platform is skipped, naming the node that runs it.
@@ -20,19 +21,15 @@ are two ways to run the suite:
   ``tools/fleet-execution-linux`` (a Linux node) run, and a deploy refuses a
   commit without a passed run of each (MCPs' ``publish-executed``).
 
-Two markers rather than one with an argument, because a marker's arguments
-are untyped and this package's mypy settings refuse an expression of type
-Any in tests as in src.
-
-A THIRD, ``host_linux_docker``, binds a case to Linux like ``host_linux`` but
-runs it ONLY in the execution run: it asserts, from inside the run, that the
-suite itself is running as the node's execdocker user against that user's
-rootless daemon and cannot reach the stack's (MCPs board task a8ee9b21).
-That is true only because ``tools/fleet-execution-linux`` requires the
-``docker`` tag, which makes the fleet build it through the isolated script,
-on a node that has execdocker and never on a CI runner. The ordinary run
-skips it on every platform, naming the project that runs it, and the Linux
-execution run requires it like any host case.
+A THIRD marker, ``host_linux_docker``, binds a case to Linux like
+``host_linux`` but runs it ONLY in the execution run: it asserts, from inside
+the run, that the suite itself is running as the node's execdocker user
+against that user's rootless daemon and cannot reach the stack's (MCPs board
+task a8ee9b21). That is true only because ``tools/fleet-execution-linux``
+requires the ``docker`` tag, which makes the fleet build it through the
+isolated script, on a node that has execdocker and never on a CI runner. The
+ordinary run skips it on every platform, naming the project that runs it,
+and the Linux execution run requires it like any host case.
 """
 
 from __future__ import annotations
@@ -41,6 +38,7 @@ import sys
 from typing import Final
 
 import pytest
+from platform_core import host_execution
 
 #: This machine's platform, as the markers and the fleet's tags name it.
 HOST_PLATFORM: Final[str] = "windows" if sys.platform == "win32" else "linux"
@@ -58,67 +56,14 @@ PROJECTS: Final[dict[str, str]] = {
     "linux": "tools/fleet-execution-linux",
 }
 
-#: The command-line option that makes a run the execution run.
-EXECUTION_OPTION: Final[str] = "--host-execution"
-
-
-def bound_platform(item: pytest.Item) -> str | None:
-    """The platform a case is bound to, if any.
-
-    Args:
-        item: A collected case.
-
-    Returns:
-        ``"windows"`` or ``"linux"`` for a host case, else None.
-    """
-    if item.get_closest_marker(EXECUTION_ONLY_MARKER) is not None:
-        return "linux"
-    for platform, marker in MARKERS.items():
-        if item.get_closest_marker(marker) is not None:
-            return platform
-    return None
-
-
-class ExecutionTally:
-    """Counts what an execution run did, on the process that reports it.
-
-    Attributes:
-        passed: Host cases whose call passed.
-        skipped: Host cases that skipped in any phase.
-    """
-
-    def __init__(self) -> None:
-        """Start from nothing run."""
-        self.passed = 0
-        self.skipped = 0
-
-    def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
-        """Count one phase's outcome.
-
-        Args:
-            report: The phase's report.
-        """
-        if report.skipped:
-            self.skipped += 1
-        elif report.passed and report.when == "call":
-            self.passed += 1
-
-    def pytest_sessionfinish(self, session: pytest.Session) -> None:
-        """Fail the run unless every selected host case ran and at least one did.
-
-        Args:
-            session: The finished session.
-        """
-        print(
-            f"\nhost execution on {HOST_PLATFORM}: {self.passed} case(s) ran, "
-            f"{self.skipped} skipped"
-        )
-        if self.skipped or not self.passed:
-            print(
-                "HOST_EXECUTION_INCOMPLETE: an execution run must run every host case "
-                f"bound to {HOST_PLATFORM} and at least one; a skip is not a run"
-            )
-            session.exitstatus = pytest.ExitCode.TESTS_FAILED
+#: This package's host cases, as platform_core's host-execution run reads them.
+PLAN: Final[host_execution.HostExecutionPlan] = host_execution.HostExecutionPlan(
+    markers={marker: platform for platform, marker in MARKERS.items()},
+    execution_only={EXECUTION_ONLY_MARKER: "linux"},
+    needs={EXECUTION_ONLY_MARKER: "needs a node's execdocker user and its rootless daemon"},
+    projects=PROJECTS,
+    here=HOST_PLATFORM,
+)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -127,11 +72,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     Args:
         parser: pytest's option parser.
     """
-    parser.addoption(
-        EXECUTION_OPTION,
-        action="store_true",
-        help="run only the host cases bound to this platform, failing on a skip or on none",
-    )
+    host_execution.add_option(parser)
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -140,47 +81,14 @@ def pytest_configure(config: pytest.Config) -> None:
     Args:
         config: The run's configuration.
     """
-    for platform, marker in MARKERS.items():
-        config.addinivalue_line(
-            "markers", f"{marker}: executes this package's scripts on a {platform} host"
-        )
-    config.addinivalue_line(
-        "markers",
-        f"{EXECUTION_ONLY_MARKER}: executes a docker project's build as execdocker on a "
-        "linux node carrying the docker tag; only the execution run runs it",
-    )
-    execution: bool = config.getoption(EXECUTION_OPTION)
-    if execution and not hasattr(config, "workerinput"):
-        config.pluginmanager.register(ExecutionTally(), "host-execution-tally")
+    host_execution.configure(config, PLAN)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Select the execution run's cases, or skip the other platform's.
+    """Select the execution run's cases, or skip what this run cannot run.
 
     Args:
         config: The run's configuration.
-        items: The collected cases, reordered or narrowed in place.
+        items: The collected cases, narrowed in place for an execution run.
     """
-    execution: bool = config.getoption(EXECUTION_OPTION)
-    if execution:
-        kept = [item for item in items if bound_platform(item) == HOST_PLATFORM]
-        dropped = [item for item in items if bound_platform(item) != HOST_PLATFORM]
-        config.hook.pytest_deselected(items=dropped)
-        items[:] = kept
-        return
-    for item in items:
-        if item.get_closest_marker(EXECUTION_ONLY_MARKER) is not None:
-            item.add_marker(
-                pytest.mark.skip(
-                    reason="needs a node's execdocker user and its rootless daemon; "
-                    f"{PROJECTS['linux']} runs it there"
-                )
-            )
-            continue
-        platform = bound_platform(item)
-        if platform is not None and platform != HOST_PLATFORM:
-            item.add_marker(
-                pytest.mark.skip(
-                    reason=f"executes on a {platform} host; {PROJECTS[platform]} runs it there"
-                )
-            )
+    host_execution.select(config, items, PLAN)
