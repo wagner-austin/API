@@ -71,16 +71,18 @@ INIT_REPOSITORY_STEM = "init-repo"
 #: The script that makes a staged companion a one-commit repository.
 COMPANION_REPOSITORY_STEM = "companion-repo"
 
-#: What a companion's staging directory is called: its own directory's name
+#: What a staging directory is called: the name of the directory it stages
 #: and this suffix, beside it under the node's stage root.
 #:
-#: THE TRANSPORT FILES ARE KEPT OUT OF THE COMPANION ITSELF. A dispatch's
-#: archive lands inside the directory it unpacks into, which is harmless for
-#: a project -- nothing reads that tree as a repository. A companion IS read
-#: as one, and its whole claim is that it is an export of a commit and
-#: nothing else; a ``tree.tgz`` committed at its root would be a file the
-#: workspace does not have, sitting in the tree a check compares against it.
-COMPANION_STAGE_SUFFIX = ".stage"
+#: THE TRANSPORT FILES ARE KEPT OUT OF EVERY STAGED TREE, a dispatch's export
+#: as well as a companion. Each is committed on the node and read as a
+#: repository: its whole claim is that it is an export of a commit and
+#: nothing else. A dispatch's archive and step scripts once landed inside
+#: its export and ``git add --all`` committed them, so MCPs' maketools
+#: host-code on hardware-wiki read ``digest.sh``, ``extract.sh`` and
+#: ``init-repo.sh`` as tracked host scripts the repository does not have
+#: (FLEET-CHECK 8c1abde3, MCPs board task a8ee9b21).
+STAGE_SUFFIX = ".stage"
 
 #: The constant capacity probe, under a node's stage root.
 CAPACITY_PROBE_STEM = "fleet-capacity"
@@ -189,33 +191,34 @@ def companion_directory(stage_root: str, directory: str) -> str:
     return f"{stage_root}/{directory}"
 
 
-def companion_stage_name(directory: str) -> str:
-    """What one companion's staging directory is called.
+def stage_name(name: str) -> str:
+    """What the staging directory of one directory under the stage root is called.
 
-    A name and not a path, because it is both: the directory beside the
-    companion, and the string the scripts that make it are named after.
+    The string the script that makes it is named after, as
+    :func:`make_directory_stem` names every directory maker.
 
     Args:
-        directory: The companion's declared directory name, one segment.
+        name: The staged directory's name under the stage root: a run id, or
+            a companion's declared directory name.
 
     Returns:
-        ``<directory>.stage``.
+        ``<name>.stage``.
     """
-    return f"{directory}{COMPANION_STAGE_SUFFIX}"
+    return f"{name}{STAGE_SUFFIX}"
 
 
-def companion_stage_directory(stage_root: str, directory: str) -> str:
-    """Where one companion's archive and scripts land while it is staged.
+def staging_directory(directory: str) -> str:
+    """Where a staged directory's archive and scripts land, beside it.
 
     Args:
-        stage_root: The node's declared stage root.
-        directory: The companion's declared directory name, one segment.
+        directory: The absolute remote directory being staged: a dispatch's
+            export or a companion.
 
     Returns:
-        ``<stage_root>/<directory>.stage``, beside the companion and never
+        ``<directory>.stage``, beside it under the same stage root and never
         inside it.
     """
-    return f"{stage_root}/{companion_stage_name(directory)}"
+    return f"{directory}{STAGE_SUFFIX}"
 
 
 def reset_directory_stem(directory: str) -> str:
@@ -314,10 +317,11 @@ def retire_stem(run_id: str) -> str:
 def root_script_stems(run_id: str) -> tuple[str, ...]:
     """Every script one dispatch leaves under the stage root.
 
-    The directory maker, the stop and the retire itself: each is named after
-    the run so two runs cannot overwrite each other's, and so none of them
-    is inside the directory the retire removes. Measured on diphtheria
-    2026-09-27: 133 ``mkdir-`` scripts had outlived every tree they made.
+    The makers of the export and of its staging directory, the stop and the
+    retire itself: each is named after the run so two runs cannot overwrite
+    each other's, and so none of them is inside a directory the retire
+    removes. Measured on diphtheria 2026-09-27: 133 ``mkdir-`` scripts had
+    outlived every tree they made.
 
     Args:
         run_id: The dispatch.
@@ -325,7 +329,12 @@ def root_script_stems(run_id: str) -> tuple[str, ...]:
     Returns:
         Their stems, in the order the run writes them.
     """
-    return (make_directory_stem(run_id), stop_stem(run_id), retire_stem(run_id))
+    return (
+        make_directory_stem(run_id),
+        make_directory_stem(stage_name(run_id)),
+        stop_stem(run_id),
+        retire_stem(run_id),
+    )
 
 
 __all__ = [
@@ -335,7 +344,6 @@ __all__ = [
     "CAPACITY_PROBE_STEM",
     "COLLECT_STEM",
     "COMPANION_REPOSITORY_STEM",
-    "COMPANION_STAGE_SUFFIX",
     "DIGEST_STEM",
     "EXTRACT_STEM",
     "INIT_REPOSITORY_STEM",
@@ -345,11 +353,10 @@ __all__ = [
     "LOG_TAIL_STEM",
     "PID_NAME",
     "RESULT_NAME",
+    "STAGE_SUFFIX",
     "TOOLCHAIN_PROBE_STEM",
     "cache_root",
     "companion_directory",
-    "companion_stage_directory",
-    "companion_stage_name",
     "dispatch_directory",
     "log_path",
     "make_directory_stem",
@@ -358,6 +365,8 @@ __all__ = [
     "retained_log_path",
     "retire_stem",
     "root_script_stems",
+    "stage_name",
+    "staging_directory",
     "stop_stem",
     "task_name",
 ]

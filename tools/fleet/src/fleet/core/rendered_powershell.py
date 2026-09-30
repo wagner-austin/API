@@ -93,6 +93,7 @@ def _dialect_scripts() -> list[RenderedScript]:
     """
     spoken = WindowsDialect()
     target = names.dispatch_directory(EXAMPLE_STAGE_ROOT, EXAMPLE_RUN_ID)
+    staged = names.staging_directory(target)
     companion = names.companion_directory(EXAMPLE_STAGE_ROOT, "MCPs")
     return [
         RenderedScript(name="dialect-capacity-probe", text=spoken.capacity_probe_script()),
@@ -102,7 +103,7 @@ def _dialect_scripts() -> list[RenderedScript]:
         RenderedScript(
             name="dialect-reset-directory", text=spoken.reset_directory_script(companion)
         ),
-        RenderedScript(name="dialect-digest", text=spoken.digest_script(target)),
+        RenderedScript(name="dialect-digest", text=spoken.digest_script(staged)),
         RenderedScript(name="dialect-result", text=spoken.result_script(target)),
         RenderedScript(
             name="dialect-log-tail",
@@ -132,7 +133,7 @@ def _dialect_scripts() -> list[RenderedScript]:
         RenderedScript(
             name="dialect-extract",
             text=spoken.checked_script(
-                dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)
+                dialect.extract_commands(f"{staged}/{names.ARCHIVE_NAME}", target)
             ),
         ),
         RenderedScript(

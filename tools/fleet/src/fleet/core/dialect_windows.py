@@ -336,7 +336,7 @@ class WindowsDialect:
         )
 
     def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
-        """Keep a settled run's transcript, then remove its directory and scripts.
+        """Keep a settled run's transcript, then remove its directories and scripts.
 
         Every location is a parameter defaulting to the rendered path, so a
         node runs it with no arguments and the Pester suite over its committed
@@ -345,7 +345,9 @@ class WindowsDialect:
         statement runs.
 
         Args:
-            target: The dispatch's absolute remote directory.
+            target: The dispatch's absolute remote directory; its staging
+                directory beside it (:func:`fleet.core.names.staging_directory`)
+                goes with it.
             retained: Where its transcript is kept.
             scripts: The scripts it left under the stage root.
 
@@ -362,8 +364,10 @@ class WindowsDialect:
         # list as a parameter's default is an expression the coverage harness
         # counts as a command, reached only by a run that takes the default.
         parameters = [f"$Script{index}" for index in range(len(scripts))]
+        staging = names.staging_directory(target)
         declared = [
             f"    [string]$Target = '{scriptable(target, label='target')}'",
+            f"    [string]$Staging = '{scriptable(staging, label='staging')}'",
             f"    [string]$Log = '{scriptable(names.log_path(target), label='log')}'",
             f"    [string]$Retained = '{scriptable(retained, label='retained')}'",
             *(
@@ -380,8 +384,10 @@ class WindowsDialect:
             "if (Test-Path -LiteralPath $Log) {",
             "    Move-Item -Force -LiteralPath $Log -Destination $Retained",
             "}",
-            "if (Test-Path -LiteralPath $Target) {",
-            "    Remove-Item -Recurse -Force -LiteralPath $Target",
+            "foreach ($directory in @($Target, $Staging)) {",
+            "    if (Test-Path -LiteralPath $directory) {",
+            "        Remove-Item -Recurse -Force -LiteralPath $directory",
+            "    }",
             "}",
             f"foreach ($script in @({', '.join(parameters)})) {{",
             "    if (Test-Path -LiteralPath $script) {",

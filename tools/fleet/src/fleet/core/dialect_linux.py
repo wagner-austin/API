@@ -323,10 +323,12 @@ class LinuxDialect:
         return self.checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
 
     def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
-        """Keep a settled run's transcript, then remove its directory and scripts.
+        """Keep a settled run's transcript, then remove its directories and scripts.
 
         Args:
-            target: The dispatch's absolute remote directory.
+            target: The dispatch's absolute remote directory; its staging
+                directory beside it (:func:`fleet.core.names.staging_directory`)
+                goes with it.
             retained: Where its transcript is kept.
             scripts: The scripts it left under the stage root.
 
@@ -340,7 +342,7 @@ class LinuxDialect:
         lines = (
             f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
             f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
-            f"rm -rf {shlex.quote(target)}",
+            f"rm -rf {shlex.quote(target)} {shlex.quote(names.staging_directory(target))}",
             "rm -f " + " ".join(shlex.quote(script) for script in scripts),
         )
         return PROLOGUE + "".join(f"{line}\n" for line in lines)

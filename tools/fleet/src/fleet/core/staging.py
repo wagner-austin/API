@@ -220,7 +220,7 @@ def stage_companion(
 
     The directory is REPLACED rather than unpacked over, and the archive
     never enters it: :func:`fleet.core.names.companion_directory` and
-    :data:`fleet.core.names.COMPANION_STAGE_SUFFIX` carry the reasons. What
+    :data:`fleet.core.names.STAGE_SUFFIX` carry the reasons. What
     lands is the export of one commit and nothing else, committed on the
     node so the check that reads it reads a HEAD.
 
@@ -244,8 +244,8 @@ def stage_companion(
     """
     spoken = dialect.for_platform(platform)
     tree = names.companion_directory(stage_root, directory)
-    staged = names.companion_stage_directory(stage_root, directory)
-    staged_stem = names.make_directory_stem(names.companion_stage_name(directory))
+    staged = names.staging_directory(tree)
+    staged_stem = names.make_directory_stem(names.stage_name(directory))
     remote.run_script(
         host,
         spoken.script_path(stage_root, names.reset_directory_stem(directory)),
@@ -293,10 +293,13 @@ def stage(
     """Send a project's tree to a node and verify it before unpacking.
 
     The scripts are the node's dialect (:mod:`fleet.core.dialect`): the
-    directory is made, the archive lands over scp, the node digests it
-    WITHOUT extracting, and only a digest that matches the
-    sender's is followed by the extract and the ``git init`` that makes ruff
-    honour ``.gitignore`` there.
+    directory and its staging directory are made, the archive lands over scp
+    in the staging directory, the node digests it WITHOUT extracting, and
+    only a digest that matches the sender's is followed by the extract and
+    the ``git init`` that makes ruff honour ``.gitignore`` there. The
+    archive and every script that stages it stay beside the export, never
+    in it, so the commit made there is the project's tree and nothing else
+    (:data:`fleet.core.names.STAGE_SUFFIX`).
 
     Args:
         host: SSH destination.
@@ -315,30 +318,37 @@ def stage(
             for any of the scripts around it.
     """
     spoken = dialect.for_platform(platform)
-    target = f"{stage_root}/{run_id}"
+    target = names.dispatch_directory(stage_root, run_id)
+    staged = names.staging_directory(target)
     remote.run_script(
         host,
         spoken.script_path(stage_root, names.make_directory_stem(run_id)),
         spoken.make_directory_script(target),
         platform=platform,
     )
+    remote.run_script(
+        host,
+        spoken.script_path(stage_root, names.make_directory_stem(names.stage_name(run_id))),
+        spoken.make_directory_script(staged),
+        platform=platform,
+    )
     send_verified(
         host,
         platform=platform,
-        into=target,
+        into=staged,
         source=source,
         payload=payload,
         described_as="an archive",
     )
     remote.run_script(
         host,
-        spoken.script_path(target, names.EXTRACT_STEM),
-        spoken.checked_script(dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)),
+        spoken.script_path(staged, names.EXTRACT_STEM),
+        spoken.checked_script(dialect.extract_commands(f"{staged}/{names.ARCHIVE_NAME}", target)),
         platform=platform,
     )
     remote.run_script(
         host,
-        spoken.script_path(target, names.INIT_REPOSITORY_STEM),
+        spoken.script_path(staged, names.INIT_REPOSITORY_STEM),
         spoken.checked_script(dialect.init_repository_commands(target, run_id)),
         platform=platform,
     )
