@@ -43,6 +43,14 @@ function Read-PinnedFile {
     <#
     .SYNOPSIS
         Write one file of the pinned MCPs commit to a directory, and return its path.
+    .DESCRIPTION
+        BYTE FOR BYTE, through Start-Process's redirection. Piping git's
+        output through PowerShell decodes it with the console's code page
+        and re-encodes it on the way to disk: under code page 437, the
+        default of a fresh Windows PowerShell console, 'caf' followed by
+        e-acute came back as different text (measured on austinpc
+        2026-09-30, MCPs board task da8b4f11). A redirected standard output
+        is the blob's own bytes.
     .PARAMETER GitCommand
         git.
     .PARAMETER Repo
@@ -61,12 +69,12 @@ function Read-PinnedFile {
         [Parameter(Mandatory)][string]$RelativePath,
         [Parameter(Mandatory)][string]$Directory
     )
-    $text = & $GitCommand -C $Repo show "${Pin}:$RelativePath"
-    if ($LASTEXITCODE -ne 0) {
-        throw "HARNESS_PIN_UNREADABLE: git show of $RelativePath at $Pin in $Repo exited $LASTEXITCODE"
-    }
     $path = Join-Path $Directory (Split-Path -Leaf $RelativePath)
-    [System.IO.File]::WriteAllLines($path, [string[]]$text)
+    $shown = Start-Process -FilePath $GitCommand -ArgumentList '-C', "`"$Repo`"", 'show', "${Pin}:$RelativePath" `
+        -RedirectStandardOutput $path -RedirectStandardError "$path.stderr" -NoNewWindow -Wait -PassThru
+    if ($shown.ExitCode -ne 0) {
+        throw "HARNESS_PIN_UNREADABLE: git show of $RelativePath at $Pin in $Repo exited $($shown.ExitCode)"
+    }
     return $path
 }
 
@@ -79,6 +87,9 @@ $staging = Join-Path ([System.IO.Path]::GetTempPath()) ('mcps-harness-modules-' 
 try {
     $requirements = Read-PinnedFile $Git $McpsRoot $pin 'scripts/powershell-requirements.psd1' $staging
     $installer = Read-PinnedFile $Git $McpsRoot $pin 'scripts/ps-harness/Install-HarnessModule.ps1' $staging
+    # Reset first: no native command runs before the installer, so an exit
+    # code left by an earlier one would otherwise read as the installer's.
+    $global:LASTEXITCODE = 0
     & $installer -RequirementsPath $requirements -ModuleRoot $ModuleRoot -Repository $Repository
     if ($LASTEXITCODE -ne 0) {
         throw "HARNESS_INSTALLER_EXITED: the installer at MCPs $pin exited $LASTEXITCODE"
