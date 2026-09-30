@@ -34,10 +34,12 @@ from fleet.contracts.dispatch import (
     DispatchJob,
     DispatchLane,
     ListingPage,
+    TrailClaim,
     decode_claim,
     decode_listing,
     decode_listing_page,
     decode_reported,
+    decode_trail_claims,
 )
 from fleet.contracts.tags import NodeTag, encode_tags
 from fleet.core import _test_hooks
@@ -389,6 +391,58 @@ def cancelled_page(credentials: McpCredentials, *, agent: str, offset: int) -> L
     )
 
 
+def submitted_page(
+    credentials: McpCredentials, *, project: str, submitted_by: str, offset: int
+) -> ListingPage:
+    """List one page of one submitter's jobs for one project, any status.
+
+    The route from a ledger row back to the job that launched it once the
+    job has left this runner (board task fd402617): the row names its
+    project and submitter, and a reclaim overwrites every field of the job
+    that named this runner.
+
+    Args:
+        credentials: Endpoint and headers.
+        project: The project's key in the registry.
+        submitted_by: The submitting session's label.
+        offset: Where the page begins, ``0`` for the newest.
+
+    Returns:
+        The page, and where the next one begins.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    arguments: JSONObject = {
+        "project": project,
+        "submittedBy": submitted_by,
+        "offset": offset,
+        "limit": LISTING_PAGE_LIMIT,
+    }
+    return decode_listing_page(
+        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
+    )
+
+
+def trail_claims(credentials: McpCredentials, *, job_id: str) -> tuple[TrailClaim, ...]:
+    """Read every claim ever taken on one job, from its trail.
+
+    Args:
+        credentials: Endpoint and headers.
+        job_id: The job to read.
+
+    Returns:
+        Its claims, oldest first.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    arguments: JSONObject = {"jobId": job_id}
+    return decode_trail_claims(
+        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_get", arguments)
+    )
+
+
 def observe_sessions(
     credentials: McpCredentials,
     *,
@@ -525,4 +579,6 @@ __all__ = [
     "report_close",
     "report_progress",
     "report_start",
+    "submitted_page",
+    "trail_claims",
 ]
