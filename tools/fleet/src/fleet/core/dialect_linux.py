@@ -322,7 +322,9 @@ class LinuxDialect:
         """
         return self.checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
 
-    def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
+    def retire_script(
+        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str
+    ) -> str:
         """Keep a settled run's transcript, then remove its directories and scripts.
 
         Args:
@@ -331,6 +333,9 @@ class LinuxDialect:
                 goes with it.
             retained: Where its transcript is kept.
             scripts: The scripts it left under the stage root.
+            task: The run's transient unit. Nothing removes it here: the
+                launch starts it with ``--collect``, so the user manager
+                unloads it when the build exits, failed or not.
 
         Returns:
             The script's text. ``mv`` is guarded because a run cancelled

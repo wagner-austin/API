@@ -230,7 +230,9 @@ class Dialect(Protocol):
         """
         ...
 
-    def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
+    def retire_script(
+        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str
+    ) -> str:
         """The script that keeps a settled run's transcript and removes the rest.
 
         Run once the runner has read the transcript's tail, when a run has
@@ -244,6 +246,12 @@ class Dialect(Protocol):
                 root's logs directory, which is created if absent.
             scripts: The scripts the run left under the stage root, this one
                 included, each removed.
+            task: The run's scheduled task or transient unit
+                (:func:`fleet.core.names.task_name`). A Windows run's task
+                outlives its build until it is deleted, which only a stop did
+                until MCPs board task a146760d counted 153 on sedona and 293
+                on serendipity; a Linux run's unit is started with
+                ``--collect``, so the manager has already removed it.
 
         Returns:
             The script's text. Every step tolerates what an earlier attempt

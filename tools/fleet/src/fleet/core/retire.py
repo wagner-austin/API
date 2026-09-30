@@ -51,6 +51,7 @@ def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
         scripts=tuple(
             spoken.script_path(stage_root, stem) for stem in names.root_script_stems(run_id)
         ),
+        task=names.task_name(run_id),
     )
 
 

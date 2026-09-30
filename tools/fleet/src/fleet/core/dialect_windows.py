@@ -335,8 +335,10 @@ class WindowsDialect:
             ),
         )
 
-    def retire_script(self, *, target: str, retained: str, scripts: tuple[str, ...]) -> str:
-        """Keep a settled run's transcript, then remove its directories and scripts.
+    def retire_script(
+        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str
+    ) -> str:
+        """Keep a settled run's transcript, then remove its directories, scripts and task.
 
         Every location is a parameter defaulting to the rendered path, so a
         node runs it with no arguments and the Pester suite over its committed
@@ -344,18 +346,28 @@ class WindowsDialect:
         safe: ``powershell -File`` has read the whole script before the first
         statement runs.
 
+        THE RUN'S TASK GOES TOO (MCPs board task a146760d). A build's task
+        stays registered after the build exits, and only a stop deleted it,
+        so every run that finished left one: 153 on sedona and 293 on
+        serendipity on 2026-09-30. It is looked up and deleted by its exact
+        name through Task Scheduler's COM service, for the reason the stop
+        script gives (:func:`fleet.core.windows_task.stop_script`): the
+        cmdlets fail while another task is deleted.
+
         Args:
             target: The dispatch's absolute remote directory; its staging
                 directory beside it (:func:`fleet.core.names.staging_directory`)
                 goes with it.
             retained: Where its transcript is kept.
             scripts: The scripts it left under the stage root.
+            task: The run's scheduled task, in the root folder.
 
         Returns:
-            The script's text. Each removal is guarded by ``Test-Path``,
-            because ``Remove-Item`` of a path that is not there is an error and
-            a retire run a second time meets exactly that; ``-Force`` removes
-            the read-only objects of the repository staged there.
+            The script's text. Each removal is guarded by ``Test-Path`` or by
+            the task being listed, because ``Remove-Item`` of a path that is
+            not there is an error and a retire run a second time meets exactly
+            that; ``-Force`` removes the read-only objects of the repository
+            staged there.
 
         Raises:
             ValueError: When a path cannot be embedded verbatim.
@@ -370,6 +382,7 @@ class WindowsDialect:
             f"    [string]$Staging = '{scriptable(staging, label='staging')}'",
             f"    [string]$Log = '{scriptable(names.log_path(target), label='log')}'",
             f"    [string]$Retained = '{scriptable(retained, label='retained')}'",
+            f"    [string]$TaskName = '{scriptable(task, label='task')}'",
             *(
                 f"    [string]{parameter} = '{scriptable(script, label='script')}'"
                 for parameter, script in zip(parameters, scripts, strict=True)
@@ -393,6 +406,12 @@ class WindowsDialect:
             "    if (Test-Path -LiteralPath $script) {",
             "        Remove-Item -Force -LiteralPath $script",
             "    }",
+            "}",
+            "$scheduler = New-Object -ComObject Schedule.Service",
+            "$scheduler.Connect()",
+            "$root = $scheduler.GetFolder('\\')",
+            "if (@($root.GetTasks(1) | Where-Object { $_.Name -eq $TaskName }).Count -gt 0) {",
+            "    $root.DeleteTask($TaskName, 0)",
             "}",
         ]
         return "\n".join(body) + "\n"
