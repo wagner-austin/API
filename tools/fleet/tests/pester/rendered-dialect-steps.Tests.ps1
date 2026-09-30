@@ -50,13 +50,17 @@ Describe 'The staged tree''s repository' {
 }
 
 Describe 'A companion''s repository' {
-    It 'indexes every file of the export with --force and names the commit it came from' {
+    It 'indexes every file of the export with --force, names the commit it came from, and names it origin/main' {
+        # The last step is what lets a check that runs MCPs' published
+        # maketools read ../MCPs at origin/main on a node (MCPs board task
+        # a8ee9b21).
         $git = Initialize-StandIn 0 -Append
         Invoke-Rendered 'dialect-companion-repository' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:companion) init --quiet",
             "-C $($script:companion) add --all --force",
-            "-C $($script:companion) -c user.name=fleet -c user.email=fleet@corvis.invalid commit --quiet --message `"fleet companion export 5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2`""
+            "-C $($script:companion) -c user.name=fleet -c user.email=fleet@corvis.invalid commit --quiet --message `"fleet companion export 5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2`"",
+            "-C $($script:companion) update-ref refs/remotes/origin/main HEAD"
         )
     }
     It 'stops at the first step git refuses, with git''s status' {
