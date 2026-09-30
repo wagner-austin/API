@@ -67,6 +67,7 @@ def test_the_names_are_one_spelling() -> None:
     assert names.retained_log_path("/s", "libs-demo-1") == "/s/logs/libs-demo-1.log"
     assert names.root_script_stems("libs-demo-1") == (
         "mkdir-libs-demo-1",
+        "mkdir-libs-demo-1.stage",
         "stop-libs-demo-1",
         "retire-libs-demo-1",
     )
@@ -91,6 +92,7 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
         retained=kept,
         scripts=(
             spoken.script_path(root, f"mkdir-{DEMO_RUN_ID}"),
+            spoken.script_path(root, f"mkdir-{DEMO_RUN_ID}.stage"),
             spoken.script_path(root, f"stop-{DEMO_RUN_ID}"),
             script_path,
         ),
@@ -123,6 +125,12 @@ class TestTheShScriptRunsForReal:
             (target / f"{names.RESULT_NAME}.log").write_text("887 passed\n", encoding="utf-8")
         for stem in names.root_script_stems(DEMO_RUN_ID):
             (root / f"{stem}.sh").write_text(PROLOGUE, encoding="utf-8")
+        # The staging directory beside the export: the archive and the
+        # scripts that staged it, none of them inside the tree.
+        staged = pathlib.Path(names.staging_directory(target.as_posix()))
+        staged.mkdir()
+        (staged / names.ARCHIVE_NAME).write_bytes(b"\x1f\x8b")
+        (staged / "extract.sh").write_text(PROLOGUE, encoding="utf-8")
         (root / "cache").mkdir()
         (root / "libs-other-1757000001").mkdir()
         return target
@@ -185,3 +193,4 @@ class TestTheShScriptRunsForReal:
 
         assert list((tmp_path / "logs").iterdir()) == []
         assert not (tmp_path / DEMO_RUN_ID).exists()
+        assert not (tmp_path / f"{DEMO_RUN_ID}.stage").exists()

@@ -28,7 +28,15 @@ from fleet.core import (
     remote,
     staging,
 )
-from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok
+from tests.conftest import (
+    DEMO_DEPENDENCY,
+    DEMO_PROJECT,
+    DEMO_RUN_ID,
+    FakeRun,
+    failed,
+    ok,
+    stage_replies,
+)
 
 #: The commit a staged companion is the export of, in these tests.
 COMPANION_SHA = "9f1c0b7a2d3e4f5061728394a5b6c7d8e9f01234"
@@ -193,19 +201,7 @@ class TestArchive:
 class TestStage:
     def test_a_verified_archive_is_unpacked(self) -> None:
         payload = b"archive-bytes"
-        runner = FakeRun(
-            [
-                ok(""),  # send mkdir script
-                ok(""),  # run mkdir
-                ok(""),  # scp the archive
-                ok(""),  # send digest script
-                ok(staging.digest(payload)),  # run digest
-                ok(""),  # send extract script
-                ok(""),  # run extract
-                ok(""),  # send the git-init script
-                ok(""),  # run git init
-            ]
-        )
+        runner = FakeRun(stage_replies(staging.digest(payload)))
         _test_hooks.run = runner
 
         target = staging.stage(
@@ -217,37 +213,31 @@ class TestStage:
             payload=payload,
         )
 
+        staged = f"{target}.stage"
         assert target == f"C:/fleet/stage/{DEMO_RUN_ID}"
         assert any(b"Invoke-Step $Tar @('-xzmf'" in (sent or b"") for sent in runner.stdin)
         # Every script went out under the Windows dialect's name and runner.
         assert runner.calls[0][-1].endswith(f"mkdir-{DEMO_RUN_ID}.ps1' -Encoding utf8\"")
         assert runner.calls[1][-6:-1] == dialect_windows.POWERSHELL_INVOCATION
+        assert runner.calls[2][-1].endswith(f"mkdir-{DEMO_RUN_ID}.stage.ps1' -Encoding utf8\"")
         # The archive crosses as bytes over scp, with no stdin to re-encode,
-        # and lands under the name the digest and extract scripts read.
-        assert runner.calls[2] == _scp("lavender", f"{target}/{names.ARCHIVE_NAME}")
-        assert runner.stdin[2] is None
-        assert runner.stdin[3] == dialect_windows.WindowsDialect().digest_script(target).encode(
+        # and lands beside the export under the name the digest and extract
+        # scripts read.
+        assert runner.calls[4] == _scp("lavender", f"{staged}/{names.ARCHIVE_NAME}")
+        assert runner.stdin[4] is None
+        assert runner.stdin[5] == dialect_windows.WindowsDialect().digest_script(staged).encode(
             "utf-8"
         )
+        # Nothing of the transport is written into the export, so the commit
+        # made there is the project's tree alone (MCPs board task a8ee9b21).
+        assert not any(f"{target}/" in " ".join(call) for call in runner.calls)
 
     def test_a_linux_node_is_staged_in_sh(self) -> None:
         """The same five acts, in the other dialect: written through a
         mkdir-and-cat command, run by /bin/sh, digested with sha256sum, and
         the shared scp, tar and git steps unchanged."""
         payload = b"archive-bytes"
-        runner = FakeRun(
-            [
-                ok(""),  # send mkdir script
-                ok(""),  # run mkdir
-                ok(""),  # scp the archive
-                ok(""),  # send digest script
-                ok(staging.digest(payload)),  # run digest
-                ok(""),  # send extract script
-                ok(""),  # run extract
-                ok(""),  # send the git-init script
-                ok(""),  # run git init
-            ]
-        )
+        runner = FakeRun(stage_replies(staging.digest(payload)))
         _test_hooks.run = runner
 
         target = staging.stage(
@@ -266,19 +256,22 @@ class TestStage:
         )
         made = f"/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh"
         assert runner.calls[1][-2:] == ("/bin/sh", made)
-        assert runner.calls[2] == _scp("diphtheria", f"{target}/{names.ARCHIVE_NAME}")
-        assert runner.calls[3][-1].endswith(f"{target}/digest.sh'")
-        assert runner.stdin[3] == (
-            f"{dialect_linux.PROLOGUE}sha256sum '{target}/tree.tgz' | cut -d ' ' -f 1\n".encode()
+        staged = f"{target}.stage"
+        made_staging = f"/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.stage.sh"
+        assert runner.calls[3][-2:] == ("/bin/sh", made_staging)
+        assert runner.calls[4] == _scp("diphtheria", f"{staged}/{names.ARCHIVE_NAME}")
+        assert runner.calls[5][-1].endswith(f"{staged}/digest.sh'")
+        assert runner.stdin[5] == (
+            f"{dialect_linux.PROLOGUE}sha256sum '{staged}/tree.tgz' | cut -d ' ' -f 1\n".encode()
         )
         # Both carry sh's prologue, whose `set -e` is what ends the script at
         # a command that failed -- the other dialect has to be asked for that
         # and was not, which is the silent stage this pair now pins.
-        assert runner.stdin[5] == (
-            f"{dialect_linux.PROLOGUE}tar -xzmf {target}/tree.tgz -C {target}\n".encode()
+        assert runner.stdin[7] == (
+            f"{dialect_linux.PROLOGUE}tar -xzmf {staged}/tree.tgz -C {target}\n".encode()
         )
         assert (
-            runner.stdin[7]
+            runner.stdin[9]
             == (
                 f"{dialect_linux.PROLOGUE}git -C {target} init --quiet\n"
                 f"git -C {target} add --all\n"
@@ -295,19 +288,7 @@ class TestStage:
         errors in build artifacts, and the same tree with `git init` run in
         it reported All checks passed."""
         payload = b"archive-bytes"
-        runner = FakeRun(
-            [
-                ok(""),  # send mkdir script
-                ok(""),  # run mkdir
-                ok(""),  # scp the archive
-                ok(""),  # send digest script
-                ok(staging.digest(payload)),  # run digest
-                ok(""),  # send extract script
-                ok(""),  # run extract
-                ok(""),  # send the git-init script
-                ok(""),  # run git init
-            ]
-        )
+        runner = FakeRun(stage_replies(staging.digest(payload)))
         _test_hooks.run = runner
 
         staging.stage(
@@ -328,7 +309,7 @@ class TestStage:
         spoken = dialect.for_platform(NodePlatform.WINDOWS)
         assert sent.index(
             spoken.checked_script(
-                dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)
+                dialect.extract_commands(f"{target}.stage/{names.ARCHIVE_NAME}", target)
             ).encode()
         ) < (
             sent.index(
@@ -344,7 +325,10 @@ class TestStage:
         the work's fault and the second the tailnet's, and nothing after the
         copy runs either way."""
         runner = FakeRun(
-            [ok(""), ok(""), failed(1, 'scp: dest open "C:/x/tree.tgz": No such file or directory')]
+            [
+                *stage_replies("")[:4],
+                failed(1, 'scp: dest open "C:/x/tree.tgz": No such file or directory'),
+            ]
         )
         _test_hooks.run = runner
 
@@ -358,16 +342,16 @@ class TestStage:
                 payload=b"bytes",
             )
 
-        target = f"C:/fleet/stage/{DEMO_RUN_ID}"
+        staged = f"C:/fleet/stage/{DEMO_RUN_ID}.stage"
         assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
         assert excinfo.value.message == (
-            f"copying {SOURCE.name} to {target}/{names.ARCHIVE_NAME} on lavender exited 1: "
+            f"copying {SOURCE.name} to {staged}/{names.ARCHIVE_NAME} on lavender exited 1: "
             'scp: dest open "C:/x/tree.tgz": No such file or directory'
         )
-        assert len(runner.calls) == 3
+        assert len(runner.calls) == 5
 
     def test_an_unreachable_node_is_unreachable_not_a_failed_copy(self) -> None:
-        runner = FakeRun([ok(""), ok(""), failed(255, "scp: Connection closed")])
+        runner = FakeRun([*stage_replies("")[:4], failed(255, "scp: Connection closed")])
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as excinfo:
@@ -392,7 +376,7 @@ class TestStage:
 
     def test_a_mismatched_digest_refuses_before_unpacking(self) -> None:
         """Nothing is extracted, so no unverified tree lands where make looks."""
-        runner = FakeRun([ok(""), ok(""), ok(""), ok(""), ok("0" * 64)])
+        runner = FakeRun(stage_replies("0" * 64)[:7])
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as excinfo:

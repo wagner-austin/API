@@ -40,7 +40,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok
+from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok, stage_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -138,15 +138,7 @@ def _companion_replies(
         ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
         ok(""),  # the companion: git archive
         ok(""),  # the project: git archive
-        ok(""),  # stage: send mkdir script
-        ok(""),  # stage: run mkdir
-        ok(""),  # stage: send the base64 payload
-        ok(""),  # stage: send reassemble script
-        ok(export_digest),  # stage: run reassemble
-        ok(""),  # stage: send extract script
-        ok(""),  # stage: run extract
-        ok(""),  # stage: send the git-init script
-        ok(""),  # stage: run git init
+        *stage_replies(export_digest),
         ok(""),  # companion: send reset script
         ok(""),  # companion: run reset
         ok(""),  # companion: send mkdir script

@@ -220,16 +220,19 @@ def test_the_names_are_one_spelling() -> None:
     assert names.make_directory_stem("libs-demo-1") == "mkdir-libs-demo-1"
     assert names.stop_stem("libs-demo-1") == "stop-libs-demo-1"
     assert names.reset_directory_stem("MCPs") == "reset-MCPs"
-    assert names.companion_stage_name("MCPs") == f"MCPs{names.COMPANION_STAGE_SUFFIX}"
+    assert names.stage_name("MCPs") == f"MCPs{names.STAGE_SUFFIX}"
 
 
-def test_a_companion_sits_beside_an_export_and_its_staging_sits_beside_it() -> None:
+def test_a_companion_sits_beside_an_export_and_each_one_s_staging_sits_beside_it() -> None:
     """The recipe runs at ``<stage_root>/<run id>`` and reaches its companion
-    as ``../MCPs``, which is the same spelling a workstation answers; the
-    staging directory is beside the companion so nothing of the transport is
-    inside the tree that gets committed."""
+    as ``../MCPs``, which is the same spelling a workstation answers; each
+    staging directory is beside the tree it stages so nothing of the
+    transport is inside the tree that gets committed (MCPs board task
+    a8ee9b21, where an export's own digest, extract and init-repo scripts
+    were committed into it)."""
     assert names.companion_directory("C:/fleet/stage", "MCPs") == "C:/fleet/stage/MCPs"
-    assert names.companion_stage_directory("C:/fleet/stage", "MCPs") == "C:/fleet/stage/MCPs.stage"
+    assert names.staging_directory("C:/fleet/stage/MCPs") == "C:/fleet/stage/MCPs.stage"
+    assert names.staging_directory(names.dispatch_directory("/s", "r-1")) == "/s/r-1.stage"
     assert names.recipe_directory("C:/fleet/stage/slime-17", "") == "C:/fleet/stage/slime-17"
 
 

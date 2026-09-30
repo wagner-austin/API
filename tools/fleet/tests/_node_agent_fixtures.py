@@ -31,6 +31,7 @@ from tests.conftest import (
     FakeRun,
     failed,
     ok,
+    stage_replies,
     workspace_document,
 )
 
@@ -191,15 +192,7 @@ def claim_replies(digest: str, *, commit_present: bool) -> list[_test_hooks.Comm
         replies.append(ok(""))  # git fetch
     replies += [
         ok(""),  # git archive -o
-        ok(""),  # stage: send mkdir script
-        ok(""),  # stage: run mkdir
-        ok(""),  # stage: send the base64 payload
-        ok(""),  # stage: send reassemble script
-        ok(digest),  # stage: run reassemble
-        ok(""),  # stage: send extract script
-        ok(""),  # stage: run extract
-        ok(""),  # stage: send the git-init script
-        ok(""),  # stage: run git init
+        *stage_replies(digest),
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script

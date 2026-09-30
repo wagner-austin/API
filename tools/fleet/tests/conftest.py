@@ -246,6 +246,35 @@ DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\n"
 
 
+def stage_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
+    """Every command staging one export runs, in order (:func:`fleet.core.staging.stage`).
+
+    One list for every sequence that stages an export, so a step added to
+    staging is added here once: the export's staging directory, which keeps
+    the archive and the step scripts out of the committed tree (MCPs board
+    task a8ee9b21), was the step that proved it.
+
+    Args:
+        archive_digest: What the node should report having received.
+
+    Returns:
+        One result per call.
+    """
+    return [
+        ok(""),  # stage: send the export's mkdir script
+        ok(""),  # stage: run it
+        ok(""),  # stage: send the staging directory's mkdir script
+        ok(""),  # stage: run it
+        ok(""),  # stage: scp the archive into the staging directory
+        ok(""),  # stage: send the digest script
+        ok(archive_digest),  # stage: run it
+        ok(""),  # stage: send extract script
+        ok(""),  # stage: run extract
+        ok(""),  # stage: send the git-init script
+        ok(""),  # stage: run git init
+    ]
+
+
 def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
     """Every command a successful dispatch runs, in order.
 
@@ -267,15 +296,7 @@ def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
         ok(""),  # probe: send script
         ok(PROBE_OK),  # probe: run it
         ok(""),  # tar, locally
-        ok(""),  # stage: send mkdir script
-        ok(""),  # stage: run mkdir
-        ok(""),  # stage: send the base64 payload
-        ok(""),  # stage: send reassemble script
-        ok(archive_digest),  # stage: run reassemble
-        ok(""),  # stage: send extract script
-        ok(""),  # stage: run extract
-        ok(""),  # stage: send the git-init script
-        ok(""),  # stage: run git init
+        *stage_replies(archive_digest),
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
