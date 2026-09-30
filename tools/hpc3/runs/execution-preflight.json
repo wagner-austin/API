@@ -1,0 +1,10 @@
+{
+  "project": "tankpit",
+  "name": "execution-preflight",
+  "command": "python -c pass",
+  "artifact": null,
+  "experiment": {
+    "purpose": "execution-suite",
+    "board_task": "465689f5"
+  }
+}

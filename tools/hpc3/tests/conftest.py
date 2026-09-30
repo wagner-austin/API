@@ -29,6 +29,9 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core._test_hooks import CommandResult
 
+#: The host case bound to HPC3 and the execution run (board task 465689f5).
+pytest_plugins = ("tests._host",)
+
 
 class RecordedCall:
     """One invocation the fake runner received.
