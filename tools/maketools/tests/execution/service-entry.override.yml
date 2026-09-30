@@ -7,15 +7,17 @@
 # it: the fixed container name, the published host port (production holds
 # those ports on diphtheria) and the restart policy. The external network is
 # renamed to one the case creates for the run and removes after it, so two
-# runs never share it. env_file is emptied because the service's .env is
-# untracked and never in a fleet export; the case sets each variable the
-# compose file interpolates instead.
+# runs never share it. env_file names the file the case writes for the run,
+# because the service's .env is untracked and never in a fleet export: it
+# carries the variables the service's settings require, as placeholders,
+# and the case also exports them for the ones the compose file interpolates.
 
 services:
   api:
     container_name: !reset null
     ports: !reset []
-    env_file: !reset []
+    env_file: !override
+      - ${EXECUTION_ENV_FILE:?the container-entry case names the run's env file}
     restart: !reset null
 
 networks:

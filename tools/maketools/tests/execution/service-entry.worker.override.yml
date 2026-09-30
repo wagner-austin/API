@@ -1,0 +1,38 @@
+# Laid over service-entry.override.yml for a service that runs an RQ worker
+# beside its api (board task 465689f5). Each such service reaches the root
+# stack's Redis, which the root compose file declares as the service
+# `redis` with the container name `platform-redis`: most read REDIS_URL,
+# defaulting to redis://platform-redis:6379/0, and turkic-api dials
+# redis:6379. The run brings its own Redis answering to both names on the
+# run's network, since the stack's is on another daemon and never reachable.
+#
+# The worker loses what the api lost in the first override, for the same
+# reasons, and both wait for this Redis to answer before they start, since
+# neither restarts in a run and a first connection refused would end it.
+
+services:
+  api:
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    container_name: !reset null
+    env_file: !override
+      - ${EXECUTION_ENV_FILE:?the container-entry case names the run's env file}
+    restart: !reset null
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    networks:
+      platform-network:
+        aliases:
+          - platform-redis
