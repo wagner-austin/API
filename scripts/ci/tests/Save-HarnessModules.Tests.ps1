@@ -14,6 +14,9 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     $script:entry = Join-Path (Split-Path -Parent $PSScriptRoot) 'Save-HarnessModules.ps1'
     $script:apiRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+    # The pinned requirements carry a byte outside ASCII, an e-acute in a
+    # comment, so a copy decoded through the console's code page shows.
+    $script:pinnedText = "@{ Pester = '5.7.1' } # caf$([char]0xE9)"
 
     function Invoke-TestGit {
         param([string]$Repo, [string[]]$Arguments)
@@ -44,7 +47,7 @@ exit $ExitCode
         $installer = Join-Path $mcps 'scripts\ps-harness\Install-HarnessModule.ps1'
         [void][System.IO.Directory]::CreateDirectory((Split-Path -Parent $installer))
         [void][System.IO.Directory]::CreateDirectory((Join-Path $api '.githooks'))
-        [System.IO.File]::WriteAllText($requirements, "@{ Pester = '5.7.1' }")
+        [System.IO.File]::WriteAllText($requirements, $script:pinnedText, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($installer, (Get-RecordingInstaller 'pinned' $ExitCode))
         [void](Invoke-TestGit $mcps @('init', '--quiet'))
         [void](Invoke-TestGit $mcps @('add', '.'))
@@ -77,13 +80,22 @@ exit $ExitCode
 }
 
 Describe 'Saving the modules the pinned harness imports' {
-    It 'runs the pinned commit''s installer over the pinned commit''s pins, not main''s, and leaves nothing staged' {
+    It 'runs the pinned commit''s installer over the pinned commit''s pins byte for byte, not main''s, under a fresh console''s code page, and leaves nothing staged' {
         $world = Initialize-PinnedWorld
-        Invoke-TestEntry $world.Parameters
+        # Code page 437 is what a fresh Windows PowerShell console decodes a
+        # native command's output with; a piped copy mangled the e-acute.
+        $encoding = [Console]::OutputEncoding
+        [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(437)
+        try {
+            Invoke-TestEntry $world.Parameters
+        }
+        finally {
+            [Console]::OutputEncoding = $encoding
+        }
         $said = [System.IO.File]::ReadAllText($world.Record) -split '\|'
         $said[0] | Should -BeExactly 'pinned'
         $said[1] | Should -BeExactly 'PSGallery'
-        $said[3].Trim() | Should -BeExactly "@{ Pester = '5.7.1' }"
+        $said[3] | Should -BeExactly $script:pinnedText
         # The staged copies are gone once the installer has run.
         [System.IO.File]::Exists($said[2]) | Should -BeFalse
     }
