@@ -12,7 +12,7 @@ source_paths:
   - "src/hpc3/core/cancel.py"
   - "src/hpc3/cli/triage.py"
 source_git_blobs:
-  "src/hpc3/core/remote.py": "3ec61f05e736a85fde36420f2780da57159b93a5"
+  "src/hpc3/core/remote.py": "10c5e4e3a13c6f0004fd05cdb01d2ebbc251d8ea"
   "src/hpc3/core/status.py": "c89b8061f970b1677c1eff9c76010912c2b80828"
   "src/hpc3/core/squeue.py": "62002937c50a30b2a5032d082e3813d3a989b711"
   "src/hpc3/core/logs.py": "436b22a97e08bf32b046ea8e3b154796189ab614"
