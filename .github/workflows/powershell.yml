@@ -4,9 +4,11 @@ name: powershell
 # POWERSHELL 5.1 (MCPs board task d69786fa, criterion A3).
 #
 # `make check-powershell` is the target API's `make lint` depends on: it runs
-# MCPs' scripts/ps-harness, as MCPs' origin/main carries it, over this
-# repository through .githooks/published_maketools.py, which reads MCPs at
-# exactly ../MCPs. The harness guards and analyses every tracked .ps1 and runs
+# MCPs' scripts/ps-harness, at the MCPs commit .githooks/mcps-harness.sha
+# records, over this repository through .githooks/published_maketools.py,
+# which reads MCPs at exactly ../MCPs. MCPs is therefore fetched with its whole
+# history, so the recorded commit is there whatever main has moved to, and the
+# modules are the versions that commit's requirements file pins. The harness guards and analyses every tracked .ps1 and runs
 # its Pester suite to 100 percent of commands and branch arms, and it prints
 # one pass line of N of N scripts, commands and branches. This job runs that
 # target, never a restatement of it, so the definition stays in the Makefile.
@@ -26,9 +28,10 @@ name: powershell
 # The inner checkout is removed once cloned, because the harness inventories
 # this repository through git and must not meet MCPs' files inside it.
 #
-# The two modules are the versions MCPs' requirements file pins, saved from
-# the gallery as MCPs' own powershell job saves them, into a directory put
-# first on PSModulePath. make is installed at a pinned version, because the
+# The two modules are the versions the pinned commit's requirements file
+# pins, saved from the gallery by scripts/ci/Save-HarnessModules.ps1, which
+# the harness itself runs under its Pester suite, into a directory put first
+# on PSModulePath. make is installed at a pinned version, because the
 # hosted image does not promise GNU make on PATH.
 
 "on":
@@ -61,6 +64,7 @@ jobs:
         with:
           repository: wagner-austin/MCPs
           ref: main
+          fetch-depth: 0
           ssh-key: ${{ secrets.MCPS_READ_DEPLOY_KEY }}
           persist-credentials: false
           path: .mcps-source
@@ -70,7 +74,7 @@ jobs:
           $source = Join-Path $env:GITHUB_WORKSPACE '.mcps-source'
           $beside = Join-Path '${{ runner.workspace }}' 'MCPs'
           if (Test-Path -LiteralPath $beside) { Remove-Item -LiteralPath $beside -Recurse -Force }
-          git clone --quiet --depth 1 ([Uri]$source).AbsoluteUri $beside
+          git clone --quiet ([Uri]$source).AbsoluteUri $beside
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $source -Recurse -Force
 
@@ -80,11 +84,7 @@ jobs:
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
           Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
           $moduleRoot = Join-Path $env:RUNNER_TEMP ('api-powershell-' + [guid]::NewGuid().ToString('N'))
-          New-Item -ItemType Directory -Path $moduleRoot | Out-Null
-          $requirements = Import-PowerShellDataFile (Join-Path '${{ runner.workspace }}' 'MCPs\scripts\powershell-requirements.psd1')
-          foreach ($requirement in $requirements.GetEnumerator()) {
-            Save-Module -Name $requirement.Key -RequiredVersion $requirement.Value -Repository PSGallery -Path $moduleRoot
-          }
+          & .\scripts\ci\Save-HarnessModules.ps1 -RepoRoot . -McpsRoot (Join-Path '${{ runner.workspace }}' 'MCPs') -ModuleRoot $moduleRoot
           "PSModulePath=$moduleRoot;$env:PSModulePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install make
