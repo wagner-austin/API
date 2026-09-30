@@ -12,7 +12,7 @@ source_paths:
   - "src/hpc3/core/cancel.py"
   - "src/hpc3/cli/triage.py"
 source_git_blobs:
-  "src/hpc3/core/remote.py": "dc66efd7dadd6bae900bd37d6f61d268960797ca"
+  "src/hpc3/core/remote.py": "3ec61f05e736a85fde36420f2780da57159b93a5"
   "src/hpc3/core/status.py": "c89b8061f970b1677c1eff9c76010912c2b80828"
   "src/hpc3/core/squeue.py": "62002937c50a30b2a5032d082e3813d3a989b711"
   "src/hpc3/core/logs.py": "436b22a97e08bf32b046ea8e3b154796189ab614"
@@ -25,7 +25,7 @@ provenance:
   - "bash 'unexpected EOF while looking for matching' from a ~29 KB age probe, hpc3 login-i15, 2026-09-05"
   - "hpc3-triage 2026-09-05 run 1: 6706 recorded, 6417 open, 12 findings, 6345 newly closed; run 2: 72 open, 0 newly closed"
   - "fix committed fa8f87f9 (repo ~/PROJECTS/API)"
-fact_checked: 2026-09-06
+fact_checked: 2026-09-30
 confidence: high
 ---
 
