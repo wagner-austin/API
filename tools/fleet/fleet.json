@@ -521,6 +521,22 @@
         "companions": []
       }
     },
+    "MCPs/camera-mcp": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": ["cxx"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "camera-mcp",
+        "install": [
+          ["npm", "ci"],
+          ["node", "scripts/ci-build-consumed-workspaces.mjs"],
+          ["npm", "rebuild"]
+        ],
+        "companions": []
+      }
+    },
     "MCPs/cloudflared": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,
