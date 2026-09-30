@@ -11,12 +11,33 @@ import sys
 from pathlib import Path
 
 import pytest
-from scripts.sweep import EXIT_BAD_USAGE, EXIT_INCOMPLETE, EXIT_OK, main
+from scripts.sweep import EXIT_BAD_USAGE, EXIT_INCOMPLETE, EXIT_OK, SOURCE_GAME_DIR, main
 
 from rw_bot.harness.sweep import SweepError
 from tests.harness_fakes import FakeHost
+from tests.sample_game import write_sample_game
 
 _JOBS = "sweeps/demo.txt"
+
+
+@pytest.fixture(autouse=True)
+def _pinned_game_on_disk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run every case beside a real, miniature pinned game directory.
+
+    A finished batch records its arms with the fingerprint of the game it
+    played, and the fingerprint hashes the jar, the runtime's release file and
+    the asset tree ON DISK, not through the in-memory host. These cases once
+    read the developer's own 451 MB ``.game`` copy for that, so on a clean
+    checkout, where it is never tracked, eleven of them failed with
+    FileNotFoundError on ``.game\\game-lib.jar`` (MCPs board task d69786fa).
+
+    Args:
+        tmp_path: Where the game directory is built and the case runs.
+        monkeypatch: Used to enter that directory, since the sweep names the
+            game by a path relative to the process.
+    """
+    write_sample_game(tmp_path / SOURCE_GAME_DIR, platform=sys.platform)
+    monkeypatch.chdir(tmp_path)
 
 
 def _plant(host: FakeHost, *lines: str) -> None:
