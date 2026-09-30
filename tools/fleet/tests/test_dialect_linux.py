@@ -145,8 +145,8 @@ class TestBuildScript:
         assert f"cd '{TARGET}/{DEMO_PROJECT}'\n" in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\n" in body
         assert (
-            "export npm_config_cache POETRY_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH "
-            "PYTEST_XDIST_AUTO_NUM_WORKERS BOARD_AGENT_LABEL\n"
+            "export npm_config_cache POETRY_CACHE_DIR POETRY_KEYRING_ENABLED "
+            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS BOARD_AGENT_LABEL\n"
         ) in body
         assert f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body
 
@@ -181,6 +181,15 @@ class TestBuildScript:
         assert "npm_config_cache='/s/cache/npm'\n" in body
         assert "POETRY_CACHE_DIR='/s/cache/pypoetry'\n" in body
         assert "PLAYWRIGHT_BROWSERS_PATH='/s/cache/ms-playwright'\n" in body
+
+    def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:
+        """MCPs board task c837fd8d: left on, poetry blocks on the D-Bus
+        SecretService on a headless node, and the build times out inside
+        ``poetry install``."""
+        lines = _build(install=(("npm", "ci"),)).splitlines()
+
+        keyring = lines.index("POETRY_KEYRING_ENABLED='false'")
+        assert keyring < lines.index(f"printf '$ %s\\n' 'npm ci' >> '{names.log_path(TARGET)}'")
 
     def test_install_steps_run_at_the_root_before_the_recipe_and_end_it_when_they_fail(
         self,

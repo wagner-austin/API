@@ -99,6 +99,9 @@ class TestIsolatedText:
         assert "BOARD_AGENT_LABEL='opus-demo-0929' " in body
         assert 'npm_config_cache="$exec_cache/npm" ' in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='3' " in body
+        # env -i clears the runner's environment, so the keyring switch must
+        # cross it too (MCPs board task c837fd8d).
+        assert "POETRY_KEYRING_ENABLED='false' " in body
         assert "/var/run/docker.sock" not in body
 
     def test_install_steps_run_in_order_as_execdocker_and_a_failure_ends_the_build(
