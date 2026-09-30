@@ -209,7 +209,7 @@ class TestMalformedAnswers:
 
         assert (
             "command 'deploy' is not one of check, lint, test, build-bases, restart-session, "
-            "revive-session, kill-session, kill-session-hard, compact-session"
+            "revive-session, kill-session, kill-session-hard, compact-session, exit-session"
             in raised.value.message
         )
 

@@ -347,6 +347,46 @@ class TestRestartLane:
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"session-audit compact at {COMMIT} exited 0: {line.strip()}"
 
+    def test_an_approved_exit_runs_the_graceful_kill_under_its_own_run_verb(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs board task 5aa8ed06: a session's approved self-exit is the
+        graceful kill's keystrokes, never the hard verb, and its run id says
+        exit so the job reads as the session's own ending."""
+        mcps = checkout(tmp_path)
+        tree = plant_extraction(tmp_path / "scratch")
+        line = f"KILL - ENDED session {TARGET} (graceful): /exit typed into pane %7\n"
+        runner = FakeRun(
+            [
+                *extraction_replies(),
+                _test_hooks.CommandResult(returncode=0, stdout=line, stderr="", timed_out=False),
+            ]
+        )
+        _test_hooks.run = runner
+        command = "exit-session"
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"claimed": restart_row(command=command)}),
+                dump_json_str(
+                    {"job": restart_row(command=command, status="running", node="austinpc")}
+                ),
+                dump_json_str(
+                    {"job": restart_row(command=command, status="passed", node="austinpc")}
+                ),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(hub_argv(config_path, repo, mcps)) == 0
+
+        assert runner.calls[-1] == restart.kill_argv(
+            mcps, tree["registry_dir"], TARGET, "fable-dm-versionsplit-0912", hard=False
+        )
+        assert endpoint.arguments[1]["runId"] == f"exit-{DEFAULT_JOB_ID}"
+        assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
+            f"session-audit kill at {COMMIT} exited 0: {line.strip()}"
+        )
+
     def test_a_kill_session_audit_did_not_carry_out_closes_failed(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:

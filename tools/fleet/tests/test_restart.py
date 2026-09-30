@@ -66,6 +66,7 @@ class TestRestartArgv:
             DispatchCommand.KILL_SESSION,
             DispatchCommand.KILL_SESSION_HARD,
             DispatchCommand.COMPACT_SESSION,
+            DispatchCommand.EXIT_SESSION,
         )
 
     def test_composes_the_exact_compact_invocation(self) -> None:
@@ -140,6 +141,17 @@ class TestRestartArgv:
             "verb": "compact",
             "mode": "compact",
             "argv": restart.compact_argv(ROOT, REGISTRY, TARGET, label),
+            "types_requester": True,
+            **pinned,
+        }
+        # MCPs board task 5aa8ed06: an approved self-exit is the graceful
+        # kill's one invocation, never the hard one, under its own run verb.
+        assert restart.session_invocation(
+            ROOT, TREE, DispatchCommand.EXIT_SESSION, TARGET, label
+        ) == {
+            "verb": "exit",
+            "mode": "kill",
+            "argv": restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=False),
             "types_requester": True,
             **pinned,
         }
