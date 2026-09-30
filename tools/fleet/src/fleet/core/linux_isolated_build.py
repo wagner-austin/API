@@ -53,6 +53,19 @@ EXEC_USER = "execdocker"
 #: ``env -i`` leaves none, and the runner's own ``~/.local/bin`` is unreadable.
 EXEC_PATH = "/usr/local/bin:/usr/bin:/bin"
 
+#: The variable, and its value, that turn poetry's keyring off in every Linux
+#: build, the runner's own and the isolated one alike (MCPs board task
+#: c837fd8d). With the keyring on, poetry asks the SecretService over D-Bus
+#: for credentials before it installs anything, and on a headless node that
+#: call can block with nothing ever answering: measured on diphtheria on
+#: 2026-09-30, ``poetry install --with dev`` printed ``Using keyring backend
+#: 'SecretService Keyring'`` and sat for over ten minutes at 0.1 percent CPU,
+#: which is how two doc-extract-api checks timed out inside poetry install
+#: before any test ran, while the same install with this set finished in
+#: 144 s. Every project the fleet builds installs from PyPI with no private
+#: index, so nothing needs a stored credential.
+POETRY_KEYRING_OFF = ("POETRY_KEYRING_ENABLED", "false")
+
 
 def isolated_build_lines(
     *,
@@ -99,6 +112,7 @@ def isolated_build_lines(
         'DOCKER_HOST="unix:///run/user/$exec_uid/docker.sock" '
         'npm_config_cache="$exec_cache/npm" '
         'POETRY_CACHE_DIR="$exec_cache/pypoetry" '
+        f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}' "
         'PLAYWRIGHT_BROWSERS_PATH="$exec_cache/ms-playwright" '
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
         f"{AGENT_LABEL_VARIABLE}='{agent}' "

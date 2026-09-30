@@ -24,6 +24,12 @@ under ``~/.local/bin``, which a login shell adds to PATH and a non-interactive
 ssh command does not (Ubuntu's ``~/.profile`` is read by login shells only).
 Every script here prepends it, so the same ``poetry`` the operator ran by
 hand is the one the build finds.
+
+WHY POETRY'S KEYRING IS OFF. Every build exports ``POETRY_KEYRING_ENABLED``
+false (:data:`fleet.core.linux_isolated_build.POETRY_KEYRING_OFF` says why):
+left on, poetry waits on a D-Bus SecretService that a headless node never
+answers, and the build times out inside ``poetry install`` (MCPs board task
+c837fd8d).
 """
 
 from __future__ import annotations
@@ -37,7 +43,7 @@ from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
-from fleet.core.linux_isolated_build import isolated_build_lines
+from fleet.core.linux_isolated_build import POETRY_KEYRING_OFF, isolated_build_lines
 
 #: How a script file is run by path.
 SH_INVOCATION = ("/bin/sh",)
@@ -430,11 +436,12 @@ class LinuxDialect:
         lines = [
             f"{PROLOGUE}npm_config_cache='{cache_root}/npm'",
             f"POETRY_CACHE_DIR='{cache_root}/pypoetry'",
+            f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}'",
             f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
             f"{AGENT_LABEL_VARIABLE}='{label}'",
-            "export npm_config_cache POETRY_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH "
-            f"PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE}",
+            f"export npm_config_cache POETRY_CACHE_DIR {POETRY_KEYRING_OFF[0]} "
+            f"PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE}",
             f"cd '{target}'",
         ]
         for step in install:
