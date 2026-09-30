@@ -505,6 +505,54 @@ def decode_listing_page(answer: str) -> ListingPage:
     return ListingPage(jobs=decode_listing(answer), next_offset=next_offset)
 
 
+class TrailClaim(TypedDict):
+    """One ``claimed`` entry on a job's trail.
+
+    Attributes:
+        actor: The runner that took the claim.
+        claimed_unix: When, whole seconds since the epoch.
+    """
+
+    actor: str
+    claimed_unix: int
+
+
+def decode_trail_claims(answer: str) -> tuple[TrailClaim, ...]:
+    """Decode the claims on a ``dispatch_get`` answer's trail: who, and when.
+
+    A claim taken over by another runner overwrites the job's ``claimedBy``
+    and ``claimedAt``, so the trail is the only record of every runner that
+    ever held it (board task fd402617). Only ``claimed`` entries are read,
+    and of them only the two fields a decision is made from.
+
+    Args:
+        answer: The tool's text.
+
+    Returns:
+        Every claim, oldest first as the trail runs.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when the trail is not an array, an
+            entry is not an object, or a claim lacks its actor or instant.
+    """
+    trail = _envelope(answer, "trail")
+    if not isinstance(trail, list):
+        raise _malformed(f"'trail' is {type(trail).__name__}, not an array", answer=answer)
+    claims: list[TrailClaim] = []
+    for entry in trail:
+        if not isinstance(entry, dict):
+            raise _malformed(f"a trail entry is {type(entry).__name__}", answer=answer)
+        if _require_str(entry, "kind", answer=answer) != "claimed":
+            continue
+        instant = _require_optional_instant(entry, "createdAt", answer=answer)
+        if instant is None:
+            raise _malformed("a claim on the trail has a null 'createdAt'", answer=answer)
+        claims.append(
+            TrailClaim(actor=_require_str(entry, "actor", answer=answer), claimed_unix=instant)
+        )
+    return tuple(claims)
+
+
 def encode_job_line(job: DispatchJob) -> str:
     """Render one job as the single line the agent logs.
 
@@ -537,10 +585,12 @@ __all__ = [
     "DispatchLane",
     "DispatchStatus",
     "ListingPage",
+    "TrailClaim",
     "decode_claim",
     "decode_job",
     "decode_listing",
     "decode_listing_page",
     "decode_reported",
+    "decode_trail_claims",
     "encode_job_line",
 ]
