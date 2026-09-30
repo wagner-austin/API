@@ -429,7 +429,7 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
     return (("tar", "-xzmf", archive, "-C", destination),)
 
 
-def companion_repository_commands(target: str, sha: str) -> tuple[tuple[str, ...], ...]:
+def companion_repository_commands(target: str, sha: str, ref: str) -> tuple[tuple[str, ...], ...]:
     """The commands that make a staged companion a one-commit repository.
 
     A companion exists to be read as a workspace, and the thing that reads
@@ -448,19 +448,33 @@ def companion_repository_commands(target: str, sha: str) -> tuple[tuple[str, ...
     ignore rule that skipped one of those files would leave the check
     reporting a workspace file as missing when the workspace has it.
 
+    AND THE COMMIT IS ALSO ``origin/<branch>`` (MCPs board task a8ee9b21).
+    A check that runs MCPs' published maketools (hardware-wiki's and
+    metabolomics-dashboard's host-code, chat's ps-harness) archives the
+    command from ``../MCPs`` at ``origin/main``, never HEAD, so that a
+    workstation's uncommitted edit is never what runs. On a node that ref did
+    not exist, so those checks refused there, 'has no origin/main carrying
+    packages/maketools'. The export IS the declared ref's tip, fetched from
+    that remote into the hub's mirror, so naming the commit
+    ``refs/remotes/origin/<branch>`` states what it is, not a stand-in.
+
     Args:
         target: Absolute remote directory holding the extracted companion.
         sha: The commit the archive was written from, recorded in the
             message so the tree on the node names what it is.
+        ref: The companion's declared ref, ``main`` or ``refs/heads/main``,
+            whose tip the archive is.
 
     Returns:
-        The three commands, in order, for a dialect's
+        The four commands, in order, for a dialect's
         :meth:`Dialect.checked_script`.
     """
+    branch = ref.removeprefix("refs/heads/")
     return (
         ("git", "-C", target, "init", "--quiet"),
         ("git", "-C", target, "add", "--all", "--force"),
         _commit_command(target, f"fleet companion export {sha}"),
+        ("git", "-C", target, "update-ref", f"refs/remotes/origin/{branch}", "HEAD"),
     )
 
 

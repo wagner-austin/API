@@ -452,6 +452,7 @@ class CompanionExport(TypedDict):
 
     Attributes:
         directory: The declared directory it lands in on the node.
+        ref: The declared ref, which the node names the commit as.
         sha: The commit its ref resolved to on this fetch.
         path: The local file the archive was written to, which scp copies.
         data: The same archive's bytes, which the node's digest is compared
@@ -459,6 +460,7 @@ class CompanionExport(TypedDict):
     """
 
     directory: str
+    ref: str
     sha: str
     path: pathlib.Path
     data: bytes
@@ -492,6 +494,7 @@ def export_companions(
         exported.append(
             CompanionExport(
                 directory=companion["directory"],
+                ref=companion["ref"],
                 sha=prepared["sha"],
                 path=path,
                 # UNSCOPED, and that is a decision rather than an omission.

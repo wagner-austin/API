@@ -54,6 +54,9 @@ EXAMPLE_RUN_ID = "MCPs-packages-maketools-1790000000"
 #: The commit the example dispatch's companion was archived from.
 EXAMPLE_COMPANION_SHA = "5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2"
 
+#: The ref the example dispatch's companion was exported from.
+EXAMPLE_COMPANION_REF = "main"
+
 #: The example dispatch's project, inside its export.
 EXAMPLE_PROJECT = "packages/maketools"
 
@@ -139,7 +142,9 @@ def _dialect_scripts() -> list[RenderedScript]:
         RenderedScript(
             name="dialect-companion-repository",
             text=spoken.checked_script(
-                dialect.companion_repository_commands(companion, EXAMPLE_COMPANION_SHA)
+                dialect.companion_repository_commands(
+                    companion, EXAMPLE_COMPANION_SHA, EXAMPLE_COMPANION_REF
+                )
             ),
         ),
         RenderedScript(
@@ -224,6 +229,7 @@ def render_all(roster: RunnerSpec) -> list[RenderedScript]:
 
 __all__ = [
     "EXAMPLE_AGENT",
+    "EXAMPLE_COMPANION_REF",
     "EXAMPLE_COMPANION_SHA",
     "EXAMPLE_DISTRO_STEM",
     "EXAMPLE_INSTALL",

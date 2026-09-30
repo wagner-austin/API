@@ -211,6 +211,7 @@ def stage_companion(
     platform: NodePlatform,
     stage_root: str,
     directory: str,
+    ref: str,
     sha: str,
     source: pathlib.Path,
     payload: bytes,
@@ -228,6 +229,8 @@ def stage_companion(
         platform: The node's declared platform.
         stage_root: Absolute directory on the node holding staged trees.
         directory: The companion's declared directory name.
+        ref: The companion's declared ref, which the commit is also named
+            as on the node (:func:`fleet.core.dialect.companion_repository_commands`).
         sha: The commit the archive was written from.
         source: The local archive file.
         payload: The archive bytes.
@@ -272,7 +275,7 @@ def stage_companion(
     remote.run_script(
         host,
         spoken.script_path(staged, names.COMPANION_REPOSITORY_STEM),
-        spoken.checked_script(dialect.companion_repository_commands(tree, sha)),
+        spoken.checked_script(dialect.companion_repository_commands(tree, sha, ref)),
         platform=platform,
     )
     return tree

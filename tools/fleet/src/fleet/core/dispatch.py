@@ -435,6 +435,7 @@ def launch(
             platform=node["platform"],
             stage_root=node["stage_root"],
             directory=companion["directory"],
+            ref=companion["ref"],
             sha=companion["sha"],
             source=companion["path"],
             payload=companion["data"],
