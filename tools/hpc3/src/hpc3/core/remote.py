@@ -50,14 +50,20 @@ MAX_COMMAND_CHARS = 4000
 #: runs hub -> cloudflared -> sedona -> hpc3 and whose legs can stall without
 #: closing: ``ConnectTimeout`` bounds the TCP connect and the banner exchange,
 #: and ``ServerAliveInterval`` with ``ServerAliveCountMax`` ends a session
-#: whose far side stops answering after four unanswered 15-second probes.
-#: Measured 2026-09-30 (board task 465689f5): with only ``BatchMode``, the
-#: image probe of an execution run sat on a stalled route until pytest-timeout
-#: killed the worker at 300 s, in 2 of 6 runs between 23:03Z and 23:20Z while
-#: the same probe answered in 3.3 s in 15 of 15 runs afterwards. A stalled leg
-#: now exits ssh with its own named timeout on stderr, which
-#: :func:`run_remote` and :func:`put_bytes` carry into
-#: ``REMOTE_COMMAND_FAILED``, instead of hanging the caller.
+#: whose far side stops answering after four unanswered 15-second probes. A
+#: stalled leg exits ssh with its own named timeout on stderr ("Connection
+#: timed out during banner exchange", met on this route on 2026-09-30 at
+#: 12:07Z while sedona's VPN was down), which :func:`run_remote` and
+#: :func:`put_bytes` carry into ``REMOTE_COMMAND_FAILED``.
+#:
+#: WHAT THESE DO NOT BOUND, measured the same day (board task 465689f5): a
+#: command the cluster is still running. The execution case's image probe hung
+#: for minutes in 4 of 11 runs between 23:03Z and 23:40Z, and on the login
+#: node the hung ``apptainer exec`` had one thread in uninterruptible sleep in
+#: ``__IBVSocket_waitForRecvCompletionEvent`` inside ``newfstatat``: the
+#: BeeGFS client waiting on InfiniBand for a /pub stat. The server kept
+#: answering keepalives throughout, and a process in that state outlives the
+#: ssh session that started it.
 SSH_OPTIONS: tuple[str, ...] = (
     "-o",
     "BatchMode=yes",
