@@ -89,14 +89,16 @@ TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 #: session-audit opens a new tmux window and resumes the transcript there.
 #: ``compact-session`` (board task 01f31e4a) shrinks a working session that
 #: got too big, the operator's "/compact if they get too big", never an
-#: exit. The words are the queue's own :class:`DispatchCommand` members, so
-#: one vocabulary names them.
+#: exit. ``exit-session`` (MCPs board task 5aa8ed06) is a session's own exit,
+#: approved by its room's supervisor. The words are the queue's own
+#: :class:`DispatchCommand` members, so one vocabulary names them.
 SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.RESTART_SESSION,
     DispatchCommand.REVIVE_SESSION,
     DispatchCommand.KILL_SESSION,
     DispatchCommand.KILL_SESSION_HARD,
     DispatchCommand.COMPACT_SESSION,
+    DispatchCommand.EXIT_SESSION,
 )
 
 #: Detail prefix for a command this module has no invocation for.
@@ -366,6 +368,18 @@ def session_invocation(
             verb="compact",
             mode="compact",
             argv=compact_argv(mcps_root, registry_dir, session_target, requested_by),
+            types_requester=True,
+            commit=tree["commit"],
+            python_path=tree["python_path"],
+        )
+    if command is DispatchCommand.EXIT_SESSION:
+        # The graceful kill's keystrokes, idle re-read and pane close, with
+        # nothing of its own: an approved self-exit is the same act, and the
+        # queue's verb is what the ledger records it by (MCPs 5aa8ed06).
+        return SessionInvocation(
+            verb="exit",
+            mode="kill",
+            argv=kill_argv(mcps_root, registry_dir, session_target, requested_by, hard=False),
             types_requester=True,
             commit=tree["commit"],
             python_path=tree["python_path"],
