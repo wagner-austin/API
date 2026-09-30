@@ -29,9 +29,12 @@ name: powershell
 # this repository through git and must not meet MCPs' files inside it.
 #
 # The two modules are the versions the pinned commit's requirements file
-# pins, saved from the gallery by scripts/ci/Save-HarnessModules.ps1, which
-# the harness itself runs under its Pester suite, into a directory put first
-# on PSModulePath. make is installed at a pinned version, because the
+# pins, saved from the gallery by the pinned commit's own
+# scripts/ps-harness/Install-HarnessModule.ps1, the installer MCPs' CI and
+# its make install-ps-modules run (MCPs board task da8b4f11), into a
+# directory put first on PSModulePath. scripts/ci/Save-HarnessModules.ps1
+# reads both files out of the MCPs clone at the pin and runs it; the harness
+# runs that script under its Pester suite. make is installed at a pinned version, because the
 # hosted image does not promise GNU make on PATH.
 
 "on":
