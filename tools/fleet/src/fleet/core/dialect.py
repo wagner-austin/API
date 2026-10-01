@@ -22,8 +22,8 @@ implementations must supply all of them or fail to type-check, and a caller
 asks :func:`for_platform` once and never reasons about the platform again.
 
 WHAT IS SHARED AND WHY IT IS HERE. ``tar -xzmf`` and the ``git`` acts -- the
-staged tree's ``init``, and the ``init`` plus ``commit`` that makes a
-companion readable as a workspace -- are the same COMMANDS on both platforms
+staged tree's ``init`` and ``commit``, and the clone of a companion from its
+bundle -- are the same COMMANDS on both platforms
 (Windows ships bsdtar, every node has git), so they are functions in this
 module rather than methods repeated in two classes. Everything else differs
 in at least one token that matters, which is why it is a method: replacing a
@@ -65,9 +65,11 @@ from typing import Protocol
 from fleet.contracts.node import NodePlatform
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
+from fleet.core.export import COMPANION_REF
 
-#: Who a staged tree's one commit is authored by, a project's export and a
-#: companion's alike, passed to ``git`` with ``-c`` on the commit itself.
+#: Who a project's staged tree's one commit is authored by, passed to ``git``
+#: with ``-c`` on the commit itself. A companion is cloned with its real
+#: commits (:func:`companion_repository_commands`) and gets none.
 #:
 #: A node has no git identity and is not given one: a dispatch that
 #: configured ``user.email`` would leave that setting behind on somebody's
@@ -421,11 +423,11 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
     build does nothing at all -- which reads as a suite that passed
     instantly.
 
-    THE TWO PATHS ARE SEPARATE because a companion's are: its archive stays
-    in a staging directory of its own and only the repository lands in the
-    directory the recipe reads, so the tree committed there is the export
-    and nothing else. A project's dispatch passes its own directory for
-    both, which is where its archive already sits.
+    THE TWO PATHS ARE SEPARATE so a payload can stay out of the tree it
+    builds; a project's dispatch passes its own directory for both, which is
+    where its archive already sits. (A companion, which used this too until
+    MCPs board task 2026dfbc, is now cloned from a bundle instead:
+    :func:`companion_repository_commands`.)
 
     Args:
         archive: Absolute path to the ``.tgz`` on the node.
@@ -437,52 +439,69 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
     return (("tar", "-xzmf", archive, "-C", destination),)
 
 
-def companion_repository_commands(target: str, sha: str, ref: str) -> tuple[tuple[str, ...], ...]:
-    """The commands that make a staged companion a one-commit repository.
+def companion_repository_commands(
+    target: str, bundle: str, sha: str, ref: str
+) -> tuple[tuple[str, ...], ...]:
+    """The commands that clone a staged companion from its bundle.
 
-    A companion exists to be read as a workspace, and the thing that reads
-    it reads HEAD -- slime's lift check compares its lifted files against
-    ``git show HEAD:<path>`` precisely so that an uncommitted edit in the
-    workspace is not mistaken for the code. On a node there is no HEAD
-    until one is made, so the export is committed here, as the project's
-    own tree is (:func:`init_repository_commands`), and the identity is
-    passed with ``-c`` rather than configured: nothing this package does
-    leaves state on a node.
+    A companion exists to be read as a workspace, and the things that read
+    it read git: slime's lift check compares its lifted files against
+    ``git show HEAD:<path>`` so that an uncommitted edit is not mistaken
+    for the code, and a check that runs MCPs' published maketools
+    (hardware-wiki's and metabolomics-dashboard's host-code, chat's
+    ps-harness) archives the command from ``../MCPs`` at ``origin/main``
+    (MCPs board task a8ee9b21).
 
-    ``--force`` on the add, which the project's tree does not use and must
-    not: there the ``.gitignore`` is what makes a staged tree index the same
-    files a checkout tracks. Here the directory holds the archive of a
-    commit and nothing else, so the tracked set is already decided, and an
-    ignore rule that skipped one of those files would leave the check
-    reporting a workspace file as missing when the workspace has it.
+    A REAL CLONE, WITH ITS HISTORY (MCPs board task 2026dfbc). Until then
+    the companion landed as ``git archive`` of the ref's tip, committed on
+    the node as one synthetic commit: no history, and a HEAD whose sha was
+    not the real one. A check that reads a companion's past therefore failed
+    on every node and passed on every workstation. corvis-stick's
+    HookCommands suite reads ``packages/claude-hooks/registration.json`` at
+    the MCPs commit its hooks pin names, and on serendipity that read
+    'fatal: path ... exists on disk, but not in cd4d6aa2', a commit that is
+    an ancestor of MCPs main (job 972977be, 2026-09-30). The hub now sends
+    ``git bundle create`` of the companion ref
+    (:func:`fleet.core.export.bundle_ref`), and the node fetches it into
+    ``refs/remotes/origin/<branch>`` and checks ``<branch>`` out there, so
+    HEAD and ``origin/<branch>`` are the ref's real commit and every
+    ancestor the hub's mirror holds is reachable from them.
 
-    AND THE COMMIT IS ALSO ``origin/<branch>`` (MCPs board task a8ee9b21).
-    A check that runs MCPs' published maketools (hardware-wiki's and
-    metabolomics-dashboard's host-code, chat's ps-harness) archives the
-    command from ``../MCPs`` at ``origin/main``, never HEAD, so that a
-    workstation's uncommitted edit is never what runs. On a node that ref did
-    not exist, so those checks refused there, 'has no origin/main carrying
-    packages/maketools'. The export IS the declared ref's tip, fetched from
-    that remote into the hub's mirror, so naming the commit
-    ``refs/remotes/origin/<branch>`` states what it is, not a stand-in.
+    THE LAST TWO COMMANDS PROVE HEAD IS ``sha``: each is an ancestor of the
+    other only when they are the same commit. The bundle is the one the hub
+    wrote after resolving the ref to ``sha``, and its digest is checked
+    before this runs, so a mismatch is not expected; it would mean the
+    bundle named another commit, and the stage stops rather than checking a
+    tree the feed would then misreport.
 
     Args:
-        target: Absolute remote directory holding the extracted companion.
-        sha: The commit the archive was written from, recorded in the
-            message so the tree on the node names what it is.
-        ref: The companion's declared ref, ``main`` or ``refs/heads/main``,
-            whose tip the archive is.
+        target: Absolute remote directory the companion is cloned into,
+            emptied and created just before.
+        bundle: Absolute path to the verified bundle on the node.
+        sha: The commit the hub resolved the ref to and bundled.
+        ref: The companion's declared ref, ``main`` or ``refs/heads/main``.
 
     Returns:
-        The four commands, in order, for a dialect's
+        The five commands, in order, for a dialect's
         :meth:`Dialect.checked_script`.
     """
     branch = ref.removeprefix("refs/heads/")
+    tracking = f"refs/remotes/origin/{branch}"
     return (
         ("git", "-C", target, "init", "--quiet"),
-        ("git", "-C", target, "add", "--all", "--force"),
-        _commit_command(target, f"fleet companion export {sha}"),
-        ("git", "-C", target, "update-ref", f"refs/remotes/origin/{branch}", "HEAD"),
+        (
+            "git",
+            "-C",
+            target,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            bundle,
+            f"+{COMPANION_REF}:{tracking}",
+        ),
+        ("git", "-C", target, "checkout", "--quiet", "-B", branch, tracking),
+        ("git", "-C", target, "merge-base", "--is-ancestor", "HEAD", sha),
+        ("git", "-C", target, "merge-base", "--is-ancestor", sha, "HEAD"),
     )
 
 

@@ -163,13 +163,14 @@ def send_verified(
     payload: bytes,
     described_as: str,
 ) -> None:
-    """Send an archive to a directory on a node and verify it lands whole.
+    """Send a payload to a directory on a node and verify it lands whole.
 
-    The half of staging that is the same for a project's export and for a
-    companion beside it: the archive lands over scp, the node digests it
-    WITHOUT extracting, and the sender compares. Nothing is unpacked here --
-    the caller decides where the verified bytes go, which is the one thing
-    the two cases do differently.
+    The half of staging that is the same for a project's export (an
+    archive) and for a companion beside it (a bundle): the payload lands
+    over scp, the node digests it WITHOUT unpacking, and the sender
+    compares. Nothing is unpacked here -- the caller decides what the
+    verified bytes become, which is the one thing the two cases do
+    differently.
 
     Args:
         host: SSH destination.
@@ -218,25 +219,26 @@ def stage_companion(
 ) -> str:
     """Put one companion repository on a node, beside the exports.
 
-    The directory is REPLACED rather than unpacked over, and the archive
+    The directory is REPLACED rather than cloned over, and the bundle
     never enters it: :func:`fleet.core.names.companion_directory` and
-    :data:`fleet.core.names.STAGE_SUFFIX` carry the reasons. What
-    lands is the export of one commit and nothing else, committed on the
-    node so the check that reads it reads a HEAD.
+    :data:`fleet.core.names.STAGE_SUFFIX` carry the reasons. What lands
+    is a clone of the declared ref's real commit with its history
+    (:func:`fleet.core.dialect.companion_repository_commands`, MCPs board
+    task 2026dfbc), so a check that reads HEAD, ``origin/<branch>`` or an
+    ancestor reads what a workstation's clone holds.
 
     Args:
         host: SSH destination.
         platform: The node's declared platform.
         stage_root: Absolute directory on the node holding staged trees.
         directory: The companion's declared directory name.
-        ref: The companion's declared ref, which the commit is also named
-            as on the node (:func:`fleet.core.dialect.companion_repository_commands`).
-        sha: The commit the archive was written from.
-        source: The local archive file.
-        payload: The archive bytes.
+        ref: The companion's declared ref, whose branch is checked out.
+        sha: The commit the bundle's ref names.
+        source: The local bundle file.
+        payload: The bundle bytes.
 
     Returns:
-        The absolute remote directory the companion was extracted into.
+        The absolute remote directory the companion was cloned into.
 
     Raises:
         AppError: As :func:`send_verified` describes, and from the transport
@@ -268,14 +270,10 @@ def stage_companion(
     )
     remote.run_script(
         host,
-        spoken.script_path(staged, names.EXTRACT_STEM),
-        spoken.checked_script(dialect.extract_commands(f"{staged}/{names.ARCHIVE_NAME}", tree)),
-        platform=platform,
-    )
-    remote.run_script(
-        host,
         spoken.script_path(staged, names.COMPANION_REPOSITORY_STEM),
-        spoken.checked_script(dialect.companion_repository_commands(tree, sha, ref)),
+        spoken.checked_script(
+            dialect.companion_repository_commands(tree, f"{staged}/{names.ARCHIVE_NAME}", sha, ref)
+        ),
         platform=platform,
     )
     return tree

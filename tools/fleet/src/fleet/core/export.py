@@ -50,8 +50,9 @@ COMPANION_REF = "refs/fleet/companion"
 #: before the tick's own bound does.
 FETCH_TIMEOUT_SECONDS = 600
 
-#: The archive's deadline, in seconds; ``git archive`` of the largest
-#: repository here (MCPs, 30 MB compressed) takes well under a minute.
+#: The deadline of an archive or a companion's bundle, in seconds; either of
+#: the largest repository here (MCPs: a 38 MB archive, a 62 MB bundle) takes
+#: well under a minute.
 ARCHIVE_TIMEOUT_SECONDS = 300
 
 #: A ``git init --bare``'s deadline, in seconds.
@@ -274,10 +275,9 @@ def archive_commit(
         paths: The pathspec, from
             :func:`fleet.core.archive_scope.archive_pathspec`, scoping the
             archive to what the project's check reads. Empty for the whole
-            commit, which is what a companion always is and what a project
-            whose repository declares no data directories still gets: an
-            empty tuple appends nothing, so the command run is the one this
-            function has always run.
+            commit, which is what a project whose repository declares no
+            data directories gets: an empty tuple appends nothing, so the
+            command run is the one this function has always run.
 
             REQUIRED AND NOT DEFAULTED, though every caller but one passes
             the same thing. The unscoped archive was the defect (board task
@@ -311,6 +311,39 @@ def archive_commit(
     if archived["returncode"] != 0:
         raise _failure(
             FleetErrorCode.EXPORT_FAILED, f"git archive {sha} from {mirror}", archived["stderr"]
+        )
+    return _test_hooks.read_bytes(destination)
+
+
+def bundle_ref(mirror: pathlib.Path, destination: pathlib.Path) -> bytes:
+    """Write ``git bundle create`` of the companion ref and read the bytes back.
+
+    The companion's payload since MCPs board task 2026dfbc: the ref with
+    its whole history, which the node clones from
+    (:func:`fleet.core.dialect.companion_repository_commands`), where an
+    archive gave it one synthetic commit. Measured on the hub for MCPs main:
+    61.8 MB in 2.2 s, against 38.1 MB and 3.0 s for the archive it replaces.
+
+    Args:
+        mirror: The companion's mirror, holding :data:`COMPANION_REF`.
+        destination: Where the bundle is written; its directory is made.
+
+    Returns:
+        The bundle's bytes, which the node's digest is compared against.
+
+    Raises:
+        AppError: ``EXPORT_FAILED`` when ``git bundle create`` exits non-zero.
+    """
+    _test_hooks.make_directory(destination.parent)
+    bundled = _test_hooks.run(
+        ("git", "-C", str(mirror), "bundle", "create", "--quiet", str(destination), COMPANION_REF),
+        timeout_seconds=ARCHIVE_TIMEOUT_SECONDS,
+    )
+    if bundled["returncode"] != 0:
+        raise _failure(
+            FleetErrorCode.EXPORT_FAILED,
+            f"git bundle create {COMPANION_REF} from {mirror}",
+            bundled["stderr"],
         )
     return _test_hooks.read_bytes(destination)
 
@@ -443,19 +476,19 @@ class PreparedCompanion(TypedDict):
 
 
 class CompanionExport(TypedDict):
-    """One companion's archive, ready to be staged beside an export.
+    """One companion's bundle, ready to be staged beside an export.
 
     Bytes and not a builder, unlike a project's payload: a companion's
-    archive is named by its own commit rather than by the run, and it is
+    bundle is named by its own commit rather than by the run, and it is
     built where the ref is resolved -- before any lease is taken, so a ref
     the remote does not serve refuses with nothing held.
 
     Attributes:
         directory: The declared directory it lands in on the node.
-        ref: The declared ref, which the node names the commit as.
+        ref: The declared ref, whose branch the node checks out.
         sha: The commit its ref resolved to on this fetch.
-        path: The local file the archive was written to, which scp copies.
-        data: The same archive's bytes, which the node's digest is compared
+        path: The local file the bundle was written to, which scp copies.
+        data: The same bundle's bytes, which the node's digest is compared
             against.
     """
 
@@ -471,11 +504,11 @@ def export_companions(
     archive_dir: pathlib.Path,
     companions: tuple[ProjectCompanion, ...],
 ) -> tuple[CompanionExport, ...]:
-    """Fetch and archive every companion a project's export carries.
+    """Fetch and bundle every companion a project's export carries.
 
     Args:
         mirrors_root: The mirrors directory under the workspace's records.
-        archive_dir: Local directory the archives are written in, which must
+        archive_dir: Local directory the bundles are written in, which must
             be run output rather than anywhere a build reads.
         companions: The project's declarations, in order.
 
@@ -483,29 +516,27 @@ def export_companions(
         One export per companion, in the same order.
 
     Raises:
-        AppError: As :func:`prepare_companion` and :func:`archive_commit`
+        AppError: As :func:`prepare_companion` and :func:`bundle_ref`
             describe.
     """
     exported: list[CompanionExport] = []
     for companion in companions:
         prepared = prepare_companion(mirrors_root, companion)
         key = companion_mirror_key(companion["remote"])
-        path = archive_dir / f"{key}-{prepared['sha']}.tgz"
+        path = archive_dir / f"{key}-{prepared['sha']}.bundle"
         exported.append(
             CompanionExport(
                 directory=companion["directory"],
                 ref=companion["ref"],
                 sha=prepared["sha"],
                 path=path,
-                # UNSCOPED, and that is a decision rather than an omission.
-                # A companion is a whole other repository staged beside the
-                # export because the project's check reads it (slime lints
-                # its lifted code against the committed MCPs workspace), and
-                # nothing here knows which parts of it that check opens. The
-                # data-path scope belongs to the project under check, whose
-                # registry line names its repository; a companion has no
-                # project line and no declaration to read.
-                data=archive_commit(prepared["mirror"], prepared["sha"], path, ()),
+                # The WHOLE repository with its history, unscoped by any
+                # data path: the project's check reads the companion as a
+                # workspace (slime lints its lifted code against the
+                # committed MCPs workspace, corvis-stick reads MCPs at the
+                # commit its hooks pin names), and nothing here knows which
+                # parts or which past commits that check opens.
+                data=bundle_ref(prepared["mirror"], path),
             )
         )
     return tuple(exported)
@@ -544,6 +575,7 @@ __all__ = [
     "CompanionExport",
     "PreparedCompanion",
     "archive_commit",
+    "bundle_ref",
     "companion_mirror_key",
     "ensure_mirror",
     "export_companions",

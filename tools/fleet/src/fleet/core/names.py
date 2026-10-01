@@ -35,7 +35,11 @@ RESULT_NAME = "result.txt"
 #: it stops its whole control group.
 PID_NAME = "build.pid"
 
-#: The archive as scp lands it, under a dispatch's directory.
+#: The payload as scp lands it, under a dispatch's directory or a companion's
+#: staging directory: an export's ``git archive``, or since MCPs board task
+#: 2026dfbc a companion's ``git bundle``. One name for both because both
+#: dialects' digest scripts read it; git reads a bundle by its contents, so
+#: the ``.tgz`` spelling misleads a reader but no tool.
 ARCHIVE_NAME = "tree.tgz"
 
 #: The script that runs the suite, which is all it does.
@@ -68,16 +72,16 @@ EXTRACT_STEM = "extract"
 #: The script that makes the staged tree a git repository.
 INIT_REPOSITORY_STEM = "init-repo"
 
-#: The script that makes a staged companion a one-commit repository.
+#: The script that clones a staged companion from its bundle.
 COMPANION_REPOSITORY_STEM = "companion-repo"
 
 #: What a staging directory is called: the name of the directory it stages
 #: and this suffix, beside it under the node's stage root.
 #:
 #: THE TRANSPORT FILES ARE KEPT OUT OF EVERY STAGED TREE, a dispatch's export
-#: as well as a companion. Each is committed on the node and read as a
-#: repository: its whole claim is that it is an export of a commit and
-#: nothing else. A dispatch's archive and step scripts once landed inside
+#: as well as a companion. Each is read as a repository: an export's claim is
+#: that it is a commit and nothing else, and a companion's that it is a clone
+#: of its ref. A dispatch's archive and step scripts once landed inside
 #: its export and ``git add --all`` committed them, so MCPs' maketools
 #: host-code on hardware-wiki read ``digest.sh``, ``extract.sh`` and
 #: ``init-repo.sh`` as tracked host scripts the repository does not have

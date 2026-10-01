@@ -421,7 +421,7 @@ class Prepared(TypedDict):
         plan: The project's declaration.
         source: Its source, present by construction here.
         mirror: The mirror on the hub, holding the commit.
-        companions: The archives of the repositories staged beside the
+        companions: The bundles of the repositories staged beside the
             export, each at the commit its declared ref names now.
         scope: The pathspec the export's archive is built with, leaving out
             the data directories this repository declares that this project
@@ -453,7 +453,7 @@ def prepare(
     tags against it, the remote, the commit on the remote, the companions
     the project's check reads beside it, and only then the project's fit on
     this node, judged on the probe the claim pass already took, so no second
-    ssh is paid. The companions are fetched and archived HERE, with the
+    ssh is paid. The companions are fetched and bundled HERE, with the
     commit, so a declared ref the remote does not serve refuses with no
     lease held and nothing copied to a node.
 

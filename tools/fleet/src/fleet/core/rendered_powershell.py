@@ -51,7 +51,7 @@ EXAMPLE_STAGE_ROOT = "C:/fleet/stage"
 #: The example dispatch's id, in the shape fleet-run mints.
 EXAMPLE_RUN_ID = "MCPs-packages-maketools-1790000000"
 
-#: The commit the example dispatch's companion was archived from.
+#: The commit the example dispatch's companion was bundled at.
 EXAMPLE_COMPANION_SHA = "5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2"
 
 #: The ref the example dispatch's companion was exported from.
@@ -144,7 +144,10 @@ def _dialect_scripts() -> list[RenderedScript]:
             name="dialect-companion-repository",
             text=spoken.checked_script(
                 dialect.companion_repository_commands(
-                    companion, EXAMPLE_COMPANION_SHA, EXAMPLE_COMPANION_REF
+                    companion,
+                    f"{names.staging_directory(companion)}/{names.ARCHIVE_NAME}",
+                    EXAMPLE_COMPANION_SHA,
+                    EXAMPLE_COMPANION_REF,
                 )
             ),
         ),
