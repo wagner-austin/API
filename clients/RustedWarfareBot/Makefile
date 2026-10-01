@@ -7,7 +7,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check sources install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
+.PHONY: help lint test check execution sources install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
 
 help:
 	@echo ""
@@ -15,7 +15,8 @@ help:
 	@echo "====================================="
 	@echo ""
 	@echo "Code health:"
-	@echo "  make check                       lint + sources + test + agent-selftest (the gate)"
+	@echo "  make check                       lint + sources + test (the gate, on any clean checkout)"
+	@echo "  make execution                   agent-selftest against the pinned game (Windows hub only)"
 	@echo "  make lint                        guard + ruff + mypy over src, tests, scripts"
 	@echo "  make test                        pytest + coverage (100% statements and branches)"
 	@echo "  make sources                     wiki provenance and navigation gate"
@@ -47,7 +48,7 @@ help:
 	@echo ""
 	@echo "Java agent (the pinned game's jvm64 is a Windows JDK, so Windows hub only):"
 	@echo "  make agent                       compile + jar the javaagent"
-	@echo "  make agent-selftest              patch the real jar, verify via the JVM verifier"
+	@echo "  make agent-selftest              patch the real jar, verify via the JVM verifier (make execution runs it)"
 	@echo ""
 	@echo "Static analysis:"
 	@echo "  make decompile                   CFR the pinned jar into a readable tree (gitignored, Windows hub)"
@@ -113,17 +114,26 @@ sources:
 	@echo "=== sources (wiki provenance and navigation)"
 	poetry run python -m scripts.wiki_check
 
-# The Java half is gated here too. Without agent-selftest in the chain, a
-# patcher regression or an obfuscated name that moved in a game update stays
-# invisible until a live run dies in the engine, which is the worst place to
-# read a build error. It needs the pinned game copy, which every other game
-# target already requires. Off Windows the self-test's else arm reports itself
-# not applicable in numbers (0 of 1 run) rather than failing, because the
-# pinned game's jvm64 is a Windows JVM and cannot run anywhere else.
-check: lint sources | test agent-selftest
+# The gate is what a clean checkout can prove: lint, the wiki's repo tier and
+# the suite. It used to chain agent-selftest too, and then it could pass only
+# on the hub, because the self-test patches the real pinned jar, a 451 MB
+# commercial binary that is never tracked. Every review and fleet re-run of a
+# commit touching this package read FAILED at Makefile:460 on a missing
+# .game/jvm64/bin/javac.exe (board tasks 4f228608 and 156c4745). The Java half
+# is not dropped: it is `make execution` below.
+check: lint sources | test
 	@echo ""
 	@echo "=== ALL CHECKS PASSED ==="
 	@echo ""
+
+# The Java half, executed against the real target, as tools/hpc3 and tools/fleet
+# name theirs (board task 465689f5). agent-selftest patches every Targets entry
+# in the pinned jar and lets the game's own JVM verifier certify the result, so
+# a patcher regression or an obfuscated name that moved in a game update fails
+# here rather than inside a live engine. Run it after any agent or game change,
+# on the hub that holds the game. Nothing skips: without the game it fails on
+# the missing JDK, and off Windows it fails by name.
+execution: agent-selftest
 
 # The javaagent compiles with the game's OWN bundled JDK 13, so the compiler
 # matches the runtime exactly, and targets Java 11 bytecode for headroom. No
@@ -404,9 +414,6 @@ WATCH_LOG ?= runs/watch.log
 # Everything below drives the pinned game copy through its bundled jvm64, a
 # Windows JDK, or a PowerShell script under scripts/make that does; none of it
 # has a meaning off the hub, so it is fenced and the else arm says why.
-# agent-selftest is the one exception in kind: it is in the check chain, so
-# its else arm reports itself not applicable in numbers and exits 0 rather
-# than reddening every Linux make check for a JVM that cannot exist there.
 ifeq ($(OS),Windows_NT)
 # ":=" and not "?=", which cost a debugging round. A "?=" variable is
 # recursively expanded, so $(shell ...) re-runs on every single reference: the
@@ -453,7 +460,7 @@ agent:
 # gate pass while a game is running: a JVM with the agent attached holds
 # rw-agent.jar open, and a gate that rebuilt it would fail for a reason that
 # has nothing to do with the code under test. It also lets two agents run
-# `make check` on one working tree at the same time.
+# `make execution` on one working tree at the same time.
 agent-selftest:
 	@Write-Host ""
 	@Write-Host "==> agent-selftest (JVM verifier as oracle)" -ForegroundColor Cyan
@@ -541,7 +548,8 @@ agent:
 	@exit 1
 
 agent-selftest:
-	@echo "agent-selftest: not applicable off Windows (the pinned game's jvm64 is a Windows JVM), 0 of 1 self-tests run"
+	@echo "agent-selftest is Windows-only (it patches the pinned jar under the pinned game's Windows JVM)"
+	@exit 1
 
 sandbox-probe:
 	@echo "sandbox-probe is Windows-only (the probe script under scripts/make drives the pinned game's Windows JVM)"
