@@ -24,13 +24,11 @@
   ],
   "wheels": [
     "platform_core-0.1.0-py3-none-any.whl",
-    "hpc3-0.1.0-py3-none-any.whl",
     "rusted_warfare_bot-0.1.0-py3-none-any.whl"
   ],
   "expected_versions": {
     "typing_extensions": "4.16.0",
     "platform_core": "0.1.0",
-    "hpc3": "0.1.0",
     "rusted-warfare-bot": "0.1.0"
   },
   "required_symbols": [
@@ -67,7 +65,7 @@
       "attribute": "RunFingerprint"
     },
     {
-      "module": "hpc3.contracts.stage",
+      "module": "platform_core.stage_manifest",
       "attribute": "StageManifest"
     }
   ],
