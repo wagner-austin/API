@@ -80,18 +80,18 @@ On every coupled scene, the `RUN_TO_RUN` digest differs from the `GPU_TO_GPU` di
 both cards. Each mode fixes *an* order and holds it across devices. It is not the same
 order. On the separated rows and the 2-body row they agree, as do the default mode's
 digests ([[coupled-body-threshold-moves-on-turing]]): with nothing to reorder, all three
-compute one answer.
+compute one answer.[^2]
 
 One coincidence worth recording: `GPU_TO_GPU`'s touching-4 digest, `08b7c665...`, is
 the digest the default mode reproduces for that scene on both cards. `RUN_TO_RUN`'s
 digest differs. So `GPU_TO_GPU` happens to choose the same reduction order as the
 default kernels on that scene. It does not on the 5-body and larger rows, where the
-default has no stable order to share.
+default has no stable order to share.[^2]
 
 Consequence: **a digest is comparable only between runs of the same mode.** A record that
 does not state its mode cannot be compared with another. The sweep record already carries
 `mode` in its header, which is why the comparison above could be decoded rather than
-assumed.
+assumed.[^2]
 
 ## Limits
 

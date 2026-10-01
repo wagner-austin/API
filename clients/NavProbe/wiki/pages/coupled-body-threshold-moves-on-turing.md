@@ -53,7 +53,7 @@ row fails on both cards every time.[^1][^2]
 
 So the boundary has a codegen component. It is not purely algorithmic, and the
 published "five bodies" is an Ampere figure. The move is one scene wide: from 6 bodies
-up the failure holds on both architectures.
+up the failure holds on both architectures.[^2]
 
 ## The rate, which is the comparison
 
@@ -70,7 +70,7 @@ built factory.[^2]
 | 6 bodies | 0 / 20 | 0 / 20 |
 
 The 3090 Ti column is a fresh control, not a quote. It re-measures the published 0/20
-under the exact pin used on the 1630.
+under the exact pin used on the 1630.[^2]
 
 ## The single sweep, decoded
 
@@ -88,7 +88,7 @@ records were decoded with `decode_sweep_run` and compared entry by entry.[^1][^3
 
 Wherever both cards reproduce, the two architectures compute **the same digest**. In
 the default mode the disagreement is in accumulation order only: no scene that
-reproduces on both cards reproduces to two different answers.
+reproduces on both cards reproduces to two different answers.[^1][^3]
 
 ## What it does and does not say
 
