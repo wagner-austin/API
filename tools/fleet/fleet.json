@@ -306,7 +306,7 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "services/grandma-api",
-        "install": [],
+        "install": [["npm", "ci", "--prefix", "services/grandma-api/web"]],
         "companions": []
       }
     },
