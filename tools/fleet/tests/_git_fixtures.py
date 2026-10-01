@@ -1,10 +1,10 @@
 """Real git for the suites that extract a commit's trees.
 
-Shared by ``test_published_tree``, ``test_rolled`` and ``test_cli_rolled``,
-which each build a small repository, point a ref at a commit and dirty the
-working tree, so the extraction is only right if it reads the commit. The
-command runs through the default command hook, which the conftest reset
-restores before every test.
+Shared by ``test_rolled`` and ``test_cli_rolled``, which each build a
+small repository, point a ref at a commit and dirty the working tree, so
+the extraction is only right if it reads the commit. The command runs
+through the default command hook, which the conftest reset restores
+before every test.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 The tick-level behaviour -- a claimed ``restart-session`` job reported
 started, executed, and closed -- lives in ``test_agent_restart.py``; this
 module holds what needs no queue: the exact session-audit invocation against
-the published tree, the refusals that keep a lawless target out of an argv
+the sealed release, the refusals that keep a lawless target out of an argv
 element, and the closing detail's tail.
 """
 
@@ -16,26 +16,32 @@ import pytest
 
 from fleet.contracts.dispatch import DispatchCommand
 from fleet.core import _test_hooks, rebuild, restart
-from fleet.core.published_tree import PublishedTree
+from fleet.core.session_release import SessionRelease
 from tests.conftest import FakeRun, ok
 
 TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
-ROOT: Final = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
-REGISTRY: Final = "C:/scratch/fleet-session-audit/abc/mcp-shared/src/source-registry"
-TREE: Final = PublishedTree(
-    commit="6e920e3e17f7ed9275422b703c33ca4325c3f45b",
-    python_path="C:/scratch/sa/src;C:/scratch/shared/src",
+ROOT: Final = pathlib.Path(
+    "C:/Users/Test/AppData/Local/Corvis/session-verbs-releases/3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6/MCPs"
+)
+REGISTRY: Final = str(ROOT / "mcp-shared" / "src" / "source-registry")
+RELEASE: Final = SessionRelease(
+    release="3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6",
+    revision="58efcb92d6c1e0a4b3f2e1d0c9b8a7f6e5d4c3b2",
+    root=ROOT,
     registry_dir=REGISTRY,
 )
 
-#: Every invocation opens the same way: the checkout's session-audit
+#: Every invocation opens the same way: the release's own session-audit
 #: environment, through poetry.
 PREFIX: Final = ("poetry", "-C", str(ROOT / "packages" / "session-audit"), "run", "session-audit")
+
+#: The closing detail's opening for a rollover, naming the release.
+SEALED: Final = f"from sealed release {RELEASE['release']} (revision {RELEASE['revision']}) exited"
 
 
 class TestRestartArgv:
     def test_composes_the_exact_session_audit_invocation(self) -> None:
-        """The register the verb reads is the extracted one, last on the line."""
+        """The register the verb reads is the release's, last on the line."""
         assert restart.restart_argv(ROOT, REGISTRY, TARGET) == (
             *PREFIX,
             "rollover",
@@ -100,67 +106,61 @@ class TestRestartArgv:
             REGISTRY,
         )
 
-    def test_maps_every_session_verb_to_exactly_one_invocation_at_the_trees_commit(self) -> None:
+    def test_maps_every_session_verb_to_exactly_one_invocation_of_the_release(self) -> None:
         label = "opus-mcps-0917-e7b5"
-        pinned = {"commit": TREE["commit"], "python_path": TREE["python_path"]}
+        sealed = {"release": RELEASE["release"], "revision": RELEASE["revision"]}
 
         assert restart.session_invocation(
-            ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, label
+            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label
         ) == {
             "verb": "restart",
             "mode": "rollover",
             "argv": restart.restart_argv(ROOT, REGISTRY, TARGET),
             "types_requester": False,
-            **pinned,
+            **sealed,
         }
         assert restart.session_invocation(
-            ROOT, TREE, DispatchCommand.REVIVE_SESSION, TARGET, label
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label
         ) == {
             "verb": "revive",
             "mode": "revive",
             "argv": restart.revive_argv(ROOT, REGISTRY, TARGET, label),
             "types_requester": True,
-            **pinned,
+            **sealed,
         }
-        assert restart.session_invocation(
-            ROOT, TREE, DispatchCommand.KILL_SESSION, TARGET, label
-        ) == {
+        assert restart.session_invocation(RELEASE, DispatchCommand.KILL_SESSION, TARGET, label) == {
             "verb": "kill",
             "mode": "kill",
             "argv": restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=False),
             "types_requester": True,
-            **pinned,
+            **sealed,
         }
-        hard = restart.session_invocation(
-            ROOT, TREE, DispatchCommand.KILL_SESSION_HARD, TARGET, label
-        )
+        hard = restart.session_invocation(RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label)
         assert hard["argv"] == restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=True)
         assert restart.session_invocation(
-            ROOT, TREE, DispatchCommand.COMPACT_SESSION, TARGET, label
+            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label
         ) == {
             "verb": "compact",
             "mode": "compact",
             "argv": restart.compact_argv(ROOT, REGISTRY, TARGET, label),
             "types_requester": True,
-            **pinned,
+            **sealed,
         }
         # MCPs board task 5aa8ed06: an approved self-exit is the graceful
         # kill's one invocation, never the hard one, under its own run verb.
-        assert restart.session_invocation(
-            ROOT, TREE, DispatchCommand.EXIT_SESSION, TARGET, label
-        ) == {
+        assert restart.session_invocation(RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label) == {
             "verb": "exit",
             "mode": "kill",
             "argv": restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=False),
             "types_requester": True,
-            **pinned,
+            **sealed,
         }
 
     def test_a_command_that_is_not_a_session_verb_is_refused_by_code(self) -> None:
         refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
         with pytest.raises(ValueError, match=refusal):
             restart.session_invocation(
-                ROOT, TREE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5"
+                RELEASE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5"
             )
 
     def test_a_submitter_that_is_not_a_board_label_is_refused_before_argv(self) -> None:
@@ -179,62 +179,51 @@ class TestRestartArgv:
 
 
 class TestRefusals:
-    def test_a_missing_checkout_is_refused_by_code(self, tmp_path: pathlib.Path) -> None:
-        absent = tmp_path / "no-such-checkout"
-
-        refusal = restart.refusal_for(absent, TARGET)
-
-        if refusal is None:
-            raise AssertionError("expected a refusal for an absent checkout")
-        assert refusal.startswith(f"{restart.ROOT_MISSING_CODE}:")
-        assert str(absent) in refusal
-
-    def test_a_row_with_no_target_is_refused_by_code(self, tmp_path: pathlib.Path) -> None:
+    def test_a_row_with_no_target_is_refused_by_code(self) -> None:
         """The queue's CHECK forbids this row; a runner that met one anyway
         must name the fact rather than invoke session-audit with nothing."""
-        refusal = restart.refusal_for(tmp_path, None)
+        refusal = restart.refusal_for(None)
 
         if refusal is None:
             raise AssertionError("expected a refusal for a targetless row")
         assert refusal.startswith(f"{restart.TARGET_MISSING_CODE}:")
 
-    def test_a_target_outside_the_uuid_grammar_is_refused_before_argv(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_a_target_outside_the_uuid_grammar_is_refused_before_argv(self) -> None:
         for lawless in ("mcps-99", TARGET.upper(), f"{TARGET} --apply"):
-            refusal = restart.refusal_for(tmp_path, lawless)
+            refusal = restart.refusal_for(lawless)
             if refusal is None:
                 raise AssertionError(f"expected a refusal for {lawless!r}")
             assert refusal.startswith(f"{restart.TARGET_INVALID_CODE}:")
 
-    def test_a_real_checkout_and_a_lawful_target_pass(self, tmp_path: pathlib.Path) -> None:
-        assert restart.refusal_for(tmp_path, TARGET) is None
+    def test_a_lawful_target_passes(self) -> None:
+        assert restart.refusal_for(TARGET) is None
 
 
 class TestRunAndDescribe:
-    def test_run_goes_through_the_command_seam_with_the_extraction_on_pythonpath(self) -> None:
-        """The verb withholds the agent's own venv and sets PYTHONPATH to the
-        published extraction, and nothing else about its environment."""
+    def test_run_withholds_the_agents_paths_and_writes_no_bytecode(self) -> None:
+        """The verb withholds the agent's own venv and any PYTHONPATH, and
+        runs with bytecode writes off so the release stays as sealed."""
         runner = FakeRun([ok("RESTARTED")])
         _test_hooks.run = runner
 
         result = restart.run_session_job(
             restart.session_invocation(
-                ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
             )
         )
 
         assert result["returncode"] == 0
         assert runner.calls == [restart.restart_argv(ROOT, REGISTRY, TARGET)]
-        assert runner.unset_env == [restart.SESSION_ENVIRONMENT_EXCLUDED] == [("VIRTUAL_ENV",)]
-        assert runner.set_env == [(("PYTHONPATH", TREE["python_path"]),)]
+        assert runner.unset_env == [restart.SESSION_ENVIRONMENT_EXCLUDED]
+        assert restart.SESSION_ENVIRONMENT_EXCLUDED == ("VIRTUAL_ENV", "PYTHONPATH")
+        assert runner.set_env == [(("PYTHONDONTWRITEBYTECODE", "1"),)]
         assert runner.timeouts == [restart.SESSION_JOB_TIMEOUT_SECONDS]
 
-    def test_revive_goes_through_the_command_seam_and_names_its_mode_and_commit(self) -> None:
+    def test_revive_goes_through_the_command_seam_and_names_its_mode_and_release(self) -> None:
         runner = FakeRun([ok("REVIVE - REVIVED session x: now pid 5")])
         _test_hooks.run = runner
         invocation = restart.session_invocation(
-            ROOT, TREE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915"
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915"
         )
 
         result = restart.run_session_job(invocation)
@@ -243,8 +232,7 @@ class TestRunAndDescribe:
             restart.revive_argv(ROOT, REGISTRY, TARGET, "fable-system-audit-0915")
         ]
         assert restart.describe_result(result, invocation) == (
-            f"session-audit revive at {TREE['commit']} exited 0: "
-            "REVIVE - REVIVED session x: now pid 5"
+            f"session-audit revive {SEALED} 0: REVIVE - REVIVED session x: now pid 5"
         )
 
     def test_describe_carries_the_exit_code_and_the_combined_output(self) -> None:
@@ -258,12 +246,12 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
             ),
         )
 
         assert detail == (
-            f"session-audit rollover at {TREE['commit']} exited 1: ROLLOVER APPLIED - "
+            f"session-audit rollover {SEALED} 1: ROLLOVER APPLIED - "
             "1 restart(s) attempted: 0 restarted, 1 skipped, 0 failed"
         )
 
@@ -277,11 +265,11 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                ROOT, TREE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
             ),
         )
 
         assert detail.endswith("RESTARTED mcps-99 now pid 41324")
         # The tail width is the rebuild lane's, lifted rather than restated.
-        opening = f"session-audit rollover at {TREE['commit']} exited 0: "
+        opening = f"session-audit rollover {SEALED} 0: "
         assert len(detail) <= len(opening) + rebuild.DETAIL_TAIL_CHARS
