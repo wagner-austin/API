@@ -1,15 +1,16 @@
 """Extract named trees of one commit into a scratch directory, or say why not.
 
-Lifted from :mod:`fleet.core.published_tree` (board task 465689f5) when a
-second caller came to need exactly what the session verbs had: code read
-from a named commit and never from a working tree. The session verbs read
-MCPs' ``origin/main`` (MCPs board task f4cd489f); the fleet's own agent
-reads the commit ``make fleet-roll`` recorded after its execution suites
-passed (:mod:`fleet.core.rolled`). Both resolve a ref, archive a few paths
-of that commit, extract them into one directory per commit under this
-machine's scratch root, and check the extraction holds what will be
-imported. Each caller names its own refusal codes, so a refusal says which
-extraction failed, and adds whatever else its extraction needs in between.
+Lifted from the session verbs' published-tree extraction (board task
+465689f5) when a second caller came to need exactly what they had: code
+read from a named commit and never from a working tree. The session verbs
+have since moved to a sealed MCPs release (:mod:`fleet.core.session_release`,
+MCPs board task c7c2527d), which uses only :func:`step_refusal` here; the
+fleet's own agent reads the commit ``make fleet-roll`` recorded after its
+execution suites passed (:mod:`fleet.core.rolled`): it resolves a ref,
+archives a few paths of that commit, extracts them into one directory per
+commit under this machine's scratch root, and checks the extraction holds
+what will be imported. Each caller names its own refusal codes, so a
+refusal says which step failed.
 
 NO FALLBACK TO THE WORKING TREE, for either caller. Every step that fails
 returns a ``CODE: message`` refusal and the caller runs nothing; code run

@@ -110,8 +110,8 @@ class RunProtocol(Protocol):
             set_env: ``(name, value)`` pairs the child receives on top of
                 what it inherits, applied after ``unset_env``. There is no
                 argv-level way to set one on Windows either: a session verb
-                puts the committed extraction of session-audit first on
-                ``PYTHONPATH`` through this (:mod:`fleet.core.published_tree`).
+                turns bytecode writes off through this, so it never changes
+                the sealed release it runs (:mod:`fleet.core.restart`).
 
         Returns:
             Exit status and captured streams. A non-zero status is returned
