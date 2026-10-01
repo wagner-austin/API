@@ -121,7 +121,7 @@ a shot. Raids and forward rallies are expressible in one order
 
 ## Drift
 
-Every name above is obfuscated and moves between releases. `Orders.verifyBindings` resolves all of them — seven classes, four fields and five method signatures — against the jar with no game running, and `make check` fails on any that moved.[^8] After a game update the failure names the whole broken surface at once rather than the first item.
+Every name above is obfuscated and moves between releases. `Orders.verifyBindings` resolves all of them — seven classes, four fields and five method signatures — against the jar with no game running, and `make execution` fails on any that moved.[^8] After a game update the failure names the whole broken surface at once rather than the first item.
 
 [^1]: `agent/src/rwbot/agent/Orders.java:126` — `moveTo` performs exactly these three reflective calls, resolving `a(n)` on the controller and `a(y)` / `a(float,float)` on the command by parameter type.
 [^2]: `wiki/sources/m5-order/builtin-ai-order-idiom.txt:3` — `com.corrodinggames.rts.gameFramework.e e2 = l2.cf.a(this);` followed by `e2.a(y2);` and `e2.a(c2);` in the engine's AI base class.
@@ -130,5 +130,5 @@ Every name above is obfuscated and moves between releases. `Orders.verifyBinding
 [^5]: `wiki/sources/m5-order/scriptengine-update.txt:2` — `if (!mainScriptThreadMarked) { mainScriptThreadMarked = true; isMainScriptThread.set(true); }`, with the drain under `synchronized (arrayList)` at `:8`.
 [^6]: `wiki/sources/m5-order/order-accepted-building-did-not-move.txt:4` — three samples at t+2s, t+5s and t+10s all reporting `(4250.0, 2550.0)` after an order to `(4490.0, 2550.0)` recorded at `:2`.
 [^7]: `wiki/sources/m5-order/order-accepted-unit-moved.txt:9` — `t+2s ... at (4335.7466, 2610.003)`, with t+5s at `:10` and t+10s at `:11`; the roster of three owned entities is at `:2`–`:4`.
-[^8]: `agent/src/rwbot/agent/BindingCheck.java:36` — `verifyBindings`, which resolves every pinned engine name through `checkClass` / `checkField` / `checkMethod` (21 class checks as of this fact-check; the surface has grown past the seven this footnote once enumerated) and returns one message per unresolved name. Asserted empty by `JarChecks.checkOrderBindings`, run from `SelfTest.java:31`, which `make check` runs via `agent-selftest`. An earlier revision attributed the method to `Orders.java`; it lives in `BindingCheck.java`.
+[^8]: `agent/src/rwbot/agent/BindingCheck.java:36` — `verifyBindings`, which resolves every pinned engine name through `checkClass` / `checkField` / `checkMethod` (21 class checks as of this fact-check; the surface has grown past the seven this footnote once enumerated) and returns one message per unresolved name. Asserted empty by `JarChecks.checkOrderBindings`, run from `SelfTest.java:31`, which `make execution` runs via `agent-selftest` (since 2026-10-01; before then `make check` chained it). An earlier revision attributed the method to `Orders.java`; it lives in `BindingCheck.java`.
 [^9]: `wiki/sources/m5-order/controller-delegate.txt:2` — `return this.b(n2);`, the entire body of `public e a(n n2)` on `gameFramework.c`.
