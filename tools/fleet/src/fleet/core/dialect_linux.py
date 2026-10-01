@@ -144,6 +144,7 @@ TOOLCHAIN_PROBE_SCRIPT = (
     "report git git\n"
     "report make make\n"
     "report node node\n"
+    "report ffmpeg ffmpeg\n"
     "report tar tar\n"
     "report cargo cargo\n"
     "if command -v g++ > /dev/null 2>&1; then\n"

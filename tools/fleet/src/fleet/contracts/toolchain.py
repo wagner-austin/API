@@ -155,6 +155,14 @@ PYTHON_REGISTERED_GUARD: Final = (
 #: The winget and choco packages are each manager's current LTS, which was
 #: 24 on both when this was written (OpenJS.NodeJS.LTS 24.19.0, nodejs-lts
 #: 24.21.0).
+#:
+#: ``ffmpeg`` joined on 2026-10-01 (MCPs board task 512e7bf8): grandma-api's
+#: check converts real audio through it, and no dispatchable Windows node had
+#: it (sedona and serendipity answered 'where ffmpeg' with nothing), so both
+#: of that project's fleet runs failed one case on FileNotFoundError while the
+#: hub, which has it, passed. Required of every node rather than routed by a
+#: tag, so a node without it is refused naming the install, and a new node
+#: gets it from this table. Presence is the requirement, like git and make.
 REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="python",
@@ -207,6 +215,18 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
                 "--accept-package-agreements --accept-source-agreements --disable-interactivity"
             ),
             "choco": "choco install nodejs-lts -y",
+        },
+    ),
+    RequiredTool(
+        name="ffmpeg",
+        reason="grandma-api's check converts real audio files through ffmpeg",
+        install={
+            "winget": (
+                "winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
+                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco install ffmpeg -y",
+            "apt-get": "sudo apt-get install -y ffmpeg",
         },
     ),
     RequiredTool(

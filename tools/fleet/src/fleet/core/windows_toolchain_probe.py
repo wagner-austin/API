@@ -96,7 +96,10 @@ $python = Find-Tool 'python'
 if ($python -like '*\Microsoft\WindowsApps\*') {
     $python = ''
 }
-foreach ($tool in @('python', 'poetry', 'git', 'make', 'node', 'tar', 'cargo', 'winget', 'choco')) {
+$tools = @(
+    'python', 'poetry', 'git', 'make', 'node', 'ffmpeg', 'tar', 'cargo', 'winget', 'choco'
+)
+foreach ($tool in $tools) {
     $found = $python
     if ($tool -ne 'python') {
         $found = Find-Tool $tool
