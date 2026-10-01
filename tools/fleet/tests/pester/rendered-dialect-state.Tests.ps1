@@ -92,6 +92,21 @@ Describe 'A dispatch directory' {
 
 Describe 'Retiring a settled dispatch' {
     BeforeAll {
+        function Test-RootTaskRegistered {
+            <#
+            .SYNOPSIS
+                Whether a task of this name is registered in the scheduler's
+                root folder, read through Schedule.Service as the retire
+                render reads it, not through Get-ScheduledTask, which reads
+                every task's definition and fails while another is deleted.
+            .PARAMETER Name
+                The task's name.
+            #>
+            param([string]$Name)
+            $scheduler = New-Object -ComObject Schedule.Service
+            $scheduler.Connect()
+            return @($scheduler.GetFolder('\').GetTasks(1) | Where-Object { $_.Name -eq $Name }).Count -gt 0
+        }
         function Initialize-SettledRun {
             param([string]$Root, [switch]$Transcript)
             $target = Join-Path $Root 'run-[1]'
@@ -152,10 +167,11 @@ Describe 'Retiring a settled dispatch' {
         $LASTEXITCODE | Should -Be 0
         $run = Initialize-SettledRun -Root (Join-Path $TestDrive 'tasked')
         $run.TaskName = $name
+        Test-RootTaskRegistered $name | Should -BeTrue
         Invoke-Rendered 'dialect-retire' $run
-        @(Get-ScheduledTask -TaskPath '\' | Where-Object { $_.TaskName -eq $name }).Count | Should -Be 0
+        Test-RootTaskRegistered $name | Should -BeFalse
         Invoke-Rendered 'dialect-retire' $run
-        @(Get-ScheduledTask -TaskPath '\' | Where-Object { $_.TaskName -eq $name }).Count | Should -Be 0
+        Test-RootTaskRegistered $name | Should -BeFalse
     }
 }
 
