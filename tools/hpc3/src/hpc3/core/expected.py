@@ -26,8 +26,8 @@ import pathlib
 import re
 
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.stage_manifest import SHA256_HEX_LENGTH, StageManifest
 
-from hpc3.contracts.stage import SHA256_HEX_LENGTH, StageManifest
 from hpc3.core import _test_hooks
 
 _DIGEST_TOKEN = re.compile(rf"\b[0-9a-f]{{{SHA256_HEX_LENGTH}}}\b")

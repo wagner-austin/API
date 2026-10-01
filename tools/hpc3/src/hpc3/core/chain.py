@@ -20,11 +20,12 @@ from __future__ import annotations
 
 import pathlib
 
+from platform_core.cluster_layout import qualified_name
+
 from hpc3.contracts.chain import ChainSpec
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.dependency import AFTER_OK, Dependency
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import qualified_name
 from hpc3.core import audit, submit
 from hpc3.core.array_submit import SubmittedMember
 

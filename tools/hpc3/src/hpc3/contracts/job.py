@@ -37,6 +37,7 @@ limits without a branch anywhere in it.
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import require_project
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
@@ -44,6 +45,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.sweep_member import require_artifact_in_command
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import (
@@ -67,7 +69,6 @@ from hpc3.contracts.job_rules import (
     _check_preemption_protection,
     _check_time_limit,
 )
-from hpc3.contracts.layout import require_project
 from hpc3.contracts.payload import check_imaged_command_can_run
 from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
@@ -199,72 +200,6 @@ def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
     if value == "":
         raise JSONTypeError(f"Field '{key}' must not be empty")
     return value
-
-
-def require_artifact_in_command(obj: dict[str, JSONValue], command: str) -> str | None:
-    """Read the declared artifact path, and refuse one the command never writes.
-
-    The ledger is an index: job -> image -> artifact. A declaration nobody
-    checks turns that into a confident wrong answer -- a reader follows the
-    path, finds nothing, and cannot tell whether the run failed, wrote
-    somewhere else, or was never going to write at all.
-
-    The check is deliberately a substring test rather than a parse. This
-    contract does not know any payload's flags, and it should not: the claim
-    being verified is only that the path the ledger will publish is a path
-    this command mentions. That catches the failure that actually happens --
-    an output path edited in one place and not the other -- without pretending
-    to understand what the command does with it.
-
-    The key is REQUIRED; only its value may be null. Absent and null used to
-    read alike, and the result was an index with its answer column empty: of
-    130 recorded runs, 8 carried an image digest -- which fills itself in from
-    the spec -- and ONE named where its result went. Every probe run in
-    ``runs/`` writes ``--out /pub/wagnera3/probe/<name>.json`` and none of them
-    said so, so `hpc3-trace` could reach the job and the image and then stop.
-
-    Requiring the key does not force a fiction on a run that produces nothing.
-    It forces the author to SAY which of the two they mean, once, in the spec
-    -- and writing ``"artifact": null`` next to a command with an ``--out``
-    flag is a claim somebody has to make on purpose rather than a field they
-    never noticed.
-
-    Args:
-        obj: The run document being decoded.
-        command: The command this run will execute, already validated.
-
-    Returns:
-        The declared path, or None when the run states it produces nothing
-        durable. A directory is a legitimate answer where a run writes several
-        files into one place: the reader follows it and finds them.
-
-    Raises:
-        JSONTypeError: If ``artifact`` is absent, is present but is not a
-            non-empty string or null, or names a path its own command does
-            not contain.
-    """
-    if "artifact" not in obj:
-        raise JSONTypeError(
-            "Field 'artifact' is required. Name the path this run writes its result to -- "
-            "the ledger publishes it, so `hpc3-trace` can answer 'which file holds this "
-            "run's answer'. Write null to state that the run produces nothing durable."
-        )
-    artifact = obj["artifact"]
-    if artifact is None:
-        return None
-    if not isinstance(artifact, str):
-        raise JSONTypeError(
-            f"Field 'artifact' must be a string or null, got {type(artifact).__name__}"
-        )
-    if artifact == "":
-        raise JSONTypeError("Field 'artifact' must name a path or be null, not an empty string")
-    if artifact not in command:
-        raise JSONTypeError(
-            f"Field 'artifact' names {artifact!r}, which does not appear in this run's "
-            "command. The ledger publishes this path as where the result will be, so a "
-            "declaration the command does not honour would index a file nobody writes."
-        )
-    return artifact
 
 
 def _require_env_path(obj: dict[str, JSONValue], image: ImageReference | None) -> str:
@@ -473,5 +408,4 @@ __all__ = [
     "JobSpec",
     "decode_job_spec",
     "encode_job_spec",
-    "require_artifact_in_command",
 ]

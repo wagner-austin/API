@@ -19,8 +19,8 @@ import re
 
 import pytest
 from platform_core.json_utils import JSONValue
+from platform_core.stage_manifest import StageManifest, decode_stage_manifest
 
-from hpc3.contracts.stage import StageManifest, decode_stage_manifest
 from hpc3.core.stage import CERTIFICATION_SUFFIX, certification_path, certification_text
 
 #: What the consumer scans for. A 64-character lowercase hex token.

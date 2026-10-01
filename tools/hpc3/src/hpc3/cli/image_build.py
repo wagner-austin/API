@@ -27,10 +27,10 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.cluster_layout import qualified_name
 
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.clusters import require_cluster
-from hpc3.contracts.layout import qualified_name
 from hpc3.core.image_submit import submit_build
 
 _PROJECT_FLAG = "--project"

@@ -12,8 +12,8 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.stage_manifest import StagedFile, StageManifest
 
-from hpc3.contracts.stage import StagedFile, StageManifest
 from hpc3.core import audit
 from hpc3.core.stage import stage_manifest, stage_one
 from tests.conftest import FakeRun, LoggedEvent, write_file

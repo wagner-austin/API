@@ -12,6 +12,11 @@ So the ceiling is checked here, before submission, against the measured
 per-partition limits. The alternative -- submit and see -- produces a half-
 running sweep whose remainder is invisible without reading ``squeue``'s reason
 column.
+
+The member itself is :class:`platform_core.sweep_member.SweepMember`, not
+defined here: payloads that write sweep documents run on compute nodes, and
+the member's shape lives in the library they already ship so their images do
+not carry this package to write one.
 """
 
 from __future__ import annotations
@@ -21,8 +26,8 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     require_list,
-    require_str,
 )
+from platform_core.sweep_member import SweepMember, decode_sweep_member, encode_sweep_member
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_facts
@@ -30,29 +35,7 @@ from hpc3.contracts.job import (
     JobSpec,
     decode_job_spec,
     encode_job_spec,
-    require_artifact_in_command,
 )
-
-
-class SweepMember(TypedDict):
-    """One variation on the sweep's template.
-
-    Attributes:
-        suffix: Appended to the template's name to make this job's name.
-            Distinct across the sweep, because the name determines the log
-            filenames and two jobs sharing one would interleave into the
-            same file.
-        command: Payload for this member, replacing the template's.
-        artifact: Where this member was told to write its result, or None.
-            Per member rather than per sweep, for the same reason the command
-            is: six arms writing to one path are five results nobody can
-            read. Checked against this member's OWN command, so a suffix
-            edited in the command and not the path fails here.
-    """
-
-    suffix: str
-    command: str
-    artifact: str | None
 
 
 class SweepSpec(TypedDict):
@@ -121,52 +104,6 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
         )
         for member in spec["members"]
     ]
-
-
-def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
-    """Read a required string field that must not be empty.
-
-    Args:
-        obj: Object being decoded.
-        key: Field name.
-
-    Returns:
-        The field's value.
-
-    Raises:
-        JSONTypeError: If the field is missing, not a string, or empty.
-    """
-    value = require_str(obj, key)
-    if value == "":
-        raise JSONTypeError(f"Field '{key}' must not be empty")
-    return value
-
-
-def decode_sweep_member(value: JSONValue) -> SweepMember:
-    """Decode and validate a JSON value into one sweep member.
-
-    Args:
-        value: Value produced by the JSON loader.
-
-    Returns:
-        Validated member.
-
-    Raises:
-        JSONTypeError: If the value is not an object, or a field is missing,
-            mistyped, empty, or -- for the suffix -- carries a character that
-            would leave the job name unusable as a filename.
-    """
-    if not isinstance(value, dict):
-        raise JSONTypeError(f"sweep member must be a JSON object, got {type(value).__name__}")
-    suffix = _require_nonempty_str(value, "suffix")
-    if "/" in suffix or "\\" in suffix:
-        raise JSONTypeError(f"Field 'suffix' must not contain a path separator, got {suffix!r}")
-    command = _require_nonempty_str(value, "command")
-    return SweepMember(
-        suffix=suffix,
-        command=command,
-        artifact=require_artifact_in_command(value, command),
-    )
 
 
 def _check_ceilings(cluster: ClusterFacts, base: JobSpec, count: int) -> None:
@@ -274,14 +211,7 @@ def encode_sweep_spec(spec: SweepSpec) -> dict[str, JSONValue]:
     Returns:
         JSON-serialisable mapping carrying every field.
     """
-    members: list[JSONValue] = [
-        {
-            "suffix": member["suffix"],
-            "command": member["command"],
-            "artifact": member["artifact"],
-        }
-        for member in spec["members"]
-    ]
+    members: list[JSONValue] = [encode_sweep_member(member) for member in spec["members"]]
     return {
         "base": encode_job_spec(spec["base"]),
         "members": members,
@@ -330,9 +260,7 @@ def decode_sweep_spec(
 
 
 __all__ = [
-    "SweepMember",
     "SweepSpec",
-    "decode_sweep_member",
     "decode_sweep_spec",
     "encode_sweep_spec",
     "expand_sweep",

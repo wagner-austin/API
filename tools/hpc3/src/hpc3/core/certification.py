@@ -8,7 +8,7 @@ previous run, edited in place, or drifted from the repo copy. It stages
 nothing, verifies nothing, trains to completion, and is comparable to nothing.
 
 ``hpc3-stage`` already solves this for corpora, and solves it generically:
-:class:`~hpc3.contracts.stage.StageManifest` names files and a destination,
+:class:`~platform_core.stage_manifest.StageManifest` names files and a destination,
 :func:`~hpc3.core.stage.stage_manifest` verifies each file's digest locally,
 sends it, re-digests it ON THE CLUSTER, and writes a ``*-digests.txt`` record
 beside the data. Nothing in that path is corpus-specific. A payload could

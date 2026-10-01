@@ -20,6 +20,7 @@ that did the submitting, at a moment when the cluster may be unreachable.
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import require_project
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
@@ -30,7 +31,6 @@ from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, require_partition
 from hpc3.contracts.experiment import encode_experiment, require_experiment
-from hpc3.contracts.layout import require_project
 
 
 class LedgerEntry(TypedDict):

@@ -19,8 +19,8 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.stage_manifest import StagedFile, StageManifest
 
-from hpc3.contracts.stage import StagedFile, StageManifest
 from hpc3.core.reproducible import (
     committed_blob,
     require_sources_reproducible,

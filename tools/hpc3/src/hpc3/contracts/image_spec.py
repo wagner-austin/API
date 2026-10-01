@@ -21,11 +21,12 @@ The rules below are the ones that make the description worth trusting:
 
 What this deliberately does NOT describe: corpora, artifacts, GPU model or
 driver. Data is bind-mounted and identified by digest
-(:mod:`hpc3.contracts.stage`); hardware is an axis containers do not control.
+(:mod:`platform_core.stage_manifest`); hardware is an axis containers do not control.
 """
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import require_project
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -45,7 +46,6 @@ from hpc3.contracts.image_spec_fields import (
     require_pinned_system_packages,
     require_str_map,
 )
-from hpc3.contracts.layout import require_project
 
 #: How a distribution's package manager spells an exact pin. One ``=``, not
 #: two: ``apt-get install xvfb=2:21.1.4-2ubuntu1.7`` is the syntax, and

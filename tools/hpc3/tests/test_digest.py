@@ -12,8 +12,8 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.stage_manifest import StagedFile
 
-from hpc3.contracts.stage import StagedFile
 from hpc3.core.digest import (
     check_remote_digest,
     parse_remote_digest,

@@ -13,11 +13,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.cluster import partition_facts
-from hpc3.contracts.sweep import (
-    decode_sweep_member,
-    encode_sweep_spec,
-    expand_sweep,
-)
+from hpc3.contracts.sweep import encode_sweep_spec, expand_sweep
 from tests.against_hpc3 import decode_sweep_spec
 from tests.conftest import gpus
 
@@ -280,57 +276,6 @@ class TestJobCeilingCannotBindFirstOnThisCluster:
             if resource is None:
                 raise AssertionError(f"{name} bounds neither GPUs nor cores")
             assert resource <= facts["max_jobs_per_user"]
-
-
-class TestMemberValidation:
-    def test_a_non_object_member_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError):
-            decode_sweep_member("s0")
-
-    def test_an_empty_suffix_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "", "command": "x", "artifact": None})
-
-    def test_an_empty_command_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "s0", "command": "", "artifact": None})
-
-    def test_a_slashed_suffix_is_refused(self) -> None:
-        """The suffix reaches a log filename; a separator would escape it."""
-        with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "a/b", "command": "x", "artifact": None})
-        with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "a\\b", "command": "x", "artifact": None})
-
-    def test_a_valid_member_decodes(self) -> None:
-        member = decode_sweep_member({"suffix": "s0", "command": "python x.py", "artifact": None})
-        assert member == {"suffix": "s0", "command": "python x.py", "artifact": None}
-
-    def test_a_member_that_never_mentions_an_artifact_is_refused(self) -> None:
-        """Per member, because a sweep is where the omission costs most: six
-        arms silently sharing no declared output is six results nobody can
-        reach, and they were all going to be compared."""
-        with pytest.raises(JSONTypeError, match="Field 'artifact' is required"):
-            decode_sweep_member({"suffix": "s0", "command": "python x.py"})
-
-    def test_a_member_declaring_an_artifact_its_command_writes_is_kept(self) -> None:
-        """Per member, because six arms writing one path are five lost results."""
-        member = decode_sweep_member(
-            {"suffix": "s0", "command": "python x.py --out /r/s0.json", "artifact": "/r/s0.json"}
-        )
-
-        assert member["artifact"] == "/r/s0.json"
-
-    def test_a_member_whose_artifact_its_command_never_writes_is_refused(self) -> None:
-        """The suffix edited in one place and not the other -- the real failure."""
-        with pytest.raises(JSONTypeError, match="does not appear in this run's command"):
-            decode_sweep_member(
-                {
-                    "suffix": "s1",
-                    "command": "python x.py --out /r/s0.json",
-                    "artifact": "/r/s1.json",
-                }
-            )
 
 
 class TestSweepValidation:

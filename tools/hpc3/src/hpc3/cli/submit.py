@@ -24,12 +24,12 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.cluster_layout import log_dir, qualified_name, script_dir
 from platform_core.json_utils import load_json_str
 from platform_core.session_label import LABEL_VARIABLE
 
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import ClusterFacts, describe_gpu_request, partition_bills
-from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_run
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks

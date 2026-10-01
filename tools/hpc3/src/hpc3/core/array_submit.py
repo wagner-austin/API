@@ -27,11 +27,11 @@ from __future__ import annotations
 
 import pathlib
 
+from platform_core.cluster_layout import qualified_name
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.array import array_task_id, format_array_argument
 from hpc3.contracts.cluster import ClusterFacts
-from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.preflight import PreflightResult
 from hpc3.contracts.sweep import SweepSpec, expand_sweep

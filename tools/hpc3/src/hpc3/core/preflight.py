@@ -19,12 +19,12 @@ rejected job is a failure the caller must handle, and handing back a
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import qualified_name
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
 from hpc3.core import env_probe, gpu_supply, image_exec, remote, sbatch
 

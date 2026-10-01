@@ -34,9 +34,10 @@ against its member name, is where per-member identity durably lives.
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import qualified_name
+
 from hpc3.contracts.dependency import dependency_argument
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.sweep import SweepSpec, expand_sweep
 from hpc3.core.sbatch import (
     code_provenance_export,

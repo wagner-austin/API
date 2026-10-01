@@ -25,10 +25,10 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.json_utils import load_json_str
+from platform_core.stage_manifest import decode_stage_manifest
+from platform_core.stage_provenance import format_provenance
 
 from hpc3.cli import _config, _fatal, _test_hooks
-from hpc3.contracts.provenance import format_provenance
-from hpc3.contracts.stage import decode_stage_manifest
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.expected import check_expected, read_expected_digests
 from hpc3.core.stage import certification_path, stage_manifest
