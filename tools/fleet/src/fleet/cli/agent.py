@@ -75,7 +75,7 @@ from fleet.contracts.dispatch import (
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import _test_hooks, observe, published_tree, queue, rebuild, registry, restart
+from fleet.core import _test_hooks, observe, queue, rebuild, registry, restart, session_release
 
 _log = get_logger(__name__)
 
@@ -210,17 +210,15 @@ def restart_job(
     credentials: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
-    *,
-    mcps_root: pathlib.Path | None,
 ) -> DispatchJob:
-    """Execute a claimed session job (restart, revive, or either kill) on the
-    hub, start to close.
+    """Execute a claimed session job (restart, revive, kill, compact or exit)
+    on the hub, start to close.
 
     The same shape as :func:`rebuild_job` and for the same reasons: the
     work is local, well under a minute, and closing it in one tick leaves
     nothing to collect. The keystroke sequence and every rail around it
-    belong to ``session_audit`` (``rollover``, ``revive`` and ``kill``);
-    this runner composes one invocation per verb through
+    belong to ``session_audit`` (``rollover``, ``revive``, ``kill`` and
+    ``compact``); this runner composes one invocation per verb through
     :func:`fleet.core.restart.session_invocation` and reports what it said
     (module docstring of :mod:`fleet.core.restart`).
 
@@ -228,8 +226,6 @@ def restart_job(
         credentials: The queue's endpoint and headers.
         job: The claimed session job.
         identity: This runner's identity arguments.
-        mcps_root: The MCPs checkout, or None when the runner was started
-            without ``--mcps-root``.
 
     Returns:
         The job, whatever became of it.
@@ -238,31 +234,18 @@ def restart_job(
         AppError: Only from the queue calls themselves, as
             :func:`claim_pass` describes.
     """
-    if mcps_root is None:
-        return _refuse_hub_job(
-            credentials,
-            job,
-            identity,
-            detail=(
-                f"{restart.ROOT_MISSING_CODE}: this runner was started "
-                f"without {MCPS_ROOT_FLAG}, so it has no session-audit to "
-                "invoke; resubmit once a hub runner is scheduled"
-            ),
-        )
-    refusal = restart.refusal_for(mcps_root, job["session_target"])
+    refusal = restart.refusal_for(job["session_target"])
     if refusal is not None:
         return _refuse_hub_job(credentials, job, identity, detail=refusal)
     # Narrowed by the refusal above: a None target was refused there.
     target = job["session_target"] if job["session_target"] is not None else ""
-    # The verb runs the session-audit published on origin/main, never the
-    # checkout's working tree (MCPs board task f4cd489f); a tree that cannot
-    # be extracted refuses the job with nothing run.
-    tree = published_tree.extract_published_tree(mcps_root)
-    if isinstance(tree, str):
-        return _refuse_hub_job(credentials, job, identity, detail=tree)
-    invocation = restart.session_invocation(
-        mcps_root, tree, job["command"], target, job["submitted_by"]
-    )
+    # The verb runs the active sealed session-verbs release, verified for
+    # this job, and nothing else (MCPs board task c7c2527d); no release, or
+    # one that fails its seal, refuses the job with nothing run.
+    release = session_release.active_session_release()
+    if isinstance(release, str):
+        return _refuse_hub_job(credentials, job, identity, detail=release)
+    invocation = restart.session_invocation(release, job["command"], target, job["submitted_by"])
     # A revive types the submitter's label into its brief and a kill passes
     # it as an argument (MCPs migs 525 and 526), so the label is judged
     # before it can become an argv element, the same way the target is.
@@ -310,8 +293,10 @@ def claim_pass(
         node: Restrict claims to this node, or None to take any hub job;
             the hub verbs are pinned to ``austinpc``, so this is the hub's
             own alias or None.
-        mcps_root: The MCPs checkout, or None when the runner was started
-            without ``--mcps-root``.
+        mcps_root: The MCPs checkout a base rebuild runs in, or None when
+            the runner was started without ``--mcps-root``. Session verbs
+            never use it: they run a sealed release
+            (:mod:`fleet.core.session_release`).
 
     Returns:
         The job that was claimed, whatever became of it, or None when the
@@ -319,7 +304,8 @@ def claim_pass(
 
     Raises:
         AppError: Only from the queue calls themselves. A LOCAL refusal (no
-            MCPs checkout, a target that cannot be resolved) is reported to
+            MCPs checkout, a target that cannot be resolved, a session
+            release that is missing or fails its seal) is reported to
             the queue as ``refused`` with its code and message verbatim and
             does not propagate; see the module docstring for why that is
             transport rather than recovery.
@@ -339,7 +325,7 @@ def claim_pass(
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
         return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
-    return restart_job(credentials, job, identity, mcps_root=mcps_root)
+    return restart_job(credentials, job, identity)
 
 
 def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
