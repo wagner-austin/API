@@ -1375,7 +1375,7 @@ name appeared nowhere here — was mine, and another session bridged it.
 
 ### `floor` — cloze floor scoring
 
-<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 112 -->
+<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 113 -->
 <!-- reviewed: tools/hpc3/runs/floor*.json = 100 -->
 
 The number every arm accuracy in the extraction-ablation programme is read as
@@ -1503,10 +1503,20 @@ scored is that the item set is a staged file rather than a data-bank id.
   been measured, and no calibration exists for this experiment. The item-level
   identity is a separate fact from the subtractability of the scalar, and the
   record of the first now carries no assumption about the second. **The
-  measured cross-card term for this floor is exactly zero over five cards**,
+  measured cross-card term for this floor is exactly zero over six cards**,
   which is precisely what a `Calibration` on `gpu_model` for this experiment
   would record; recording one is a programme decision rather than a fix, and
   it is the reason the verdict above is `uncalibrated` rather than `equal`.
+
+  The sixth is the RTX A2000 12GB in diphtheria, scored on 2026-10-01 as the
+  GPU proof of Model-Trainer's move off austinpc (board task `d141c8b0`):
+  `artifacts/floor-baseline/gpt2-a2000-cublas.json`, the same command, kernel
+  arm and item set, run in the `model-trainer-worker` image built there from
+  `3d829a5f`, driver 595.91.07 on Linux. It is **1374/2627 and payload
+  `e964e46b…` again**, so a GA106 card, on the first Linux host outside the
+  cluster to score this floor, decides the same items as the other five.
+  Its `image_digest` is blank for the same reason the 3090 Ti's is: a locally
+  built image has no registry digest to record.
 
 - **Its evidence was machine-local until 2026-09-12, which is the failure
   `.gitignore` already records four times over.** 96 of the 100 run documents
