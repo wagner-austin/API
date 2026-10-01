@@ -107,13 +107,15 @@ def _companion_config(config_path: pathlib.Path) -> pathlib.Path:
 
 
 def _companion_commit_script() -> str:
-    """The script that makes lavender's staged companion a repository.
+    """The script that clones lavender's staged companion from its bundle.
 
     Returns:
         Its text, as the dialect renders it for a Windows node.
     """
     return dialect.for_platform(NodePlatform.WINDOWS).checked_script(
-        dialect.companion_repository_commands("C:/fleet/stage/MCPs", COMPANION_SHA, "main")
+        dialect.companion_repository_commands(
+            "C:/fleet/stage/MCPs", "C:/fleet/stage/MCPs.stage/tree.tgz", COMPANION_SHA, "main"
+        )
     )
 
 
@@ -136,7 +138,7 @@ def _companion_replies(
         ok(""),  # the companion's mirror: git init --bare
         ok(""),  # the companion: git fetch the ref
         ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
-        ok(""),  # the companion: git archive
+        ok(""),  # the companion: git bundle create
         ok(""),  # the project: git archive
         *stage_replies(export_digest),
         ok(""),  # companion: send reset script
@@ -146,10 +148,8 @@ def _companion_replies(
         ok(""),  # companion: send the base64 payload
         ok(""),  # companion: send reassemble script
         ok(companion_digest),  # companion: run reassemble
-        ok(""),  # companion: send extract script
-        ok(""),  # companion: run extract
-        ok(""),  # companion: send the commit script
-        ok(""),  # companion: run the commit
+        ok(""),  # companion: send the clone script
+        ok(""),  # companion: run the clone
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
@@ -167,8 +167,8 @@ class TestCompanions:
         self, config_path: pathlib.Path
     ) -> None:
         """The whole path, through the real prepare, the real export and the
-        real staging: the ref resolved to a commit, that commit archived, and
-        the tree landed at ``<stage_root>/MCPs`` -- which is ``../MCPs`` from
+        real staging: the ref resolved to a commit, the ref bundled, and the
+        clone landed at ``<stage_root>/MCPs`` -- which is ``../MCPs`` from
         the export root, the one spelling that answers on a node and on a
         workstation alike."""
         sourced = _companion_config(config_path)
@@ -204,8 +204,8 @@ class TestCompanions:
             f"+{COMPANION_REF}:refs/fleet/companion",
         )
         assert runner.calls[base + 2][3] == "rev-parse"
-        assert runner.calls[base + 3][3] == "archive"
-        assert runner.calls[base + 3][-1] == COMPANION_SHA
+        assert runner.calls[base + 3][3:5] == ("bundle", "create")
+        assert runner.calls[base + 3][-1] == "refs/fleet/companion"
         sent = [body or b"" for body in runner.stdin]
         assert _companion_commit_script().encode() in sent
 

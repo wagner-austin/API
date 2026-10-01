@@ -372,16 +372,17 @@ class TestFetchRef:
 
 
 class TestExportingCompanions:
-    def test_a_companion_is_mirrored_fetched_and_archived_at_its_tip(
+    def test_a_companion_is_mirrored_fetched_and_bundled_at_its_tip(
         self, tmp_path: pathlib.Path
     ) -> None:
         """The whole path one declaration takes on the hub, in order: the
-        mirror made, the ref's tip fetched and resolved, and the archive of
-        THAT commit read back as the bytes a node is staged with."""
-        payload = b"\x1f\x8b\x08\x00companion"
+        mirror made, the ref's tip fetched and resolved, and the bundle of
+        the companion ref read back as the bytes a node is staged with (MCPs
+        board task 2026dfbc: the ref with its history, not an archive)."""
+        payload = b"# v2 git bundle\ncompanion"
         archives = tmp_path / "archives"
         archives.mkdir()
-        (archives / f"companion-wagner-austin-MCPs-{SHA}.tgz").write_bytes(payload)
+        (archives / f"companion-wagner-austin-MCPs-{SHA}.bundle").write_bytes(payload)
         runner = FakeRun([ok(""), ok(""), ok(f"{SHA}\n"), ok("")])
         _test_hooks.run = runner
 
@@ -396,15 +397,38 @@ class TestExportingCompanions:
                 directory="MCPs",
                 ref="main",
                 sha=SHA,
-                path=archives / f"companion-wagner-austin-MCPs-{SHA}.tgz",
+                path=archives / f"companion-wagner-austin-MCPs-{SHA}.bundle",
                 data=payload,
             ),
         )
         assert runner.calls[0][:2] == ("git", "init")
         assert runner.calls[1][3] == "fetch"
         assert runner.calls[2][3] == "rev-parse"
-        assert runner.calls[3][3] == "archive"
-        assert runner.calls[3][-1] == SHA
+        assert runner.calls[3] == (
+            "git",
+            "-C",
+            str(tmp_path / "mirrors" / "companion-wagner-austin-MCPs.git"),
+            "bundle",
+            "create",
+            "--quiet",
+            str(archives / f"companion-wagner-austin-MCPs-{SHA}.bundle"),
+            export.COMPANION_REF,
+        )
+        assert runner.timeouts[3] == export.ARCHIVE_TIMEOUT_SECONDS
+
+    def test_a_bundle_git_refuses_is_an_export_failure_in_gits_words(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        _test_hooks.run = FakeRun([failed(128, "fatal: Refusing to create empty bundle.")])
+
+        with pytest.raises(AppError) as raised:
+            export.bundle_ref(tmp_path / "m.git", tmp_path / "out" / "c.bundle")
+
+        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
+        assert raised.value.message == (
+            f"git bundle create {export.COMPANION_REF} from {tmp_path / 'm.git'}: "
+            "fatal: Refusing to create empty bundle."
+        )
 
     def test_a_project_declaring_none_asks_git_nothing(self, tmp_path: pathlib.Path) -> None:
         runner = FakeRun([])

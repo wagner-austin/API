@@ -98,37 +98,98 @@ def test_the_extract_takes_the_archive_and_the_destination_separately() -> None:
     )
 
 
-def test_a_companion_is_committed_so_the_check_reading_it_has_a_head() -> None:
-    """slime's lift check reads ``git show HEAD:<path>`` deliberately, so that
-    an uncommitted edit in the workspace is not mistaken for the code. On a
-    node there is no HEAD until one is made, and the identity is passed rather
-    than configured so nothing is left behind on the machine."""
-    commands = dialect.companion_repository_commands("/s/MCPs", "a" * 40, "main")
-
-    assert commands[:2] == (
-        ("git", "-C", "/s/MCPs", "init", "--quiet"),
-        ("git", "-C", "/s/MCPs", "add", "--all", "--force"),
+def test_a_companion_is_cloned_from_its_bundle_onto_its_branch() -> None:
+    """MCPs board task 2026dfbc: the bundle's ref is fetched into
+    ``origin/<branch>``, the branch is checked out there, and HEAD is proved
+    to be the commit the hub bundled."""
+    commands = dialect.companion_repository_commands(
+        "/s/MCPs", "/s/MCPs.stage/tree.tgz", "a" * 40, "refs/heads/main"
     )
-    assert commands[2][-1] == f"fleet companion export {'a' * 40}"
-    assert commands[3] == ("git", "-C", "/s/MCPs", "update-ref", "refs/remotes/origin/main", "HEAD")
+
+    assert commands == (
+        ("git", "-C", "/s/MCPs", "init", "--quiet"),
+        (
+            "git",
+            "-C",
+            "/s/MCPs",
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "/s/MCPs.stage/tree.tgz",
+            "+refs/fleet/companion:refs/remotes/origin/main",
+        ),
+        ("git", "-C", "/s/MCPs", "checkout", "--quiet", "-B", "main", "refs/remotes/origin/main"),
+        ("git", "-C", "/s/MCPs", "merge-base", "--is-ancestor", "HEAD", "a" * 40),
+        ("git", "-C", "/s/MCPs", "merge-base", "--is-ancestor", "a" * 40, "HEAD"),
+    )
+
+
+def _git(*args: str) -> str:
+    """Run git under a throwaway identity and answer its trimmed output.
+
+    Args:
+        *args: The arguments after ``git``.
+
+    Returns:
+        Its standard output, stripped.
+    """
+    ran = subprocess.run(
+        ("git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *args),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return ran.stdout.strip()
+
+
+def _bundled_companion(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str, str]:
+    """A two-commit repository bundled at its companion ref, as the hub does.
+
+    Args:
+        tmp_path: Where the repository and its bundle are made.
+
+    Returns:
+        The bundle, the first commit and the tip.
+    """
+    source = tmp_path / "source"
+    (source / "packages" / "maketools").mkdir(parents=True)
+    _git("init", "--quiet", str(source))
+    (source / "packages" / "maketools" / "run.py").write_bytes(b"print(1)\n")
+    _git("-C", str(source), "add", "--all")
+    _git("-C", str(source), "commit", "--quiet", "--message", "first")
+    first = _git("-C", str(source), "rev-parse", "HEAD")
+    (source / "packages" / "maketools" / "run.py").write_bytes(b"print(2)\n")
+    _git("-C", str(source), "commit", "--quiet", "--all", "--message", "tip")
+    tip = _git("-C", str(source), "rev-parse", "HEAD")
+    _git("-C", str(source), "update-ref", "refs/fleet/companion", tip)
+    bundle = tmp_path / "MCPs.stage" / names.ARCHIVE_NAME
+    bundle.parent.mkdir()
+    _git("-C", str(source), "bundle", "create", "--quiet", str(bundle), "refs/fleet/companion")
+    return bundle, first, tip
 
 
 @pytest.mark.parametrize("ref", ["main", "refs/heads/main"])
-def test_a_staged_companion_serves_origin_main_to_a_git_dir_archive(
+def test_a_staged_companion_is_its_ref_with_history_and_serves_origin_main(
     tmp_path: pathlib.Path, ref: str
 ) -> None:
-    """MCPs board task a8ee9b21. hardware-wiki's, metabolomics-dashboard's
-    and chat's checks run MCPs' published maketools, which reads
-    ``git --git-dir=../MCPs/.git archive origin/main`` and refused on a node
-    with 'has no origin/main carrying packages/maketools'. The commands run
-    here for real, over a tree shaped like the export, and the same archive
-    call then reads the staged file back."""
+    """The commands run here for real against a bundle shaped like the hub's.
+    HEAD and ``origin/main`` are the bundled tip and its ancestor is
+    readable, which is what corvis-stick's HookCommands suite needed of MCPs
+    on serendipity (MCPs board task 2026dfbc). And MCPs board task a8ee9b21
+    still holds: published maketools reads ``git --git-dir=../MCPs/.git
+    archive origin/main``, and that call reads the staged file back."""
+    bundle, first, tip = _bundled_companion(tmp_path)
     target = tmp_path / "MCPs"
-    (target / "packages" / "maketools").mkdir(parents=True)
-    (target / "packages" / "maketools" / "run.py").write_bytes(b"print(1)\n")
-    for command in dialect.companion_repository_commands(target.as_posix(), "b" * 40, ref):
+    target.mkdir()
+    for command in dialect.companion_repository_commands(
+        target.as_posix(), bundle.as_posix(), tip, ref
+    ):
         subprocess.run(command, check=True, capture_output=True, timeout=60)
 
+    assert _git("-C", str(target), "rev-parse", "HEAD") == tip
+    assert _git("-C", str(target), "rev-parse", "refs/remotes/origin/main") == tip
+    assert _git("-C", str(target), "show", f"{first}:packages/maketools/run.py") == "print(1)"
     archived = subprocess.run(
         [
             "git",
@@ -147,7 +208,26 @@ def test_a_staged_companion_serves_origin_main_to_a_git_dir_archive(
     # on a Windows node), which is the checkout's business, not the ref's.
     with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:
         content = archive.read("packages/maketools/run.py")
-    assert content.replace(b"\r\n", b"\n") == b"print(1)\n"
+    assert content.replace(b"\r\n", b"\n") == b"print(2)\n"
+
+
+def test_a_bundle_whose_ref_is_not_the_bundled_commit_stops_the_stage(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The last two commands prove HEAD is the commit the hub resolved; asked
+    for the bundle's ancestor instead, the first of them exits non-zero, so
+    the checked script ends there and the run is not staged on a tree the
+    feed would misname."""
+    bundle, first, _tip = _bundled_companion(tmp_path)
+    target = tmp_path / "MCPs"
+    target.mkdir()
+    *clone, head_in_sha, _sha_in_head = dialect.companion_repository_commands(
+        target.as_posix(), bundle.as_posix(), first, "main"
+    )
+    for command in clone:
+        subprocess.run(command, check=True, capture_output=True, timeout=60)
+
+    assert subprocess.run(head_in_sha, capture_output=True, timeout=60).returncode == 1
 
 
 class TestCheckedScript:

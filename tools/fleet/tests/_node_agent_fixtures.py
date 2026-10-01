@@ -150,8 +150,8 @@ def prebuilt_export(config_path: pathlib.Path) -> bytes:
 
 
 def prebuilt_companion(config_path: pathlib.Path) -> bytes:
-    """Write the archive a companion's ``git archive`` would have, where the
-    tick reads it.
+    """Write the bundle a companion's ``git bundle create`` would have, where
+    the tick reads it.
 
     Named by the companion's own commit rather than by the run, which is the
     name :func:`fleet.core.export.export_companions` writes.
@@ -160,12 +160,12 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
         config_path: The workspace document.
 
     Returns:
-        The archive bytes.
+        The bundle bytes.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    destination = loaded.archives / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.tgz"
+    destination = loaded.archives / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    payload = b"\x1f\x8b" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
+    payload = b"# v2 git bundle\n" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
     destination.write_bytes(payload)
     return payload
 

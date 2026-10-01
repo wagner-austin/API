@@ -3,8 +3,9 @@ $ErrorActionPreference = 'Stop'
 
 # The Windows dialect's checked scripts, executed from their committed
 # renders under rendered/ (fleet.core.dialect_windows.checked_script, MCPs
-# board task d69786fa, A2): the extract, and the git steps that make a
-# staged tree and a companion one-commit repositories. Their one piece of
+# board task d69786fa, A2): the extract, the git steps that make a staged
+# tree a one-commit repository, and those that clone a companion from its
+# bundle (MCPs board task 2026dfbc). Their one piece of
 # logic is "run each step, and end with the first non-zero status", so tar
 # and git are stand-ins passed through the parameters the renders name them
 # by, recording the exact argument vector each received.
@@ -50,17 +51,18 @@ Describe 'The staged tree''s repository' {
 }
 
 Describe 'A companion''s repository' {
-    It 'indexes every file of the export with --force, names the commit it came from, and names it origin/main' {
-        # The last step is what lets a check that runs MCPs' published
-        # maketools read ../MCPs at origin/main on a node (MCPs board task
-        # a8ee9b21).
+    It 'clones the bundle onto origin/main and main, then proves HEAD is the bundled commit' {
+        # A real clone with its history (MCPs board task 2026dfbc), whose
+        # origin/main still lets a check that runs MCPs' published maketools
+        # read ../MCPs on a node (MCPs board task a8ee9b21).
         $git = Initialize-StandIn 0 -Append
         Invoke-Rendered 'dialect-companion-repository' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:companion) init --quiet",
-            "-C $($script:companion) add --all --force",
-            "-C $($script:companion) -c user.name=fleet -c user.email=fleet@corvis.invalid commit --quiet --message `"fleet companion export 5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2`"",
-            "-C $($script:companion) update-ref refs/remotes/origin/main HEAD"
+            "-C $($script:companion) fetch --quiet --no-tags $($script:companion).stage/tree.tgz +refs/fleet/companion:refs/remotes/origin/main",
+            "-C $($script:companion) checkout --quiet -B main refs/remotes/origin/main",
+            "-C $($script:companion) merge-base --is-ancestor HEAD 5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2",
+            "-C $($script:companion) merge-base --is-ancestor 5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2 HEAD"
         )
     }
     It 'stops at the first step git refuses, with git''s status' {

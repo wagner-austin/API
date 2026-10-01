@@ -402,14 +402,14 @@ class TestStagingACompanion:
     task 0515040d): what the node is asked to do, in what order, and what the
     directory it lands in is guaranteed to hold."""
 
-    def test_the_tree_lands_beside_the_exports_and_is_committed_at_its_sha(self) -> None:
+    def test_the_tree_lands_beside_the_exports_cloned_from_its_bundle(self) -> None:
         """``<stage_root>/<directory>`` is ``../<directory>`` from an export
         root, which is where a workstation keeps the same checkout, so the
-        recipe names one path on either machine. The commit is what a check
-        reading ``git show HEAD:`` needs, and it is made here because a node
-        has no HEAD until one is."""
+        recipe names one path on either machine. The verified bundle is
+        cloned there (MCPs board task 2026dfbc), with nothing unpacked
+        first."""
         payload = b"companion-bytes"
-        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 4)
+        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 2)
         _test_hooks.run = runner
 
         where = staging.stage_companion(
@@ -432,22 +432,17 @@ class TestStagingACompanion:
         assert (
             sent[7]
             == spoken.checked_script(
-                dialect.extract_commands(f"C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}", where)
+                dialect.companion_repository_commands(where, landed, COMPANION_SHA, "main")
             ).encode()
         )
-        assert (
-            sent[9]
-            == spoken.checked_script(
-                dialect.companion_repository_commands(where, COMPANION_SHA, "main")
-            ).encode()
-        )
+        assert len(runner.calls) == 9
 
-    def test_the_archive_never_enters_the_tree_that_is_committed(self) -> None:
+    def test_the_bundle_never_enters_the_tree_that_is_cloned(self) -> None:
         """A ``tree.tgz`` at the root of a staged workspace would be a file the
         workspace does not have, sitting in the tree a check compares against
         it, so the transport files stay in a staging directory beside it."""
         payload = b"companion-bytes"
-        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 4)
+        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 2)
         _test_hooks.run = runner
 
         staging.stage_companion(
@@ -465,12 +460,13 @@ class TestStagingACompanion:
         assert not any(f"C:/fleet/stage/MCPs/{names.ARCHIVE_NAME}" in text for text in written)
         assert f"lavender:C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}" in written
 
-    def test_the_directory_is_replaced_rather_than_unpacked_over(self) -> None:
+    def test_the_directory_is_replaced_rather_than_cloned_over(self) -> None:
         """Every run carrying a companion writes the same directory, so a file
-        the workspace has since deleted would otherwise survive into a tree
-        that is then committed AS the workspace."""
+        the workspace has since deleted would otherwise survive into the tree
+        a check then reads AS the workspace, and git init over a previous
+        clone would keep its refs."""
         payload = b"companion-bytes"
-        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 4)
+        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 2)
         _test_hooks.run = runner
 
         staging.stage_companion(
@@ -489,16 +485,18 @@ class TestStagingACompanion:
         assert sent.index(sent[0]) < sent.index(
             dialect.for_platform(NodePlatform.LINUX)
             .checked_script(
-                dialect.extract_commands(
-                    f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
+                dialect.companion_repository_commands(
                     "/home/corvis/fleet/stage/MCPs",
+                    f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
+                    COMPANION_SHA,
+                    "main",
                 )
             )
             .encode()
         )
 
-    def test_a_mismatched_digest_names_the_companion_and_unpacks_nothing(self) -> None:
-        """The message says WHICH archive disagreed, because a dispatch now
+    def test_a_mismatched_digest_names_the_companion_and_clones_nothing(self) -> None:
+        """The message says WHICH payload disagreed, because a dispatch now
         carries more than one and a mismatch that named none would leave a
         reader looking at the wrong transfer."""
         runner = FakeRun([ok("")] * 6 + [ok("0" * 64)])
@@ -518,4 +516,4 @@ class TestStagingACompanion:
 
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
         assert f"the MCPs companion at {COMPANION_SHA}" in excinfo.value.message
-        assert not any(b"Invoke-Step $Tar @('-xzmf'" in (sent or b"") for sent in runner.stdin)
+        assert not any(b"merge-base" in (sent or b"") for sent in runner.stdin)
