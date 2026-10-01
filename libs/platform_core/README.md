@@ -471,6 +471,29 @@ config: ThreadConfig = configure_torch_threads(max_threads=4)
 print(f"Using {config['threads']} threads")
 ```
 
+## Cluster Documents
+
+The documents a cluster submitter and the payloads it runs both read and
+write. They live here rather than in `tools/hpc3` so a payload's compute image
+can speak them without carrying the submitter (ssh, `sbatch`, console scripts).
+`hpc3` imports every one of them from here; there is no second definition.
+
+| Module | Holds |
+|--------|-------|
+| `platform_core.cluster_layout` | Project names, `<project>.<name>` job names, and the `<root>/<project>` directories derived from them |
+| `platform_core.stage_manifest` | `StagedFile` / `StageManifest`: which bytes a staging operation places, by digest |
+| `platform_core.stage_provenance` | The required record of where staged bytes came from |
+| `platform_core.sweep_member` | `SweepMember`, and `require_artifact_in_command`, which every run document's `artifact` is held to |
+
+```python
+from platform_core.sweep_member import decode_sweep_member, encode_sweep_member
+
+member = decode_sweep_member(
+    {"suffix": "s0", "command": "python x.py --out /r/s0.json", "artifact": "/r/s0.json"}
+)
+assert encode_sweep_member(member)["artifact"] == "/r/s0.json"
+```
+
 ## API Reference
 
 ### Error Types
