@@ -15,8 +15,8 @@ The game is a plain Java program and boots fully headless via `-nodisplay`, so t
 Verification is structural rather than incidental: `mechanics/` holds the extracted
 game facts, doctrines make each experiment differ from its control by exactly one
 field, seeded matches are bit-identical per seed with a world digest that proves it,
-and `make agent-selftest` patches the real jar so a moved obfuscated class fails at
-the build gate instead of inside a live engine.
+and `make execution` patches the real jar so a moved obfuscated class fails at
+that gate instead of inside a live engine.
 
 ## Wiki
 
@@ -27,7 +27,8 @@ Claims about engine internals are pinned to a game build (`game_version` frontma
 ## Build
 
 ```bash
-make check          # lint + sources + test + agent-selftest (the gate)
+make check          # lint + sources + test (the gate, on any clean checkout)
+make execution      # agent-selftest against the pinned game, on the hub
 make lint           # guard + ruff + mypy over src, tests, scripts
 make sources        # wiki provenance and navigation: anchors, links, counts
 make test           # pytest + coverage, 100% statements and branches
@@ -35,9 +36,11 @@ make agent          # compile + jar the javaagent with the game's own JDK
 make agent-selftest # patch the real jar, verified by the JVM's bytecode verifier
 ```
 
-`make check` includes `agent-selftest`, so the Java half is gated too: a patcher
-regression, or an obfuscated class name that moved in a game update, fails at
-the gate rather than inside a live engine.
+`make execution` runs `agent-selftest`, so the Java half is gated too: a patcher
+regression, or an obfuscated class name that moved in a game update, fails
+there rather than inside a live engine. It is kept out of `make check` because
+it patches the real pinned jar, which is never tracked, so only the hub that
+holds the game can run it; run it after any agent or game change.
 
 ## Playing
 
