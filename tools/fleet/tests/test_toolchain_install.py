@@ -107,6 +107,17 @@ class TestManagerSelection:
         )
         assert install_command("node", ("choco",)) == "choco install nodejs-lts -y"
 
+    def test_ffmpeg_installs_from_each_platforms_manager(self) -> None:
+        """2026-10-01, MCPs board task 512e7bf8: grandma-api's check converts
+        real audio through ffmpeg, which sedona and serendipity lacked; winget
+        offered Gyan.FFmpeg.Essentials 9.0.1 on both."""
+        assert install_command("ffmpeg", ("pip", "winget", "choco")) == (
+            "winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
+            "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+        )
+        assert install_command("ffmpeg", ("choco",)) == "choco install ffmpeg -y"
+        assert install_command("ffmpeg", ("pipx", "apt-get")) == "sudo apt-get install -y ffmpeg"
+
     def test_an_unknown_tool_has_no_command(self) -> None:
         assert install_command("kubectl", ("winget", "choco")) == ""
 

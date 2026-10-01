@@ -57,6 +57,7 @@ Describe 'The toolchain probe' {
         [void](Initialize-Answer $first 'node' @('v20.17.0') 0)
         [void](Initialize-Answer $first 'poetry' @('Poetry (version 1.8.3)') 3 -Stderr)
         [void](Initialize-Answer $first 'tar' @() 0)
+        $ffmpegCalls = Initialize-Answer $first 'ffmpeg' @('ffmpeg version 9.0.1-essentials_build-www.gyan.dev', 'built with gcc') 0
         [void](Initialize-Answer $quoted 'make' @('GNU Make 4.4.1', 'Built for Windows32') 0)
         $vswhereCalls = Initialize-Answer (Join-Path $script:root 'vs') 'vswhere' @('17.11.35312.102') 0
         $env:PATH = "$first;;`"$quoted`""
@@ -70,10 +71,12 @@ Describe 'The toolchain probe' {
         }
         $said | Should -Be @(
             'python=yes=Python 3.11.9', 'poetry=yes=Poetry (version 1.8.3)', 'git=yes=git version 2.46.0.windows.1',
-            'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
+            'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'ffmpeg=yes=ffmpeg version 9.0.1-essentials_build-www.gyan.dev',
+            'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
             'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'docker=no=',
             $integrity)
         [System.IO.File]::ReadAllLines($pythonCalls) | Should -Be @('--version', '-m pip --version')
+        [System.IO.File]::ReadAllLines($ffmpegCalls) | Should -Be @('--version')
         [System.IO.File]::ReadAllText($vswhereCalls).Trim() |
             Should -BeExactly '-products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion'
     }
@@ -83,8 +86,9 @@ Describe 'The toolchain probe' {
         $env:PATH = $alias
         $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'absent\vswhere.exe') })
         $said[0] | Should -BeExactly 'python=no='
-        $said[9] | Should -BeExactly 'pip=no='
-        $said[10] | Should -BeExactly 'cxx=no='
+        $said[5] | Should -BeExactly 'ffmpeg=no='
+        $said[10] | Should -BeExactly 'pip=no='
+        $said[11] | Should -BeExactly 'cxx=no='
         Test-Path -LiteralPath $calls | Should -BeFalse
     }
     It 'reports pip absent when the interpreter has none, and no VC tools when vswhere finds none' {
@@ -94,8 +98,8 @@ Describe 'The toolchain probe' {
         $env:PATH = $tools
         $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'vs\vswhere.cmd') })
         $said[0] | Should -BeExactly 'python=yes=Python 3.11.9'
-        $said[9] | Should -BeExactly 'pip=no='
-        $said[10] | Should -BeExactly 'cxx=no='
+        $said[10] | Should -BeExactly 'pip=no='
+        $said[11] | Should -BeExactly 'cxx=no='
     }
     It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {
         $env:PATH = Join-Path $script:root 'empty'

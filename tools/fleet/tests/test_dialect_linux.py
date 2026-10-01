@@ -340,7 +340,7 @@ class TestTransportShape:
         body = DIALECT.toolchain_probe_script()
 
         assert "report python python3\n" in body
-        for tool in ("poetry", "git", "make", "node", "tar", "cargo", "apt-get", "pipx"):
+        for tool in ("poetry", "git", "make", "node", "ffmpeg", "tar", "cargo", "apt-get", "pipx"):
             assert f"report {tool} {tool}\n" in body
         assert "printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n" in body
         # The docker line asks execdocker's own socket, never the PATH's
@@ -484,6 +484,7 @@ class TestForRealUnderSh:
             "git",
             "make",
             "node",
+            "ffmpeg",
             "tar",
             "cargo",
             "cxx",

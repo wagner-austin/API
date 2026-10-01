@@ -178,6 +178,20 @@ class TestReadiness:
         """MEASURED: make was on one node of three."""
         assert missing(toolchain.parse_probe(SEDONA)) == ("make",)
 
+    def test_a_node_without_ffmpeg_is_missing_it_and_told_the_install(self) -> None:
+        """MEASURED 2026-10-01 (MCPs board task 512e7bf8): serendipity had
+        every other tool and winget, and 'where ffmpeg' found nothing."""
+        reports = toolchain.parse_probe(
+            "python=yes=Python 3.11.9\npoetry=yes=Poetry (version 2.4.2)\n"
+            "git=yes=git version 2.55.0.windows.5\nmake=yes=GNU Make 4.4.1\n"
+            "node=yes=v24.21.0\nffmpeg=no=\ntar=yes=bsdtar 3.8.8\nwinget=yes=v1.12\n"
+        )
+
+        assert missing(reports) == ("ffmpeg",)
+        assert "ffmpeg (winget install --id Gyan.FFmpeg.Essentials" in describe_gap(
+            "serendipity", reports
+        )
+
     def test_the_wrong_python_is_not_ready_even_with_every_tool(self) -> None:
         reports = toolchain.parse_probe(WRONG_PYTHON)
 
