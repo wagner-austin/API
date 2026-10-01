@@ -4,7 +4,7 @@ tags: [methodology, roadmap, open-questions]
 related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[warp-gpu-determinism-fails-on-coupled-bodies]]"]
 source_paths: []
 source_git_blobs: {}
-fact_checked: 2026-09-03
+fact_checked: 2026-10-01
 confidence: high
 hubs: [instrument-design]
 ---
@@ -55,11 +55,18 @@ taken at 64.
 digests against the table. Identical digests retire the question; any difference means the
 published digests describe a truncated solve and the table needs re-stating.
 
-## 2. Do the findings hold on another GPU architecture?
+## 2. Do the findings hold on another GPU architecture? — ANSWERED 2026-10-01: partly. The threshold moves; the deterministic modes are portable
 
-Everything GPU-side was measured on two Ampere sm_86 devices: the RTX 3090 Ti (84 SMs) and, since 2026-08-16, sedona's RTX 3070 Ti Laptop (46 SMs), where the coupled-body threshold did not move ([[coupled-body-threshold-does-not-move-with-sm-count]]). That falsifies the occupancy explanation *within* an architecture but says nothing about cross-architecture codegen: both devices compile to the same sm_86 target. A threshold that is a codegen or warp-scheduling artefact could still move on a different architecture; one that is algorithmic should not.
+Everything GPU-side had been measured on two Ampere sm_86 devices: the RTX 3090 Ti (84 SMs) and sedona's RTX 3070 Ti Laptop (46 SMs). The coupled-body threshold did not move between them ([[coupled-body-threshold-does-not-move-with-sm-count]]). That falsified the occupancy explanation *within* an architecture but said nothing about cross-architecture codegen. A threshold that is a codegen or warp-scheduling artefact could move on a different architecture; one that is algorithmic should not.
 
-**What would answer it:** run the same sweep on a non-Ampere card — the sm_75 GTX 1630, in the post as of 2026-08-19. The instrument needs no change of *design*; the sweep scripts gained a `--device` flag the same day so a host holding two cards can address each one, and the resolved device is recorded in every report ([[measurement-fleet-is-reachable-by-ssh-alias]] lists what each machine can host).
+**Answered on the sm_75 GTX 1630, with two results:**
+
+- **The default-mode threshold moves, by one scene.** With `linesearch_iterative` pinned to 32 on both cards and driver 591.86 on both, the 5-body touching row reproduces **16/20** on Turing against **0/20** on the 3090 Ti. The 4-body row reproduces 20/20 on both, and the 6-body row 0/20 on both. So the boundary has a codegen component, and "five bodies" is an Ampere figure. Wherever both cards reproduce, they compute the same digest ([[coupled-body-threshold-moves-on-turing]]).
+- **`GPU_TO_GPU` holds its claim, and so does `RUN_TO_RUN`.** Under the alias patch, all ten scenes give bit-identical reference digests on sm_86 and sm_75, in both modes, including every coupled row. The two modes do not agree with each other on coupled scenes. Each fixes an order that is portable across the two architectures, and the two orders differ ([[warp-deterministic-modes-are-digest-portable-across-architectures]]).
+
+**How it was run, and how that departs from the plan below.** The 1630 is still in `lavender`, so the two cards ran in two hosts, not one. Driver 591.86 and Windows 10.0.26200 are identical on both. CPU, chipset and RAM differ. For the digest result, that makes the match a stronger statement, not a weaker one. For the threshold result, it leaves the host as a named, uncontrolled difference. The host is not a plausible cause, because the GPU computes the step and the host's model compile is bit-portable ([[cpu-determinism-is-bit-portable-across-x86-vendors]]). Moving the card into `austinpc` would remove that caveat. It would not change what the answer is, so this question is closed rather than held open for the move.
+
+What follows is the plan as it was written before the run. It is kept because the slot facts still govern any future two-card build in `austinpc`.
 
 **The card goes in `austinpc`, beside the 3090 Ti — not in a second machine.** That is a measurement decision, not a convenience one. Question 2 asks to isolate *architecture*; putting the 1630 in the one box that already holds an Ampere card holds the OS, the driver, the CPU and the RAM fixed, leaving the architecture as the only variable. Housing it in `lavender` — the only other machine with a free slot — would introduce a second driver branch on top, which is exactly the confound [[coupled-body-threshold-does-not-move-with-sm-count]] already had to caveat when `sedona` ran driver 551.23 against this host's 13.1. The board is a full-ATX MSI PRO Z790-P WIFI. **Its second x16-length slot is not x16 electrical**, which the plan originally assumed: MSI's specification for this SKU gives `PCI_E1` PCIe 5.0 x16 from the CPU (where the 3090 Ti sits), `PCI_E2` PCIe 3.0 **x1**, `PCI_E3` PCIe 4.0 **x4**, and `PCI_E4` PCIe 3.0 x1 — so exactly one slot on the board carries meaningful bandwidth and it is already occupied. The 1630 measured Gen3 x16 (width 16/16) in `lavender`; in `austinpc` it would negotiate x1 or, in `PCI_E3`, x4.
 
@@ -78,7 +85,7 @@ Each writes a `navprobe-sweep-run/2` document; `navprobe.codecs.sweep_run.decode
 
 **`--linesearch-block-dim 32` is not decoration either.** It pins the one setting known to move the verdict ([[coupled-body-threshold-turns-on-one-kernels-block-size]]), and 32 specifically because that is the vendor default every published figure on this wiki was measured under — so the comparison extends the existing corpus rather than starting a new one. Passing it explicitly rather than relying on the default is what makes the report *say* which block size ran: the value is carried in the record, so two sweeps that pinned different values are visibly incomparable instead of quietly so. Omit it on one device and the whole experiment is uninterpretable, because a moved threshold could be the architecture or could be the block size.
 
-**It also makes `GPU_TO_GPU` testable for the first time.** That mode compiles under the alias patch ([[tactile-alias-patch-clears-warp-deterministic-compile]]) but has never been swept, because a mode whose entire claim is *the same digest on different devices* cannot be tested with one architecture. Two architectures in one box turns it into a real experiment, and it absorbs the cross-machine digest repetition left over from question 1. If the digests match across sm_75 and sm_86 under `GPU_TO_GPU`, coupled-body reproducibility is portable rather than merely per-device — a stronger result than anything on this wiki so far.
+**It also made `GPU_TO_GPU` testable for the first time.** That mode compiles under the alias patch ([[tactile-alias-patch-clears-warp-deterministic-compile]]), but until 2026-10-01 it had never been swept: a mode whose entire claim is *the same digest on different devices* cannot be tested on one architecture. The sweep also absorbed the cross-machine digest repetition left over from question 1. The digests matched across sm_75 and sm_86, under `RUN_TO_RUN` as well, so coupled-body reproducibility under either mode is portable rather than per-device ([[warp-deterministic-modes-are-digest-portable-across-architectures]]).
 
 **One constraint to plan around:** 4 GiB of VRAM. The scale ladder needed `constraint_capacity` right-sized to 256 to fit 4096 worlds on a 24 GiB card ([[deterministic-mode-cost-falls-with-scale]]), so the top rungs will cap lower here. Irrelevant to the threshold sweep, which runs at `world_count = 2`.
 
@@ -100,7 +107,7 @@ The cross-backend divergence begins at the first contact solve ([[backend-diverg
 
 ## 5. Why six?
 
-The coupled-body boundary sits at five or six bodies depending on the harness. Nothing here inspects a kernel, so the mechanism is a hypothesis: a scheduling or block-size boundary rather than anything physical.
+The coupled-body boundary sits at five or six bodies depending on the harness, and on sm_75 the 5-body row reproduces 16/20 where sm_86 gives 0/20 ([[coupled-body-threshold-moves-on-turing]]). So whatever reading the CUDA finds has to account for the architecture as well as the block size. Nothing here inspects a kernel, so the mechanism is a hypothesis: a scheduling or block-size boundary rather than anything physical.
 
 **What would answer it:** reading the generated CUDA. The `block_dim` sweep this question used to defer to has been run, and it narrows where to read: the boundary case reproduces when `linesearch_iterative`'s block size is 64 and not at 32, 96, 128 or 256, while the `JTDAJ` accumulation kernels — the obvious suspects — do nothing ([[coupled-body-threshold-turns-on-one-kernels-block-size]]). So the question is now specific: what does that kernel's generated CUDA do differently at exactly two warps? No mechanism is claimed; "only 64" is a fact awaiting one.
 
