@@ -4,13 +4,12 @@ tags: [cluster-facts, identity, ledger]
 hubs: [cluster-facts, operations]
 related: ["[[ledger-closures]]", "[[run-documents]]"]
 source_paths:
-  - "src/hpc3/contracts/layout.py"
   - "README.md"
 source_git_blobs:
-  "src/hpc3/contracts/layout.py": "cb698fabbd6994fc9b6bc10092e77df3dc7f520e"
   "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
 provenance:
   - "AccountingStoreFlags = (null), measured 2026-08-23"
+  - "platform_core.cluster_layout (libs/platform_core, outside this workspaceRoot)"
 fact_checked: 2026-09-09
 confidence: high
 ---
@@ -25,6 +24,11 @@ Jobs are not loose. Every one carries its project:
 | `--comment` | project, hardware and environment, readable via `scontrol show job <id>` or `squeue -o %k` **while the job is live** |
 | scripts | `<root>/<project>/scripts/<project>.<name>.sbatch` |
 | logs | `<root>/<project>/logs/<project>.<name>-<jobid>.{out,err}` |
+
+The names and directories are derived in `platform_core.cluster_layout`, not
+in this package, since 2026-10-01: a payload placing its results under
+`<root>/<project>` computes that directory with the same function this
+package submits into, without its compute image carrying the submitter.
 
 The payload can read `HPC3_JOB_NAME` from its environment — enough to name
 its own output, which is what covenant-radar's optimizer does to keep

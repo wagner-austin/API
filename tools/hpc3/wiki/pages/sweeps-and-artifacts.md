@@ -7,8 +7,10 @@ source_paths:
   - "src/hpc3/contracts/sweep.py"
   - "src/hpc3/core/sweep.py"
 source_git_blobs:
-  "src/hpc3/contracts/sweep.py": "7c63b071da5d96248cbee482acb3624a04cb8a25"
+  "src/hpc3/contracts/sweep.py": "1a811f83a4a6ffe5dd58488535e5053bbd67b5d8"
   "src/hpc3/core/sweep.py": "b730820ce899c2f022e3c69fd97f78844d77c6cd"
+provenance:
+  - "platform_core.sweep_member (libs/platform_core, outside this workspaceRoot)"
 fact_checked: 2026-09-14
 confidence: high
 ---
@@ -34,6 +36,13 @@ Each member states its own `artifact`, or `null` if it writes no file of its
 own — six arms writing to one path are five results nobody can read. The
 artifact is checked against that member's own command, so a suffix changed in
 one and not the other fails here rather than after the run.
+
+The member and that check are not defined in this package. Since 2026-10-01
+they live in `platform_core.sweep_member`, which `src/hpc3/contracts/sweep.py`
+and the job contract import: the payloads that WRITE sweep documents run on
+compute nodes, and rusted's image carried this whole submitter, ssh client
+included, to decode three document types it could have taken from the library
+it already ships.
 
 `hpc3-sweep` submits each member and records each one as it goes. There is no
 rollback: a member that fails leaves the earlier ones running and findable,

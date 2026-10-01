@@ -8,7 +8,7 @@ source_paths:
   - "src/hpc3/contracts/preflight.py"
   - "src/hpc3/core/preflight.py"
 source_git_blobs:
-  "src/hpc3/contracts/job.py": "cdc49f720c6fa89780f5d43b8ec04a33cff484e4"
+  "src/hpc3/contracts/job.py": "1bc6b5aaafdbf0f5dc0e8b3c8b61ddca89db936f"
   "src/hpc3/contracts/preflight.py": "e72df28502ee022931ff38610f697c10fef0dbc0"
   "src/hpc3/core/preflight.py": "c642109e539eb3a0a7cfb97c6e44ff161fe7cb0a"
 fact_checked: 2026-09-14

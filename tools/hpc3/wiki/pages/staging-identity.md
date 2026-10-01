@@ -4,15 +4,14 @@ tags: [identity, staging]
 hubs: [images-and-staging]
 related: ["[[image-build-flow]]", "[[known-answers]]"]
 source_paths:
-  - "src/hpc3/contracts/stage.py"
   - "src/hpc3/core/expected.py"
-  - "src/hpc3/contracts/provenance.py"
   - "src/hpc3/core/stage.py"
 source_git_blobs:
-  "src/hpc3/contracts/stage.py": "52a0836d3ecc451ffd05cfe3860580d8182cd9ec"
-  "src/hpc3/core/expected.py": "0ad187f7ba85b5b91ee9d1732c6545825f107cb5"
-  "src/hpc3/contracts/provenance.py": "8760fc424d4d9775622b00c4f963735b02be6fa5"
+  "src/hpc3/core/expected.py": "7355b6fee112fcba63cc346eef386fead380ea03"
   "src/hpc3/core/stage.py": "582badba6fe1feb258dd91d0be2b7735d1c7898b"
+provenance:
+  - "platform_core.stage_manifest (libs/platform_core, outside this workspaceRoot)"
+  - "platform_core.stage_provenance (libs/platform_core, outside this workspaceRoot)"
 fact_checked: 2026-09-01
 confidence: high
 ---
@@ -58,3 +57,11 @@ Every manifest carries a required, non-empty `provenance` block:
 Free-form because what identifies a source differs per project, and a fixed
 schema would mean writing `"none"` into fields that do not apply. The block is
 the record; `--expect-from` is the enforcement.
+
+The manifest and its provenance block are shapes, not staging, and since
+2026-10-01 they live in `platform_core.stage_manifest` and
+`platform_core.stage_provenance`. A payload writes a manifest as well as this
+package reading one -- rusted's `rw_bot.stage_record` builds them -- and the
+payload's image ships `platform_core` already; taking the shape from this
+package put the whole submitter inside the compute image. The enforcement,
+`src/hpc3/core/expected.py`, stays here, because only the submitter needs it.

@@ -8,7 +8,7 @@ source_paths:
   - "src/hpc3/core/inflight.py"
   - "src/hpc3/core/campaign.py"
 source_git_blobs:
-  "src/hpc3/contracts/job.py": "cdc49f720c6fa89780f5d43b8ec04a33cff484e4"
+  "src/hpc3/contracts/job.py": "1bc6b5aaafdbf0f5dc0e8b3c8b61ddca89db936f"
   "src/hpc3/core/inflight.py": "03cf4ad35a0e4c2987b9d5e8ed20e440b3891c55"
   "src/hpc3/core/campaign.py": "16eb99599f73899e856393e48ee7f3fe7addc71e"
 provenance:

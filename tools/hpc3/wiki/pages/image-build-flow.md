@@ -16,10 +16,10 @@ source_paths:
   - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
-  "src/hpc3/contracts/workspace.py": "843e854bdd634c97029050366e3381ea5a48aac6"
+  "src/hpc3/contracts/workspace.py": "852c2abe6b41fd6b033b1c97c5fdcb0cde2dc086"
   "src/hpc3/contracts/image_spec.py": "26354bdfe7ae4f19d4bac5fa6936f851010f93e2"
   "src/hpc3/contracts/image_spec_fields.py": "88d23d5fc4d2646f89f75b1ad5c85d7df9c4c4b2"
-  "src/hpc3/cli/image.py": "fa9f24c8972291940866c7fd0a790e5ec45f3215"
+  "src/hpc3/cli/image.py": "596fbb22fa96cf0b4d418b62732c527d3f31bd34"
   "src/hpc3/cli/image_build.py": "690afc1d5b6cc9732ead9a3d619346b50f563643"
   "src/hpc3/cli/image_capture.py": "af0766bc1d4da403e2e566d6f0540bc3e1766f40"
   "src/hpc3/core/env_probe.py": "e83c330acd07bdb53dfdcc8fe1ee8a64de3af529"

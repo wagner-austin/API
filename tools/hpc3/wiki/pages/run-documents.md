@@ -7,7 +7,7 @@ source_paths:
   - "src/hpc3/contracts/run.py"
   - "src/hpc3/contracts/experiment.py"
 source_git_blobs:
-  "src/hpc3/contracts/run.py": "fe5f5b4deaf3f7d404cd01142b8ace6ecb19fcbd"
+  "src/hpc3/contracts/run.py": "8e526ae04061ef147e61c3afe2d70246f1048665"
   "src/hpc3/contracts/experiment.py": "530e8484b421d13119e951fef3ed8ea8b2706abf"
 fact_checked: 2026-09-14
 confidence: high
