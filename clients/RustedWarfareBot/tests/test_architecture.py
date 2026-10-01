@@ -338,3 +338,40 @@ def test_no_module_has_grown_a_second_job() -> None:
         if len(_module_source(path).splitlines()) > _MAX_MODULE_LINES
     ]
     assert oversized == []
+
+
+#: The submitter. ``src`` ships as a wheel inside the compute image, and a
+#: node that runs a match must never carry the tool that dispatches matches.
+_SUBMITTER_PACKAGE = "hpc3"
+
+
+def test_no_shipped_module_imports_the_submitter() -> None:
+    """The image that RUNS the work does not contain the tool that DISPATCHES it.
+
+    Until 2026-10-01 three modules here imported ``hpc3`` for a sweep member,
+    a stage manifest and a project directory, so the rusted image baked the
+    whole submitter -- ssh client, ``sbatch`` renderer, console scripts -- to
+    obtain three document shapes. The shapes moved to ``platform_core``, which
+    the image ships anyway, and ``hpc3`` became a dev dependency for the
+    scripts and tests that drive the cluster from a workstation.
+
+    Being a dev dependency does not enforce this by itself: the suite runs
+    with dev dependencies installed, so an ``import hpc3`` in ``src`` would
+    pass every test here and fail only inside the built image. This check is
+    what fails first.
+    """
+    offenders = sorted(
+        f"{_module_name(path)} imports {name}"
+        for path in _python_files(_SRC)
+        for name in _imported_modules(path)
+        if name == _SUBMITTER_PACKAGE or name.startswith(f"{_SUBMITTER_PACKAGE}.")
+    )
+    assert offenders == []
+
+
+def test_the_submitter_scan_reads_the_shared_contracts() -> None:
+    """The scan above is not vacuous: it sees the imports that replaced hpc3's."""
+    harness = _SRC / "harness"
+    assert "platform_core.sweep_member" in _imported_modules(harness / "campaign.py")
+    assert "platform_core.cluster_layout" in _imported_modules(harness / "results_layout.py")
+    assert "platform_core.stage_manifest" in _imported_modules(_SRC / "stage_record.py")

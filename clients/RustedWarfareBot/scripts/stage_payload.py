@@ -35,9 +35,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-from hpc3.contracts.stage import encode_stage_manifest
 from platform_core.cli_args import parse_single_flags, require_flag
 from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.stage_manifest import encode_stage_manifest
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.agent_build import JAVA_RELEASE

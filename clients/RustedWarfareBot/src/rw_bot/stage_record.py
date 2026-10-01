@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from hpc3.contracts.stage import StagedFile, StageManifest
+from platform_core.stage_manifest import StagedFile, StageManifest
 
 from rw_bot.tree_archive import ArchiveResult
 

@@ -21,13 +21,13 @@ import sys
 from pathlib import Path
 
 import pytest
-from hpc3.contracts.stage import StagedFile, decode_stage_manifest
 from platform_core.json_utils import (
     JSONValue,
     load_json_str,
     narrow_json_to_dict,
     require_list,
 )
+from platform_core.stage_manifest import StagedFile, decode_stage_manifest
 from scripts.stage_payload import (
     AGENT_BYTECODE,
     CLASS_FILE_OFFSET,

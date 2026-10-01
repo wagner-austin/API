@@ -27,12 +27,14 @@ because nothing anywhere fails. The composition lives in
 :mod:`rw_bot.harness.results_layout`, which is also what the match itself
 checks its own result against.
 
-THE SCHEMA IS HPC3'S, IMPORTED. This module builds
-:class:`~hpc3.contracts.sweep.SweepMember` values rather than dictionaries
-shaped like them, so the members a batch emits carry the type the cluster's
-own decoder will read them back as. A second description of the format here
-would be a fork whose first divergence is a document the submitter refuses
-after the game tree has already been staged.
+THE SCHEMA IS SHARED, IMPORTED. This module builds
+:class:`~platform_core.sweep_member.SweepMember` values rather than
+dictionaries shaped like them, so the members a batch emits carry the type
+``hpc3``'s own decoder will read them back as. A second description of the
+format here would be a fork whose first divergence is a document the
+submitter refuses after the game tree has already been staged. The type comes
+from ``platform_core`` and not from ``hpc3`` because this module runs inside
+the compute image, which must not carry the submitter that dispatches it.
 
 WHAT THIS DELIBERATELY DOES NOT BUILD is the template the members hang off.
 ``hpc3`` resolves that from its WORKSPACE -- the partition, the wall clock and
@@ -47,7 +49,7 @@ from __future__ import annotations
 import shlex
 from collections.abc import Sequence
 
-from hpc3.contracts.sweep import SweepMember
+from platform_core.sweep_member import SweepMember
 
 from rw_bot.harness import campaign_match
 from rw_bot.harness.match import MatchConfig

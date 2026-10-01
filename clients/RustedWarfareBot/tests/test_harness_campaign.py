@@ -14,7 +14,7 @@ from __future__ import annotations
 import shlex
 
 import pytest
-from hpc3.contracts.sweep import decode_sweep_member
+from platform_core.sweep_member import decode_sweep_member
 
 from rw_bot.harness.campaign import (
     MATCH_MODULE,

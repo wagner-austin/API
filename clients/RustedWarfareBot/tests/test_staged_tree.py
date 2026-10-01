@@ -11,10 +11,10 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from hpc3.contracts.stage import decode_stage_manifest
 from hpc3.core.expected import check_expected, read_expected_digests
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
+from platform_core.stage_manifest import decode_stage_manifest
 
 from rw_bot.harness.clone import VOLATILE_FILES
 from rw_bot.staged_tree import (
