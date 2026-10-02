@@ -137,7 +137,8 @@ def _ledger(config_path: pathlib.Path) -> tuple[LedgerEntry, ...]:
 def _live_runs(config_path: pathlib.Path) -> int:
     """How many runs lavender's capacity check counts."""
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    return records.live_runs(loaded.ledger, node="lavender")
+    live = records.live_load(loaded.ledger, node="lavender", projects=loaded.workspace["projects"])
+    return live["runs"]
 
 
 class TestTheFailure:

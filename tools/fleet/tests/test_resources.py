@@ -293,7 +293,10 @@ class TestTheCommands:
         assert leases.find_by_run(loaded.leases, run_id=DEMO_RUN_ID, now_unix=DEMO_NOW) == _lease(
             resources=(SHARED_DB,)
         )
-        assert records.live_runs(loaded.ledger, node="lavender") == 1
+        live = records.live_load(
+            loaded.ledger, node="lavender", projects=loaded.workspace["projects"]
+        )
+        assert live["runs"] == 1
 
     def test_a_second_dispatch_is_refused_without_probing_any_node(
         self, tmp_path: pathlib.Path

@@ -50,7 +50,6 @@ def _node(platform: NodePlatform, stage_root: str) -> NodeConfig:
             reserved_cores=8,
             reserved_ram_gb=6.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=1,
             max_disk_gb=40.0,
         ),
     )

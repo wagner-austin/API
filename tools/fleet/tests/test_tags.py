@@ -79,7 +79,6 @@ def _node(
             reserved_cores=4,
             reserved_ram_gb=4.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=1,
             max_disk_gb=40.0,
         ),
     )

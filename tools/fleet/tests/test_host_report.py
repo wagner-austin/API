@@ -75,7 +75,6 @@ def _host() -> NodeConfig:
             reserved_cores=4,
             reserved_ram_gb=6.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=1,
             max_disk_gb=40.0,
         ),
     )
@@ -106,7 +105,6 @@ def _wsl_node() -> NodeConfig:
             reserved_cores=8,
             reserved_ram_gb=12.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=1,
             max_disk_gb=40.0,
         ),
     )

@@ -50,7 +50,6 @@ def _workspace_document() -> JSONObject:
         "reserved_cores": 2,
         "reserved_ram_gb": 4.0,
         "worker_ram_gb": 1.1,
-        "max_concurrent_runs": 2,
         "max_disk_gb": 20.0,
     }
     node: JSONObject = {
@@ -186,7 +185,7 @@ class TestNodes:
 
         lines, _unreachable = nodes.describe_fleet(loaded)
 
-        assert any("1 live run(s)" in line for line in lines)
+        assert any("1 live run(s) holding 6 worker(s)" in line for line in lines)
 
 
 def _running_row() -> LedgerEntry:

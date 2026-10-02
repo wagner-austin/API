@@ -34,10 +34,8 @@ from fleet.contracts.node import (
     NodeConfig,
     NodeGpu,
     NodePlatform,
-    NodeState,
     decode_node_config,
     decode_node_gpu,
-    describe_node,
     encode_node_config,
     encode_node_gpu,
 )
@@ -59,7 +57,6 @@ _BUDGET = NodeBudget(
     reserved_cores=2,
     reserved_ram_gb=4.0,
     worker_ram_gb=1.1,
-    max_concurrent_runs=2,
     max_disk_gb=20.0,
 )
 
@@ -297,22 +294,6 @@ class TestNodeConfig:
 
         with pytest.raises(JSONTypeError, match="platform"):
             decode_node_config(encoded)
-
-
-class TestDescribeNode:
-    STATE = NodeState(
-        host="lavender", free_ram_gb=27.4, free_disk_gb=860.0, live_runs=1, ci_slice=None
-    )
-
-    def test_it_names_the_architecture_for_a_gpu_node(self) -> None:
-        described = describe_node(_node(), self.STATE)
-
-        assert "sm_7.5" in described
-        assert "27.4/32.0 GB RAM free" in described
-        assert "1 live run(s)" in described
-
-    def test_a_cpu_only_node_says_so(self) -> None:
-        assert "cpu-only" in describe_node(_node(gpu=None), self.STATE)
 
 
 class TestProject:

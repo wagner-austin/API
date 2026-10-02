@@ -70,7 +70,6 @@ def _node() -> NodeConfig:
             "reserved_cores": 2,
             "reserved_ram_gb": 4.0,
             "worker_ram_gb": 1.1,
-            "max_concurrent_runs": 2,
             "max_disk_gb": 20.0,
         },
     )
@@ -413,19 +412,24 @@ class TestLiveRows:
     ) -> None:
         """THE SECOND-DISPATCH REGRESSION, measured 2026-09-04.
 
-        `records.live_runs` counted every row whose outcome was `running`,
-        superseded ones included. sedona declares max_concurrent_runs: 1, so
+        The node's live count read every row whose outcome was `running`,
+        superseded ones included. sedona then took one run at a time, so
         having run and closed exactly one dispatch it refused every future one
         as already full -- a node's live count could only go up.
         """
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
+        projects = loaded.workspace["projects"]
         _dispatch(config_path, repo)
-        assert records.live_runs(loaded.ledger, node="lavender") == 1
+        assert records.live_load(loaded.ledger, node="lavender", projects=projects)["runs"] == 1
         _test_hooks.run = FakeRun([ok(""), ok(f"0 {DEMO_FINISHED}\n"), *retire_replies()])
 
         collect.main([_config.CONFIG_FLAG, str(config_path)])
 
-        assert records.live_runs(loaded.ledger, node="lavender") == 0
+        assert records.live_load(loaded.ledger, node="lavender", projects=projects) == {
+            "runs": 0,
+            "workers": 0,
+            "ram_gb": 0.0,
+        }
 
     def test_a_finished_run_is_not_reported_lost(
         self, config_path: pathlib.Path, repo: pathlib.Path

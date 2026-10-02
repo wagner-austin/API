@@ -17,7 +17,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from fleet.cli import _config, nodes
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.core import _test_hooks, records
-from tests.conftest import PROBE_OK, FakeRun, failed, ok, workspace_document
+from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok, workspace_document
 
 #: sedona's reading at 10:51Z scaled to the fixture: under the reservation.
 STARVED = "free_ram_gb=2.9\nfree_disk_gb=860.0\n"
@@ -87,8 +87,8 @@ def test_a_node_with_room_says_its_lane_can_claim(tmp_path: pathlib.Path) -> Non
     _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
     assert _lines(_config_with(tmp_path, workspace_document())) == [
-        "lavender: lavender: cpu-only, 27.0/32.0 GB RAM free, 860 GB disk free, 0 live run(s); "
-        "node lane can claim"
+        "lavender: lavender: cpu-only, 27.0/32.0 GB RAM free, 860 GB disk free, 0 live run(s) "
+        "holding 0 worker(s); node lane can claim"
     ]
 
 
@@ -105,12 +105,14 @@ def test_a_node_under_its_reservation_names_the_reservation(tmp_path: pathlib.Pa
         "somebody is on this machine."
     )
     assert _lines(_config_with(tmp_path, document)) == [
-        "lavender: lavender: cpu-only, 2.9/32.0 GB RAM free, 860 GB disk free, 0 live run(s); "
-        f"node lane claims nothing: {reserved}; elevated lane claims nothing: {reserved}"
+        "lavender: lavender: cpu-only, 2.9/32.0 GB RAM free, 860 GB disk free, 0 live run(s) "
+        f"holding 0 worker(s); node lane claims nothing: {reserved}; "
+        f"elevated lane claims nothing: {reserved}"
     ]
 
 
 def test_a_node_whose_live_runs_fill_it_names_the_held_runs(tmp_path: pathlib.Path) -> None:
+    """Two runs of 7 workers hold lavender's 14 spare cores (MCPs 939ec5c7)."""
     config = _config_with(tmp_path, workspace_document())
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config)})
     for run in ("run-1", "run-2"):
@@ -121,14 +123,14 @@ def test_a_node_whose_live_runs_fill_it_names_the_held_runs(tmp_path: pathlib.Pa
                     "run_id": run,
                     "node": "lavender",
                     "host": "lavender",
-                    "project": "services/Model-Trainer",
+                    "project": DEMO_PROJECT,
                     "agent": "opus-fleet-0904",
                     "session_id": "acc774c0-3bc3-4cce-9dda-c7a12fb99519",
                     "started_unix": 100,
                     "ended_unix": 100,
                     "outcome": "running",
                     "exit_code": -1,
-                    "workers": 1,
+                    "workers": 7,
                     "detail": "",
                 }
             ),
@@ -138,9 +140,10 @@ def test_a_node_whose_live_runs_fill_it_names_the_held_runs(tmp_path: pathlib.Pa
     (line,) = _lines(config)
 
     assert line.endswith(
-        "2 live run(s); node lane claims nothing: NODE_OWNER_RESERVED: lavender already holds "
-        "2 fleet run(s), its declared limit of 2. Memory is checked against a snapshot, so this "
-        "second bound exists because three dispatches that each fit alone do not fit together."
+        "2 live run(s) holding 14 worker(s); node lane claims nothing: NODE_OWNER_RESERVED: "
+        "lavender has 27.0 GB free against a reservation of 4.0 GB for whoever is using it, and "
+        "16 cores against 2 reserved, and its 2 live fleet run(s) hold 14 worker(s) and 15.4 GB. "
+        "Nothing is left for a dispatch; somebody is on this machine."
     )
 
 

@@ -25,7 +25,6 @@ def _budget(
     reserved_cores: int = 2,
     reserved_ram_gb: float = 4.0,
     worker_ram_gb: float = 1.1,
-    max_concurrent_runs: int = 2,
     max_disk_gb: float = 20.0,
 ) -> NodeBudget:
     """Build a budget, letting a test name only the field it is about.
@@ -34,7 +33,6 @@ def _budget(
         reserved_cores: Cores left for the node's owner.
         reserved_ram_gb: Memory left for the node's owner.
         worker_ram_gb: Memory one test worker holds.
-        max_concurrent_runs: Dispatches allowed at once.
         max_disk_gb: Disk reserved for staged trees.
 
     Returns:
@@ -44,7 +42,6 @@ def _budget(
         reserved_cores=reserved_cores,
         reserved_ram_gb=reserved_ram_gb,
         worker_ram_gb=worker_ram_gb,
-        max_concurrent_runs=max_concurrent_runs,
         max_disk_gb=max_disk_gb,
     )
 
@@ -120,11 +117,6 @@ class TestDecode:
     def test_a_negative_memory_reservation_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must not be negative"):
             decode_node_budget(encode_node_budget(_budget(reserved_ram_gb=-1.0)))
-
-    def test_a_node_allowed_no_runs_is_refused(self) -> None:
-        """Spelled by leaving the node out, not by a zero."""
-        with pytest.raises(JSONTypeError, match="max_concurrent_runs must be at least 1"):
-            decode_node_budget(encode_node_budget(_budget(max_concurrent_runs=0)))
 
     def test_a_zero_disk_reservation_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="max_disk_gb must be positive"):

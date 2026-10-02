@@ -31,6 +31,7 @@ from platform_core.mcp_client import urllib_mcp_post
 
 from fleet.cli import _config
 from fleet.cli import agent as agent_cli
+from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, manifest, staging
 
 #: The host-case markers and the execution run (board task 465689f5), and
@@ -245,6 +246,9 @@ DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 #: What a healthy capacity probe answers.
 PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\n"
 
+#: A node holding no live fleet run.
+IDLE = LiveLoad(runs=0, workers=0, ram_gb=0.0)
+
 
 def stage_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
     """Every command staging one export runs, in order (:func:`fleet.core.staging.stage`).
@@ -350,7 +354,6 @@ def workspace_document() -> JSONObject:
                     "reserved_cores": 2,
                     "reserved_ram_gb": 4.0,
                     "worker_ram_gb": 1.1,
-                    "max_concurrent_runs": 2,
                     "max_disk_gb": 20.0,
                 },
             }

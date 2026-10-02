@@ -13,9 +13,16 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import (
+    LiveLoad,
+    NodeConfig,
+    NodeGpu,
+    NodePlatform,
+    NodeState,
+    describe_node,
+)
 from fleet.core import _test_hooks, dialect_linux, dialect_windows, probe
-from tests.conftest import FakeRun, ok
+from tests.conftest import IDLE, FakeRun, ok
 
 
 def _node() -> NodeConfig:
@@ -43,7 +50,6 @@ def _node() -> NodeConfig:
             reserved_cores=2,
             reserved_ram_gb=4.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=2,
             max_disk_gb=20.0,
         ),
     )
@@ -53,13 +59,15 @@ class TestProbe:
     def test_it_reads_the_fields_the_script_emits(self) -> None:
         output = "free_ram_gb=27.395\nfree_disk_gb=860.123\nlogical_cores=16\n"
 
-        state = probe.parse_probe("lavender", output, live_runs=2)
+        held = LiveLoad(runs=2, workers=4, ram_gb=4.4)
+
+        state = probe.parse_probe("lavender", output, live=held)
 
         assert state == {
             "host": "lavender",
             "free_ram_gb": 27.395,
             "free_disk_gb": 860.123,
-            "live_runs": 2,
+            "live": held,
             "ci_slice": None,
         }
 
@@ -70,7 +78,7 @@ class TestProbe:
             "ci_slice_current_gb=16.000\nci_slice_high_gb=16.000\n"
         )
 
-        state = probe.parse_probe("lavender-wsl", output, live_runs=0)
+        state = probe.parse_probe("lavender-wsl", output, live=IDLE)
 
         assert state["ci_slice"] == {"current_gb": 16.0, "high_gb": 16.0}
         assert state["free_ram_gb"] == 8.161
@@ -86,7 +94,7 @@ class TestProbe:
         output = "free_ram_gb=8.1\nfree_disk_gb=9.0\n" + extra
 
         with pytest.raises(AppError) as excinfo:
-            probe.parse_probe("lavender-wsl", output, live_runs=0)
+            probe.parse_probe("lavender-wsl", output, live=IDLE)
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert named in excinfo.value.message
@@ -95,17 +103,17 @@ class TestProbe:
         """PowerShell's N3 format writes them; the value is still a number."""
         output = "free_ram_gb=1,027.395\nfree_disk_gb=860.000\n"
 
-        assert probe.parse_probe("lavender", output, live_runs=0)["free_ram_gb"] == 1027.395
+        assert probe.parse_probe("lavender", output, live=IDLE)["free_ram_gb"] == 1027.395
 
     def test_a_line_without_an_equals_is_ignored(self) -> None:
         """PowerShell writes warnings to the same stream."""
         output = "WARNING: something\nfree_ram_gb=1.0\nfree_disk_gb=2.0\n"
 
-        assert probe.parse_probe("lavender", output, live_runs=0)["free_ram_gb"] == 1.0
+        assert probe.parse_probe("lavender", output, live=IDLE)["free_ram_gb"] == 1.0
 
     def test_a_missing_field_names_itself(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            probe.parse_probe("lavender", "free_ram_gb=1.0\n", live_runs=0)
+            probe.parse_probe("lavender", "free_ram_gb=1.0\n", live=IDLE)
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert "free_disk_gb" in excinfo.value.message
@@ -115,33 +123,35 @@ class TestProbe:
         output = "free_ram_gb=Cannot find drive\nfree_disk_gb=1.0\n"
 
         with pytest.raises(AppError) as excinfo:
-            probe.parse_probe("lavender", output, live_runs=0)
+            probe.parse_probe("lavender", output, live=IDLE)
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert "Cannot find drive" in excinfo.value.message
 
     def test_a_field_with_two_decimal_points_is_not_a_number(self) -> None:
         with pytest.raises(AppError, match="not a number"):
-            probe.parse_probe("lavender", "free_ram_gb=1.2.3\nfree_disk_gb=1.0\n", live_runs=0)
+            probe.parse_probe("lavender", "free_ram_gb=1.2.3\nfree_disk_gb=1.0\n", live=IDLE)
 
     def test_a_signed_value_is_a_number(self) -> None:
-        state = probe.parse_probe("lavender", "free_ram_gb=-1.0\nfree_disk_gb=+2.0\n", live_runs=0)
+        state = probe.parse_probe("lavender", "free_ram_gb=-1.0\nfree_disk_gb=+2.0\n", live=IDLE)
 
         assert state["free_ram_gb"] == -1.0
         assert state["free_disk_gb"] == 2.0
 
     def test_a_bare_sign_is_not_a_number(self) -> None:
         with pytest.raises(AppError, match="not a number"):
-            probe.parse_probe("lavender", "free_ram_gb=-\nfree_disk_gb=1.0\n", live_runs=0)
+            probe.parse_probe("lavender", "free_ram_gb=-\nfree_disk_gb=1.0\n", live=IDLE)
 
     def test_probing_a_node_sends_the_script_and_parses_the_answer(self) -> None:
         runner = FakeRun([ok(""), ok("free_ram_gb=27.0\nfree_disk_gb=860.0\n")])
         _test_hooks.run = runner
 
-        state = probe.probe_node(_node(), live_runs=1)
+        held = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+
+        state = probe.probe_node(_node(), live=held)
 
         assert state["free_ram_gb"] == 27.0
-        assert state["live_runs"] == 1
+        assert state["live"] == held
         assert runner.stdin[0] == dialect_windows.CAPACITY_PROBE_SCRIPT.encode("utf-8")
         assert runner.calls[0][-1].endswith("C:/fleet/stage/fleet-capacity.ps1' -Encoding utf8\"")
 
@@ -157,7 +167,7 @@ class TestProbe:
         runner = FakeRun([ok(""), ok("free_ram_gb=1.0\nfree_disk_gb=1.0\n")])
         _test_hooks.run = runner
 
-        probe.probe_node(_node(), live_runs=0)
+        probe.probe_node(_node(), live=IDLE)
 
         assert runner.stdin[0] == dialect_windows.CAPACITY_PROBE_SCRIPT.encode("utf-8")
         assert "{0:N3}" in dialect_windows.CAPACITY_PROBE_SCRIPT
@@ -169,9 +179,38 @@ class TestProbe:
         node["platform"] = NodePlatform.LINUX
         node["stage_root"] = "/home/corvis/fleet/stage"
 
-        state = probe.probe_node(node, live_runs=0)
+        state = probe.probe_node(node, live=IDLE)
 
         assert state["free_disk_gb"] == 687.729
         assert runner.stdin[0] == dialect_linux.CAPACITY_PROBE_SCRIPT.encode("utf-8")
         assert runner.calls[0][-1].endswith("cat > '/home/corvis/fleet/stage/fleet-capacity.sh'")
         assert runner.calls[1][-2:] == ("/bin/sh", "/home/corvis/fleet/stage/fleet-capacity.sh")
+
+
+class TestDescribeNode:
+    """The line fleet-nodes prints for a probed node, live runs included."""
+
+    STATE = NodeState(
+        host="lavender",
+        free_ram_gb=27.4,
+        free_disk_gb=860.0,
+        ci_slice=None,
+        live=LiveLoad(runs=1, workers=6, ram_gb=6.6),
+    )
+
+    def test_it_names_the_architecture_and_what_live_runs_hold(self) -> None:
+        node = _node()
+        node["gpu"] = NodeGpu(
+            model="NVIDIA GeForce GTX 1630",
+            vram_mib=4096,
+            compute_capability="7.5",
+            driver_version="591.86",
+        )
+
+        assert describe_node(node, self.STATE) == (
+            "lavender: NVIDIA GeForce GTX 1630 sm_7.5, 27.4/32.0 GB RAM free, 860 GB disk free, "
+            "1 live run(s) holding 6 worker(s)"
+        )
+
+    def test_a_cpu_only_node_says_so(self) -> None:
+        assert describe_node(_node(), self.STATE).startswith("lavender: cpu-only, ")

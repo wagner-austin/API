@@ -220,7 +220,6 @@ def node(
             reserved_cores=2,
             reserved_ram_gb=4.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=2,
             max_disk_gb=20.0,
         ),
     )

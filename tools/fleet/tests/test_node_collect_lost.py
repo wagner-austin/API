@@ -164,7 +164,10 @@ class TestTakenOver:
         )
         assert _lease_released(sourced_config)
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
-        assert records.live_runs(loaded.ledger, node="lavender") == 0
+        live = records.live_load(
+            loaded.ledger, node="lavender", projects=loaded.workspace["projects"]
+        )
+        assert live["runs"] == 0
 
     def test_a_job_back_in_the_queue_with_no_holder_is_lost_to_this_runner_too(
         self, sourced_config: pathlib.Path

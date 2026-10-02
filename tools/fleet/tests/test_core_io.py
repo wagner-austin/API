@@ -26,9 +26,23 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
-from fleet.contracts.node import NodePlatform
+from fleet.contracts.node import LiveLoad, NodePlatform
+from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, dialect_windows, records, remote
 from tests.conftest import FakeRun, failed, ok, timed_out
+
+#: The one project the ledger rows below run, at a worker cost that sums exactly.
+_PROJECTS = {
+    "services/Model-Trainer": ProjectConfig(
+        worker_ram_gb=1.5,
+        minimum_workers=2,
+        expected_minutes=5,
+        exclusive_resources=(),
+        external_paths=(),
+        required_tags=(),
+        source=None,
+    )
+}
 
 
 def _row(*, run_id: str = "run-1", node: str = "lavender", outcome: str = "running") -> LedgerEntry:
@@ -335,15 +349,36 @@ class TestLedgerRecords:
         assert excinfo.value.code is FleetErrorCode.LEDGER_ROW_UNPARSABLE
         assert "line 1" in excinfo.value.message
 
-    def test_live_runs_counts_only_running_rows_on_that_node(self, tmp_path: pathlib.Path) -> None:
+    def test_live_load_sums_only_running_rows_on_that_node(self, tmp_path: pathlib.Path) -> None:
+        """Each live run's 6 granted workers at the project's 1.5 GB."""
         path = tmp_path / "ledger.jsonl"
         records.append_ledger(path, _row(run_id="a", node="lavender", outcome="running"))
         records.append_ledger(path, _row(run_id="b", node="lavender", outcome="passed"))
         records.append_ledger(path, _row(run_id="c", node="loki", outcome="running"))
+        records.append_ledger(path, _row(run_id="d", node="loki", outcome="running"))
 
-        assert records.live_runs(path, node="lavender") == 1
-        assert records.live_runs(path, node="loki") == 1
-        assert records.live_runs(path, node="sedona") == 0
+        assert records.live_load(path, node="lavender", projects=_PROJECTS) == LiveLoad(
+            runs=1, workers=6, ram_gb=9.0
+        )
+        assert records.live_load(path, node="loki", projects=_PROJECTS) == LiveLoad(
+            runs=2, workers=12, ram_gb=18.0
+        )
+        assert records.live_load(path, node="sedona", projects=_PROJECTS) == LiveLoad(
+            runs=0, workers=0, ram_gb=0.0
+        )
+
+    def test_a_live_run_of_an_unregistered_project_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """What its workers hold is unknown, and guessing low overloads the node."""
+        path = tmp_path / "ledger.jsonl"
+        records.append_ledger(path, _row(run_id="a", node="lavender", outcome="running"))
+
+        with pytest.raises(AppError) as excinfo:
+            records.live_load(path, node="lavender", projects={})
+
+        assert excinfo.value.code is FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN
+        assert excinfo.value.message.startswith(
+            "live run a on lavender is of services/Model-Trainer, which fleet.json no longer"
+        )
 
 
 class TestFeedRecords:

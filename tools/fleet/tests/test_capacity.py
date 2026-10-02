@@ -11,10 +11,18 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, NodeState, SliceMemory
+from fleet.contracts.node import (
+    LiveLoad,
+    NodeConfig,
+    NodeGpu,
+    NodePlatform,
+    NodeState,
+    SliceMemory,
+)
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
-from fleet.core.capacity import assess, first_fit, plan_dispatch, room_for_any
+from fleet.core.capacity import assess, first_fit, job_ceiling, plan_dispatch, room_for_any
+from tests.conftest import IDLE
 
 #: What a windows node with no other declaration carries, and a linux one.
 WINDOWS_TAGS = frozenset({NodeTag.WINDOWS})
@@ -35,7 +43,6 @@ def _node(
     cores: int = 16,
     reserved_cores: int = 2,
     reserved_ram_gb: float = 4.0,
-    max_concurrent_runs: int = 2,
     max_disk_gb: float = 20.0,
     platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
@@ -47,7 +54,6 @@ def _node(
         cores: Logical processors.
         reserved_cores: Cores left for the owner.
         reserved_ram_gb: Memory left for the owner.
-        max_concurrent_runs: Dispatches allowed at once.
         max_disk_gb: Disk reserved for staged trees.
         platform: The node's dialect.
         gpu: Its CUDA device, or None for a CPU-only node.
@@ -74,7 +80,6 @@ def _node(
             reserved_cores=reserved_cores,
             reserved_ram_gb=reserved_ram_gb,
             worker_ram_gb=1.1,
-            max_concurrent_runs=max_concurrent_runs,
             max_disk_gb=max_disk_gb,
         ),
     )
@@ -85,7 +90,7 @@ def _state(
     host: str = "lavender",
     free_ram_gb: float = 27.0,
     free_disk_gb: float = 800.0,
-    live_runs: int = 0,
+    live: LiveLoad = IDLE,
     ci_slice: SliceMemory | None = None,
 ) -> NodeState:
     """Build a probed state.
@@ -94,7 +99,7 @@ def _state(
         host: The node it came from.
         free_ram_gb: Memory free.
         free_disk_gb: Disk free.
-        live_runs: Fleet dispatches already live.
+        live: What the node's live fleet runs hold.
         ci_slice: Its runners.slice reading, or None for a node with none.
 
     Returns:
@@ -104,7 +109,7 @@ def _state(
         host=host,
         free_ram_gb=free_ram_gb,
         free_disk_gb=free_disk_gb,
-        live_runs=live_runs,
+        live=live,
         ci_slice=ci_slice,
     )
 
@@ -142,17 +147,7 @@ class TestAssess:
 
         assert verdict["code"] is None
         assert verdict["reason"] == ""
-        assert verdict["workers"] == 14
-
-    def test_a_node_at_its_concurrency_limit_is_refused(self) -> None:
-        """Three dispatches that each fit alone do not fit together."""
-        verdict = assess(
-            _node(max_concurrent_runs=2), _state(live_runs=2), _project(), WINDOWS_TAGS
-        )
-
-        assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
-        assert verdict["workers"] == 0
-        assert "already holds 2 fleet run(s)" in verdict["reason"]
+        assert verdict["workers"] == 7
 
     def test_a_node_without_room_to_stage_is_refused(self) -> None:
         verdict = assess(
@@ -241,32 +236,101 @@ class TestAssess:
         assert lacking["code"] is FleetErrorCode.NODE_LACKS_TAG
         assert lacking["reason"].startswith("pendragon lacks ffmpeg: ")
         assert found["code"] is None
-        assert found["workers"] == 14
+        assert found["workers"] == 7
 
     def test_a_node_carrying_every_required_tag_is_weighed_on_capacity(self) -> None:
         project = _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS))
         carried = frozenset({NodeTag.WINDOWS, NodeTag.GPU})
 
-        assert assess(_node(gpu=GTX_1630), _state(), project, carried)["workers"] == 14
+        assert assess(_node(gpu=GTX_1630), _state(), project, carried)["workers"] == 7
         full = assess(_node(gpu=GTX_1630), _state(free_ram_gb=3.0), project, carried)
         assert full["code"] is FleetErrorCode.NODE_OWNER_RESERVED
 
     def test_a_project_requiring_nothing_takes_any_platform(self) -> None:
         linux = _node(platform=NodePlatform.LINUX)
-        assert assess(linux, _state(), _project(), LINUX_TAGS)["workers"] == 14
+        assert assess(linux, _state(), _project(), LINUX_TAGS)["workers"] == 7
 
     def test_the_project_cost_overrides_the_node_default(self) -> None:
-        """What a worker costs is a property of the suite, not the machine."""
-        light = assess(_node(), _state(), _project(worker_ram_gb=0.2), WINDOWS_TAGS)
-        big = assess(_node(cores=200), _state(), _project(worker_ram_gb=0.2), WINDOWS_TAGS)
+        """What a worker costs is a property of the suite, not the machine:
+        at 0.2 GB a worker, 23 GB affords 115, under 198 spare cores."""
+        heavy = assess(_node(cores=400), _state(), _project(), WINDOWS_TAGS)
+        light = assess(_node(cores=400), _state(), _project(worker_ram_gb=0.2), WINDOWS_TAGS)
 
-        assert light["workers"] == 14
-        assert big["workers"] == 115
+        assert heavy["workers"] == 20
+        assert light["workers"] == 115
+
+
+class TestLivePools:
+    """MCPs board task 939ec5c7: what a node's live runs hold comes off its
+    pools, and one job takes at most half the spare cores, so a node that
+    once took one run at a time now takes as many as its cores and memory
+    hold."""
+
+    def test_one_job_takes_at_most_half_the_spare_cores(self) -> None:
+        """16 cores, 2 reserved: memory affords 20 workers, the cores 14, the
+        ceiling 7, which leaves the other 7 for a second job."""
+        assert job_ceiling(_node(), _project()) == 7
+        assert assess(_node(), _state(), _project(), WINDOWS_TAGS)["workers"] == 7
+
+    def test_an_odd_spare_rounds_the_ceiling_up(self) -> None:
+        assert job_ceiling(_node(cores=17), _project(minimum_workers=1)) == 8
+
+    def test_a_minimum_above_the_ceiling_raises_it(self) -> None:
+        """A suite that cannot run on fewer than 10 workers is granted 10,
+        and the cores pool still bounds the sum."""
+        verdict = assess(_node(), _state(), _project(minimum_workers=10), WINDOWS_TAGS)
+
+        assert job_ceiling(_node(), _project(minimum_workers=10)) == 10
+        assert verdict["workers"] == 10
+
+    def test_a_second_job_fits_beside_a_live_one(self) -> None:
+        """The first job's 7 workers and 7.7 GB come off; 7 cores and
+        27.0 - 7.7 - 4.0 = 15.3 GB (13 workers) are left, so 7 again."""
+        live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
+
+        assert assess(_node(), _state(live=live), _project(), WINDOWS_TAGS)["workers"] == 7
+
+    def test_live_memory_shrinks_the_grant(self) -> None:
+        """16.0 - 7.7 - 4.0 = 4.3 GB: three 1.1 GB workers, under the 7
+        cores still free."""
+        live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
+
+        verdict = assess(
+            _node(), _state(free_ram_gb=16.0, live=live), _project(minimum_workers=2), WINDOWS_TAGS
+        )
+
+        assert verdict["code"] is None
+        assert verdict["workers"] == 3
+
+    def test_a_short_grant_names_what_the_live_runs_hold(self) -> None:
+        live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
+
+        verdict = assess(_node(), _state(free_ram_gb=16.0, live=live), _project(), WINDOWS_TAGS)
+
+        assert verdict["code"] is FleetErrorCode.NODE_MEMORY_EXHAUSTED
+        assert verdict["reason"] == (
+            "lavender affords 3 worker(s) for a suite that declares a minimum of 4: 16.0 GB "
+            "free, 1.1 GB per worker, 4.0 GB reserved for the node's owner, and its 1 live "
+            "fleet run(s) hold 7 worker(s) and 7.7 GB. Dispatching anyway would run a suite at "
+            "a fraction of its workers until its own lease expired underneath it."
+        )
+
+    def test_live_runs_holding_every_spare_core_leave_nothing(self) -> None:
+        live = LiveLoad(runs=2, workers=14, ram_gb=15.4)
+
+        verdict = assess(_node(), _state(free_ram_gb=60.0, live=live), _project(), WINDOWS_TAGS)
+
+        assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
+        assert verdict["workers"] == 0
+        assert (
+            "16 cores against 2 reserved, and its 2 live fleet run(s) hold 14 worker(s) and "
+            "15.4 GB. Nothing is left for a dispatch" in verdict["reason"]
+        )
 
 
 class TestPlanDispatch:
     def test_it_returns_the_worker_count_when_the_node_accepts(self) -> None:
-        assert plan_dispatch(_node(), _state(), _project(), WINDOWS_TAGS) == 14
+        assert plan_dispatch(_node(), _state(), _project(), WINDOWS_TAGS) == 7
 
     def test_it_raises_the_verdict_s_own_code(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -283,7 +347,7 @@ class TestFirstFit:
             ("loki", _node(host="loki", cores=16), _state(host="loki", free_ram_gb=27.0)),
         )
 
-        assert first_fit(candidates, _project()) == ("loki", 14)
+        assert first_fit(candidates, _project()) == ("loki", 7)
 
     def test_a_tie_keeps_the_earlier_candidate(self) -> None:
         """Workspace order is a tie-break a person controls."""
@@ -366,7 +430,7 @@ class TestFirstFit:
             ("lavender", _node(gpu=GTX_1630), _state()),
         )
 
-        assert first_fit(candidates, _project(required_tags=(NodeTag.GPU,))) == ("lavender", 14)
+        assert first_fit(candidates, _project(required_tags=(NodeTag.GPU,))) == ("lavender", 7)
 
 
 #: The tags diphtheria's runner claims with, and the roll gate it could not take.
@@ -388,10 +452,13 @@ class TestRoomForAny:
 
         assert line.startswith("NODE_OWNER_RESERVED: lavender has 2.2 GB free against a reserv")
 
-    def test_the_concurrency_limit_is_named(self) -> None:
-        line = str(room_for_any(_node(), _state(live_runs=2), (_project(),), frozenset()))
+    def test_live_runs_holding_the_node_are_named(self) -> None:
+        live = LiveLoad(runs=2, workers=14, ram_gb=15.4)
 
-        assert line.startswith("NODE_OWNER_RESERVED: lavender already holds 2 fleet run(s)")
+        line = str(room_for_any(_node(), _state(live=live), (_project(),), frozenset()))
+
+        assert line.startswith("NODE_OWNER_RESERVED: lavender has 27.0 GB free against a reserv")
+        assert "its 2 live fleet run(s) hold 14 worker(s) and 15.4 GB" in line
 
     def test_a_full_disk_is_named(self) -> None:
         line = str(room_for_any(_node(), _state(free_disk_gb=3.0), (_project(),), frozenset()))

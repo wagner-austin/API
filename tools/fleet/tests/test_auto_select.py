@@ -31,13 +31,14 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_dict
 
 from fleet.cli import _config, run
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodePlatform, NodeState
+from fleet.contracts.node import LiveLoad, NodeConfig, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
 from fleet.core.capacity import Unassessed, first_fit
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
+    IDLE,
     PROBE_OK,
     FakeClock,
     FakeRun,
@@ -78,7 +79,6 @@ def _node(host: str) -> NodeConfig:
             reserved_cores=2,
             reserved_ram_gb=4.0,
             worker_ram_gb=1.1,
-            max_concurrent_runs=2,
             max_disk_gb=20.0,
         ),
     )
@@ -95,7 +95,7 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         The state.
     """
     return NodeState(
-        host=host, free_ram_gb=free_ram_gb, free_disk_gb=860.0, live_runs=0, ci_slice=None
+        host=host, free_ram_gb=free_ram_gb, free_disk_gb=860.0, live=IDLE, ci_slice=None
     )
 
 
@@ -225,7 +225,7 @@ class TestAttemptProbeReportsRatherThanRaises:
     def test_an_unreachable_node_comes_back_as_a_reason(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "bad handshake")])
 
-        outcome = probe.attempt_probe(_node("loki"), live_runs=0)
+        outcome = probe.attempt_probe(_node("loki"), live=IDLE)
 
         assert outcome["state"] is None
         assert "ssh to loki failed" in outcome["reason"]
@@ -237,7 +237,7 @@ class TestAttemptProbeReportsRatherThanRaises:
         that the same way rather than abandoning the fleet over it."""
         _test_hooks.run = FakeRun([ok(""), ok("Get-CimInstance : access denied")])
 
-        outcome = probe.attempt_probe(_node("loki"), live_runs=0)
+        outcome = probe.attempt_probe(_node("loki"), live=IDLE)
 
         assert outcome["state"] is None
         assert "free_ram_gb" in outcome["reason"]
@@ -245,14 +245,15 @@ class TestAttemptProbeReportsRatherThanRaises:
     def test_a_healthy_node_comes_back_with_its_state(self) -> None:
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
-        outcome = probe.attempt_probe(_node("lavender"), live_runs=3)
+        held = LiveLoad(runs=3, workers=6, ram_gb=6.6)
+        outcome = probe.attempt_probe(_node("lavender"), live=held)
 
         state = outcome["state"]
         if state is None:
             raise AssertionError(f"expected a state, got: {outcome['reason']}")
         assert state["host"] == "lavender"
         assert state["free_ram_gb"] == 27.0
-        assert state["live_runs"] == 3
+        assert state["live"] == held
         assert outcome["reason"] == ""
 
     def test_the_named_node_path_still_raises(self) -> None:
@@ -262,7 +263,7 @@ class TestAttemptProbeReportsRatherThanRaises:
         _test_hooks.run = FakeRun([failed(255, "bad handshake")])
 
         with pytest.raises(AppError) as excinfo:
-            probe.probe_node(_node("lavender"), live_runs=0)
+            probe.probe_node(_node("lavender"), live=IDLE)
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
 
