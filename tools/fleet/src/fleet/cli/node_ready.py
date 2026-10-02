@@ -2,14 +2,19 @@
 
 Lifted out of :mod:`fleet.cli.node_agent`, which runs the tick, because the
 gate grew a second product (MCPs board task 939ec5c7): besides the node's
-measured state it now returns the tags the runner claims with, and the tool
-tags among them are read from the toolchain probe this gate already pays
-for. A runner claims with its node's declared tags
-(:func:`fleet.contracts.tags.runner_tags`) plus the tag of every tool the
-probe found (:func:`fleet.contracts.tags.tool_tags`), so installing ffmpeg
-on a node makes it eligible for grandma-api's check on its next tick with
-no file edited, and a node without ffmpeg takes every other job instead of
-claiming nothing.
+measured state it returns the tags the runner claims with, read from the
+toolchain probe this gate already pays for
+(:func:`fleet.contracts.detection.detected_tags`), plus ``elevated`` for the
+node's elevated runner (:func:`fleet.contracts.tags.runner_tags`). So
+installing ffmpeg, a compiler or the test database on a node makes it
+eligible for the jobs that need it on its next tick with no file edited, a
+node without one takes every other job instead of claiming nothing, and how
+the declaration differs from the answer is logged every tick
+(:func:`fleet.contracts.detection.tag_drift`).
+
+THE TOOLCHAIN IS ASKED BEFORE THE ROOM. Which projects a runner could take
+depends on its tags, and the room check sizes the smallest of them, so the
+tags are read first; the cost is one probe on a tick that finds no room.
 """
 
 from __future__ import annotations
@@ -18,12 +23,16 @@ from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
 from fleet.cli import _config
+from fleet.contracts.detection import detected_tags, tag_drift
 from fleet.contracts.elevation import elevation_gap
 from fleet.contracts.node import NodeConfig, NodeState
-from fleet.contracts.tags import NodeTag, runner_tags, tool_tags
+from fleet.contracts.tags import NodeTag, runner_tags
 from fleet.core import capacity, host_report, probe, records, toolchain
 
 _log = get_logger(__name__)
+
+#: The one tag a runner takes from its lane rather than from its probe.
+ELEVATED_ONLY = frozenset({NodeTag.ELEVATED})
 
 
 class Ready(TypedDict):
@@ -31,9 +40,8 @@ class Ready(TypedDict):
 
     Attributes:
         state: What it reported when probed this tick.
-        tags: The tags its runner claims with: the declared ones for this
-            runner's lane, plus the tag of every tool its toolchain probe
-            found this tick.
+        tags: The tags its runner claims with: every one its toolchain
+            probe found this tick, plus ``elevated`` for the elevated runner.
     """
 
     state: NodeState
@@ -54,13 +62,13 @@ def ready_state(
 
     Returns:
         The node's measured state and claim tags when it is enabled (a stale
-        task for a retired node asks nothing), answered, has room, has every
-        required tool and (elevated) holds an administrator's token;
+        task for a retired node asks nothing), answered, has every required
+        tool, has room and (elevated) holds an administrator's token;
         otherwise None, with the gate that closed and its reason logged, and
         for a node with a ``wsl_host`` what that host reports
-        (:mod:`fleet.core.host_report`). A tagged tool the node lacks closes
-        no gate: it is logged with its install command and the runner claims
-        without its tag.
+        (:mod:`fleet.core.host_report`). A tagged tool the node lacks, and a
+        declaration its probe contradicts, close no gate: each is logged and
+        the runner claims with what the probe found.
     """
     if not node["enabled"]:
         _log.info("%s is disabled in fleet.json; claiming nothing", alias)
@@ -73,12 +81,6 @@ def ready_state(
         if node["wsl_host"] is not None:
             seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
             _log.info("%s did not answer, and %s", alias, seen)
-        return None
-    declared = runner_tags(node, elevated=elevated)
-    projects = tuple(loaded.workspace["projects"].values())
-    full = capacity.room_for_any(node, state, projects, declared)
-    if full is not None:
-        _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
         return None
     answered = toolchain.attempt_toolchain(node)
     if not isinstance(answered, tuple):
@@ -97,6 +99,14 @@ def ready_state(
     lacking = toolchain.tagged_gap(alias, answered)
     if lacking is not None:
         _log.info("%s", lacking)
+    for drift in tag_drift(node, answered):
+        _log.info("%s (%s) %s", alias, node["host"], drift)
+    tags = detected_tags(node, answered) | (runner_tags(node, elevated=elevated) & ELEVATED_ONLY)
+    projects = tuple(loaded.workspace["projects"].values())
+    full = capacity.room_for_any(node, state, projects, tags)
+    if full is not None:
+        _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
+        return None
     unelevated = elevation_gap(alias, node, answered) if elevated else None
     if unelevated is not None:
         _log.info(
@@ -106,7 +116,7 @@ def ready_state(
             unelevated.message,
         )
         return None
-    return Ready(state=state, tags=declared | tool_tags(answered))
+    return Ready(state=state, tags=tags)
 
 
 __all__ = ["Ready", "ready_state"]

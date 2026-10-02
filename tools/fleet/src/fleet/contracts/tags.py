@@ -11,6 +11,14 @@ the one that drifts (a box whose card was pulled would keep its ``gpu`` tag
 until somebody remembered the list). Deriving means the tag is exactly as
 true as the declaration it comes from.
 
+A RUNNER CLAIMS WITH WHAT ITS NODE ANSWERS, NOT WITH THIS (MCPs board task
+939ec5c7). :func:`node_tags` is what the hub's own planning reads without
+asking a node (``fleet-run``, preflight); the runner on each node re-reads
+every one of these facts from the node every tick and claims with that
+(:mod:`fleet.contracts.detection`), comparing it with the declaration and
+logging any difference, so installing a tool makes a node eligible on its
+next tick with no file edited.
+
 WHY THESE SIX. ``windows`` and ``linux`` because a suite may run on one
 dialect only: slime's browser project launches Chromium with ANGLE over
 Direct3D 11 and refuses every other platform by name
@@ -112,13 +120,13 @@ class NodeTag(StrEnum):
 #: The tag each platform carries. A table rather than a lookup by word, so
 #: the two vocabularies stay separate types; test_tags pins that every
 #: platform has a row, which is what a third platform would need first.
-_PLATFORM_TAG: Final[dict[NodePlatform, NodeTag]] = {
+PLATFORM_TAG: Final[dict[NodePlatform, NodeTag]] = {
     NodePlatform.WINDOWS: NodeTag.WINDOWS,
     NodePlatform.LINUX: NodeTag.LINUX,
 }
 
 #: The tag each declared toolchain carries, for the same reason.
-_CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
+CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.RUST: NodeTag.RUST,
     Capability.CXX: NodeTag.CXX,
     Capability.DOCKER: NodeTag.DOCKER,
@@ -147,7 +155,7 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
         when it declares an elevated runner, and ``rust``, ``cxx``,
         ``docker`` or ``stack`` for each capability it declares a version of.
     """
-    tags: set[NodeTag] = {_PLATFORM_TAG[node["platform"]]}
+    tags: set[NodeTag] = {PLATFORM_TAG[node["platform"]]}
     if node["gpu"] is not None:
         tags.add(NodeTag.GPU)
     if node["test_database"]:
@@ -156,7 +164,7 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
         tags.add(NodeTag.ELEVATED)
     tags.update(
         tag
-        for capability, tag in _CAPABILITY_TAG.items()
+        for capability, tag in CAPABILITY_TAG.items()
         if declared_capability(node, capability) is not None
     )
     return frozenset(tags)
@@ -302,6 +310,8 @@ def missing_tags(carried: frozenset[NodeTag], required: tuple[NodeTag, ...]) -> 
 
 
 __all__ = [
+    "CAPABILITY_TAG",
+    "PLATFORM_TAG",
     "TOOL_TAG",
     "NodeTag",
     "decode_node_tag",

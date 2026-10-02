@@ -37,15 +37,17 @@ A project that needs one requires the tag of the same name
 (:mod:`fleet.contracts.tags`), and a node carries it when its declaration
 names a version.
 
-WHY THE DECLARATION IS A VERSION AND IS RE-MEASURED. A boolean would be the
-hand-written tag the tags module exists to avoid, true until somebody
-remembered to change it. The declaration is instead the exact version the
-node's probe reported, and the runner's toolchain probe asks again every
-tick; a node whose answer differs from its declaration claims nothing
-(:func:`fleet.core.toolchain.readiness_gap`), so the tag is exactly as true
-as the last measurement. A node that has the toolchain and declares none only
-withholds the tag, which misroutes nothing, so that direction is reported by
-the ready summary rather than refused.
+THE RUNNER CLAIMS WITH WHAT ITS PROBE FOUND, NOT WITH THE DECLARATION (MCPs
+board task 939ec5c7). The runner's toolchain probe asks every tick, and a
+toolchain that answers with a version gives the node its tag on that tick
+(:func:`detected`, :mod:`fleet.contracts.detection`), so installing one makes
+the node eligible on its next tick with no file edited, and removing one takes
+the tag away just as fast. Until then a node whose answer differed from its
+declaration claimed nothing at all, which idled it for every job, not only the
+ones needing that toolchain. The declaration stays, as the version the hub's
+own planning (:func:`fleet.contracts.tags.node_tags`) reads without asking the
+node, and every tick compares it with the answer and logs the difference
+(:func:`version_drift`) so fleet.json can be corrected.
 """
 
 from __future__ import annotations
@@ -54,7 +56,6 @@ import re
 from enum import StrEnum
 from typing import Final
 
-from platform_core.errors import FleetErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from fleet.contracts.toolchain import ToolReport
@@ -97,14 +98,6 @@ PROBE_NAME: Final[dict[Capability, str]] = {
     Capability.STACK: "stack",
 }
 
-#: What refuses a node whose declaration disagrees with its probe.
-MISMATCH_CODE: Final[dict[Capability, FleetErrorCode]] = {
-    Capability.RUST: FleetErrorCode.NODE_RUST_MISMATCH,
-    Capability.CXX: FleetErrorCode.NODE_CXX_MISMATCH,
-    Capability.DOCKER: FleetErrorCode.NODE_DOCKER_MISMATCH,
-    Capability.STACK: FleetErrorCode.NODE_STACK_MISMATCH,
-}
-
 #: Where a declared version is read, for the decode refusal.
 _SOURCE: Final[dict[Capability, str]] = {
     Capability.RUST: "cargo --version prints, e.g. '1.98.1'",
@@ -118,20 +111,6 @@ _SOURCE: Final[dict[Capability, str]] = {
     Capability.STACK: (
         f"the node account's docker daemon reports as its ServerVersion while it holds "
         f"{STACK_NETWORK} and {', '.join(STACK_IMAGES)}, e.g. '29.8.1'"
-    ),
-}
-
-#: What goes wrong when a node carries a tag it cannot honour.
-_CONSEQUENCE: Final[dict[Capability, str]] = {
-    Capability.RUST: "a crate build claimed on it would fail in poetry sync",
-    Capability.CXX: "an npm ci claimed on it would fail rebuilding a native module under node-gyp",
-    Capability.DOCKER: (
-        "a deploy suite claimed on it would have no daemon it may use, and must never use the "
-        "stack's"
-    ),
-    Capability.STACK: (
-        "a suite that starts the stack's images claimed on it would fail where docker run "
-        "finds neither the image nor the network"
     ),
 }
 
@@ -170,7 +149,7 @@ def measured(capability: Capability, reports: tuple[ToolReport, ...]) -> str | N
     Returns:
         The version; the whole answer when a present toolchain answered in
         another shape (a shim with no toolchain to run prints an error), so
-        it can equal no declaration and the refusal quotes it; or None when
+        it can equal no declaration and the drift line quotes it; or None when
         the probe reported the toolchain absent or not at all.
     """
     for report in reports:
@@ -181,10 +160,26 @@ def measured(capability: Capability, reports: tuple[ToolReport, ...]) -> str | N
     return None
 
 
-def capability_gap(
+def detected(capability: Capability, reports: tuple[ToolReport, ...]) -> bool:
+    """Whether a node's probe found a working toolchain this tick.
+
+    Args:
+        capability: The toolchain.
+        reports: What the node answered.
+
+    Returns:
+        True only when the toolchain answered with a version of
+        :data:`VERSION`'s shape; a present shim that prints an error has no
+        toolchain behind it, so it carries no tag.
+    """
+    found = measured(capability, reports)
+    return found is not None and VERSION.fullmatch(found) is not None
+
+
+def version_drift(
     capability: Capability, declared: str | None, reports: tuple[ToolReport, ...]
 ) -> str | None:
-    """Say how a node's declared toolchain disagrees with its probe.
+    """Say how a node's declared toolchain differs from what its probe found.
 
     Args:
         capability: The toolchain.
@@ -192,22 +187,22 @@ def capability_gap(
         reports: What the node answered.
 
     Returns:
-        None when the node declares none, or exactly the version its probe
-        reported. Otherwise the disagreement, naming both and the
+        None when the declaration is exactly the version the probe reported,
+        or both say there is none. Otherwise the difference, naming both, the
+        tag the runner claims with this tick (:func:`detected`) and the
         declaration that would match.
     """
-    if declared is None:
-        return None
     found = measured(capability, reports)
     if found == declared:
         return None
     probe = PROBE_NAME[capability]
     reported = f"no {probe}" if found is None else f"{probe} {found!r}"
-    fix = "null" if found is None or not VERSION.fullmatch(found) else repr(found)
+    claims = "with" if detected(capability, reports) else "without"
+    fix = repr(found) if detected(capability, reports) else "null"
+    said = "none" if declared is None else repr(declared)
     return (
-        f"declares {capability} {declared!r} but its probe reports {reported}; the declaration "
-        f"is what gives a node the {capability} tag, so {_CONSEQUENCE[capability]}. Set "
-        f"{capability} to {fix}, or install that toolchain"
+        f"declares {capability} {said} but its probe reports {reported}, so it claims {claims} "
+        f"the {capability} tag; set {capability} to {fix} in fleet.json"
     )
 
 
@@ -236,13 +231,13 @@ def decode_capability(capability: Capability, value: JSONValue) -> str | None:
 
 
 __all__ = [
-    "MISMATCH_CODE",
     "PROBE_NAME",
     "STACK_IMAGES",
     "STACK_NETWORK",
     "VERSION",
     "Capability",
-    "capability_gap",
     "decode_capability",
+    "detected",
     "measured",
+    "version_drift",
 ]

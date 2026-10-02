@@ -22,15 +22,10 @@ from __future__ import annotations
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.capability import (
-    MISMATCH_CODE,
-    PROBE_NAME,
-    Capability,
-    capability_gap,
-    measured,
-)
+from fleet.contracts.capability import PROBE_NAME, Capability, measured
+from fleet.contracts.detection import GPU_PROBE, TESTDB_PROBE
 from fleet.contracts.elevation import INTEGRITY_PROBE
-from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
+from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
     REQUIRED_NODE_MAJOR,
@@ -57,9 +52,10 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
 
     Returns:
         One report per line naming a required tool, a tagged tool
-        (``ffmpeg``), a package manager, a declared toolchain's probe line
-        (``cargo``, ``cxx``, ``docker``, ``stack``) or
-        the session's token (``integrity``, :mod:`fleet.contracts.elevation`),
+        (``ffmpeg``), a package manager, a toolchain's probe line
+        (``cargo``, ``cxx``, ``docker``, ``stack``), the CUDA device or test
+        database line (``gpu``, ``testdb``, :mod:`fleet.contracts.detection`)
+        or the session's token (``integrity``, :mod:`fleet.contracts.elevation`),
         in the order the node emitted them. Empty when no line did.
     """
     reports: list[ToolReport] = []
@@ -67,7 +63,7 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
         {tool["name"] for tool in REQUIRED_TOOLS + TAGGED_TOOLS}
         | set(PACKAGE_MANAGERS)
         | set(PROBE_NAME.values())
-        | {INTEGRITY_PROBE}
+        | {GPU_PROBE, TESTDB_PROBE, INTEGRITY_PROBE}
     )
     for line in output.splitlines():
         parts = line.strip().split("=", 2)
@@ -198,14 +194,12 @@ def readiness_gap(
         needs it and what would install it on THIS node, or
         ``NODE_PYTHON_MISMATCH`` when everything is present but the
         interpreter is the wrong minor version, or ``NODE_NODEJS_MISMATCH``
-        when Node.js is older than :data:`REQUIRED_NODE_MAJOR`, or
-        ``NODE_RUST_MISMATCH`` / ``NODE_CXX_MISMATCH`` /
-        ``NODE_DOCKER_MISMATCH`` / ``NODE_STACK_MISMATCH`` when the node
-        declares a toolchain version its probe does not report
-        (:func:`fleet.contracts.capability.capability_gap`). Separate codes
-        because the fixes differ: one is a package manager, the others are
-        a decision about which runtime that machine should carry, and the
-        last are declarations to correct.
+        when Node.js is older than :data:`REQUIRED_NODE_MAJOR`. Separate
+        codes because the fixes differ: one is a package manager, the others
+        a decision about which runtime that machine should carry. A
+        toolchain that differs from the node's declaration closes no gate:
+        the runner claims with what the probe found
+        (:mod:`fleet.contracts.detection`).
     """
     absent = missing(reports)
     if absent:
@@ -237,10 +231,6 @@ def readiness_gap(
             "required; the TypeScript projects declare that engine, and native modules they "
             "install fail to build under an older one",
         )
-    for capability in Capability:
-        gap = capability_gap(capability, declared_capability(node, capability), reports)
-        if gap is not None:
-            return AppError(MISMATCH_CODE[capability], f"{node_name} ({node['host']}) {gap}")
     return None
 
 

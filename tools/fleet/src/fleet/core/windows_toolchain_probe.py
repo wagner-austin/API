@@ -53,7 +53,13 @@ from __future__ import annotations
 #: read from vswhere as its installationVersion and collected whole, for the
 #: same PowerShell 5.1 reason as pip. A node without vswhere, or whose vswhere
 #: finds no VC tools (sedona on 2026-09-27: the installer present, the
-#: component absent), reports ``cxx=no=``. ``docker`` is always ``no`` here:
+#: component absent), reports ``cxx=no=``. ``gpu`` is nvidia-smi's first
+#: device as ``<name>, <compute capability>``, ``no`` when nvidia-smi is not
+#: on the PATH, fails or lists nothing (measured 2026-10-02: sedona answers
+#: ``NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6``, serendipity and pendragon
+#: have no nvidia-smi), and ``testdb`` is always ``no``: no Windows node can
+#: reach a test database (:mod:`fleet.contracts.detection`, MCPs board task
+#: 939ec5c7). ``docker`` is always ``no`` here:
 #: the capability is the execution suite's rootless daemon under its own
 #: Linux user (MCPs board task 6c4516af), which no Windows node carries,
 #: and Docker Desktop is exactly the kind of shared daemon it excludes.
@@ -61,6 +67,12 @@ from __future__ import annotations
 #: ``yes=administrator`` only when ``WindowsPrincipal.IsInRole`` finds the
 #: Administrators role, which a filtered token never reports, so a node's
 #: elevated runner knows every tick whether it can register a Highest task.
+#:
+#: IT ENDS WITH ``exit 0``. A tool's own exit code is one of the answers
+#: above, never the probe's: without it the last native call's
+#: ``$LASTEXITCODE`` became the script's, so a failing nvidia-smi (or a
+#: failing ``python -m pip`` on a node without vswhere) read as a probe that
+#: failed. Every real failure of the probe itself throws under ``Stop``.
 TOOLCHAIN_PROBE_SCRIPT = r"""param(
     [string]$Cmd = "$env:SystemRoot\System32\cmd.exe",
     [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
@@ -129,12 +141,23 @@ if ($vc -ne '') {
 } else {
     'cxx=no='
 }
+$gpu = 'gpu=no='
+$smi = Find-Tool 'nvidia-smi'
+if ($smi -ne '') {
+    $card = Invoke-Answer $Cmd $smi '--query-gpu=name,compute_cap --format=csv,noheader'
+    if ($card.Succeeded -and $card.First -ne '') {
+        $gpu = "gpu=yes=$($card.First)"
+    }
+}
+$gpu
+'testdb=no='
 'docker=no='
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {
     'integrity=no=limited'
 }
+exit 0
 """
 
 

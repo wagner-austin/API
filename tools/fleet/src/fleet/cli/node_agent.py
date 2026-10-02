@@ -220,7 +220,7 @@ def claim_pass(
     live node beside it found nothing (:func:`fleet.core.capacity.room_for_any`
     carries the measurement), so a node that does not answer, or has room
     for nothing, claims nothing this tick and the job stays for one that
-    can run it. The same holds for its TOOLCHAIN, asked second
+    can run it. The same holds for its TOOLCHAIN, asked before the room
     (:func:`fleet.core.toolchain.attempt_toolchain`, over the ssh account
     whose SID the build's scheduled task is registered for): lavender
     claimed slime jobs d515d038 and 7235d4c4, staged a whole export and ran

@@ -37,13 +37,13 @@ from __future__ import annotations
 import posixpath
 import shlex
 
-from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import POETRY_KEYRING_OFF, isolated_build_lines
+from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
 
 #: How a script file is run by path.
 SH_INVOCATION = ("/bin/sh",)
@@ -95,89 +95,10 @@ CAPACITY_PROBE_SCRIPT = (
     "fi\n"
 )
 
-#: The toolchain probe, verbatim.
-#:
-#: THE INTERPRETER IS ``python3`` AND IS REPORTED AS ``python``. The required
-#: tool is named ``python`` because that is what a Windows PATH calls it; on
-#: Linux the Makefile prologue (``scripts/make/shell.mk``) calls ``python3``,
-#: so that is what the probe asks for, and it reports the answer under the
-#: name the contract requires so :func:`fleet.contracts.toolchain.python_is_right`
-#: reads one report on every platform. The managers asked about are the two
-#: that exist here: ``apt-get`` for git and make, ``pipx`` for poetry. ``node``
-#: is asked and never installed here: Ubuntu 24.04's archive carries Node
-#: 18.19.1 where the fleet runs 24, and diphtheria's 24.21.0 came from the
-#: NodeSource repository (both read from ``apt-cache policy nodejs`` there,
-#: 2026-09-23), so a Linux node's Node is installed by hand.
-#:
-#: THE ``docker`` LINE ASKS ONE DAEMON BY ITS SOCKET, never ``docker`` on the
-#: runner's PATH, which is the stack's daemon on diphtheria. It is the
-#: execdocker user's rootless daemon (MCPs board task 6c4516af), asked as
-#: that user with ``sudo -n``, so a node without the user, without sudo for
-#: it or whose daemon does not say ``name=rootless`` answers ``docker=no=``.
-#: So does one whose user lacks the compose or buildx CLI plugin, since the
-#: lane the tag routes runs ``docker compose`` and builds images: lavender-wsl
-#: carried the tag with neither, and MCPs/execution-deploy job 7ad01613 died
-#: there at ``docker: unknown command: docker compose`` (2026-09-29).
-#: The ``sudo`` is an ``if`` condition because the prologue's ``set -e``
-#: does not fire there: as a bare assignment, a ``sudo`` refusing for want
-#: of a password ended the whole probe with exit 1 (measured as execdocker on
-#: diphtheria, 2026-09-29, MCPs board task a8ee9b21), not the ``no`` line.
-#:
-#: THE ``stack`` LINE ASKS THE PATH's DAEMON, the one the stack suites'
-#: ``docker run`` reaches, and answers its ServerVersion only when that
-#: daemon holds :data:`fleet.contracts.capability.STACK_NETWORK` and every
-#: one of the images in ``STACK_IMAGES`` (MCPs board task 554bffc1). Its
-#: three asks are one ``if`` condition for the same ``set -e`` reason, so a
-#: node with no docker, no network or one image missing answers
-#: ``stack=no=``. Measured 2026-09-29: diphtheria holds all four on 29.8.1,
-#: and lavender-wsl's daemon has no ``mcp-network``.
-TOOLCHAIN_PROBE_SCRIPT = (
-    PROLOGUE + "report() {\n"
-    '  if command -v "$2" > /dev/null 2>&1; then\n'
-    '    printf \'%s=yes=%s\\n\' "$1" "$("$2" --version 2>&1 | head -n 1 | tr -d \'\\r\')"\n'
-    "  else\n"
-    "    printf '%s=no=\\n' \"$1\"\n"
-    "  fi\n"
-    "}\n"
-    "report python python3\n"
-    "report poetry poetry\n"
-    "report git git\n"
-    "report make make\n"
-    "report node node\n"
-    "report ffmpeg ffmpeg\n"
-    "report tar tar\n"
-    "report cargo cargo\n"
-    "if command -v g++ > /dev/null 2>&1; then\n"
-    "  printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n"
-    "else\n"
-    "  printf 'cxx=no=\\n'\n"
-    "fi\n"
-    "if id execdocker > /dev/null 2>&1 &&"
-    ' d="$(sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
-    " info --format '{{.ServerVersion}} {{json .SecurityOptions}}' 2>/dev/null)\"; then\n"
-    '  case "$d" in\n'
-    "    *name=rootless*)\n"
-    "      if sudo -n -u execdocker docker compose version > /dev/null 2>&1 &&"
-    " sudo -n -u execdocker docker buildx version > /dev/null 2>&1; then\n"
-    "        printf 'docker=yes=%s\\n' \"${d%% *}\"\n"
-    "      else\n"
-    "        printf 'docker=no=\\n'\n"
-    "      fi ;;\n"
-    "    *) printf 'docker=no=\\n' ;;\n"
-    "  esac\n"
-    "else\n"
-    "  printf 'docker=no=\\n'\n"
-    "fi\n"
-    f"if docker network inspect {STACK_NETWORK} > /dev/null 2>&1 &&"
-    f" docker image inspect {' '.join(STACK_IMAGES)} > /dev/null 2>&1 &&"
-    " v=\"$(docker version --format '{{.Server.Version}}' 2>/dev/null)\"; then\n"
-    "  printf 'stack=yes=%s\\n' \"$v\"\n"
-    "else\n"
-    "  printf 'stack=no=\\n'\n"
-    "fi\n"
-    "report apt-get apt-get\n"
-    "report pipx pipx\n"
-)
+#: The toolchain probe, verbatim: the prologue, then
+#: :data:`fleet.core.linux_toolchain_probe.TOOLCHAIN_PROBE_BODY`, which says
+#: what each line asks.
+TOOLCHAIN_PROBE_SCRIPT = PROLOGUE + TOOLCHAIN_PROBE_BODY
 
 
 #: The body of the session-observer script: what python3 runs, verbatim.
