@@ -55,7 +55,9 @@ class RequiredTool(TypedDict):
     """One thing a node must have, and how to get it on each package manager.
 
     Attributes:
-        name: The executable, as it is spelled on a PATH.
+        name: The executable, as it is spelled on a PATH, or for the one
+            tagged entry that is not an executable, ``hooks``, the probe
+            line that answers for the hooks check's environment.
         reason: Why a dispatch needs it. Carried so a refusal explains
             itself rather than naming a binary and leaving the reader to
             infer what it was for.
@@ -84,7 +86,7 @@ class ToolReport(TypedDict):
     """What one node answered about one tool.
 
     Attributes:
-        name: The executable.
+        name: The executable, or the probe line's name.
         present: Whether it is on the node's PATH.
         version: What it reported, or an empty string when absent or when it
             declines to say. Recorded because presence is not the whole
@@ -223,6 +225,29 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     ),
 )
 
+#: The route file a node's Claude Code hooks reach the board through, under
+#: the build account's home: what MCPs ``packages/claude-hooks``
+#: ``install-hooks-node.py`` writes, and what that package's live suites read.
+HOOKS_ROUTE_FILE: Final = (".claude", "corvis-hooks.json")
+
+#: The modules MCPs ``packages/claude-hooks``'s make check imports from the
+#: system interpreter it runs on: ruff, mypy, pytest, pytest-xdist and
+#: pytest-cov. The probe's ``hooks`` line answers present only when one
+#: ``import`` of all of them succeeds.
+HOOKS_CHECK_MODULES: Final = ("ruff", "mypy", "pytest", "xdist", "pytest_cov")
+
+#: The distributions that provide :data:`HOOKS_CHECK_MODULES`, at the versions
+#: the hub's interpreter ran the package's check with on 2026-10-02 (MCPs board
+#: task ec895824), so a node's check reads the same lint and type rules the
+#: hub's does.
+HOOKS_CHECK_PACKAGES: Final = (
+    "ruff==0.15.1",
+    "mypy==1.19.1",
+    "pytest==9.0.2",
+    "pytest-xdist==3.8.0",
+    "pytest-cov==7.1.0",
+)
+
 #: Tools only some projects need, each the source of a capability tag
 #: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
 #: them every tick like the required tools, but a node without one is refused
@@ -240,6 +265,17 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             ),
             "choco": "choco install ffmpeg -y",
             "apt-get": "sudo apt-get install -y ffmpeg",
+        },
+    ),
+    RequiredTool(
+        name="hooks",
+        reason=(
+            "MCPs packages/claude-hooks's check runs on the system interpreter with its tools "
+            "and reaches the board through ~/.claude/corvis-hooks.json, which only "
+            "install-hooks-node.py writes, with the key the operator chose for the node"
+        ),
+        install={
+            "pip": "python -m pip install --user " + " ".join(HOOKS_CHECK_PACKAGES),
         },
     ),
 )
@@ -528,6 +564,9 @@ def decode_tool_report(value: JSONValue) -> ToolReport:
 
 
 __all__ = [
+    "HOOKS_CHECK_MODULES",
+    "HOOKS_CHECK_PACKAGES",
+    "HOOKS_ROUTE_FILE",
     "PACKAGE_MANAGERS",
     "PINNED_PYTHON",
     "PYTHON_REGISTERED_GUARD",

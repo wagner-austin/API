@@ -65,6 +65,14 @@ ffmpeg on every tick of 2026-10-02 until 02:48Z while tag-free jobs waited
 runner adds it when this tick's toolchain probe found the executable
 (:func:`tool_tags`), so installing ffmpeg makes the node eligible on its next
 tick, and a node without it takes every other job.
+``hooks`` because MCPs ``packages/claude-hooks``'s check runs its suites on
+the system interpreter, as Claude Code runs the hooks, and its live cases
+reach the board through the build account's ``~/.claude/corvis-hooks.json``.
+Measured 2026-10-02 (MCPs board task ec895824): sedona's account carried that
+route file, pendragon's and serendipity's did not, and none of the three
+interpreters had the check's tools. It is a tool tag like ``ffmpeg``: the
+probe's ``hooks`` line answers present only when the route file exists and
+the interpreter imports every tool the check runs.
 ``elevated`` because MCPs' Task Scheduler
 installers register what only an administrator may register, and every
 build launches as an S4U task at RunLevel Limited (MCPs board task
@@ -101,8 +109,8 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615, 622 and 639) is the same ten words as these members'
-    values, in this order.
+    570, 571, 615, 622, 639 and 648) is the same eleven words as these
+    members' values, in this order.
     """
 
     WINDOWS = "windows"
@@ -115,6 +123,7 @@ class NodeTag(StrEnum):
     ELEVATED = "elevated"
     STACK = "stack"
     FFMPEG = "ffmpeg"
+    HOOKS = "hooks"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -133,13 +142,15 @@ CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.STACK: NodeTag.STACK,
 }
 
-#: The tag each detected tool carries, keyed by the executable the toolchain
-#: probe reports (:class:`fleet.contracts.toolchain.ToolReport`). These are
-#: the one kind of tag no declaration holds: a runner adds them when this
+#: The tag each detected tool carries, keyed by the line the toolchain probe
+#: reports it under (:class:`fleet.contracts.toolchain.ToolReport`): the
+#: executable's name, or ``hooks`` for the hooks check's environment. These
+#: are the one kind of tag no declaration holds: a runner adds them when this
 #: tick's probe found the tool, so installing it makes the node eligible on
 #: its next tick and removing it takes the tag away on the next.
 TOOL_TAG: Final[dict[str, NodeTag]] = {
     "ffmpeg": NodeTag.FFMPEG,
+    "hooks": NodeTag.HOOKS,
 }
 
 
@@ -239,8 +250,9 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
         "fleet test database, a Rust or C++ toolchain, the execution suite's rootless "
-        "Docker daemon, an elevated runner, the corvis compose stack, or a tool its probe "
-        "found), and one it does not carry could never be satisfied"
+        "Docker daemon, an elevated runner, the corvis compose stack, or a tool or the "
+        "hooks check's environment its probe found), and one it does not carry could never "
+        "be satisfied"
     )
 
 
