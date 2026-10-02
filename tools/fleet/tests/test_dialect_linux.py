@@ -490,6 +490,8 @@ class TestForRealUnderSh:
             "cxx",
             "docker",
             "stack",
+            "gpu",
+            "testdb",
             "apt-get",
             "pipx",
         }
