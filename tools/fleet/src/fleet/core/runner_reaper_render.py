@@ -22,12 +22,17 @@ Two pieces, both idempotent:
    new one.
 2. A reaper, run by a timer every 30 seconds as root, because a job ends
    inside a running unit and no ``KillMode`` applies then. In each runner
-   unit with a ``Runner.Listener`` alive and no ``Runner.Worker``, every
-   process in the unit's cgroup that does not descend from its main
-   process is killed: a job's processes descend from the Worker, so once
-   none runs, a process outside that tree is one a finished job reparented
-   to init. A unit with no Listener is mid self-update, whose ``_update.sh``
-   is outside the tree by design, and is left alone that pass.
+   unit with a ``Runner.Listener`` alive, a process in the unit's cgroup
+   that does not descend from its main process is one a job daemonized
+   and init adopted. With no ``Runner.Worker`` alive every such process
+   outlived its job and is killed. With one alive, only those started
+   before the earliest live Worker are: a job's processes all start after
+   its Worker, so an older one belongs to a job before it. That second
+   rule is measured, not assumed: across 124 snapshots of lavender on
+   2026-10-02 every busy runner went from one job straight into the next,
+   so a reaper waiting for an idle unit would never have run there. A unit
+   with no Listener is mid self-update, whose ``_update.sh`` is outside
+   the tree by design, and is left alone that pass.
 """
 
 from __future__ import annotations
@@ -53,8 +58,8 @@ REAPER_TIMER_NAME = "fleet-runner-reaper.timer"
 REAPER_INTERVAL_SECONDS = 30
 
 #: The reaper. ``--audit SECONDS UNIT`` prints, for one unit, how many of
-#: its processes outside the main process's tree are older than SECONDS
-#: while no Worker runs, and kills nothing: the audit's check
+#: the processes it would kill are older than SECONDS, and kills nothing:
+#: the audit's check
 #: (:mod:`fleet.core.runner_orphan_check`) asks the same question the reaper
 #: acts on.
 REAPER_SCRIPT = """#!/usr/bin/env bash
@@ -89,27 +94,41 @@ runs() {
     return 1
 }
 
-age_of() {
-    local stat ticks uptime
+start_of() {
+    local stat
     stat=$(cat "$proc_root/$1/stat" 2>/dev/null) || return 1
     stat=${stat##*) }
     set -- $stat
-    ticks=${20}
+    echo "${20}"
+}
+
+age_of() {
+    local ticks uptime
+    ticks=$(start_of "$1") || return 1
     uptime=$(cut -d. -f1 "$proc_root/uptime")
     echo $(( uptime - ticks / $(getconf CLK_TCK) ))
 }
 
 leftovers() {
-    local unit=$1 cgroup main pids pid
+    local unit=$1 cgroup main pids pid started since
     cgroup=$(systemctl show -p ControlGroup --value "$unit")
     [ -n "$cgroup" ] && [ -r "$cgroup_root$cgroup/cgroup.procs" ] || return 0
     main=$(systemctl show -p MainPID --value "$unit")
     [ "$main" != 0 ] || return 0
     pids=$(cat "$cgroup_root$cgroup/cgroup.procs")
     runs Runner.Listener "$pids" || return 0
-    ! runs Runner.Worker "$pids" || return 0
+    since=$(for pid in $pids; do
+        if grep -qs Runner.Worker "$proc_root/$pid/cmdline" && started=$(start_of "$pid"); then
+            echo "$started"
+        fi
+    done | sort -n | head -n 1)
     for pid in $pids; do
-        descends_from "$pid" "$main" || echo "$pid"
+        descends_from "$pid" "$main" && continue
+        if [ -n "$since" ]; then
+            started=$(start_of "$pid") || continue
+            [ "$started" -lt "$since" ] || continue
+        fi
+        echo "$pid"
     done
 }
 
