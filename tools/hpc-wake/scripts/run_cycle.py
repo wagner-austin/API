@@ -122,6 +122,25 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         ),
         "cwd": "..\\fleet-health-wake",
     },
+    # hub-tunnel-wake (MCPs board task 86c8e2c6): the hub tunnel's health
+    # journal -> board, through the same bridge and standing task as the
+    # row above. MCPs' `make hub-tunnel-run` (packages/maketools,
+    # maketools.hub_tunnel_state) appends one line in that journal's shape
+    # each time the ssh -R tunnel into diphtheria goes down or comes back,
+    # so a dead tunnel is posted within one tick of its listeners going.
+    # Its own journal, one writer per file; the bridge keeps a cursor per
+    # journal beside it.
+    {
+        "name": "hub-tunnel-wake",
+        "args": (
+            "poetry",
+            "run",
+            "fleet-health-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\logs\\hub-tunnel\\health-events.jsonl",
+        ),
+        "cwd": "..\\fleet-health-wake",
+    },
 )
 
 

@@ -62,6 +62,7 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
             _Completed("ci-out\n", "ci-err\n", 0),
             _Completed("lock-out\n", "lock-err\n", 0),
             _Completed("health-out\n", "health-err\n", 0),
+            _Completed("tunnel-out\n", "tunnel-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake
@@ -211,6 +212,9 @@ class TestMain:
             mark4,
             out4,
             err4,
+            mark5,
+            out5,
+            err5,
         ) = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
         assert mark1 == "-- hpc-wake"
@@ -221,6 +225,8 @@ class TestMain:
         assert (out3, err3) == ("lock-out", "lock-err")
         assert mark4 == "-- fleet-health-wake"
         assert (out4, err4) == ("health-out", "health-err")
+        assert mark5 == "-- hub-tunnel-wake"
+        assert (out5, err5) == ("tunnel-out", "tunnel-err")
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -269,6 +275,16 @@ class TestMain:
         ]
         assert health_cwd == (root / "..\\fleet-health-wake").resolve()
         assert health_env == env
+        tunnel_args, tunnel_cwd, tunnel_env = runner.calls[4]
+        assert list(tunnel_args) == [
+            "poetry",
+            "run",
+            "fleet-health-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\logs\\hub-tunnel\\health-events.jsonl",
+        ]
+        assert tunnel_cwd == (root / "..\\fleet-health-wake").resolve()
+        assert tunnel_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
         assert ci_env == env
@@ -287,7 +303,7 @@ class TestMain:
         root = _staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 4
+        assert len(runner.calls) == 5
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -341,7 +357,13 @@ class TestHealthRecord:
 
         assert _written_line(root) == "2026-09-21T20:43:15Z"
         recorded = read_health(_health_path(root))
-        assert set(recorded) == {"hpc-wake", "ci-wake", "lock-wake", "fleet-health-wake"}
+        assert set(recorded) == {
+            "hpc-wake",
+            "ci-wake",
+            "lock-wake",
+            "fleet-health-wake",
+            "hub-tunnel-wake",
+        }
         assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
         assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
 
@@ -354,6 +376,7 @@ class TestHealthRecord:
         runner.results = [
             _Completed("", "", 0),
             _Completed("", "TASK_SESSION_UNLEDGERED\n", 1),
+            _Completed("", "", 0),
             _Completed("", "", 0),
             _Completed("", "", 0),
         ] * 2
@@ -371,7 +394,7 @@ class TestHealthRecord:
 
 
 class TestPublishers:
-    def test_the_inventory_is_the_four_bridges_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_five_bridges_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
         become sibling scheduled tasks -- has a diff to point at."""
@@ -380,6 +403,7 @@ class TestPublishers:
             "ci-wake",
             "lock-wake",
             "fleet-health-wake",
+            "hub-tunnel-wake",
         ]
         assert run_cycle.PUBLISHERS[0]["cwd"] == "."
         assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
@@ -401,6 +425,12 @@ class TestPublishers:
             "fleet-health-wake",
             "--journal",
             "C:\\Users\\Test\\PROJECTS\\MCPs\\fleet-mcp\\state\\health-events.jsonl",
+        )
+        assert run_cycle.PUBLISHERS[4]["cwd"] == "..\\fleet-health-wake"
+        assert run_cycle.PUBLISHERS[4]["args"][2:] == (
+            "fleet-health-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\logs\\hub-tunnel\\health-events.jsonl",
         )
 
 
