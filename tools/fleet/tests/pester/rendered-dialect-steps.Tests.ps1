@@ -39,6 +39,7 @@ Describe 'The staged tree''s repository' {
         Invoke-Rendered 'dialect-init-repository' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:target) init --quiet",
+            "-C $($script:target) config gc.auto 0",
             "-C $($script:target) add --all --force",
             "-C $($script:target) -c user.name=fleet -c user.email=fleet@corvis.invalid commit --quiet --message `"fleet export MCPs-packages-maketools-1790000000`""
         )
@@ -59,6 +60,7 @@ Describe 'A companion''s repository' {
         Invoke-Rendered 'dialect-companion-repository' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:companion) init --quiet",
+            "-C $($script:companion) config gc.auto 0",
             "-C $($script:companion) fetch --quiet --no-tags $($script:companion).stage/tree.tgz +refs/fleet/companion:refs/remotes/origin/main",
             "-C $($script:companion) checkout --quiet -B main refs/remotes/origin/main",
             "-C $($script:companion) merge-base --is-ancestor HEAD 5f389cb3d9bdd2e9b49e8df6683a6fee71a359b2",
