@@ -24,13 +24,14 @@ BeforeAll {
         return $record
     }
 
-    # A python.cmd that answers --version, and -m pip --version with the
-    # given exit code.
+    # A python.cmd that answers --version, -m pip --version with the given
+    # exit code, and -c (the hooks line's import) with ImportExit.
     function Initialize-Python {
-        param([string]$Directory, [int]$PipExit)
+        param([string]$Directory, [int]$PipExit, [int]$ImportExit = 0)
         [void][System.IO.Directory]::CreateDirectory($Directory)
         $record = Join-Path $Directory 'python.calls.txt'
-        $body = "@echo off`r`necho %*>>`"$record`"`r`nif `"%1`"==`"-m`" goto pip`r`necho Python 3.11.9`r`nexit /b 0`r`n" +
+        $body = "@echo off`r`necho %*>>`"$record`"`r`nif `"%1`"==`"-m`" goto pip`r`n" +
+            "if `"%1`"==`"-c`" exit /b $ImportExit`r`necho Python 3.11.9`r`nexit /b 0`r`n" +
             ":pip`r`necho pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)`r`nexit /b $PipExit`r`n"
         [System.IO.File]::WriteAllText((Join-Path $Directory 'python.cmd'), $body, [System.Text.Encoding]::ASCII)
         return $record
@@ -61,7 +62,9 @@ Describe 'The toolchain probe' {
         [void](Initialize-Answer $quoted 'make' @('GNU Make 4.4.1', 'Built for Windows32') 0)
         $vswhereCalls = Initialize-Answer (Join-Path $script:root 'vs') 'vswhere' @('17.11.35312.102') 0
         $env:PATH = "$first;;`"$quoted`""
-        $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'vs\vswhere.cmd') })
+        $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{
+                VsWhere = (Join-Path $script:root 'vs\vswhere.cmd'); HooksRoute = (Join-Path $script:root 'no-route.json')
+            })
         # The default seam asks this session's own token, so the expected
         # line is read here the same way, independently of the script.
         $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -74,7 +77,7 @@ Describe 'The toolchain probe' {
             'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'ffmpeg=yes=ffmpeg version 9.0.1-essentials_build-www.gyan.dev',
             'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
             'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'gpu=no=',
-            'testdb=no=', 'docker=no=', $integrity)
+            'testdb=no=', 'docker=no=', 'hooks=no=', $integrity)
         [System.IO.File]::ReadAllLines($pythonCalls) | Should -Be @('--version', '-m pip --version')
         [System.IO.File]::ReadAllLines($ffmpegCalls) | Should -Be @('--version')
         [System.IO.File]::ReadAllText($vswhereCalls).Trim() |
@@ -118,6 +121,27 @@ Describe 'The toolchain probe' {
         [void](Initialize-Answer $silent 'nvidia-smi' @() 0)
         $env:PATH = $silent
         @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[12] | Should -BeExactly 'gpu=no='
+    }
+    It 'reports the hooks route only when the file exists and one import of the check tools succeeds (MCPs ec895824)' {
+        $absent = Join-Path $script:root 'absent\vswhere.exe'
+        $route = Join-Path $script:root 'home\.claude\corvis-hooks.json'
+        [void][System.IO.Directory]::CreateDirectory((Split-Path $route))
+        [System.IO.File]::WriteAllText($route, '{}')
+        $ready = Join-Path $script:root 'ready'
+        $readyCalls = Initialize-Python $ready 0 0
+        $env:PATH = $ready
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[15] |
+            Should -BeExactly "hooks=yes=$route"
+        [System.IO.File]::ReadAllLines($readyCalls) |
+            Should -Be @('--version', '-m pip --version', '-c "import ruff, mypy, pytest, xdist, pytest_cov"')
+        $lacking = Join-Path $script:root 'lacking'
+        [void](Initialize-Python $lacking 0 1)
+        $env:PATH = $lacking
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[15] |
+            Should -BeExactly 'hooks=no='
+        $env:PATH = Join-Path $script:root 'empty'
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[15] |
+            Should -BeExactly 'hooks=no='
     }
     It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {
         $env:PATH = Join-Path $script:root 'empty'
