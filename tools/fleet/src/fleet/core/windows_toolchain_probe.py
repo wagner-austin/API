@@ -11,6 +11,8 @@ a PATH the suite lays out (MCPs board task d69786fa).
 
 from __future__ import annotations
 
+from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
+
 #: The toolchain probe, verbatim.
 #:
 #: UNDER THE STRICT HEADER, SO NOTHING IS ASKED WITH ``SilentlyContinue``. A
@@ -63,6 +65,13 @@ from __future__ import annotations
 #: the capability is the execution suite's rootless daemon under its own
 #: Linux user (MCPs board task 6c4516af), which no Windows node carries,
 #: and Docker Desktop is exactly the kind of shared daemon it excludes.
+#: ``hooks`` is the MCPs claude-hooks check's environment (MCPs board task
+#: ec895824): ``yes=<route file>`` only when the build account carries the
+#: hooks route file (``$HooksRoute``, a parameter so the suite names one) and
+#: the interpreter the tool loop reported imports every module of
+#: :data:`fleet.contracts.toolchain.HOOKS_CHECK_MODULES` in one ``-c``; a
+#: node without the file is never asked to import. Measured 2026-10-02:
+#: sedona carries the file, pendragon and serendipity do not.
 #: ``integrity`` is the ssh session's token (:mod:`fleet.contracts.elevation`):
 #: ``yes=administrator`` only when ``WindowsPrincipal.IsInRole`` finds the
 #: Administrators role, which a filtered token never reports, so a node's
@@ -73,9 +82,13 @@ from __future__ import annotations
 #: ``$LASTEXITCODE`` became the script's, so a failing nvidia-smi (or a
 #: failing ``python -m pip`` on a node without vswhere) read as a probe that
 #: failed. Every real failure of the probe itself throws under ``Stop``.
-TOOLCHAIN_PROBE_SCRIPT = r"""param(
+TOOLCHAIN_PROBE_SCRIPT = (
+    r"""param(
     [string]$Cmd = "$env:SystemRoot\System32\cmd.exe",
     [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
+    [string]$HooksRoute = "$env:USERPROFILE"""
+    + "".join(f"\\{part}" for part in HOOKS_ROUTE_FILE)
+    + r"""",
     [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
@@ -152,6 +165,16 @@ if ($smi -ne '') {
 $gpu
 'testdb=no='
 'docker=no='
+$hooks = 'hooks=no='
+if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {
+    $imports = Invoke-Answer $Cmd $python '-c "import """
+    + ", ".join(HOOKS_CHECK_MODULES)
+    + r""""'
+    if ($imports.Succeeded) {
+        $hooks = "hooks=yes=$HooksRoute"
+    }
+}
+$hooks
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {
@@ -159,6 +182,7 @@ if ([bool](& $Administrator)) {
 }
 exit 0
 """
+)
 
 
 __all__ = ["TOOLCHAIN_PROBE_SCRIPT"]
