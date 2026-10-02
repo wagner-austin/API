@@ -201,29 +201,32 @@ jobs:
     #
     # Deliberately NOT keyed to the heavy-package list in runs-on below:
     # that list routes by whether a package needs the self-hosted pool,
-    # which is a different question from how long it takes (RustedWarfareBot
-    # is on that list and finishes in about a minute). Two lists that look
-    # alike and mean different things drift, and the drift is silent.
+    # which is a different question from how long it takes. Two lists that
+    # look alike and mean different things drift, and the drift is silent.
     timeout-minutes: 60
-    # clients/RustedWarfareBot runs on the self-hosted pool and everything
-    # else stays on GitHub's. Its RunRecord fingerprints sha256 the REAL
-    # game binary by design (rw_bot/provenance.py -- the game build is the
-    # load-bearing provenance axis), and that binary is licensed: it can
-    # never enter this public repo, its caches, or a GitHub-hosted VM. The
-    # self-hosted boxes hold the operator's own licensed tree instead; the
-    # "Link the licensed game tree" step below asserts it loudly. Labels
-    # copied verbatim from the runner registration -- a label that matches
-    # nothing does not fail, it queues silently forever.
+    # Two packages run on the self-hosted pool and everything else stays on
+    # GitHub's. Labels copied verbatim from the runner registration -- a
+    # label that matches nothing does not fail, it queues silently forever.
     #
-    # services/Model-Trainer joins it 2026-09-08, for the same shape of
-    # reason: its suite honestly requires the host -- real CUDA (the default
-    # hooks digest the actual card; lavender's GTX 1630 is visible inside
-    # WSL), nvidia-smi (the driver-version fingerprint reads the real
-    # driver), a writable /data (the settings default APP__DATA_ROOT, the
-    # container convention), and a llama.cpp checkout at /opt/llama.cpp for
-    # the GGUF export tests. On a hosted CPU runner those are 28 failures
-    # that look like defects and are actually the machine. The host assets
-    # live under the same /opt convention as the RWB game tree.
+    # services/Model-Trainer joined it 2026-09-08 because its suite honestly
+    # requires the host -- real CUDA (the default hooks digest the actual
+    # card; lavender's GTX 1630 is visible inside WSL), nvidia-smi (the
+    # driver-version fingerprint reads the real driver), a writable /data
+    # (the settings default APP__DATA_ROOT, the container convention), and a
+    # llama.cpp checkout at /opt/llama.cpp for the GGUF export tests. On a
+    # hosted CPU runner those are 28 failures that look like defects and are
+    # actually the machine.
+    #
+    # clients/RustedWarfareBot left it 2026-10-02 (board task 4f228608). It
+    # was the pool's first member, because its suite digested the REAL
+    # licensed game jar, which can never enter this public repo, its caches
+    # or a GitHub-hosted VM, and a step linked the operator's tree from
+    # /opt/corvis/rw-game. Since 642fbb989 every case builds a miniature
+    # tree in tmp_path and make check no longer runs agent-selftest, so a
+    # checkout with no game passes it, and the step only failed the job on
+    # every push from 2026-09-26 on, when lavender-wsl no longer held the
+    # tree. The check against the real jar is `make execution`, run where
+    # the pinned game is.
     #
     # services/handwriting-ai joins for MEMORY, not GPU: twice (runs
     # 34261012178 and 34263882633) the hosted 16GB VM received "a shutdown
@@ -232,10 +235,10 @@ jobs:
     # runner agent, reported as infrastructure rather than as a failed
     # assertion. Sixteen xdist workers each holding torch plus real
     # training does not fit in 16GB; the lavender pool has 26GB.
-    # The pool membership list appears twice -- here and in the Tests step's
-    # worker count -- as the SAME fromJSON literal, deliberately adjacent in
-    # meaning: a package joins the pool and halves its workers in one edit.
-    runs-on: ${{ contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
+    # Every pool member is named twice -- here and in the make check step's
+    # worker cap, handwriting-ai at 2 and Model-Trainer at 8 -- so a package
+    # joins the pool and takes its share of the box in one edit.
+    runs-on: ${{ contains(fromJSON('["services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -382,34 +385,6 @@ jobs:
         if: ${{ hashFiles(format('{0}/pyproject.toml', matrix.package)) != '' }}
         run: poetry sync --with dev
 
-      # RustedWarfareBot only: the licensed game tree, held on the
-      # self-hosted runner's host and never in this repository. The
-      # provenance fingerprint digests the real engine jar by design, so 11
-      # tests and the coverage bar honestly require it. A runner without the
-      # tree fails HERE, naming the design, instead of nine minutes later as
-      # FileNotFoundError inside a test that looks like a code defect.
-      #
-      # The tree lives beside the other CI-only host asset under /opt/corvis
-      # and is SYMLINKED, not copied. That deliberately differs from the
-      # model-cache precedent next door (copied per job because
-      # transformers.js WRITES its cache on a miss, so a shared symlink
-      # races): this tree is immutable READ-ONLY provenance input -- nothing
-      # in the job writes it, every reader sha256-pins it -- so one shared
-      # directory across the runner pool is safe here and wrong there.
-      - name: Link the licensed game tree
-        if: matrix.package == 'clients/RustedWarfareBot'
-        run: |
-          set -euo pipefail
-          TREE=/opt/corvis/rw-game
-          if [ ! -f "$TREE/game-lib.jar" ]; then
-            echo "::error::This self-hosted runner does not hold the licensed game tree at $TREE."
-            echo "::error::Place the operator's Linux game tree there (see the board note 'RUSTED CI JAR WALL', 2026-09-07)."
-            echo "::error::The tree can never enter this public repository or any GitHub-hosted runner."
-            exit 1
-          fi
-          ln -sfn "$TREE" .game
-          ls -la .game/game-lib.jar
-
       # grandma-api only: ffmpeg for the real-conversion audio tests. The
       # package's converter shells out to the real binary by design (no
       # mocks), and the hosted ubuntu image does not carry it -- measured
@@ -420,9 +395,9 @@ jobs:
         if: matrix.package == 'services/grandma-api'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
-      # Model-Trainer only, mirror of the RWB tree-link step: assert the
-      # host assets its suite honestly requires, loudly and early, instead
-      # of 28 failures that read as code defects. /data is the settings
+      # Model-Trainer only: assert the host assets its suite honestly
+      # requires, loudly and early, instead of 28 failures that read as code
+      # defects. /data is the settings
       # default APP__DATA_ROOT (the container convention); /opt/llama.cpp
       # feeds the GGUF export tests' script finder; nvidia-smi proves the
       # GPU passthrough this runner exists to provide.
@@ -510,7 +485,7 @@ jobs:
       - name: make check
         run: |
           set -euo pipefail
-          workers='${{ matrix.package == 'services/handwriting-ai' && '2' || (contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer"]'), matrix.package) && '8' || '') }}'
+          workers='${{ matrix.package == 'services/handwriting-ai' && '2' || (matrix.package == 'services/Model-Trainer' && '8' || '') }}'
           if [ -n "$workers" ]; then
             export PYTEST_XDIST_AUTO_NUM_WORKERS="$workers"
           fi
