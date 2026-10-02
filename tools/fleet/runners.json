@@ -8,7 +8,8 @@
       "wslconfig_min_memory_gb": 26,
       "scratch_dir": "C:/fleet/stage",
       "gpu_required": true,
-      "systemd_timers": ["ci-clean.timer"],
+      "systemd_timers": ["ci-clean.timer", "fleet-runner-reaper.timer"],
+      "job_timeout_minutes": 360,
       "installs": [
         {
           "repo": "wagner-austin/API",
