@@ -30,7 +30,7 @@ from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core.archive_scope import EXCLUDE, WHOLE_TREE, archive_pathspec, owns
-from fleet.core.dialect import EXPORT_AUTHOR_EMAIL
+from fleet.core.stage_repository import EXPORT_AUTHOR_EMAIL
 
 API: Final[str] = "https://github.com/wagner-austin/API.git"
 MCPS: Final[str] = "https://github.com/wagner-austin/MCPs.git"
@@ -102,7 +102,7 @@ def _is_a_git_checkout() -> bool:
 
     AND "HEAD RESOLVES" STOPPED MEANING "CHECKOUT" ON 2026-09-26 (MCPs board
     task 6bbfd171): the runner now commits the staged export once, as
-    :data:`~fleet.core.dialect.EXPORT_AUTHOR_EMAIL`, because MCPs
+    :data:`~fleet.core.stage_repository.EXPORT_AUTHOR_EMAIL`, because MCPs
     packages/db's migrator reads ``HEAD``. The first dispatch of this suite
     after that change, c8e38453 on sedona, failed six cases here that took
     the export for a checkout. So a tree is a checkout when ``HEAD``

@@ -26,6 +26,7 @@ from fleet.core import (
     manifest,
     names,
     remote,
+    stage_repository,
     staging,
 )
 from tests.conftest import (
@@ -274,6 +275,7 @@ class TestStage:
             runner.stdin[9]
             == (
                 f"{dialect_linux.PROLOGUE}git -C {target} init --quiet\n"
+                f"git -C {target} config gc.auto 0\n"
                 f"git -C {target} add --all --force\n"
                 f"git -C {target} -c user.name=fleet -c user.email=fleet@corvis.invalid "
                 f"commit --quiet --message 'fleet export {DEMO_RUN_ID}'\n"
@@ -314,7 +316,7 @@ class TestStage:
         ) < (
             sent.index(
                 spoken.checked_script(
-                    dialect.init_repository_commands(target, DEMO_RUN_ID)
+                    stage_repository.init_repository_commands(target, DEMO_RUN_ID)
                 ).encode()
             )
         )
@@ -432,7 +434,7 @@ class TestStagingACompanion:
         assert (
             sent[7]
             == spoken.checked_script(
-                dialect.companion_repository_commands(where, landed, COMPANION_SHA, "main")
+                stage_repository.companion_repository_commands(where, landed, COMPANION_SHA, "main")
             ).encode()
         )
         assert len(runner.calls) == 9
@@ -485,7 +487,7 @@ class TestStagingACompanion:
         assert sent.index(sent[0]) < sent.index(
             dialect.for_platform(NodePlatform.LINUX)
             .checked_script(
-                dialect.companion_repository_commands(
+                stage_repository.companion_repository_commands(
                     "/home/corvis/fleet/stage/MCPs",
                     f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
                     COMPANION_SHA,

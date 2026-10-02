@@ -22,7 +22,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 from fleet.cli import _config, node_agent
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.source import ProjectCompanion
-from fleet.core import _test_hooks, dialect, records, staging
+from fleet.core import _test_hooks, dialect, records, stage_repository, staging
 from tests._node_agent_fixtures import (
     COMPANION_DIRECTORY,
     COMPANION_REF,
@@ -113,7 +113,7 @@ def _companion_commit_script() -> str:
         Its text, as the dialect renders it for a Windows node.
     """
     return dialect.for_platform(NodePlatform.WINDOWS).checked_script(
-        dialect.companion_repository_commands(
+        stage_repository.companion_repository_commands(
             "C:/fleet/stage/MCPs", "C:/fleet/stage/MCPs.stage/tree.tgz", COMPANION_SHA, "main"
         )
     )
