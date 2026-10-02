@@ -31,6 +31,14 @@ re-derives what changed, so the one definition of a transition lives beside
 the standard it reads. A kind this package does not declare is a decode
 refusal, never a line posted without being understood.
 
+**A second journal in the same shape** is MCPs
+`logs/hub-tunnel/health-events.jsonl`, appended by the hub tunnel's runner
+(`make hub-tunnel-run`, `packages/maketools`, `maketools.hub_tunnel_state`)
+with one `transitions` line each time the ssh -R tunnel into diphtheria goes
+down or comes back (MCPs board task `86c8e2c6`). The pump runs this bridge on
+it as its own row, `hub-tunnel-wake`, so each journal keeps one writer and
+its own cursor, and both post to the same standing task.
+
 The position is a byte offset beside the journal
 (`health-events.jsonl.fleet-health-wake-offset.json`), kept by
 `platform_core.journal_cursor`, the cursor lifted out of lock-wake: torn
