@@ -17,9 +17,6 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.ensemble import _hooks
-from covenant_ml.ensemble._hooks import (
-    _OptionsDict,
-)
 from covenant_ml.ensemble.regression_types import (
     RegressionEnsembleMetric,
     RegressionEnsembleOOFData,
@@ -358,7 +355,7 @@ def optimize_regression_ensemble_weights(
     )
 
     # Options
-    options: _OptionsDict = {
+    options: dict[str, int | float] = {
         "maxiter": config["max_iterations"],
         "ftol": config["tolerance"],
     }

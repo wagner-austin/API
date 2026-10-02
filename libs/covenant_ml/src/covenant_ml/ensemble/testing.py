@@ -10,10 +10,6 @@ from collections.abc import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-from covenant_ml.ensemble._hooks import (
-    _OptionsDict,
-)
-
 
 class FakeOptimizeResult:
     """Fake scipy OptimizeResult for testing."""
@@ -45,7 +41,7 @@ def fake_minimize(
     method: str,
     bounds: tuple[tuple[float, float], ...],
     constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...],
-    options: _OptionsDict,
+    options: dict[str, int | float],
 ) -> FakeOptimizeResult:
     """Fake minimize that does simple grid search.
 

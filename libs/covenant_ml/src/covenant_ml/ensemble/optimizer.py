@@ -13,10 +13,7 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.ensemble import _hooks
-from covenant_ml.ensemble._hooks import (
-    _OptimizeResultProtocol,
-    _OptionsDict,
-)
+from covenant_ml.ensemble._hooks import _OptimizeResultProtocol
 from covenant_ml.ensemble.types import (
     EnsembleOOFData,
     EnsembleWeights,
@@ -141,7 +138,7 @@ def optimize_ensemble_weights(
     )
 
     # Options
-    options: _OptionsDict = {
+    options: dict[str, int | float] = {
         "maxiter": config["max_iterations"],
         "ftol": config["tolerance"],
     }
