@@ -431,8 +431,12 @@ class TestClaimingNothing:
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         """2.2 GB free against a 4.0 GB owner reservation, as lavender read
-        at 09:58Z that day: nothing fits, so no job is taken to be refused."""
-        _test_hooks.run = FakeRun([ok(""), ok("free_ram_gb=2.2\nfree_disk_gb=243.0\n")])
+        at 09:58Z that day: nothing fits, so no job is taken to be refused.
+        The toolchain is asked first, since the tags it finds decide which
+        projects the room is sized for."""
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("free_ram_gb=2.2\nfree_disk_gb=243.0\n"), ok(""), ok(LAVENDER_2026_09_23)]
+        )
         endpoint = FakeQueue([dump_json_str({"jobs": []})])
         _test_hooks.http_post = endpoint
 

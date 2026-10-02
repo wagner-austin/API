@@ -73,8 +73,8 @@ Describe 'The toolchain probe' {
             'python=yes=Python 3.11.9', 'poetry=yes=Poetry (version 1.8.3)', 'git=yes=git version 2.46.0.windows.1',
             'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'ffmpeg=yes=ffmpeg version 9.0.1-essentials_build-www.gyan.dev',
             'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
-            'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'docker=no=',
-            $integrity)
+            'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'gpu=no=',
+            'testdb=no=', 'docker=no=', $integrity)
         [System.IO.File]::ReadAllLines($pythonCalls) | Should -Be @('--version', '-m pip --version')
         [System.IO.File]::ReadAllLines($ffmpegCalls) | Should -Be @('--version')
         [System.IO.File]::ReadAllText($vswhereCalls).Trim() |
@@ -100,6 +100,24 @@ Describe 'The toolchain probe' {
         $said[0] | Should -BeExactly 'python=yes=Python 3.11.9'
         $said[10] | Should -BeExactly 'pip=no='
         $said[11] | Should -BeExactly 'cxx=no='
+    }
+    It 'reports the CUDA device nvidia-smi lists, and none when it fails or lists nothing (MCPs 939ec5c7)' {
+        $absent = Join-Path $script:root 'absent\vswhere.exe'
+        $card = Join-Path $script:root 'card'
+        $calls = Initialize-Answer $card 'nvidia-smi' @('NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6') 0
+        $env:PATH = $card
+        $found = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })
+        $found[12] | Should -BeExactly 'gpu=yes=NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6'
+        $found[13] | Should -BeExactly 'testdb=no='
+        [System.IO.File]::ReadAllText($calls).Trim() | Should -BeExactly '--query-gpu=name,compute_cap --format=csv,noheader'
+        $failing = Join-Path $script:root 'failing'
+        [void](Initialize-Answer $failing 'nvidia-smi' @('NVIDIA-SMI has failed') 9)
+        $env:PATH = $failing
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[12] | Should -BeExactly 'gpu=no='
+        $silent = Join-Path $script:root 'silent'
+        [void](Initialize-Answer $silent 'nvidia-smi' @() 0)
+        $env:PATH = $silent
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[12] | Should -BeExactly 'gpu=no='
     }
     It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {
         $env:PATH = Join-Path $script:root 'empty'

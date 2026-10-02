@@ -102,6 +102,31 @@ class TestTheToolTagsAClaimCarries:
 
         assert endpoint.arguments[1]["tags"] == ["windows"]
 
+    def test_a_card_and_compiler_fleet_json_does_not_declare_are_claimed_and_logged(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """MCPs board task 939ec5c7, A2: what the probe finds is what the
+        runner claims with, so a node is eligible on the tick after an
+        install with no file edited, and each difference from fleet.json is
+        logged so the declaration can be corrected."""
+        found = "cxx=yes=17.14.37710.0\ngpu=yes=NVIDIA GeForce GTX 1630, 7.5\ntestdb=no=\n"
+        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23 + found)])
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.arguments[1]["tags"] == ["cxx", "gpu", "windows"]
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages[-3:] == [
+            "lavender (lavender) declares gpu none but nvidia-smi reports 'NVIDIA GeForce GTX "
+            "1630, 7.5', so it claims with the gpu tag; correct gpu in fleet.json",
+            "lavender (lavender) declares cxx none but its probe reports cxx '17.14.37710.0', so "
+            "it claims with the cxx tag; set cxx to '17.14.37710.0' in fleet.json",
+            "nothing in the node lane for lavender",
+        ]
+
 
 class TestAToolchainThatCanBuild:
     def test_a_ready_node_says_what_it_was_judged_on_and_asks_the_queue(

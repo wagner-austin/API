@@ -1,12 +1,13 @@
 """Toolchains a node declares by version and its probe re-measures every tick.
 
-MCPs board tasks 1e2da299 (``rust``) and 3f19c136 (``cxx``). The tag a
-project requires is derived from the node's declaration, and the runner's
-readiness gate compares that declaration with what the probe answered, so
-these cases pin the three halves together: the contract that reads the
-declaration, the reader that pulls the version out of a probe line, and the
-gate that refuses a node whose two disagree. The answers are diphtheria's,
-measured the evenings rustup was installed and the ``cxx`` line was added.
+MCPs board tasks 1e2da299 (``rust``) and 3f19c136 (``cxx``). The runner
+claims a toolchain's tag when its probe answers a version (MCPs board task
+939ec5c7) and compares the node's declaration with that answer every tick,
+so these cases pin the halves together: the contract that reads the
+declaration, the reader that pulls the version out of a probe line, what
+counts as detected, and the drift line a disagreement logs instead of the
+refusal it used to be. The answers are diphtheria's, measured the evenings
+rustup was installed and the ``cxx`` line was added.
 """
 
 from __future__ import annotations
@@ -14,18 +15,17 @@ from __future__ import annotations
 import re
 
 import pytest
-from platform_core.errors import FleetErrorCode
 from platform_core.json_utils import JSONTypeError
 
 from fleet.contracts.capability import (
-    MISMATCH_CODE,
     PROBE_NAME,
     STACK_IMAGES,
     STACK_NETWORK,
     Capability,
-    capability_gap,
     decode_capability,
+    detected,
     measured,
+    version_drift,
 )
 from fleet.contracts.node import declared_capability, decode_node_config, encode_node_config
 from fleet.contracts.toolchain import ToolReport
@@ -65,7 +65,7 @@ def _answered(name: str, present: bool, version: str) -> tuple[ToolReport, ...]:
 
 
 class TestTheCapabilityTables:
-    def test_each_capability_has_its_probe_line_and_refusal_code(self) -> None:
+    def test_each_capability_has_its_probe_line(self) -> None:
         assert [capability.value for capability in Capability] == [
             "rust",
             "cxx",
@@ -73,12 +73,6 @@ class TestTheCapabilityTables:
             "stack",
         ]
         assert PROBE_NAME == {RUST: "cargo", CXX: "cxx", DOCKER: "docker", STACK: "stack"}
-        assert MISMATCH_CODE == {
-            RUST: FleetErrorCode.NODE_RUST_MISMATCH,
-            CXX: FleetErrorCode.NODE_CXX_MISMATCH,
-            DOCKER: FleetErrorCode.NODE_DOCKER_MISMATCH,
-            STACK: FleetErrorCode.NODE_STACK_MISMATCH,
-        }
 
     def test_the_stack_is_the_network_and_the_three_suites_images(self) -> None:
         """What doc-extract-api, transcriber-api and pg-backup-sidecar start
@@ -128,59 +122,54 @@ class TestMeasured:
         assert measured(CXX, _answered("cxx", True, SHIM_ERROR)) == SHIM_ERROR
 
 
-class TestCapabilityGap:
-    def test_a_node_declaring_none_is_never_refused_even_with_the_toolchain(self) -> None:
+class TestDetected:
+    def test_a_version_is_a_detected_toolchain(self) -> None:
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
-        assert capability_gap(RUST, None, reports) is None
-        assert capability_gap(CXX, None, reports) is None
+        assert detected(RUST, reports)
+        assert detected(CXX, reports)
 
-    def test_the_measured_version_satisfies_its_declaration(self) -> None:
+    def test_an_absent_line_or_a_shim_s_error_is_not(self) -> None:
+        assert not detected(RUST, toolchain.read_reports(DIPHTHERIA_2026_09_23))
+        assert not detected(DOCKER, _answered("docker", False, ""))
+        assert not detected(RUST, _answered("cargo", True, SHIM_ERROR))
+
+
+class TestVersionDrift:
+    def test_a_matching_declaration_or_none_on_both_sides_is_no_drift(self) -> None:
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
-        assert capability_gap(RUST, "1.98.1", reports) is None
-        assert capability_gap(CXX, "13.3.0", reports) is None
+        assert version_drift(RUST, "1.98.1", reports) is None
+        assert version_drift(CXX, "13.3.0", reports) is None
+        assert version_drift(DOCKER, None, reports) is None
 
-    def test_a_declared_toolchain_the_probe_does_not_find_says_set_null(self) -> None:
-        assert capability_gap(RUST, "1.98.1", toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
-            "declares rust '1.98.1' but its probe reports no cargo; the declaration is what "
-            "gives a node the rust tag, so a crate build claimed on it would fail in poetry "
-            "sync. Set rust to null, or install that toolchain"
-        )
-        assert capability_gap(CXX, "17.14.36310.24", _answered("cxx", False, "")) == (
-            "declares cxx '17.14.36310.24' but its probe reports no cxx; the declaration is "
-            "what gives a node the cxx tag, so an npm ci claimed on it would fail rebuilding a "
-            "native module under node-gyp. Set cxx to null, or install that toolchain"
-        )
-        assert capability_gap(DOCKER, "29.8.1", _answered("docker", False, "")) == (
-            "declares docker '29.8.1' but its probe reports no docker; the declaration is what "
-            "gives a node the docker tag, so a deploy suite claimed on it would have no daemon it "
-            "may use, and must never use the stack's. Set docker to null, or install that "
-            "toolchain"
-        )
-        assert capability_gap(STACK, "29.8.1", _answered("stack", False, "")) == (
-            "declares stack '29.8.1' but its probe reports no stack; the declaration is what "
-            "gives a node the stack tag, so a suite that starts the stack's images claimed on it "
-            "would fail where docker run finds neither the image nor the network. Set stack to "
-            "null, or install that toolchain"
-        )
-
-    def test_another_version_names_the_one_that_would_match(self) -> None:
+    def test_an_undeclared_toolchain_is_claimed_and_named(self) -> None:
+        """Installing one makes the node eligible with no file edited."""
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
-        assert capability_gap(RUST, "1.97.0", reports) == (
-            "declares rust '1.97.0' but its probe reports cargo '1.98.1'; the declaration is "
-            "what gives a node the rust tag, so a crate build claimed on it would fail in "
-            "poetry sync. Set rust to '1.98.1', or install that toolchain"
-        )
-        assert capability_gap(CXX, "13.2.0", reports) == (
-            "declares cxx '13.2.0' but its probe reports cxx '13.3.0'; the declaration is what "
-            "gives a node the cxx tag, so an npm ci claimed on it would fail rebuilding a "
-            "native module under node-gyp. Set cxx to '13.3.0', or install that toolchain"
+        assert version_drift(RUST, None, reports) == (
+            "declares rust none but its probe reports cargo '1.98.1', so it claims with the "
+            "rust tag; set rust to '1.98.1' in fleet.json"
         )
 
-    def test_an_unreadable_answer_is_quoted_and_offers_null(self) -> None:
-        assert capability_gap(RUST, "1.98.1", _answered("cargo", True, SHIM_ERROR)) == (
-            f"declares rust '1.98.1' but its probe reports cargo {SHIM_ERROR!r}; the "
-            "declaration is what gives a node the rust tag, so a crate build claimed on it "
-            "would fail in poetry sync. Set rust to null, or install that toolchain"
+    def test_a_declared_toolchain_the_probe_does_not_find_is_claimed_without(self) -> None:
+        assert version_drift(RUST, "1.98.1", toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
+            "declares rust '1.98.1' but its probe reports no cargo, so it claims without the "
+            "rust tag; set rust to null in fleet.json"
+        )
+        assert version_drift(STACK, "29.8.1", _answered("stack", False, "")) == (
+            "declares stack '29.8.1' but its probe reports no stack, so it claims without the "
+            "stack tag; set stack to null in fleet.json"
+        )
+
+    def test_another_version_keeps_the_tag_and_names_the_one_that_would_match(self) -> None:
+        reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
+        assert version_drift(CXX, "13.2.0", reports) == (
+            "declares cxx '13.2.0' but its probe reports cxx '13.3.0', so it claims with the "
+            "cxx tag; set cxx to '13.3.0' in fleet.json"
+        )
+
+    def test_an_unreadable_answer_is_quoted_and_claims_without(self) -> None:
+        assert version_drift(RUST, "1.98.1", _answered("cargo", True, SHIM_ERROR)) == (
+            f"declares rust '1.98.1' but its probe reports cargo {SHIM_ERROR!r}, so it claims "
+            "without the rust tag; set rust to null in fleet.json"
         )
 
 
@@ -265,30 +254,20 @@ class TestTheReadinessGate:
             "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent"
         )
 
-    def test_each_disagreeing_declaration_is_refused_with_its_own_code(self) -> None:
+    def test_a_disagreeing_declaration_closes_no_gate(self) -> None:
+        """It used to refuse the node for every job (MCPs board task 939ec5c7)."""
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
-        rust = toolchain.readiness_gap(
-            "diphtheria", node("diphtheria", rust="1.97.0", cxx="13.3.0"), reports
+        assert (
+            toolchain.readiness_gap(
+                "diphtheria", node("diphtheria", rust="1.97.0", cxx="13.3.0"), reports
+            )
+            is None
         )
-        cxx = toolchain.readiness_gap(
-            "lavender",
-            node("lavender", cxx="17.14.36310.24"),
-            toolchain.read_reports(DIPHTHERIA_2026_09_27),
+        assert (
+            toolchain.readiness_gap(
+                "lavender",
+                node("lavender", cxx="17.14.36310.24"),
+                toolchain.read_reports(DIPHTHERIA_2026_09_27),
+            )
+            is None
         )
-        stated = [("", "") if gap is None else (gap.code.value, gap.message) for gap in (rust, cxx)]
-        assert stated == [
-            (
-                FleetErrorCode.NODE_RUST_MISMATCH.value,
-                "diphtheria (diphtheria) declares rust '1.97.0' but its probe reports cargo "
-                "'1.98.1'; the declaration is what gives a node the rust tag, so a crate build "
-                "claimed on it would fail in poetry sync. Set rust to '1.98.1', or install that "
-                "toolchain",
-            ),
-            (
-                FleetErrorCode.NODE_CXX_MISMATCH.value,
-                "lavender (lavender) declares cxx '17.14.36310.24' but its probe reports no cxx; "
-                "the declaration is what gives a node the cxx tag, so an npm ci claimed on it "
-                "would fail rebuilding a native module under node-gyp. Set cxx to null, or "
-                "install that toolchain",
-            ),
-        ]
