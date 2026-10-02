@@ -49,6 +49,14 @@ testdb node, failed them where ``docker run`` found neither (MCPs board task
 554bffc1): the tag means the node declares the version of the daemon its own
 account reaches, which its probe reads only while that daemon holds the
 network and the images. All four are :mod:`fleet.contracts.capability`.
+``ffmpeg`` because API ``services/grandma-api``'s check converts real audio
+files through it, and it used to be a tool every build required, so a node
+without it claimed nothing at all: pendragon logged ``NODE_TOOL_MISSING`` for
+ffmpeg on every tick of 2026-10-02 until 02:48Z while tag-free jobs waited
+(MCPs board task 939ec5c7). It is the one tag no declaration carries: a
+runner adds it when this tick's toolchain probe found the executable
+(:func:`tool_tags`), so installing ffmpeg makes the node eligible on its next
+tick, and a node without it takes every other job.
 ``elevated`` because MCPs' Task Scheduler
 installers register what only an administrator may register, and every
 build launches as an S4U task at RunLevel Limited (MCPs board task
@@ -78,14 +86,15 @@ from platform_core.members import find_member
 
 from fleet.contracts.capability import Capability
 from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
+from fleet.contracts.toolchain import ToolReport
 
 
 class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615 and 622) is the same nine words as these members' values,
-    in this order.
+    570, 571, 615, 622 and 639) is the same ten words as these members'
+    values, in this order.
     """
 
     WINDOWS = "windows"
@@ -97,6 +106,7 @@ class NodeTag(StrEnum):
     DOCKER = "docker"
     ELEVATED = "elevated"
     STACK = "stack"
+    FFMPEG = "ffmpeg"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -113,6 +123,15 @@ _CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.CXX: NodeTag.CXX,
     Capability.DOCKER: NodeTag.DOCKER,
     Capability.STACK: NodeTag.STACK,
+}
+
+#: The tag each detected tool carries, keyed by the executable the toolchain
+#: probe reports (:class:`fleet.contracts.toolchain.ToolReport`). These are
+#: the one kind of tag no declaration holds: a runner adds them when this
+#: tick's probe found the tool, so installing it makes the node eligible on
+#: its next tick and removing it takes the tag away on the next.
+TOOL_TAG: Final[dict[str, NodeTag]] = {
+    "ffmpeg": NodeTag.FFMPEG,
 }
 
 
@@ -172,6 +191,23 @@ def runner_tags(node: NodeConfig, *, elevated: bool) -> frozenset[NodeTag]:
     return carried
 
 
+def tool_tags(reports: tuple[ToolReport, ...]) -> frozenset[NodeTag]:
+    """The tags of the tools a toolchain probe found on a node.
+
+    Args:
+        reports: What the node answered this tick.
+
+    Returns:
+        :data:`TOOL_TAG`'s tag for every tool the probe reported present;
+        empty when it found none of them.
+    """
+    return frozenset(
+        TOOL_TAG[report["name"]]
+        for report in reports
+        if report["present"] and report["name"] in TOOL_TAG
+    )
+
+
 def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
     """Read one tag into the closed set.
 
@@ -195,9 +231,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
         "fleet test database, a Rust or C++ toolchain, the execution suite's rootless "
-        "Docker daemon, an elevated runner, or the corvis compose stack), and one it does "
-        "not carry could "
-        "never be satisfied"
+        "Docker daemon, an elevated runner, the corvis compose stack, or a tool its probe "
+        "found), and one it does not carry could never be satisfied"
     )
 
 
@@ -251,22 +286,23 @@ def encode_tags(tags: tuple[NodeTag, ...]) -> list[JSONValue]:
     return [tag.value for tag in tags]
 
 
-def missing_tags(node: NodeConfig, required: tuple[NodeTag, ...]) -> tuple[NodeTag, ...]:
-    """The tags a project requires that a node does not carry.
+def missing_tags(carried: frozenset[NodeTag], required: tuple[NodeTag, ...]) -> tuple[NodeTag, ...]:
+    """The tags a project requires that a runner does not carry.
 
     Args:
-        node: The node's declaration.
+        carried: The tags the runner carries: :func:`node_tags`, or a
+            runner's claim tags with :func:`tool_tags` added.
         required: The project's required tags.
 
     Returns:
         The missing tags in the project's declaration order; empty when the
-        node satisfies every requirement.
+        runner satisfies every requirement.
     """
-    carried = node_tags(node)
     return tuple(tag for tag in required if tag not in carried)
 
 
 __all__ = [
+    "TOOL_TAG",
     "NodeTag",
     "decode_node_tag",
     "decode_required_tags",
@@ -274,4 +310,5 @@ __all__ = [
     "missing_tags",
     "node_tags",
     "runner_tags",
+    "tool_tags",
 ]

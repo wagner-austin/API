@@ -156,13 +156,12 @@ PYTHON_REGISTERED_GUARD: Final = (
 #: 24 on both when this was written (OpenJS.NodeJS.LTS 24.19.0, nodejs-lts
 #: 24.21.0).
 #:
-#: ``ffmpeg`` joined on 2026-10-01 (MCPs board task 512e7bf8): grandma-api's
-#: check converts real audio through it, and no dispatchable Windows node had
-#: it (sedona and serendipity answered 'where ffmpeg' with nothing), so both
-#: of that project's fleet runs failed one case on FileNotFoundError while the
-#: hub, which has it, passed. Required of every node rather than routed by a
-#: tag, so a node without it is refused naming the install, and a new node
-#: gets it from this table. Presence is the requirement, like git and make.
+#: ``ffmpeg`` is NOT on this list, although it was from 2026-10-01 (MCPs board
+#: task 512e7bf8) to 2026-10-02: only grandma-api's check uses it, and as a
+#: tool every build required it idled a whole node for one project, which is
+#: how pendragon claimed nothing on every tick of 2026-10-02 until 02:48Z
+#: while tag-free jobs waited (MCPs board task 939ec5c7). It is a tag now:
+#: :data:`TAGGED_TOOLS`.
 REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="python",
@@ -218,6 +217,20 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         },
     ),
     RequiredTool(
+        name="tar",
+        reason="staging sends a gzipped tar and the node unpacks it",
+        install={},
+    ),
+)
+
+#: Tools only some projects need, each the source of a capability tag
+#: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
+#: them every tick like the required tools, but a node without one is refused
+#: nothing: its runners claim without the tag, so the queue hands the jobs
+#: that require it to another node, and the tick logs what is missing, which
+#: projects wait for it and the command that would install it here.
+TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
+    RequiredTool(
         name="ffmpeg",
         reason="grandma-api's check converts real audio files through ffmpeg",
         install={
@@ -228,11 +241,6 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "choco": "choco install ffmpeg -y",
             "apt-get": "sudo apt-get install -y ffmpeg",
         },
-    ),
-    RequiredTool(
-        name="tar",
-        reason="staging sends a gzipped tar and the node unpacks it",
-        install={},
     ),
 )
 
@@ -418,7 +426,7 @@ def install_command(tool: str, managers: tuple[str, ...]) -> str:
         caller must not conflate with failure: a tool this package never
         installs, and a node whose managers do not cover it.
     """
-    for required in REQUIRED_TOOLS:
+    for required in REQUIRED_TOOLS + TAGGED_TOOLS:
         if required["name"] != tool:
             continue
         for manager in managers:
@@ -527,6 +535,7 @@ __all__ = [
     "REQUIRED_NODE_MAJOR",
     "REQUIRED_PYTHON",
     "REQUIRED_TOOLS",
+    "TAGGED_TOOLS",
     "RequiredTool",
     "ToolReport",
     "available_managers",
