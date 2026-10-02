@@ -36,6 +36,7 @@ from fleet.contracts.toolchain import (
     REQUIRED_NODE_MAJOR,
     REQUIRED_PYTHON,
     REQUIRED_TOOLS,
+    TAGGED_TOOLS,
     ToolReport,
     available_managers,
     install_command,
@@ -55,15 +56,15 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
         output: The probe script's standard output.
 
     Returns:
-        One report per line naming a required tool, a package manager, a
-        declared toolchain's probe line (``cargo``, ``cxx``, ``docker``,
-        ``stack``) or
+        One report per line naming a required tool, a tagged tool
+        (``ffmpeg``), a package manager, a declared toolchain's probe line
+        (``cargo``, ``cxx``, ``docker``, ``stack``) or
         the session's token (``integrity``, :mod:`fleet.contracts.elevation`),
         in the order the node emitted them. Empty when no line did.
     """
     reports: list[ToolReport] = []
     wanted = (
-        {tool["name"] for tool in REQUIRED_TOOLS}
+        {tool["name"] for tool in REQUIRED_TOOLS + TAGGED_TOOLS}
         | set(PACKAGE_MANAGERS)
         | set(PROBE_NAME.values())
         | {INTEGRITY_PROBE}
@@ -263,7 +264,8 @@ def ready_summary(reports: tuple[ToolReport, ...]) -> str:
         v24.20.0; poetry, git, make, tar present``, followed by ``; cargo
         <answer>`` and ``; cxx <answer>`` for each declared toolchain the
         probe found, so a node that has one and declares none is visible on
-        every tick.
+        every tick, and ``; ffmpeg present`` or ``; ffmpeg absent`` for each
+        tagged tool, so the tag a runner claims with is visible beside it.
     """
     judged = {"python", "node"}
     present = [
@@ -277,10 +279,57 @@ def ready_summary(reports: tuple[ToolReport, ...]) -> str:
         for capability in Capability
         if (version := measured(capability, reports)) is not None
     )
+    lacking = absent_tagged(reports)
+    tagged = "".join(
+        f"; {tool['name']} {'absent' if tool['name'] in lacking else 'present'}"
+        for tool in TAGGED_TOOLS
+    )
     return (
         f"python {version_number(reported_version(reports, 'python'))}; "
         f"node {version_number(reported_version(reports, 'node'))}; "
-        f"{', '.join(present)} present{found}"
+        f"{', '.join(present)} present{found}{tagged}"
+    )
+
+
+def absent_tagged(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
+    """Name the tagged tools a node's probe did not find.
+
+    Args:
+        reports: What the node answered.
+
+    Returns:
+        Each :data:`fleet.contracts.toolchain.TAGGED_TOOLS` name the probe
+        reported absent or did not report at all, in the contract's order.
+    """
+    found = {report["name"] for report in reports if report["present"]}
+    return tuple(tool["name"] for tool in TAGGED_TOOLS if tool["name"] not in found)
+
+
+def tagged_gap(node_name: str, reports: tuple[ToolReport, ...]) -> str | None:
+    """Say which tagged tools a ready node lacks, and what that costs it.
+
+    Not a refusal: the node's runners claim without those tags, so the
+    queue offers the jobs that need them to another node and this one takes
+    every other job (MCPs board task 939ec5c7).
+
+    Args:
+        node_name: The node's workspace name.
+        reports: What it answered.
+
+    Returns:
+        None when the probe found every tagged tool; otherwise one line per
+        tool joined by ``; ``, naming the tool, why a project needs it and
+        the command that would install it on THIS node.
+    """
+    absent = absent_tagged(reports)
+    if not absent:
+        return None
+    managers = available_managers(reports)
+    reasons = {tool["name"]: tool["reason"] for tool in TAGGED_TOOLS}
+    return f"{node_name} claims without the tag of every tool it lacks: " + "; ".join(
+        f"{name} -- {reasons[name]}, so those jobs go to a node that has it -- "
+        f"{install_command(name, managers) or 'no automatic install on this node'}"
+        for name in absent
     )
 
 
@@ -399,6 +448,7 @@ def install_missing(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[
 
 
 __all__ = [
+    "absent_tagged",
     "attempt_toolchain",
     "install_missing",
     "install_script",
@@ -409,4 +459,5 @@ __all__ = [
     "readiness_gap",
     "ready_summary",
     "require_ready",
+    "tagged_gap",
 ]

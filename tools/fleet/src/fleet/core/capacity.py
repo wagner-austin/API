@@ -106,7 +106,9 @@ def _who_holds_it(state: NodeState) -> str:
     )
 
 
-def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> DispatchVerdict:
+def assess(
+    node: NodeConfig, state: NodeState, project: ProjectConfig, carried: frozenset[NodeTag]
+) -> DispatchVerdict:
     """Weigh one node against one project without raising.
 
     The project's ``worker_ram_gb`` overrides the node's, because what a
@@ -126,11 +128,14 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
         node: The node's declaration.
         state: What it reported when last probed.
         project: The work being dispatched.
+        carried: The tags the runner judging it carries: the node's declared
+            tags, plus on a node runner the tool tags this tick's toolchain
+            probe found (:func:`fleet.contracts.tags.tool_tags`).
 
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
-    missing = missing_tags(node, project["required_tags"])
+    missing = missing_tags(carried, project["required_tags"])
     if missing:
         return DispatchVerdict(
             workers=0,
@@ -138,9 +143,9 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
             reason=(
                 f"{node['host']} lacks {', '.join(missing)}: the project requires "
                 f"{', '.join(project['required_tags'])} and this node carries "
-                f"{', '.join(sorted(node_tags(node)))}. Tags are derived from the node's "
-                "declared platform and gpu, so the answer is another node, never this one "
-                "later."
+                f"{', '.join(sorted(carried))}. Tags come from the node's declaration and "
+                "from the tools its toolchain probe found, so the answer is another node, or "
+                "this one once the missing tool is installed."
             ),
         )
     if state["live_runs"] >= node["budget"]["max_concurrent_runs"]:
@@ -257,19 +262,22 @@ def room_for_any(
         required_tags=(),
         source=None,
     )
-    verdict = assess(node, state, default_tenant)
+    verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:
         return None
     return f"{verdict['code'].value}: {verdict['reason']}"
 
 
-def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) -> int:
+def plan_dispatch(
+    node: NodeConfig, state: NodeState, project: ProjectConfig, carried: frozenset[NodeTag]
+) -> int:
     """Decide how many workers one named node may give this project, or refuse.
 
     Args:
         node: The node's declaration.
         state: What it reported when last probed.
         project: The work being dispatched.
+        carried: The tags the dispatching runner carries (:func:`assess`).
 
     Returns:
         Workers to grant, never fewer than the project's minimum.
@@ -283,7 +291,7 @@ def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) ->
             workers than the project can use. Distinct codes because the
             fixes differ: another node, wait, clean up, or a bigger node.
     """
-    verdict = assess(node, state, project)
+    verdict = assess(node, state, project, carried)
     if verdict["code"] is not None:
         raise AppError(verdict["code"], verdict["reason"])
     return verdict["workers"]
@@ -337,6 +345,12 @@ def first_fit(
     Ties keep the earlier candidate, so a workspace's node order is a
     tie-break a person can control rather than a detail of iteration.
 
+    EACH CANDIDATE IS JUDGED ON ITS DECLARED TAGS (:func:`node_tags`). This
+    is the direct dispatch a session runs, which takes no toolchain probe, so
+    a project that requires a tool tag (``ffmpeg``) is refused
+    ``NODE_LACKS_TAG`` here; the queue's node runners, which probe the
+    toolchain every tick, are where such a project runs.
+
     A NODE THAT COULD NOT BE ASSESSED IS A REFUSAL, NOT AN ABORT, and that is
     the whole reason ``unassessed`` exists. Two of this fleet's three nodes
     are laptops; one being asleep is the ordinary case, not a fault. Measured
@@ -388,7 +402,7 @@ def first_fit(
     refusals: list[str] = [f"{entry['name']}: {entry['reason']}" for entry in unassessed]
     refused_with: list[FleetErrorCode] = []
     for name, node, state in candidates:
-        verdict = assess(node, state, project)
+        verdict = assess(node, state, project, node_tags(node))
         if verdict["code"] is not None:
             refusals.append(f"{name}: {verdict['reason']}")
             refused_with.append(verdict["code"])

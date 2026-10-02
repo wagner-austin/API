@@ -23,7 +23,7 @@ from __future__ import annotations
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.runners import RunnerSpec
-from fleet.contracts.tags import missing_tags
+from fleet.contracts.tags import missing_tags, node_tags
 from fleet.contracts.workspace import FleetWorkspace
 
 
@@ -60,7 +60,7 @@ def smallest_job_gb(node: NodeConfig, projects: tuple[ProjectConfig, ...]) -> fl
     sizes = [
         project["minimum_workers"] * project["worker_ram_gb"]
         for project in projects
-        if not missing_tags(node, project["required_tags"])
+        if not missing_tags(node_tags(node), project["required_tags"])
     ]
     return min(sizes, default=0.0)
 
