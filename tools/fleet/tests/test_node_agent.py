@@ -552,31 +552,6 @@ class TestRefusals:
         assert detail.startswith("EXPORT_FAILED: git fetch")
         assert "could not resolve host" in detail
 
-    def test_a_node_with_room_but_too_little_for_the_project_refuses_with_the_engines_code(
-        self, sourced_config: pathlib.Path
-    ) -> None:
-        """6.0 GB free is 2.0 GB past the owner's 4.0 GB reservation: one
-        1.1 GB worker, so the node passes the pre-claim gate (room for
-        something) and the claimed project, whose minimum is two workers,
-        is refused after the claim with the engine's own code."""
-        _test_hooks.run = FakeRun(
-            [
-                ok(""),
-                ok("free_ram_gb=6.0\nfree_disk_gb=860.0\n"),
-                ok(""),
-                ok(LAVENDER_2026_09_23),
-                ok(""),
-                ok(""),
-            ]
-        )
-
-        detail = self._refused_detail(sourced_config, queue_job(status="claimed"))
-
-        assert detail.startswith(
-            f"{FleetErrorCode.NODE_MEMORY_EXHAUSTED.value}: lavender affords 1 worker(s) for a "
-            "suite that declares a minimum of 2"
-        )
-
     def test_a_node_lane_job_without_a_sha_is_a_contract_fault_not_a_refusal(
         self, sourced_config: pathlib.Path
     ) -> None:

@@ -114,6 +114,7 @@ class TestClaim:
                 lane=DispatchLane.HUB,
                 tags=(),
                 node=None,
+                projects=None,
                 lease_seconds=3600,
                 identity=RUNNER_IDENTITY,
             )
@@ -132,6 +133,7 @@ class TestClaim:
             lane=DispatchLane.NODE,
             tags=(NodeTag.WINDOWS, NodeTag.GPU),
             node=None,
+            projects=None,
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
@@ -163,7 +165,8 @@ class TestClaim:
             "cwd": "C:/fleet",
         }
 
-    def test_a_node_scoped_runner_sends_its_node(self) -> None:
+    def test_a_node_scoped_runner_sends_its_node_and_the_projects_it_fits(self) -> None:
+        """MCPs board task 939ec5c7: the queue offers it only those projects."""
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -172,12 +175,14 @@ class TestClaim:
             lane=DispatchLane.NODE,
             tags=(NodeTag.WINDOWS,),
             node="lavender",
+            projects=("libs/demo", "tools/fleet"),
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
 
         assert endpoint.arguments[0]["node"] == "lavender"
         assert endpoint.arguments[0]["lane"] == "node"
+        assert endpoint.arguments[0]["projects"] == ["libs/demo", "tools/fleet"]
 
     def test_a_hub_runner_sends_the_hub_lane_and_no_tags(self) -> None:
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
@@ -188,6 +193,7 @@ class TestClaim:
             lane=DispatchLane.HUB,
             tags=(),
             node=None,
+            projects=None,
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
