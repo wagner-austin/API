@@ -375,7 +375,16 @@ board task 939ec5c7). A runner claims with what its node's toolchain probe
 answers this tick (`fleet.contracts.detection`): its platform, `gpu` when
 nvidia-smi lists a device, `testdb` when the `corvis-fleet-testdb` container
 exists, `rust`, `cxx`, `docker` and `stack` when each answers a version, and
-`ffmpeg` when the executable is found. Installing a tool therefore makes a
+`ffmpeg` when the executable is found, and `hooks` when the build account
+carries `~/.claude/corvis-hooks.json` and its system interpreter imports
+ruff, mypy, pytest, xdist and pytest_cov in one `-c` (MCPs board task
+ec895824). `hooks` routes MCPs `packages/claude-hooks`, whose check runs on
+the system interpreter as Claude Code runs the hooks and whose live suites
+reach the board through that route file; measured 2026-10-02, sedona carried
+the file and pendragon and serendipity did not. A node with pip but without
+the tools is offered `python -m pip install --user` at the versions the hub
+ran that check with; the route file only `install-hooks-node.py` writes.
+Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
 disappears takes its tag with it. Each difference from `fleet.json` is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its
