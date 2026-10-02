@@ -91,6 +91,11 @@ function Initialize-StandIn {
     <#
     .SYNOPSIS
         A .cmd that records its arguments and exits with a chosen code.
+    .DESCRIPTION
+        The redirection comes BEFORE the echo. Written after it, as
+        'echo %*>>"file"', a call whose last argument is one digit (git's
+        'config gc.auto 0', MCPs board task 939ec5c7) reads as '0>>"file"',
+        a redirect of handle 0, and its line never reaches the record.
     .PARAMETER ExitCode
         What it exits with.
     .PARAMETER Append
@@ -104,6 +109,6 @@ function Initialize-StandIn {
     $record = Join-Path $root 'arguments.txt'
     $path = Join-Path $root 'tool.cmd'
     $redirect = @{ $true = '>>'; $false = '>' }[$Append.IsPresent]
-    [System.IO.File]::WriteAllText($path, "@echo off`r`necho %*$redirect`"$record`"`r`nexit /b $ExitCode`r`n", [System.Text.Encoding]::ASCII)
+    [System.IO.File]::WriteAllText($path, "@echo off`r`n$redirect`"$record`" echo %*`r`nexit /b $ExitCode`r`n", [System.Text.Encoding]::ASCII)
     return [pscustomobject]@{ Path = $path; Record = $record }
 }
