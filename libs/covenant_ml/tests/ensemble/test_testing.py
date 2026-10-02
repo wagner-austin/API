@@ -7,9 +7,6 @@ from collections.abc import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-from covenant_ml.ensemble._hooks import (
-    _OptionsDict,
-)
 from covenant_ml.ensemble.testing import FakeOptimizeResult, fake_minimize
 
 
@@ -73,7 +70,7 @@ class TestFakeMinimize:
         constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = (
             constraint,
         )
-        options: _OptionsDict = {"maxiter": 100, "ftol": 1e-6}
+        options: dict[str, int | float] = {"maxiter": 100, "ftol": 1e-6}
 
         result = fake_minimize(
             fun=objective,
@@ -114,7 +111,7 @@ class TestFakeMinimize:
         constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = (
             constraint,
         )
-        options: _OptionsDict = {"maxiter": 100}
+        options: dict[str, int | float] = {"maxiter": 100}
 
         # Initial objective value
         initial_fun = objective(x0)
@@ -145,7 +142,7 @@ class TestFakeMinimize:
         x0 = _float_array(0.5, 0.5)
         bounds: tuple[tuple[float, float], ...] = ((0.0, 1.0), (0.0, 1.0))
         constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = ()
-        options: _OptionsDict = {"maxiter": 5}  # Low maxiter
+        options: dict[str, int | float] = {"maxiter": 5}  # Low maxiter
 
         result = fake_minimize(
             fun=counting_objective,
@@ -169,7 +166,7 @@ class TestFakeMinimize:
         x0 = _float_array(0.33, 0.33, 0.34)
         bounds: tuple[tuple[float, float], ...] = ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
         constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = ()
-        options: _OptionsDict = {"maxiter": 20}
+        options: dict[str, int | float] = {"maxiter": 20}
 
         result = fake_minimize(
             fun=objective,
