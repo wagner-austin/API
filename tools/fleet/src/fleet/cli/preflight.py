@@ -28,6 +28,7 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from fleet.cli import _config, run
 from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import capacity, probe, records
 
@@ -59,7 +60,7 @@ def preflight_named_node(loaded: _config.LoadedWorkspace, *, project: str, node:
     declared = require_node(loaded.workspace, node)
     wanted = require_project(loaded.workspace, project)
     state = probe.probe_node(declared, live_runs=records.live_runs(loaded.ledger, node=node))
-    return capacity.plan_dispatch(declared, state, wanted)
+    return capacity.plan_dispatch(declared, state, wanted, node_tags(declared))
 
 
 def preflight_fleet(loaded: _config.LoadedWorkspace, *, project: str) -> tuple[str, int]:

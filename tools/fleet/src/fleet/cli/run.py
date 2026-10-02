@@ -44,6 +44,7 @@ from fleet.contracts.lease import describe_contention
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.resources import fleet_wide
+from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import _test_hooks, capacity, dispatch, leases, probe, records
 
@@ -102,7 +103,7 @@ def choose(
                 "without --node to let the fleet choose among the machines that are.",
             )
         state = _probe(loaded, name=named, node=node)
-        return named, node, capacity.plan_dispatch(node, state, plan)
+        return named, node, capacity.plan_dispatch(node, state, plan, node_tags(node))
 
     candidates: list[tuple[str, NodeConfig, NodeState]] = []
     unassessed: list[capacity.Unassessed] = []

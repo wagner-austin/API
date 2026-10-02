@@ -13,7 +13,9 @@ kills. Now each enabled node in ``fleet.json`` has a scheduled task of its own
 (``scripts/register-node-agents.ps1``) running this command with ``--node``
 set to it, claiming from the queue's NODE lane the jobs that name it or name
 no node, and only those whose required tags the node carries
-(:func:`fleet.contracts.tags.node_tags`). The hub's ``fleet-agent`` keeps the
+(:func:`fleet.contracts.tags.node_tags`, plus the tag of every tool its
+toolchain probe found this tick, :mod:`fleet.cli.node_ready`). The hub's
+``fleet-agent`` keeps the
 HUB lane, so the two never hold each other's work. The runners live on the
 hub rather than on the nodes because the hub holds the git credentials and
 the ssh keys and the tailnet policy lets nothing else reach it.
@@ -87,11 +89,11 @@ from typing_extensions import TypedDict
 from fleet.cli import _config
 from fleet.cli import run as run_cli
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
+from fleet.cli.node_ready import Ready, ready_state
 from fleet.cli.node_start import report_started
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchLane, encode_job_line
-from fleet.contracts.elevation import elevation_gap
 from fleet.contracts.ledger import LedgerEntry
-from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import ProjectSource
 from fleet.contracts.tags import runner_tags
@@ -103,12 +105,8 @@ from fleet.core import (
     dispatch,
     elevated_yield,
     export,
-    host_report,
-    probe,
     queue,
-    records,
     run_lease,
-    toolchain,
 )
 
 _log = get_logger(__name__)
@@ -196,67 +194,6 @@ def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
     )
 
 
-def ready_state(
-    loaded: _config.LoadedWorkspace, *, alias: str, node: NodeConfig, elevated: bool
-) -> NodeState | None:
-    """Ask the node, in order, whether it may claim at all this tick.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        alias: This node's workspace name.
-        node: Its declaration.
-        elevated: Whether this is the node's elevated runner, which also
-            needs the probe to read an administrator's token.
-
-    Returns:
-        The node's measured state when it is enabled (a stale task for a
-        retired node asks nothing), answered, has room, has every tool and
-        (elevated) holds an administrator's token; otherwise None, with the
-        gate that closed and its reason logged, and for a node with a
-        ``wsl_host`` what that host reports (:mod:`fleet.core.host_report`).
-    """
-    if not node["enabled"]:
-        _log.info("%s is disabled in fleet.json; claiming nothing", alias)
-        return None
-    probed = probe.attempt_probe(node, live_runs=records.live_runs(loaded.ledger, node=alias))
-    state = probed["state"]
-    if state is None:
-        _log.info("%s did not answer; claiming nothing: %s", alias, probed["reason"])
-        if node["wsl_host"] is not None:
-            seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
-            _log.info("%s did not answer, and %s", alias, seen)
-        return None
-    projects = tuple(loaded.workspace["projects"].values())
-    full = capacity.room_for_any(node, state, projects, runner_tags(node, elevated=elevated))
-    if full is not None:
-        _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
-        return None
-    answered = toolchain.attempt_toolchain(node)
-    if not isinstance(answered, tuple):
-        _log.info(
-            "%s did not answer the toolchain probe; claiming nothing: %s: %s",
-            alias,
-            answered["code"],
-            answered["message"],
-        )
-        return None
-    gap = toolchain.readiness_gap(alias, node, answered)
-    if gap is not None:
-        _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
-        return None
-    _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
-    unelevated = elevation_gap(alias, node, answered) if elevated else None
-    if unelevated is not None:
-        _log.info(
-            "%s cannot launch elevated; claiming nothing: %s: %s",
-            alias,
-            unelevated.code,
-            unelevated.message,
-        )
-        return None
-    return state
-
-
 def claim_pass(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
@@ -290,6 +227,9 @@ def claim_pass(
     npm ci before dying at the Makefile's first python call on the Store
     alias stub (MCPs board task e62c8120), so a node missing a tool now logs
     the code, the tool and this node's install command and claims nothing.
+    A TAGGED tool it lacks closes nothing: the runner claims without that
+    tool's tag (:func:`fleet.cli.node_ready.ready_state`), so the queue keeps
+    the jobs that need it for another node (MCPs board task 939ec5c7).
 
     Returns:
         The job that was claimed, whatever became of it, or None when this
@@ -303,15 +243,15 @@ def claim_pass(
             code and message verbatim and does not propagate: transport,
             not recovery.
     """
-    state = ready_state(loaded, alias=alias, node=node, elevated=elevated)
-    if state is None or elevated_yield.yields_to_elevated(
+    ready = ready_state(loaded, alias=alias, node=node, elevated=elevated)
+    if ready is None or elevated_yield.yields_to_elevated(
         credentials, loaded.workspace, alias=alias, node=node, elevated=elevated
     ):
         return None
     job = queue.claim_next(
         credentials,
         lane=DispatchLane.NODE,
-        tags=tuple(sorted(runner_tags(node, elevated=elevated))),
+        tags=tuple(sorted(ready["tags"])),
         node=alias,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
@@ -321,7 +261,7 @@ def claim_pass(
     _log.info("claimed %s", encode_job_line(job))
     sha = require_sha(job)
     try:
-        prepared = prepare(loaded, job, node=node, state=state, sha=sha)
+        prepared = prepare(loaded, job, node=node, ready=ready, sha=sha)
     except AppError as refusal:
         return refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
     if isinstance(prepared, str):
@@ -443,7 +383,7 @@ def prepare(
     job: DispatchJob,
     *,
     node: NodeConfig,
-    state: NodeState,
+    ready: Ready,
     sha: str,
 ) -> Prepared | str:
     """Resolve, check and fetch everything a job needs before its lease.
@@ -461,7 +401,8 @@ def prepare(
         loaded: The workspace and its resolved record paths.
         job: The claimed job.
         node: This node's declaration.
-        state: What it reported when probed this tick.
+        ready: What it reported when probed this tick, and the tags its
+            runner claimed with, the project's fit judged against both.
         sha: The job's commit.
 
     The archive's scope is resolved here too, with the rest of what the
@@ -494,7 +435,7 @@ def prepare(
     export.require_install_paths(mirror, sha, source["install"])
     companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
     run_cli.require_resources_free(loaded, plan)
-    workers = capacity.plan_dispatch(node, state, plan)
+    workers = capacity.plan_dispatch(node, ready["state"], plan, ready["tags"])
     return Prepared(
         plan=plan,
         source=source,
