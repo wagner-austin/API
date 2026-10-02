@@ -117,12 +117,21 @@ def assess(
     describes this one.
 
     Checks run cheapest-consequence first: the project's required tags, then
-    concurrency, then disk, then memory. Tags come first because a node of
-    the wrong kind is refused however idle it is, and a reader told "sedona
-    is full" about a linux-only suite would wait for a node that can never
-    take it. Memory is last because its message is the most specific and a
-    reader should see it rather than a disk complaint that happens to also be
-    true.
+    disk, then cores and memory. Tags come first because a node of the wrong
+    kind is refused however idle it is, and a reader told "sedona is full"
+    about a linux-only suite would wait for a node that can never take it.
+    Memory is last because its message is the most specific and a reader
+    should see it rather than a disk complaint that happens to also be true.
+
+    HOW MANY RUNS A NODE HOLDS IS LIVE, NOT DECLARED (MCPs board task
+    939ec5c7). Every node used to declare one concurrent run, and on
+    2026-10-02 thirteen jobs queued behind four running while live probes
+    showed memory a second run could have used. Now the node's live runs are
+    charged first: the workers they were granted come off its cores and the
+    memory those workers may hold comes off its free memory, whether or not
+    they have spawned yet (:class:`fleet.contracts.node.LiveLoad`), and what
+    is left is granted. One grant is capped at :func:`job_ceiling`, so the
+    first job leaves room for a second instead of taking the whole node.
 
     Args:
         node: The node's declaration.
@@ -148,17 +157,6 @@ def assess(
                 "this one once the missing tool is installed."
             ),
         )
-    if state["live_runs"] >= node["budget"]["max_concurrent_runs"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_OWNER_RESERVED,
-            reason=(
-                f"{node['host']} already holds {state['live_runs']} fleet run(s), its declared "
-                f"limit of {node['budget']['max_concurrent_runs']}. Memory is checked against "
-                "a snapshot, so this second bound exists because three dispatches that each "
-                "fit alone do not fit together."
-            ),
-        )
     if state["free_disk_gb"] < node["budget"]["max_disk_gb"]:
         return DispatchVerdict(
             workers=0,
@@ -169,10 +167,14 @@ def assess(
                 "dispatch to a node is a cold stage of a whole monorepo."
             ),
         )
-    workers = admissible_workers(
-        {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]},
-        logical_cores=node["logical_cores"],
-        free_ram_gb=state["free_ram_gb"],
+    live = state["live"]
+    workers = min(
+        admissible_workers(
+            {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]},
+            logical_cores=node["logical_cores"] - live["workers"],
+            free_ram_gb=state["free_ram_gb"] - live["ram_gb"],
+        ),
+        job_ceiling(node, project),
     )
     if workers <= 0:
         return DispatchVerdict(
@@ -182,7 +184,8 @@ def assess(
                 f"{node['host']} has {state['free_ram_gb']:.1f} GB free against a reservation "
                 f"of {node['budget']['reserved_ram_gb']:.1f} GB for whoever is using it, and "
                 f"{node['logical_cores']} cores against {node['budget']['reserved_cores']} "
-                f"reserved. Nothing is left for a dispatch; {_who_holds_it(state)}."
+                f"reserved{_live_clause(state)}. Nothing is left for a dispatch; "
+                f"{_who_holds_it(state)}."
             ),
         )
     if workers < project["minimum_workers"]:
@@ -193,12 +196,51 @@ def assess(
                 f"{node['host']} affords {workers} worker(s) for a suite that declares a "
                 f"minimum of {project['minimum_workers']}: {state['free_ram_gb']:.1f} GB "
                 f"free, {project['worker_ram_gb']:.1f} GB per worker, "
-                f"{node['budget']['reserved_ram_gb']:.1f} GB reserved for the node's owner. "
-                "Dispatching anyway would run a suite at a fraction of its workers until its "
-                "own lease expired underneath it."
+                f"{node['budget']['reserved_ram_gb']:.1f} GB reserved for the node's owner"
+                f"{_live_clause(state)}. Dispatching anyway would run a suite at a fraction of "
+                "its workers until its own lease expired underneath it."
             ),
         )
     return DispatchVerdict(workers=workers, code=None, reason="")
+
+
+def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
+    """The most workers one dispatch may be granted on a node.
+
+    Half the cores the node's owner leaves, rounded up, and never below the
+    project's own minimum: a suite spends real time in serial install and
+    build phases and xdist scales below linearly, so two half-width runs keep
+    a node busier than one full-width one, and the cores pool in
+    :func:`assess` still bounds the sum.
+
+    Args:
+        node: The node's declaration.
+        project: The work being dispatched.
+
+    Returns:
+        The ceiling, at least ``project['minimum_workers']``.
+    """
+    spare = node["logical_cores"] - node["budget"]["reserved_cores"]
+    return max(project["minimum_workers"], -(-spare // 2))
+
+
+def _live_clause(state: NodeState) -> str:
+    """Name what a node's live runs hold, for a capacity refusal.
+
+    Args:
+        state: What the node reported.
+
+    Returns:
+        An empty string when no fleet run is live on the node; otherwise
+        ``, and its N live fleet run(s) hold W worker(s) and X GB``.
+    """
+    live = state["live"]
+    if live["runs"] == 0:
+        return ""
+    return (
+        f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) and "
+        f"{live['ram_gb']:.1f} GB"
+    )
 
 
 def room_for_any(
@@ -238,8 +280,8 @@ def room_for_any(
 
     Returns:
         None when the node could take one worker of the smallest project it
-        can serve (concurrency under the limit, disk for a staged tree,
-        memory after the owner's reservation), else the ``CODE: reason`` line
+        can serve (disk for a staged tree, then cores and memory after the
+        owner's reservation and the node's live runs), else the ``CODE: reason`` line
         saying why it can take nothing, worded as :func:`assess` would word
         the same refusal, or ``NODE_LACKS_TAG`` when no registered project's
         tags fit this runner at all.
@@ -285,8 +327,8 @@ def plan_dispatch(
     Raises:
         AppError: With ``NODE_LACKS_TAG`` when the node is missing a tag the
             project requires, ``NODE_OWNER_RESERVED`` when nothing is left
-            after the owner's reservation or the node is at its concurrency
-            limit, ``NODE_DISK_EXHAUSTED`` when the staged tree would not
+            after the owner's reservation and the node's live runs,
+            ``NODE_DISK_EXHAUSTED`` when the staged tree would not
             fit, or ``NODE_MEMORY_EXHAUSTED`` when the node affords fewer
             workers than the project can use. Distinct codes because the
             fixes differ: another node, wait, clean up, or a bigger node.
@@ -422,6 +464,7 @@ __all__ = [
     "Unassessed",
     "assess",
     "first_fit",
+    "job_ceiling",
     "plan_dispatch",
     "room_for_any",
 ]

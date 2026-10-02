@@ -53,10 +53,6 @@ class NodeBudget(TypedDict):
             a box ends up holding 77.9 GB. ~1.1 GB is the measured figure for
             a worker that imports torch; a project whose suite does not is
             entitled to declare less and get more workers.
-        max_concurrent_runs: How many fleet dispatches may be live on this
-            node at once, across all projects. A second bound on top of the
-            memory arithmetic, because memory is checked against a snapshot
-            and three dispatches that each fit alone do not fit together.
         max_disk_gb: Gigabytes the staged working trees may occupy in total.
             Counted because the first dispatch to a node is a cold stage of a
             whole monorepo, and a node that fills its system drive is a node
@@ -66,7 +62,6 @@ class NodeBudget(TypedDict):
     reserved_cores: int
     reserved_ram_gb: float
     worker_ram_gb: float
-    max_concurrent_runs: int
     max_disk_gb: float
 
 
@@ -114,7 +109,6 @@ def encode_node_budget(budget: NodeBudget) -> JSONObject:
         "reserved_cores": budget["reserved_cores"],
         "reserved_ram_gb": budget["reserved_ram_gb"],
         "worker_ram_gb": budget["worker_ram_gb"],
-        "max_concurrent_runs": budget["max_concurrent_runs"],
         "max_disk_gb": budget["max_disk_gb"],
     }
 
@@ -154,12 +148,6 @@ def decode_node_budget(value: JSONValue) -> NodeBudget:
             f"reserved_ram_gb={reserved_ram_gb}; a negative reservation reads as permission "
             "to take more of the machine than it has"
         )
-    max_concurrent_runs = require_int(value, "max_concurrent_runs")
-    if max_concurrent_runs < 1:
-        raise JSONTypeError(
-            f"max_concurrent_runs must be at least 1, got {max_concurrent_runs}; a node that "
-            "may hold no runs is spelled by leaving it out of the workspace"
-        )
     max_disk_gb = require_float(value, "max_disk_gb")
     if max_disk_gb <= 0.0:
         raise JSONTypeError(f"max_disk_gb must be positive, got {max_disk_gb}")
@@ -167,7 +155,6 @@ def decode_node_budget(value: JSONValue) -> NodeBudget:
         reserved_cores=reserved_cores,
         reserved_ram_gb=reserved_ram_gb,
         worker_ram_gb=worker_ram_gb,
-        max_concurrent_runs=max_concurrent_runs,
         max_disk_gb=max_disk_gb,
     )
 

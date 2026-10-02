@@ -65,7 +65,8 @@ def ready_state(
     if not node["enabled"]:
         _log.info("%s is disabled in fleet.json; claiming nothing", alias)
         return None
-    probed = probe.attempt_probe(node, live_runs=records.live_runs(loaded.ledger, node=alias))
+    live = records.live_load(loaded.ledger, node=alias, projects=loaded.workspace["projects"])
+    probed = probe.attempt_probe(node, live=live)
     state = probed["state"]
     if state is None:
         _log.info("%s did not answer; claiming nothing: %s", alias, probed["reason"])

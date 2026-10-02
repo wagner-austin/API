@@ -59,7 +59,8 @@ def preflight_named_node(loaded: _config.LoadedWorkspace, *, project: str, node:
     """
     declared = require_node(loaded.workspace, node)
     wanted = require_project(loaded.workspace, project)
-    state = probe.probe_node(declared, live_runs=records.live_runs(loaded.ledger, node=node))
+    live = records.live_load(loaded.ledger, node=node, projects=loaded.workspace["projects"])
+    state = probe.probe_node(declared, live=live)
     return capacity.plan_dispatch(declared, state, wanted, node_tags(declared))
 
 
@@ -86,8 +87,8 @@ def preflight_fleet(loaded: _config.LoadedWorkspace, *, project: str) -> tuple[s
     wanted = require_project(loaded.workspace, project)
     candidates: list[tuple[str, NodeConfig, NodeState]] = []
     for name, declared in sorted(loaded.workspace["nodes"].items()):
-        live = records.live_runs(loaded.ledger, node=name)
-        candidates.append((name, declared, probe.probe_node(declared, live_runs=live)))
+        live = records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"])
+        candidates.append((name, declared, probe.probe_node(declared, live=live)))
     return capacity.first_fit(tuple(candidates), wanted)
 
 

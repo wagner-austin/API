@@ -23,7 +23,7 @@ the reasons were only in each runner's daily log on the hub: sedona held 2.9 GB
 free against its 4.0 GB reservation, lavender 2.2 GB against 6.0 GB. So a
 reachable node's line ends with every runner's own pre-claim verdict,
 :func:`fleet.core.capacity.room_for_any` on the same probe (the owner's
-reservation against free memory, the concurrency its live runs hold, disk),
+reservation against free memory, the cores and memory its live runs hold, disk),
 for its node lane and, where it declares one, its elevated lane; and an
 unreachable node inside another machine's WSL adds what that host reports.
 
@@ -157,9 +157,9 @@ def _probe_line(loaded: _config.LoadedWorkspace, name: str, node: NodeConfig) ->
     Returns:
         The line to print, and 1 when the node did not answer.
     """
-    live = records.live_runs(loaded.ledger, node=name)
+    live = records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"])
     try:
-        state = probe.probe_node(node, live_runs=live)
+        state = probe.probe_node(node, live=live)
     except AppError as unreachable:
         line = f"{name}: UNREACHABLE -- {unreachable.message}"
         if node["wsl_host"] is not None:

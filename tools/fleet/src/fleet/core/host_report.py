@@ -79,7 +79,8 @@ def describe_wsl_host(workspace: FleetWorkspace, ledger: pathlib.Path, host_name
         state, or why the host could not say.
     """
     host = require_node(workspace, host_name)
-    probed = probe.attempt_probe(host, live_runs=records.live_runs(ledger, node=host_name))
+    live = records.live_load(ledger, node=host_name, projects=workspace["projects"])
+    probed = probe.attempt_probe(host, live=live)
     state = probed["state"]
     if state is None:
         return f"its host {host_name} did not answer either: {probed['reason']}"

@@ -125,7 +125,8 @@ def choose(
         # ``capacity.first_fit``'s ``unassessed`` for the dispatch that was
         # refused because loki was asleep while lavender had room.
         outcome = probe.attempt_probe(
-            declared, live_runs=records.live_runs(loaded.ledger, node=name)
+            declared,
+            live=records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"]),
         )
         answered: NodeState | None = outcome["state"]
         if answered is None:
@@ -190,7 +191,8 @@ def _probe(loaded: _config.LoadedWorkspace, *, name: str, node: NodeConfig) -> N
     Raises:
         AppError: With ``NODE_UNREACHABLE`` if it does not answer.
     """
-    return probe.probe_node(node, live_runs=records.live_runs(loaded.ledger, node=name))
+    live = records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"])
+    return probe.probe_node(node, live=live)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

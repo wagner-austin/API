@@ -34,7 +34,7 @@ from typing import TypedDict
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodeState, SliceMemory
+from fleet.contracts.node import LiveLoad, NodeConfig, NodeState, SliceMemory
 from fleet.core import dialect, names, remote
 
 #: The numeric fields a node must report before anything can be decided about it.
@@ -65,15 +65,15 @@ class ProbeOutcome(TypedDict):
     reason: str
 
 
-def read_state(host: str, output: str, *, live_runs: int) -> ProbeOutcome:
+def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
     """Read a probe's output into a node's live state, or say why not.
 
     Args:
         host: The node that produced it, carried into the state so a reading
             cannot later be attributed to the wrong machine.
         output: The probe script's standard output.
-        live_runs: Fleet dispatches currently live on the node, counted from
-            the ledger rather than probed -- see the module docstring.
+        live: What the node's live fleet runs were granted, read from the
+            ledger rather than probed -- see the module docstring.
 
     Returns:
         What the node reported, or the reason its answer could not be read.
@@ -98,14 +98,14 @@ def read_state(host: str, output: str, *, live_runs: int) -> ProbeOutcome:
             host=host,
             free_ram_gb=readings["free_ram_gb"],
             free_disk_gb=readings["free_disk_gb"],
-            live_runs=live_runs,
+            live=live,
             ci_slice=ci_slice,
         ),
         reason="",
     )
 
 
-def parse_probe(host: str, output: str, *, live_runs: int) -> NodeState:
+def parse_probe(host: str, output: str, *, live: LiveLoad) -> NodeState:
     """Read a probe's output into a node's live state.
 
     The raising boundary over :func:`read_state`.
@@ -113,7 +113,7 @@ def parse_probe(host: str, output: str, *, live_runs: int) -> NodeState:
     Args:
         host: The node that produced it.
         output: The probe script's standard output.
-        live_runs: Fleet dispatches currently live on the node.
+        live: What the node's live fleet runs were granted.
 
     Returns:
         What the node reported.
@@ -127,7 +127,7 @@ def parse_probe(host: str, output: str, *, live_runs: int) -> NodeState:
             the usual cause is a PowerShell error printed where a number was
             expected.
     """
-    outcome = read_state(host, output, live_runs=live_runs)
+    outcome = read_state(host, output, live=live)
     state = outcome["state"]
     if state is None:
         raise AppError(FleetErrorCode.NODE_UNREACHABLE, outcome["reason"])
@@ -221,7 +221,7 @@ def _is_number(value: str) -> bool:
     return digits.isdigit()
 
 
-def attempt_probe(node: NodeConfig, *, live_runs: int) -> ProbeOutcome:
+def attempt_probe(node: NodeConfig, *, live: LiveLoad) -> ProbeOutcome:
     """Ask a node what it has free, reporting failure as a value.
 
     What auto-select uses. A node that is powered off, that refuses ssh, or
@@ -230,7 +230,7 @@ def attempt_probe(node: NodeConfig, *, live_runs: int) -> ProbeOutcome:
 
     Args:
         node: The node to probe.
-        live_runs: Fleet dispatches currently live on it, from the ledger.
+        live: What its live fleet runs were granted, from the ledger.
 
     Returns:
         Its live state, or why nothing could be read from it.
@@ -251,10 +251,10 @@ def attempt_probe(node: NodeConfig, *, live_runs: int) -> ProbeOutcome:
     failure = outcome["failure"]
     if failure is not None:
         return ProbeOutcome(state=None, reason=failure["message"])
-    return read_state(node["host"], outcome["output"], live_runs=live_runs)
+    return read_state(node["host"], outcome["output"], live=live)
 
 
-def probe_node(node: NodeConfig, *, live_runs: int) -> NodeState:
+def probe_node(node: NodeConfig, *, live: LiveLoad) -> NodeState:
     """Ask a node what it has free.
 
     The raising boundary over :func:`attempt_probe`, for a caller that has
@@ -263,7 +263,7 @@ def probe_node(node: NodeConfig, *, live_runs: int) -> NodeState:
 
     Args:
         node: The node to probe.
-        live_runs: Fleet dispatches currently live on it, from the ledger.
+        live: What its live fleet runs were granted, from the ledger.
 
     Returns:
         Its live state.
@@ -273,7 +273,7 @@ def probe_node(node: NodeConfig, *, live_runs: int) -> NodeState:
             answer cannot be read, or ``DISPATCH_FAILED`` if the probe script
             itself exits non-zero.
     """
-    outcome = attempt_probe(node, live_runs=live_runs)
+    outcome = attempt_probe(node, live=live)
     state = outcome["state"]
     if state is None:
         raise AppError(FleetErrorCode.NODE_UNREACHABLE, outcome["reason"])

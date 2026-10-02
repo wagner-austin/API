@@ -202,6 +202,30 @@ class SliceMemory(TypedDict):
     high_gb: float
 
 
+class LiveLoad(TypedDict):
+    """What a node's live fleet runs were granted, read from the ledger.
+
+    The share of the node a capacity check must treat as taken before it
+    grants anything more (MCPs board task 939ec5c7). A run's workers spawn
+    after its probe, so the probe's free memory cannot be trusted to show
+    them; charging every live run its whole grant is what lets several runs
+    share a node without three that each fit a snapshot overloading it
+    together, the hazard a fixed one-run limit used to guard.
+
+    Attributes:
+        runs: Fleet dispatches currently live on the node, counted from the
+            ledger rather than from the process table -- a run is ours
+            because we recorded it, not because a process looks like one.
+        workers: The test workers those runs were granted, in total.
+        ram_gb: The memory those workers may hold: each run's workers times
+            its project's ``worker_ram_gb``.
+    """
+
+    runs: int
+    workers: int
+    ram_gb: float
+
+
 class NodeState(TypedDict):
     """What a node reported when it was last probed.
 
@@ -215,9 +239,7 @@ class NodeState(TypedDict):
             the wrong node after being passed around.
         free_ram_gb: Physical memory free at probe time.
         free_disk_gb: Free space on the staging drive at probe time.
-        live_runs: Fleet dispatches currently live on this node, counted from
-            the ledger rather than from the process table -- a run is ours
-            because we recorded it, not because a process looks like one.
+        live: What this node's live fleet runs were granted (:class:`LiveLoad`).
         ci_slice: The node's ``runners.slice`` memory, or None where the
             node has no such cgroup (every Windows node, and every linux
             node that hosts no CI runners). Read so a refusal can say CI
@@ -228,7 +250,7 @@ class NodeState(TypedDict):
     host: str
     free_ram_gb: float
     free_disk_gb: float
-    live_runs: int
+    live: LiveLoad
     ci_slice: SliceMemory | None
 
 
@@ -526,11 +548,13 @@ def describe_node(node: NodeConfig, state: NodeState) -> str:
     card = "cpu-only" if gpu is None else f"{gpu['model']} sm_{gpu['compute_capability']}"
     return (
         f"{node['host']}: {card}, {state['free_ram_gb']:.1f}/{node['ram_gb']:.1f} GB RAM free, "
-        f"{state['free_disk_gb']:.0f} GB disk free, {state['live_runs']} live run(s)"
+        f"{state['free_disk_gb']:.0f} GB disk free, {state['live']['runs']} live run(s) "
+        f"holding {state['live']['workers']} worker(s)"
     )
 
 
 __all__ = [
+    "LiveLoad",
     "NodeConfig",
     "NodeGpu",
     "NodePlatform",

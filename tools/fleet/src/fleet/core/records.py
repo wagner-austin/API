@@ -18,12 +18,15 @@ prevent. The reader raises and names the line number.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Mapping
 
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
 from fleet.contracts.feed import FeedEvent, decode_feed_event, encode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledger_entry, is_live
+from fleet.contracts.node import LiveLoad
+from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks
 
 
@@ -85,12 +88,12 @@ def latest_rows(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
 
     THE LEDGER IS APPEND-ONLY, SO A FINISHED RUN STILL HAS A RUNNING ROW IN
     IT. Anything asking what is happening now must therefore reduce to the
-    last row per id, and the first version of :func:`live_runs` did not:
-    it counted every row whose outcome was ``running``, including the ones
+    last row per id, and the first version of the live count did not: it
+    counted every row whose outcome was ``running``, including the ones
     already superseded. Measured 2026-09-04 on the second real dispatch --
-    sedona declares ``max_concurrent_runs: 1``, and having run and CANCELLED
-    exactly one dispatch it refused every future one as already full. A
-    node's live count could only ever go up.
+    sedona then allowed one live run, and having run and CANCELLED exactly
+    one dispatch it refused every future one as already full. A node's live
+    count could only ever go up.
 
     Args:
         path: The ledger file.
@@ -108,18 +111,37 @@ def latest_rows(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
     return tuple(latest.values())
 
 
-def live_runs(path: pathlib.Path, *, node: str) -> int:
-    """Count the dispatches still holding resources on one node.
+def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectConfig]) -> LiveLoad:
+    """Sum what the dispatches still holding resources on one node were granted.
 
     Args:
         path: The ledger file.
         node: The node's workspace name.
+        projects: Every registered project, for each run's ``worker_ram_gb``.
 
     Returns:
         How many dispatches on that node are CURRENTLY running -- see
-        :func:`latest_rows` for why the distinction is load-bearing.
+        :func:`latest_rows` for why the distinction is load-bearing -- with
+        the workers they were granted and the memory those workers may hold.
+
+    Raises:
+        AppError: With ``WORKSPACE_PROJECT_UNKNOWN`` when a live run's project
+            is no longer registered, since what its workers cost is then
+            unknown, and guessing low is how a node gets overloaded.
     """
-    return sum(1 for row in latest_rows(path) if row["node"] == node and is_live(row))
+    live = [row for row in latest_rows(path) if row["node"] == node and is_live(row)]
+    ram_gb = 0.0
+    for row in live:
+        project = projects.get(row["project"])
+        if project is None:
+            raise AppError(
+                FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN,
+                f"live run {row['run_id']} on {node} is of {row['project']}, which fleet.json no "
+                "longer registers, so what its workers hold is unknown; register the project "
+                "again or let the run end before this node takes more work",
+            )
+        ram_gb += row["workers"] * project["worker_ram_gb"]
+    return LiveLoad(runs=len(live), workers=sum(row["workers"] for row in live), ram_gb=ram_gb)
 
 
 def append_ledger(path: pathlib.Path, entry: LedgerEntry) -> None:
@@ -170,7 +192,7 @@ __all__ = [
     "append_feed",
     "append_ledger",
     "latest_rows",
-    "live_runs",
+    "live_load",
     "read_feed",
     "read_ledger",
 ]
