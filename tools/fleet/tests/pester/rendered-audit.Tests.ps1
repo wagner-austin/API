@@ -35,7 +35,7 @@ BeforeAll {
     }
 
     # A process row as Win32_Process answers it.
-    function New-Process {
+    function Get-ProcessRow {
         param([int]$Id, [int]$Parent, [string]$Name, [string]$Path, [object]$Created)
         return [pscustomobject]@{ ProcessId = $Id; ParentProcessId = $Parent; Name = $Name; CommandLine = "`"$Path`" --run"; ExecutablePath = $Path; CreationDate = $Created }
     }
@@ -69,8 +69,8 @@ BeforeAll {
             $stale = [System.Collections.Generic.List[object]]::new()
             $id = 9000
             foreach ($root in @(Get-RunnerRoot $Name)) {
-                $stale.Add((New-Process ($id++) 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
-                $stale.Add((New-Process ($id++) 1 'unread.exe' "${root}_work\unread.exe" $null))
+                $stale.Add((Get-ProcessRow ($id++) 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
+                $stale.Add((Get-ProcessRow ($id++) 1 'unread.exe' "${root}_work\unread.exe" $null))
             }
             $table = $stale.ToArray()
             $readProcesses = { $table }.GetNewClosure()
@@ -167,7 +167,7 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
     }
     It 'drifts only the runner whose own directory holds a stale leftover, never a sibling runner sharing its prefix' {
         $roots = @(Get-RunnerRoot $script:name)
-        $stale = New-Process 9100 1 'stale.exe' "$($roots[0])_work\stale.exe" (Get-Date).AddDays(-2)
+        $stale = Get-ProcessRow 9100 1 'stale.exe' "$($roots[0])_work\stale.exe" (Get-Date).AddDays(-2)
         $variant = Initialize-Host $script:name -Processes @($stale)
         $drifted = @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' })
         $drifted.Count | Should -Be 1
@@ -176,14 +176,14 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
     It 'counts nothing while a Runner.Worker runs in the service''s tree, walking a reused parent id without looping' {
         $root = @(Get-RunnerRoot $script:name)[0]
         $variant = Initialize-Host $script:name -Processes @(
-            (New-Process 4000 4001 'Runner.Listener.exe' "${root}bin\Runner.Listener.exe" (Get-Date).AddDays(-3)),
-            (New-Process 4001 4000 'Runner.Worker.exe' "${root}bin\Runner.Worker.exe" (Get-Date).AddMinutes(-5)),
-            (New-Process 9200 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
+            (Get-ProcessRow 4000 4001 'Runner.Listener.exe' "${root}bin\Runner.Listener.exe" (Get-Date).AddDays(-3)),
+            (Get-ProcessRow 4001 4000 'Runner.Worker.exe' "${root}bin\Runner.Worker.exe" (Get-Date).AddMinutes(-5)),
+            (Get-ProcessRow 9200 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
         @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' }).Count | Should -Be 0
     }
     It 'counts nothing younger than the host''s job timeout' {
         $root = @(Get-RunnerRoot $script:name)[0]
-        $variant = Initialize-Host $script:name -Processes @((New-Process 9300 1 'young.exe' "${root}_work\young.exe" (Get-Date).AddMinutes(-5)))
+        $variant = Initialize-Host $script:name -Processes @((Get-ProcessRow 9300 1 'young.exe' "${root}_work\young.exe" (Get-Date).AddMinutes(-5)))
         @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' }).Count | Should -Be 0
     }
     It 'asks each WSL runner''s own PATH for the GPU' {
