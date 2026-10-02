@@ -32,6 +32,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core.runner_install import RUNNER_VERSION, install_root_for, token_variable
+from fleet.core.runner_reaper_render import render_kill_mode_lines, render_reaper_lines
 from fleet.core.runner_recovery import render_wsl_recovery_lines
 from fleet.core.runner_slice_render import render_runner_slice_lines, render_slice_unit_lines
 from fleet.core.runner_windows_provision import render_windows_provision_script
@@ -255,6 +256,7 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         ),
         f"[ -f {directory}/.service ] || (cd {directory} && ./svc.sh install gharunner)",
         *render_wsl_recovery_lines(install),
+        *render_kill_mode_lines(install),
         f"(cd {directory} && ./svc.sh start)",
         *render_runner_slice_lines(install),
     ]
@@ -300,6 +302,8 @@ def _render_linux_script(spec: HostRunnerSpec) -> str:
             lines += _render_asset_lines(asset)
     lines += ["", "# --- the runners' share of the VM (MCPs board task 45a4f22b) ---"]
     lines += render_slice_unit_lines(spec["ci_slice"])
+    lines += ["", "# --- what a finished job leaves behind (MCPs board task 53528106) ---"]
+    lines += render_reaper_lines()
     lines += ["", "# --- runner installs ---"]
     # wsl-side installs only: windows-side ones are provision.ps1's, in
     # their own execution environment.

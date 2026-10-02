@@ -41,6 +41,13 @@ from fleet.core.runner_machine_env import (
     machine_variable_check_id,
     render_machine_environment_check_lines,
 )
+from fleet.core.runner_orphan_check import (
+    LEFTOVER_FUNCTION,
+    ORPHAN_REASON,
+    PROCESS_PARAMETER,
+    orphan_check_id,
+    render_orphan_check_lines,
+)
 from fleet.core.script_values import scriptable
 
 #: File name the rendered audit script lands under in the host's scratch_dir.
@@ -193,6 +200,7 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
                     check_id=service_account_check_id(install), reason=SERVICE_ACCOUNT_REASON
                 )
             )
+        checks.append(ExpectedCheck(check_id=orphan_check_id(install), reason=ORPHAN_REASON))
     for asset in spec["assets"]:
         checks.append(ExpectedCheck(check_id=f"asset:{asset['path']}", reason=asset["reason"]))
         if asset["sha256"] is not None:
@@ -357,6 +365,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         "    [scriptblock]$GetService = { param([string]$Name) "
         "@(Get-CimInstance Win32_Service -Filter \"Name='$Name'\") },",
         "    [scriptblock]$TestWorkdir = { param([string]$Path) Test-Path -LiteralPath $Path },",
+        f"    {PROCESS_PARAMETER},",
         "    [string]$Git = 'git',",
         "    " + system32_parameter("Schtasks", "schtasks.exe") + ",",
         "    " + system32_parameter("Wsl", "wsl.exe") + ",",
@@ -387,6 +396,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         "    param([string]$Shell, [string]$WslPath, [string]$Name, [string]$Command)",
         '    return Invoke-Probe $Shell "`"$WslPath`" -d $Name -- $Command"',
         "}",
+        *LEFTOVER_FUNCTION,
     ]
     keepalive = spec["keepalive_task"]
     if keepalive is not None:
@@ -458,6 +468,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
                 f"('Test-Path {workdir}')",
                 *render_service_account_check_lines(install),
             ]
+        lines += render_orphan_check_lines(spec, install)
     for asset in spec["assets"]:
         path = scriptable(asset["path"], label="asset path")
         lines += _emit_wsl_test_check(f"asset:{path}", "-e", path)

@@ -33,6 +33,7 @@ from platform_core.json_utils import (
     JSONValue,
     require_bool,
     require_dict,
+    require_int,
     require_list,
     require_str,
     require_str_list,
@@ -166,6 +167,10 @@ class HostRunnerSpec(TypedDict):
         systemd_timers: Timers that must be enabled inside the execution
             environment, e.g. ``ci-clean.timer`` -- hygiene is part of the
             provision, not an afterthought on one box's disk.
+        job_timeout_minutes: The longest ``timeout-minutes`` any job these
+            runners take may declare. A runner holding a process older than
+            this with no ``Runner.Worker`` alive is holding what a finished
+            job left (MCPs board task 53528106), which the audit fails.
         installs: Every runner install this host carries.
         assets: Every path its job classes require.
         base: What a stock Windows install needs before any runner can
@@ -184,6 +189,7 @@ class HostRunnerSpec(TypedDict):
     scratch_dir: str
     gpu_required: bool
     systemd_timers: list[str]
+    job_timeout_minutes: int
     installs: list[RunnerInstall]
     assets: list[FileAsset]
     base: HostBase
@@ -391,6 +397,7 @@ def encode_host_runner_spec(spec: HostRunnerSpec) -> JSONObject:
         "scratch_dir": spec["scratch_dir"],
         "gpu_required": spec["gpu_required"],
         "systemd_timers": list(spec["systemd_timers"]),
+        "job_timeout_minutes": spec["job_timeout_minutes"],
         "installs": [encode_runner_install(install) for install in spec["installs"]],
         "assets": [encode_file_asset(asset) for asset in spec["assets"]],
         "base": encode_host_base(spec["base"]),
@@ -437,7 +444,7 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, an optional concept is absent rather than null, or the
-            memory floor is not positive.
+            memory floor or the job timeout is not positive.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"host must be a JSON object, got {type(value).__name__}")
@@ -462,6 +469,12 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
                 "nothing is the host default spelled confusingly"
             )
         memory = raw_memory
+    job_timeout = require_int(value, "job_timeout_minutes")
+    if job_timeout <= 0:
+        raise JSONTypeError(
+            f"job_timeout_minutes must be positive, got {job_timeout}; every job a runner "
+            "takes is bounded, and the audit measures a finished job's leftovers against it"
+        )
     installs = [decode_runner_install(entry) for entry in require_list(value, "installs")]
     if not installs:
         raise JSONTypeError(
@@ -477,6 +490,7 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
         scratch_dir=require_str(value, "scratch_dir"),
         gpu_required=require_bool(value, "gpu_required"),
         systemd_timers=require_str_list(value, "systemd_timers"),
+        job_timeout_minutes=job_timeout,
         installs=installs,
         assets=[decode_file_asset(entry) for entry in require_list(value, "assets")],
         base=decode_host_base(require_dict(value, "base")),
