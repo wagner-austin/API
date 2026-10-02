@@ -7,7 +7,8 @@ table; ``systemctl``, ``kill`` and ``getconf`` are shell functions defined
 before the script runs, which answer from the table and record what was
 killed. The table mirrors lavender on 2026-10-02: a runner unit whose main
 process is ``runsvc.sh``, under it the node service and ``Runner.Listener``,
-and beside them processes a cancelled job reparented to init.
+and beside them processes a cancelled job reparented to init, one started
+before the next job's Worker and one after it.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ systemctl() {
     esac
 }
 kill() {
-    if [ -e "$TABLE/unkillable/$2" ]; then
+    if [ -e "$TABLE/unkillable/$2" ] || [ ! -e "$TABLE/proc/$2" ]; then
         return 1
     fi
     echo "$2" >> "$TABLE/killed"
@@ -171,12 +172,48 @@ class TestAReapPass:
         )
         assert _killed(tmp_path) == ["20", "21"]
 
-    def test_a_running_job_s_unit_is_left_alone(self, tmp_path: pathlib.Path) -> None:
+    def test_a_busy_unit_loses_only_what_started_before_its_worker(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The Worker started at 90000 ticks: the forkserver at 10000 is a
+        job before it, the worker process at 95000 is this job's own."""
         _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
 
         ran = _run(tmp_path)
 
+        assert (ran.returncode, ran.stderr) == (0, "")
+        assert ran.stdout == (
+            f"fleet-runner-reaper: {UNIT}: killed 1 process(es) a finished job left behind\n"
+        )
+        assert _killed(tmp_path) == ["20"]
+
+    def test_a_busy_unit_keeps_a_process_whose_start_it_cannot_read(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
+        (tmp_path / "proc" / "20" / "stat").unlink()
+
+        ran = _run(tmp_path)
+
         assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "", [])
+
+    def test_a_worker_whose_start_cannot_be_read_leaves_the_unit_idle(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """It exited after cgroup.procs listed it, so its job is over, and
+        a kill of its pid fails as a kill of a gone process does."""
+        _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
+        for entry in (tmp_path / "proc" / "13").iterdir():
+            entry.unlink()
+        (tmp_path / "proc" / "13").rmdir()
+
+        ran = _run(tmp_path)
+
+        assert ran.returncode == 0
+        assert ran.stdout == (
+            f"fleet-runner-reaper: {UNIT}: killed 2 process(es) a finished job left behind\n"
+        )
+        assert _killed(tmp_path) == ["20", "21"]
 
     def test_a_unit_mid_self_update_is_left_alone(self, tmp_path: pathlib.Path) -> None:
         """The Listener has exited to let _update.sh run outside the tree."""
@@ -323,9 +360,11 @@ class TestTheAuditMode:
 
         assert (ran.returncode, ran.stdout) == (0, "1\n")
 
-    def test_a_running_job_counts_nothing(self, tmp_path: pathlib.Path) -> None:
+    def test_a_busy_unit_counts_only_what_started_before_its_worker(
+        self, tmp_path: pathlib.Path
+    ) -> None:
         _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
 
         ran = _run(tmp_path, "--audit", "0", UNIT)
 
-        assert (ran.returncode, ran.stdout) == (0, "0\n")
+        assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "1\n", [])
