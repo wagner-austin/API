@@ -66,9 +66,20 @@ if ($vc -ne '') {
 } else {
     'cxx=no='
 }
+$gpu = 'gpu=no='
+$smi = Find-Tool 'nvidia-smi'
+if ($smi -ne '') {
+    $card = Invoke-Answer $Cmd $smi '--query-gpu=name,compute_cap --format=csv,noheader'
+    if ($card.Succeeded -and $card.First -ne '') {
+        $gpu = "gpu=yes=$($card.First)"
+    }
+}
+$gpu
+'testdb=no='
 'docker=no='
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {
     'integrity=no=limited'
 }
+exit 0
