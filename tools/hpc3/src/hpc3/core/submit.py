@@ -19,11 +19,11 @@ from __future__ import annotations
 
 import pathlib
 
+from platform_core.cluster_layout import qualified_name
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit, ledger, preflight, remote
 from hpc3.core.inflight import check_artifact_is_free, claimed_artifacts

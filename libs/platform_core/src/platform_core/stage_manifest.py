@@ -14,9 +14,16 @@ bytes on both sides of the transfer against it.
 Both sides is deliberate. A local check proves the emitter produced the right
 file; it says nothing about what arrived. Only a digest computed on the
 cluster proves what the job will actually read.
+
+Both sides also means two packages. ``hpc3`` reads a manifest to stage it, and
+a payload writes one to say which bytes it needs; the shape lives here, in the
+library both already ship, so the payload's image does not carry the
+submitter to write it.
 """
 
 from __future__ import annotations
+
+from typing_extensions import TypedDict
 
 from platform_core.json_utils import (
     JSONTypeError,
@@ -25,9 +32,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
-from typing_extensions import TypedDict
-
-from hpc3.contracts.provenance import encode_provenance, require_provenance
+from platform_core.stage_provenance import encode_provenance, require_provenance
 
 SHA256_HEX_LENGTH = 64
 
@@ -65,7 +70,7 @@ class StageManifest(TypedDict):
             Required and never empty. The digests below prove the bytes on the
             cluster are the bytes named here; only this says what "here" is,
             and a manifest that cannot answer that is the one worth refusing.
-            See :mod:`hpc3.contracts.provenance`.
+            See :mod:`platform_core.stage_provenance`.
     """
 
     destination: str

@@ -8,16 +8,18 @@ keep our rows legible to us and inoffensive to them.
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONTypeError, JSONValue
 
-from hpc3.contracts.layout import (
+from platform_core.cluster_layout import (
     MAX_PROJECT_LENGTH,
     log_dir,
+    project_dir,
+    project_of,
     qualified_name,
     require_project,
     require_root,
     script_dir,
 )
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 
 def _obj(value: JSONValue) -> dict[str, JSONValue]:
@@ -82,7 +84,29 @@ class TestQualifiedName:
         assert qualified_name("abl", "train") != qualified_name("turkic-lstm", "train")
 
 
+class TestProjectOf:
+    def test_it_inverts_qualified_name(self) -> None:
+        assert project_of(qualified_name("rusted", "replicate-repA")) == "rusted"
+
+    def test_only_the_first_dot_separates(self) -> None:
+        """A project may not hold a dot, so a later one belongs to the name."""
+        assert project_of("abl.armB.s42") == "abl"
+
+    def test_a_name_without_a_dot_has_no_project(self) -> None:
+        """A job this package did not submit: reported as None, not raised."""
+        assert project_of("jupyter-notebook") is None
+
+    def test_a_leading_dot_has_no_project(self) -> None:
+        assert project_of(".hidden") is None
+
+
 class TestDirectoryDerivation:
+    def test_the_project_directory_is_the_root_plus_the_project(self) -> None:
+        assert project_dir("/pub/wagnera3", "rusted") == "/pub/wagnera3/rusted"
+
+    def test_the_project_directory_drops_a_trailing_slash_on_the_root(self) -> None:
+        assert project_dir("/pub/wagnera3/", "rusted") == "/pub/wagnera3/rusted"
+
     def test_scripts_and_logs_separate_per_project(self) -> None:
         assert script_dir("/pub/wagnera3", "abl") == "/pub/wagnera3/abl/scripts"
         assert log_dir("/pub/wagnera3", "abl") == "/pub/wagnera3/abl/logs"

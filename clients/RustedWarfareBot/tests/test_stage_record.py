@@ -9,8 +9,8 @@ tree had grown to 409.
 from __future__ import annotations
 
 import pytest
-from hpc3.contracts.stage import decode_stage_manifest, encode_stage_manifest
 from platform_core.json_utils import JSONTypeError
+from platform_core.stage_manifest import decode_stage_manifest, encode_stage_manifest
 
 from rw_bot.stage_record import stage_manifest
 from rw_bot.tree_archive import ArchiveResult

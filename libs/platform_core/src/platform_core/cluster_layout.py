@@ -16,6 +16,14 @@ So a project name is required, and it is not decoration:
 Deriving rather than accepting paths is the point. A caller who can pass a log
 directory is a caller who will eventually pass the wrong one, and the job that
 results is findable only by whoever remembers what was typed that day.
+
+WHY THIS LIVES IN PLATFORM_CORE. Two sides read this layout: ``hpc3``, which
+submits jobs into it, and the payloads that run inside those jobs and write
+their results under it. A payload ships as an image on a compute node, and
+when the layout lived in ``hpc3`` the image had to carry the whole submitter
+-- its ssh client, its ``sbatch`` renderer, its console scripts -- to compute
+one directory. Here both sides import one definition, and the artifact that
+runs the work no longer contains the tool that dispatches it.
 """
 
 from __future__ import annotations

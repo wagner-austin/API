@@ -37,11 +37,11 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.cluster_layout import qualified_name
 from platform_core.json_utils import load_json_str
 
 from hpc3.cli import _fatal, _test_hooks
 from hpc3.contracts.image_spec import decode_image_spec
-from hpc3.contracts.layout import qualified_name
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.image_build import render_build_script
 from hpc3.core.image_definition import render_definition, render_requirements
@@ -81,8 +81,8 @@ def require_build_name(raw: str) -> str:
 
     Raises:
         ValueError: If it is empty or contains a dot. The dot is the
-            separator :func:`~hpc3.contracts.layout.qualified_name` relies on
-            and :func:`~hpc3.contracts.layout.project_of` splits on, so a
+            separator :func:`~platform_core.cluster_layout.qualified_name` relies on
+            and :func:`~platform_core.cluster_layout.project_of` splits on, so a
             name carrying one makes the two disagree about where the project
             ends.
     """

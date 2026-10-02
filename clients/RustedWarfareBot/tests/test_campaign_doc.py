@@ -14,7 +14,6 @@ import runpy
 
 import pytest
 from hpc3.contracts.run import SWEEP_IDENTITY_FIELDS
-from hpc3.contracts.sweep import decode_sweep_member
 from platform_core.errors import AppError
 from platform_core.json_utils import (
     JSONValue,
@@ -24,6 +23,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.sweep_member import decode_sweep_member
 from scripts.campaign_doc import (
     EXIT_OK,
     PROJECT,

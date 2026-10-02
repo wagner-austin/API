@@ -19,8 +19,9 @@ from __future__ import annotations
 
 import pathlib
 
-from hpc3.contracts.provenance import format_provenance
-from hpc3.contracts.stage import StagedFile, StageManifest
+from platform_core.stage_manifest import StagedFile, StageManifest
+from platform_core.stage_provenance import format_provenance
+
 from hpc3.core import audit, digest, remote
 from hpc3.core.reproducible import require_sources_reproducible
 

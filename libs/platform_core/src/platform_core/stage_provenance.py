@@ -2,7 +2,7 @@
 
 Staging proves the bytes on the cluster are the bytes named in the manifest.
 It cannot prove the manifest names the right bytes, and that is the gap this
-module and :mod:`hpc3.core.expected` close between them.
+module and ``hpc3``'s expected-digest check close between them.
 
 The failure is specific and it passes every transport check: emit a corpus
 from the wrong source state, and you get a manifest whose digests match the
@@ -21,13 +21,18 @@ Two halves answer it, and they are deliberately different in kind:
   synthetic data. Forcing a fixed schema on that would mean projects writing
   ``"none"`` into fields that do not apply, and a fabricated field is worse
   than an absent one.
-* **The expected-digest check** is the *enforcement*, in
-  :mod:`hpc3.core.expected`. It holds the manifest against an external record
-  of digests that were published, which is a real check precisely because the
-  record is not written by the same act that stages.
+* **The expected-digest check** is the *enforcement*, in the submitter
+  (``hpc3.core.expected``), which is the only side that needs it. It holds
+  the manifest against an external record of digests that were published,
+  which is a real check precisely because the record is not written by the
+  same act that stages.
 
 Provenance is required and must not be empty. A staging operation that cannot
 say where its bytes came from is the one worth refusing.
+
+The record lives in ``platform_core`` beside :mod:`platform_core.stage_manifest`,
+which carries it, so that a payload writing a manifest on a compute node does
+not import the submitter to do so.
 """
 
 from __future__ import annotations

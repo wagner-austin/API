@@ -24,12 +24,12 @@ project default; silently taking the default is how that happens.
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import require_project
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, require_list
 
 from hpc3.contracts.chain import ChainSpec, decode_chain_spec
 from hpc3.contracts.job import JobSpec, decode_job_spec
-from hpc3.contracts.layout import require_project
 from hpc3.contracts.project import PROJECT_FIELDS, ProjectConfig, encode_project_config
 from hpc3.contracts.sweep import SweepSpec, decode_sweep_spec
 from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster
@@ -102,7 +102,7 @@ STAGE_IDENTITY_FIELDS = ("suffix", "command", "artifact")
 No ``name``: a stage is named by the chain plus its suffix, so the two stages
 of one pipeline sort together in ``squeue`` and share a log directory prefix.
 
-``artifact`` IS here, for the reason :class:`~hpc3.contracts.sweep.SweepMember`
+``artifact`` IS here, for the reason :class:`~platform_core.sweep_member.SweepMember`
 carries its own: two stages of one pipeline write two different results, and a
 chain that named one path for all of them would leave every stage but the last
 unreadable. It was absent when the field was introduced, which made every chain

@@ -21,11 +21,11 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.cluster_layout import log_dir, qualified_name, script_dir
 from platform_core.json_utils import load_json_str
 
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster

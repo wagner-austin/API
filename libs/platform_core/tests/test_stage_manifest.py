@@ -8,9 +8,9 @@ separator would write outside the destination directory.
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONTypeError, JSONValue
 
-from hpc3.contracts.stage import (
+from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_core.stage_manifest import (
     decode_stage_manifest,
     decode_staged_file,
     encode_stage_manifest,

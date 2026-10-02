@@ -22,7 +22,8 @@ from __future__ import annotations
 import pathlib
 import subprocess
 
-from hpc3.contracts.stage import StagedFile, StageManifest
+from platform_core.stage_manifest import StagedFile, StageManifest
+
 from hpc3.core.reproducible import unreproducible
 
 _LF = b'{\n  "seed": 0\n}\n'

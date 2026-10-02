@@ -17,7 +17,7 @@ pass. Nothing errors; the queue just fills again.
 
 WHY THIS MODULE EXISTS RATHER THAN THE PATHS LIVING WITH THEIR USERS. The
 member's command and the member's declared artifact must name the same file --
-that is the invariant ``hpc3.contracts.job.require_artifact_in_command``
+that is the invariant ``platform_core.sweep_member.require_artifact_in_command``
 checks -- and the match that runs must write it. Three callers, so the
 composition is here and none of them spells it. It also stopped the suffix
 being declared twice, in :mod:`rw_bot.harness.campaign` and
@@ -27,7 +27,7 @@ become ``.result``.
 
 from __future__ import annotations
 
-from hpc3.contracts.layout import project_dir
+from platform_core.cluster_layout import project_dir
 
 from rw_bot.harness.sweep import SweepJob, job_name
 
@@ -91,7 +91,8 @@ def result_path(batch: str, job: SweepJob) -> str:
     The one place this path is composed. A member's artifact and the command
     that writes it are both built from here, so the declaration and the run
     cannot disagree -- which is the failure
-    :func:`~hpc3.contracts.job.require_artifact_in_command` exists to catch.
+    :func:`~platform_core.sweep_member.require_artifact_in_command` exists to
+    catch.
 
     Args:
         batch: The sweep this job belongs to.
@@ -145,7 +146,7 @@ def cluster_path(root: str, project: str, relative: str) -> str:
     """Place a repository-relative path under a project's cluster directory.
 
     The boundary between the two roots, crossed in exactly one place. The
-    project directory comes from :func:`hpc3.contracts.layout.project_dir`
+    project directory comes from :func:`platform_core.cluster_layout.project_dir`
     rather than being spelled here, so a batch's data lands beside the scripts
     and logs ``hpc3`` already puts there instead of in a parallel tree this
     package invented.

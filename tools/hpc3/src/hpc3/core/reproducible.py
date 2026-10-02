@@ -44,8 +44,8 @@ from __future__ import annotations
 import pathlib
 
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.stage_manifest import StageManifest
 
-from hpc3.contracts.stage import StageManifest
 from hpc3.core import _test_hooks
 
 

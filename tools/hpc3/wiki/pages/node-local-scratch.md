@@ -9,9 +9,9 @@ source_paths:
   - "src/hpc3/core/preflight.py"
   - "src/hpc3/core/remote.py"
 source_git_blobs:
-  "src/hpc3/core/sbatch.py": "8aee3d5af17615635b977964617361d2de8aac0a"
-  "src/hpc3/core/array_sbatch.py": "2e4af50b67a58a6b888da19effb40259e8d384ed"
-  "src/hpc3/core/preflight.py": "1de6a55d04143d9b9f052150a80b1f6122e15b9b"
+  "src/hpc3/core/sbatch.py": "0a247eba2978d1fc73886bf5153003ed127fc5e7"
+  "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
+  "src/hpc3/core/preflight.py": "d2716452af30f8fa11119716b65b8d51d24e5853"
   "src/hpc3/core/remote.py": "10c5e4e3a13c6f0004fd05cdb01d2ebbc251d8ea"
 provenance:
   - "probe job 55675199 on hpc3-l18-04, 2026-09-01"

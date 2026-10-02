@@ -17,6 +17,7 @@ a successful job.
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import qualified_name
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
@@ -30,7 +31,6 @@ from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.dependency import dependency_argument
 from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import qualified_name
 from hpc3.core.image_exec import APPTAINER_MODULE, bind_arguments, gpu_arguments
 
 MINUTES_PER_HOUR = 60

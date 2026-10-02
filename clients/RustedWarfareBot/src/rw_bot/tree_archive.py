@@ -2,7 +2,7 @@
 
 WHY ONE FILE AT ALL. ``hpc3``'s staging contract places bare filenames into a
 single destination directory and verifies each on both sides
-(:mod:`hpc3.contracts.stage`). It cannot express a directory, and a tree of
+(:mod:`platform_core.stage_manifest`). It cannot express a directory, and a tree of
 1,774 files would be 1,774 SSH round trips. An archive is one member of that
 contract, and its digest is checked on the cluster exactly as any other file's
 would be.

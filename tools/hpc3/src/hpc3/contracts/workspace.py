@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import pathlib
 
+from platform_core.cluster_layout import require_project, require_root
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 from typing_extensions import TypedDict
@@ -36,7 +37,6 @@ from typing_extensions import TypedDict
 from hpc3.clusters import require_cluster
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.fields import require_nonempty_str
-from hpc3.contracts.layout import require_project, require_root
 from hpc3.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 
 DEFAULT_QUIET_SECONDS = 1800

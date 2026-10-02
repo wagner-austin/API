@@ -13,8 +13,8 @@ import hashlib
 import pathlib
 
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.stage_manifest import StagedFile
 
-from hpc3.contracts.stage import StagedFile
 from hpc3.core import _test_hooks
 
 

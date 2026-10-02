@@ -15,9 +15,10 @@ scraping captured output.
 
 from __future__ import annotations
 
+from platform_core.cluster_layout import qualified_name
+
 from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_facts
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.layout import qualified_name
 from hpc3.core import _test_hooks
 
 JOB_SUBMITTED = "hpc3_job_submitted"
