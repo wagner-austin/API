@@ -5,6 +5,7 @@ param(
     [string]$EnvironmentKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
     [scriptblock]$GetService = { param([string]$Name) @(Get-CimInstance Win32_Service -Filter "Name='$Name'") },
     [scriptblock]$TestWorkdir = { param([string]$Path) Test-Path -LiteralPath $Path },
+    [scriptblock]$GetProcesses = { @(Get-CimInstance Win32_Process) },
     [string]$Git = 'git',
     [string]$Schtasks = "$env:SystemRoot\System32\schtasks.exe",
     [string]$Wsl = "$env:SystemRoot\System32\wsl.exe",
@@ -32,6 +33,44 @@ function Invoke-Probe {
 function Invoke-InDistro {
     param([string]$Shell, [string]$WslPath, [string]$Name, [string]$Command)
     return Invoke-Probe $Shell "`"$WslPath`" -d $Name -- $Command"
+}
+function Get-RunnerLeftover {
+    param([object[]]$Processes, [int]$ServicePid, [string]$Root, [int]$OlderThanSeconds)
+    $children = @{}
+    foreach ($Process in $Processes) {
+        $Parent = [int]$Process.ParentProcessId
+        if (-not $children.ContainsKey($Parent)) {
+            $children[$Parent] = [System.Collections.Generic.List[object]]::new()
+        }
+        $children[$Parent].Add($Process)
+    }
+    $tree = @{}
+    $pending = [System.Collections.Generic.Queue[int]]::new()
+    if ($ServicePid -ne 0) {
+        $pending.Enqueue($ServicePid)
+    }
+    while ($pending.Count -gt 0) {
+        $Id = $pending.Dequeue()
+        $tree[$Id] = $true
+        if ($children.ContainsKey($Id)) {
+            foreach ($Child in $children[$Id]) {
+                if (-not $tree.ContainsKey([int]$Child.ProcessId)) {
+                    $pending.Enqueue([int]$Child.ProcessId)
+                }
+            }
+        }
+    }
+    $working = @($Processes | Where-Object { $tree.ContainsKey([int]$_.ProcessId) -and [string]$_.Name -eq 'Runner.Worker.exe' })
+    if ($working.Count -gt 0) {
+        return @()
+    }
+    $cutoff = (Get-Date).AddSeconds(-$OlderThanSeconds)
+    return @($Processes | Where-Object {
+        -not $tree.ContainsKey([int]$_.ProcessId) -and $null -ne $_.CreationDate -and
+        $_.CreationDate -lt $cutoff -and (
+            ([string]$_.CommandLine).Replace('/', '\').IndexOf($Root, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            ([string]$_.ExecutablePath).StartsWith($Root, [StringComparison]::OrdinalIgnoreCase))
+    })
 }
 $Probe = Invoke-Probe $Cmd "`"$Schtasks`" /query /tn wsl-keepalive /fo csv"
 $KeepaliveRow = (@($Probe.Lines | Select-Object -Skip 1 -First 1) -join '')
@@ -139,70 +178,121 @@ Write-Check 'gpu:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0 -an
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-enabled 'ci-clean.timer'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'timer:ci-clean.timer' ($State -eq 'enabled') ('it said: ' + $Probe.Text)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-enabled 'fleet-runner-reaper.timer'"
+$State = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'timer:fleet-runner-reaper.timer' ($State -eq 'enabled') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-API.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-api-1/_work'"
 Write-Check 'workdir:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-API.lavender-wsl.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-API.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-API.lavender-wsl-2.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-API.lavender-wsl-2.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-api-2/_work'"
 Write-Check 'workdir:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-API.lavender-wsl-2.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-API.lavender-wsl-2.service with no job running; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl-2.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-2.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-2/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-2.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl-2.service with no job running; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl-3.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-3.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-3/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-3.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl-3.service with no job running; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl-4.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-4.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-4/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-4.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl-4.service with no job running; the reaper counted: ' + $Probe.Text)
 $Service = @(& $GetService 'actions.runner.wagner-austin-MCPs.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-MCPs.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
 Write-Check 'workdir:wagner-austin/MCPs:windows:lavender' ([bool](& $TestWorkdir 'C:/actions-runner/_work')) ('Test-Path C:/actions-runner/_work')
 $Account = (@($Service | ForEach-Object { [string]$_.StartName }) -join '')
 Write-Check 'account:windows:actions.runner.wagner-austin-MCPs.lavender:LocalSystem' ($Account -eq 'LocalSystem') ('Win32_Service StartName: ' + $Account)
+$ServicePid = 0
+foreach ($Row in $Service) {
+    $ServicePid = [int]$Row.ProcessId
+}
+$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner\' 21600)
+Write-Check 'orphans:wagner-austin/MCPs:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner\ outside actions.runner.wagner-austin-MCPs.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-corvis-stick.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-corvis-stick.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-corvis-stick-1/_work'"
 Write-Check 'workdir:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-corvis-stick.lavender-wsl.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-corvis-stick.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
 $Service = @(& $GetService 'actions.runner.wagner-austin-corvis-stick.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-corvis-stick.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
 Write-Check 'workdir:wagner-austin/corvis-stick:windows:lavender' ([bool](& $TestWorkdir 'C:/actions-runner-corvis-stick/_work')) ('Test-Path C:/actions-runner-corvis-stick/_work')
 $Account = (@($Service | ForEach-Object { [string]$_.StartName }) -join '')
 Write-Check 'account:windows:actions.runner.wagner-austin-corvis-stick.lavender:LocalSystem' ($Account -eq 'LocalSystem') ('Win32_Service StartName: ' + $Account)
+$ServicePid = 0
+foreach ($Row in $Service) {
+    $ServicePid = [int]$Row.ProcessId
+}
+$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner-corvis-stick\' 21600)
+Write-Check 'orphans:wagner-austin/corvis-stick:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-corvis-stick\ outside actions.runner.wagner-austin-corvis-stick.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Service = @(& $GetService 'actions.runner.wagner-austin-chat.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-chat.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
 Write-Check 'workdir:wagner-austin/chat:windows:lavender' ([bool](& $TestWorkdir 'C:/actions-runner-chat/_work')) ('Test-Path C:/actions-runner-chat/_work')
 $Account = (@($Service | ForEach-Object { [string]$_.StartName }) -join '')
 Write-Check 'account:windows:actions.runner.wagner-austin-chat.lavender:LocalSystem' ($Account -eq 'LocalSystem') ('Win32_Service StartName: ' + $Account)
+$ServicePid = 0
+foreach ($Row in $Service) {
+    $ServicePid = [int]$Row.ProcessId
+}
+$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner-chat\' 21600)
+Write-Check 'orphans:wagner-austin/chat:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-chat\ outside actions.runner.wagner-austin-chat.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-tree-bot.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-tree-bot.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-treebot-1/_work'"
 Write-Check 'workdir:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-tree-bot.lavender-wsl.service'"
+$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'orphans:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-tree-bot.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
 $Service = @(& $GetService 'actions.runner.wagner-austin-tree-bot.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-tree-bot.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
 Write-Check 'workdir:wagner-austin/tree-bot:windows:lavender' ([bool](& $TestWorkdir 'C:/actions-runner-tree-bot/_work')) ('Test-Path C:/actions-runner-tree-bot/_work')
 $Account = (@($Service | ForEach-Object { [string]$_.StartName }) -join '')
 Write-Check 'account:windows:actions.runner.wagner-austin-tree-bot.lavender:LocalSystem' ($Account -eq 'LocalSystem') ('Win32_Service StartName: ' + $Account)
+$ServicePid = 0
+foreach ($Row in $Service) {
+    $ServicePid = [int]$Row.ProcessId
+}
+$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner-tree-bot\' 21600)
+Write-Check 'orphans:wagner-austin/tree-bot:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-tree-bot\ outside actions.runner.wagner-austin-tree-bot.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -e '/opt/corvis/rw-game/game-lib.jar'"
 Write-Check 'asset:/opt/corvis/rw-game/game-lib.jar' ($Probe.Exit -eq 0) ('test -e exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "sha256sum '/opt/corvis/rw-game/game-lib.jar'"
