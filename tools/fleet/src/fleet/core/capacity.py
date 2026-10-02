@@ -29,7 +29,7 @@ why.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
@@ -310,6 +310,38 @@ def room_for_any(
     return f"{verdict['code'].value}: {verdict['reason']}"
 
 
+def fitting_projects(
+    node: NodeConfig,
+    state: NodeState,
+    projects: Mapping[str, ProjectConfig],
+    carried: frozenset[NodeTag],
+) -> tuple[str, ...]:
+    """The registered projects a runner could launch on its node right now.
+
+    What a node runner hands the queue with its claim (MCPs board task
+    939ec5c7), so it is offered only a job it can run. Without it a node with
+    room for the smallest project claimed the oldest job its tags matched and
+    refused it on capacity, which closes a job for good: diphtheria did that
+    to MCPs/execution-deploy twice on 2026-10-02 (8ccd89db, 86208e6b) while
+    lavender-wsl, also tagged for it, might have run it later.
+
+    Args:
+        node: The node's declaration.
+        state: What it reported when probed this tick.
+        projects: Every registered project, by name.
+        carried: The tags the runner claims with.
+
+    Returns:
+        The name of every project :func:`assess` accepts on this state, in
+        name order; empty when none fits.
+    """
+    return tuple(
+        name
+        for name, project in sorted(projects.items())
+        if assess(node, state, project, carried)["code"] is None
+    )
+
+
 def plan_dispatch(
     node: NodeConfig, state: NodeState, project: ProjectConfig, carried: frozenset[NodeTag]
 ) -> int:
@@ -464,6 +496,7 @@ __all__ = [
     "Unassessed",
     "assess",
     "first_fit",
+    "fitting_projects",
     "job_ceiling",
     "plan_dispatch",
     "room_for_any",

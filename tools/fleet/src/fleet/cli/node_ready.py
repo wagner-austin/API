@@ -27,6 +27,7 @@ from fleet.contracts.detection import detected_tags, tag_drift
 from fleet.contracts.elevation import elevation_gap
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.tags import NodeTag, runner_tags
+from fleet.contracts.toolchain import ToolReport
 from fleet.core import capacity, host_report, probe, records, toolchain
 
 _log = get_logger(__name__)
@@ -42,10 +43,15 @@ class Ready(TypedDict):
         state: What it reported when probed this tick.
         tags: The tags its runner claims with: every one its toolchain
             probe found this tick, plus ``elevated`` for the elevated runner.
+        fits: The registered projects it could launch now
+            (:func:`fleet.core.capacity.fitting_projects`), which its claim
+            names so the queue offers it nothing it would refuse. Never
+            empty: a node that fits none claims nothing.
     """
 
     state: NodeState
     tags: frozenset[NodeTag]
+    fits: tuple[str, ...]
 
 
 def ready_state(
@@ -95,6 +101,37 @@ def ready_state(
     if gap is not None:
         _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
         return None
+    return _claimable(
+        loaded, alias=alias, node=node, state=state, answered=answered, elevated=elevated
+    )
+
+
+def _claimable(
+    loaded: _config.LoadedWorkspace,
+    *,
+    alias: str,
+    node: NodeConfig,
+    state: NodeState,
+    answered: tuple[ToolReport, ...],
+    elevated: bool,
+) -> Ready | None:
+    """Read a ready node's claim tags and the projects it fits, or say why none.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        alias: This node's workspace name.
+        node: Its declaration.
+        state: What it reported when probed this tick.
+        answered: What its toolchain probe answered, already judged ready.
+        elevated: Whether this is the node's elevated runner.
+
+    Returns:
+        The node's state, claim tags and fitting projects; or None when it has
+        room for nothing, fits no project, or (elevated) does not hold an
+        administrator's token, with the reason logged. The ready summary, a
+        tagged tool it lacks and each difference from its declaration are
+        logged first.
+    """
     _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
     lacking = toolchain.tagged_gap(alias, answered)
     if lacking is not None:
@@ -102,10 +139,17 @@ def ready_state(
     for drift in tag_drift(node, answered):
         _log.info("%s (%s) %s", alias, node["host"], drift)
     tags = detected_tags(node, answered) | (runner_tags(node, elevated=elevated) & ELEVATED_ONLY)
-    projects = tuple(loaded.workspace["projects"].values())
-    full = capacity.room_for_any(node, state, projects, tags)
+    registered = loaded.workspace["projects"]
+    full = capacity.room_for_any(node, state, tuple(registered.values()), tags)
     if full is not None:
         _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
+        return None
+    fits = capacity.fitting_projects(node, state, registered, tags)
+    if not fits:
+        _log.info(
+            "%s has room for one worker but not for any project's minimum; claiming nothing",
+            alias,
+        )
         return None
     unelevated = elevation_gap(alias, node, answered) if elevated else None
     if unelevated is not None:
@@ -116,7 +160,7 @@ def ready_state(
             unelevated.message,
         )
         return None
-    return Ready(state=state, tags=tags)
+    return Ready(state=state, tags=tags, fits=fits)
 
 
 __all__ = ["Ready", "ready_state"]

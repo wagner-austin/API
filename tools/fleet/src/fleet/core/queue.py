@@ -129,6 +129,7 @@ def claim_next(
     lane: DispatchLane,
     tags: tuple[NodeTag, ...],
     node: str | None,
+    projects: tuple[str, ...] | None,
     lease_seconds: int,
     identity: JSONObject,
 ) -> DispatchJob | None:
@@ -145,6 +146,9 @@ def claim_next(
             back only a job whose required tags are all among them.
         node: Restrict to jobs for this node plus jobs that named none, or
             None to take anything.
+        projects: Restrict to jobs of these projects, the ones the node can
+            run right now (:func:`fleet.core.capacity.fitting_projects`), or
+            None for a lane whose verbs are not sized by a node's capacity.
         lease_seconds: How long the claim survives without a report. Always
             set, never omitted: an unbounded claim means a runner that dies
             holds the job forever, and this runner is scheduled rather than
@@ -165,6 +169,8 @@ def claim_next(
     }
     if node is not None:
         arguments["node"] = node
+    if projects is not None:
+        arguments["projects"] = list(projects)
     return decode_claim(
         call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_claim", arguments)
     )

@@ -253,6 +253,7 @@ def claim_pass(
         lane=DispatchLane.NODE,
         tags=tuple(sorted(ready["tags"])),
         node=alias,
+        projects=ready["fits"],
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )

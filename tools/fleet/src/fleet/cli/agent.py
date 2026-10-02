@@ -315,6 +315,7 @@ def claim_pass(
         lane=DispatchLane.HUB,
         tags=(),
         node=node,
+        projects=None,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
