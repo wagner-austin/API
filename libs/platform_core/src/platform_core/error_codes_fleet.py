@@ -99,23 +99,6 @@ class FleetErrorCode(ErrorCodeBase):
     # carried v18.13.0 and was dispatched to, because node was judged on
     # presence alone.
     NODE_NODEJS_MISMATCH = "NODE_NODEJS_MISMATCH"
-    # A node's declared Rust toolchain disagrees with the cargo its probe
-    # reports. The declaration is what gives a node the `rust` tag, so a
-    # runner that claimed on it would hand a Rust-crate build to a node that
-    # cannot compile it (MCPs board task 1e2da299).
-    NODE_RUST_MISMATCH = "NODE_RUST_MISMATCH"
-    # The same for the C++ toolchain node-gyp uses: an npm ci that rebuilds
-    # a native module on a node without one fails before any test runs
-    # (MCPs board task 3f19c136).
-    NODE_CXX_MISMATCH = "NODE_CXX_MISMATCH"
-    # The same for the execution suite's own rootless Docker daemon: a deploy
-    # suite claimed on a node without it would have no daemon it may use, and
-    # must never fall back to the stack's (MCPs board task 6c4516af).
-    NODE_DOCKER_MISMATCH = "NODE_DOCKER_MISMATCH"
-    # The same for the corvis compose stack: a suite that starts the stack's
-    # images on mcp-network, claimed on a node that has neither, fails where
-    # docker run exits 125 (MCPs board task 554bffc1).
-    NODE_STACK_MISMATCH = "NODE_STACK_MISMATCH"
     # A node's elevated runner whose ssh session does not hold an
     # administrator's token: every build it launched at RunLevel Highest
     # would fail to register, so it claims nothing (MCPs board task
