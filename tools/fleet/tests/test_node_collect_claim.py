@@ -20,6 +20,7 @@ from platform_core.json_utils import dump_json_str
 from platform_core.mcp_client import McpHttpResponse
 
 from fleet.cli import _config, node_agent, node_collect
+from fleet.contracts.dispatch import decode_job, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.core import _test_hooks, claim_window, leases, records, staging
 from tests._node_agent_fixtures import (
@@ -149,12 +150,18 @@ class TestTheFailure:
         _test_hooks.run = FakeRun(claim_replies(staging.digest(payload), commit_present=True))
         claimed = queue_job(status="claimed", taskId=VERDICT_TASK)
         queue = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": claimed})])
-        _test_hooks.http_post = RefusedAt(queue, refused_call=2)
+        # Calls 0 to 2 are the list, the claim and the tick's record; 3 is
+        # the start report.
+        _test_hooks.http_post = RefusedAt(queue, refused_call=3)
 
         with pytest.raises(URLError):
             node_agent.main(node_argv(sourced_config))
 
         assert queue.tools == ["dispatch_list", "dispatch_claim"]
+        assert len(queue.ticks) == 1
+        assert queue.ticks[0]["claiming"] is True
+        job = decode_job(claimed, answer=dump_json_str(claimed))
+        assert queue.ticks[0]["verdict"] == f"claimed {encode_job_line(job)}"
         assert _ledger(sourced_config)[-1]["outcome"] == "running"
         assert _live_runs(sourced_config) == 1
 

@@ -20,6 +20,7 @@ from fleet.cli import node_agent
 from fleet.contracts.toolchain import install_command
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
+    NOTHING_MATCHED,
     PROBED,
     _credentials_in_env,
     _sourced_config,
@@ -85,7 +86,7 @@ class TestTheToolTagsAClaimCarries:
         assert messages[-2:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
             "poetry, git, make, tar present; ffmpeg present",
-            "nothing in the node lane for lavender",
+            NOTHING_MATCHED,
         ]
 
     def test_a_node_without_ffmpeg_claims_without_it(
@@ -124,7 +125,7 @@ class TestTheToolTagsAClaimCarries:
             "1630, 7.5', so it claims with the gpu tag; correct gpu in fleet.json",
             "lavender (lavender) declares cxx none but its probe reports cxx '17.14.37710.0', so "
             "it claims with the cxx tag; set cxx to '17.14.37710.0' in fleet.json",
-            "nothing in the node lane for lavender",
+            NOTHING_MATCHED,
         ]
 
 
@@ -148,7 +149,7 @@ class TestAToolchainThatCanBuild:
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
             "--accept-package-agreements --accept-source-agreements --disable-interactivity",
-            "nothing in the node lane for lavender",
+            NOTHING_MATCHED,
         ]
 
 
@@ -165,7 +166,7 @@ class TestAToolchainThatCannotBuild:
         )
         assert install_command("python", ("winget", "choco")) in refusal
         assert "poetry -- " in refusal
-        assert "nothing in the node lane for lavender" in messages
+        assert messages[-1] == refusal
 
     def test_a_wrong_minor_python_claims_nothing_with_its_own_code(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture

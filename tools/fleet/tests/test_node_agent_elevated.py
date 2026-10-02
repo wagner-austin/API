@@ -27,7 +27,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import PROBE_OK, FakeRun, ok
+from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, ok
 
 __all__ = ["_credentials_in_env"]
 
@@ -120,6 +120,13 @@ class TestClaiming:
         endpoint, messages = _tick(elevated_config, FILTERED_TOKEN, elevated=True, caplog=caplog)
 
         assert endpoint.tools == ["dispatch_list"]
+        (tick,) = endpoint.ticks
+        assert (tick["agent"], tick["elevated"], tick["claiming"]) == (
+            "fleet-node-lavender-elevated",
+            True,
+            False,
+        )
+        assert (tick["tags"], tick["fits"]) == (["elevated", "windows"], [DEMO_PROJECT])
         assert (
             "lavender cannot launch elevated; claiming nothing: NODE_NOT_ELEVATED: lavender "
             "(lavender) declares an elevated runner, but its ssh session does not hold an "

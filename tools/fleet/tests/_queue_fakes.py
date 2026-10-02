@@ -63,13 +63,22 @@ class FakeQueue:
     speaks, so what is asserted is the request this package actually builds
     and the answer it can actually read.
 
+    ``dispatch_tick`` is answered on its own and kept apart, in ``ticks``:
+    every node runner tick records itself (MCPs board task 939ec5c7, A4), so
+    scripting it into every claim test would bury each one's subject under a
+    call it does not assert on; the tests that do read ``ticks``.
+
     Attributes:
-        tools: Every tool name it was asked for, in order.
-        arguments: Every arguments object it was sent, in order.
+        tools: Every tool name it was asked for, ``dispatch_tick`` aside, in
+            order.
+        arguments: Every arguments object it was sent, ``dispatch_tick``'s
+            aside, in order.
+        ticks: Every ``dispatch_tick`` arguments object, in order.
     """
 
     tools: list[str]
     arguments: list[JSONObject]
+    ticks: list[JSONObject]
     _replies: list[str | ToolRefusal]
 
     def __init__(self, replies: Sequence[str | ToolRefusal]) -> None:
@@ -83,6 +92,7 @@ class FakeQueue:
         """
         self.tools = []
         self.arguments = []
+        self.ticks = []
         self._replies = list(replies)
 
     def __call__(
@@ -109,21 +119,63 @@ class FakeQueue:
         """
         envelope = narrow_json_to_dict(load_json_str(body.decode("utf-8")))
         params = narrow_json_to_dict(envelope["params"])
-        self.tools.append(narrow_json_to_str(params["name"]))
-        self.arguments.append(narrow_json_to_dict(params["arguments"]))
-        assert self._replies, f"unscripted queue call: {self.tools[-1]}"
+        tool = narrow_json_to_str(params["name"])
+        arguments = narrow_json_to_dict(params["arguments"])
+        if tool == "dispatch_tick":
+            self.ticks.append(arguments)
+            return _framed({"content": [{"text": TICK_RECORDED}]})
+        self.tools.append(tool)
+        self.arguments.append(arguments)
+        assert self._replies, f"unscripted queue call: {tool}"
         reply = self._replies.pop(0)
         result: JSONObject = (
             {"isError": True, "content": [{"text": reply.message}]}
             if isinstance(reply, ToolRefusal)
             else {"content": [{"text": reply}]}
         )
-        payload: JSONObject = {"jsonrpc": "2.0", "id": 1, "result": result}
-        return McpHttpResponse(
-            status=200,
-            content_type="text/event-stream",
-            body=f"event: message\ndata: {dump_json_str(payload)}\n\n",
-        )
+        return _framed(result)
+
+
+#: When :class:`FakeQueue` says it stored a tick.
+TICKED_AT = "2026-10-02T05:00:00.000Z"
+
+#: ``dispatch_tick``'s answer in :class:`FakeQueue`, trimmed to what the
+#: runner reads.
+TICK_RECORDED = dump_json_str({"tick": {"tickedAt": TICKED_AT}})
+
+
+#: The identity keys every runner call carries beside its own arguments.
+IDENTITY_KEYS = frozenset({"agent", "sessionId", "cwd"})
+
+
+def tick_body(arguments: JSONObject) -> JSONObject:
+    """A recorded ``dispatch_tick`` call without its identity arguments.
+
+    Args:
+        arguments: One entry of :attr:`FakeQueue.ticks`.
+
+    Returns:
+        The tick as :func:`fleet.contracts.runner_tick.encode_runner_tick`
+        wrote it.
+    """
+    return {key: value for key, value in arguments.items() if key not in IDENTITY_KEYS}
+
+
+def _framed(result: JSONObject) -> McpHttpResponse:
+    """Wrap one tool result in the JSON-RPC envelope and SSE framing.
+
+    Args:
+        result: The tool result.
+
+    Returns:
+        The response the live endpoint would send.
+    """
+    payload: JSONObject = {"jsonrpc": "2.0", "id": 1, "result": result}
+    return McpHttpResponse(
+        status=200,
+        content_type="text/event-stream",
+        body=f"event: message\ndata: {dump_json_str(payload)}\n\n",
+    )
 
 
 #: Credentials every queue test posts with.

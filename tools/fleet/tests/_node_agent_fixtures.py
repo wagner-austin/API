@@ -48,6 +48,10 @@ COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
 #: The pre-claim probes every claiming tick pays, each script sent and then
 #: run: lavender answering room for a dispatch, then its toolchain as it
 #: answered on 2026-09-23, ready (MCPs board task bad56f65).
+#: What lavender logs, and records as its tick's verdict, when it asked the
+#: queue for the one registered project and the lane held nothing for it.
+NOTHING_MATCHED = "lavender asked for 1 fitting project(s); nothing in the node lane matched"
+
 PROBED: tuple[_test_hooks.CommandResult, ...] = (
     ok(""),
     ok(PROBE_OK),
@@ -241,6 +245,7 @@ __all__ = [
     "COMPANION_REF",
     "COMPANION_REMOTE",
     "COMPANION_SHA",
+    "NOTHING_MATCHED",
     "PASSING_TAIL",
     "PROBED",
     "REMOTE",

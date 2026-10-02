@@ -423,9 +423,7 @@ class TestClaimingNothing:
 
         assert endpoint.tools == ["dispatch_list"]
         messages = [record.getMessage() for record in caplog.records]
-        silent = "lavender did not answer; claiming nothing: "
-        assert any(message.startswith(silent) for message in messages)
-        assert "nothing in the node lane for lavender" in messages
+        assert messages[-1].startswith("lavender did not answer; claiming nothing: ")
 
     def test_a_node_with_room_for_nothing_claims_nothing(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture

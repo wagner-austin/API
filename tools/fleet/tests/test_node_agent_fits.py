@@ -58,7 +58,6 @@ def test_a_node_with_room_for_one_worker_but_no_project_s_minimum_claims_nothing
         assert node_agent.main(node_argv(sourced_config)) == 0
 
     assert endpoint.tools == ["dispatch_list"]
-    assert [record.getMessage() for record in caplog.records][-2:] == [
-        "lavender has room for one worker but not for any project's minimum; claiming nothing",
-        "nothing in the node lane for lavender",
-    ]
+    assert [record.getMessage() for record in caplog.records][-1] == (
+        "lavender has room for one worker but not for any project's minimum; claiming nothing"
+    )

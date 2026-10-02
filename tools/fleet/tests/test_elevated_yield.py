@@ -19,9 +19,9 @@ from fleet.cli import node_agent
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core import _test_hooks, elevated_yield
 from tests._node_agent_fixtures import _credentials_in_env, node_argv, sourced_document
-from tests._queue_fakes import QUEUE_CREDENTIALS, FakeQueue, queue_job
+from tests._queue_fakes import QUEUE_CREDENTIALS, FakeQueue, queue_job, tick_body
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import PROBE_OK, FakeRun, ok, workspace_document
+from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, ok, workspace_document
 
 __all__ = ["_credentials_in_env"]
 
@@ -186,3 +186,14 @@ def test_a_whole_ordinary_tick_claims_nothing_while_an_elevated_job_waits(
 
     assert endpoint.tools == ["dispatch_list", "dispatch_list"]
     assert endpoint.arguments[1] == {"project": ELEVATED_PROJECT, "status": "queued", "limit": 100}
+    assert [tick_body(tick) for tick in endpoint.ticks] == [
+        {
+            "node": "lavender",
+            "elevated": False,
+            "tags": ["windows"],
+            "fits": [DEMO_PROJECT],
+            "load": {"runs": 0, "workers": 0, "freeRamGb": 27.0},
+            "claiming": False,
+            "verdict": "yields to its elevated runner; claiming nothing",
+        }
+    ]

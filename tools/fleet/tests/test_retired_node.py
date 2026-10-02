@@ -25,7 +25,7 @@ from fleet.cli import _config, node_agent, nodes
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import _credentials_in_env, node_argv
-from tests._queue_fakes import FakeQueue
+from tests._queue_fakes import FakeQueue, tick_body
 from tests.conftest import FakeRun, workspace_document
 
 __all__ = ["_credentials_in_env"]
@@ -105,3 +105,13 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
 
     assert (runner.calls, endpoint.tools) == ([], ["dispatch_list"])
     assert "lavender is disabled in fleet.json; claiming nothing" in caplog.text
+    assert [tick_body(tick) for tick in endpoint.ticks] == [
+        {
+            "node": "lavender",
+            "elevated": False,
+            "tags": [],
+            "fits": [],
+            "claiming": False,
+            "verdict": "is disabled in fleet.json; claiming nothing",
+        }
+    ]
