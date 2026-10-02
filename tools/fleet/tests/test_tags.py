@@ -163,10 +163,10 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_platforms_and_eight_capabilities(self) -> None:
+    def test_the_vocabulary_is_the_platforms_and_nine_capabilities(self) -> None:
         """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571,
-        615, 622 and 639) is these ten words, so the members' values are pinned
-        in order."""
+        615, 622, 639 and 648) is these eleven words, so the members' values are
+        pinned in order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
             "linux",
@@ -178,13 +178,16 @@ class TestNodeTags:
             "elevated",
             "stack",
             "ffmpeg",
+            "hooks",
         ]
 
     def test_no_declaration_carries_a_tool_tag(self) -> None:
-        """ffmpeg comes only from the toolchain probe (:func:`tool_tags`), so a
-        node with every declaration set still carries none."""
+        """ffmpeg and hooks come only from the toolchain probe
+        (:func:`tool_tags`), so a node with every declaration set carries
+        neither."""
         loaded = _node(test_database=True, rust="1.98.1", cxx="13.3.0", elevated=True)
         assert NodeTag.FFMPEG not in node_tags(loaded)
+        assert NodeTag.HOOKS not in node_tags(loaded)
 
 
 class TestToolTags:
@@ -197,13 +200,24 @@ class TestToolTags:
         )
         assert tool_tags(found) == frozenset({NodeTag.FFMPEG})
 
+    def test_a_probe_that_found_the_hooks_environment_gives_its_tag(self) -> None:
+        """sedona once its interpreter carries the check's tools (MCPs board
+        task ec895824): the line answers with the route file it found."""
+        found = (
+            ToolReport(
+                name="hooks", present=True, version=r"C:\Users\austi\.claude\corvis-hooks.json"
+            ),
+        )
+        assert tool_tags(found) == frozenset({NodeTag.HOOKS})
+        assert tool_tags((ToolReport(name="hooks", present=False, version=""),)) == frozenset()
+
     def test_an_absent_or_unreported_tool_gives_nothing(self) -> None:
         absent = (ToolReport(name="ffmpeg", present=False, version=""),)
         assert tool_tags(absent) == frozenset()
         assert tool_tags(()) == frozenset()
 
     def test_only_the_tagged_tools_have_tags(self) -> None:
-        assert TOOL_TAG == {"ffmpeg": NodeTag.FFMPEG}
+        assert TOOL_TAG == {"ffmpeg": NodeTag.FFMPEG, "hooks": NodeTag.HOOKS}
         assert tool_tags((ToolReport(name="make", present=True, version="4.4"),)) == frozenset()
 
 
@@ -275,9 +289,10 @@ class TestDecodeNodeTag:
         with pytest.raises(
             JSONTypeError,
             match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, "
-            r"stack, ffmpeg, got 'podman'; .* a Rust or C\+\+ toolchain, the execution suite's "
-            r"rootless Docker daemon, an elevated runner, the corvis compose stack, or a tool its "
-            r"probe found\), and one it does not carry could never be satisfied$",
+            r"stack, ffmpeg, hooks, got 'podman'; .* a Rust or C\+\+ toolchain, the execution "
+            r"suite's rootless Docker daemon, an elevated runner, the corvis compose stack, or a "
+            r"tool or the hooks check's environment its probe found\), and one it does not carry "
+            r"could never be satisfied$",
         ):
             decode_node_tag("podman", field="t")
 

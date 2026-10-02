@@ -28,6 +28,8 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue
 from tests._toolchain_fixtures import (
+    HOOKS_INSTALL,
+    HOOKS_REASON,
     LAVENDER_2026_09_23,
     LAVENDER_STORE_STUB,
     SERENDIPITY_2026_09_25,
@@ -83,9 +85,33 @@ class TestTheToolTagsAClaimCarries:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         assert endpoint.arguments[1]["tags"] == ["ffmpeg", "windows"]
         messages = [record.getMessage() for record in caplog.records]
+        assert messages[-3:] == [
+            "lavender toolchain ready: python 3.11.9; node v24.20.0; "
+            "poetry, git, make, tar present; ffmpeg present; hooks absent",
+            f"lavender claims without the tag of every tool it lacks: hooks -- {HOOKS_REASON}, "
+            f"so those jobs go to a node that has it -- {HOOKS_INSTALL}",
+            NOTHING_MATCHED,
+        ]
+
+    def test_a_node_whose_probe_found_the_hooks_environment_claims_with_its_tag(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """sedona once its interpreter carries the claude-hooks check's tools
+        (MCPs board task ec895824): the runner claims with hooks beside
+        windows, so the queue may hand it that package's check."""
+        found = "ffmpeg=yes=ffmpeg 7.1.1\nhooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
+        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23 + found)])
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.arguments[1]["tags"] == ["ffmpeg", "hooks", "windows"]
+        messages = [record.getMessage() for record in caplog.records]
         assert messages[-2:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg present",
+            "poetry, git, make, tar present; ffmpeg present; hooks present",
             NOTHING_MATCHED,
         ]
 
@@ -144,11 +170,12 @@ class TestAToolchainThatCanBuild:
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-3:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg absent",
+            "poetry, git, make, tar present; ffmpeg absent; hooks absent",
             "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
-            "--accept-package-agreements --accept-source-agreements --disable-interactivity",
+            "--accept-package-agreements --accept-source-agreements --disable-interactivity; "
+            f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- {HOOKS_INSTALL}",
             NOTHING_MATCHED,
         ]
 

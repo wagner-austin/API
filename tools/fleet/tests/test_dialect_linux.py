@@ -492,6 +492,7 @@ class TestForRealUnderSh:
             "stack",
             "gpu",
             "testdb",
+            "hooks",
             "apt-get",
             "pipx",
         }

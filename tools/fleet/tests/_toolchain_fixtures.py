@@ -180,6 +180,21 @@ DIPHTHERIA_2026_09_27_CXX = (
 #: A node carrying the wrong interpreter, which no probed Windows node did.
 WRONG_PYTHON = LOKI.replace("Python 3.11.9", "Python 3.12.4")
 
+#: Why a project needs the ``hooks`` tag, as a tick's gap line quotes it (MCPs
+#: board task ec895824).
+HOOKS_REASON = (
+    "MCPs packages/claude-hooks's check runs on the system interpreter with its tools and "
+    "reaches the board through ~/.claude/corvis-hooks.json, which only install-hooks-node.py "
+    "writes, with the key the operator chose for the node"
+)
+
+#: The pip line a node with pip is offered for the hooks check's tools, at the
+#: versions the hub ran that check with on 2026-10-02.
+HOOKS_INSTALL = (
+    "python -m pip install --user ruff==0.15.1 mypy==1.19.1 pytest==9.0.2 "
+    "pytest-xdist==3.8.0 pytest-cov==7.1.0"
+)
+
 
 def node(
     host: str = "lavender",

@@ -34,6 +34,8 @@ from fleet.contracts.toolchain import (
 from fleet.core import _test_hooks, dialect_linux, toolchain, windows_toolchain_probe
 from tests._toolchain_fixtures import (
     DIPHTHERIA,
+    HOOKS_INSTALL,
+    HOOKS_REASON,
     LAVENDER,
     LOKI,
     SEDONA,
@@ -190,28 +192,36 @@ class TestReadiness:
 
         assert missing(reports) == ()
         assert describe_gap("serendipity", reports) == "serendipity: ready"
-        assert toolchain.absent_tagged(reports) == ("ffmpeg",)
+        assert toolchain.absent_tagged(reports) == ("ffmpeg", "hooks")
         assert toolchain.tagged_gap("serendipity", reports) == (
             "serendipity claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
-            "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+            "--accept-package-agreements --accept-source-agreements --disable-interactivity; "
+            f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- no automatic "
+            "install on this node"
         )
 
-    def test_a_node_with_ffmpeg_has_no_tagged_gap(self) -> None:
-        reports = toolchain.parse_probe("ffmpeg=yes=ffmpeg version 7.1.1-essentials\n")
+    def test_a_node_with_every_tagged_tool_has_no_tagged_gap(self) -> None:
+        reports = toolchain.parse_probe(
+            "ffmpeg=yes=ffmpeg version 7.1.1-essentials\n"
+            "hooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
+        )
 
         assert toolchain.absent_tagged(reports) == ()
-        assert toolchain.tagged_gap("pendragon", reports) is None
+        assert toolchain.tagged_gap("sedona", reports) is None
 
     def test_a_tagged_tool_with_no_install_here_says_so(self) -> None:
-        """A node whose only manager is pip has no command for ffmpeg."""
-        reports = toolchain.parse_probe("ffmpeg=no=\npip=yes=pip 25.2\n")
+        """A node whose only manager is pip has no command for ffmpeg, and is
+        offered the pinned pip line for the hooks check's tools (MCPs board
+        task ec895824)."""
+        reports = toolchain.parse_probe("ffmpeg=no=\nhooks=no=\npip=yes=pip 25.2\n")
 
         assert toolchain.tagged_gap("lenovoold", reports) == (
             "lenovoold claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
-            "it -- no automatic install on this node"
+            f"it -- no automatic install on this node; hooks -- {HOOKS_REASON}, so those jobs go "
+            f"to a node that has it -- {HOOKS_INSTALL}"
         )
 
     def test_the_wrong_python_is_not_ready_even_with_every_tool(self) -> None:
