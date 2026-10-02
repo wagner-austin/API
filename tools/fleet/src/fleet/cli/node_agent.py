@@ -88,10 +88,11 @@ from typing_extensions import TypedDict
 
 from fleet.cli import _config
 from fleet.cli import run as run_cli
-from fleet.cli.node_collect import CLAIM_LEASE_SECONDS, collect_pass, require_sha
+from fleet.cli.node_claim import ask_queue
+from fleet.cli.node_collect import collect_pass, require_sha
 from fleet.cli.node_ready import Ready, ready_state
 from fleet.cli.node_start import report_started
-from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchLane, encode_job_line
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig
@@ -103,10 +104,10 @@ from fleet.core import (
     archive_scope,
     capacity,
     dispatch,
-    elevated_yield,
     export,
     queue,
     run_lease,
+    tick_report,
 )
 
 _log = get_logger(__name__)
@@ -243,23 +244,17 @@ def claim_pass(
             code and message verbatim and does not propagate: transport,
             not recovery.
     """
-    ready = ready_state(loaded, alias=alias, node=node, elevated=elevated)
-    if ready is None or elevated_yield.yields_to_elevated(
-        credentials, loaded.workspace, alias=alias, node=node, elevated=elevated
-    ):
+    gate = ready_state(loaded, alias=alias, node=node, elevated=elevated)
+    ready = gate["ready"]
+    if ready is None:
+        tick_report.record_tick(credentials, gate["tick"], identity=identity)
         return None
-    job = queue.claim_next(
-        credentials,
-        lane=DispatchLane.NODE,
-        tags=tuple(sorted(ready["tags"])),
-        node=alias,
-        projects=ready["fits"],
-        lease_seconds=CLAIM_LEASE_SECONDS,
-        identity=identity,
+    tick = gate["tick"]
+    job = ask_queue(
+        loaded, credentials, identity, tick, ready, alias=alias, node=node, elevated=elevated
     )
     if job is None:
         return None
-    _log.info("claimed %s", encode_job_line(job))
     sha = require_sha(job)
     try:
         prepared = prepare(loaded, job, node=node, ready=ready, sha=sha)
@@ -495,8 +490,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     credentials = queue.load_credentials()
     collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
-    if claim_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated) is None:
-        _log.info("nothing in the node lane for %s", alias)
+    claim_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated)
     return 0
 
 

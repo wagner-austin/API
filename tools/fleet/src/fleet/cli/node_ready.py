@@ -15,6 +15,12 @@ the declaration differs from the answer is logged every tick
 THE TOOLCHAIN IS ASKED BEFORE THE ROOM. Which projects a runner could take
 depends on its tags, and the room check sizes the smallest of them, so the
 tags are read first; the cost is one probe on a tick that finds no room.
+
+EVERY ANSWER CARRIES THE TICK (A4). Whichever gate closes, the runner
+records what it found, its tags, its load, the projects it fits and the
+verdict, as its row on the queue (:mod:`fleet.core.tick_report`), so the
+line this module logs is also the line ``fleet_status`` shows beside the
+node.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from fleet.cli import _config
 from fleet.contracts.detection import detected_tags, tag_drift
 from fleet.contracts.elevation import elevation_gap
 from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.runner_tick import RunnerTick, TickLoad
 from fleet.contracts.tags import NodeTag, runner_tags
 from fleet.contracts.toolchain import ToolReport
 from fleet.core import capacity, host_report, probe, records, toolchain
@@ -54,9 +61,23 @@ class Ready(TypedDict):
     fits: tuple[str, ...]
 
 
+class Gate(TypedDict):
+    """What the gate decided, and the tick to record for it.
+
+    Attributes:
+        ready: The node's state, tags and fits when it may claim, else None.
+        tick: What this tick found, with the verdict of the gate that closed,
+            or for a ready node ``claiming`` set and a verdict the claim
+            replaces once it has asked the queue.
+    """
+
+    ready: Ready | None
+    tick: RunnerTick
+
+
 def ready_state(
     loaded: _config.LoadedWorkspace, *, alias: str, node: NodeConfig, elevated: bool
-) -> Ready | None:
+) -> Gate:
     """Ask the node, in order, whether it may claim at all this tick.
 
     Args:
@@ -67,42 +88,101 @@ def ready_state(
             needs the probe to read an administrator's token.
 
     Returns:
-        The node's measured state and claim tags when it is enabled (a stale
-        task for a retired node asks nothing), answered, has every required
-        tool, has room and (elevated) holds an administrator's token;
-        otherwise None, with the gate that closed and its reason logged, and
-        for a node with a ``wsl_host`` what that host reports
+        The gate. ``ready`` carries the node's measured state and claim tags
+        when it is enabled (a stale task for a retired node asks nothing),
+        answered, has every required tool, has room and (elevated) holds an
+        administrator's token; otherwise it is None, with the gate that
+        closed and its reason logged and carried as the tick's verdict, and
+        for a node with a ``wsl_host`` what that host reports logged too
         (:mod:`fleet.core.host_report`). A tagged tool the node lacks, and a
         declaration its probe contradicts, close no gate: each is logged and
         the runner claims with what the probe found.
     """
     if not node["enabled"]:
-        _log.info("%s is disabled in fleet.json; claiming nothing", alias)
-        return None
+        return closed(alias, elevated, None, "is disabled in fleet.json; claiming nothing")
     live = records.live_load(loaded.ledger, node=alias, projects=loaded.workspace["projects"])
     probed = probe.attempt_probe(node, live=live)
     state = probed["state"]
     if state is None:
-        _log.info("%s did not answer; claiming nothing: %s", alias, probed["reason"])
+        gate = closed(
+            alias, elevated, None, f"did not answer; claiming nothing: {probed['reason']}"
+        )
         if node["wsl_host"] is not None:
             seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
             _log.info("%s did not answer, and %s", alias, seen)
-        return None
+        return gate
+    load = tick_load(state)
     answered = toolchain.attempt_toolchain(node)
     if not isinstance(answered, tuple):
-        _log.info(
-            "%s did not answer the toolchain probe; claiming nothing: %s: %s",
+        return closed(
             alias,
-            answered["code"],
-            answered["message"],
+            elevated,
+            load,
+            "did not answer the toolchain probe; claiming nothing: "
+            f"{answered['code']}: {answered['message']}",
         )
-        return None
     gap = toolchain.readiness_gap(alias, node, answered)
     if gap is not None:
-        _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
-        return None
+        return closed(
+            alias, elevated, load, f"cannot build; claiming nothing: {gap.code}: {gap.message}"
+        )
     return _claimable(
         loaded, alias=alias, node=node, state=state, answered=answered, elevated=elevated
+    )
+
+
+def tick_load(state: NodeState) -> TickLoad:
+    """Read the tick's load off a node's measured state.
+
+    Args:
+        state: What the node reported this tick.
+
+    Returns:
+        Its live runs and their workers, and its free memory.
+    """
+    return TickLoad(
+        runs=state["live"]["runs"],
+        workers=state["live"]["workers"],
+        free_ram_gb=state["free_ram_gb"],
+    )
+
+
+def closed(
+    alias: str,
+    elevated: bool,
+    load: TickLoad | None,
+    verdict: str,
+    *,
+    tags: frozenset[NodeTag] = frozenset(),
+    fits: tuple[str, ...] = (),
+) -> Gate:
+    """Log why a node claims nothing this tick, and carry it as the tick.
+
+    Args:
+        alias: This node's workspace name.
+        elevated: Whether this is the node's elevated runner.
+        load: What the node holds, or None when it was not probed or did
+            not answer.
+        verdict: Why it claims nothing, without the node's name, which the
+            log line prefixes and the tick carries as its own field.
+        tags: The tags its probe detected, when the tick got that far.
+        fits: The projects it fits, when the tick got that far.
+
+    Returns:
+        A gate with no ready node and the tick to record.
+    """
+    _log.info("%s %s", alias, verdict)
+    return Gate(
+        ready=None,
+        tick=RunnerTick(
+            node=alias,
+            elevated=elevated,
+            tags=tuple(sorted(tags)),
+            fits=fits,
+            load=load,
+            claiming=False,
+            verdict=verdict,
+        ),
     )
 
 
@@ -114,7 +194,7 @@ def _claimable(
     state: NodeState,
     answered: tuple[ToolReport, ...],
     elevated: bool,
-) -> Ready | None:
+) -> Gate:
     """Read a ready node's claim tags and the projects it fits, or say why none.
 
     Args:
@@ -126,11 +206,11 @@ def _claimable(
         elevated: Whether this is the node's elevated runner.
 
     Returns:
-        The node's state, claim tags and fitting projects; or None when it has
-        room for nothing, fits no project, or (elevated) does not hold an
-        administrator's token, with the reason logged. The ready summary, a
-        tagged tool it lacks and each difference from its declaration are
-        logged first.
+        The gate: the node's state, claim tags and fitting projects; or no
+        ready node when it has room for nothing, fits no project, or
+        (elevated) does not hold an administrator's token, with the reason
+        logged and carried. The ready summary, a tagged tool it lacks and
+        each difference from its declaration are logged first.
     """
     _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
     lacking = toolchain.tagged_gap(alias, answered)
@@ -139,28 +219,44 @@ def _claimable(
     for drift in tag_drift(node, answered):
         _log.info("%s (%s) %s", alias, node["host"], drift)
     tags = detected_tags(node, answered) | (runner_tags(node, elevated=elevated) & ELEVATED_ONLY)
+    load = tick_load(state)
     registered = loaded.workspace["projects"]
     full = capacity.room_for_any(node, state, tuple(registered.values()), tags)
     if full is not None:
-        _log.info("%s has room for nothing; claiming nothing: %s", alias, full)
-        return None
+        return closed(
+            alias, elevated, load, f"has room for nothing; claiming nothing: {full}", tags=tags
+        )
     fits = capacity.fitting_projects(node, state, registered, tags)
     if not fits:
-        _log.info(
-            "%s has room for one worker but not for any project's minimum; claiming nothing",
+        return closed(
             alias,
+            elevated,
+            load,
+            "has room for one worker but not for any project's minimum; claiming nothing",
+            tags=tags,
         )
-        return None
     unelevated = elevation_gap(alias, node, answered) if elevated else None
     if unelevated is not None:
-        _log.info(
-            "%s cannot launch elevated; claiming nothing: %s: %s",
+        return closed(
             alias,
-            unelevated.code,
-            unelevated.message,
+            elevated,
+            load,
+            f"cannot launch elevated; claiming nothing: {unelevated.code}: {unelevated.message}",
+            tags=tags,
+            fits=fits,
         )
-        return None
-    return Ready(state=state, tags=tags, fits=fits)
+    return Gate(
+        ready=Ready(state=state, tags=tags, fits=fits),
+        tick=RunnerTick(
+            node=alias,
+            elevated=elevated,
+            tags=tuple(sorted(tags)),
+            fits=fits,
+            load=load,
+            claiming=True,
+            verdict=f"fits {len(fits)} project(s); asking the queue",
+        ),
+    )
 
 
-__all__ = ["Ready", "ready_state"]
+__all__ = ["ELEVATED_ONLY", "Gate", "Ready", "closed", "ready_state", "tick_load"]
