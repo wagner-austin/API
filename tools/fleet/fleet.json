@@ -315,6 +315,30 @@
         "companions": []
       }
     },
+    "tools/hpc3": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/hpc3",
+        "install": [],
+        "companions": []
+      }
+    },
+    "clients/RustedWarfareBot": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 4,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "clients/RustedWarfareBot",
+        "install": [],
+        "companions": []
+      }
+    },
     "slime": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,

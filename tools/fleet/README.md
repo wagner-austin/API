@@ -894,9 +894,9 @@ which is exactly how the field was found. A declared path that has since been
 renamed is refused at dispatch rather than at tar, because `tar: docs: Cannot
 stat` names a path and the reader's actual fix is to edit the workspace.
 
-### And sometimes the declaration cannot exist, which is why `tools/hpc3` is gone
+### Why `tools/hpc3` left the registry on 2026-09-06, and why it is back
 
-`tools/hpc3` was a declared project until 2026-09-06 and is not one now. Five
+`tools/hpc3` was a declared project until 2026-09-06, when it was removed. Five
 dispatches of it failed over two days, every one recorded in the ledger as
 `failed`, and none of them was an hpc3 defect.
 
@@ -910,17 +910,24 @@ reader exists and simply was not staged. The counts settle it: 1484 tests
 locally, and on lavender 1478 passed + 4 failed + 2 skipped, the same 1484,
 with only the tree differing.
 
-`external_paths` cannot express this. The four trees measure **139 GB**
-(`services` alone is 130 GB) against the ~34 MB archive an hpc3 dispatch
-currently ships. There is no declaration that makes this suite correct on a
-node, so the honest state is that it does not go to one.
+`external_paths` could not express this. The four working trees measured
+**139 GB** (`services` alone was 130 GB) against the ~34 MB archive an hpc3
+dispatch shipped then, so no declaration made the suite correct on a node,
+and it was removed rather than left to answer wrongly.
 
-Removing it means `fleet-run --project tools/hpc3` now refuses with
-`WORKSPACE_PROJECT_UNKNOWN`, naming the projects that are declared. That
-refusal does not say *why*, which is the same silence
-[`not_dispatchable`](#enabled-and-why-the-fleet-is-written-down-twice) exists
-to end on the node side — so the reason lives here until the project side
-grows the same field. **Do not re-add it because the entry looks missing.**
+The premise no longer holds. A node-lane check now ships `git archive` of
+the submitted commit, and since board task 140e7042 that archive is the
+WHOLE tracked tree less the data directories `data_paths` declares
+(`fleet.core.archive_scope`): every package's source under `libs`,
+`services`, `clients` and `tools` travels, and the 139 GB was untracked
+working-tree data that was never going to. The readers
+`test_exported_env_readers.py` walks for and the `model_trainer` modules
+`test_committed_specs.py` resolves are tracked source, so they are on the
+node, and `tools/hpc3/artifacts`, the one declared data directory the suite
+could want, is hpc3's own and so is kept. It was re-declared on 2026-10-02
+for board task 0b3591d7, beside `clients/RustedWarfareBot`, because that
+task's close needs a fleet verdict of both at the commits that moved the
+sweep, stage and layout contracts into `platform_core`.
 
 ## Cancelling
 
