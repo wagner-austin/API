@@ -178,18 +178,41 @@ class TestReadiness:
         """MEASURED: make was on one node of three."""
         assert missing(toolchain.parse_probe(SEDONA)) == ("make",)
 
-    def test_a_node_without_ffmpeg_is_missing_it_and_told_the_install(self) -> None:
-        """MEASURED 2026-10-01 (MCPs board task 512e7bf8): serendipity had
-        every other tool and winget, and 'where ffmpeg' found nothing."""
+    def test_a_node_without_ffmpeg_can_build_and_is_told_what_it_misses(self) -> None:
+        """serendipity's answer of 2026-10-01 (MCPs board task 512e7bf8), every
+        other tool and winget present and 'where ffmpeg' empty. ffmpeg is a
+        tag now (MCPs board task 939ec5c7), so the node is ready, and the
+        tagged gap names the tool, who needs it and the install here."""
         reports = toolchain.parse_probe(
             "python=yes=Python 3.11.9\npoetry=yes=Poetry (version 2.4.2)\n"
             "git=yes=git version 2.55.0.windows.5\nmake=yes=GNU Make 4.4.1\n"
             "node=yes=v24.21.0\nffmpeg=no=\ntar=yes=bsdtar 3.8.8\nwinget=yes=v1.12\n"
         )
 
-        assert missing(reports) == ("ffmpeg",)
-        assert "ffmpeg (winget install --id Gyan.FFmpeg.Essentials" in describe_gap(
-            "serendipity", reports
+        assert missing(reports) == ()
+        assert describe_gap("serendipity", reports) == "serendipity: ready"
+        assert toolchain.absent_tagged(reports) == ("ffmpeg",)
+        assert toolchain.tagged_gap("serendipity", reports) == (
+            "serendipity claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
+            "check converts real audio files through ffmpeg, so those jobs go to a node that has "
+            "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
+            "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+        )
+
+    def test_a_node_with_ffmpeg_has_no_tagged_gap(self) -> None:
+        reports = toolchain.parse_probe("ffmpeg=yes=ffmpeg version 7.1.1-essentials\n")
+
+        assert toolchain.absent_tagged(reports) == ()
+        assert toolchain.tagged_gap("pendragon", reports) is None
+
+    def test_a_tagged_tool_with_no_install_here_says_so(self) -> None:
+        """A node whose only manager is pip has no command for ffmpeg."""
+        reports = toolchain.parse_probe("ffmpeg=no=\npip=yes=pip 25.2\n")
+
+        assert toolchain.tagged_gap("lenovoold", reports) == (
+            "lenovoold claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
+            "check converts real audio files through ffmpeg, so those jobs go to a node that has "
+            "it -- no automatic install on this node"
         )
 
     def test_the_wrong_python_is_not_ready_even_with_every_tool(self) -> None:

@@ -16,6 +16,10 @@ from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
 from fleet.core.capacity import assess, first_fit, plan_dispatch, room_for_any
 
+#: What a windows node with no other declaration carries, and a linux one.
+WINDOWS_TAGS = frozenset({NodeTag.WINDOWS})
+LINUX_TAGS = frozenset({NodeTag.LINUX})
+
 #: lavender's card as fleet.json declares it, for the nodes that carry one.
 GTX_1630 = NodeGpu(
     model="NVIDIA GeForce GTX 1630",
@@ -134,7 +138,7 @@ def _project(
 
 class TestAssess:
     def test_a_healthy_node_accepts_and_names_no_code(self) -> None:
-        verdict = assess(_node(), _state(), _project())
+        verdict = assess(_node(), _state(), _project(), WINDOWS_TAGS)
 
         assert verdict["code"] is None
         assert verdict["reason"] == ""
@@ -142,20 +146,24 @@ class TestAssess:
 
     def test_a_node_at_its_concurrency_limit_is_refused(self) -> None:
         """Three dispatches that each fit alone do not fit together."""
-        verdict = assess(_node(max_concurrent_runs=2), _state(live_runs=2), _project())
+        verdict = assess(
+            _node(max_concurrent_runs=2), _state(live_runs=2), _project(), WINDOWS_TAGS
+        )
 
         assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert verdict["workers"] == 0
         assert "already holds 2 fleet run(s)" in verdict["reason"]
 
     def test_a_node_without_room_to_stage_is_refused(self) -> None:
-        verdict = assess(_node(max_disk_gb=20.0), _state(free_disk_gb=5.0), _project())
+        verdict = assess(
+            _node(max_disk_gb=20.0), _state(free_disk_gb=5.0), _project(), WINDOWS_TAGS
+        )
 
         assert verdict["code"] is FleetErrorCode.NODE_DISK_EXHAUSTED
         assert "reserves 20 GB" in verdict["reason"]
 
     def test_a_node_whose_owner_is_using_it_is_refused(self) -> None:
-        verdict = assess(_node(), _state(free_ram_gb=3.0), _project())
+        verdict = assess(_node(), _state(free_ram_gb=3.0), _project(), WINDOWS_TAGS)
 
         assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert "somebody is on this machine" in verdict["reason"]
@@ -169,8 +177,8 @@ class TestAssess:
         below = SliceMemory(current_gb=12.0, high_gb=16.0)
         node = _node(reserved_ram_gb=12.0)
 
-        held = assess(node, _state(free_ram_gb=8.2, ci_slice=at_high), _project())
-        light = assess(node, _state(free_ram_gb=8.2, ci_slice=below), _project())
+        held = assess(node, _state(free_ram_gb=8.2, ci_slice=at_high), _project(), WINDOWS_TAGS)
+        light = assess(node, _state(free_ram_gb=8.2, ci_slice=below), _project(), WINDOWS_TAGS)
 
         assert held["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert held["reason"].endswith(
@@ -185,7 +193,9 @@ class TestAssess:
         Dispatching anyway runs the suite at a fraction of its workers until
         its own lease expires underneath it.
         """
-        verdict = assess(_node(cores=20), _state(free_ram_gb=11.4), _project(minimum_workers=8))
+        verdict = assess(
+            _node(cores=20), _state(free_ram_gb=11.4), _project(minimum_workers=8), WINDOWS_TAGS
+        )
 
         assert verdict["code"] is FleetErrorCode.NODE_MEMORY_EXHAUSTED
         assert "affords 6 worker(s)" in verdict["reason"]
@@ -197,49 +207,70 @@ class TestAssess:
             _node(host="diphtheria", platform=NodePlatform.LINUX),
             _state(host="diphtheria"),
             _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS)),
+            LINUX_TAGS,
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
         assert verdict["workers"] == 0
         assert verdict["reason"].startswith("diphtheria lacks gpu, windows: ")
         assert "requires gpu, windows and this node carries linux" in verdict["reason"]
-        assert "another node, never this one later" in verdict["reason"]
+        assert "or this one once the missing tool is installed" in verdict["reason"]
 
     def test_the_tag_refusal_names_only_the_tags_missing(self) -> None:
         verdict = assess(
             _node(host="loki"),
             _state(host="loki"),
             _project(required_tags=(NodeTag.WINDOWS, NodeTag.GPU)),
+            WINDOWS_TAGS,
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
         assert verdict["reason"].startswith("loki lacks gpu: ")
 
+    def test_a_tool_tag_is_judged_on_what_the_runner_carries(self) -> None:
+        """pendragon on 2026-10-02 (MCPs board task 939ec5c7): grandma-api
+        needs ffmpeg, so a runner whose probe did not find it is refused that
+        one project, and the same node with ffmpeg found is weighed on its
+        capacity like any other."""
+        grandma = _project(required_tags=(NodeTag.WINDOWS, NodeTag.FFMPEG))
+        node = _node(host="pendragon")
+
+        lacking = assess(node, _state(host="pendragon"), grandma, WINDOWS_TAGS)
+        found = assess(node, _state(host="pendragon"), grandma, WINDOWS_TAGS | {NodeTag.FFMPEG})
+
+        assert lacking["code"] is FleetErrorCode.NODE_LACKS_TAG
+        assert lacking["reason"].startswith("pendragon lacks ffmpeg: ")
+        assert found["code"] is None
+        assert found["workers"] == 14
+
     def test_a_node_carrying_every_required_tag_is_weighed_on_capacity(self) -> None:
         project = _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS))
+        carried = frozenset({NodeTag.WINDOWS, NodeTag.GPU})
 
-        assert assess(_node(gpu=GTX_1630), _state(), project)["workers"] == 14
-        full = assess(_node(gpu=GTX_1630), _state(free_ram_gb=3.0), project)
+        assert assess(_node(gpu=GTX_1630), _state(), project, carried)["workers"] == 14
+        full = assess(_node(gpu=GTX_1630), _state(free_ram_gb=3.0), project, carried)
         assert full["code"] is FleetErrorCode.NODE_OWNER_RESERVED
 
     def test_a_project_requiring_nothing_takes_any_platform(self) -> None:
-        assert assess(_node(platform=NodePlatform.LINUX), _state(), _project())["workers"] == 14
+        linux = _node(platform=NodePlatform.LINUX)
+        assert assess(linux, _state(), _project(), LINUX_TAGS)["workers"] == 14
 
     def test_the_project_cost_overrides_the_node_default(self) -> None:
         """What a worker costs is a property of the suite, not the machine."""
-        light = assess(_node(), _state(), _project(worker_ram_gb=0.2))
+        light = assess(_node(), _state(), _project(worker_ram_gb=0.2), WINDOWS_TAGS)
+        big = assess(_node(cores=200), _state(), _project(worker_ram_gb=0.2), WINDOWS_TAGS)
 
         assert light["workers"] == 14
-        assert assess(_node(cores=200), _state(), _project(worker_ram_gb=0.2))["workers"] == 115
+        assert big["workers"] == 115
 
 
 class TestPlanDispatch:
     def test_it_returns_the_worker_count_when_the_node_accepts(self) -> None:
-        assert plan_dispatch(_node(), _state(), _project()) == 14
+        assert plan_dispatch(_node(), _state(), _project(), WINDOWS_TAGS) == 14
 
     def test_it_raises_the_verdict_s_own_code(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            plan_dispatch(_node(), _state(free_ram_gb=3.0), _project())
+            plan_dispatch(_node(), _state(free_ram_gb=3.0), _project(), WINDOWS_TAGS)
 
         assert excinfo.value.code is FleetErrorCode.NODE_OWNER_RESERVED
 

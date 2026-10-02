@@ -13,6 +13,7 @@ from platform_core.json_utils import JSONTypeError
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform
 from fleet.contracts.tags import (
+    TOOL_TAG,
     NodeTag,
     decode_node_tag,
     decode_required_tags,
@@ -20,7 +21,9 @@ from fleet.contracts.tags import (
     missing_tags,
     node_tags,
     runner_tags,
+    tool_tags,
 )
+from fleet.contracts.toolchain import ToolReport
 
 #: sedona's card as fleet.json declares it.
 RTX_3070_TI = NodeGpu(
@@ -142,9 +145,9 @@ class TestNodeTags:
             {NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX, NodeTag.DOCKER}
         )
         required = (NodeTag.TESTDB, NodeTag.CXX, NodeTag.STACK)
-        assert missing_tags(lavender_wsl, required) == (NodeTag.STACK,)
-        assert missing_tags(diphtheria, required) == ()
-        assert missing_tags(lavender_wsl, (NodeTag.TESTDB, NodeTag.CXX)) == ()
+        assert missing_tags(node_tags(lavender_wsl), required) == (NodeTag.STACK,)
+        assert missing_tags(node_tags(diphtheria), required) == ()
+        assert missing_tags(node_tags(lavender_wsl), (NodeTag.TESTDB, NodeTag.CXX)) == ()
 
     def test_a_node_declaring_an_elevated_runner_carries_elevated(self) -> None:
         """serendipity, whose ssh account is an administrator (MCPs board task
@@ -161,10 +164,10 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_platforms_and_seven_capabilities(self) -> None:
+    def test_the_vocabulary_is_the_platforms_and_eight_capabilities(self) -> None:
         """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571,
-        615 and 622) is these nine words, so the members' values are pinned in
-        order."""
+        615, 622 and 639) is these ten words, so the members' values are pinned
+        in order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
             "linux",
@@ -175,7 +178,34 @@ class TestNodeTags:
             "docker",
             "elevated",
             "stack",
+            "ffmpeg",
         ]
+
+    def test_no_declaration_carries_a_tool_tag(self) -> None:
+        """ffmpeg comes only from the toolchain probe (:func:`tool_tags`), so a
+        node with every declaration set still carries none."""
+        loaded = _node(test_database=True, rust="1.98.1", cxx="13.3.0", elevated=True)
+        assert NodeTag.FFMPEG not in node_tags(loaded)
+
+
+class TestToolTags:
+    def test_a_probe_that_found_ffmpeg_gives_its_tag(self) -> None:
+        """pendragon once winget installed it, 2026-10-02 02:4xZ (MCPs board
+        task 939ec5c7)."""
+        found = (
+            ToolReport(name="git", present=True, version="2.51.0"),
+            ToolReport(name="ffmpeg", present=True, version="7.1.1-essentials"),
+        )
+        assert tool_tags(found) == frozenset({NodeTag.FFMPEG})
+
+    def test_an_absent_or_unreported_tool_gives_nothing(self) -> None:
+        absent = (ToolReport(name="ffmpeg", present=False, version=""),)
+        assert tool_tags(absent) == frozenset()
+        assert tool_tags(()) == frozenset()
+
+    def test_only_the_tagged_tools_have_tags(self) -> None:
+        assert TOOL_TAG == {"ffmpeg": NodeTag.FFMPEG}
+        assert tool_tags((ToolReport(name="make", present=True, version="4.4"),)) == frozenset()
 
 
 class TestRunnerTags:
@@ -199,10 +229,11 @@ class TestRunnerTags:
 
 class TestMissingTags:
     def test_a_satisfied_requirement_is_empty(self) -> None:
-        assert missing_tags(_node(gpu=RTX_3070_TI), (NodeTag.GPU, NodeTag.WINDOWS)) == ()
+        carried = node_tags(_node(gpu=RTX_3070_TI))
+        assert missing_tags(carried, (NodeTag.GPU, NodeTag.WINDOWS)) == ()
 
     def test_the_missing_tags_come_back_in_the_project_s_order(self) -> None:
-        linux = _node(platform=NodePlatform.LINUX)
+        linux = node_tags(_node(platform=NodePlatform.LINUX))
         assert missing_tags(linux, (NodeTag.WINDOWS, NodeTag.GPU)) == (
             NodeTag.WINDOWS,
             NodeTag.GPU,
@@ -213,19 +244,27 @@ class TestMissingTags:
         )
 
     def test_a_database_suite_is_missing_testdb_on_a_node_without_one(self) -> None:
-        with_database = _node(platform=NodePlatform.LINUX, test_database=True)
-        assert missing_tags(_node(platform=NodePlatform.LINUX), (NodeTag.TESTDB,)) == (
-            NodeTag.TESTDB,
-        )
+        with_database = node_tags(_node(platform=NodePlatform.LINUX, test_database=True))
+        plain = node_tags(_node(platform=NodePlatform.LINUX))
+        assert missing_tags(plain, (NodeTag.TESTDB,)) == (NodeTag.TESTDB,)
         assert missing_tags(with_database, (NodeTag.TESTDB,)) == ()
 
     def test_a_crate_build_is_missing_rust_on_a_node_without_cargo(self) -> None:
-        with_cargo = _node(platform=NodePlatform.LINUX, rust="1.98.1")
-        assert missing_tags(_node(platform=NodePlatform.LINUX), (NodeTag.RUST,)) == (NodeTag.RUST,)
+        with_cargo = node_tags(_node(platform=NodePlatform.LINUX, rust="1.98.1"))
+        plain = node_tags(_node(platform=NodePlatform.LINUX))
+        assert missing_tags(plain, (NodeTag.RUST,)) == (NodeTag.RUST,)
         assert missing_tags(with_cargo, (NodeTag.RUST,)) == ()
 
+    def test_an_audio_suite_is_missing_ffmpeg_until_the_probe_finds_it(self) -> None:
+        """grandma-api's requirement against a windows runner before and after
+        its probe found ffmpeg (MCPs board task 939ec5c7)."""
+        declared = node_tags(_node())
+        grandma = (NodeTag.WINDOWS, NodeTag.FFMPEG)
+        assert missing_tags(declared, grandma) == (NodeTag.FFMPEG,)
+        assert missing_tags(declared | {NodeTag.FFMPEG}, grandma) == ()
+
     def test_a_project_requiring_nothing_is_never_missing_anything(self) -> None:
-        assert missing_tags(_node(platform=NodePlatform.LINUX), ()) == ()
+        assert missing_tags(node_tags(_node(platform=NodePlatform.LINUX)), ()) == ()
 
 
 class TestDecodeNodeTag:
@@ -237,9 +276,9 @@ class TestDecodeNodeTag:
         with pytest.raises(
             JSONTypeError,
             match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, "
-            r"stack, got 'podman'; .* a Rust or C\+\+ toolchain, the execution suite's rootless "
-            r"Docker daemon, an elevated runner, or the corvis compose stack\), and one it does "
-            r"not carry could never be satisfied$",
+            r"stack, ffmpeg, got 'podman'; .* a Rust or C\+\+ toolchain, the execution suite's "
+            r"rootless Docker daemon, an elevated runner, the corvis compose stack, or a tool its "
+            r"probe found\), and one it does not carry could never be satisfied$",
         ):
             decode_node_tag("podman", field="t")
 

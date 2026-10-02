@@ -26,7 +26,12 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue
-from tests._toolchain_fixtures import LAVENDER_STORE_STUB, SERENDIPITY_2026_09_25, WRONG_PYTHON
+from tests._toolchain_fixtures import (
+    LAVENDER_2026_09_23,
+    LAVENDER_STORE_STUB,
+    SERENDIPITY_2026_09_25,
+    WRONG_PYTHON,
+)
 from tests.conftest import PROBE_OK, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -58,6 +63,46 @@ def _tick(
     return [record.getMessage() for record in caplog.records]
 
 
+class TestTheToolTagsAClaimCarries:
+    def test_a_node_whose_probe_found_ffmpeg_claims_with_its_tag(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """pendragon after its ffmpeg install, 2026-10-02 02:48Z (MCPs board
+        task 939ec5c7): the runner claims with ffmpeg beside windows, so the
+        queue may hand it grandma-api's check, and logs no tagged gap."""
+        _test_hooks.run = FakeRun(
+            [ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg 7.1.1\n")]
+        )
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        assert endpoint.arguments[1]["tags"] == ["ffmpeg", "windows"]
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages[-2:] == [
+            "lavender toolchain ready: python 3.11.9; node v24.20.0; "
+            "poetry, git, make, tar present; ffmpeg present",
+            "nothing in the node lane for lavender",
+        ]
+
+    def test_a_node_without_ffmpeg_claims_without_it(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """pendragon before 02:48Z: windows alone, so the queue keeps
+        grandma-api's check for another node and offers this one the rest."""
+        _test_hooks.run = FakeRun(PROBED)
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.arguments[1]["tags"] == ["windows"]
+
+
 class TestAToolchainThatCanBuild:
     def test_a_ready_node_says_what_it_was_judged_on_and_asks_the_queue(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -71,9 +116,13 @@ class TestAToolchainThatCanBuild:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-2:] == [
+        assert messages[-3:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present",
+            "poetry, git, make, tar present; ffmpeg absent",
+            "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
+            "check converts real audio files through ffmpeg, so those jobs go to a node that has "
+            "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
+            "--accept-package-agreements --accept-source-agreements --disable-interactivity",
             "nothing in the node lane for lavender",
         ]
 

@@ -67,11 +67,19 @@ class TestReadySummary:
     def test_it_names_what_a_ready_node_was_judged_on(self) -> None:
         assert (
             toolchain.ready_summary(toolchain.read_reports(LAVENDER_2026_09_23))
-            == "python 3.11.9; node v24.20.0; poetry, git, make, tar present"
+            == "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent"
         )
         assert (
             toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23))
-            == "python 3.11.15; node v24.21.0; poetry, git, make, tar present"
+            == "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent"
+        )
+
+    def test_it_names_a_tagged_tool_the_probe_found(self) -> None:
+        """pendragon after its winget install, 2026-10-02 02:4xZ (MCPs board
+        task 939ec5c7): the tag its runner claims with is on the same line."""
+        found = toolchain.read_reports(LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg version 7.1.1\n")
+        assert toolchain.ready_summary(found) == (
+            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg present"
         )
 
 
