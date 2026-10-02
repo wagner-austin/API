@@ -24,8 +24,9 @@ asks :func:`for_platform` once and never reasons about the platform again.
 WHAT IS SHARED AND WHY IT IS HERE. ``tar -xzmf`` and the ``git`` acts -- the
 staged tree's ``init`` and ``commit``, and the clone of a companion from its
 bundle -- are the same COMMANDS on both platforms
-(Windows ships bsdtar, every node has git), so they are functions in this
-module rather than methods repeated in two classes. Everything else differs
+(Windows ships bsdtar, every node has git), so they are functions rather
+than methods repeated in two classes: ``tar`` here, the ``git`` acts in
+:mod:`fleet.core.stage_repository` since MCPs board task 939ec5c7. Everything else differs
 in at least one token that matters, which is why it is a method: replacing a
 directory is ``Remove-Item -Recurse -Force`` on one platform and ``rm -rf``
 on the other.
@@ -65,44 +66,6 @@ from typing import Protocol
 from fleet.contracts.node import NodePlatform
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
-from fleet.core.export import COMPANION_REF
-
-#: Who a project's staged tree's one commit is authored by, passed to ``git``
-#: with ``-c`` on the commit itself. A companion is cloned with its real
-#: commits (:func:`companion_repository_commands`) and gets none.
-#:
-#: A node has no git identity and is not given one: a dispatch that
-#: configured ``user.email`` would leave that setting behind on somebody's
-#: workstation, and the next thing they committed there would carry it. The
-#: address is in the reserved ``.invalid`` domain (RFC 2606), so it cannot
-#: reach anybody even if a tree staged here were ever pushed.
-EXPORT_AUTHOR_NAME = "fleet"
-EXPORT_AUTHOR_EMAIL = "fleet@corvis.invalid"
-
-
-def _commit_command(target: str, message: str) -> tuple[str, ...]:
-    """The one commit of a staged tree, under the export identity.
-
-    Args:
-        target: Absolute remote directory holding the repository.
-        message: The commit message (a sha or a run id in words).
-
-    Returns:
-        The command, as an argument vector.
-    """
-    return (
-        "git",
-        "-C",
-        target,
-        "-c",
-        f"user.name={EXPORT_AUTHOR_NAME}",
-        "-c",
-        f"user.email={EXPORT_AUTHOR_EMAIL}",
-        "commit",
-        "--quiet",
-        "--message",
-        message,
-    )
 
 
 class Dialect(Protocol):
@@ -427,7 +390,7 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
     builds; a project's dispatch passes its own directory for both, which is
     where its archive already sits. (A companion, which used this too until
     MCPs board task 2026dfbc, is now cloned from a bundle instead:
-    :func:`companion_repository_commands`.)
+    :func:`fleet.core.stage_repository.companion_repository_commands`.)
 
     Args:
         archive: Absolute path to the ``.tgz`` on the node.
@@ -439,150 +402,8 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
     return (("tar", "-xzmf", archive, "-C", destination),)
 
 
-def companion_repository_commands(
-    target: str, bundle: str, sha: str, ref: str
-) -> tuple[tuple[str, ...], ...]:
-    """The commands that clone a staged companion from its bundle.
-
-    A companion exists to be read as a workspace, and the things that read
-    it read git: slime's lift check compares its lifted files against
-    ``git show HEAD:<path>`` so that an uncommitted edit is not mistaken
-    for the code, and a check that runs MCPs' published maketools
-    (hardware-wiki's and metabolomics-dashboard's host-code, chat's
-    ps-harness) archives the command from ``../MCPs`` at ``origin/main``
-    (MCPs board task a8ee9b21).
-
-    A REAL CLONE, WITH ITS HISTORY (MCPs board task 2026dfbc). Until then
-    the companion landed as ``git archive`` of the ref's tip, committed on
-    the node as one synthetic commit: no history, and a HEAD whose sha was
-    not the real one. A check that reads a companion's past therefore failed
-    on every node and passed on every workstation. corvis-stick's
-    HookCommands suite reads ``packages/claude-hooks/registration.json`` at
-    the MCPs commit its hooks pin names, and on serendipity that read
-    'fatal: path ... exists on disk, but not in cd4d6aa2', a commit that is
-    an ancestor of MCPs main (job 972977be, 2026-09-30). The hub now sends
-    ``git bundle create`` of the companion ref
-    (:func:`fleet.core.export.bundle_ref`), and the node fetches it into
-    ``refs/remotes/origin/<branch>`` and checks ``<branch>`` out there, so
-    HEAD and ``origin/<branch>`` are the ref's real commit and every
-    ancestor the hub's mirror holds is reachable from them.
-
-    THE LAST TWO COMMANDS PROVE HEAD IS ``sha``: each is an ancestor of the
-    other only when they are the same commit. The bundle is the one the hub
-    wrote after resolving the ref to ``sha``, and its digest is checked
-    before this runs, so a mismatch is not expected; it would mean the
-    bundle named another commit, and the stage stops rather than checking a
-    tree the feed would then misreport.
-
-    Args:
-        target: Absolute remote directory the companion is cloned into,
-            emptied and created just before.
-        bundle: Absolute path to the verified bundle on the node.
-        sha: The commit the hub resolved the ref to and bundled.
-        ref: The companion's declared ref, ``main`` or ``refs/heads/main``.
-
-    Returns:
-        The five commands, in order, for a dialect's
-        :meth:`Dialect.checked_script`.
-    """
-    branch = ref.removeprefix("refs/heads/")
-    tracking = f"refs/remotes/origin/{branch}"
-    return (
-        ("git", "-C", target, "init", "--quiet"),
-        (
-            "git",
-            "-C",
-            target,
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            bundle,
-            f"+{COMPANION_REF}:{tracking}",
-        ),
-        ("git", "-C", target, "checkout", "--quiet", "-B", branch, tracking),
-        ("git", "-C", target, "merge-base", "--is-ancestor", "HEAD", sha),
-        ("git", "-C", target, "merge-base", "--is-ancestor", sha, "HEAD"),
-    )
-
-
-def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...], ...]:
-    """The commands that make a staged tree a one-commit git repository.
-
-    THE SAME ON BOTH PLATFORMS, and without them a staged build lints
-    different files from a local one. Ruff honours ``.gitignore`` and applies
-    it ONLY inside a git repository -- so a tree that carries the file but no
-    ``.git`` silently widens what gets linted to include everything the
-    repository deliberately excludes.
-
-    Measured on lavender 2026-09-04, dispatching ``tools/hpc3``: 902 ruff
-    errors, all in ``tools/hpc3/runs``, which ``.gitignore`` line 170 excludes
-    as build artifacts while explicitly tracking the run documents beside
-    them. The same tree with ``git init`` run in it reports ``All checks
-    passed``. Locally ``ruff check .`` passes and
-    ``ruff check . --no-respect-gitignore`` reports exactly 902 -- the same
-    number, which identifies the mechanism rather than suggesting it.
-
-    THE ALTERNATIVE WAS TO ADD AN EXCLUDE TO THE PROJECT, AND IT WOULD HAVE
-    BEEN WRONG. The repository already states which paths are build output;
-    a ruff ``exclude`` restating it is a second copy of one policy, and the
-    copy that drifts is the one nobody looks at. Reproducing the environment
-    a build is defined against is this package's job, not the project's.
-
-    THE INDEX IS FILLED TOO, since the first fleet verdict (MCPs board task
-    fd5cabfa, 2026-09-21T10:03Z): ``MCPs/packages/maketools`` at 9ee70275
-    on diphtheria read ``1 failed, 416 passed``, the one failure
-    ``test_git_lists_the_tracked_files_matching_a_pattern`` asserting that
-    ``git ls-files CLAUDE.md`` names the file, and in a repository with an
-    empty index it names nothing. A checkout's suite reads its own tracked
-    set (that package's ``lint-makefiles`` lints exactly the tracked
-    Makefiles), so a staged tree whose index is empty is not the tree the
-    suite was written against.
-
-    AND IT IS FORCED, since API board task 0b3591d7 (2026-10-03). A plain
-    ``git add --all`` drops every tracked file ``.gitignore`` ignores, which
-    is every force-added one: ``tools/hpc3`` at f75c4a94 on lavender-wsl
-    read ``1 failed``, its run-document audit reading ``git archive HEAD``
-    and finding only the one sweep a ``.gitignore`` negation re-includes,
-    the nine force-added beside it missing. The tree here is exactly the
-    commit's archive, the transport files staged beside it, so ``--force``
-    indexes the commit's files and nothing else; ruff reads ``.gitignore``
-    patterns rather than the index, so the lint above is unchanged.
-
-    AND THE INDEX IS COMMITTED, since MCPs board task 6bbfd171
-    (2026-09-26). This docstring said until then that nothing reads a commit
-    in the tree the recipe runs in, and it was false for every package whose
-    suite migrates a test database: ``packages/db``'s migrator admits a test
-    migration only against ``git rev-parse HEAD`` and ``git ls-tree HEAD``
-    (``src/migrate/test-admission.ts``), and on diphtheria that day a staged
-    MCPs tree with no commit failed it with ``TEST_MIGRATION_PROVENANCE_UNAVAILABLE:
-    git rev-parse: fatal: ambiguous argument 'HEAD'``. The same tree with
-    one commit applied 557 migrations and ``packages/tenant`` read ``ALL
-    CHECKS PASSED``. The commit is made here, before any install step runs,
-    so no hook the project's install configures (husky's
-    ``core.hooksPath``) exists yet to run on it.
-
-    Args:
-        target: Absolute remote directory holding the staged tree.
-        run_id: The dispatch, recorded in the message so the tree on the
-            node names the run it was staged for.
-
-    Returns:
-        The three commands, in order, for a dialect's
-        :meth:`Dialect.checked_script`.
-    """
-    return (
-        ("git", "-C", target, "init", "--quiet"),
-        ("git", "-C", target, "add", "--all", "--force"),
-        _commit_command(target, f"fleet export {run_id}"),
-    )
-
-
 __all__ = [
-    "EXPORT_AUTHOR_EMAIL",
-    "EXPORT_AUTHOR_NAME",
     "Dialect",
-    "companion_repository_commands",
     "extract_commands",
     "for_platform",
-    "init_repository_commands",
 ]

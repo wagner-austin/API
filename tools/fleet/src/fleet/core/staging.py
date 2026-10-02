@@ -42,7 +42,7 @@ import pathlib
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodePlatform
-from fleet.core import _test_hooks, dialect, names, remote
+from fleet.core import _test_hooks, dialect, names, remote, stage_repository
 
 #: Directory names never carried to a node.
 #:
@@ -223,7 +223,7 @@ def stage_companion(
     never enters it: :func:`fleet.core.names.companion_directory` and
     :data:`fleet.core.names.STAGE_SUFFIX` carry the reasons. What lands
     is a clone of the declared ref's real commit with its history
-    (:func:`fleet.core.dialect.companion_repository_commands`, MCPs board
+    (:func:`fleet.core.stage_repository.companion_repository_commands`, MCPs board
     task 2026dfbc), so a check that reads HEAD, ``origin/<branch>`` or an
     ancestor reads what a workstation's clone holds.
 
@@ -272,7 +272,9 @@ def stage_companion(
         host,
         spoken.script_path(staged, names.COMPANION_REPOSITORY_STEM),
         spoken.checked_script(
-            dialect.companion_repository_commands(tree, f"{staged}/{names.ARCHIVE_NAME}", sha, ref)
+            stage_repository.companion_repository_commands(
+                tree, f"{staged}/{names.ARCHIVE_NAME}", sha, ref
+            )
         ),
         platform=platform,
     )
@@ -347,7 +349,7 @@ def stage(
     remote.run_script(
         host,
         spoken.script_path(staged, names.INIT_REPOSITORY_STEM),
-        spoken.checked_script(dialect.init_repository_commands(target, run_id)),
+        spoken.checked_script(stage_repository.init_repository_commands(target, run_id)),
         platform=platform,
     )
     return target

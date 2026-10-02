@@ -37,6 +37,7 @@ from fleet.core import (
     runner_load,
     runner_rebuild,
     runner_windows_provision,
+    stage_repository,
     venv_sweep,
     verdict,
 )
@@ -138,12 +139,14 @@ def _dialect_scripts() -> list[RenderedScript]:
         ),
         RenderedScript(
             name="dialect-init-repository",
-            text=spoken.checked_script(dialect.init_repository_commands(target, EXAMPLE_RUN_ID)),
+            text=spoken.checked_script(
+                stage_repository.init_repository_commands(target, EXAMPLE_RUN_ID)
+            ),
         ),
         RenderedScript(
             name="dialect-companion-repository",
             text=spoken.checked_script(
-                dialect.companion_repository_commands(
+                stage_repository.companion_repository_commands(
                     companion,
                     f"{names.staging_directory(companion)}/{names.ARCHIVE_NAME}",
                     EXAMPLE_COMPANION_SHA,

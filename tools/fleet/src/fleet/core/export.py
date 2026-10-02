@@ -320,7 +320,7 @@ def bundle_ref(mirror: pathlib.Path, destination: pathlib.Path) -> bytes:
 
     The companion's payload since MCPs board task 2026dfbc: the ref with
     its whole history, which the node clones from
-    (:func:`fleet.core.dialect.companion_repository_commands`), where an
+    (:func:`fleet.core.stage_repository.companion_repository_commands`), where an
     archive gave it one synthetic commit. Measured on the hub for MCPs main:
     61.8 MB in 2.2 s, against 38.1 MB and 3.0 s for the archive it replaces.
 
