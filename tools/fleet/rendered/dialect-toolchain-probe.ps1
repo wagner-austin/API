@@ -1,6 +1,7 @@
 param(
     [string]$Cmd = "$env:SystemRoot\System32\cmd.exe",
     [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
+    [string]$HooksRoute = "$env:USERPROFILE\.claude\corvis-hooks.json",
     [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
@@ -77,6 +78,14 @@ if ($smi -ne '') {
 $gpu
 'testdb=no='
 'docker=no='
+$hooks = 'hooks=no='
+if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {
+    $imports = Invoke-Answer $Cmd $python '-c "import ruff, mypy, pytest, xdist, pytest_cov"'
+    if ($imports.Succeeded) {
+        $hooks = "hooks=yes=$HooksRoute"
+    }
+}
+$hooks
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {
