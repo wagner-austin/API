@@ -249,6 +249,7 @@ def _roster_host() -> HostRunnerSpec:
         scratch_dir="C:/fleet/stage",
         gpu_required=False,
         systemd_timers=["ci-clean.timer"],
+        job_timeout_minutes=360,
         installs=[_install()],
         assets=[],
         base=a_base(),

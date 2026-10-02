@@ -56,6 +56,7 @@ def _host(
         scratch_dir="C:/fleet/stage",
         gpu_required=False,
         systemd_timers=[],
+        job_timeout_minutes=360,
         installs=installs,
         assets=[],
         base=a_base(),

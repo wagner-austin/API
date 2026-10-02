@@ -53,6 +53,7 @@ def _host(scratch: pathlib.Path) -> HostRunnerSpec:
         scratch_dir=scratch.as_posix(),
         gpu_required=False,
         systemd_timers=[],
+        job_timeout_minutes=360,
         installs=[
             RunnerInstall(
                 repo="wagner-austin/API",

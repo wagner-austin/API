@@ -14,6 +14,7 @@ import subprocess
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import (
     runner_install,
+    runner_reaper_render,
     runner_recovery,
     runner_render,
     runner_slice_render,
@@ -48,6 +49,7 @@ def _host(
         scratch_dir="C:/fleet/stage",
         gpu_required=True,
         systemd_timers=["ci-clean.timer"],
+        job_timeout_minutes=360,
         installs=[
             RunnerInstall(
                 repo="wagner-austin/API",
@@ -265,17 +267,20 @@ class TestRerunsOverAHalfBuiltHost:
         guard = lines.index("if [ ! -f /home/gharunner/actions-runner/.runner ]; then")
         assert "./config.sh" in lines[guard + 1]
         assert lines[guard + 2] == "fi"
-        # The unit exists after svc.sh install and gets its restart policy
-        # before it starts, and is moved into the CI slice after it starts,
-        # when its live cgroup can be read.
+        # The unit exists after svc.sh install and gets its restart policy and
+        # its kill mode before it starts, and is moved into the CI slice
+        # after it starts, when its live cgroup can be read.
         recovery = runner_recovery.render_wsl_recovery_lines(install)
+        kill_mode = runner_reaper_render.render_kill_mode_lines(install)
         placed = runner_slice_render.render_runner_slice_lines(install)
         start = len(lines) - len(placed) - 1
-        assert lines[start - 1 - len(recovery)] == (
+        before = start - len(kill_mode) - len(recovery)
+        assert lines[before - 1] == (
             "[ -f /home/gharunner/actions-runner/.service ] || "
             "(cd /home/gharunner/actions-runner && ./svc.sh install gharunner)"
         )
-        assert lines[start - len(recovery) : start] == recovery
+        assert lines[before : start - len(kill_mode)] == recovery
+        assert lines[start - len(kill_mode) : start] == kill_mode
         assert lines[start] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
         assert lines[start + 1 :] == placed
 

@@ -34,6 +34,7 @@ def _host(keepalive: str | None) -> HostRunnerSpec:
         scratch_dir="C:/fleet/stage",
         gpu_required=False,
         systemd_timers=[],
+        job_timeout_minutes=360,
         installs=[],
         assets=[],
         base=a_base(),

@@ -27,14 +27,31 @@ BeforeAll {
         return [string[]]@([regex]::Matches($text, "StartsWith\('([0-9a-f]{64})'\)") | ForEach-Object { $_.Groups[1].Value })
     }
 
+    # Each Windows runner's directory, as its orphan row names it.
+    function Get-RunnerRoot {
+        param([string]$Name)
+        $text = [System.IO.File]::ReadAllText((Join-Path $script:rendered "$Name.ps1"))
+        return [string[]]@([regex]::Matches($text, "Get-RunnerLeftover @\(& \`$GetProcesses\) \`$ServicePid '([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+    }
+
+    # A process row as Win32_Process answers it.
+    function New-Process {
+        param([int]$Id, [int]$Parent, [string]$Name, [string]$Path, [object]$Created)
+        return [pscustomobject]@{ ProcessId = $Id; ParentProcessId = $Parent; Name = $Name; CommandLine = "`"$Path`" --run"; ExecutablePath = $Path; CreationDate = $Created }
+    }
+
     # A healthy host or a sick one: every probe answers, or every probe fails.
     # A healthy host can differ in one answer: the disk df reports, what du
     # reports for every cache directory, the account a service runs as, the
-    # machine variable's value, git's core.longpaths.
+    # machine variable's value, git's core.longpaths, what the reaper counts
+    # and the process table. Every runner service on a healthy host runs as
+    # process 4000; a sick host's runners hold a two-day-old leftover each,
+    # and one whose start time Win32_Process could not read.
     function Initialize-Host {
         param(
             [string]$Name, [switch]$Sick,
-            [string]$Used = '40G', [string]$Cached = '4G', [string]$StartName = 'LocalSystem', [string]$Held = '', [string]$GitAnswer = 'true'
+            [string]$Used = '40G', [string]$Cached = '4G', [string]$StartName = 'LocalSystem', [string]$Held = '', [string]$GitAnswer = 'true',
+            [string]$Reaped = '0', [object[]]$Processes = @()
         )
         $registry = 'HKCU:\Software\fleet-test-' + [guid]::NewGuid().ToString('N')
         foreach ($key in 'Policy', 'FileSystem', 'Environment') {
@@ -49,10 +66,19 @@ BeforeAll {
             Set-ItemProperty -LiteralPath "$registry\Policy" -Name ExecutionPolicy -Value 'Restricted'
             $service = { param([string]$Name) $asked.Add("service $Name"); @() }.GetNewClosure()
             $workdir = { param([string]$Path) $asked.Add("workdir $Path"); $false }.GetNewClosure()
+            $stale = [System.Collections.Generic.List[object]]::new()
+            $id = 9000
+            foreach ($root in @(Get-RunnerRoot $Name)) {
+                $stale.Add((New-Process ($id++) 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
+                $stale.Add((New-Process ($id++) 1 'unread.exe' "${root}_work\unread.exe" $null))
+            }
+            $table = $stale.ToArray()
+            $readProcesses = { $table }.GetNewClosure()
         } else {
             $pins = @(Get-Pin $Name)
             $sum = @($pins + ('0' * 64))[0]
             $wsl = Initialize-Batch 'wsl' @(
+                'echo %* | findstr /c:"--audit" >nul', 'if not errorlevel 1 goto reaped',
                 'echo %* | findstr /c:"free -m" >nul', 'if not errorlevel 1 goto free',
                 'echo %* | findstr /c:"df -BG" >nul', 'if not errorlevel 1 goto df',
                 'echo %* | findstr /c:"du -s -BG" >nul', 'if not errorlevel 1 goto du',
@@ -61,6 +87,7 @@ BeforeAll {
                 'echo %* | findstr /c:"is-active" >nul', 'if not errorlevel 1 goto active',
                 'echo %* | findstr /c:"sha256sum" >nul', 'if not errorlevel 1 goto sum',
                 'exit /b 0',
+                ':reaped', "echo $Reaped", 'exit /b 0',
                 ':free', 'echo               total        used', 'echo Mem:          64000        2000', 'exit /b 0',
                 ':df', 'echo  Used', "echo  $Used", 'exit /b 0',
                 ':du', "echo $Cached /the/directory", 'exit /b 0',
@@ -80,14 +107,16 @@ BeforeAll {
                 Set-ItemProperty -LiteralPath "$registry\Environment" -Name $variable.Groups[1].Value -Value $value
             }
             $account = $StartName
-            $service = { param([string]$Name) $asked.Add("service $Name"); [pscustomobject]@{ State = 'Running'; StartName = $account } }.GetNewClosure()
+            $service = { param([string]$Name) $asked.Add("service $Name"); [pscustomobject]@{ State = 'Running'; StartName = $account; ProcessId = 4000 } }.GetNewClosure()
             $workdir = { param([string]$Path) $asked.Add("workdir $Path"); $true }.GetNewClosure()
+            $table = $Processes
+            $readProcesses = { $table }.GetNewClosure()
         }
         return [pscustomobject]@{
             Wsl = $wsl; Asked = $asked
             Parameters = @{
                 PolicyKey = "$registry\Policy"; FileSystemKey = "$registry\FileSystem"; EnvironmentKey = "$registry\Environment"
-                GetService = $service; TestWorkdir = $workdir; Git = $git.Path; Schtasks = $schtasks.Path; Wsl = $wsl.Path
+                GetService = $service; TestWorkdir = $workdir; GetProcesses = $readProcesses; Git = $git.Path; Schtasks = $schtasks.Path; Wsl = $wsl.Path
             }
         }
     }
@@ -131,6 +160,31 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         @($said | Where-Object { $_ -like 'CHECK disk:* DRIFT the distro root uses -1 GB*There is no distribution with the supplied name. (exit 1)' }).Count | Should -Be 1
         @($said | Where-Object { $_ -like 'CHECK cache:* DRIFT /* holds -1 GB against a ceiling of *There is no distribution with the supplied name. (exit 1)' }).Count |
             Should -Be @($script:ids | Where-Object { $_ -like 'cache:*' }).Count
+        @($said | Where-Object { $_ -like 'CHECK orphans:*:wsl:* DRIFT *the reaper counted: There is no distribution with the supplied name. (exit 1)' }).Count |
+            Should -Be @($script:ids | Where-Object { $_ -like 'orphans:*:wsl:*' }).Count
+        @($said | Where-Object { $_ -like 'CHECK orphans:*:windows:* DRIFT 1 process(es) under *: stale.exe pid 9*' }).Count |
+            Should -Be @($script:ids | Where-Object { $_ -like 'orphans:*:windows:*' }).Count
+    }
+    It 'drifts only the runner whose own directory holds a stale leftover, never a sibling runner sharing its prefix' {
+        $roots = @(Get-RunnerRoot $script:name)
+        $stale = New-Process 9100 1 'stale.exe' "$($roots[0])_work\stale.exe" (Get-Date).AddDays(-2)
+        $variant = Initialize-Host $script:name -Processes @($stale)
+        $drifted = @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' })
+        $drifted.Count | Should -Be 1
+        $drifted[0] | Should -BeLike "CHECK orphans:*:windows:* DRIFT 1 process(es) under $($roots[0]) outside *, older than 360 minutes with no job running: stale.exe pid 9100"
+    }
+    It 'counts nothing while a Runner.Worker runs in the service''s tree, walking a reused parent id without looping' {
+        $root = @(Get-RunnerRoot $script:name)[0]
+        $variant = Initialize-Host $script:name -Processes @(
+            (New-Process 4000 4001 'Runner.Listener.exe' "${root}bin\Runner.Listener.exe" (Get-Date).AddDays(-3)),
+            (New-Process 4001 4000 'Runner.Worker.exe' "${root}bin\Runner.Worker.exe" (Get-Date).AddMinutes(-5)),
+            (New-Process 9200 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
+        @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' }).Count | Should -Be 0
+    }
+    It 'counts nothing younger than the host''s job timeout' {
+        $root = @(Get-RunnerRoot $script:name)[0]
+        $variant = Initialize-Host $script:name -Processes @((New-Process 9300 1 'young.exe' "${root}_work\young.exe" (Get-Date).AddMinutes(-5)))
+        @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' }).Count | Should -Be 0
     }
     It 'asks each WSL runner''s own PATH for the GPU' {
         $healthy = Initialize-Host $script:name
@@ -149,6 +203,8 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         @{ Case = 'a machine variable differing only in case'; Variant = @{ Held = 'C:\FLEET\POETRY' }; Row = 'machine-env:*'
             Detail = 'the machine environment holds POETRY_CACHE_DIR=C:\FLEET\POETRY; the roster says C:\fleet\poetry' }
         @{ Case = 'git without core.longpaths'; Variant = @{ GitAnswer = 'false' }; Row = 'long-paths:*'; Detail = 'LongPathsEnabled=1 git core.longpaths=false (exit 0)' }
+        @{ Case = 'a reaper counting leftovers'; Variant = @{ Reaped = '2' }; Row = 'orphans:*:wsl:*'
+            Detail = 'processes older than 360 minutes outside * with no job running; the reaper counted: 2 (exit 0)' }
     ) {
         $variant = Initialize-Host $script:name @Variant
         $said = [string[]]@(Invoke-Rendered $script:name $variant.Parameters)
@@ -169,10 +225,11 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         @(Read-CallRecord $full.Wsl | Where-Object { $_ -like '*du -s -BG*' } | ForEach-Object { ($_ -split "'")[1] }) |
             Should -Be @($cache | ForEach-Object { $_.Substring(6, $_.LastIndexOf(':') - 6) })
     }
-    It 'reads Windows services and workdirs through its own defaults, still one row each' {
+    It 'reads Windows services, workdirs and processes through its own defaults, still one row each' {
         $sick = Initialize-Host $script:name -Sick
         $sick.Parameters.Remove('GetService')
         $sick.Parameters.Remove('TestWorkdir')
+        $sick.Parameters.Remove('GetProcesses')
         $said = [string[]]@(Invoke-Rendered $script:name $sick.Parameters)
         @($said | ForEach-Object { ($_ -split ' ')[1] }) | Should -Be $script:ids
     }

@@ -21,6 +21,7 @@ from fleet.contracts.runners import (
     decode_host_runner_spec,
     decode_runner_install,
     decode_runner_spec,
+    encode_host_runner_spec,
     encode_runner_spec,
 )
 from tests._runner_fixtures import base_json, ci_slice_json
@@ -90,6 +91,7 @@ def _host(**overrides: JSONValue) -> dict[str, JSONValue]:
         "scratch_dir": "C:/fleet/stage",
         "gpu_required": True,
         "systemd_timers": ["ci-clean.timer"],
+        "job_timeout_minutes": 360,
         "installs": [_install()],
         "assets": [_asset()],
         "base": base_json(),
@@ -283,6 +285,22 @@ class TestHostRunnerSpec:
     def test_a_host_with_no_installs_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="not a CI host"):
             decode_host_runner_spec(_host(installs=[]))
+
+    def test_the_job_timeout_round_trips(self) -> None:
+        decoded = decode_host_runner_spec(_host(job_timeout_minutes=60))
+        assert decoded["job_timeout_minutes"] == 60
+        assert encode_host_runner_spec(decoded)["job_timeout_minutes"] == 60
+
+    def test_an_absent_job_timeout_is_refused(self) -> None:
+        raw = _host()
+        del raw["job_timeout_minutes"]
+        with pytest.raises(JSONTypeError, match="job_timeout_minutes"):
+            decode_host_runner_spec(raw)
+
+    @pytest.mark.parametrize("minutes", [0, -60])
+    def test_a_non_positive_job_timeout_is_refused(self, minutes: int) -> None:
+        with pytest.raises(JSONTypeError, match="job_timeout_minutes must be positive"):
+            decode_host_runner_spec(_host(job_timeout_minutes=minutes))
 
     def test_a_host_without_a_base_is_refused(self) -> None:
         raw = _host()

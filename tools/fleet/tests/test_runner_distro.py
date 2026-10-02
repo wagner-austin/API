@@ -29,6 +29,7 @@ def _host() -> HostRunnerSpec:
         scratch_dir="C:/fleet/stage",
         gpu_required=False,
         systemd_timers=[],
+        job_timeout_minutes=360,
         installs=[
             RunnerInstall(
                 repo="wagner-austin/API",

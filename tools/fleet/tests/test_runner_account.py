@@ -114,15 +114,17 @@ class TestTheAccountRow:
                 scratch_dir=tmp_path.as_posix(),
                 gpu_required=False,
                 systemd_timers=[],
+                job_timeout_minutes=360,
                 installs=[_install(workdir)],
                 assets=[],
                 base=a_base(),
                 ci_slice=a_ci_slice(),
             )
         )
-        assert [check["check_id"] for check in expected[-3:]] == [
+        assert [check["check_id"] for check in expected[-4:]] == [
             f"service:windows:{_SERVICE}",
             "workdir:wagner-austin/MCPs:windows:lavender",
             f"account:windows:{_SERVICE}:LocalSystem",
+            "orphans:wagner-austin/MCPs:windows:lavender",
         ]
-        assert expected[-1]["reason"] == runner_account.SERVICE_ACCOUNT_REASON
+        assert expected[-2]["reason"] == runner_account.SERVICE_ACCOUNT_REASON
