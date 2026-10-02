@@ -509,22 +509,26 @@ diphtheria's `reserved_ram_gb` is 2.0: 15.3 GB available, 10.3 promised and
 2.0 reserved left 3.0 GB, enough for `idle/execution`'s 2.0 GB worker. A node
 with no capped container reads the same `MemAvailable` it always did.
 
-**lavender is at `max_concurrent_runs: 1`, and that is not a typo.** It became
-a CI runner on 2026-09-06, so the "other user" the reservations protect is no
-longer just the person at the keyboard — a second *system* now competes for the
-same box, and it is not in the arithmetic. The reservations still hold and
-`capacity.assess` reads free RAM and disk live, so a dispatch is refused rather
-than allowed to thrash; the concurrency cap is what stops us stacking two of
-our own suites on top of CI's load.
+**How many runs a node holds is live, not declared** (MCPs board task
+939ec5c7). Every node used to declare `max_concurrent_runs`, and every node
+declared 1: on 2026-10-02 thirteen jobs queued behind four running while the
+probes showed memory a second run could have used. The field is gone from
+`NodeBudget`, `fleet.json` and every reader. `capacity.assess` now charges a
+node's live runs first, from the ledger (`records.live_load`): the workers each
+was granted come off the node's cores and `workers x worker_ram_gb` comes off
+its free memory, whether or not those workers have spawned yet, and what is left
+is granted. One grant is capped at `capacity.job_ceiling`, half the cores the
+owner leaves rounded up and never below the project's `minimum_workers`, so the
+first job leaves room for a second. On the fleet as declared the ceiling is
+sedona 8, lavender 6, pendragon and lavender-wsl 4, diphtheria and serendipity
+2, unless a project's minimum is higher.
 
-The number came from a measurement rather than caution: `opus-artifact-sweep-0902`
-observed a heavy job saturating lavender until ssh connections were **reset**,
-while TCP 22 and 445 stayed open and tailscale stayed direct — a box that resets
-is alive and overloaded, not down. Disk is a non-issue on the same evidence
-(0.53 GB runner plus 3–5 GB expected, against 849 GB free and a 40 GB reserve),
-so the disk budget is untouched and `enabled` stays `true`.
-
-Raise it back to 2 when CI stops sharing the box, not before.
+A node shared with CI keeps its headroom through its reservations, not a run
+count: lavender became a CI runner on 2026-09-06 and `opus-artifact-sweep-0902`
+saw a heavy job saturate it until ssh connections were **reset** (TCP 22 and 445
+open, tailscale direct: alive and overloaded, not down). That is why
+`lavender-wsl` reserves 8 of its 16 cores and the linux probe reads the CI
+slice, and both still bound every grant.
 
 ## `enabled`, and why the fleet is written down twice
 
@@ -768,7 +772,7 @@ registry records both kinds per node with the probe that measured each
 carry this tag" is a recorded fact: austinpc, sedona and lavender, and
 diphtheria on linux, as of 2026-09-21.
 
-The planner checks tags **first**, before concurrency, disk and memory, and
+The planner checks tags **first**, before disk, cores and memory, and
 refuses with `NODE_LACKS_TAG` naming the tags missing:
 
 ```
