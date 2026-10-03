@@ -60,16 +60,17 @@ function Get-RunnerLeftover {
             }
         }
     }
-    $working = @($Processes | Where-Object { $tree.ContainsKey([int]$_.ProcessId) -and [string]$_.Name -eq 'Runner.Worker.exe' })
+    $cutoff = (Get-Date).AddSeconds(-$OlderThanSeconds)
+    $working = @($Processes | Where-Object { $tree.ContainsKey([int]$_.ProcessId) -and [string]$_.Name -eq 'Runner.Worker.exe' -and ($null -eq $_.CreationDate -or $_.CreationDate -ge $cutoff) })
     if ($working.Count -gt 0) {
         return @()
     }
-    $cutoff = (Get-Date).AddSeconds(-$OlderThanSeconds)
     return @($Processes | Where-Object {
-        -not $tree.ContainsKey([int]$_.ProcessId) -and $null -ne $_.CreationDate -and
-        $_.CreationDate -lt $cutoff -and (
-            ([string]$_.CommandLine).Replace('/', '\').IndexOf($Root, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            ([string]$_.ExecutablePath).StartsWith($Root, [StringComparison]::OrdinalIgnoreCase))
+        $null -ne $_.CreationDate -and $_.CreationDate -lt $cutoff -and (
+            ($tree.ContainsKey([int]$_.ProcessId) -and [string]$_.Name -eq 'Runner.Worker.exe') -or
+            (-not $tree.ContainsKey([int]$_.ProcessId) -and (
+                ([string]$_.CommandLine).Replace('/', '\').IndexOf($Root, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+                ([string]$_.ExecutablePath).StartsWith($Root, [StringComparison]::OrdinalIgnoreCase))))
     })
 }
 $Probe = Invoke-Probe $Cmd "`"$Schtasks`" /query /tn wsl-keepalive /fo csv"
@@ -188,7 +189,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-API.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-API.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-API.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-API.lavender-wsl-2.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-API.lavender-wsl-2.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -196,7 +197,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-API.lavender-wsl-2.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-API.lavender-wsl-2.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-API.lavender-wsl-2.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -204,7 +205,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl-2.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-2.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -212,7 +213,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-2.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl-2.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl-2.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl-3.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-3.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -220,7 +221,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-3.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl-3.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl-3.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-MCPs.lavender-wsl-4.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-4.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -228,7 +229,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-4.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-MCPs.lavender-wsl-4.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl-4.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Service = @(& $GetService 'actions.runner.wagner-austin-MCPs.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-MCPs.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
@@ -240,7 +241,7 @@ foreach ($Row in $Service) {
     $ServicePid = [int]$Row.ProcessId
 }
 $Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner\' 21600)
-Write-Check 'orphans:wagner-austin/MCPs:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner\ outside actions.runner.wagner-austin-MCPs.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
+Write-Check 'orphans:wagner-austin/MCPs:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner\ older than 360 minutes that a finished job left outside actions.runner.wagner-austin-MCPs.lavender, or a Worker past that job timeout: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-corvis-stick.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-corvis-stick.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -248,7 +249,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-corvis-stick.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-corvis-stick.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-corvis-stick.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Service = @(& $GetService 'actions.runner.wagner-austin-corvis-stick.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-corvis-stick.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
@@ -260,7 +261,7 @@ foreach ($Row in $Service) {
     $ServicePid = [int]$Row.ProcessId
 }
 $Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner-corvis-stick\' 21600)
-Write-Check 'orphans:wagner-austin/corvis-stick:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-corvis-stick\ outside actions.runner.wagner-austin-corvis-stick.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
+Write-Check 'orphans:wagner-austin/corvis-stick:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-corvis-stick\ older than 360 minutes that a finished job left outside actions.runner.wagner-austin-corvis-stick.lavender, or a Worker past that job timeout: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Service = @(& $GetService 'actions.runner.wagner-austin-chat.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-chat.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
@@ -272,7 +273,7 @@ foreach ($Row in $Service) {
     $ServicePid = [int]$Row.ProcessId
 }
 $Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner-chat\' 21600)
-Write-Check 'orphans:wagner-austin/chat:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-chat\ outside actions.runner.wagner-austin-chat.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
+Write-Check 'orphans:wagner-austin/chat:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-chat\ older than 360 minutes that a finished job left outside actions.runner.wagner-austin-chat.lavender, or a Worker past that job timeout: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "systemctl is-active 'actions.runner.wagner-austin-tree-bot.lavender-wsl.service'"
 $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-tree-bot.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
@@ -280,7 +281,7 @@ $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-run
 Write-Check 'workdir:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-tree-bot.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
-Write-Check 'orphans:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes outside actions.runner.wagner-austin-tree-bot.lavender-wsl.service with no job running; the reaper counted: ' + $Probe.Text)
+Write-Check 'orphans:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-tree-bot.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
 $Service = @(& $GetService 'actions.runner.wagner-austin-tree-bot.lavender')
 $ServiceState = (@($Service | ForEach-Object { [string]$_.State }) -join '')
 Write-Check 'service:windows:actions.runner.wagner-austin-tree-bot.lavender' ($ServiceState -eq 'Running') ('Win32_Service State: ' + $ServiceState)
@@ -292,7 +293,7 @@ foreach ($Row in $Service) {
     $ServicePid = [int]$Row.ProcessId
 }
 $Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid 'C:\actions-runner-tree-bot\' 21600)
-Write-Check 'orphans:wagner-austin/tree-bot:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-tree-bot\ outside actions.runner.wagner-austin-tree-bot.lavender, older than 360 minutes with no job running: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
+Write-Check 'orphans:wagner-austin/tree-bot:windows:lavender' ($Leftover.Count -eq 0) ([string]$Leftover.Count + ' process(es) under C:\actions-runner-tree-bot\ older than 360 minutes that a finished job left outside actions.runner.wagner-austin-tree-bot.lavender, or a Worker past that job timeout: ' + ((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + [string]$_.ProcessId })) -join ', '))
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -e '/opt/corvis/rw-game/game-lib.jar'"
 Write-Check 'asset:/opt/corvis/rw-game/game-lib.jar' ($Probe.Exit -eq 0) ('test -e exited ' + $Probe.Exit)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "sha256sum '/opt/corvis/rw-game/game-lib.jar'"
