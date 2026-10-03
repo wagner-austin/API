@@ -68,7 +68,7 @@ fleet-watch     --config fleet.json                 # the event stream
 fleet-watch     --config fleet.json --run <run-id>
 fleet-cancel    --config fleet.json --run <run-id>
 fleet-agent     --config fleet.json \               # one tick of the HUB lane's runner
-                --agent <label> --session <uuid> --repo-root <path>
+                --agent <label> --session <uuid> --repo-root <path> [--announce]
 poetry run python -m fleet.cli.node_agent \         # one tick of ONE node's runner
                 --config fleet.json --node <alias> [--announce]
 ```
@@ -433,7 +433,11 @@ matched its declaration.
 `fleet-node-agent/<alias>`, so every tick of one node's runner is one session
 on the board's ledger and `held_by` finds its own claims across ticks. The
 registration script runs the tick once with `--announce`, which posts the
-check-in that registers that session (MCPs mig 530) and claims nothing.
+check-in that registers that session (MCPs mig 530) and claims nothing. The
+hub runner does the same through the tick's `hub-announce` lane, run by
+`register-agent-schedule.ps1`: the queue's close posts a task-naming job's
+outcome under the closer's label, and an exit-session job names the finished
+task (MCPs board task 2fecad69).
 
 ### What a node-lane job carries: a commit, not a working tree
 
@@ -498,8 +502,16 @@ the interactive case; the queue path never does.
 
 When the collect pass finds the suite finished it reads the result and the
 last 200 lines of the transcript off the node, composes one line
-(`fleet.core.verdict`) and posts it to the submitting task's thread, or to
-the `fleet` room addressed `@<submitter>` when the job named no task:
+(`fleet.core.verdict`) and closes the job with it as the detail. A job that
+names a task gets its row from the queue itself: the close writer in MCPs
+`packages/db` (`fleet-dispatch/outcome.ts`) posts every terminal outcome,
+passed, failed, refused or cancelled, to the task's thread in the
+transaction that closes the job, opening `@<submitter> FLEET JOB <id>
+<status>`, under the closing runner's label (MCPs board task 2fecad69). The
+mention is what wakes a submitter above the board-wake context ceiling, and
+until it existed a refused job posted nothing at all. A job that names no
+task gets this runner's own post, in the `fleet` room addressed
+`@<submitter>`:
 
 ```
 FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% log=lavender:C:/fleet/stage/<run>/result.txt.log run=<run>
