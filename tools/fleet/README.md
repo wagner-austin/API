@@ -299,10 +299,20 @@ derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
 a CUDA device, `testdb` for a node whose `test_database` is true, and `rust`
 or `cxx` for each toolchain the node declares a version of) and the
 queue's `required_tags <@ tags` containment returns
-only jobs the node satisfies. A job's `required_tags` are the project's from
-`fleet.json`; `dispatch_submit` takes them and the runner re-checks them
-against the registry line on claim, refusing `PROJECT_TAGS_MISMATCH` when a
-submitter named fewer than the project needs. The identity registry's
+only jobs the node satisfies. A job's `required_tags` should be the
+project's from `fleet.json`, but what a job NEEDS is its project's
+declaration: every claim names the projects the runner fits, each assessed
+against that declaration and the runner's tags, so the job's own tags only
+route it. The runner refuses `PROJECT_TAGS_MISMATCH` on claim only when a job
+requires a tag its project does not declare; a job naming fewer runs under
+the declaration. One routing gap needed its own ask (MCPs board task
+939ec5c7): the queue hands a runner carrying `elevated` only jobs requiring
+it, and no ordinary runner fits a project declaring it, so
+MCPs/scripts/ps-harness job 7c16305c, submitted with `[windows]` on
+2026-10-03, reached no runner for hours. An elevated runner whose lane
+matched nothing asks once more with its tags less `elevated`, for only the
+elevated projects it fits (`fleet.cli.node_claim.claim_untagged`), and its
+tick log names the missing tag. The identity registry's
 measured `gpu` column and this workspace's declared `gpu` are reconciled by
 `fleet-nodes --registry` beside `enabled` and `platform`, so the tags the
 runners claim by are the tags the roster agrees on.
