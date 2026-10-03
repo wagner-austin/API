@@ -201,50 +201,54 @@ class SubprocessRunner:
     ) -> CandidateOutcome:
         log = _LOGGER
         out_dir = _test_hooks.tempfile_mkdtemp(prefix="calib_child_")
-        out_path = _os.path.join(out_dir, "result.txt")
-
-        # Always pass a lightweight spec to the child
-        spec = _to_spec(ds)
-
-        spawn_start = _time.perf_counter()
-        log_q: _mp.Queue[stdlib_logging.LogRecord] = self._ctx.Queue()
-        # Mirror child logs to both root and application logger handlers (no fallbacks)
-        _root_handlers = list(stdlib_logging.getLogger().handlers)
-        _app_handlers = list(stdlib_logging.getLogger("handwriting_ai").handlers)
-        _parent_handlers = tuple(_root_handlers + _app_handlers)
-        listener = _test_hooks.queue_listener_factory(
-            log_q, *_parent_handlers, respect_handler_level=True
-        )
-        listener.start()
-        proc = self._ctx.Process(
-            target=_child_entry,
-            args=(out_path, spec, cand, int(samples), float(budget["abort_pct"]), log_q),
-        )
-        # Ensure non-daemonic to allow DataLoader workers in child
-        proc.daemon = False
-        start = _time.perf_counter()
-        proc.start()
-        spawn_elapsed = _time.perf_counter() - spawn_start
-        log.info(
-            "calibration_parent_spawned threads=%d workers=%d bs=%d spawn_ms=%.1f timeout_s=%.1f",
-            cand["intra_threads"],
-            cand["num_workers"],
-            cand["batch_size"],
-            spawn_elapsed * 1000,
-            float(budget["timeout_s"]),
-        )
-
         try:
-            return self._wait_for_outcome(proc, out_path, start, float(budget["timeout_s"]))
+            out_path = _os.path.join(out_dir, "result.txt")
+
+            # Always pass a lightweight spec to the child
+            spec = _to_spec(ds)
+
+            spawn_start = _time.perf_counter()
+            log_q: _mp.Queue[stdlib_logging.LogRecord] = self._ctx.Queue()
+            # Mirror child logs to both root and application logger handlers (no fallbacks)
+            _root_handlers = list(stdlib_logging.getLogger().handlers)
+            _app_handlers = list(stdlib_logging.getLogger("handwriting_ai").handlers)
+            _parent_handlers = tuple(_root_handlers + _app_handlers)
+            listener = _test_hooks.queue_listener_factory(
+                log_q, *_parent_handlers, respect_handler_level=True
+            )
+            listener.start()
+            proc = self._ctx.Process(
+                target=_child_entry,
+                args=(out_path, spec, cand, int(samples), float(budget["abort_pct"]), log_q),
+            )
+            # Ensure non-daemonic to allow DataLoader workers in child
+            proc.daemon = False
+            start = _time.perf_counter()
+            proc.start()
+            spawn_elapsed = _time.perf_counter() - spawn_start
+            log.info(
+                "calibration_parent_spawned threads=%d workers=%d bs=%d "
+                "spawn_ms=%.1f timeout_s=%.1f",
+                cand["intra_threads"],
+                cand["num_workers"],
+                cand["batch_size"],
+                spawn_elapsed * 1000,
+                float(budget["timeout_s"]),
+            )
+
+            try:
+                return self._wait_for_outcome(proc, out_path, start, float(budget["timeout_s"]))
+            finally:
+                if proc.is_alive():
+                    with _suppress(Exception):
+                        proc.kill()
+                    with _suppress(Exception):
+                        proc.join(1.0)
+                with _suppress(Exception):
+                    listener.stop()
+                _gc.collect()
         finally:
-            if proc.is_alive():
-                with _suppress(Exception):
-                    proc.kill()
-                with _suppress(Exception):
-                    proc.join(1.0)
-            with _suppress(Exception):
-                listener.stop()
-            _gc.collect()
+            _test_hooks.remove_temp_tree(out_dir)
 
     def _wait_for_outcome(
         self,
