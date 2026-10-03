@@ -42,6 +42,7 @@ OTHER_PROJECT = "libs/other"
 OTHER_RUN_ID = f"libs-other-lavender-{DEMO_NOW}"
 OTHER_JOB_ID = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
 
+
 @pytest.fixture(name="two_projects")
 def _two_projects(config_path: pathlib.Path) -> pathlib.Path:
     """Rewrite the workspace with ``libs/other`` sourced beside the demo.
