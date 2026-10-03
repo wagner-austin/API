@@ -281,6 +281,19 @@ git credentials and the ssh keys, and the tailnet policy lets a
 are claimed by two runners in one tick, which is the measurement A1 asks for
 and the wiki page (`fleet-check-runner`, mcps-codebase) carries.
 
+**A tick fills its node's room, not one slot of it** (MCPs board task
+48842bfd). After every job it launches, a runner runs its whole gate again
+(`fleet.cli.node_ready.ready_state`: the ledger, which already charges the
+run just launched, then the probe) and claims again, until the node has no
+room or the lane nothing it fits (`fleet.cli.node_agent.fill_pass`). It stops
+at the first job it refuses, so a node that stops answering mid-staging
+refuses one job, not the lane. Each pass names only the projects whose lease
+this node could take now (`fleet.cli.node_ready.unleased`, asking
+`fleet.core.leases.admits`), so the pass after a launch never claims a second
+job of the project still running and refuses it `LEASE_HELD`; that job waits
+in the lane instead. Each runner's log ends every tick with `<alias>
+launched N job(s) this tick`.
+
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
 a CUDA device, `testdb` for a node whose `test_database` is true, and `rust`
