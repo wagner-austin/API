@@ -27,6 +27,7 @@ reports again.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Mapping
 
 from fleet.contracts.feed import FeedEvent, FeedKind
 from fleet.contracts.lease import Lease
@@ -114,6 +115,52 @@ def open_lease(
         acquired_unix=now_unix,
         expires_unix=now_unix + lease_seconds(plan, slack=LEASE_SLACK),
         resources=scoped(plan["exclusive_resources"], node=node, node_local=node_local),
+    )
+
+
+def held_on_node(
+    leases_path: pathlib.Path,
+    *,
+    node: str,
+    names: tuple[str, ...],
+    projects: Mapping[str, ProjectConfig],
+    node_local: tuple[str, ...],
+) -> tuple[str, ...]:
+    """The projects among ``names`` that :func:`take` would refuse on one node now.
+
+    A RUNNER ASKS THIS BEFORE IT CLAIMS (MCPs board task 939ec5c7). Once a
+    node runs several jobs at once, the projects it fits by capacity include
+    one already running on it, whose lease :func:`take` refuses
+    ``LEASE_HELD``, and every testdb project while one testdb suite runs
+    there, since each declares the node's own ``corvis-fleet-testdb``
+    (``RESOURCE_HELD``). A claimed job refused for either is closed for good,
+    so the runner leaves these out of the projects it hands the queue, and
+    the job waits for another node or a later tick instead.
+
+    The same two questions :func:`fleet.core.leases.acquire` asks, through
+    the same functions, so this answer and the refusal cannot disagree.
+
+    Args:
+        leases_path: The lease file.
+        node: The node's workspace name.
+        names: The projects to ask about, each registered in ``projects``.
+        projects: Every registered project, for its declared resources.
+        node_local: The workspace's node-local resource names.
+
+    Returns:
+        The held ones, in the order given; empty when none is.
+    """
+    now_unix = _test_hooks.now()
+    return tuple(
+        name
+        for name in names
+        if leases.find_holder(leases_path, node=node, project=name, now_unix=now_unix) is not None
+        or leases.contended_by(
+            leases_path,
+            wanted=scoped(projects[name]["exclusive_resources"], node=node, node_local=node_local),
+            now_unix=now_unix,
+        )
+        is not None
     )
 
 
@@ -257,4 +304,12 @@ def abandon(
     return leases.release_if_held(loaded_leases, run_id=lease["run_id"], now_unix=now_unix)
 
 
-__all__ = ["LEASE_SLACK", "abandon", "emit", "open_lease", "run_id_for", "take"]
+__all__ = [
+    "LEASE_SLACK",
+    "abandon",
+    "emit",
+    "held_on_node",
+    "open_lease",
+    "run_id_for",
+    "take",
+]

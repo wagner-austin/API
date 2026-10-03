@@ -35,7 +35,7 @@ from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.runner_tick import RunnerTick, TickLoad
 from fleet.contracts.tags import NodeTag, runner_tags
 from fleet.contracts.toolchain import ToolReport
-from fleet.core import capacity, host_report, probe, records, toolchain
+from fleet.core import capacity, host_report, probe, records, run_lease, toolchain
 
 _log = get_logger(__name__)
 
@@ -206,8 +206,11 @@ def _claimable(
         elevated: Whether this is the node's elevated runner.
 
     Returns:
-        The gate: the node's state, claim tags and fitting projects; or no
-        ready node when it has room for nothing, fits no project, or
+        The gate: the node's state, claim tags and fitting projects, less
+        every one a lease on the node holds now
+        (:func:`fleet.core.run_lease.held_on_node`), so a claim never takes a
+        job its lease would refuse; or no ready node when it has room for
+        nothing, fits no project, fits only projects a lease holds, or
         (elevated) does not hold an administrator's token, with the reason
         logged and carried. The ready summary, a tagged tool it lacks and
         each difference from its declaration are logged first.
@@ -226,7 +229,30 @@ def _claimable(
         return closed(
             alias, elevated, load, f"has room for nothing; claiming nothing: {full}", tags=tags
         )
-    fits = capacity.fitting_projects(node, state, registered, tags)
+    roomy = capacity.fitting_projects(node, state, registered, tags)
+    held = run_lease.held_on_node(
+        loaded.leases,
+        node=alias,
+        names=roomy,
+        projects=registered,
+        node_local=loaded.workspace["node_local_resources"],
+    )
+    if held:
+        _log.info(
+            "%s leaves out what a lease on it holds now, which the queue keeps for another "
+            "node or a later tick: %s",
+            alias,
+            ", ".join(held),
+        )
+    fits = tuple(name for name in roomy if name not in held)
+    if roomy and not fits:
+        return closed(
+            alias,
+            elevated,
+            load,
+            "has room, but every project it fits is held by a lease on it; claiming nothing",
+            tags=tags,
+        )
     if not fits:
         return closed(
             alias,
