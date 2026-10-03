@@ -19,11 +19,13 @@
 # It requires windows and elevated, as MCPs/scripts/ps-harness does: the
 # provision suites register real scheduled tasks under S4U, and the elevated
 # runner is the one whose builds hold an administrator's token.
+#
+# THE PIN IS READ BY tools/maketools, NOT BY MAKE. `$(file <...)` exists from
+# GNU make 4.0, and serendipity's GnuWin32 make 3.81 read it as nothing, so
+# the first fleet run (job 2d949933) handed the harness an empty --ref.
 include ../../scripts/make/shell.mk
 
 .PHONY: lint test check
-
-MCPS_HARNESS_REF := $(file <../../.githooks/mcps-harness.sha)
 
 # This directory holds no code of its own, only this recipe, so its lint is
 # the grammar every tracked Makefile keeps to.
@@ -31,7 +33,7 @@ lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py lint-makefiles
 
 test:
-	$(PYTHON) ../../.githooks/published_maketools.py ps-harness --ref $(MCPS_HARNESS_REF) ../../../MCPs ../..
+	$(PYTHON) ../../tools/maketools/scripts/run.py ps-harness
 
 check: lint test
 	@echo "=== ALL CHECKS PASSED ==="
