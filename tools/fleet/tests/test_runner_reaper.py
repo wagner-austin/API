@@ -20,7 +20,7 @@ import pytest
 from typing_extensions import TypedDict
 
 from fleet.cli.runners import load_runner_spec
-from fleet.contracts.runners import RunnerInstall
+from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_reaper_render, runner_render
 from tests._host_bash import host_bash
 
@@ -80,8 +80,21 @@ LEFT: tuple[Process, ...] = (
     Process(pid=21, ppid=20, cmdline="python pt_data_worker", start_ticks=95000),
 )
 
-#: A job's worker under the Listener.
+#: A job's worker under the Listener, 100 s old.
 WORKER = Process(pid=13, ppid=12, cmdline="./bin/Runner.Worker spawnclient", start_ticks=90000)
+
+#: The job's own step under its Worker, 90 s old.
+STEP = Process(pid=14, ppid=13, cmdline="python -m pytest", start_ticks=91000)
+
+#: A process the running job daemonized, 50 s old: after its Worker.
+CURRENT = Process(pid=22, ppid=1, cmdline="python current", start_ticks=95000)
+
+#: lavender's job timeout, 360 minutes, which every Worker in the table is
+#: well inside.
+BOUND = "21600"
+
+#: A job timeout the 100 s old Worker has outlived.
+SHORT_BOUND = "60"
 
 
 def _lay_out(table: pathlib.Path, processes: tuple[Process, ...], *, main: int = 10) -> None:
@@ -164,7 +177,7 @@ class TestAReapPass:
     ) -> None:
         _lay_out(tmp_path, OWN + LEFT)
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert (ran.returncode, ran.stderr) == (0, "")
         assert ran.stdout == (
@@ -172,20 +185,66 @@ class TestAReapPass:
         )
         assert _killed(tmp_path) == ["20", "21"]
 
-    def test_a_busy_unit_loses_only_what_started_before_its_worker(
+    def test_a_busy_unit_loses_old_orphan_trees_and_keeps_its_own_job_s(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """The Worker started at 90000 ticks: the forkserver at 10000 is a
-        job before it, the worker process at 95000 is this job's own."""
-        _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
+        """The Worker started at 90000 ticks. The forkserver at 10000 is a job
+        before it, and so is its worker at 95000, because its tree's root is
+        that forkserver (gpt6-idle-1001's rule); the daemon at 95000 whose
+        root is itself, and the step under the Worker, are this job's own."""
+        _lay_out(tmp_path, (*OWN, WORKER, STEP, *LEFT, CURRENT))
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert (ran.returncode, ran.stderr) == (0, "")
         assert ran.stdout == (
-            f"fleet-runner-reaper: {UNIT}: killed 1 process(es) a finished job left behind\n"
+            f"fleet-runner-reaper: {UNIT}: killed 2 process(es) a finished job left behind\n"
         )
-        assert _killed(tmp_path) == ["20"]
+        assert _killed(tmp_path) == ["20", "21"]
+
+    def test_a_worker_past_the_job_timeout_dies_with_its_tree_and_shields_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The 10:09Z case of 2026-10-02: a Worker GitHub had let go of kept
+        its pytest, and spared 49 forkservers, for 3 h 22 min."""
+        _lay_out(tmp_path, (*OWN, WORKER, STEP, *LEFT, CURRENT))
+
+        ran = _run(tmp_path, SHORT_BOUND)
+
+        assert (ran.returncode, ran.stderr) == (0, "")
+        assert ran.stdout == (
+            f"fleet-runner-reaper: {UNIT}: killed 5 process(es) a finished job left behind\n"
+        )
+        assert _killed(tmp_path) == ["13", "14", "20", "21", "22"]
+
+    def test_a_stale_worker_does_not_hide_a_live_one_s_rule(self, tmp_path: pathlib.Path) -> None:
+        """Beside the stale Worker a live one, started at 99000 ticks, still
+        spares what started after it, its own step included."""
+        live = Process(
+            pid=15, ppid=12, cmdline="./bin/Runner.Worker spawnclient", start_ticks=99000
+        )
+        step = Process(pid=16, ppid=15, cmdline="python -m pytest", start_ticks=99500)
+        late = Process(pid=23, ppid=1, cmdline="python late", start_ticks=99600)
+        _lay_out(tmp_path, (*OWN, WORKER, STEP, live, step, *LEFT, CURRENT, late))
+
+        ran = _run(tmp_path, "50")
+
+        assert (ran.returncode, ran.stderr) == (0, "")
+        assert _killed(tmp_path) == ["13", "14", "20", "21", "22"]
+
+    def test_without_a_job_timeout_it_refuses_by_name_and_kills_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        _lay_out(tmp_path, OWN + LEFT)
+
+        ran = _run(tmp_path)
+
+        assert (ran.returncode, ran.stdout, ran.stderr, _killed(tmp_path)) == (
+            2,
+            "",
+            "fleet-runner-reaper: usage: fleet-runner-reaper SECONDS, the host job timeout\n",
+            [],
+        )
 
     def test_a_busy_unit_keeps_a_process_whose_start_it_cannot_read(
         self, tmp_path: pathlib.Path
@@ -193,7 +252,7 @@ class TestAReapPass:
         _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
         (tmp_path / "proc" / "20" / "stat").unlink()
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "", [])
 
@@ -207,7 +266,7 @@ class TestAReapPass:
             entry.unlink()
         (tmp_path / "proc" / "13").rmdir()
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert ran.returncode == 0
         assert ran.stdout == (
@@ -219,7 +278,7 @@ class TestAReapPass:
         """The Listener has exited to let _update.sh run outside the tree."""
         _lay_out(tmp_path, (*OWN[:2], *LEFT))
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "", [])
 
@@ -227,14 +286,14 @@ class TestAReapPass:
         _lay_out(tmp_path, OWN + LEFT)
         (tmp_path / "show" / f"{UNIT}.ControlGroup").write_bytes(b"\n")
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "", [])
 
     def test_a_unit_with_no_main_process_is_skipped(self, tmp_path: pathlib.Path) -> None:
         _lay_out(tmp_path, OWN + LEFT, main=0)
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "", [])
 
@@ -244,7 +303,7 @@ class TestAReapPass:
         _lay_out(tmp_path, OWN + LEFT)
         (tmp_path / "unkillable" / "20").write_bytes(b"")
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert ran.returncode == 1
         assert ran.stdout == (
@@ -261,7 +320,7 @@ class TestAReapPass:
             entry.unlink()
         (tmp_path / "proc" / "21").rmdir()
 
-        ran = _run(tmp_path)
+        ran = _run(tmp_path, BOUND)
 
         assert ran.returncode == 0
         assert ran.stdout == (
@@ -285,6 +344,16 @@ def _install() -> RunnerInstall:
         labels=["lavender-wsl"],
         python_toolcache=[],
     )
+
+
+def _lavender() -> HostRunnerSpec:
+    """The committed roster's lavender, the host the reaper runs on.
+
+    Returns:
+        Its spec.
+    """
+    roster = load_runner_spec(str(pathlib.Path(__file__).parents[1] / "runners.json"))
+    return roster["hosts"][0]
 
 
 class TestTheRender:
@@ -311,11 +380,12 @@ class TestTheRender:
             runner_reaper_render.render_kill_mode_lines(install)
 
     def test_the_reaper_and_its_units_are_written_whole_and_the_timer_started(self) -> None:
-        lines = runner_reaper_render.render_reaper_lines()
+        spec = _lavender()
+        lines = runner_reaper_render.render_reaper_lines(spec)
         assert lines[0] == "cat > /usr/local/sbin/fleet-runner-reaper <<'REAPER_EOF'"
         assert lines[1] == runner_reaper_render.REAPER_SCRIPT.rstrip("\n")
         assert lines[2:4] == ["REAPER_EOF", "chmod +x /usr/local/sbin/fleet-runner-reaper"]
-        assert runner_reaper_render.REAPER_SERVICE.rstrip("\n") in lines
+        assert runner_reaper_render.render_reaper_service(spec).rstrip("\n") in lines
         assert runner_reaper_render.REAPER_TIMER.rstrip("\n") in lines
         assert lines[-2:] == [
             "systemctl daemon-reload",
@@ -325,19 +395,30 @@ class TestTheRender:
     def test_the_timer_runs_the_service_every_thirty_seconds(self) -> None:
         assert "OnUnitActiveSec=30s\n" in runner_reaper_render.REAPER_TIMER
         assert "WantedBy=timers.target\n" in runner_reaper_render.REAPER_TIMER
-        assert (
-            "ExecStart=/usr/local/sbin/fleet-runner-reaper\n" in runner_reaper_render.REAPER_SERVICE
+
+    def test_the_service_passes_the_host_s_job_timeout_in_seconds(self) -> None:
+        spec = _lavender()
+        spec["job_timeout_minutes"] = 45
+        assert runner_reaper_render.render_reaper_service(spec) == (
+            "[Unit]\n"
+            "Description=Kill what finished GitHub Actions jobs left in their runner units\n"
+            "\n"
+            "[Service]\n"
+            "Type=oneshot\n"
+            "ExecStart=/usr/local/sbin/fleet-runner-reaper 2700\n"
         )
 
     def test_the_provision_installs_the_reaper_before_any_runner(self) -> None:
-        roster = load_runner_spec(str(pathlib.Path(__file__).parents[1] / "runners.json"))
-        script = runner_render.render_provision(roster["hosts"][0])["linux_script"]
+        spec = _lavender()
+        script = runner_render.render_provision(spec)["linux_script"]
         assert script.index("enable --now fleet-runner-reaper.timer") < script.index(
             "# --- runner installs ---"
         )
+        # lavender's roster bound, 360 minutes.
+        assert "ExecStart=/usr/local/sbin/fleet-runner-reaper 21600\n" in script
         # Twice per WSL runner: the comparison and the write.
         assert script.count("fleet-kill.conf") == 2 * len(
-            [i for i in roster["hosts"][0]["installs"] if i["side"] == "wsl"]
+            [i for i in spec["installs"] if i["side"] == "wsl"]
         )
 
 
@@ -360,11 +441,23 @@ class TestTheAuditMode:
 
         assert (ran.returncode, ran.stdout) == (0, "1\n")
 
-    def test_a_busy_unit_counts_only_what_started_before_its_worker(
+    def test_a_busy_unit_counts_only_old_leftovers_of_a_job_before_its_worker(
         self, tmp_path: pathlib.Path
     ) -> None:
-        _lay_out(tmp_path, (*OWN, WORKER, *LEFT))
+        """The 100 s old Worker is inside a 120 s bound, so it runs a job:
+        the 900 s old forkserver counts, its 50 s old worker is too young,
+        and the step and the daemon are the job's own."""
+        _lay_out(tmp_path, (*OWN, WORKER, STEP, *LEFT, CURRENT))
 
-        ran = _run(tmp_path, "--audit", "0", UNIT)
+        ran = _run(tmp_path, "--audit", "120", UNIT)
 
         assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "1\n", [])
+
+    def test_a_worker_past_the_bound_counts_with_its_tree(self, tmp_path: pathlib.Path) -> None:
+        """Against 60 s the 100 s old Worker is stale: it, its 90 s old step
+        and the 900 s old forkserver count; the 50 s old ones are too young."""
+        _lay_out(tmp_path, (*OWN, WORKER, STEP, *LEFT, CURRENT))
+
+        ran = _run(tmp_path, "--audit", SHORT_BOUND, UNIT)
+
+        assert (ran.returncode, ran.stdout, _killed(tmp_path)) == (0, "3\n", [])

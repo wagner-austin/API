@@ -97,9 +97,9 @@ class TestTheWslRow:
         assert lines[2] == (
             "Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl' "
             "($Probe.Exit -eq 0 -and $Leftover -eq '0') "
-            "('processes older than 60 minutes outside "
-            "actions.runner.wagner-austin-MCPs.lavender-wsl.service with no job running; "
-            "the reaper counted: ' + $Probe.Text)"
+            "('processes older than 60 minutes that a finished job left in "
+            "actions.runner.wagner-austin-MCPs.lavender-wsl.service, "
+            "or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)"
         )
 
 
