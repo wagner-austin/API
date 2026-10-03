@@ -65,7 +65,9 @@ def parse_wsl_list(output: str) -> list[Distro]:
     return rows
 
 
-def describe_wsl_host(workspace: FleetWorkspace, ledger: pathlib.Path, host_name: str) -> str:
+def describe_wsl_host(
+    workspace: FleetWorkspace, ledger: pathlib.Path, host_name: str, *, writer: str
+) -> str:
     """Say what a WSL node's host reports, for a tick that could not reach the node.
 
     Args:
@@ -73,6 +75,9 @@ def describe_wsl_host(workspace: FleetWorkspace, ledger: pathlib.Path, host_name
         ledger: The workspace's ledger, for the dispatches live on the host
             that the capacity probe's reading carries.
         host_name: The host's workspace name, the node's ``wsl_host``.
+        writer: Who is asking: the WSL node's runner, or the command
+            listing nodes, which names the host's probe script
+            (:func:`fleet.core.probe.attempt_probe`).
 
     Returns:
         One clause naming the host's free memory and disk and each distro's
@@ -80,7 +85,7 @@ def describe_wsl_host(workspace: FleetWorkspace, ledger: pathlib.Path, host_name
     """
     host = require_node(workspace, host_name)
     live = records.live_load(ledger, node=host_name, projects=workspace["projects"])
-    probed = probe.attempt_probe(host, live=live)
+    probed = probe.attempt_probe(host, live=live, writer=writer)
     state = probed["state"]
     if state is None:
         return f"its host {host_name} did not answer either: {probed['reason']}"

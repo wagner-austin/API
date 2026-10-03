@@ -76,6 +76,10 @@ _log = get_logger(__name__)
 
 REGISTRY_FLAG = "--registry"
 
+#: The writer this command's capacity probes are named for on each node
+#: (:func:`fleet.core.names.capacity_probe_stem`).
+PROBE_WRITER = "fleet-nodes"
+
 PROBE_FLAG = "--probe"
 
 PROBE_ALWAYS = "always"
@@ -159,11 +163,13 @@ def _probe_line(loaded: _config.LoadedWorkspace, name: str, node: NodeConfig) ->
     """
     live = records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"])
     try:
-        state = probe.probe_node(node, live=live)
+        state = probe.probe_node(node, live=live, writer=PROBE_WRITER)
     except AppError as unreachable:
         line = f"{name}: UNREACHABLE -- {unreachable.message}"
         if node["wsl_host"] is not None:
-            seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
+            seen = host_report.describe_wsl_host(
+                loaded.workspace, loaded.ledger, node["wsl_host"], writer=PROBE_WRITER
+            )
             line = f"{line}; {seen}"
         return line, 1
     projects = tuple(loaded.workspace["projects"].values())

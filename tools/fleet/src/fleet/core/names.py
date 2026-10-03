@@ -88,12 +88,6 @@ COMPANION_REPOSITORY_STEM = "companion-repo"
 #: (FLEET-CHECK 8c1abde3, MCPs board task a8ee9b21).
 STAGE_SUFFIX = ".stage"
 
-#: The constant capacity probe, under a node's stage root.
-CAPACITY_PROBE_STEM = "fleet-capacity"
-
-#: The constant toolchain probe, under a node's stage root.
-TOOLCHAIN_PROBE_STEM = "fleet-toolchain"
-
 #: The install script, under a node's stage root.
 INSTALL_STEM = "fleet-install"
 
@@ -291,6 +285,62 @@ def make_directory_stem(name: str) -> str:
     return f"mkdir-{name}"
 
 
+def runner_name(alias: str, *, elevated: bool) -> str:
+    """Name one of a node's runners: the node itself, or its elevated lane.
+
+    The name a runner's tick log, its scheduled task's stem and its probe
+    scripts carry, so the two runners of a node that declares ``elevated``
+    never share one of them.
+
+    Args:
+        alias: The node's workspace name.
+        elevated: Whether this is the node's elevated runner.
+
+    Returns:
+        ``<alias>`` or ``<alias>-elevated``.
+    """
+    return f"{alias}-elevated" if elevated else alias
+
+
+def capacity_probe_stem(writer: str) -> str:
+    """Name the capacity probe one writer sends to a node's stage root.
+
+    ONE PATH PER WRITER, never one per node. Every caller that asks a node
+    what it has free writes the same constant script and runs it, and two
+    callers asking the same node at once both wrote one file: on 2026-10-03
+    serendipity's node and elevated runners, scheduled on the same minute,
+    collided on it every tick (``The process cannot access the file ...
+    because it is being used by another process``; ``Set-Content : Stream
+    was not readable``), so neither read the node and it claimed nothing
+    with 11.5 GB free (MCPs board task 939ec5c7).
+
+    Args:
+        writer: Who sends it: a runner's :func:`runner_name`, or the command
+            that probes (``fleet-run``, ``fleet-nodes``, ``fleet-preflight``).
+
+    Returns:
+        The stem.
+    """
+    return f"fleet-capacity-{writer}"
+
+
+def toolchain_probe_stem(writer: str) -> str:
+    """Name the toolchain probe one writer sends to a node's stage root.
+
+    One path per writer for the reason :func:`capacity_probe_stem` gives;
+    the toolchain probe is the one serendipity's two runners were measured
+    colliding on.
+
+    Args:
+        writer: Who sends it: a runner's :func:`runner_name`, or the command
+            that probes (``fleet-bootstrap``).
+
+    Returns:
+        The stem.
+    """
+    return f"fleet-toolchain-{writer}"
+
+
 def stop_stem(run_id: str) -> str:
     """Name the script that stops one dispatch.
 
@@ -345,7 +395,6 @@ __all__ = [
     "ARCHIVE_NAME",
     "BUILD_STEM",
     "CACHE_DIRECTORY",
-    "CAPACITY_PROBE_STEM",
     "COLLECT_STEM",
     "COMPANION_REPOSITORY_STEM",
     "DIGEST_STEM",
@@ -358,8 +407,8 @@ __all__ = [
     "PID_NAME",
     "RESULT_NAME",
     "STAGE_SUFFIX",
-    "TOOLCHAIN_PROBE_STEM",
     "cache_root",
+    "capacity_probe_stem",
     "companion_directory",
     "dispatch_directory",
     "log_path",
@@ -369,8 +418,10 @@ __all__ = [
     "retained_log_path",
     "retire_stem",
     "root_script_stems",
+    "runner_name",
     "stage_name",
     "staging_directory",
     "stop_stem",
     "task_name",
+    "toolchain_probe_stem",
 ]

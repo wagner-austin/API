@@ -72,7 +72,7 @@ from platform_core import cli_args
 from platform_core.env_assignments import parse_env_assignments
 
 from fleet.cli import rolled as rolled_cli
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, names
 
 API_ROOT_FLAG: Final = "--api-root"
 LOG_DIRECTORY_FLAG: Final = "--log-directory"
@@ -198,7 +198,7 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
         raise ValueError(f"FLEET_TICK_USAGE: the {lane} lane needs {NODE_FLAG}")
     announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
     elevated = lane in _ELEVATED_LANES
-    runner = f"{node}-elevated" if elevated else node
+    runner = names.runner_name(node, elevated=elevated)
     return TickPlan(
         arguments=(
             rolled_cli.REPO_ROOT_FLAG,

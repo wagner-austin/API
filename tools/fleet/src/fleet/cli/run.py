@@ -56,6 +56,10 @@ AGENT_FLAG = "--agent"
 SESSION_FLAG = "--session"
 ROOT_FLAG = "--repo-root"
 
+#: The writer this command's capacity probes are named for on each node
+#: (:func:`fleet.core.names.capacity_probe_stem`).
+PROBE_WRITER = "fleet-run"
+
 _FLAGS = (
     _config.CONFIG_FLAG,
     PROJECT_FLAG,
@@ -127,6 +131,7 @@ def choose(
         outcome = probe.attempt_probe(
             declared,
             live=records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"]),
+            writer=PROBE_WRITER,
         )
         answered: NodeState | None = outcome["state"]
         if answered is None:
@@ -192,7 +197,7 @@ def _probe(loaded: _config.LoadedWorkspace, *, name: str, node: NodeConfig) -> N
         AppError: With ``NODE_UNREACHABLE`` if it does not answer.
     """
     live = records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"])
-    return probe.probe_node(node, live=live)
+    return probe.probe_node(node, live=live, writer=PROBE_WRITER)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

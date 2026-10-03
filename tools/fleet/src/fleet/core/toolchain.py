@@ -113,7 +113,9 @@ def parse_probe(output: str) -> tuple[ToolReport, ...]:
     return reports
 
 
-def attempt_toolchain(node: NodeConfig) -> tuple[ToolReport, ...] | remote.RemoteFailure:
+def attempt_toolchain(
+    node: NodeConfig, *, writer: str
+) -> tuple[ToolReport, ...] | remote.RemoteFailure:
     """Ask a node what it has installed, reporting failure as a value.
 
     THE VALUE FORM EXISTS FOR THE NODE RUNNER. A runner deciding whether to
@@ -125,6 +127,9 @@ def attempt_toolchain(node: NodeConfig) -> tuple[ToolReport, ...] | remote.Remot
 
     Args:
         node: The node to probe.
+        writer: Who is asking, which names the script's path on the node
+            (:func:`fleet.core.names.toolchain_probe_stem`), so a node's two
+            runners probing on the same minute never write one file.
 
     Returns:
         Its reports, never empty; or the typed reason there are none: the
@@ -140,7 +145,7 @@ def attempt_toolchain(node: NodeConfig) -> tuple[ToolReport, ...] | remote.Remot
     spoken = dialect.for_platform(node["platform"])
     outcome = remote.attempt_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.TOOLCHAIN_PROBE_STEM),
+        spoken.script_path(node["stage_root"], names.toolchain_probe_stem(writer)),
         spoken.toolchain_probe_script(),
         platform=node["platform"],
     )
@@ -156,13 +161,14 @@ def attempt_toolchain(node: NodeConfig) -> tuple[ToolReport, ...] | remote.Remot
     return reports
 
 
-def probe_toolchain(node: NodeConfig) -> tuple[ToolReport, ...]:
+def probe_toolchain(node: NodeConfig, *, writer: str) -> tuple[ToolReport, ...]:
     """Ask a node what it has installed.
 
     The raising boundary over :func:`attempt_toolchain`.
 
     Args:
         node: The node to probe.
+        writer: Who is asking, as :func:`attempt_toolchain` takes it.
 
     Returns:
         One report per required tool.
@@ -172,7 +178,7 @@ def probe_toolchain(node: NodeConfig) -> tuple[ToolReport, ...]:
             ``DISPATCH_FAILED`` if the probe exits non-zero, or
             ``NODE_TOOL_MISSING`` if its answer cannot be read.
     """
-    outcome = attempt_toolchain(node)
+    outcome = attempt_toolchain(node, writer=writer)
     if isinstance(outcome, tuple):
         return outcome
     raise AppError(outcome["code"], outcome["message"])

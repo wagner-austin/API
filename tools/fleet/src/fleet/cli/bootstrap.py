@@ -48,6 +48,10 @@ _log = get_logger(__name__)
 NODE_FLAG = "--node"
 INSTALL_FLAG = "--install"
 
+#: The writer this command's toolchain probes are named for on the node
+#: (:func:`fleet.core.names.toolchain_probe_stem`).
+PROBE_WRITER = "fleet-bootstrap"
+
 _FLAGS = (_config.CONFIG_FLAG, NODE_FLAG)
 
 
@@ -68,7 +72,7 @@ def bootstrap_node(name: str, node: NodeConfig, *, install: bool) -> tuple[str, 
             Not softened: a half-installed node is worse than an untouched
             one, because it looks ready.
     """
-    reports = toolchain.probe_toolchain(node)
+    reports = toolchain.probe_toolchain(node, writer=PROBE_WRITER)
     if not install:
         return describe_gap(name, reports), is_ready(reports)
 
@@ -76,7 +80,7 @@ def bootstrap_node(name: str, node: NodeConfig, *, install: bool) -> tuple[str, 
     if not installed:
         return describe_gap(name, reports), is_ready(reports)
 
-    after = toolchain.probe_toolchain(node)
+    after = toolchain.probe_toolchain(node, writer=PROBE_WRITER)
     return (
         f"{describe_gap(name, after)} (installed {', '.join(installed)})",
         is_ready(after),

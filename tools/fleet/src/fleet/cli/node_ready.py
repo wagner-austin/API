@@ -35,7 +35,7 @@ from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.runner_tick import RunnerTick, TickLoad
 from fleet.contracts.tags import NodeTag, runner_tags
 from fleet.contracts.toolchain import ToolReport
-from fleet.core import capacity, host_report, probe, records, run_lease, toolchain
+from fleet.core import capacity, host_report, names, probe, records, run_lease, toolchain
 
 _log = get_logger(__name__)
 
@@ -101,18 +101,25 @@ def ready_state(
     if not node["enabled"]:
         return closed(alias, elevated, None, "is disabled in fleet.json; claiming nothing")
     live = records.live_load(loaded.ledger, node=alias, projects=loaded.workspace["projects"])
-    probed = probe.attempt_probe(node, live=live)
+    # The probes' scripts are named for this runner, never for the node: a
+    # node's ordinary and elevated runners tick on the same minute, and one
+    # shared path collided on serendipity every tick (MCPs board task
+    # 939ec5c7, :func:`fleet.core.names.capacity_probe_stem`).
+    writer = names.runner_name(alias, elevated=elevated)
+    probed = probe.attempt_probe(node, live=live, writer=writer)
     state = probed["state"]
     if state is None:
         gate = closed(
             alias, elevated, None, f"did not answer; claiming nothing: {probed['reason']}"
         )
         if node["wsl_host"] is not None:
-            seen = host_report.describe_wsl_host(loaded.workspace, loaded.ledger, node["wsl_host"])
+            seen = host_report.describe_wsl_host(
+                loaded.workspace, loaded.ledger, node["wsl_host"], writer=writer
+            )
             _log.info("%s did not answer, and %s", alias, seen)
         return gate
     load = tick_load(state)
-    answered = toolchain.attempt_toolchain(node)
+    answered = toolchain.attempt_toolchain(node, writer=writer)
     if not isinstance(answered, tuple):
         return closed(
             alias,

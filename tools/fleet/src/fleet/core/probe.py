@@ -221,7 +221,7 @@ def _is_number(value: str) -> bool:
     return digits.isdigit()
 
 
-def attempt_probe(node: NodeConfig, *, live: LiveLoad) -> ProbeOutcome:
+def attempt_probe(node: NodeConfig, *, live: LiveLoad, writer: str) -> ProbeOutcome:
     """Ask a node what it has free, reporting failure as a value.
 
     What auto-select uses. A node that is powered off, that refuses ssh, or
@@ -231,6 +231,9 @@ def attempt_probe(node: NodeConfig, *, live: LiveLoad) -> ProbeOutcome:
     Args:
         node: The node to probe.
         live: What its live fleet runs were granted, from the ledger.
+        writer: Who is asking, which names the script's path on the node
+            (:func:`fleet.core.names.capacity_probe_stem`) so two callers
+            asking at once never write one file.
 
     Returns:
         Its live state, or why nothing could be read from it.
@@ -244,7 +247,7 @@ def attempt_probe(node: NodeConfig, *, live: LiveLoad) -> ProbeOutcome:
     spoken = dialect.for_platform(node["platform"])
     outcome = remote.attempt_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.CAPACITY_PROBE_STEM),
+        spoken.script_path(node["stage_root"], names.capacity_probe_stem(writer)),
         spoken.capacity_probe_script(),
         platform=node["platform"],
     )
@@ -254,7 +257,7 @@ def attempt_probe(node: NodeConfig, *, live: LiveLoad) -> ProbeOutcome:
     return read_state(node["host"], outcome["output"], live=live)
 
 
-def probe_node(node: NodeConfig, *, live: LiveLoad) -> NodeState:
+def probe_node(node: NodeConfig, *, live: LiveLoad, writer: str) -> NodeState:
     """Ask a node what it has free.
 
     The raising boundary over :func:`attempt_probe`, for a caller that has
@@ -264,6 +267,7 @@ def probe_node(node: NodeConfig, *, live: LiveLoad) -> NodeState:
     Args:
         node: The node to probe.
         live: What its live fleet runs were granted, from the ledger.
+        writer: Who is asking, as :func:`attempt_probe` takes it.
 
     Returns:
         Its live state.
@@ -273,7 +277,7 @@ def probe_node(node: NodeConfig, *, live: LiveLoad) -> NodeState:
             answer cannot be read, or ``DISPATCH_FAILED`` if the probe script
             itself exits non-zero.
     """
-    outcome = attempt_probe(node, live=live)
+    outcome = attempt_probe(node, live=live, writer=writer)
     state = outcome["state"]
     if state is None:
         raise AppError(FleetErrorCode.NODE_UNREACHABLE, outcome["reason"])

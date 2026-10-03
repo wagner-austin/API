@@ -37,6 +37,10 @@ _log = get_logger(__name__)
 PROJECT_FLAG = "--project"
 NODE_FLAG = "--node"
 
+#: The writer this command's capacity probes are named for on each node
+#: (:func:`fleet.core.names.capacity_probe_stem`).
+PROBE_WRITER = "fleet-preflight"
+
 _FLAGS = (_config.CONFIG_FLAG, PROJECT_FLAG, NODE_FLAG)
 
 
@@ -60,7 +64,7 @@ def preflight_named_node(loaded: _config.LoadedWorkspace, *, project: str, node:
     declared = require_node(loaded.workspace, node)
     wanted = require_project(loaded.workspace, project)
     live = records.live_load(loaded.ledger, node=node, projects=loaded.workspace["projects"])
-    state = probe.probe_node(declared, live=live)
+    state = probe.probe_node(declared, live=live, writer=PROBE_WRITER)
     return capacity.plan_dispatch(declared, state, wanted, node_tags(declared))
 
 
@@ -88,7 +92,9 @@ def preflight_fleet(loaded: _config.LoadedWorkspace, *, project: str) -> tuple[s
     candidates: list[tuple[str, NodeConfig, NodeState]] = []
     for name, declared in sorted(loaded.workspace["nodes"].items()):
         live = records.live_load(loaded.ledger, node=name, projects=loaded.workspace["projects"])
-        candidates.append((name, declared, probe.probe_node(declared, live=live)))
+        candidates.append(
+            (name, declared, probe.probe_node(declared, live=live, writer=PROBE_WRITER))
+        )
     return capacity.first_fit(tuple(candidates), wanted)
 
 
