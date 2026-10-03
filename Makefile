@@ -130,7 +130,7 @@ logs:
 # ---------------------------------------------------------------------------
 # Development: lint and test across all libs/services/clients/tools
 # ---------------------------------------------------------------------------
-lint: check-powershell
+lint:
 	$(MAKETOOLS) fan-out lint libs services clients tools
 
 # EVERY POWERSHELL FILE THIS REPOSITORY TRACKS, GUARDED, ANALYSED AND RUN BY
@@ -139,17 +139,20 @@ lint: check-powershell
 # .githooks/mcps-harness.sha records, extracted by
 # .githooks/published_maketools.py from the MCPs checkout beside this one, so
 # no copy of it or of its rules lives here. It is repository-wide because it
-# inventories through git ls-files, which is why it runs from the root and
-# not from each package's check.
+# inventories through git ls-files, so it runs over the whole repository and
+# not inside each package's check.
 #
 # PINNED, not origin/main (d69786fa A3): a verdict at an API commit is then
 # the verdict of the harness that commit names, however far MCPs has moved
 # when a review re-runs it, and moving the harness is a commit here. The CI
 # job reads the same file.
-MCPS_HARNESS_REF := $(file <.githooks/mcps-harness.sha)
-
+#
+# THE COMMAND LIVES IN tools/ps-harness (MCPs board task 939ec5c7), the
+# directory the fleet runs as a project, so a node's row and this target run
+# one recipe. `make test` reaches it through the fan-out, which is why `lint`
+# no longer depends on this target: it would run the harness twice.
 check-powershell:
-	$(PYTHON) .githooks/published_maketools.py ps-harness --ref $(MCPS_HARNESS_REF) ../MCPs .
+	make -C tools/ps-harness test
 
 test:
 	$(MAKETOOLS) fan-out test libs services clients tools
