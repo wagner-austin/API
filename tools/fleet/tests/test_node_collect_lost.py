@@ -113,13 +113,16 @@ def _tick(
     Args:
         config_path: The workspace document.
         answers: What the queue answers after the held and cancelled listings,
-            before the claim.
+            before the claim a stop leaves room for.
         stops: Whether the node is expected to be sent a stop.
 
     Returns:
         The queue and the ssh runner, for assertions.
     """
     replies = [ok(""), ok("stopped"), *retire_replies(), *PROBED] if stops else list(PROBED)
+    # The claim is asked only once a stop gave the project's lease back; a run
+    # left alone holds it (MCPs board task 48842bfd).
+    claim = [dump_json_str({"claimed": None})] if stops else []
     runner = FakeRun(replies)
     _test_hooks.run = runner
     endpoint = FakeQueue(
@@ -127,7 +130,7 @@ def _tick(
             dump_json_str({"jobs": []}),
             listing_page([], None),
             *answers,
-            dump_json_str({"claimed": None}),
+            *claim,
         ]
     )
     _test_hooks.http_post = endpoint

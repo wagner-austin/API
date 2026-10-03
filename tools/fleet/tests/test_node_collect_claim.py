@@ -232,7 +232,6 @@ class TestTheNextTick:
                 STARTED,
                 NO_CANCELS,
                 *_adopted_and_asked_about(late),
-                dump_json_str({"claimed": None}),
             ]
         )
         _test_hooks.http_post = endpoint
@@ -340,7 +339,6 @@ class TestACancelBeforeTheStart:
                 listing_page([cancelled], None),
                 listing_page([cancelled], None),
                 trail_answer(cancelled, claims),
-                dump_json_str({"claimed": None}),
             ]
         )
 

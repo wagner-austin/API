@@ -28,6 +28,7 @@ from tests._node_agent_fixtures import (
     COMPANION_REF,
     COMPANION_REMOTE,
     COMPANION_SHA,
+    NOTHING_LAUNCHED,
     PROBED,
     REMOTE,
     _credentials_in_env,
@@ -153,6 +154,7 @@ def _companion_replies(
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
+        *PROBED,  # the re-probe after the launch, which finds the project held
     ]
 
 
@@ -334,7 +336,8 @@ class TestClaiming:
     ) -> None:
         runner = _claim_and_start(sourced_config)
 
-        # The build script is the third-from-last send; its body travelled
+        # The build script is the third-from-last send before the re-probe
+        # that follows every launch (MCPs board task 48842bfd); its body travelled
         # on stdin, and it is exactly the dialect's rendering for this
         # target with the registry's install steps and the node's cache
         # root, the workers being those the capacity check granted.
@@ -351,7 +354,7 @@ class TestClaiming:
             elevated=False,
             agent="opus-dispatch-0905",
         )
-        assert runner.stdin[-3] == expected.encode("utf-8")
+        assert runner.stdin[-3 - len(PROBED)] == expected.encode("utf-8")
         # The claimed job's submitter, exported so a hold the suite takes is
         # attributed to that session (MCPs board task 6c4516af A4).
         assert "$env:BOARD_AGENT_LABEL = 'opus-dispatch-0905'" in expected
@@ -423,7 +426,8 @@ class TestClaimingNothing:
 
         assert endpoint.tools == ["dispatch_list"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-1].startswith("lavender did not answer; claiming nothing: ")
+        assert messages[-2].startswith("lavender did not answer; claiming nothing: ")
+        assert messages[-1] == NOTHING_LAUNCHED
 
     def test_a_node_with_room_for_nothing_claims_nothing(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture

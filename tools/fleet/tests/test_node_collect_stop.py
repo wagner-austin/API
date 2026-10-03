@@ -274,7 +274,6 @@ class TestCancelledUnderIt:
                 dump_json_str({"jobs": []}),
                 _cancelled_page([], None),
                 _cancelled_page([], None),
-                dump_json_str({"claimed": None}),
             ]
         )
         _test_hooks.http_post = endpoint

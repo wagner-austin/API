@@ -20,6 +20,7 @@ from fleet.cli import node_agent
 from fleet.contracts.toolchain import install_command
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
+    NOTHING_LAUNCHED,
     NOTHING_MATCHED,
     PROBED,
     _credentials_in_env,
@@ -85,12 +86,13 @@ class TestTheToolTagsAClaimCarries:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         assert endpoint.arguments[1]["tags"] == ["ffmpeg", "windows"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-3:] == [
+        assert messages[-4:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
             "poetry, git, make, tar present; ffmpeg present; hooks absent",
             f"lavender claims without the tag of every tool it lacks: hooks -- {HOOKS_REASON}, "
             f"so those jobs go to a node that has it -- {HOOKS_INSTALL}",
             NOTHING_MATCHED,
+            NOTHING_LAUNCHED,
         ]
 
     def test_a_node_whose_probe_found_the_hooks_environment_claims_with_its_tag(
@@ -109,10 +111,11 @@ class TestTheToolTagsAClaimCarries:
 
         assert endpoint.arguments[1]["tags"] == ["ffmpeg", "hooks", "windows"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-2:] == [
+        assert messages[-3:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
             "poetry, git, make, tar present; ffmpeg present; hooks present",
             NOTHING_MATCHED,
+            NOTHING_LAUNCHED,
         ]
 
     def test_a_node_without_ffmpeg_claims_without_it(
@@ -146,12 +149,13 @@ class TestTheToolTagsAClaimCarries:
 
         assert endpoint.arguments[1]["tags"] == ["cxx", "gpu", "windows"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-3:] == [
+        assert messages[-4:] == [
             "lavender (lavender) declares gpu none but nvidia-smi reports 'NVIDIA GeForce GTX "
             "1630, 7.5', so it claims with the gpu tag; correct gpu in fleet.json",
             "lavender (lavender) declares cxx none but its probe reports cxx '17.14.37710.0', so "
             "it claims with the cxx tag; set cxx to '17.14.37710.0' in fleet.json",
             NOTHING_MATCHED,
+            NOTHING_LAUNCHED,
         ]
 
 
@@ -168,7 +172,7 @@ class TestAToolchainThatCanBuild:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-3:] == [
+        assert messages[-4:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
             "poetry, git, make, tar present; ffmpeg absent; hooks absent",
             "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
@@ -177,6 +181,7 @@ class TestAToolchainThatCanBuild:
             "--accept-package-agreements --accept-source-agreements --disable-interactivity; "
             f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- {HOOKS_INSTALL}",
             NOTHING_MATCHED,
+            NOTHING_LAUNCHED,
         ]
 
 
@@ -193,7 +198,7 @@ class TestAToolchainThatCannotBuild:
         )
         assert install_command("python", ("winget", "choco")) in refusal
         assert "poetry -- " in refusal
-        assert messages[-1] == refusal
+        assert messages[-2:] == [refusal, NOTHING_LAUNCHED]
 
     def test_a_wrong_minor_python_claims_nothing_with_its_own_code(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture

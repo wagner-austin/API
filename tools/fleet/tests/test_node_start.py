@@ -20,6 +20,7 @@ from platform_core.json_utils import dump_json_str
 from fleet.cli import _config, node_agent
 from fleet.core import _test_hooks, leases, records, staging
 from tests._node_agent_fixtures import (
+    PROBED,
     _credentials_in_env,
     _sourced_config,
     claim_replies,
@@ -38,19 +39,24 @@ BAD_TRANSITION = (
 )
 
 
-def _tick(config_path: pathlib.Path, *, read_back: str) -> tuple[FakeQueue, FakeRun]:
+def _tick(
+    config_path: pathlib.Path, *, read_back: str, claims_again: bool
+) -> tuple[FakeQueue, FakeRun]:
     """Arm one claim tick whose start report is refused, and the job's read-back.
 
     Args:
         config_path: The workspace document.
         read_back: The ``dispatch_get`` answer the refusal is followed by.
+        claims_again: Whether the tick goes on to claim again, as one that
+            launched does once the stop gave the project's lease back (MCPs
+            board task 48842bfd); the queue answers that claim with nothing.
 
     Returns:
         The queue and the ssh runner, to assert on after the tick.
     """
     payload = prebuilt_export(config_path)
-    stop = [ok(""), ok("stopped"), *retire_replies()]
-    runner = FakeRun([*claim_replies(staging.digest(payload), commit_present=True), *stop])
+    stop = (ok(""), ok("stopped"), *retire_replies())
+    runner = FakeRun(claim_replies(staging.digest(payload), commit_present=True, after_launch=stop))
     _test_hooks.run = runner
     endpoint = FakeQueue(
         [
@@ -58,6 +64,7 @@ def _tick(config_path: pathlib.Path, *, read_back: str) -> tuple[FakeQueue, Fake
             dump_json_str({"claimed": queue_job(status="claimed")}),
             ToolRefusal(BAD_TRANSITION),
             read_back,
+            *([dump_json_str({"claimed": None})] if claims_again else []),
         ]
     )
     _test_hooks.http_post = endpoint
@@ -69,14 +76,21 @@ def test_a_job_cancelled_while_it_launched_is_stopped_and_the_tick_succeeds(
 ) -> None:
     cancelled = queue_job(status="cancelled", claimedBy="fleet-node-lavender")
     read_back = dump_json_str({"job": cancelled, "trail": []})
-    endpoint, runner = _tick(sourced_config, read_back=read_back)
+    endpoint, runner = _tick(sourced_config, read_back=read_back, claims_again=True)
 
     assert node_agent.main(node_argv(sourced_config)) == 0
 
-    assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report", "dispatch_get"]
+    assert endpoint.tools == [
+        "dispatch_list",
+        "dispatch_claim",
+        "dispatch_report",
+        "dispatch_get",
+        "dispatch_claim",
+    ]
     assert endpoint.arguments[3] == {"jobId": DEFAULT_JOB_ID}
     # Every scripted reply was consumed: the launch, then the stop and the
-    # retire of the run it launched.
+    # retire of the run it launched, then the re-probe of a tick that
+    # launched (MCPs board task 48842bfd).
     assert len(runner.calls) == len(claim_replies("x", commit_present=True)) + 2 + len(
         retire_replies()
     )
@@ -94,13 +108,16 @@ def test_a_refused_start_for_a_job_not_cancelled_propagates_and_stops_nothing(
     sourced_config: pathlib.Path,
 ) -> None:
     claimed = queue_job(status="claimed", claimedBy="fleet-node-lavender")
-    endpoint, runner = _tick(sourced_config, read_back=dump_json_str({"job": claimed, "trail": []}))
+    endpoint, runner = _tick(
+        sourced_config, read_back=dump_json_str({"job": claimed, "trail": []}), claims_again=False
+    )
 
     with pytest.raises(AppError) as excinfo:
         node_agent.main(node_argv(sourced_config))
 
     assert excinfo.value.message == f"MCP tool reported a failure: {BAD_TRANSITION}"
     assert endpoint.tools[-1] == "dispatch_get"
-    assert len(runner.calls) == len(claim_replies("x", commit_present=True))
+    # Up to the launch: the refusal ends the tick before it probes again.
+    assert len(runner.calls) == len(claim_replies("x", commit_present=True)) - len(PROBED)
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
     assert records.read_ledger(loaded.ledger)[-1]["outcome"] == "running"

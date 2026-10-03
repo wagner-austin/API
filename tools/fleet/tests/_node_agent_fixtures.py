@@ -52,6 +52,10 @@ COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
 #: queue for the one registered project and the lane held nothing for it.
 NOTHING_MATCHED = "lavender asked for 1 fitting project(s); nothing in the node lane matched"
 
+#: The last line of every lavender tick that launched nothing, whichever gate
+#: or refusal ended it (MCPs board task 48842bfd).
+NOTHING_LAUNCHED = "lavender launched 0 job(s) this tick"
+
 PROBED: tuple[_test_hooks.CommandResult, ...] = (
     ok(""),
     ok(PROBE_OK),
@@ -174,8 +178,38 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
     return payload
 
 
-def claim_replies(digest: str, *, commit_present: bool) -> list[_test_hooks.CommandResult]:
-    """Every command a node-lane claim tick runs, in order.
+def claim_replies(
+    digest: str,
+    *,
+    commit_present: bool,
+    after_launch: tuple[_test_hooks.CommandResult, ...] = (),
+) -> list[_test_hooks.CommandResult]:
+    """Every command a node-lane claim tick that launches its job runs, in order.
+
+    Args:
+        digest: What the node reports having reassembled.
+        commit_present: Whether the mirror already holds the sha, which
+            decides whether a fetch runs.
+        after_launch: What the start report runs once the job is launched,
+            before the tick probes again: the stop and retire of a job
+            cancelled while it launched.
+
+    Returns:
+        One result per call.
+    """
+    return [
+        *PROBED,  # the probe, before any claim
+        *launch_steps(digest, commit_present=commit_present),
+        *after_launch,
+        # The tick claims again after a launch (MCPs board task 48842bfd):
+        # the re-probe finds the one registered project held by the run just
+        # launched, so it asks the queue for nothing more.
+        *PROBED,
+    ]
+
+
+def launch_steps(digest: str, *, commit_present: bool) -> list[_test_hooks.CommandResult]:
+    """Every command between a claim and its launch, for a project whose mirror is new.
 
     Args:
         digest: What the node reports having reassembled.
@@ -185,23 +219,16 @@ def claim_replies(digest: str, *, commit_present: bool) -> list[_test_hooks.Comm
     Returns:
         One result per call.
     """
-    replies = [
-        *PROBED,  # the probe, before any claim
+    fetched = [ok("")] if commit_present else [failed(128, "missing"), ok("")]
+    return [
         ok(""),  # git init --bare (the mirror is new)
-    ]
-    if commit_present:
-        replies.append(ok(""))  # git cat-file -e: present
-    else:
-        replies.append(failed(128, "missing"))  # git cat-file -e: absent
-        replies.append(ok(""))  # git fetch
-    replies += [
+        *fetched,  # git cat-file -e: present; or absent, then git fetch
         ok(""),  # git archive -o
         *stage_replies(digest),
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
     ]
-    return replies
 
 
 def launch(config_path: pathlib.Path) -> None:
@@ -245,6 +272,7 @@ __all__ = [
     "COMPANION_REF",
     "COMPANION_REMOTE",
     "COMPANION_SHA",
+    "NOTHING_LAUNCHED",
     "NOTHING_MATCHED",
     "PASSING_TAIL",
     "PROBED",
@@ -253,6 +281,7 @@ __all__ = [
     "claim_replies",
     "held_answer",
     "launch",
+    "launch_steps",
     "node_argv",
     "prebuilt_companion",
     "prebuilt_export",
