@@ -125,7 +125,6 @@ class TestPastItsLease:
         endpoint = FakeQueue(
             [
                 held_answer(taskId=VERDICT_TASK),
-                "posted",
                 dump_json_str({"job": queue_job(status="failed")}),
                 dump_json_str({"claimed": None}),
             ]
@@ -135,19 +134,20 @@ class TestPastItsLease:
         assert node_agent.main(node_argv(sourced_config)) == 0
 
         assert runner.stdin[2] == _stop_body(sourced_config).encode("utf-8")
-        assert endpoint.tools == ["dispatch_list", "task_post", "dispatch_report", "dispatch_claim"]
+        # The job names a task, so the timed-out verdict reaches its thread
+        # through the queue's close (MCPs board task 2fecad69), not a post.
+        assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
         reason = (
             "LEASE_NOT_HELD: still running 1s past its lease deadline 1757000600, so the runner "
             "ended its process tree; raise libs/demo's expected_minutes if the suite needs longer"
         )
-        line = narrow_json_to_str(endpoint.arguments[1]["body"])
+        closed = endpoint.arguments[1]
+        line = narrow_json_to_str(closed["detail"])
         assert line.startswith(f"FLEET-CHECK {DEFAULT_JOB_ID[:8]} libs/demo ")
         assert " exit=124 " in line
         assert line.endswith(f" stopped: {reason}")
-        closed = endpoint.arguments[2]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == node_collect.TIMED_OUT_EXIT_CODE
-        assert closed["detail"] == line
         last = _ledger(sourced_config)[-1]
         assert last["outcome"] == "failed"
         assert last["exit_code"] == node_collect.TIMED_OUT_EXIT_CODE

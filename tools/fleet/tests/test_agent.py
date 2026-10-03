@@ -31,7 +31,7 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, queue
 from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
 from tests.conftest import FakeRun, agent_argv, failed, ok
 
@@ -154,6 +154,55 @@ class TestCredentialsAndEntryPoint:
                 sys.modules["fleet.cli.agent"] = saved_module
 
         assert raised.value.code == 0
+
+
+class TestAnnounce:
+    """The hub runner's one-time check-in (MCPs board task 2fecad69).
+
+    The queue's close writer posts a task-naming job's outcome under the
+    closing runner's label, and the board admits a post only from a session
+    on its ledger, so the hub runner registers itself as each node runner
+    does."""
+
+    def test_announce_registers_the_hub_runner_and_claims_nothing(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        board_watch_hooks.env = FakeEnv(BOARD_ENV)
+        _test_hooks.env = FakeEnv({})
+        _test_hooks.hostname = lambda: "austinpc"
+        endpoint = FakeQueue(["checked in"])
+        _test_hooks.http_post = endpoint
+
+        assert agent.main([*agent_argv(config_path, repo), queue.ANNOUNCE_FLAG]) == 0
+
+        # The queue's credentials are unset and nothing asked for them: an
+        # announce touches the board alone.
+        assert endpoint.tools == ["task_post"]
+        checkin = endpoint.arguments[0]
+        assert checkin["kind"] == "checkin"
+        assert checkin["harness"] == "fleet-agent"
+        assert checkin["machine"] == f"{sys.platform}:austinpc"
+        assert checkin["room"] == "fleet"
+        assert checkin["agent"] == "fleet-runner-austinpc"
+        assert checkin["sessionId"] == "33333333-cccc-4ccc-8ccc-333333333333"
+        assert checkin["body"] == (
+            "fleet-runner-austinpc: claims the queue's hub lane (build-bases and the session "
+            "verbs) and closes each job it claims, which posts the outcome to the job's task "
+            "thread under this label"
+        )
+
+    def test_announce_without_the_boards_key_is_refused_before_any_call(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        board_watch_hooks.env = FakeEnv({})
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
+
+        with pytest.raises(AppError) as raised:
+            agent.main([*agent_argv(config_path, repo), queue.ANNOUNCE_FLAG])
+
+        assert raised.value.code is BoardWatchErrorCode.API_KEY_MISSING
+        assert endpoint.tools == []
 
 
 def _registry(tmp_path: pathlib.Path) -> pathlib.Path:

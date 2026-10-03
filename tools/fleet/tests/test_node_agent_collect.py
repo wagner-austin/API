@@ -3,8 +3,9 @@ and its entry points (MCPs board task fd5cabfa, A3).
 
 A later tick finds the job it launched among ``held_by``, reads the result
 and the transcript's tail off the node, composes the verdict line, posts it
-to the submitting task's thread (or the submitter's feed when the job names
-no task) and closes the job on both sides. The claim half is
+to the submitter's feed when the job names no task, and closes the job on
+both sides; the queue's close posts a task-naming job's outcome to its
+thread (MCPs board task 2fecad69). The claim half is
 ``test_node_agent.py``; the fixtures both use are ``_node_agent_fixtures.py``.
 """
 
@@ -19,7 +20,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import node_agent, node_collect
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, queue
 from tests._node_agent_fixtures import (
     PASSING_TAIL,
     PROBED,
@@ -37,9 +38,12 @@ __all__ = ["_credentials_in_env", "_sourced_config"]
 
 
 class TestCollecting:
-    def test_a_finished_suite_posts_its_verdict_to_the_task_and_closes_both_sides(
+    def test_a_finished_suite_naming_a_task_closes_both_sides_and_leaves_the_post_to_the_queue(
         self, sourced_config: pathlib.Path
     ) -> None:
+        """The verdict line is the close's detail, and the queue's close
+        writer posts it to the task's thread addressed to the submitter
+        (MCPs board task 2fecad69), so the runner posts nothing itself."""
         launch(sourced_config)
         node = FakeRun(
             [ok(""), ok("0 1757000060"), ok(""), ok(PASSING_TAIL), *retire_replies(), *PROBED]
@@ -48,7 +52,6 @@ class TestCollecting:
         endpoint = FakeQueue(
             [
                 held_answer(taskId=VERDICT_TASK),
-                "posted",
                 dump_json_str({"job": queue_job(status="passed")}),
                 dump_json_str({"claimed": None}),
             ]
@@ -57,18 +60,15 @@ class TestCollecting:
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
-        assert endpoint.tools == ["dispatch_list", "task_post", "dispatch_report", "dispatch_claim"]
-        posted = endpoint.arguments[1]
-        assert posted["kind"] == "note"
-        assert posted["taskId"] == VERDICT_TASK
-        assert posted["agent"] == "fleet-node-lavender"
-        line = narrow_json_to_str(posted["body"])
+        assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
+        closed = endpoint.arguments[1]
+        line = narrow_json_to_str(closed["detail"])
         assert line == (
             f"FLEET-CHECK {DEFAULT_JOB_ID[:8]} {DEMO_PROJECT} sha={DEFAULT_SHA} node=lavender "
             "exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% "
             f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
         )
-        # Retired after the tail was read and before the verdict was posted:
+        # Retired after the tail was read and before the job was closed:
         # the fifth and sixth calls send the retire to the stage root and run it.
         retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
         assert [retire_path in " ".join(call) for call in node.calls[:6]] == [
@@ -79,11 +79,9 @@ class TestCollecting:
             True,
             True,
         ]
-        closed = endpoint.arguments[2]
         assert closed["action"] == "close"
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
-        assert closed["detail"] == line
         ledger = (sourced_config.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
         assert "passed" in ledger
 
@@ -204,7 +202,7 @@ class TestAnnounceAndEntryPoints:
         endpoint = FakeQueue(["checked in"])
         _test_hooks.http_post = endpoint
 
-        assert node_agent.main([*node_argv(sourced_config), node_agent.ANNOUNCE_FLAG]) == 0
+        assert node_agent.main([*node_argv(sourced_config), queue.ANNOUNCE_FLAG]) == 0
 
         assert endpoint.tools == ["task_post"]
         checkin = endpoint.arguments[0]

@@ -87,6 +87,30 @@ class TestTheLanes:
             header="hub",
         )
 
+    # MCPs board task 2fecad69: the queue's close posts a task-naming job's
+    # outcome under the closing runner's label, so the hub runner checks in
+    # once, into the hub's own log, and claims nothing.
+    def test_the_hub_announce_lane_checks_the_hub_runner_in_and_claims_nothing(self) -> None:
+        root = pathlib.Path("C:/Users/Test/PROJECTS/API")
+        assert tick.plan_tick(root, "hub-announce", None) == tick.TickPlan(
+            arguments=(
+                "--repo-root",
+                str(root),
+                "--agent",
+                "fleet-agent",
+                "--",
+                "--agent",
+                "fleet-runner-austinpc",
+                "--session",
+                "a850f688-f98d-415c-a244-e993226ca2fc",
+                "--repo-root",
+                str(root),
+                "--announce",
+            ),
+            stem="fleet-agent",
+            header="hub-announce",
+        )
+
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:
         root = pathlib.Path("C:/api")
         assert tick.plan_tick(root, "node", "sedona") == tick.TickPlan(
@@ -130,10 +154,11 @@ class TestTheLanes:
         assert plan["stem"] == "fleet-node-serendipity-elevated"
         assert plan["header"] == header
 
-    def test_the_hub_lane_naming_a_node_is_refused(self) -> None:
+    @pytest.mark.parametrize("lane", ["hub", "hub-announce"])
+    def test_a_hub_lane_naming_a_node_is_refused(self, lane: tick.Lane) -> None:
         with pytest.raises(ValueError) as refused:
-            tick.plan_tick(pathlib.Path("C:/api"), "hub", "sedona")
-        assert str(refused.value) == "FLEET_TICK_USAGE: the hub lane takes no --node"
+            tick.plan_tick(pathlib.Path("C:/api"), lane, "sedona")
+        assert str(refused.value) == f"FLEET_TICK_USAGE: the {lane} lane takes no --node"
 
     @pytest.mark.parametrize("lane", ["node", "announce", "elevated", "elevated-announce"])
     def test_a_node_lane_naming_no_node_is_refused(self, lane: tick.Lane) -> None:
@@ -142,13 +167,13 @@ class TestTheLanes:
         assert str(refused.value) == f"FLEET_TICK_USAGE: the {lane} lane needs --node"
 
     def test_each_lane_name_is_accepted_and_nothing_else(self) -> None:
-        names = ("hub", "node", "announce", "elevated", "elevated-announce")
+        names = ("hub", "hub-announce", "node", "announce", "elevated", "elevated-announce")
         assert [tick.require_lane(name) for name in names] == list(names)
         with pytest.raises(ValueError) as refused:
             tick.require_lane("agent")
         assert str(refused.value) == (
-            "FLEET_TICK_USAGE: --lane is one of ['hub', 'node', 'announce', 'elevated', "
-            "'elevated-announce'], not 'agent'"
+            "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'node', 'announce', "
+            "'elevated', 'elevated-announce'], not 'agent'"
         )
 
     def test_the_ticks_deadline_is_half_a_minute_past_the_agents(self) -> None:

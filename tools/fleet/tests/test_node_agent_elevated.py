@@ -19,7 +19,7 @@ import pytest
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import node_agent
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, queue
 from tests._node_agent_fixtures import (
     _credentials_in_env,
     node_argv,
@@ -166,7 +166,7 @@ class TestRefusalsAndAnnounce:
         endpoint = FakeQueue(["checked in"])
         _test_hooks.http_post = endpoint
 
-        argv = [*node_argv(elevated_config), node_agent.ELEVATED_FLAG, node_agent.ANNOUNCE_FLAG]
+        argv = [*node_argv(elevated_config), node_agent.ELEVATED_FLAG, queue.ANNOUNCE_FLAG]
         assert node_agent.main(argv) == 0
 
         checkin = endpoint.arguments[0]
