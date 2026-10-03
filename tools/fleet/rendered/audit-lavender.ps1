@@ -67,10 +67,9 @@ function Get-RunnerLeftover {
     }
     return @($Processes | Where-Object {
         $null -ne $_.CreationDate -and $_.CreationDate -lt $cutoff -and (
-            ($tree.ContainsKey([int]$_.ProcessId) -and [string]$_.Name -eq 'Runner.Worker.exe') -or
-            (-not $tree.ContainsKey([int]$_.ProcessId) -and (
-                ([string]$_.CommandLine).Replace('/', '\').IndexOf($Root, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-                ([string]$_.ExecutablePath).StartsWith($Root, [StringComparison]::OrdinalIgnoreCase))))
+            ([string]$_.CommandLine).Replace('/', '\').IndexOf($Root, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            ([string]$_.ExecutablePath).StartsWith($Root, [StringComparison]::OrdinalIgnoreCase)) -and (
+            -not $tree.ContainsKey([int]$_.ProcessId) -or [string]$_.Name -eq 'Runner.Worker.exe')
     })
 }
 $Probe = Invoke-Probe $Cmd "`"$Schtasks`" /query /tn wsl-keepalive /fo csv"
