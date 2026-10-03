@@ -170,24 +170,36 @@ def refuse(
 
 
 def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
-    """Whether the job's tags disagree with the registry's for its project.
+    """Whether the job requires a tag the registry does not declare for its project.
+
+    WHAT A JOB NEEDS IS ITS PROJECT'S DECLARATION; the job's own tags only
+    route it through the queue. Every claim names the projects its runner
+    fits (:func:`fleet.core.capacity.fitting_projects`), each assessed
+    against the declaration and the runner's tags, and :func:`prepare`
+    assesses it again, so a job that names FEWER tags than its project
+    still runs only on a runner that carries all of them, and runs. MCPs
+    board task 939ec5c7: MCPs/scripts/ps-harness job 7c16305c, submitted on
+    2026-10-03 with ``[windows]`` for a project declaring ``[windows,
+    elevated]``, waited from 17:16Z on a node with room, because no runner
+    would take it and this rule, then an equality, would have refused it.
 
     Args:
         job: The claimed job.
         declared: The project's ``required_tags`` in the registry.
 
     Returns:
-        The ``PROJECT_TAGS_MISMATCH`` refusal, or None when they agree as
-        sets. Refused rather than run under either: the queue matched the
-        job to this node by the job's tags, and a job that named fewer than
-        the project needs would have landed on a node the project refuses.
+        The ``PROJECT_TAGS_MISMATCH`` refusal when the job requires a tag
+        the project does not declare, which asks for a node the registry
+        never said the project needs; None when every tag it names is
+        declared.
     """
-    if set(job["required_tags"]) == set(declared):
+    extra = sorted(set(job["required_tags"]) - set(declared))
+    if not extra:
         return None
     return (
         f"{FleetErrorCode.PROJECT_TAGS_MISMATCH.value}: the job requires "
-        f"[{', '.join(job['required_tags'])}] but fleet.json declares "
-        f"[{', '.join(declared)}] for {job['project']}; resubmit with the registry's tags"
+        f"[{', '.join(extra)}], which fleet.json does not declare for {job['project']} "
+        f"(it declares [{', '.join(declared)}]); resubmit with the registry's tags"
     )
 
 
@@ -457,7 +469,7 @@ def prepare(
 
     Returns:
         What the dispatch needs, or the ``PROJECT_TAGS_MISMATCH`` refusal
-        as its ``CODE: message`` line.
+        (:func:`tags_refusal`) as its ``CODE: message`` line.
 
     Raises:
         AppError: ``WORKSPACE_PROJECT_UNKNOWN``, ``PROJECT_REMOTE_MISSING``,

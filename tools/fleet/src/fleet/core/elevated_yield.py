@@ -17,8 +17,8 @@ ordinary lane gives up a few minutes at a time, never its backlog.
 
 WHICH JOBS COUNT. The queue lists by project, not by tag, so the question is
 asked once per project the registry declares with the ``elevated`` tag, the
-only projects whose jobs can require it (a job's tags must equal its
-project's, :func:`fleet.cli.node_agent.tags_refusal`). A job pinned to
+only projects whose jobs need it (what a job needs is its project's
+declaration, :func:`fleet.cli.node_agent.tags_refusal`). A job pinned to
 another node does not count: that node's elevated runner takes it.
 
 NOR DOES A JOB THE ELEVATED RUNNER COULD NOT TAKE NOW (MCPs board task
@@ -31,16 +31,16 @@ so neither lane claimed with sixteen jobs queued. The ordinary runner asks
 the same function the claim gate asks, and yields only to a project it
 does not hold.
 
-NOR A JOB THAT DOES NOT ITSELF REQUIRE ``elevated`` (board task eaf80425).
-The queue hands the elevated lane only jobs that carry the tag, so a job
-of an elevated project submitted with fewer tags never reaches the
-elevated runner. MCPs/scripts/ps-harness job 7c16305c was queued on
-2026-10-03 17:16Z requiring only ``windows``. Until this rule, serendipity's
-ordinary runner yielded to it on every tick, and claimed nothing while
-libs/covenant_ml, which only serendipity can run, waited behind it. Such a job
-reaches no runner, and that is the submitter's to correct by resubmitting
-with the registry's tags (``PROJECT_TAGS_MISMATCH``). It is not a reason
-for the ordinary runner to stop.
+A JOB SUBMITTED WITHOUT THE ``elevated`` TAG COUNTS TOO (MCPs board task
+939ec5c7). MCPs/scripts/ps-harness job 7c16305c was queued on 2026-10-03
+17:16Z requiring only ``windows``, and the queue's exclusive rule hands the
+elevated lane only jobs that carry the tag, so for a while no runner took
+it: serendipity's ordinary runner yielded to it on every tick while
+libs/covenant_ml, which only serendipity can run, waited behind it, and
+board task eaf80425 then stopped counting such a job. The elevated runner
+now claims it as well (:func:`fleet.cli.node_claim.claim_untagged`), so it
+is a job that runner takes, and the ordinary runner yields to it like any
+other.
 """
 
 from __future__ import annotations
@@ -94,9 +94,9 @@ def waiting_elevated_job(
             on this node holds now; the queue is not asked about those.
 
     Returns:
-        A queued job of an elevated project that no lease on this node holds,
-        that names this node or no node, and that itself requires the
-        ``elevated`` tag, or None when there is none.
+        A queued job of an elevated project that no lease on this node holds
+        and that names this node or no node, whatever tags it was submitted
+        with, or None when there is none.
 
     Raises:
         AppError: Any transport or contract failure from the queue call.
@@ -118,7 +118,7 @@ def waiting_elevated_job(
         )
     for project in (name for name in candidates if name not in held):
         for job in queue.queued_for(credentials, project=project):
-            if job["requested_node"] in (None, alias) and NodeTag.ELEVATED in job["required_tags"]:
+            if job["requested_node"] in (None, alias):
                 return job
     return None
 
