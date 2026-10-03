@@ -17,11 +17,13 @@ incident actually died.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Sequence
 
 from platform_core.errors import FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import _config, node_agent
+from fleet.contracts.lease import Lease
 from fleet.contracts.workspace import require_project
 from fleet.core import _test_hooks, leases, records, run_lease
 from tests._node_agent_fixtures import (
@@ -135,6 +137,65 @@ class TestAStagingFaultIsReported:
         assert records.read_ledger(loaded.ledger) == ()
 
 
+class _LeasedMidTick(FakeRun):
+    """A runner whose last scripted call is where another dispatch takes the lease.
+
+    Since MCPs board task 939ec5c7 a runner leaves a project held on its node
+    out of its claim (:func:`fleet.core.run_lease.held_on_node`), so
+    ``LEASE_HELD`` is left to the race that check cannot close: another
+    dispatch (the node's elevated runner, or ``fleet-run``) taking the project
+    between this tick's claim and its lease. This takes it at the last call
+    before the lease, the sha check of ``prepare``.
+    """
+
+    def __init__(
+        self, replies: tuple[_test_hooks.CommandResult, ...], *, path: pathlib.Path, holder: Lease
+    ) -> None:
+        """Answer as :class:`FakeRun`, and take ``holder`` on the last call.
+
+        Args:
+            replies: One result per expected call.
+            path: The lease file.
+            holder: The other dispatch's lease.
+        """
+        super().__init__(replies)
+        self._remaining = len(replies)
+        self._path = path
+        self._holder = holder
+
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout_seconds: int,
+        stdin_bytes: bytes | None = None,
+        unset_env: Sequence[str] = (),
+        set_env: Sequence[tuple[str, str]] = (),
+    ) -> _test_hooks.CommandResult:
+        """Answer the call, taking the other dispatch's lease with the last one.
+
+        Args:
+            argv: The command.
+            timeout_seconds: The deadline the caller chose.
+            stdin_bytes: Its standard input, or None.
+            unset_env: The variables the caller withheld from the child.
+            set_env: The variables the caller set in the child.
+
+        Returns:
+            The next scripted result.
+        """
+        self._remaining -= 1
+        if self._remaining == 0:
+            leases.acquire(self._path, self._holder, now_unix=DEMO_NOW - 60)
+        return super().__call__(
+            argv,
+            timeout_seconds=timeout_seconds,
+            stdin_bytes=stdin_bytes,
+            unset_env=unset_env,
+            set_env=set_env,
+        )
+
+
 class TestAnotherDispatchesLeaseStands:
     def test_a_lease_held_refusal_releases_nothing(self, sourced_config: pathlib.Path) -> None:
         """Only a lease this dispatch acquired is given back.
@@ -155,8 +216,7 @@ class TestAnotherDispatchesLeaseStands:
             node_local=loaded.workspace["node_local_resources"],
             now_unix=DEMO_NOW - 60,
         )
-        leases.acquire(loaded.leases, holder, now_unix=DEMO_NOW - 60)
-        _test_hooks.run = FakeRun(list(UP_TO_THE_LEASE))
+        _test_hooks.run = _LeasedMidTick(UP_TO_THE_LEASE, path=loaded.leases, holder=holder)
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": []}),

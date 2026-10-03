@@ -131,14 +131,19 @@ class TestCollecting:
             [
                 held_answer(),
                 dump_json_str({"job": queue_job(status="running", node="lavender")}),
-                dump_json_str({"claimed": None}),
             ]
         )
         _test_hooks.http_post = endpoint
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
-        assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
+        # The run still holds its project's lease on lavender, so the claim
+        # pass leaves the one project out and asks the queue for nothing
+        # (MCPs board task 939ec5c7).
+        assert endpoint.tools == ["dispatch_list", "dispatch_report"]
+        assert endpoint.ticks[0]["verdict"] == (
+            "has room, but every project it fits is held by a lease on it; claiming nothing"
+        )
         renewed = endpoint.arguments[1]
         assert renewed["action"] == "progress"
         assert renewed["leaseSeconds"] == node_collect.CLAIM_LEASE_SECONDS

@@ -30,8 +30,8 @@ from fleet.contracts.workspace import (
     encode_fleet_workspace,
     require_project,
 )
-from fleet.core import leases, run_lease
-from tests.conftest import DEMO_NOW, DEMO_PROJECT, workspace_document
+from fleet.core import _test_hooks, leases, run_lease
+from tests.conftest import DEMO_NOW, DEMO_PROJECT, FakeClock, workspace_document
 
 #: The real node-local resource.
 TESTDB = "corvis-fleet-testdb"
@@ -169,6 +169,37 @@ class TestTheLeaseFile:
             now_unix=DEMO_NOW,
         )
         assert lease["resources"] == ("corvis-fleet-testdb@lavender-wsl", SHARED)
+
+
+class TestWhatARunnerLeavesOut:
+    """:func:`fleet.core.run_lease.held_on_node`, which a runner asks before
+    it claims (MCPs board task 939ec5c7), against a real lease file."""
+
+    def test_the_node_s_own_copy_holds_and_an_expired_lease_holds_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = tmp_path / "leases.json"
+        workspace = decode_fleet_workspace(_document(node_local=(TESTDB,), exclusive=(TESTDB,)))
+        held = scoped((TESTDB,), node="diphtheria", node_local=(TESTDB,))
+        leases.acquire(
+            path,
+            _lease(node="diphtheria", resources=held, run_id="a", project="libs/db"),
+            now_unix=DEMO_NOW,
+        )
+
+        def ask(node: str) -> tuple[str, ...]:
+            return run_lease.held_on_node(
+                path,
+                node=node,
+                names=(DEMO_PROJECT,),
+                projects=workspace["projects"],
+                node_local=workspace["node_local_resources"],
+            )
+
+        _test_hooks.now = FakeClock(DEMO_NOW)
+        assert (ask("diphtheria"), ask("lavender-wsl")) == ((DEMO_PROJECT,), ())
+        _test_hooks.now = FakeClock(DEMO_NOW + 601)
+        assert ask("diphtheria") == ()
 
 
 class TestTheEarlyCheck:

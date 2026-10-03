@@ -179,13 +179,14 @@ class TestTheNextTick:
                 STARTED,
                 NO_CANCELS,
                 *_adopted_and_asked_about(DEMO_NOW),
-                dump_json_str({"claimed": None}),
             ]
         )
         _test_hooks.http_post = endpoint
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
+        # No dispatch_claim: the adopted run holds the one project's lease on
+        # lavender, so the claim pass leaves it out (MCPs board task 939ec5c7).
         assert endpoint.tools == [
             "dispatch_list",
             "dispatch_report",
@@ -193,7 +194,6 @@ class TestTheNextTick:
             "dispatch_list",
             "dispatch_list",
             "dispatch_get",
-            "dispatch_claim",
         ]
         # The trail says why the start came a tick late (55f2cb0b, A2).
         assert endpoint.arguments[2]["action"] == "progress"
