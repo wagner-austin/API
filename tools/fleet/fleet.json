@@ -145,7 +145,7 @@
       },
       "enabled": true,
       "test_database": false,
-      "rust": null,
+      "rust": "1.99.0",
       "cxx": "17.14.37710.0",
       "docker": null,
       "stack": null,
@@ -295,7 +295,7 @@
       "worker_ram_gb": 1.6,
       "minimum_workers": 2,
       "expected_minutes": 16,
-      "required_tags": ["rust"],
+      "required_tags": ["windows", "rust"],
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "libs/covenant_ml",

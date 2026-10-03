@@ -393,6 +393,16 @@ The toolchain probe asks cargo on every runner tick, and the runner claims the
 toolchain. The Linux dialect puts `~/.cargo/bin` on every script's PATH beside
 `~/.local/bin`, so the probe and the build find the same cargo.
 
+`libs/covenant_ml` requires `windows` as well as `rust` (board task
+eaf80425): it builds the same crate, and its `benchmarking/power.py` tests
+call the real Win32 power-throttling boundary through `ctypes.WinDLL`. Its
+first fleet run, on diphtheria on 2026-10-03, failed 20 of them for want of
+Win32. serendipity is the Windows node that carries cargo (`1.99.0`, rustup
+at user scope for `austi` on 2026-10-03, minimal profile, stable). It already
+had the MSVC tools that cargo links with, and rustup's installer puts
+`%USERPROFILE%\.cargo\bin` on the user PATH, where the Windows probe looks.
+Removing `%USERPROFILE%\.rustup` and `%USERPROFILE%\.cargo` reverses it.
+
 **`cxx` is the same contract for node-gyp's C++ toolchain** (MCPs board task
 3f19c136). Every MCPs TypeScript project installs with a root `npm ci`, which
 rebuilds `hnswlib-node` under node-gyp, so every project in `fleet.json`
