@@ -428,6 +428,20 @@ change a node whose answer differed from its declaration claimed nothing at
 all, for every job. Measured 2026-10-02, every dispatchable node's answer
 matched its declaration.
 
+**Each writer has its own probe scripts on a node** (MCPs board task
+939ec5c7). The capacity and toolchain probes are written to the node's stage
+root and run there, as `fleet-capacity-<writer>` and `fleet-toolchain-<writer>`
+(`fleet.core.names.capacity_probe_stem`): a runner writes as its runner name
+(`serendipity`, `serendipity-elevated`), and `fleet-run`, `fleet-nodes`,
+`fleet-preflight` and `fleet-bootstrap` each as their own command name. Until
+2026-10-03 every caller wrote one `fleet-capacity.ps1` and one
+`fleet-toolchain.ps1` per node, and serendipity's two runners, which tick on
+the same minute, collided on the toolchain script every tick: the node runner
+read `The process cannot access the file ... because it is being used by
+another process`, the elevated one `Set-Content : Stream was not readable`,
+and the node claimed nothing with 11.5 GB free. The two old files stay on
+each node's stage root until removed by hand; nothing writes or runs them.
+
 **The identity is derived, never configured.** The label is
 `fleet-node-<alias>` and the session id is the version-5 UUID of
 `fleet-node-agent/<alias>`, so every tick of one node's runner is one session
