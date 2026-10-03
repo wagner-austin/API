@@ -3,7 +3,7 @@ hub lane.
 
 Usage:
     fleet-agent --config fleet.json --repo-root C:/Users/Test/PROJECTS/API \\
-        --agent fleet-runner-austinpc --session <uuid>
+        --agent fleet-runner-austinpc --session <uuid> [--announce]
 
 THIS IS THE OTHER HALF OF QUEUE INVERSION. ``fleet-mcp``'s ``dispatch_*``
 tools hold a queue that any session can enqueue onto -- from a phone, from
@@ -358,6 +358,14 @@ def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one tick: claim at most one hub-lane job and run it, then observe.
 
+    With ``--announce`` the tick instead posts the check-in that registers
+    this runner's session on the board's ledger and claims nothing. The
+    queue's close writer posts a task-naming job's outcome under the
+    closer's label and the board admits a post only from a ledgered
+    session, so a hub runner that never announced could not close a
+    session-exit job, which names the finished task (MCPs board task
+    2fecad69).
+
     Args:
         argv: Command-line arguments excluding the program name.
 
@@ -368,11 +376,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, or a
             required one is absent.
-        AppError: When the queue cannot be reached or answered a shape this
-            runner cannot read, or when the workspace does not decode.
+        AppError: When the queue or the board cannot be reached or answered
+            a shape this runner cannot read, or when the workspace does not
+            decode.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    announce = queue.ANNOUNCE_FLAG in tokens
+    parsed = cli_args.parse_single_flags(
+        [token for token in tokens if token != queue.ANNOUNCE_FLAG], _FLAGS
+    )
     # The workspace is still read, and refused when malformed, although the
     # hub lane dispatches nothing to a node: a runner whose fleet.json does
     # not decode has no business claiming anything, and the node runners
@@ -381,8 +393,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     agent = cli_args.require_flag(parsed, AGENT_FLAG)
     session_id = cli_args.require_flag(parsed, SESSION_FLAG)
     project_root = pathlib.Path(cli_args.require_flag(parsed, ROOT_FLAG)).resolve()
-    credentials = queue.load_credentials()
     identity = queue.identity_arguments(agent, session_id, str(project_root))
+    if announce:
+        _log.info(
+            "%s",
+            queue.announce(
+                board_config.load_credentials(),
+                machine=f"{sys.platform}:{_test_hooks.hostname()}",
+                body=(
+                    f"{agent}: claims the queue's hub lane (build-bases and the session "
+                    "verbs) and closes each job it claims, which posts the outcome to the "
+                    "job's task thread under this label"
+                ),
+                identity=identity,
+            ),
+        )
+        return 0
+    credentials = queue.load_credentials()
 
     raw_mcps_root = parsed.get(MCPS_ROOT_FLAG)
     mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None

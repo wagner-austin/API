@@ -9,14 +9,19 @@ Usage:
         --lane announce --node sedona
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane elevated --node serendipity
+    poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
+        --lane hub-announce
 
 The action behind every fleet task on the hub: ``API-FleetAgent-3min`` runs
 the hub lane and each ``API-FleetNode-<alias>-3min`` one node's lane
 (``tools/fleet/scripts/register-*.ps1``). ``announce`` is the node lane's
-one-time check-in, run by the registration. A node declaring ``elevated``
-also has ``API-FleetNode-<alias>-elevated-3min``, whose ``elevated`` lane
-(and its ``elevated-announce``) runs that node's second, elevated runner
-under its own identity and log (MCPs board task a98d7083).
+one-time check-in, run by the registration, and ``hub-announce`` the hub
+runner's, which the board needs since the queue's close posts a task-naming
+job's outcome under the closing runner's label (MCPs board task 2fecad69).
+A node declaring ``elevated`` also has
+``API-FleetNode-<alias>-elevated-3min``, whose ``elevated`` lane (and its
+``elevated-announce``) runs that node's second, elevated runner under its
+own identity and log (MCPs board task a98d7083).
 
 WHY PYTHON AND NOT POWERSHELL (MCPs board task 94ac1c4f). The ticks ran
 ``powershell.exe`` over a script until 2026-09-29. On the hub,
@@ -75,8 +80,18 @@ LANE_FLAG: Final = "--lane"
 NODE_FLAG: Final = "--node"
 _FLAGS: Final = (API_ROOT_FLAG, LOG_DIRECTORY_FLAG, LANE_FLAG, NODE_FLAG)
 
-Lane = Literal["hub", "node", "announce", "elevated", "elevated-announce"]
-_LANES: Final[tuple[Lane, ...]] = ("hub", "node", "announce", "elevated", "elevated-announce")
+Lane = Literal["hub", "hub-announce", "node", "announce", "elevated", "elevated-announce"]
+_LANES: Final[tuple[Lane, ...]] = (
+    "hub",
+    "hub-announce",
+    "node",
+    "announce",
+    "elevated",
+    "elevated-announce",
+)
+
+#: The lanes the hub runner serves: its tick and its one-time check-in.
+_HUB_LANES: Final[tuple[Lane, ...]] = ("hub", "hub-announce")
 
 #: The node lanes that run a node's ELEVATED runner (MCPs board task
 #: a98d7083): its own identity and log, claiming only the jobs requiring the
@@ -145,34 +160,39 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
         The launcher's command line, the log stem and the record's header.
 
     Raises:
-        ValueError: ``FLEET_TICK_USAGE`` when the hub lane names a node or a
+        ValueError: ``FLEET_TICK_USAGE`` when a hub lane names a node or a
             node lane names none.
     """
     repo = str(api_root)
-    if lane == "hub":
+    if lane in _HUB_LANES:
         if node is not None:
-            raise ValueError(f"FLEET_TICK_USAGE: the hub lane takes no {NODE_FLAG}")
+            raise ValueError(f"FLEET_TICK_USAGE: the {lane} lane takes no {NODE_FLAG}")
+        hub = (
+            rolled_cli.REPO_ROOT_FLAG,
+            repo,
+            rolled_cli.AGENT_FLAG,
+            "fleet-agent",
+            rolled_cli.SEPARATOR,
+            "--agent",
+            HUB_AGENT,
+            "--session",
+            HUB_SESSION,
+            "--repo-root",
+            repo,
+        )
+        if lane == "hub-announce":
+            return TickPlan(arguments=(*hub, "--announce"), stem="fleet-agent", header=lane)
         mcps_root = api_root.parent / "MCPs"
         return TickPlan(
             arguments=(
-                rolled_cli.REPO_ROOT_FLAG,
-                repo,
-                rolled_cli.AGENT_FLAG,
-                "fleet-agent",
-                rolled_cli.SEPARATOR,
-                "--agent",
-                HUB_AGENT,
-                "--session",
-                HUB_SESSION,
-                "--repo-root",
-                repo,
+                *hub,
                 "--mcps-root",
                 str(mcps_root),
                 "--registry",
                 str(mcps_root / "fleet-mcp" / "fleet-nodes.json"),
             ),
             stem="fleet-agent",
-            header="hub",
+            header=lane,
         )
     if node is None:
         raise ValueError(f"FLEET_TICK_USAGE: the {lane} lane needs {NODE_FLAG}")

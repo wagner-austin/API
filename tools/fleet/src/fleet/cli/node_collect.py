@@ -5,8 +5,9 @@ ceiling; the claim half stays there. Each tick asks the queue what this
 runner holds and settles every run it launched in one of four ways:
 
 * FINISHED. The node wrote a result: read the transcript's tail, compose the
-  verdict (:mod:`fleet.core.verdict`), post it to the job's task thread or the
-  submitter's feed, and close the job on both sides.
+  verdict (:mod:`fleet.core.verdict`), post it to the submitter's feed when
+  the job names no task, and close the job on both sides; the queue's close
+  posts a task-naming job's outcome to its thread (MCPs board task 2fecad69).
 * STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim and leave it.
 * STILL RUNNING, PAST ITS LEASE (MCPs board task fd5cabfa). Stop it. Until
   this, a renewal had no deadline, so a suite that hung kept its claim and
@@ -95,7 +96,7 @@ def settle(
     detail: str,
     stopped: str | None,
 ) -> str:
-    """Post a run's verdict, close its row, then close its queue job.
+    """Post a task-less run's verdict, close its row, then close its queue job.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -142,13 +143,16 @@ def settle(
     )
     rendered = verdict.render_verdict(judged)
     line = rendered if stopped is None else f"{rendered} stopped: {stopped}"
-    queue.post_verdict(
-        board,
-        task_id=job["task_id"],
-        submitted_by=job["submitted_by"],
-        line=line,
-        identity=identity,
-    )
+    # A job naming a task gets its row from the queue's close below, on the
+    # task's thread and addressed to the submitter (MCPs board task
+    # 2fecad69); only a task-less job's verdict is this runner's to post.
+    if job["task_id"] is None:
+        queue.post_verdict(
+            board,
+            submitted_by=job["submitted_by"],
+            line=line,
+            identity=identity,
+        )
     dispatch.finish(
         loaded.leases,
         loaded.ledger,

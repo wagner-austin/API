@@ -41,8 +41,9 @@ dispatch uses, sends the build script with the project's install steps and
 the node's caches, launches it detached, and reports the run started. A
 later tick collects it (:mod:`fleet.cli.node_collect`): reads the result,
 reads the tail of the transcript, composes the verdict
-(:mod:`fleet.core.verdict`), posts it to the job's task thread or the
-submitter's feed, and closes the job on both sides; or stops the build, when
+(:mod:`fleet.core.verdict`), posts it to the submitter's feed when the job
+names no task (the queue's close posts a task's row, MCPs board task
+2fecad69), and closes the job on both sides; or stops the build, when
 it runs past its lease or its queue job was cancelled under it.
 
 THE IDENTITY IS DERIVED, NOT CONFIGURED. The label is ``fleet-node-<alias>``
@@ -113,7 +114,6 @@ from fleet.core import (
 _log = get_logger(__name__)
 
 NODE_FLAG = "--node"
-ANNOUNCE_FLAG = "--announce"
 ELEVATED_FLAG = "--elevated"
 
 _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
@@ -511,9 +511,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             run.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    announce = ANNOUNCE_FLAG in tokens
+    announce = queue.ANNOUNCE_FLAG in tokens
     elevated = ELEVATED_FLAG in tokens
-    remaining = [token for token in tokens if token not in (ANNOUNCE_FLAG, ELEVATED_FLAG)]
+    remaining = [token for token in tokens if token not in (queue.ANNOUNCE_FLAG, ELEVATED_FLAG)]
     parsed = cli_args.parse_single_flags(remaining, _FLAGS)
     loaded = _config.load_workspace(parsed)
     alias = cli_args.require_flag(parsed, NODE_FLAG)
@@ -565,7 +565,6 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "ANNOUNCE_FLAG",
     "ELEVATED_FLAG",
     "IDENTITY_NAMESPACE",
     "NODE_FLAG",
