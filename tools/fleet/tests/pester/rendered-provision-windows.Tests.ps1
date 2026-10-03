@@ -128,7 +128,20 @@ BeforeAll {
         $scheduler.Connect()
         $root = $scheduler.GetFolder('\')
         foreach ($task in @($root.GetTasks(1) | Where-Object { $_.Name -eq $Name })) {
+            # Stop is a request: the instance's cmd.exe can still hold
+            # TestDrive's wsl.cmd when the task is deleted, and Pester's
+            # TestDrive teardown then fails with 'being used by another
+            # process', as check-powershell did on the hub at f0fa90f12 (MCPs
+            # board task 939ec5c7). So the case waits, bounded, for the
+            # task's last instance to end before it deletes the task.
             $task.Stop(0)
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            while ($task.GetInstances(0).Count -gt 0) {
+                if ([DateTime]::UtcNow -gt $deadline) {
+                    throw "keepalive task $Name still has a running instance 30 s after Stop"
+                }
+                Start-Sleep -Milliseconds 100
+            }
             $root.DeleteTask($Name, 0)
         }
     }
