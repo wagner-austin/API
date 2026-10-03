@@ -84,9 +84,14 @@ DIVERGENT: Final[Sequence[tuple[str, str]]] = (
     (r"\$[({]MAKE[)}]", "$(MAKE) (use plain make -C)"),
 )
 
-#: make functions that run the shell, banned anywhere in the file.
+#: make functions that run the shell, banned anywhere in the file, and
+#: ``$(file ...)``, which GNU make added in 4.0: serendipity's GnuWin32 make
+#: 3.81 expands it to nothing, so ``--ref $(file <.githooks/mcps-harness.sha)``
+#: handed tools/ps-harness's first fleet run (job 2d949933, MCPs board task
+#: 939ec5c7) an empty ref. A recipe that reads a file calls a script.
 MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
     (r"\$\(shell\b", "$(shell ...) runs the platform shell"),
+    (r"\$\(file\b", "$(file ...) needs GNU make 4.0 (3.81 reads it as nothing)"),
     (r"^\s*SHELL\s*[:?]?=", "SHELL is set only in " + SHELL_INCLUDE),
     (r"^\s*\.SHELLFLAGS\s*[:?]?=", ".SHELLFLAGS is set only in " + SHELL_INCLUDE),
 )
