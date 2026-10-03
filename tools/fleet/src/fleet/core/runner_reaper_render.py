@@ -25,19 +25,30 @@ Two pieces, both idempotent:
    unit with a ``Runner.Listener`` alive, a process in the unit's cgroup
    that does not descend from its main process is one a job daemonized
    and init adopted. With no ``Runner.Worker`` alive every such process
-   outlived its job and is killed. With one alive, only those started
-   before the earliest live Worker are: a job's processes all start after
-   its Worker, so an older one belongs to a job before it. That second
-   rule is measured, not assumed: across 124 snapshots of lavender on
-   2026-10-02 every busy runner went from one job straight into the next,
-   so a reaper waiting for an idle unit would never have run there. A unit
-   with no Listener is mid self-update, whose ``_update.sh`` is outside
-   the tree by design, and is left alone that pass.
+   outlived its job and is killed. With one alive, only the orphan trees
+   whose root started before the earliest live Worker are: a job's
+   processes all start after its Worker, so an older one belongs to a job
+   before it, and so does whatever that old process forks later, which is
+   why the root's start is read rather than the process's own
+   (gpt6-idle-1001's rule, measured as a forkserver's late worker). That
+   second rule is measured, not assumed: across 124 snapshots of lavender
+   on 2026-10-02 every busy runner went from one job straight into the
+   next, so a reaper waiting for an idle unit would never have run there.
+   A unit with no Listener is mid self-update, whose ``_update.sh`` is
+   outside the tree by design, and is left alone that pass.
+3. A Worker older than the host's ``job_timeout_minutes`` is no live
+   Worker. GitHub ends every job by then, and a Worker still alive is one
+   whose cancel never arrived: at 10:09Z on 2026-10-02 an API runner GitHub
+   read offline still held a Worker and its pytest 3 h 22 min after the
+   Worker's log stopped, and because a live Worker spared the unit, 49
+   forkservers and 12,678,709,248 bytes stayed with it. Such a Worker does
+   not shield the unit's orphans, and it and every process under it are
+   killed with them.
 """
 
 from __future__ import annotations
 
-from fleet.contracts.runners import RunnerInstall
+from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core.script_values import scriptable
 
 #: The runner drop-in's file name inside ``<unit>.d``.
@@ -57,14 +68,15 @@ REAPER_TIMER_NAME = "fleet-runner-reaper.timer"
 #: cancelled job to an empty cgroup.
 REAPER_INTERVAL_SECONDS = 30
 
-#: The reaper. ``--audit SECONDS UNIT`` prints, for one unit, how many of
-#: the processes it would kill are older than SECONDS, and kills nothing:
-#: the audit's check
-#: (:mod:`fleet.core.runner_orphan_check`) asks the same question the reaper
-#: acts on.
+#: The reaper. ``SECONDS`` is the host's job timeout: past it a Worker is
+#: stale. ``--audit SECONDS UNIT`` prints, for one unit, how many of the
+#: processes it would kill are older than SECONDS, and kills nothing: the
+#: audit's check (:mod:`fleet.core.runner_orphan_check`) asks the same
+#: question the reaper acts on.
 REAPER_SCRIPT = """#!/usr/bin/env bash
 # fleet-runner-reaper -- rendered by fleet-runners (MCPs board task 53528106).
 # Kills what a finished GitHub Actions job left in its runner unit's cgroup.
+# Usage: fleet-runner-reaper SECONDS | fleet-runner-reaper --audit SECONDS UNIT
 set -euo pipefail
 cgroup_root=/sys/fs/cgroup
 proc_root=/proc
@@ -109,23 +121,46 @@ age_of() {
     echo $(( uptime - ticks / $(getconf CLK_TCK) ))
 }
 
+tree_start_of() {
+    local pid=$1 parent
+    while :; do
+        parent=$(parent_of "$pid") || return 1
+        [ "$parent" -gt 1 ] || break
+        pid=$parent
+    done
+    start_of "$pid"
+}
+
 leftovers() {
-    local unit=$1 cgroup main pids pid started since
+    local unit=$1 bound=$2 cgroup main pids pid started age since='' stale='' worker
     cgroup=$(systemctl show -p ControlGroup --value "$unit")
     [ -n "$cgroup" ] && [ -r "$cgroup_root$cgroup/cgroup.procs" ] || return 0
     main=$(systemctl show -p MainPID --value "$unit")
     [ "$main" != 0 ] || return 0
     pids=$(cat "$cgroup_root$cgroup/cgroup.procs")
     runs Runner.Listener "$pids" || return 0
-    since=$(for pid in $pids; do
-        if grep -qs Runner.Worker "$proc_root/$pid/cmdline" && started=$(start_of "$pid"); then
-            echo "$started"
-        fi
-    done | sort -n | head -n 1)
     for pid in $pids; do
-        descends_from "$pid" "$main" && continue
+        grep -qs Runner.Worker "$proc_root/$pid/cmdline" || continue
+        started=$(start_of "$pid") || continue
+        age=$(age_of "$pid") || continue
+        if [ "$age" -gt "$bound" ]; then
+            stale="$stale $pid"
+        elif [ -z "$since" ] || [ "$started" -lt "$since" ]; then
+            since=$started
+        fi
+    done
+    for pid in $pids; do
+        if descends_from "$pid" "$main"; then
+            for worker in $stale; do
+                if descends_from "$pid" "$worker"; then
+                    echo "$pid"
+                    break
+                fi
+            done
+            continue
+        fi
         if [ -n "$since" ]; then
-            started=$(start_of "$pid") || continue
+            started=$(tree_start_of "$pid") || continue
             [ "$started" -lt "$since" ] || continue
         fi
         echo "$pid"
@@ -134,7 +169,7 @@ leftovers() {
 
 if [ "${1:-}" = --audit ]; then
     count=0
-    for pid in $(leftovers "$3"); do
+    for pid in $(leftovers "$3" "$2"); do
         age=$(age_of "$pid") || continue
         [ "$age" -le "$2" ] || count=$((count + 1))
     done
@@ -142,9 +177,14 @@ if [ "${1:-}" = --audit ]; then
     exit 0
 fi
 
+if [ $# -ne 1 ]; then
+    echo "fleet-runner-reaper: usage: fleet-runner-reaper SECONDS, the host job timeout" >&2
+    exit 2
+fi
+bound=$1
 for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut -d' ' -f1); do
     killed=0
-    for pid in $(leftovers "$unit"); do
+    for pid in $(leftovers "$unit" "$bound"); do
         if kill -KILL "$pid" 2>/dev/null; then
             killed=$((killed + 1))
         elif [ -e "$proc_root/$pid" ]; then
@@ -156,15 +196,6 @@ for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut 
         echo "fleet-runner-reaper: $unit: killed $killed process(es) a finished job left behind"
     fi
 done
-"""
-
-#: The reaper's service.
-REAPER_SERVICE = f"""[Unit]
-Description=Kill what finished GitHub Actions jobs left in their runner units
-
-[Service]
-Type=oneshot
-ExecStart={REAPER_PATH}
 """
 
 #: The reaper's timer.
@@ -211,8 +242,32 @@ def render_kill_mode_lines(install: RunnerInstall) -> list[str]:
     ]
 
 
-def render_reaper_lines() -> list[str]:
+def render_reaper_service(spec: HostRunnerSpec) -> str:
+    """The reaper's service, which passes the host's job timeout.
+
+    Args:
+        spec: The host; its ``job_timeout_minutes`` is the age past which a
+            Worker is stale.
+
+    Returns:
+        The unit file's text.
+    """
+    seconds = spec["job_timeout_minutes"] * 60
+    return (
+        "[Unit]\n"
+        "Description=Kill what finished GitHub Actions jobs left in their runner units\n"
+        "\n"
+        "[Service]\n"
+        "Type=oneshot\n"
+        f"ExecStart={REAPER_PATH} {seconds}\n"
+    )
+
+
+def render_reaper_lines(spec: HostRunnerSpec) -> list[str]:
     """Bash lines that install the reaper and start its timer.
+
+    Args:
+        spec: The host, whose job timeout the service passes the reaper.
 
     Returns:
         The lines: the script and both units written whole on every run, as
@@ -224,7 +279,7 @@ def render_reaper_lines() -> list[str]:
         "REAPER_EOF",
         f"chmod +x {REAPER_PATH}",
         f"cat > /etc/systemd/system/{REAPER_SERVICE_NAME} <<'UNIT_EOF'",
-        REAPER_SERVICE.rstrip("\n"),
+        render_reaper_service(spec).rstrip("\n"),
         "UNIT_EOF",
         f"cat > /etc/systemd/system/{REAPER_TIMER_NAME} <<'TIMER_EOF'",
         REAPER_TIMER.rstrip("\n"),
@@ -240,10 +295,10 @@ __all__ = [
     "REAPER_INTERVAL_SECONDS",
     "REAPER_PATH",
     "REAPER_SCRIPT",
-    "REAPER_SERVICE",
     "REAPER_SERVICE_NAME",
     "REAPER_TIMER",
     "REAPER_TIMER_NAME",
     "render_kill_mode_lines",
     "render_reaper_lines",
+    "render_reaper_service",
 ]

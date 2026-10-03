@@ -303,7 +303,7 @@ def _render_linux_script(spec: HostRunnerSpec) -> str:
     lines += ["", "# --- the runners' share of the VM (MCPs board task 45a4f22b) ---"]
     lines += render_slice_unit_lines(spec["ci_slice"])
     lines += ["", "# --- what a finished job leaves behind (MCPs board task 53528106) ---"]
-    lines += render_reaper_lines()
+    lines += render_reaper_lines(spec)
     lines += ["", "# --- runner installs ---"]
     # wsl-side installs only: windows-side ones are provision.ps1's, in
     # their own execution environment.

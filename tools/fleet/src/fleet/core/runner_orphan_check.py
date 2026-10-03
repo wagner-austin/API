@@ -7,7 +7,9 @@ nothing in the audit could see it. This row asks each runner, on both
 sides, how many of its processes lie outside its service's own tree, are
 older than the host's ``job_timeout_minutes``, and live while no
 ``Runner.Worker`` runs: any such process outlived every job that could own
-it.
+it. A Worker older than that timeout runs no job GitHub still holds, so it
+counts itself rather than shielding the rest (on 2026-10-02 at 10:09Z one
+such Worker kept 12.7 GB in an API runner for 3 h 22 min).
 
 A WSL runner is asked through the reaper's own ``--audit`` mode
 (:mod:`fleet.core.runner_reaper_render`), so the audit measures exactly what
@@ -35,8 +37,12 @@ PROCESS_PARAMETER = "[scriptblock]$GetProcesses = { @(Get-CimInstance Win32_Proc
 
 #: The PowerShell function the Windows rows call: the processes naming a
 #: runner directory outside its service's tree, older than the bound, when
-#: no Runner.Worker runs in the tree. A stopped service has no tree, so
-#: every such process counts.
+#: no live Runner.Worker runs in the tree, and any Worker in the tree that is
+#: itself older than the bound. A Worker past the job timeout runs no job
+#: GitHub still holds, so it shields nothing (the reaper's third rule,
+#: :mod:`fleet.core.runner_reaper_render`); one whose start cannot be read
+#: is taken as live. A stopped service has no tree, so every such process
+#: counts.
 LEFTOVER_FUNCTION = [
     "function Get-RunnerLeftover {",
     "    param([object[]]$Processes, [int]$ServicePid, [string]$Root, [int]$OlderThanSeconds)",
@@ -64,19 +70,22 @@ LEFTOVER_FUNCTION = [
     "            }",
     "        }",
     "    }",
+    "    $cutoff = (Get-Date).AddSeconds(-$OlderThanSeconds)",
     "    $working = @($Processes | Where-Object { $tree.ContainsKey([int]$_.ProcessId) "
-    "-and [string]$_.Name -eq 'Runner.Worker.exe' })",
+    "-and [string]$_.Name -eq 'Runner.Worker.exe' "
+    "-and ($null -eq $_.CreationDate -or $_.CreationDate -ge $cutoff) })",
     "    if ($working.Count -gt 0) {",
     "        return @()",
     "    }",
-    "    $cutoff = (Get-Date).AddSeconds(-$OlderThanSeconds)",
     "    return @($Processes | Where-Object {",
-    "        -not $tree.ContainsKey([int]$_.ProcessId) -and $null -ne $_.CreationDate -and",
-    "        $_.CreationDate -lt $cutoff -and (",
-    "            ([string]$_.CommandLine).Replace('/', '\\').IndexOf($Root, "
+    "        $null -ne $_.CreationDate -and $_.CreationDate -lt $cutoff -and (",
+    "            ($tree.ContainsKey([int]$_.ProcessId) "
+    "-and [string]$_.Name -eq 'Runner.Worker.exe') -or",
+    "            (-not $tree.ContainsKey([int]$_.ProcessId) -and (",
+    "                ([string]$_.CommandLine).Replace('/', '\\').IndexOf($Root, "
     "[StringComparison]::OrdinalIgnoreCase) -ge 0 -or",
-    "            ([string]$_.ExecutablePath).StartsWith($Root, "
-    "[StringComparison]::OrdinalIgnoreCase))",
+    "                ([string]$_.ExecutablePath).StartsWith($Root, "
+    "[StringComparison]::OrdinalIgnoreCase))))",
     "    })",
     "}",
 ]
@@ -134,8 +143,8 @@ def render_orphan_check_lines(spec: HostRunnerSpec, install: RunnerInstall) -> l
             f"'{service}'\"",
             "$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')",
             f"Write-Check '{check_id}' ($Probe.Exit -eq 0 -and $Leftover -eq '0') "
-            f"('processes older than {minutes} minutes outside {service} with no job "
-            "running; the reaper counted: ' + $Probe.Text)",
+            f"('processes older than {minutes} minutes that a finished job left in {service}, "
+            "or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)",
         ]
     root = scriptable(runner_root(install), label="workdir")
     # The $Service rows the driver's service row read just before, as the
@@ -147,8 +156,8 @@ def render_orphan_check_lines(spec: HostRunnerSpec, install: RunnerInstall) -> l
         "}",
         f"$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid '{root}' {seconds})",
         f"Write-Check '{check_id}' ($Leftover.Count -eq 0) "
-        f"([string]$Leftover.Count + ' process(es) under {root} outside {service}, older than "
-        f"{minutes} minutes with no job running: ' + "
+        f"([string]$Leftover.Count + ' process(es) under {root} older than {minutes} minutes "
+        f"that a finished job left outside {service}, or a Worker past that job timeout: ' + "
         "((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + "
         "[string]$_.ProcessId })) -join ', '))",
     ]
