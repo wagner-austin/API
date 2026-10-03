@@ -25,6 +25,13 @@
     and the forty-minute limit are FleetSchedule.ps1's, with the incidents
     behind each.
 
+    It then runs the hub-announce tick once: the hub runner's check-in,
+    which registers its session on the board's ledger. The queue's close
+    writer posts a task-naming job's outcome under the closing runner's
+    label, and the board refuses a post from a session it has never
+    ledgered, so an unannounced hub runner could not close a session-exit
+    job, which names the finished task (MCPs board task 2fecad69).
+
     Idempotent: re-running unregisters + re-registers, so this serves as
     both install and refresh.
 
@@ -78,6 +85,16 @@ $apiRoot = [System.IO.Path]::GetFullPath($ApiRoot)
 $poetry = Resolve-FleetPoetry $Poetry
 $arguments = Get-FleetTickCommandLine -ApiRoot $apiRoot -LogDirectory $LogDirectory -Lane hub -Node ''
 
-$identity = & $Register $TaskName $poetry (Join-Path $apiRoot 'tools\fleet') $arguments `
+$fleetRoot = Join-Path $apiRoot 'tools\fleet'
+$identity = & $Register $TaskName $poetry $fleetRoot $arguments `
     'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.'
-Write-Information "Registered $TaskName (every 3 minutes and at boot, $identity, S4U, Limited)." -InformationAction Continue
+# The announce runs from this console, synchronously, as each node runner's
+# does in register-node-agents.ps1, so a refused check-in is seen here. The
+# process object's exit code is read directly: no redirection or pipe
+# stands between it and this check.
+$announce = Get-FleetTickCommandLine -ApiRoot $apiRoot -LogDirectory $LogDirectory -Lane hub-announce -Node ''
+$announced = Start-Process -FilePath $poetry -ArgumentList $announce -WorkingDirectory $fleetRoot -NoNewWindow -Wait -PassThru
+if ($announced.ExitCode -ne 0) {
+    throw "FLEET_HUB_ANNOUNCE_FAILED: the hub-announce tick exited $($announced.ExitCode); see fleet-agent-*.log under $LogDirectory"
+}
+Write-Information "Registered $TaskName (every 3 minutes and at boot, $identity, S4U, Limited) and announced it." -InformationAction Continue

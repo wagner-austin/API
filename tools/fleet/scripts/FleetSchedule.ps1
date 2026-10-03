@@ -150,7 +150,8 @@ function Get-FleetTickCommandLine {
     .PARAMETER LogDirectory
         Where the tick's log goes.
     .PARAMETER Lane
-        hub, node, announce, or the elevated runner's elevated and
+        hub, hub-announce (the hub runner's check-in, MCPs board task
+        2fecad69), node, announce, or the elevated runner's elevated and
         elevated-announce (MCPs board task a98d7083).
     .PARAMETER Node
         The node's alias for the node lanes; empty for the hub.
@@ -161,7 +162,7 @@ function Get-FleetTickCommandLine {
     param(
         [Parameter(Mandatory)][string]$ApiRoot,
         [Parameter(Mandatory)][string]$LogDirectory,
-        [Parameter(Mandatory)][ValidateSet('hub', 'node', 'announce', 'elevated', 'elevated-announce')][string]$Lane,
+        [Parameter(Mandatory)][ValidateSet('hub', 'hub-announce', 'node', 'announce', 'elevated', 'elevated-announce')][string]$Lane,
         [Parameter(Mandatory)][AllowEmptyString()][string]$Node
     )
     $line = "run -- python -m fleet.cli.tick --api-root `"$ApiRoot`" --log-directory `"$LogDirectory`" --lane $Lane"
