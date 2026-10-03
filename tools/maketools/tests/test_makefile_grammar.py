@@ -180,6 +180,15 @@ def test_the_shell_function_is_allowed_only_inside_the_windows_arm(repo: Path) -
     assert violation["text"] == "X := $(shell ls)"
 
 
+def test_the_file_function_is_banned_even_inside_the_windows_arm(repo: Path) -> None:
+    """serendipity's make 3.81 is a Windows make, so the fence exempts nothing."""
+    text = PORTABLE + "PIN := $(file <.githooks/mcps-harness.sha)\n"
+    fenced = PORTABLE + "ifeq ($(OS),Windows_NT)\nPIN := $(file <pin.sha)\nendif\n"
+    for case in (text, fenced):
+        (violation,) = check_makefile(repo, repo / "libs" / "Makefile", case)
+        assert violation["rule"] == "$(file ...) needs GNU make 4.0 (3.81 reads it as nothing)"
+
+
 def test_the_shell_variable_stays_banned_inside_the_windows_arm(repo: Path) -> None:
     text = PORTABLE + "ifeq ($(OS),Windows_NT)\nSHELL := pwsh\nendif\n"
     (violation,) = check_makefile(repo, repo / "libs" / "Makefile", text)

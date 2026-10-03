@@ -36,6 +36,7 @@ def test_every_command_is_registered() -> None:
         "lint-makefiles",
         "native-wheel",
         "poetry-build",
+        "ps-harness",
         "reap-stale",
         "require-tool",
         "test",
