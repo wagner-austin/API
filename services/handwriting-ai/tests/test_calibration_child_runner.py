@@ -285,6 +285,7 @@ def test_run_finally_kills_alive_child(tmp_path: Path) -> None:
     }
     out = runner.run(ds, cand, samples=1, budget=budget)
     assert out["ok"] and out["res"] is not None and int(out["res"]["batch_size"]) == 1
+    assert not out_dir.exists()
 
 
 def test_child_entry_flush_branch_no_flush_handler(tmp_path: Path) -> None:
