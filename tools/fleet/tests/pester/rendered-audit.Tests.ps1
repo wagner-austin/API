@@ -223,7 +223,7 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
             Detail = 'the machine environment holds POETRY_CACHE_DIR=C:\FLEET\POETRY; the roster says C:\fleet\poetry' }
         @{ Case = 'git without core.longpaths'; Variant = @{ GitAnswer = 'false' }; Row = 'long-paths:*'; Detail = 'LongPathsEnabled=1 git core.longpaths=false (exit 0)' }
         @{ Case = 'a reaper counting leftovers'; Variant = @{ Reaped = '2' }; Row = 'orphans:*:wsl:*'
-            Detail = 'processes older than 360 minutes outside * with no job running; the reaper counted: 2 (exit 0)' }
+            Detail = 'processes older than 360 minutes that a finished job left in *, or under a Worker past that job timeout; the reaper counted: 2 (exit 0)' }
     ) {
         $variant = Initialize-Host $script:name @Variant
         $said = [string[]]@(Invoke-Rendered $script:name $variant.Parameters)
