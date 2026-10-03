@@ -34,7 +34,7 @@ from collections.abc import Mapping, Sequence
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
-from fleet.contracts.budget import admissible_workers
+from fleet.contracts.budget import NodeBudget, admissible_workers
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag, missing_tags, node_tags
@@ -86,24 +86,47 @@ class DispatchVerdict(TypedDict):
 SLICE_AT_HIGH = 0.98
 
 
-def _who_holds_it(state: NodeState) -> str:
-    """Name what holds a node's memory in a reservation refusal.
+def _project_budget(node: NodeConfig, project: ProjectConfig) -> NodeBudget:
+    """A node's budget with the project's cost per worker in place of the node's.
 
     Args:
+        node: The node's declaration.
+        project: The work being weighed.
+
+    Returns:
+        The budget the project is weighed against.
+    """
+    return {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]}
+
+
+def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str:
+    """Name what holds a node's room in a reservation refusal.
+
+    Args:
+        node: The node's declaration.
         state: What the node reported.
+        budget: The budget the project was weighed against.
 
     Returns:
         The node's CI runners, with the slice's numbers, when its probe read
         a ``runners.slice`` at its ``memory.high`` (MCPs board task
-        5d6e57e7); otherwise the owner, as before.
+        5d6e57e7); else the node's own fleet runs, when without their
+        charge it would have room (MCPs board task 939ec5c7: on 2026-10-03
+        lavender-wsl, with 18.8 GB free and two runs holding seven workers,
+        was said to have "somebody" on it); otherwise the owner.
     """
     ci_slice = state["ci_slice"]
-    if ci_slice is None or ci_slice["current_gb"] < SLICE_AT_HIGH * ci_slice["high_gb"]:
-        return "somebody is on this machine"
-    return (
-        f"its CI runners hold it: runners.slice is at {ci_slice['current_gb']:.1f} GB of its "
-        f"{ci_slice['high_gb']:.1f} GB memory.high, so the lane waits for a CI job to end"
+    if ci_slice is not None and ci_slice["current_gb"] >= SLICE_AT_HIGH * ci_slice["high_gb"]:
+        return (
+            f"its CI runners hold it: runners.slice is at {ci_slice['current_gb']:.1f} GB of "
+            f"its {ci_slice['high_gb']:.1f} GB memory.high, so the lane waits for a CI job to end"
+        )
+    unloaded = admissible_workers(
+        budget, logical_cores=node["logical_cores"], free_ram_gb=state["free_ram_gb"]
     )
+    if state["live"]["runs"] > 0 and unloaded > 0:
+        return "its own fleet runs hold the rest, so it takes the next job when one of them ends"
+    return "somebody is on this machine"
 
 
 def assess(
@@ -168,9 +191,10 @@ def assess(
             ),
         )
     live = state["live"]
+    budget = _project_budget(node, project)
     workers = min(
         admissible_workers(
-            {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]},
+            budget,
             logical_cores=node["logical_cores"] - live["workers"],
             free_ram_gb=state["free_ram_gb"] - live["ram_gb"],
         ),
@@ -185,7 +209,7 @@ def assess(
                 f"of {node['budget']['reserved_ram_gb']:.1f} GB for whoever is using it, and "
                 f"{node['logical_cores']} cores against {node['budget']['reserved_cores']} "
                 f"reserved{_live_clause(state)}. Nothing is left for a dispatch; "
-                f"{_who_holds_it(state)}."
+                f"{_who_holds_it(node, state, budget)}."
             ),
         )
     if workers < project["minimum_workers"]:
