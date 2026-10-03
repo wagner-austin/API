@@ -37,8 +37,8 @@ PROCESS_PARAMETER = "[scriptblock]$GetProcesses = { @(Get-CimInstance Win32_Proc
 
 #: The PowerShell function the Windows rows call: the processes naming a
 #: runner directory outside its service's tree, older than the bound, when
-#: no live Runner.Worker runs in the tree, and any Worker in the tree that is
-#: itself older than the bound. A Worker past the job timeout runs no job
+#: no live Runner.Worker runs in the tree, and any Worker in the tree, under
+#: that directory, that is itself older than the bound. A Worker past the job timeout runs no job
 #: GitHub still holds, so it shields nothing (the reaper's third rule,
 #: :mod:`fleet.core.runner_reaper_render`); one whose start cannot be read
 #: is taken as live. A stopped service has no tree, so every such process
@@ -79,13 +79,12 @@ LEFTOVER_FUNCTION = [
     "    }",
     "    return @($Processes | Where-Object {",
     "        $null -ne $_.CreationDate -and $_.CreationDate -lt $cutoff -and (",
-    "            ($tree.ContainsKey([int]$_.ProcessId) "
-    "-and [string]$_.Name -eq 'Runner.Worker.exe') -or",
-    "            (-not $tree.ContainsKey([int]$_.ProcessId) -and (",
-    "                ([string]$_.CommandLine).Replace('/', '\\').IndexOf($Root, "
+    "            ([string]$_.CommandLine).Replace('/', '\\').IndexOf($Root, "
     "[StringComparison]::OrdinalIgnoreCase) -ge 0 -or",
-    "                ([string]$_.ExecutablePath).StartsWith($Root, "
-    "[StringComparison]::OrdinalIgnoreCase))))",
+    "            ([string]$_.ExecutablePath).StartsWith($Root, "
+    "[StringComparison]::OrdinalIgnoreCase)) -and (",
+    "            -not $tree.ContainsKey([int]$_.ProcessId) -or "
+    "[string]$_.Name -eq 'Runner.Worker.exe')",
     "    })",
     "}",
 ]
