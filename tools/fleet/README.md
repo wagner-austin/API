@@ -564,6 +564,15 @@ first job leaves room for a second. On the fleet as declared the ceiling is
 sedona 8, lavender 6, pendragon and lavender-wsl 4, diphtheria and serendipity
 2, unless a project's minimum is higher.
 
+**A node running several jobs is never offered one its own lease file would
+refuse.** The projects a runner hands `dispatch_claim` are the ones that fit by
+room, less every one `run_lease.held_on_node` finds held on that node now: a
+project already running there (`LEASE_HELD`), and every testdb project while
+one testdb suite runs there, since each declares the node's own
+`corvis-fleet-testdb` (`RESOURCE_HELD`). A claimed job refused for either is
+closed for good, so the job stays queued for another node or a later tick, and
+the runner logs what it left out.
+
 A node shared with CI keeps its headroom through its reservations, not a run
 count: lavender became a CI runner on 2026-09-06 and `opus-artifact-sweep-0902`
 saw a heavy job saturate it until ssh connections were **reset** (TCP 22 and 445
