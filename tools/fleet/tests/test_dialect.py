@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import pathlib
 import subprocess
-import tarfile
 import zipfile
 
 import pytest
@@ -246,15 +245,19 @@ def test_a_staged_export_tracks_every_file_its_commit_tracks(tmp_path: pathlib.P
     _git("-C", str(source), "add", "--all")
     _git("-C", str(source), "add", "--force", "runs/sweep.json")
     _git("-C", str(source), "commit", "--quiet", "--message", "source")
+    # Zip rather than the tar.gz the hub stages: what is under test is the
+    # index the init commands build, not the extraction, and tarfile's
+    # extractall(filter=) exists only from Python 3.11.4, which serendipity's
+    # interpreter predates (FLEET-CHECK 691db3e6).
     archived = subprocess.run(
-        ["git", "-C", str(source), "archive", "--format=tar.gz", "HEAD"],
+        ["git", "-C", str(source), "archive", "--format=zip", "HEAD"],
         check=True,
         capture_output=True,
         timeout=60,
     )
     target = tmp_path / "run"
-    with tarfile.open(fileobj=io.BytesIO(archived.stdout)) as archive:
-        archive.extractall(target, filter="data")
+    with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:
+        archive.extractall(target)
 
     for command in dialect.init_repository_commands(target.as_posix(), "tools-hpc3-1"):
         subprocess.run(command, check=True, capture_output=True, timeout=60)
