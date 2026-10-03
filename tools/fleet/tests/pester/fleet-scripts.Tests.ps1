@@ -77,6 +77,7 @@ BeforeAll {
 Describe 'The tick command line' {
     It 'names the <Lane> lane' -ForEach @(
         @{ Lane = 'hub'; Node = ''; Expected = 'run -- python -m fleet.cli.tick --api-root "C:\api" --log-directory "C:\logs" --lane hub' },
+        @{ Lane = 'hub-announce'; Node = ''; Expected = 'run -- python -m fleet.cli.tick --api-root "C:\api" --log-directory "C:\logs" --lane hub-announce' },
         @{ Lane = 'node'; Node = 'sedona'; Expected = 'run -- python -m fleet.cli.tick --api-root "C:\api" --log-directory "C:\logs" --lane node --node sedona' },
         @{ Lane = 'announce'; Node = 'sedona'; Expected = 'run -- python -m fleet.cli.tick --api-root "C:\api" --log-directory "C:\logs" --lane announce --node sedona' },
         @{ Lane = 'elevated'; Node = 'sedona'; Expected = 'run -- python -m fleet.cli.tick --api-root "C:\api" --log-directory "C:\logs" --lane elevated --node sedona' },
@@ -105,13 +106,18 @@ Describe 'The schedules' {
             [void](Unregister-FleetTick $task.TaskName)
         }
     }
-    It 'registers poetry running the hub tick every three minutes and at boot, as this account under S4U at Limited, at priority 4, and replaces it on a second run' {
+    It 'registers poetry running the hub tick every three minutes and at boot, as this account under S4U at Limited, at priority 4, announces it, and replaces it on a second run' {
         $name = "${script:prefix}hub"
         $parameters = @{ TaskName = $name; ApiRoot = $script:world.Api; LogDirectory = $script:world.Logs; Poetry = $script:world.Poetry }
         Invoke-TestEntry $script:registerHub $parameters 6>$null
+        # The announce ran for real: the stand-in poetry, from tools\fleet,
+        # with the hub-announce lane's arguments (MCPs board task 2fecad69).
+        # A scheduler that started the registered task at once appends a
+        # hub-lane call after it.
+        (Read-PoetryCall $script:world)[0..1] | Should -Be @((Get-TestTickArgument $script:world 'hub-announce'), "cwd=$($script:world.Fleet)")
         $said = @(Invoke-TestEntry $script:registerHub $parameters 6>&1 | ForEach-Object { "$_" })
         $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        $said | Should -Be @("Registered $name (every 3 minutes and at boot, $identity, S4U, Limited).")
+        $said | Should -Be @("Registered $name (every 3 minutes and at boot, $identity, S4U, Limited) and announced it.")
         @(Get-FleetScheduledTask -Prefix $name -Suffix '').Count | Should -Be 1
         # The definition as Task Scheduler stores it: Limited is the schema's
         # default run level and is stored as no RunLevel element at all,
@@ -127,6 +133,14 @@ Describe 'The schedules' {
         $task.Settings.Priority | Should -BeExactly '4'
         @($task.Triggers.BootTrigger).Count | Should -Be 1
         $task.Triggers.TimeTrigger.Repetition.Interval | Should -BeExactly 'PT3M'
+    }
+    It 'refuses a hub registration whose announce fails' {
+        $failing = Initialize-FleetTickWorld -ExitCode 7
+        {
+            Invoke-TestEntry $script:registerHub @{
+                TaskName = "${script:prefix}hub"; ApiRoot = $failing.Api; LogDirectory = $failing.Logs; Poetry = $failing.Poetry
+            } 6>$null
+        } | Should -Throw "FLEET_HUB_ANNOUNCE_FAILED: the hub-announce tick exited 7; see fleet-agent-*.log under $($failing.Logs)"
     }
     It 'unregisters the hub task, and says so when there is none' {
         $name = "${script:prefix}hub"
@@ -214,7 +228,7 @@ Describe 'The schedules' {
         }.GetNewClosure()
         $said = @(Invoke-TestEntry $script:registerHub @{ TaskName = "${script:prefix}hub"; Poetry = $script:world.Poetry; Register = $register } 6>&1 |
             ForEach-Object { "$_" })
-        $said | Should -Be @("Registered ${script:prefix}hub (every 3 minutes and at boot, recorded, S4U, Limited).")
+        $said | Should -Be @("Registered ${script:prefix}hub (every 3 minutes and at boot, recorded, S4U, Limited) and announced it.")
         $arguments = "run -- python -m fleet.cli.tick --api-root `"$($script:apiRoot)`" --log-directory `"$env:LOCALAPPDATA\Temp\claude`" --lane hub"
         [System.IO.File]::ReadAllLines($record) | Should -Be @("${script:prefix}hub|$($script:world.Poetry)|$($script:apiRoot)\tools\fleet|$arguments|" +
             'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.')
