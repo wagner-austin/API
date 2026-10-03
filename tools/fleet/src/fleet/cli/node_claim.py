@@ -57,7 +57,12 @@ def ask_queue(
         AppError: From the queue calls.
     """
     if elevated_yield.yields_to_elevated(
-        credentials, loaded.workspace, alias=alias, node=node, elevated=elevated
+        credentials,
+        loaded.workspace,
+        alias=alias,
+        node=node,
+        elevated=elevated,
+        leases=loaded.leases,
     ):
         verdict = "yields to its elevated runner; claiming nothing"
         tick_report.record_tick(
