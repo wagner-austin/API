@@ -182,6 +182,26 @@ class TestAssess:
         )
         assert light["reason"].endswith("somebody is on this machine.")
 
+    def test_a_node_its_own_runs_fill_names_them_and_one_its_owner_fills_does_not(self) -> None:
+        """lavender-wsl in fleet_status at 09:09Z on 2026-10-03 (MCPs board
+        task 939ec5c7): 18.8 GB free, two runs holding seven workers and
+        15.5 GB, and the reason said somebody was on the machine. With those
+        runs gone it would have room, so they are named; when even an idle
+        node would have none, the owner still is."""
+        runs = LiveLoad(runs=2, workers=7, ram_gb=15.5)
+        node = _node(reserved_cores=8, reserved_ram_gb=6.0)
+
+        own = assess(node, _state(free_ram_gb=18.8, live=runs), _project(), WINDOWS_TAGS)
+        owner = assess(node, _state(free_ram_gb=5.0, live=runs), _project(), WINDOWS_TAGS)
+
+        assert own["code"] is FleetErrorCode.NODE_OWNER_RESERVED
+        assert own["reason"].endswith(
+            "Nothing is left for a dispatch; its own fleet runs hold the rest, so it takes the "
+            "next job when one of them ends."
+        )
+        assert owner["code"] is FleetErrorCode.NODE_OWNER_RESERVED
+        assert owner["reason"].endswith("somebody is on this machine.")
+
     def test_a_node_too_small_for_the_suite_is_refused(self) -> None:
         """THE sedona CASE. 6 workers afforded, 8 declared as the minimum.
 

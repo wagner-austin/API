@@ -143,7 +143,8 @@ def test_a_node_whose_live_runs_fill_it_names_the_held_runs(tmp_path: pathlib.Pa
         "2 live run(s) holding 14 worker(s); node lane claims nothing: NODE_OWNER_RESERVED: "
         "lavender has 27.0 GB free against a reservation of 4.0 GB for whoever is using it, and "
         "16 cores against 2 reserved, and its 2 live fleet run(s) hold 14 worker(s) and 15.4 GB. "
-        "Nothing is left for a dispatch; somebody is on this machine."
+        "Nothing is left for a dispatch; its own fleet runs hold the rest, so it takes the next "
+        "job when one of them ends."
     )
 
 
