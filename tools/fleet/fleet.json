@@ -67,7 +67,7 @@
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0
       },
-      "enabled": false,
+      "enabled": true,
       "test_database": false,
       "rust": null,
       "cxx": null,
