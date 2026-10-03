@@ -13,7 +13,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.cli import node_agent
 from fleet.contracts.lease import Lease
@@ -36,6 +36,9 @@ __all__ = ["_credentials_in_env"]
 
 #: The project that requires the tag, as the real registry names it.
 ELEVATED_PROJECT = "MCPs/execution-elevated"
+
+#: Its registry tags, which a job of it carries when it is submitted correctly.
+ELEVATED_TAGS: list[JSONValue] = ["elevated", "windows"]
 
 
 def _with_elevated(document: JSONObject, *, node_elevated: bool) -> JSONObject:
@@ -187,7 +190,9 @@ class TestWhoYields:
         )
 
     def test_it_yields_to_a_job_pinned_to_this_node(self, lease_file: pathlib.Path) -> None:
-        job = queue_job(project=ELEVATED_PROJECT, requestedNode="lavender")
+        job = queue_job(
+            project=ELEVATED_PROJECT, requestedNode="lavender", requiredTags=ELEVATED_TAGS
+        )
         answer, _ = _ask(
             _workspace(node_elevated=True), lease_file, elevated=False, replies=[_queued(job)]
         )
@@ -197,7 +202,23 @@ class TestWhoYields:
     def test_a_job_pinned_to_another_node_is_that_nodes_business(
         self, lease_file: pathlib.Path
     ) -> None:
-        job = queue_job(project=ELEVATED_PROJECT, requestedNode="serendipity")
+        job = queue_job(
+            project=ELEVATED_PROJECT, requestedNode="serendipity", requiredTags=ELEVATED_TAGS
+        )
+        answer, endpoint = _ask(
+            _workspace(node_elevated=True), lease_file, elevated=False, replies=[_queued(job)]
+        )
+
+        assert (answer, endpoint.tools) == (False, ["dispatch_list"])
+
+    def test_a_job_that_does_not_require_the_tag_is_not_yielded_to(
+        self, lease_file: pathlib.Path
+    ) -> None:
+        """serendipity, 2026-10-03 from 17:16Z (board task eaf80425):
+        MCPs/scripts/ps-harness job 7c16305c was queued requiring only
+        windows, so the queue never offered it to the elevated lane. The
+        ordinary runner yielded to it on every tick and ran nothing."""
+        job = queue_job(project=ELEVATED_PROJECT, requiredTags=["windows"])
         answer, endpoint = _ask(
             _workspace(node_elevated=True), lease_file, elevated=False, replies=[_queued(job)]
         )
@@ -237,7 +258,7 @@ class TestWhoYields:
         self, lease_file: pathlib.Path
     ) -> None:
         _hold(lease_file, node="serendipity", project=ELEVATED_PROJECT)
-        job = queue_job(project=ELEVATED_PROJECT)
+        job = queue_job(project=ELEVATED_PROJECT, requiredTags=ELEVATED_TAGS)
 
         answer, endpoint = _ask(
             _workspace(node_elevated=True), lease_file, elevated=False, replies=[_queued(job)]
@@ -269,7 +290,9 @@ def test_a_whole_ordinary_tick_claims_nothing_while_an_elevated_job_waits(
         encoding="utf-8",
     )
     _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23)])
-    endpoint = FakeQueue([_queued(), _queued(queue_job(project=ELEVATED_PROJECT))])
+    endpoint = FakeQueue(
+        [_queued(), _queued(queue_job(project=ELEVATED_PROJECT, requiredTags=ELEVATED_TAGS))]
+    )
     _test_hooks.http_post = endpoint
 
     with caplog.at_level("INFO"):
