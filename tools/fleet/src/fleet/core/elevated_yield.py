@@ -30,6 +30,17 @@ its elevated runner was running another ps-harness job and matched nothing,
 so neither lane claimed with sixteen jobs queued. The ordinary runner asks
 the same function the claim gate asks, and yields only to a project it
 does not hold.
+
+NOR A JOB THAT DOES NOT ITSELF REQUIRE ``elevated`` (board task eaf80425).
+The queue hands the elevated lane only jobs that carry the tag, so a job
+of an elevated project submitted with fewer tags never reaches the
+elevated runner. MCPs/scripts/ps-harness job 7c16305c was queued on
+2026-10-03 17:16Z requiring only ``windows``. Until this rule, serendipity's
+ordinary runner yielded to it on every tick, and claimed nothing while
+libs/covenant_ml, which only serendipity can run, waited behind it. Such a job
+reaches no runner, and that is the submitter's to correct by resubmitting
+with the registry's tags (``PROJECT_TAGS_MISMATCH``). It is not a reason
+for the ordinary runner to stop.
 """
 
 from __future__ import annotations
@@ -83,8 +94,9 @@ def waiting_elevated_job(
             on this node holds now; the queue is not asked about those.
 
     Returns:
-        A queued job of an elevated project that no lease on this node holds
-        and that names this node or no node, or None when there is none.
+        A queued job of an elevated project that no lease on this node holds,
+        that names this node or no node, and that itself requires the
+        ``elevated`` tag, or None when there is none.
 
     Raises:
         AppError: Any transport or contract failure from the queue call.
@@ -106,7 +118,7 @@ def waiting_elevated_job(
         )
     for project in (name for name in candidates if name not in held):
         for job in queue.queued_for(credentials, project=project):
-            if job["requested_node"] in (None, alias):
+            if job["requested_node"] in (None, alias) and NodeTag.ELEVATED in job["required_tags"]:
                 return job
     return None
 
