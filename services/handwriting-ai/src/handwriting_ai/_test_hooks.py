@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from shutil import rmtree
 
 import torch
 from PIL.Image import Image as PILImage
@@ -454,6 +455,7 @@ train_epoch: TrainEpochProtocol = _default_train_epoch
 calibrate_input_pipeline: CalibrateInputPipelineProtocol = _default_calibrate_input_pipeline
 
 tempfile_mkdtemp: TempfileMkdtempProtocol = _default_tempfile_mkdtemp
+remove_temp_tree: Callable[[str], None] = rmtree
 
 queue_handler_factory: QueueHandlerFactory = load_queue_handler_factory()
 
