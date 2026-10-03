@@ -211,19 +211,18 @@ class TestWhoYields:
 
         assert (answer, endpoint.tools) == (False, ["dispatch_list"])
 
-    def test_a_job_that_does_not_require_the_tag_is_not_yielded_to(
-        self, lease_file: pathlib.Path
-    ) -> None:
-        """serendipity, 2026-10-03 from 17:16Z (board task eaf80425):
+    def test_a_job_submitted_without_the_tag_is_yielded_to(self, lease_file: pathlib.Path) -> None:
+        """serendipity, 2026-10-03 from 17:16Z (MCPs board task 939ec5c7):
         MCPs/scripts/ps-harness job 7c16305c was queued requiring only
-        windows, so the queue never offered it to the elevated lane. The
-        ordinary runner yielded to it on every tick and ran nothing."""
+        windows. The elevated runner now takes such a job
+        (``node_claim.claim_untagged``), so it waits for that runner like
+        any other elevated job."""
         job = queue_job(project=ELEVATED_PROJECT, requiredTags=["windows"])
         answer, endpoint = _ask(
             _workspace(node_elevated=True), lease_file, elevated=False, replies=[_queued(job)]
         )
 
-        assert (answer, endpoint.tools) == (False, ["dispatch_list"])
+        assert (answer, endpoint.tools) == (True, ["dispatch_list"])
 
     def test_an_empty_queue_leaves_the_ordinary_runner_to_claim(
         self, lease_file: pathlib.Path

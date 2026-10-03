@@ -20,6 +20,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_str
 
 from fleet.cli import _config, node_agent
+from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.source import ProjectCompanion
 from fleet.core import _test_hooks, dialect, records, stage_repository, staging
@@ -493,7 +494,7 @@ class TestRefusals:
 
         assert FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN in detail
 
-    def test_tags_that_disagree_with_the_registry_are_refused_before_any_git_command(
+    def test_a_tag_the_registry_does_not_declare_is_refused_before_any_git_command(
         self, sourced_config: pathlib.Path
     ) -> None:
         runner = FakeRun(PROBED)
@@ -504,10 +505,18 @@ class TestRefusals:
         )
 
         assert detail == (
-            "PROJECT_TAGS_MISMATCH: the job requires [gpu] but fleet.json declares [] for "
-            "libs/demo; resubmit with the registry's tags"
+            "PROJECT_TAGS_MISMATCH: the job requires [gpu], which fleet.json does not declare "
+            "for libs/demo (it declares []); resubmit with the registry's tags"
         )
         assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED)
+
+    def test_a_job_naming_fewer_tags_than_its_project_passes_the_gate(self) -> None:
+        """What it needs is the declaration, which the claim's fits already
+        assessed against this runner (MCPs board task 939ec5c7, job 7c16305c)."""
+        row = queue_job(status="claimed", requiredTags=["windows"])
+        job = decode_job(row, answer=dump_json_str(row))
+
+        assert node_agent.tags_refusal(job, ("elevated", "windows")) is None
 
     def test_a_project_with_no_remote_is_refused_by_name(self, config_path: pathlib.Path) -> None:
         """The shared fixture's project declares ``source: null``."""
