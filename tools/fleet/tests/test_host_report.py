@@ -46,6 +46,10 @@ LAVENDER_LIST = _wsl_bytes(
     "  NAME      STATE           VERSION\r\n* Ubuntu    Running         2\r\n"
 )
 
+#: Who asks lavender: lavender-wsl's runner, whose tick reports the host
+#: when the guest does not answer, so the host's probe script carries its name.
+WRITER = names.runner_name("lavender-wsl", elevated=False)
+
 #: What the Windows capacity probe prints for lavender at 0.3 GB free.
 LAVENDER_STARVED = "free_ram_gb=0.3\nfree_disk_gb=612.4\n"
 
@@ -114,10 +118,12 @@ def _probe_send_context() -> str:
     """What remote reports it was doing when the capacity probe's send fails.
 
     Returns:
-        ``sending <the Windows probe's path under lavender's stage root>``.
+        ``sending <the Windows probe's path under lavender's stage root>``,
+        named for lavender-wsl's runner, the writer :func:`_describe` passes.
     """
     spoken = dialect.for_platform(NodePlatform.WINDOWS)
-    return f"sending {spoken.script_path('C:/fleet/stage', names.CAPACITY_PROBE_STEM)}"
+    stem = names.capacity_probe_stem(WRITER)
+    return f"sending {spoken.script_path('C:/fleet/stage', stem)}"
 
 
 class TestListing:
@@ -169,7 +175,9 @@ def _describe(tmp_path: pathlib.Path) -> str:
         The report.
     """
     workspace = decode_fleet_workspace(workspace_document())
-    return host_report.describe_wsl_host(workspace, tmp_path / "ledger.jsonl", "lavender")
+    return host_report.describe_wsl_host(
+        workspace, tmp_path / "ledger.jsonl", "lavender", writer=WRITER
+    )
 
 
 class TestDescribe:

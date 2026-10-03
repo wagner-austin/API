@@ -148,12 +148,14 @@ class TestProbe:
 
         held = LiveLoad(runs=1, workers=2, ram_gb=2.2)
 
-        state = probe.probe_node(_node(), live=held)
+        state = probe.probe_node(_node(), live=held, writer="fleet-run")
 
         assert state["free_ram_gb"] == 27.0
         assert state["live"] == held
         assert runner.stdin[0] == dialect_windows.CAPACITY_PROBE_SCRIPT.encode("utf-8")
-        assert runner.calls[0][-1].endswith("C:/fleet/stage/fleet-capacity.ps1' -Encoding utf8\"")
+        assert runner.calls[0][-1].endswith(
+            "C:/fleet/stage/fleet-capacity-fleet-run.ps1' -Encoding utf8\""
+        )
 
     def test_the_script_arrives_byte_identical_to_the_constant(self) -> None:
         """THE RENDER-AND-SEND RULE, asserted rather than described.
@@ -167,7 +169,7 @@ class TestProbe:
         runner = FakeRun([ok(""), ok("free_ram_gb=1.0\nfree_disk_gb=1.0\n")])
         _test_hooks.run = runner
 
-        probe.probe_node(_node(), live=IDLE)
+        probe.probe_node(_node(), live=IDLE, writer="fleet-run")
 
         assert runner.stdin[0] == dialect_windows.CAPACITY_PROBE_SCRIPT.encode("utf-8")
         assert "{0:N3}" in dialect_windows.CAPACITY_PROBE_SCRIPT
@@ -179,12 +181,13 @@ class TestProbe:
         node["platform"] = NodePlatform.LINUX
         node["stage_root"] = "/home/corvis/fleet/stage"
 
-        state = probe.probe_node(node, live=IDLE)
+        state = probe.probe_node(node, live=IDLE, writer="lavender-wsl")
 
         assert state["free_disk_gb"] == 687.729
         assert runner.stdin[0] == dialect_linux.CAPACITY_PROBE_SCRIPT.encode("utf-8")
-        assert runner.calls[0][-1].endswith("cat > '/home/corvis/fleet/stage/fleet-capacity.sh'")
-        assert runner.calls[1][-2:] == ("/bin/sh", "/home/corvis/fleet/stage/fleet-capacity.sh")
+        script = "/home/corvis/fleet/stage/fleet-capacity-lavender-wsl.sh"
+        assert runner.calls[0][-1].endswith(f"cat > '{script}'")
+        assert runner.calls[1][-2:] == ("/bin/sh", script)
 
 
 class TestDescribeNode:

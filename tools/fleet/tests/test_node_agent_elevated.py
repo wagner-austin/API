@@ -146,6 +146,49 @@ class TestClaiming:
         assert any("NODE_NOT_ELEVATED" in message for message in messages)
 
 
+def _probe_scripts(config_path: pathlib.Path, *, elevated: bool) -> tuple[str, ...]:
+    """Run one ready tick of lavender's runner and read the scripts it ran.
+
+    Args:
+        config_path: The workspace document.
+        elevated: Whether this is the elevated runner.
+
+    Returns:
+        The remote path of each probe script the tick ran, capacity then
+        toolchain: the last argument of the second and fourth ssh calls.
+    """
+    runner = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(ADMINISTRATOR_TOKEN)])
+    _test_hooks.run = runner
+    _test_hooks.http_post = FakeQueue(
+        [dump_json_str({"jobs": []}), dump_json_str({"claimed": None})]
+    )
+    argv = node_argv(config_path) + ([node_agent.ELEVATED_FLAG] if elevated else [])
+    assert node_agent.main(argv) == 0
+    return runner.calls[1][-1], runner.calls[3][-1]
+
+
+class TestTheTwoRunnersProbeOnTheirOwnPaths:
+    def test_each_runner_writes_and_runs_probe_scripts_named_for_itself(
+        self, elevated_config: pathlib.Path
+    ) -> None:
+        """serendipity, 2026-10-03 08:22Z (MCPs board task 939ec5c7): its two
+        runners tick on the same minute and both wrote
+        C:/fleet/stage/fleet-toolchain.ps1, so the node lane read "being used
+        by another process", the elevated lane "Stream was not readable", and
+        a node with 11.5 GB free claimed nothing. Each now has its own."""
+        ordinary = _probe_scripts(elevated_config, elevated=False)
+        elevated = _probe_scripts(elevated_config, elevated=True)
+
+        assert ordinary == (
+            "C:/fleet/stage/fleet-capacity-lavender.ps1",
+            "C:/fleet/stage/fleet-toolchain-lavender.ps1",
+        )
+        assert elevated == (
+            "C:/fleet/stage/fleet-capacity-lavender-elevated.ps1",
+            "C:/fleet/stage/fleet-toolchain-lavender-elevated.ps1",
+        )
+
+
 class TestRefusalsAndAnnounce:
     def test_an_elevated_runner_for_a_node_that_declares_none_is_refused_before_any_call(
         self, config_path: pathlib.Path

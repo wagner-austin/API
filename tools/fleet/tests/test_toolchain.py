@@ -321,11 +321,13 @@ class TestProbeToolchain:
         runner = FakeRun([ok(""), ok(LOKI)])
         _test_hooks.run = runner
 
-        reports = toolchain.probe_toolchain(node("loki"))
+        reports = toolchain.probe_toolchain(node("loki"), writer="fleet-bootstrap")
 
         assert len(reports) == 8
         assert runner.stdin[0] == windows_toolchain_probe.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
-        assert runner.calls[0][-1].endswith("C:/fleet/stage/fleet-toolchain.ps1' -Encoding utf8\"")
+        assert runner.calls[0][-1].endswith(
+            "C:/fleet/stage/fleet-toolchain-fleet-bootstrap.ps1' -Encoding utf8\""
+        )
 
     def test_a_linux_node_is_asked_in_sh(self) -> None:
         runner = FakeRun([ok(""), ok(DIPHTHERIA)])
@@ -334,17 +336,20 @@ class TestProbeToolchain:
         linux["platform"] = NodePlatform.LINUX
         linux["stage_root"] = "/home/corvis/fleet/stage"
 
-        reports = toolchain.probe_toolchain(linux)
+        reports = toolchain.probe_toolchain(linux, writer="diphtheria")
 
         assert len(reports) == 7
         assert runner.stdin[0] == dialect_linux.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
-        assert runner.calls[1][-2:] == ("/bin/sh", "/home/corvis/fleet/stage/fleet-toolchain.sh")
+        assert runner.calls[1][-2:] == (
+            "/bin/sh",
+            "/home/corvis/fleet/stage/fleet-toolchain-diphtheria.sh",
+        )
 
     def test_an_unreachable_node_says_so(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "timed out")])
 
         with pytest.raises(AppError) as excinfo:
-            toolchain.probe_toolchain(node())
+            toolchain.probe_toolchain(node(), writer="fleet-bootstrap")
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
 

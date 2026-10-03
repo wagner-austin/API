@@ -225,7 +225,7 @@ class TestAttemptProbeReportsRatherThanRaises:
     def test_an_unreachable_node_comes_back_as_a_reason(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "bad handshake")])
 
-        outcome = probe.attempt_probe(_node("loki"), live=IDLE)
+        outcome = probe.attempt_probe(_node("loki"), live=IDLE, writer="fleet-run")
 
         assert outcome["state"] is None
         assert "ssh to loki failed" in outcome["reason"]
@@ -237,7 +237,7 @@ class TestAttemptProbeReportsRatherThanRaises:
         that the same way rather than abandoning the fleet over it."""
         _test_hooks.run = FakeRun([ok(""), ok("Get-CimInstance : access denied")])
 
-        outcome = probe.attempt_probe(_node("loki"), live=IDLE)
+        outcome = probe.attempt_probe(_node("loki"), live=IDLE, writer="fleet-run")
 
         assert outcome["state"] is None
         assert "free_ram_gb" in outcome["reason"]
@@ -246,7 +246,7 @@ class TestAttemptProbeReportsRatherThanRaises:
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
         held = LiveLoad(runs=3, workers=6, ram_gb=6.6)
-        outcome = probe.attempt_probe(_node("lavender"), live=held)
+        outcome = probe.attempt_probe(_node("lavender"), live=held, writer="fleet-run")
 
         state = outcome["state"]
         if state is None:
@@ -263,7 +263,7 @@ class TestAttemptProbeReportsRatherThanRaises:
         _test_hooks.run = FakeRun([failed(255, "bad handshake")])
 
         with pytest.raises(AppError) as excinfo:
-            probe.probe_node(_node("lavender"), live=IDLE)
+            probe.probe_node(_node("lavender"), live=IDLE, writer="fleet-run")
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
 

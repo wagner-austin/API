@@ -71,7 +71,7 @@ class TestATickThatClaimsNothing:
             "fits": [],
             "claiming": False,
             "verdict": "did not answer; claiming nothing: ssh to lavender failed while sending "
-            "C:/fleet/stage/fleet-capacity.ps1: ssh: connect to host lavender: timed out",
+            "C:/fleet/stage/fleet-capacity-lavender.ps1: ssh: connect to host lavender: timed out",
         }
 
     def test_a_toolchain_that_did_not_answer_records_the_load_but_no_tags(

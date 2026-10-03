@@ -26,7 +26,7 @@ class TestAttemptToolchain:
     def test_a_ready_answer_comes_back_as_its_reports(self) -> None:
         _test_hooks.run = FakeRun([ok(""), ok(LAVENDER_2026_09_23)])
 
-        answered = toolchain.attempt_toolchain(node())
+        answered = toolchain.attempt_toolchain(node(), writer="lavender")
 
         assert answered == toolchain.read_reports(LAVENDER_2026_09_23)
         assert [report["name"] for report in toolchain.read_reports(LAVENDER_2026_09_23)] == [
@@ -44,7 +44,7 @@ class TestAttemptToolchain:
     def test_a_node_that_cannot_be_reached_is_a_value_with_the_transport_code(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "ssh: connect to host lavender: timed out")])
 
-        answered = toolchain.attempt_toolchain(node())
+        answered = toolchain.attempt_toolchain(node(), writer="lavender")
 
         assert not isinstance(answered, tuple)
         assert answered["code"] is FleetErrorCode.NODE_UNREACHABLE
@@ -53,7 +53,7 @@ class TestAttemptToolchain:
     def test_an_answer_naming_no_tool_is_a_value_naming_the_host(self) -> None:
         _test_hooks.run = FakeRun([ok(""), ok("nothing\n")])
 
-        assert toolchain.attempt_toolchain(node()) == {
+        assert toolchain.attempt_toolchain(node(), writer="lavender") == {
             "code": FleetErrorCode.NODE_TOOL_MISSING,
             "message": "lavender: a toolchain probe returned nothing recognisable, so the "
             "node was never asked: 'nothing'",
