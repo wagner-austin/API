@@ -153,8 +153,10 @@ jobs:
           echo "diffing $base..${{ github.sha }}"
           git diff --name-only "$base" "${{ github.sha }}" > changed.txt || true
           # Packages with a dedicated workflow are checked there, not here.
+          # tools/ps-harness runs the PowerShell harness, which needs Windows
+          # PowerShell 5.1; powershell.yml runs it on every push.
           selected="$(python scripts/ci_select_packages.py < changed.txt \
-            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels','libs/covenant_ml'}; \
+            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels','libs/covenant_ml','tools/ps-harness'}; \
                          print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
           echo "selected: $selected"
           echo "packages=$selected" >> "$GITHUB_OUTPUT"

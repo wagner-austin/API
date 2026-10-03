@@ -3,7 +3,8 @@ name: powershell
 # EVERY POWERSHELL FILE API TRACKS, RUN THROUGH MCPs' HARNESS ON WINDOWS
 # POWERSHELL 5.1 (MCPs board task d69786fa, criterion A3).
 #
-# `make check-powershell` is the target API's `make lint` depends on: it runs
+# `make check-powershell` runs tools/ps-harness's test, the recipe the fleet
+# also runs as that project (MCPs board task 939ec5c7): it runs
 # MCPs' scripts/ps-harness, at the MCPs commit .githooks/mcps-harness.sha
 # records, over this repository through .githooks/published_maketools.py,
 # which reads MCPs at exactly ../MCPs. MCPs is therefore fetched with its whole
