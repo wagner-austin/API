@@ -146,7 +146,7 @@ def node_identity(alias: str, *, elevated: bool) -> tuple[str, str]:
 
 def refuse(
     credentials: McpCredentials, job: DispatchJob, identity: JSONObject, *, detail: str
-) -> DispatchJob:
+) -> None:
     """Close a job as refused, with its named reason, and log it.
 
     Args:
@@ -154,9 +154,6 @@ def refuse(
         job: The claimed job.
         identity: This runner's identity arguments.
         detail: The ``CODE: message`` refusal for the queue.
-
-    Returns:
-        The job, for the caller to hand back.
 
     Raises:
         AppError: Only from the queue call itself.
@@ -170,7 +167,6 @@ def refuse(
         identity=identity,
     )
     _log.info("refused %s: %s", job["job_id"], detail)
-    return job
 
 
 def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
@@ -203,7 +199,7 @@ def claim_pass(
     alias: str,
     node: NodeConfig,
     elevated: bool,
-) -> DispatchJob | None:
+) -> bool:
     """Take one job for this node and launch it, or report why it could not.
 
     Args:
@@ -233,8 +229,9 @@ def claim_pass(
     the jobs that need it for another node (MCPs board task 939ec5c7).
 
     Returns:
-        The job that was claimed, whatever became of it, or None when this
-        node could take nothing or nothing in the lane matched it.
+        True when a job was claimed and launched; False when this node could
+        take nothing, nothing in the lane matched it, or the job it claimed
+        was refused, which :func:`fill_pass` reads as the end of the tick.
 
     Raises:
         AppError: Only from the queue calls themselves. A LOCAL refusal (an
@@ -248,20 +245,22 @@ def claim_pass(
     ready = gate["ready"]
     if ready is None:
         tick_report.record_tick(credentials, gate["tick"], identity=identity)
-        return None
+        return False
     tick = gate["tick"]
     job = ask_queue(
         loaded, credentials, identity, tick, ready, alias=alias, node=node, elevated=elevated
     )
     if job is None:
-        return None
+        return False
     sha = require_sha(job)
     try:
         prepared = prepare(loaded, job, node=node, ready=ready, sha=sha)
     except AppError as refusal:
-        return refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
+        refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
+        return False
     if isinstance(prepared, str):
-        return refuse(credentials, job, identity, detail=prepared)
+        refuse(credentials, job, identity, detail=prepared)
+        return False
 
     def build(run_id: str) -> dispatch.Payload:
         path = loaded.archives / f"{run_id}.tgz"
@@ -270,12 +269,61 @@ def claim_pass(
 
     row = launch_claimed(loaded, job, alias=alias, node=node, prepared=prepared, build=build)
     if isinstance(row, str):
-        return refuse(credentials, job, identity, detail=row)
+        refuse(credentials, job, identity, detail=row)
+        return False
     agent = node_identity(alias, elevated=elevated)[0]
     report_started(
         loaded, credentials, identity, job=job, row=row, alias=alias, node=node, agent=agent
     )
-    return job
+    return True
+
+
+def fill_pass(
+    loaded: _config.LoadedWorkspace,
+    credentials: McpCredentials,
+    identity: JSONObject,
+    *,
+    alias: str,
+    node: NodeConfig,
+    elevated: bool,
+) -> int:
+    """Claim and launch until this node has no room or the lane nothing it fits.
+
+    ONE CLAIM PER TICK CAPPED THE FLEET BY THE CLOCK, NOT BY MEMORY (MCPs
+    board task 48842bfd): once a node's room counted every live run
+    (:func:`fleet.core.capacity.assess`), a node could hold several, but a
+    runner launched at most one job per three-minute tick. With 14 checks
+    queued on 2026-10-03, each node took exactly one per tick, each finished
+    within about a tick, and lavender-wsl ran one job at a time with 18.6 GB
+    free. So after every launch the runner claims again, and every pass
+    re-runs the whole gate: :func:`fleet.cli.node_ready.ready_state` re-reads
+    the ledger, which already charges the run just launched, re-probes the
+    node, and leaves out the projects whose lease it now holds.
+
+    A PASS THAT LAUNCHES NOTHING ENDS THE TICK, a refusal included. A node
+    that stopped answering while one job was being staged would refuse the
+    next and the next, closing the whole lane in one tick; stopping at the
+    first refusal leaves the rest for the next tick or another node.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        credentials: The queue's endpoint and headers.
+        identity: This runner's identity arguments.
+        alias: This node's workspace name.
+        node: Its declaration.
+        elevated: Whether this is the node's elevated runner.
+
+    Returns:
+        How many jobs this tick launched.
+
+    Raises:
+        AppError: From :func:`claim_pass`.
+    """
+    launched = 0
+    while claim_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated):
+        launched += 1
+    _log.info("%s launched %d job(s) this tick", alias, launched)
+    return launched
 
 
 def launch_claimed(
@@ -445,7 +493,7 @@ def prepare(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick for one node: collect what finished, claim at most one job.
+    """Run one tick for one node: collect what finished, then fill its room.
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -490,7 +538,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     credentials = queue.load_credentials()
     collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
-    claim_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated)
+    fill_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated)
     return 0
 
 
@@ -524,6 +572,7 @@ __all__ = [
     "Prepared",
     "claim_pass",
     "entrypoint",
+    "fill_pass",
     "main",
     "node_identity",
     "prepare",
