@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import pathlib
 import subprocess
+import tarfile
 import zipfile
 
 import pytest
@@ -72,7 +73,7 @@ def test_the_shared_commands_are_the_same_on_both_platforms() -> None:
     )
     assert dialect.init_repository_commands("/s/run", "MCPs-packages-db-1790400000") == (
         ("git", "-C", "/s/run", "init", "--quiet"),
-        ("git", "-C", "/s/run", "add", "--all"),
+        ("git", "-C", "/s/run", "add", "--all", "--force"),
         (
             "git",
             "-C",
@@ -228,6 +229,39 @@ def test_a_bundle_whose_ref_is_not_the_bundled_commit_stops_the_stage(
         subprocess.run(command, check=True, capture_output=True, timeout=60)
 
     assert subprocess.run(head_in_sha, capture_output=True, timeout=60).returncode == 1
+
+
+def test_a_staged_export_tracks_every_file_its_commit_tracks(tmp_path: pathlib.Path) -> None:
+    """The commands run here for real on the archive of a commit that tracks
+    a file its own ``.gitignore`` ignores, which is what ``git add -f`` makes
+    and what ``tools/hpc3``'s nine sweep documents are. Indexed without
+    ``--force`` the staged HEAD lost them, and hpc3's audit of ``git archive
+    HEAD`` failed on lavender-wsl at f75c4a94 (API board task 0b3591d7)."""
+    source = tmp_path / "source"
+    (source / "runs").mkdir(parents=True)
+    _git("init", "--quiet", str(source))
+    (source / ".gitignore").write_bytes(b"runs/*\n")
+    (source / "runs" / "sweep.json").write_bytes(b"{}\n")
+    (source / "kept.py").write_bytes(b"print(1)\n")
+    _git("-C", str(source), "add", "--all")
+    _git("-C", str(source), "add", "--force", "runs/sweep.json")
+    _git("-C", str(source), "commit", "--quiet", "--message", "source")
+    archived = subprocess.run(
+        ["git", "-C", str(source), "archive", "--format=tar.gz", "HEAD"],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+    target = tmp_path / "run"
+    with tarfile.open(fileobj=io.BytesIO(archived.stdout)) as archive:
+        archive.extractall(target, filter="data")
+
+    for command in dialect.init_repository_commands(target.as_posix(), "tools-hpc3-1"):
+        subprocess.run(command, check=True, capture_output=True, timeout=60)
+
+    tracked = _git("-C", str(target), "ls-files")
+    assert tracked.splitlines() == _git("-C", str(source), "ls-files").splitlines()
+    assert "runs/sweep.json" in tracked.splitlines()
 
 
 class TestCheckedScript:

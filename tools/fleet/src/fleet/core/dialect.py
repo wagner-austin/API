@@ -536,10 +536,17 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
     empty index it names nothing. A checkout's suite reads its own tracked
     set (that package's ``lint-makefiles`` lints exactly the tracked
     Makefiles), so a staged tree whose index is empty is not the tree the
-    suite was written against. ``git add --all`` under the tree's own
-    ``.gitignore`` indexes what a checkout tracks: an export is the tracked
-    files by construction, and a working tree's ignored build output stays
-    out the way it does in the checkout.
+    suite was written against.
+
+    AND IT IS FORCED, since API board task 0b3591d7 (2026-10-03). A plain
+    ``git add --all`` drops every tracked file ``.gitignore`` ignores, which
+    is every force-added one: ``tools/hpc3`` at f75c4a94 on lavender-wsl
+    read ``1 failed``, its run-document audit reading ``git archive HEAD``
+    and finding only the one sweep a ``.gitignore`` negation re-includes,
+    the nine force-added beside it missing. The tree here is exactly the
+    commit's archive, the transport files staged beside it, so ``--force``
+    indexes the commit's files and nothing else; ruff reads ``.gitignore``
+    patterns rather than the index, so the lint above is unchanged.
 
     AND THE INDEX IS COMMITTED, since MCPs board task 6bbfd171
     (2026-09-26). This docstring said until then that nothing reads a commit
@@ -565,7 +572,7 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
     """
     return (
         ("git", "-C", target, "init", "--quiet"),
-        ("git", "-C", target, "add", "--all"),
+        ("git", "-C", target, "add", "--all", "--force"),
         _commit_command(target, f"fleet export {run_id}"),
     )
 

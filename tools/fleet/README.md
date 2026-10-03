@@ -441,7 +441,7 @@ one) and the runner exports THAT commit:
 3. `git archive --format=tar.gz <sha>` is staged through the same verified
    transport every dispatch uses, so the tree on the node equals the commit
    by construction, and the staged tree is made a one-commit repository
-   (`git init`, `git add --all`, one commit as `fleet`) because MCPs
+   (`git init`, `git add --all --force`, one commit as `fleet`) because MCPs
    `packages/db`'s migrator admits test migrations against `HEAD`;
 4. every repository the project's `source` declares under `companions` is
    exported BESIDE it, from its own mirror at the TIP of the declared `ref`,
@@ -881,11 +881,20 @@ So `staging.stage` initialises a repository after extracting, and
 `1 failed, 416 passed`, the one failure asserting that `git ls-files
 CLAUDE.md` names the file, which in a repository with an empty index it does
 not. A checkout's suite reads its own tracked set (maketools' `lint-makefiles`
-lints exactly the tracked Makefiles), so the init script runs `git add --all`
-under the tree's own `.gitignore`: an export is the tracked files by
-construction, and a working tree's ignored build output stays out the way it
-does in the checkout. Nothing is committed; no node has a git identity and
-nothing reads a commit.
+lints exactly the tracked Makefiles), so the init script indexes the tree and
+commits it under the export identity (`packages/db`'s migrator reads `HEAD`,
+board task 6bbfd171).
+
+**The index is forced, since API board task 0b3591d7** (2026-10-03). The
+staged tree is exactly the archive of the commit, so every file in it is one
+the commit tracks, and `git add --all --force` indexes all of them. A plain
+`--all` applied `.gitignore` instead and dropped every tracked file it
+ignores, which is every force-added one: `tools/hpc3` at f75c4a94 on
+lavender-wsl read `1 failed`, its run-document audit reading `git archive
+HEAD` and finding only the one sweep a `.gitignore` negation re-includes,
+with the nine force-added sweeps beside it missing. Ruff reads `.gitignore`
+patterns, not the index, so the lint the repository was made for is
+unchanged.
 
 **The alternative was an `exclude` in the project's own ruff config, and it
 would have been wrong.** The repository already states which paths are build

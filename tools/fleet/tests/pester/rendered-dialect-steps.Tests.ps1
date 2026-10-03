@@ -34,12 +34,12 @@ Describe 'The extract' {
 }
 
 Describe 'The staged tree''s repository' {
-    It 'initialises, indexes under the tree''s own ignore rules, and commits under the export identity' {
+    It 'initialises, indexes every file the commit carries, and commits under the export identity' {
         $git = Initialize-StandIn 0 -Append
         Invoke-Rendered 'dialect-init-repository' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:target) init --quiet",
-            "-C $($script:target) add --all",
+            "-C $($script:target) add --all --force",
             "-C $($script:target) -c user.name=fleet -c user.email=fleet@corvis.invalid commit --quiet --message `"fleet export MCPs-packages-maketools-1790000000`""
         )
     }
