@@ -489,25 +489,29 @@ VERDICT_ROOM: Final = "fleet"
 #: What a runner tells the ledger it is, on its registering check-in.
 RUNNER_HARNESS: Final = "fleet-agent"
 
+#: The flag that makes a runner's tick post its registering check-in and
+#: claim nothing, on the hub runner and on every node runner alike.
+ANNOUNCE_FLAG: Final = "--announce"
+
 
 def post_verdict(
     credentials: McpCredentials,
     *,
-    task_id: str | None,
     submitted_by: str,
     line: str,
     identity: JSONObject,
 ) -> str:
-    """Post a check's verdict where the submitter will read it.
+    """Post the verdict of a check that names no task, where its submitter reads it.
 
-    The second call here that goes to the TASKBOARD (MCPs board task
-    fd5cabfa, A3): ``task_post`` on the job's task thread, or, when the job
-    names no task, a board-level note in :data:`VERDICT_ROOM` that opens
-    with the submitter's label so it lands in their feed.
+    A board-level note in :data:`VERDICT_ROOM` that opens with the
+    submitter's label, so it lands in their feed as a mention (MCPs board
+    task fd5cabfa, A3). A job that names a task is not posted here: the
+    queue's close writer puts its outcome on that task's thread, addressed
+    to the submitter, in the transaction that closes it (MCPs board task
+    2fecad69), for every terminal status and not only a suite that ran.
 
     Args:
         credentials: The board's endpoint and headers.
-        task_id: The job's task, or None.
         submitted_by: The label that enqueued the job.
         line: The verdict line (:func:`fleet.core.verdict.render_verdict`).
         identity: From :func:`identity_arguments`, the runner's own.
@@ -519,13 +523,12 @@ def post_verdict(
         AppError: Any transport or contract failure from the underlying call,
             including the board refusing a runner it has never ledgered.
     """
-    arguments: JSONObject = {"kind": "note", **identity}
-    if task_id is None:
-        arguments["room"] = VERDICT_ROOM
-        arguments["body"] = f"@{submitted_by} {line}"
-    else:
-        arguments["taskId"] = task_id
-        arguments["body"] = line
+    arguments: JSONObject = {
+        "kind": "note",
+        "room": VERDICT_ROOM,
+        "body": f"@{submitted_by} {line}",
+        **identity,
+    }
     return call_mcp_tool(_test_hooks.http_post, credentials, "task_post", arguments)
 
 
@@ -567,6 +570,7 @@ def announce(
 
 
 __all__ = [
+    "ANNOUNCE_FLAG",
     "API_KEY_VARIABLE",
     "LISTING_PAGE_LIMIT",
     "RUNNER_HARNESS",
