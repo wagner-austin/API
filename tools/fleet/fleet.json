@@ -243,6 +243,18 @@
         "companions": []
       }
     },
+    "tools/hpc-wake": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/hpc-wake",
+        "install": [],
+        "companions": []
+      }
+    },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 4,
@@ -530,6 +542,18 @@
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/maketools",
+        "install": [],
+        "companions": []
+      }
+    },
+    "MCPs/scripts/ps-harness": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 1,
+      "expected_minutes": 25,
+      "required_tags": ["windows", "elevated"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "scripts/ps-harness",
         "install": [],
         "companions": []
       }
