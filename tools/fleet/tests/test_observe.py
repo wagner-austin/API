@@ -85,7 +85,13 @@ def node(
         The node.
     """
     return RegistryNode(
-        name=name, enabled=enabled, role=role, user=user, platform=platform, cuda=False
+        name=name,
+        enabled=enabled,
+        role=role,
+        user=user,
+        platform=platform,
+        cuda=False,
+        test_database=False,
     )
 
 

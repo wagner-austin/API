@@ -122,6 +122,24 @@ Describe 'The toolchain probe' {
         $env:PATH = $silent
         @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[12] | Should -BeExactly 'gpu=no='
     }
+    It 'reports the image of the corvis-fleet-testdb container docker answers, and none when it fails or answers nothing (MCPs daae17f2)' {
+        $absent = Join-Path $script:root 'absent\vswhere.exe'
+        $running = Join-Path $script:root 'running'
+        $calls = Initialize-Answer $running 'docker' @('pgvector/pgvector:pg16-bookworm') 0
+        $env:PATH = $running
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] |
+            Should -BeExactly 'testdb=yes=pgvector/pgvector:pg16-bookworm'
+        [System.IO.File]::ReadAllText($calls).Trim() |
+            Should -BeExactly 'container inspect --format "{{.Config.Image}}" corvis-fleet-testdb'
+        $missing = Join-Path $script:root 'missing'
+        [void](Initialize-Answer $missing 'docker' @('Error: No such container: corvis-fleet-testdb') 1 -Stderr)
+        $env:PATH = $missing
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'testdb=no='
+        $silent = Join-Path $script:root 'silent'
+        [void](Initialize-Answer $silent 'docker' @() 0)
+        $env:PATH = $silent
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'testdb=no='
+    }
     It 'reports the hooks route only when the file exists and one import of the check tools succeeds (MCPs ec895824)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
         $route = Join-Path $script:root 'home\.claude\corvis-hooks.json'

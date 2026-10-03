@@ -151,6 +151,16 @@ class TestBuildScript:
                 agent="o'brien-0929",
             )
 
+    def test_it_puts_git_for_windows_bash_first_on_the_path(self) -> None:
+        """So ``bash scripts/testdb-setup.sh`` runs Git's bash, never WSL's
+        System32 launcher (MCPs board task daae17f2)."""
+        lines = _build().splitlines()
+
+        assert '    [string]$GitBin = "$env:ProgramFiles\\Git\\bin",' in lines
+        assert lines.index('$env:PATH = "$GitBin;$env:PATH"') < lines.index(
+            "Set-Location -LiteralPath $Target"
+        )
+
     def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
         """A clean export carries no dependencies; the node's cache is where
         they are restored from, and every run on the node shares it."""

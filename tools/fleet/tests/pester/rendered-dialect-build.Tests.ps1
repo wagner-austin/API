@@ -111,6 +111,22 @@ Describe 'The build' {
         [System.IO.File]::ReadAllLines($npm.Record) | Should -Be @("$($export.Target) ci")
         Read-Result $export.Target | Should -BeExactly '0'
     }
+    It 'runs a bash install step as the bash in GitBin, ahead of any bash already on PATH (MCPs daae17f2)' {
+        $export = Initialize-Export
+        $wsl = Initialize-Tool 'bash' 0
+        $git = Initialize-Tool 'bash' 0
+        $make = Initialize-Tool 'make' 0
+        $env:PATH = "$($wsl.Directory);$env:PATH"
+        Invoke-Rendered 'dialect-build' @{
+            Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache
+            Install = @('bash scripts/testdb-setup.sh --container corvis-fleet-testdb'); Make = $make.Path; GitBin = $git.Directory
+        }
+        [System.IO.File]::ReadAllLines($git.Record) |
+            Should -Be @("$($export.Target) scripts/testdb-setup.sh --container corvis-fleet-testdb")
+        Test-Path -LiteralPath $wsl.Record | Should -BeFalse
+        $env:PATH | Should -BeLike "$($git.Directory);$($wsl.Directory);*"
+        Read-Result $export.Target | Should -BeExactly '0'
+    }
     It 'transcribes cmd.exe''s own refusal of a tool that does not exist, and writes its status' {
         # cmd.exe /c exits 1 for a command it cannot find; 9009 is only its
         # ERRORLEVEL inside a session.

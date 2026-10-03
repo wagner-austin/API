@@ -120,15 +120,17 @@ class NodeConfig(TypedDict):
             loopback postgres container ``corvis-fleet-testdb`` that MCPs
             ``scripts/testdb-setup.sh --container`` restarts empty and
             migrates before each run, provisioned on diphtheria by MCPs
-            ``scripts/host/diphtheria/provision.sh``. True gives the node
+            ``scripts/host/diphtheria/provision.sh`` and on a Windows node
+            with Docker Desktop by ``scripts/install-windows-testdb.ps1``
+            (sedona, MCPs board task daae17f2). True gives the node
             the ``testdb`` tag (:mod:`fleet.contracts.tags`), which every
             project whose suite needs a migrated ``corvis_test`` requires.
 
             DECLARED, AND REQUIRED LIKE ``enabled`` (MCPs board task
-            6bbfd171). No Windows node can reach a test database (measured
-            2026-09-26: sedona and serendipity both refuse the cluster's
-            6432), so a Postgres-backed package handed to one fails its
-            global setup; a default of false would hide a provisioned node
+            6bbfd171). A node without the container cannot reach a test
+            database (measured 2026-09-26: sedona and serendipity both
+            refuse the cluster's 6432), so a Postgres-backed package handed
+            to one fails its global setup; a default of false would hide a provisioned node
             from those packages and a default of true would send them to
             nodes with no database, so the workspace says which.
         rust: The version ``cargo --version`` printed on this node, e.g.

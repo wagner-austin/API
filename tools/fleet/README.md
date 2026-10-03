@@ -305,10 +305,31 @@ task c4fc4f3e), and that MCPs
 migrates before a run, as a CI job's service container is fresh. Every MCPs
 project whose suite starts from `packages/db`'s global test setup names that
 step as an install step and requires `testdb`, so it only reaches a node where
-the setup can succeed. No Windows node can reach a test database (measured
-2026-09-26: sedona and serendipity both refuse the cluster's 6432), and no
-node is pointed at the production cluster's `corvis_test`, which would put the
-`corvis_app` credential on it.
+the setup can succeed. No node is pointed at the production cluster's
+`corvis_test` (measured 2026-09-26: sedona and serendipity both refuse the
+cluster's 6432 anyway), which would put the `corvis_app` credential on it.
+
+**sedona is the Windows testdb node** (MCPs board task daae17f2). On
+2026-10-02 eleven testdb jobs queued behind lavender-wsl, the one testdb lane
+diphtheria's production reservation left free, and every closure on the board
+waited on it. sedona's build account reaches Docker Desktop, so
+`scripts/install-windows-testdb.ps1` (pester-tested beside the renders) gives
+it the same container: it pulls `pgvector/pgvector:pg16-bookworm` under an
+empty docker config with only System32 on the PATH (Docker Desktop's
+credential helper refuses an ssh logon: "A specified logon session does not
+exist"), creates `corvis-fleet-testdb` on a loopback port with its data on
+tmpfs, and unpacks EDB's PostgreSQL 16.15 client `bin` (sha256-pinned) into
+`C:\fleet\pgsql-16.15\bin` on the account's PATH, for the `pg_isready` and
+`psql` the MCPs scripts call. Two Windows differences the lane needed: the
+Windows build puts Git for Windows' `bin` first on the PATH
+(`fleet.core.windows_build`), because `System32\bash.exe` is WSL's launcher
+and would run `bash scripts/testdb-setup.sh` in Docker Desktop's own distro;
+and Windows psql ignores every option after a positional argument, so MCPs'
+`ci-bootstrap-testdb.sh` names each database with `-d`. The Windows probe asks
+Docker Desktop for the container's image as the Linux probe asks its daemon
+(`fleet.core.windows_toolchain_probe`). If Docker Desktop is down (it starts
+at the account's logon), the probe answers `testdb=no=` and sedona simply
+claims no testdb job until it is back.
 
 **`corvis-fleet-testdb` is node-local** (MCPs board task c4fc4f3e). The
 workspace's `node_local_resources` lists the exclusive resources each node
@@ -609,8 +630,9 @@ because the directions call for opposite edits — and exit 1. This is detection
 not prevention: nothing stops somebody editing one file and not the other, it
 stops that going unnoticed.
 
-Six ways they can disagree, and on agreement the command says how many nodes
-it compared (`N node(s) agree with <path> on enabled, platform and gpu`):
+Seven ways they can disagree, and on agreement the command says how many nodes
+it compared (`N node(s) agree with <path> on enabled, platform, gpu and
+test_database`):
 
 | disagreement | what it costs |
 |---|---|
@@ -620,6 +642,7 @@ it compared (`N node(s) agree with <path> on enabled, platform and gpu`):
 | enabled there, unmentioned here | capacity nobody has decided about |
 | platform differs | every script goes out in the wrong dialect; a parse error that reads as the node's fault |
 | gpu declared here, none measured there (or the reverse) | a `gpu` job matched on the declaration runs, or never runs, on the wrong box |
+| `test_database` differs | one of the two files is wrong about which nodes take a Postgres-backed check (MCPs board task daae17f2) |
 
 The gpu row compares this file's declared `gpu` (a CUDA device or `null`)
 with the registry's measured column: a CUDA device iff its `probe` is

@@ -71,6 +71,15 @@ def build_script(
     submitter, held to the board's grammar (:mod:`fleet.core.agent_label`),
     so a fleet hold the suite takes is attributed to that session.
 
+    ``bash`` IS GIT FOR WINDOWS' BASH, its ``bin`` put first on the PATH
+    (``$GitBin``, MCPs board task daae17f2). Every testdb project's install
+    step is ``bash scripts/testdb-setup.sh``, a script written for the bash
+    the hub and the Linux nodes run, and a Windows PATH names
+    ``System32\\bash.exe`` first, which is WSL's launcher: on sedona it
+    entered Docker Desktop's ``docker-desktop`` distro. Git's ``bin`` holds
+    only ``bash``, ``sh`` and ``git``, so nothing else a recipe calls
+    resolves differently.
+
     Args:
         target: Absolute remote directory holding the export, its root.
         path: The project's directory inside the export, ``""`` for the root.
@@ -106,6 +115,7 @@ def build_script(
         f"    [string]$CacheRoot = '{scriptable(cache_root, label='cache root')}',",
         f"    [string[]]$Install = @({steps}),",
         "    [string]$Make = 'make',",
+        '    [string]$GitBin = "$env:ProgramFiles\\Git\\bin",',
         "    " + system32_parameter("Cmd", "cmd.exe"),
         ")",
         *STRICT_HEADER,
@@ -118,6 +128,7 @@ def build_script(
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',
         f"$env:CORVIS_FLEET_ELEVATED = '{1 if elevated else 0}'",
         f"$env:{AGENT_LABEL_VARIABLE} = '{label}'",
+        '$env:PATH = "$GitBin;$env:PATH"',
         "function Invoke-Logged {",
         "    param([string]$Shell, [string]$Command)",
         '    & $Shell /d /s /c "$Command >> `"$log`" 2>&1"',

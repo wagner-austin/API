@@ -91,6 +91,11 @@ class RegistryNode(TypedDict):
             measurement (MCPs board task 41f45bd7) and this workspace's
             ``gpu`` is a declaration, and a job tagged ``gpu`` is matched on
             the declaration, so the two must agree (board task fd5cabfa, A1).
+        test_database: The registry's ``test_database``, whether the node runs
+            the ``corvis-fleet-testdb`` container (MCPs board task daae17f2).
+            The key is spelled as this workspace spells it, and a node that
+            disagrees is reported beside ``gpu``, the other tag the roster
+            declares in both files.
     """
 
     name: str
@@ -99,6 +104,7 @@ class RegistryNode(TypedDict):
     user: str | None
     platform: NodePlatform
     cuda: bool
+    test_database: bool
 
 
 class RegistryDrift(TypedDict):
@@ -134,6 +140,11 @@ class RegistryDrift(TypedDict):
             by the tags this workspace derives, so a ``gpu`` job would land
             on a box whose measured adapter cannot run it, or never land on
             one that could.
+        test_database_disagrees: Nodes the two files disagree on running
+            the fleet test database, as ``(name, here, there)`` booleans.
+            The hub plans testdb jobs by this workspace's declaration, so a
+            disagreement means one of the two files is wrong about which
+            nodes can take a Postgres-backed check.
     """
 
     enabled_here_disabled_there: tuple[str, ...]
@@ -142,6 +153,7 @@ class RegistryDrift(TypedDict):
     enabled_there_absent_here: tuple[str, ...]
     platform_disagrees: tuple[tuple[str, str, str], ...]
     gpu_disagrees: tuple[tuple[str, bool, bool], ...]
+    test_database_disagrees: tuple[tuple[str, bool, bool], ...]
 
 
 #: The registry's probe whose adapters are CUDA devices; the other probe,
@@ -188,8 +200,8 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
     Raises:
         AppError: ``NODE_REGISTRY_UNREADABLE`` when the document is not the
             shape the registry has always had -- an object with a ``nodes``
-            array of objects carrying ``name``, ``enabled``, ``role`` and
-            ``platform``. Raised rather
+            array of objects carrying ``name``, ``enabled``, ``role``,
+            ``platform``, ``gpu`` and ``test_database``. Raised rather
             than skipped: a reconciler that shrugged at an unreadable registry
             would report agreement it never established.
     """
@@ -214,6 +226,7 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
             user=None if raw_user is None else narrow_json_to_str(raw_user),
             platform=decode_node_platform(require_str(entry, "platform")),
             cuda=_decode_cuda(entry),
+            test_database=require_bool(entry, "test_database"),
         )
     return declared
 
@@ -231,8 +244,8 @@ def _unreadable(detail: str) -> AppError[FleetErrorCode]:
         FleetErrorCode.NODE_REGISTRY_UNREADABLE,
         f"the fleet identity registry cannot be read: {detail}. Expected the shape "
         "fleet-mcp/fleet-nodes.json has always had -- an object with a 'nodes' array, "
-        "each entry carrying 'name', 'enabled', 'role', 'platform' and 'gpu' (null or an "
-        "object with a 'probe').",
+        "each entry carrying 'name', 'enabled', 'role', 'platform', 'gpu' (null or an "
+        "object with a 'probe') and 'test_database'.",
     )
 
 
@@ -271,6 +284,7 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
     undecided: list[str] = []
     platform_disagrees: list[tuple[str, str, str]] = []
     gpu_disagrees: list[tuple[str, bool, bool]] = []
+    test_database_disagrees: list[tuple[str, bool, bool]] = []
     for name, node in sorted(workspace["nodes"].items()):
         declared = registry.get(name)
         if declared is None:
@@ -286,6 +300,8 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
         here_cuda = node["gpu"] is not None
         if here_cuda != declared["cuda"]:
             gpu_disagrees.append((name, here_cuda, declared["cuda"]))
+        if node["test_database"] != declared["test_database"]:
+            test_database_disagrees.append((name, node["test_database"], declared["test_database"]))
     for name, declared in sorted(registry.items()):
         unmentioned = name not in workspace["nodes"] and name not in workspace["not_dispatchable"]
         if declared["enabled"] and unmentioned:
@@ -297,6 +313,7 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
         enabled_there_absent_here=tuple(undecided),
         platform_disagrees=tuple(platform_disagrees),
         gpu_disagrees=tuple(gpu_disagrees),
+        test_database_disagrees=tuple(test_database_disagrees),
     )
 
 
@@ -307,7 +324,7 @@ def has_drifted(drift: RegistryDrift) -> bool:
         drift: What :func:`compare` found.
 
     Returns:
-        True when any of the six disagreements is non-empty.
+        True when any of the seven disagreements is non-empty.
     """
     return bool(
         drift["enabled_here_disabled_there"]
@@ -316,6 +333,7 @@ def has_drifted(drift: RegistryDrift) -> bool:
         or drift["enabled_there_absent_here"]
         or drift["platform_disagrees"]
         or drift["gpu_disagrees"]
+        or drift["test_database_disagrees"]
     )
 
 
@@ -373,6 +391,13 @@ def describe(drift: RegistryDrift, *, registry_path: str) -> tuple[str, ...]:
             f"{name}: this workspace {here}, {registry_path} {there}. The node runners "
             "claim by the tags derived here, so a gpu job is matched on the declaration "
             "and runs, or never runs, on the wrong box."
+        )
+    for name, here_db, there_db in drift["test_database_disagrees"]:
+        lines.append(
+            f"{name}: this workspace says test_database {str(here_db).lower()}, "
+            f"{registry_path} says {str(there_db).lower()}. The hub plans testdb jobs by "
+            "the declaration here, so one of the two files is wrong about which nodes "
+            "can take a Postgres-backed check."
         )
     return tuple(lines)
 

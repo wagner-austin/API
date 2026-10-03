@@ -33,9 +33,10 @@ the probe that measured each, so which windows nodes may carry this tag is a
 recorded fact rather than a guess: on 2026-09-21 austinpc, sedona and
 lavender, and diphtheria on linux. ``testdb`` because 17 MCPs packages start
 their suites from ``packages/db``'s global test setup, which needs a migrated
-``corvis_test`` and its owner role, and no Windows node can reach a test
-database (MCPs board task 6bbfd171, measured 2026-09-26): the tag means the
-node runs ``corvis-fleet-testdb``, the loopback container MCPs
+``corvis_test`` and its owner role, and a node without its own container
+cannot reach one (MCPs board task 6bbfd171, measured 2026-09-26): the tag
+means the node runs ``corvis-fleet-testdb``, on Linux or under Docker Desktop
+on Windows (sedona, MCPs board task daae17f2), the loopback container MCPs
 ``scripts/testdb-setup.sh`` restarts empty and migrates before each run, so
 such a package lands only where its global setup can succeed. ``rust``
 because API ``services/covenant-radar-api`` builds the maturin crate

@@ -46,17 +46,24 @@ INTEGRATED_GPU: JSONObject = {
 }
 
 
-def _registry_document(platform: str = "windows", gpu: JSONValue = None, **enabled: bool) -> str:
+def _registry_document(
+    platform: str = "windows",
+    gpu: JSONValue = None,
+    test_database: bool = False,
+    **enabled: bool,
+) -> str:
     """Render an identity registry carrying the given nodes.
 
     Shaped like the real one: an object with a ``nodes`` ARRAY whose entries
-    carry ``name``, ``enabled``, ``role``, ``user``, ``platform`` and ``gpu``
-    among fields this package ignores.
+    carry ``name``, ``enabled``, ``role``, ``user``, ``platform``, ``gpu``
+    and ``test_database`` among fields this package ignores.
 
     Args:
         platform: What the registry says every node here runs.
         gpu: The measured gpu column every node here carries; null by
             default, because the fixture workspace's lavender declares none.
+        test_database: Whether every node here runs the fleet test
+            database; false by default, as the fixture workspace declares.
         **enabled: Node name to whether the registry says it is expected to
             answer.
 
@@ -74,6 +81,7 @@ def _registry_document(platform: str = "windows", gpu: JSONValue = None, **enabl
                 "tailnetIp": "100.0.0.1",
                 "enabled": value,
                 "gpu": gpu,
+                "test_database": test_database,
                 "tunnel": None,
                 "notes": "carried by the real registry; ignored here",
             }
@@ -259,6 +267,50 @@ class TestTheDriftThatHappened:
             "lavender: this workspace declares no gpu, /x/r.json measured one with nvidia-smi"
         )
 
+    def test_a_test_database_the_two_files_disagree_on_is_drift_both_ways(self) -> None:
+        """sedona's lane, exactly (MCPs board task daae17f2): the hub plans
+        testdb jobs by this workspace, so the registry must say the same."""
+        there_only = registry.compare(
+            _workspace(lavender=True),
+            registry.decode_registry_nodes(_registry_document(test_database=True, lavender=True)),
+        )
+
+        assert there_only["test_database_disagrees"] == (("lavender", False, True),)
+        assert registry.has_drifted(there_only) is True
+        assert registry.describe(there_only, registry_path="/x/r.json") == (
+            "lavender: this workspace says test_database false, /x/r.json says true. The hub "
+            "plans testdb jobs by the declaration here, so one of the two files is wrong about "
+            "which nodes can take a Postgres-backed check.",
+        )
+        document = workspace_document()
+        nodes = document["nodes"]
+        if not isinstance(nodes, dict):
+            raise AssertionError("the fixture workspace must declare nodes")
+        lavender = nodes["lavender"]
+        if not isinstance(lavender, dict):
+            raise AssertionError("the fixture workspace must declare lavender")
+        lavender["test_database"] = True
+        here_only = registry.compare(
+            decode_fleet_workspace(document),
+            registry.decode_registry_nodes(_registry_document(lavender=True)),
+        )
+
+        assert here_only["test_database_disagrees"] == (("lavender", True, False),)
+        agreed = registry.compare(
+            decode_fleet_workspace(document),
+            registry.decode_registry_nodes(_registry_document(test_database=True, lavender=True)),
+        )
+        assert registry.has_drifted(agreed) is False
+
+    def test_a_node_without_test_database_is_refused(self) -> None:
+        with pytest.raises(Exception) as excinfo:
+            registry.decode_registry_nodes(
+                '{"nodes": [{"name": "loki", "role": "worker", "user": "austi", "enabled": true, '
+                '"platform": "windows", "gpu": null}]}'
+            )
+
+        assert "test_database" in str(excinfo.value)
+
     def test_a_cuda_device_on_both_sides_agrees(self) -> None:
         drift = registry.compare(
             _workspace_with_cuda(),
@@ -322,6 +374,7 @@ class TestTheObserverReadsRoleAndUser:
             user="austi",
             platform=NodePlatform.WINDOWS,
             cuda=False,
+            test_database=False,
         )
 
     def test_a_cuda_device_the_nvidia_probe_measured_is_read_as_one(self) -> None:
@@ -333,7 +386,7 @@ class TestTheObserverReadsRoleAndUser:
         """The phone, exactly as the live registry declares it."""
         nodes = registry.decode_registry_nodes(
             '{"nodes": [{"name": "phone", "role": "client", "user": null, "enabled": true, '
-            '"platform": "linux", "gpu": null}]}'
+            '"platform": "linux", "gpu": null, "test_database": false}]}'
         )
 
         assert nodes["phone"] == registry.RegistryNode(
@@ -343,6 +396,7 @@ class TestTheObserverReadsRoleAndUser:
             user=None,
             platform=NodePlatform.LINUX,
             cuda=False,
+            test_database=False,
         )
 
     def test_integrated_graphics_the_win32_probe_found_is_not_a_cuda_device(self) -> None:

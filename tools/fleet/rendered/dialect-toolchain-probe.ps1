@@ -76,7 +76,15 @@ if ($smi -ne '') {
     }
 }
 $gpu
-'testdb=no='
+$testdb = 'testdb=no='
+$docker = Find-Tool 'docker'
+if ($docker -ne '') {
+    $container = Invoke-Answer $Cmd $docker 'container inspect --format "{{.Config.Image}}" corvis-fleet-testdb'
+    if ($container.Succeeded -and $container.First -ne '') {
+        $testdb = "testdb=yes=$($container.First)"
+    }
+}
+$testdb
 'docker=no='
 $hooks = 'hooks=no='
 if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {

@@ -59,6 +59,7 @@ def _registry_node(name: str, *, enabled: bool) -> JSONObject:
         "enabled": enabled,
         "platform": "windows",
         "gpu": None,
+        "test_database": False,
     }
 
 
@@ -267,7 +268,10 @@ class TestFleetNodesReportsAndReconciles:
             )
 
         messages = [record.getMessage() for record in caplog.records]
-        assert f"2 node(s) agree with {registry_path} on enabled, platform and gpu" in messages
+        assert (
+            f"2 node(s) agree with {registry_path} on enabled, platform, gpu and test_database"
+            in messages
+        )
 
     def test_without_the_flag_no_reconciliation_is_claimed(
         self, mixed_config: pathlib.Path

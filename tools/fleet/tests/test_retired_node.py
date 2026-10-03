@@ -74,6 +74,7 @@ def test_the_reconciliation_reads_the_retirement_as_agreement(
         "enabled": True,
         "platform": "windows",
         "gpu": None,
+        "test_database": False,
     }
     registry_path.write_text(dump_json_str({"nodes": [entry]}), encoding="utf-8")
     runner = FakeRun([])

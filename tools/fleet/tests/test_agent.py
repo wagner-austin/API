@@ -184,6 +184,7 @@ def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
                             "vramMib": 24564,
                             "driver": "591.86",
                         },
+                        "test_database": False,
                     },
                     {
                         "name": "serendipity",
@@ -192,6 +193,7 @@ def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
                         "enabled": True,
                         "platform": "windows",
                         "gpu": None,
+                        "test_database": False,
                     },
                 ]
             }

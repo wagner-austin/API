@@ -243,7 +243,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # A pass says how much it examined: silence here read the same as a
         # reconciliation nobody asked for.
         _log.info(
-            "%d node(s) agree with %s on enabled, platform and gpu",
+            "%d node(s) agree with %s on enabled, platform, gpu and test_database",
             len(loaded.workspace["nodes"]),
             registry_path,
         )

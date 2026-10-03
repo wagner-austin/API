@@ -19,7 +19,7 @@
         "max_disk_gb": 40.0
       },
       "enabled": true,
-      "test_database": false,
+      "test_database": true,
       "rust": null,
       "cxx": "17.14.37710.0",
       "docker": null,

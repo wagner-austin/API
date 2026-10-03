@@ -11,6 +11,7 @@ a PATH the suite lays out (MCPs board task d69786fa).
 
 from __future__ import annotations
 
+from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
 
 #: The toolchain probe, verbatim.
@@ -59,12 +60,19 @@ from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
 #: device as ``<name>, <compute capability>``, ``no`` when nvidia-smi is not
 #: on the PATH, fails or lists nothing (measured 2026-10-02: sedona answers
 #: ``NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6``, serendipity and pendragon
-#: have no nvidia-smi), and ``testdb`` is always ``no``: no Windows node can
-#: reach a test database (:mod:`fleet.contracts.detection`, MCPs board task
-#: 939ec5c7). ``docker`` is always ``no`` here:
+#: have no nvidia-smi). ``testdb`` is the image of the
+#: :data:`fleet.contracts.detection.TESTDB_CONTAINER` container the ``docker``
+#: on the PATH reports, the Linux probe's question asked of Docker Desktop's
+#: daemon, and ``no`` when there is no docker, its daemon does not answer, or
+#: it holds no such container (MCPs board task daae17f2: measured 2026-10-03,
+#: sedona's build account reaches Docker Desktop, so the loopback container
+#: ``scripts/install-windows-testdb.ps1`` creates there gives it the lane
+#: lavender-wsl and diphtheria carry). ``docker`` is always ``no`` here:
 #: the capability is the execution suite's rootless daemon under its own
 #: Linux user (MCPs board task 6c4516af), which no Windows node carries,
-#: and Docker Desktop is exactly the kind of shared daemon it excludes.
+#: and Docker Desktop is exactly the kind of shared daemon it excludes. The
+#: test database needs no such isolation: its container holds only the
+#: throwaway roles every run recreates.
 #: ``hooks`` is the MCPs claude-hooks check's environment (MCPs board task
 #: ec895824): ``yes=<route file>`` only when the build account carries the
 #: hooks route file (``$HooksRoute``, a parameter so the suite names one) and
@@ -163,7 +171,17 @@ if ($smi -ne '') {
     }
 }
 $gpu
-'testdb=no='
+$testdb = 'testdb=no='
+$docker = Find-Tool 'docker'
+if ($docker -ne '') {
+    $container = Invoke-Answer $Cmd $docker 'container inspect --format "{{.Config.Image}}" """
+    + TESTDB_CONTAINER
+    + r"""'
+    if ($container.Succeeded -and $container.First -ne '') {
+        $testdb = "testdb=yes=$($container.First)"
+    }
+}
+$testdb
 'docker=no='
 $hooks = 'hooks=no='
 if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {

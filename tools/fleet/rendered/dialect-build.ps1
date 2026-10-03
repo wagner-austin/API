@@ -5,6 +5,7 @@ param(
     [string]$CacheRoot = 'C:/fleet/stage/cache',
     [string[]]$Install = @('npm ci'),
     [string]$Make = 'make',
+    [string]$GitBin = "$env:ProgramFiles\Git\bin",
     [string]$Cmd = "$env:SystemRoot\System32\cmd.exe"
 )
 Set-StrictMode -Version Latest
@@ -18,6 +19,7 @@ $env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"
 $env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"
 $env:CORVIS_FLEET_ELEVATED = '0'
 $env:BOARD_AGENT_LABEL = 'opus-example-0929'
+$env:PATH = "$GitBin;$env:PATH"
 function Invoke-Logged {
     param([string]$Shell, [string]$Command)
     & $Shell /d /s /c "$Command >> `"$log`" 2>&1"
