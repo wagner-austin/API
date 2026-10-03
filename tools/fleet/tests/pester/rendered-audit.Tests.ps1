@@ -171,7 +171,26 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         $variant = Initialize-Host $script:name -Processes @($stale)
         $drifted = @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' })
         $drifted.Count | Should -Be 1
-        $drifted[0] | Should -BeLike "CHECK orphans:*:windows:* DRIFT 1 process(es) under $($roots[0]) outside *, older than 360 minutes with no job running: stale.exe pid 9100"
+        $drifted[0] | Should -BeLike "CHECK orphans:*:windows:* DRIFT 1 process(es) under $($roots[0]) older than 360 minutes that a finished job left outside *, or a Worker past that job timeout: stale.exe pid 9100"
+    }
+    It 'counts a Runner.Worker older than the job timeout, and what it was shielding' {
+        # The 10:09Z case of 2026-10-02 on the WSL side: GitHub had let go of
+        # the job, the Worker never heard, and the leftovers stayed.
+        $root = @(Get-RunnerRoot $script:name)[0]
+        $variant = Initialize-Host $script:name -Processes @(
+            (Get-ProcessRow 4000 1 'Runner.Listener.exe' "${root}bin\Runner.Listener.exe" (Get-Date).AddDays(-3)),
+            (Get-ProcessRow 4001 4000 'Runner.Worker.exe' "${root}bin\Runner.Worker.exe" (Get-Date).AddDays(-1)),
+            (Get-ProcessRow 9200 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
+        $drifted = @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' })
+        $drifted.Count | Should -Be 1
+        $drifted[0] | Should -BeLike "CHECK orphans:*:windows:* DRIFT 2 process(es) under $root older than 360 minutes *: Runner.Worker.exe pid 4001, stale.exe pid 9200"
+    }
+    It 'takes a Runner.Worker whose start cannot be read for a running job' {
+        $root = @(Get-RunnerRoot $script:name)[0]
+        $variant = Initialize-Host $script:name -Processes @(
+            (Get-ProcessRow 4001 4000 'Runner.Worker.exe' "${root}bin\Runner.Worker.exe" $null),
+            (Get-ProcessRow 9200 1 'stale.exe' "${root}_work\stale.exe" (Get-Date).AddDays(-2)))
+        @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' }).Count | Should -Be 0
     }
     It 'counts nothing while a Runner.Worker runs in the service''s tree, walking a reused parent id without looping' {
         $root = @(Get-RunnerRoot $script:name)[0]
