@@ -287,12 +287,11 @@ and the wiki page (`fleet-check-runner`, mcps-codebase) carries.
 run just launched, then the probe) and claims again, until the node has no
 room or the lane nothing it fits (`fleet.cli.node_agent.fill_pass`). It stops
 at the first job it refuses, so a node that stops answering mid-staging
-refuses one job, not the lane. Each pass names only the projects whose lease
-this node could take now (`fleet.cli.node_ready.unleased`, asking
-`fleet.core.leases.admits`), so the pass after a launch never claims a second
-job of the project still running and refuses it `LEASE_HELD`; that job waits
-in the lane instead. Each runner's log ends every tick with `<alias>
-launched N job(s) this tick`.
+refuses one job, not the lane. Each pass leaves out of its claim what a lease
+on the node holds now (`fleet.core.run_lease.held_on_node`, below), so the
+pass after a launch never claims a second job of the project still running
+and refuses it `LEASE_HELD`; that job waits in the lane instead. Each
+runner's log ends every tick with `<alias> launched N job(s) this tick`.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
