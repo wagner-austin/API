@@ -1,0 +1,103 @@
+{
+  "project": "mi",
+  "name": "qa-full-wiki-v55",
+  "image": {
+    "path": "/pub/wagnera3/images/v55/abl",
+    "sha256": "12d7be2515908848254c0b1941824fe993ccbf29f9f847121e47348fec5fc2fb",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 720,
+  "mem_gb": 64,
+  "resumes_from_checkpoint": true,
+  "throttle": 6,
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "gpu_pinned_because": "every cell of every axis on one card model, so the card cannot differ between two cells an axis compares; A100 is the profile the earlier full-wiki submissions declared",
+  "experiment": {
+    "measurement": "cartridge-question-set",
+    "corpus": "personal-wiki-885-pages-ee6e6d12",
+    "corpus_digest": "a756664dbb4e",
+    "corpus_stage": "runs/qa-corpus-wiki-full-ee6e6d12-stage.json",
+    "items": "3278-to-3827-per-cell-measured-2026-10-04",
+    "declared_effect": "0.02",
+    "image_commit": "04d46ff9ec73d6600c8f019aa262ae07a0c738ea",
+    "arms": "base-cartridge-oracle-bm25-dense-fused-expanded-reranked-longcontext",
+    "seeds": "7.8.9",
+    "protection": "per-arm-and-per-seed-checkpoint-resume",
+    "task": "e3c833f7",
+    "axes": "scale-gpt2-family+slots-32.64.128.256-on-gpt2-large+window-128.512+epochs-3.6.24",
+    "why": "the-scale-capacity-window-and-epoch-curves-on-a-corpus-the-power-gate-admits",
+    "supersedes": "qa-full-wiki-gpt2-v52-whose-corpus-had-no-stage-manifest"
+  },
+  "members": [
+    {
+      "suffix": "gpt2-full-wiki-qa",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa.json"
+    },
+    {
+      "suffix": "gpt2-medium-full-wiki-qa",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-medium-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-medium-full-wiki-qa.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-medium-full-wiki-qa.json"
+    },
+    {
+      "suffix": "gpt2-large-full-wiki-qa",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-large-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa.json"
+    },
+    {
+      "suffix": "gpt2-xl-full-wiki-qa",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-xl-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-xl-full-wiki-qa.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-xl-full-wiki-qa.json"
+    },
+    {
+      "suffix": "gpt2-large-full-wiki-qa-slots-32",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-large-full-wiki-qa-slots-32 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-32.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-32.json"
+    },
+    {
+      "suffix": "gpt2-large-full-wiki-qa-slots-64",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-large-full-wiki-qa-slots-64 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-64.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-64.json"
+    },
+    {
+      "suffix": "gpt2-large-full-wiki-qa-slots-128",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-large-full-wiki-qa-slots-128 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-128.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-128.json"
+    },
+    {
+      "suffix": "gpt2-large-full-wiki-qa-slots-256",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-large-full-wiki-qa-slots-256 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-256.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-large-full-wiki-qa-slots-256.json"
+    },
+    {
+      "suffix": "gpt2-full-wiki-qa-window-128",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa-window-128 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-window-128.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-window-128.json"
+    },
+    {
+      "suffix": "gpt2-full-wiki-qa-window-512",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa-window-512 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-window-512.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-window-512.json"
+    },
+    {
+      "suffix": "gpt2-full-wiki-qa-epochs-3",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa-epochs-3 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-epochs-3.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-epochs-3.json"
+    },
+    {
+      "suffix": "gpt2-full-wiki-qa-epochs-6",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa-epochs-6 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-epochs-6.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-epochs-6.json"
+    },
+    {
+      "suffix": "gpt2-full-wiki-qa-epochs-24",
+      "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa-epochs-24 --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-epochs-24.json",
+      "artifact": "/pub/wagnera3/mi/cartridge/results/qa-v55/gpt2-full-wiki-qa-epochs-24.json"
+    }
+  ]
+}
