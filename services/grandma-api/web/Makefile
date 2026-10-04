@@ -1,9 +1,12 @@
 include ../../../scripts/make/shell.mk
 
-.PHONY: check lint typecheck test build serve dev
+.PHONY: check _check-unbudgeted lint typecheck test build serve dev
 
-check: lint typecheck test
+check:
+	$(PYTHON) ../../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint typecheck test
 
 lint:
 	npm run lint
