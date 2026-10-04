@@ -9,17 +9,20 @@ field the axis owns replaced, and comparing whole plans -- a field added to
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from model_trainer.core.contracts.qa_plan import QaPlan
+from model_trainer.core.services.model import cartridge_qa_axes
 from model_trainer.core.services.model.cartridge_qa_axes import (
-    EPOCHS,
+    EPOCH_CELLS,
     FULL_WIKI_BASE,
     SCALE_RUNGS,
     SLOT_AXIS_MAX_SEQ_LEN,
-    SLOT_AXIS_MODEL,
-    SLOT_COUNTS,
-    WINDOWS,
+    SLOT_AXIS_RUNG,
+    SLOT_CELLS,
+    WINDOW_CELLS,
     epoch_cells,
     full_wiki_family,
     merged_plan_tables,
@@ -62,8 +65,8 @@ class TestTheScaleLadder:
         """
         rungs = scale_rungs(_base())
 
-        assert [rung["model_id"] for rung in rungs.values()] == [
-            model_id for model_id, _selector in SCALE_RUNGS
+        assert [(name, plan["model_id"]) for name, plan in rungs.items()] == [
+            (name, model_id) for name, model_id, _selector in SCALE_RUNGS
         ]
         assert rungs["pythia-6.9b-full-wiki-qa"]["model_id"] == "EleutherAI/pythia-6.9b"
         assert rungs["gpt2-large-full-wiki-qa"]["model_id"] == "gpt2-large"
@@ -79,7 +82,7 @@ class TestTheScaleLadder:
 
 class TestTheCapacityAxis:
     def test_each_cell_moves_only_its_slot_count_from_the_crossing_rung(self) -> None:
-        rung = scale_rungs(_base())["gpt2-large-full-wiki-qa"]
+        rung = scale_rungs(_base())[SLOT_AXIS_RUNG]
 
         for name, cell in slot_cells(rung).items():
             expected: QaPlan = {
@@ -89,18 +92,18 @@ class TestTheCapacityAxis:
             }
             assert cell == expected, name
 
-    def test_it_spans_the_doubling_ladder_under_one_budget(self) -> None:
+    def test_it_spans_the_doubling_ladder_under_one_budget_on_gpt2_large(self) -> None:
         """Every cell held to 768, or the smallest cartridge faces the most evidence."""
-        cells = slot_cells(scale_rungs(_base())["gpt2-large-full-wiki-qa"])
+        cells = slot_cells(scale_rungs(_base())[SLOT_AXIS_RUNG])
 
-        assert sorted(cells) == [f"gpt2-large-full-wiki-qa-slots-{n}" for n in (128, 256, 32, 64)]
-        assert tuple(cell["num_slots"] for cell in cells.values()) == SLOT_COUNTS
+        assert [(name, cell["num_slots"]) for name, cell in cells.items()] == list(SLOT_CELLS)
+        assert [count for _name, count in SLOT_CELLS] == [32, 64, 128, 256]
         assert {cell["max_seq_len"] for cell in cells.values()} == {768}
-        assert {cell["model_id"] for cell in cells.values()} == {SLOT_AXIS_MODEL}
+        assert {cell["model_id"] for cell in cells.values()} == {"gpt2-large"}
 
     def test_the_budget_leaves_room_for_the_largest_prefix(self) -> None:
         """gpt2-large has 1024 positions; the 256-slot cell must still fit."""
-        assert SLOT_AXIS_MAX_SEQ_LEN + max(SLOT_COUNTS) == 1024
+        assert SLOT_AXIS_MAX_SEQ_LEN + max(count for _name, count in SLOT_CELLS) == 1024
 
 
 class TestTheWindowAndEpochAxes:
@@ -108,32 +111,26 @@ class TestTheWindowAndEpochAxes:
         base = _base()
         cells = window_cells(base)
 
-        assert sorted(cells) == ["gpt2-full-wiki-qa-window-128", "gpt2-full-wiki-qa-window-512"]
+        assert [(name, cell["window"]) for name, cell in cells.items()] == list(WINDOW_CELLS)
         for name, cell in cells.items():
             expected: QaPlan = {**base, "window": cell["window"]}
             assert cell == expected, name
-        assert tuple(cell["window"] for cell in cells.values()) == WINDOWS
 
     def test_each_epoch_cell_moves_only_its_epochs(self) -> None:
         base = _base()
         cells = epoch_cells(base)
 
-        assert sorted(cells) == [
-            "gpt2-full-wiki-qa-epochs-24",
-            "gpt2-full-wiki-qa-epochs-3",
-            "gpt2-full-wiki-qa-epochs-6",
-        ]
+        assert [(name, cell["epochs"]) for name, cell in cells.items()] == list(EPOCH_CELLS)
         for name, cell in cells.items():
             expected: QaPlan = {**base, "epochs": cell["epochs"]}
             assert cell == expected, name
-        assert tuple(cell["epochs"] for cell in cells.values()) == EPOCHS
 
     def test_neither_axis_repeats_the_base_s_own_value(self) -> None:
         """The base IS each axis's point at 256 and 12; a cell there would be a twin."""
         base = _base()
 
-        assert base["window"] not in WINDOWS
-        assert base["epochs"] not in EPOCHS
+        assert base["window"] not in [window for _name, window in WINDOW_CELLS]
+        assert base["epochs"] not in [epochs for _name, epochs in EPOCH_CELLS]
 
     def test_every_window_cell_leaves_room_for_the_cartridge_in_training(self) -> None:
         """A training window plus the prefix must fit gpt2's 1024 positions."""
@@ -145,12 +142,27 @@ class TestTheFamily:
     def test_it_is_the_ladder_and_the_three_axes_and_nothing_else(self) -> None:
         family = full_wiki_family(_base())
 
-        assert len(family) == len(SCALE_RUNGS) + len(SLOT_COUNTS) + len(WINDOWS) + len(EPOCHS)
+        assert len(family) == (
+            len(SCALE_RUNGS) + len(SLOT_CELLS) + len(WINDOW_CELLS) + len(EPOCH_CELLS)
+        )
         assert FULL_WIKI_BASE not in family
 
     def test_the_registry_serves_every_cell_unchanged(self) -> None:
         for name, plan in full_wiki_family(_base()).items():
             assert QA_PLANS[name] == plan, name
+
+    def test_every_cell_name_is_a_quoted_literal_in_this_module_s_source(self) -> None:
+        """A run document's plan name must be findable by reading the source.
+
+        ``tools/hpc3``'s committed-run check, and anyone grepping a plan name
+        out of a run document, look for the name as a quoted string. A name
+        assembled at import time is in no file, which is how image v55's run
+        documents came to fail that check and be cancelled.
+        """
+        source = pathlib.Path(cartridge_qa_axes.__file__).read_text(encoding="utf-8")
+
+        for name in full_wiki_family(_base()):
+            assert f'"{name}"' in source, name
 
     @pytest.mark.parametrize("name", sorted(full_wiki_family(QA_PLANS[FULL_WIKI_BASE])))
     def test_every_cell_clears_the_gate_on_its_measured_corpus(self, name: str) -> None:
