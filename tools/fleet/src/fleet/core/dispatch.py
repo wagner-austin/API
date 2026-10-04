@@ -49,6 +49,7 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig
+from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
 from fleet.core import (
     _test_hooks,
@@ -185,8 +186,8 @@ class Recipe(TypedDict):
         path: The project's directory inside the staged tree, ``""`` for the
             root; the recipe's working directory.
         install: The steps run at the tree's root before the recipe, each an
-            argv in the source grammar; empty when the recipe installs its
-            own dependencies.
+            argv in the source grammar with the phase it is timed as; empty
+            when the recipe installs its own dependencies.
         isolated_docker: True when the project declares the ``docker`` tag,
             so its build runs as the node's execdocker user against that
             user's rootless daemon, never as the runner, whose own daemon on
@@ -199,7 +200,7 @@ class Recipe(TypedDict):
     """
 
     path: str
-    install: tuple[tuple[str, ...], ...]
+    install: tuple[InstallStep, ...]
     isolated_docker: bool
     elevated: bool
 
@@ -241,7 +242,7 @@ def working_tree_payload(
     return build
 
 
-def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[tuple[str, ...], ...]) -> Recipe:
+def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[InstallStep, ...]) -> Recipe:
     """The recipe for one project, isolated when it declares the docker tag
     and elevated when it declares the elevated tag.
 

@@ -23,7 +23,7 @@ from fleet.contracts.node import encode_node_config
 from fleet.contracts.project import encode_project_config
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks
-from tests._node_agent_fixtures import _credentials_in_env, sourced_document
+from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, sourced_document
 from tests._queue_fakes import FakeQueue
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, FakeRun, ok
@@ -55,7 +55,7 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
         The same path, rewritten.
     """
     real = decode_fleet_workspace(load_json_str(REAL_WORKSPACE.read_text("utf-8")))
-    document = sourced_document((("npm", "ci"),))
+    document = sourced_document((NPM_CI,))
     document["nodes"] = {"pendragon": encode_node_config(real["nodes"]["pendragon"])}
     projects = document["projects"]
     assert isinstance(projects, dict)

@@ -64,6 +64,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from fleet.contracts.node import NodePlatform
+from fleet.contracts.source import InstallStep
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
 
@@ -244,7 +245,7 @@ class Dialect(Protocol):
         target: str,
         path: str,
         workers: int,
-        install: tuple[tuple[str, ...], ...],
+        install: tuple[InstallStep, ...],
         cache_root: str,
         isolated_docker: bool,
         elevated: bool,
@@ -259,7 +260,9 @@ class Dialect(Protocol):
             path: The project's directory inside it, ``""`` for the root.
             workers: Test workers the capacity check granted.
             install: The project's declared install steps, run at the root
-                before the recipe, each an argv in the source grammar.
+                before the recipe, each an argv in the source grammar timed
+                as the phase it names (:mod:`fleet.core.phase_markers`); the
+                recipe is timed as the phase ``check``.
             cache_root: The node's cache directory, which the package
                 managers are pointed at.
             isolated_docker: True for a project that declares the ``docker``

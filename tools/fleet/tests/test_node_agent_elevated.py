@@ -21,6 +21,7 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_str
 from fleet.cli import node_agent
 from fleet.core import _test_hooks, queue
 from tests._node_agent_fixtures import (
+    NPM_CI,
     _credentials_in_env,
     node_argv,
     sourced_document,
@@ -49,7 +50,7 @@ def _elevated_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    document = sourced_document((("npm", "ci"),))
+    document = sourced_document((NPM_CI,))
     nodes = document["nodes"]
     assert isinstance(nodes, dict)
     lavender = nodes["lavender"]
@@ -193,7 +194,7 @@ class TestRefusalsAndAnnounce:
     def test_an_elevated_runner_for_a_node_that_declares_none_is_refused_before_any_call(
         self, config_path: pathlib.Path
     ) -> None:
-        config_path.write_text(dump_json_str(sourced_document((("npm", "ci"),))), encoding="utf-8")
+        config_path.write_text(dump_json_str(sourced_document((NPM_CI,))), encoding="utf-8")
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 

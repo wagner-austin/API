@@ -21,6 +21,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import node_agent
+from fleet.contracts.source import InstallStep
 from fleet.core import _test_hooks, export
 from tests._node_agent_fixtures import PROBED, _credentials_in_env, node_argv, sourced_document
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
@@ -29,6 +30,11 @@ from tests.conftest import FakeRun, failed, ok
 __all__ = ["_credentials_in_env"]
 
 STEP = ("bash", "scripts/testdb-setup.sh", "--container", "corvis-fleet-testdb")
+
+
+def step(*argv: str) -> InstallStep:
+    """An install step of the test-database phase running ``argv``."""
+    return InstallStep(phase="test-database", argv=argv)
 
 
 def _git(repo: pathlib.Path, *args: str) -> str:
@@ -84,14 +90,18 @@ class TestRequireInstallPaths:
         self, commit: tuple[pathlib.Path, str]
     ) -> None:
         repo, sha = commit
-        export.require_install_paths(repo, sha, (("npm", "ci"), ("bash", "scripts/present.sh")))
+        export.require_install_paths(
+            repo, sha, (step("npm", "ci"), step("bash", "scripts/present.sh"))
+        )
 
     def test_a_commit_lacking_a_named_path_is_refused_naming_the_step_and_the_path(
         self, commit: tuple[pathlib.Path, str]
     ) -> None:
         repo, sha = commit
         with pytest.raises(AppError) as raised:
-            export.require_install_paths(repo, sha, (("bash", "scripts/present.sh"), STEP))
+            export.require_install_paths(
+                repo, sha, (step("bash", "scripts/present.sh"), step(*STEP))
+            )
         assert raised.value.code is FleetErrorCode.INSTALL_PATH_NOT_IN_COMMIT
         assert raised.value.message == (
             f"the install step 'bash scripts/testdb-setup.sh --container corvis-fleet-testdb' "
@@ -105,7 +115,9 @@ class TestRequireInstallPaths:
         runner = FakeRun([])
         _test_hooks.run = runner
 
-        export.require_install_paths(tmp_path, DEFAULT_SHA, (("npm", "ci"), ("npm", "rebuild")))
+        export.require_install_paths(
+            tmp_path, DEFAULT_SHA, (step("npm", "ci"), step("npm", "rebuild"))
+        )
 
         assert runner.calls == []
 
@@ -114,7 +126,7 @@ class TestTheTickRefusesBeforeAnyLease:
     def test_a_missing_install_path_closes_the_job_refused_with_nothing_leased(
         self, config_path: pathlib.Path
     ) -> None:
-        config_path.write_text(dump_json_str(sourced_document((STEP,))), encoding="utf-8")
+        config_path.write_text(dump_json_str(sourced_document((step(*STEP),))), encoding="utf-8")
         runner = FakeRun(
             [
                 *PROBED,

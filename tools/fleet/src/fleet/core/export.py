@@ -29,7 +29,7 @@ import pathlib
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
-from fleet.contracts.source import PATH_PATTERN, ProjectCompanion, ProjectSource
+from fleet.contracts.source import PATH_PATTERN, InstallStep, ProjectCompanion, ProjectSource
 from fleet.core import _test_hooks
 
 #: The directory under the workspace's ``runs`` that holds one bare mirror
@@ -421,9 +421,7 @@ def install_paths(step: tuple[str, ...]) -> tuple[str, ...]:
     )
 
 
-def require_install_paths(
-    mirror: pathlib.Path, sha: str, install: tuple[tuple[str, ...], ...]
-) -> None:
+def require_install_paths(mirror: pathlib.Path, sha: str, install: tuple[InstallStep, ...]) -> None:
     """Refuse a commit that lacks a path its declared install steps name.
 
     The steps come from today's registry and the tree from the commit, so a
@@ -443,16 +441,17 @@ def require_install_paths(
             path the commit lacks.
     """
     for step in install:
-        for path in install_paths(step):
+        for path in install_paths(step["argv"]):
             probe = _test_hooks.run(
                 ("git", "-C", str(mirror), "cat-file", "-e", f"{sha}:{path}"),
                 timeout_seconds=INIT_TIMEOUT_SECONDS,
             )
             if probe["returncode"] != 0:
+                command = " ".join(step["argv"])
                 raise AppError(
                     code=FleetErrorCode.INSTALL_PATH_NOT_IN_COMMIT,
                     message=(
-                        f"the install step {' '.join(step)!r} names {path}, which commit {sha} "
+                        f"the install step {command!r} names {path}, which commit {sha} "
                         "does not contain: the step was declared in fleet.json after this "
                         "commit, so today's registry cannot build it. Check a commit that "
                         f"carries {path}, or run this one from a working tree with fleet-run"

@@ -30,6 +30,7 @@ from tests._node_agent_fixtures import (
     COMPANION_REMOTE,
     COMPANION_SHA,
     NOTHING_LAUNCHED,
+    NPM_CI,
     PROBED,
     REMOTE,
     _credentials_in_env,
@@ -95,7 +96,7 @@ def _companion_config(config_path: pathlib.Path) -> pathlib.Path:
     config_path.write_text(
         dump_json_str(
             sourced_document(
-                (("npm", "ci"),),
+                (NPM_CI,),
                 (
                     ProjectCompanion(
                         remote=COMPANION_REMOTE, ref=COMPANION_REF, directory=COMPANION_DIRECTORY
@@ -349,7 +350,7 @@ class TestClaiming:
             target=f"C:/fleet/stage/{DEMO_RUN_ID}",
             path=DEMO_PROJECT,
             workers=rows[0]["workers"],
-            install=(("npm", "ci"),),
+            install=(NPM_CI,),
             cache_root="C:/fleet/stage/cache",
             isolated_docker=False,
             elevated=False,

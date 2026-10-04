@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import load_json_str
 
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import InstallStep, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 
@@ -85,6 +85,6 @@ def test_each_games_suite_runs_isolated_on_a_rootless_daemon(game: str) -> None:
     assert project["source"] == ProjectSource(
         remote=f"https://github.com/wagner-austin/{game}.git",
         path="execution",
-        install=(("npm", "ci"),),
+        install=(InstallStep(phase="install", argv=("npm", "ci")),),
         companions=(),
     )

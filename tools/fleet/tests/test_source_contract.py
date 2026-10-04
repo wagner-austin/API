@@ -11,14 +11,22 @@ from __future__ import annotations
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
+from platform_core.json_utils import (
+    JSONObject,
+    JSONTypeError,
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+)
 
 from fleet.contracts.dispatch import decode_claim
 from fleet.contracts.project import decode_project_config, encode_project_config
 from fleet.contracts.source import (
     INSTALL_TOKEN,
     PATH_PATTERN,
+    PHASE_PATTERN,
     REMOTE_PATTERN,
+    InstallStep,
     ProjectCompanion,
     ProjectSource,
     decode_companion_directory,
@@ -41,8 +49,17 @@ SSH_SCP = "git@github.com:wagner-austin/MCPs.git"
 SSH_URL = "ssh://git@github.com/wagner-austin/MCPs.git"
 
 
+NPM_CI = InstallStep(phase="install", argv=("npm", "ci"))
+
+
+def _step(*argv: str) -> JSONObject:
+    """One declared step of the install phase, as fleet.json spells it."""
+    tokens: list[JSONValue] = list(argv)
+    return {"phase": "install", "argv": tokens}
+
+
 def _source(
-    install: tuple[tuple[str, ...], ...] = (("npm", "ci"),),
+    install: tuple[InstallStep, ...] = (NPM_CI,),
     companions: tuple[ProjectCompanion, ...] = (),
 ) -> ProjectSource:
     """A source for the MCPs wiki-search package.
@@ -99,12 +116,19 @@ class TestPath:
 
 
 class TestInstall:
-    def test_steps_decode_to_tuples_of_tokens(self) -> None:
+    def test_steps_decode_to_their_phase_and_tokens(self) -> None:
         decoded = decode_install(
-            [["npm", "ci"], ["npx", "playwright", "install", "chromium"]], field="source.install"
+            [
+                _step("npm", "ci"),
+                {"phase": "workspace-build", "argv": ["npx", "playwright", "install", "chromium"]},
+            ],
+            field="source.install",
         )
 
-        assert decoded == (("npm", "ci"), ("npx", "playwright", "install", "chromium"))
+        assert decoded == (
+            NPM_CI,
+            InstallStep(phase="workspace-build", argv=("npx", "playwright", "install", "chromium")),
+        )
 
     def test_an_empty_list_is_a_project_that_installs_itself(self) -> None:
         assert decode_install([], field="source.install") == ()
@@ -114,16 +138,32 @@ class TestInstall:
             decode_install(None, field="source.install")
 
     def test_a_non_list_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be a list of argv lists, got str"):
+        with pytest.raises(JSONTypeError, match=r"a list of \{phase, argv\} steps, got str"):
             decode_install("npm ci", field="source.install")
 
-    def test_a_step_that_is_not_a_list_is_refused_by_index(self) -> None:
-        with pytest.raises(JSONTypeError, match=r"source\.install\[1\] must be a list of argv"):
-            decode_install([["npm", "ci"], "npm rebuild"], field="source.install")
+    def test_a_step_that_is_not_an_object_is_refused_by_index(self) -> None:
+        """An argv list, the shape before steps named their phase, is one of these."""
+        with pytest.raises(
+            JSONTypeError, match=r"source\.install\[1\] must be an object naming its phase and argv"
+        ):
+            decode_install([_step("npm", "ci"), ["npm", "rebuild"]], field="source.install")
 
-    def test_an_empty_step_is_refused_by_index(self) -> None:
-        with pytest.raises(JSONTypeError, match=r"source\.install\[0\] is empty"):
-            decode_install([[]], field="source.install")
+    @pytest.mark.parametrize("phase", ["", "Install", "workspace build", "-x", "a--b", "a-", 7])
+    def test_a_phase_outside_the_grammar_is_refused_by_index(self, phase: str | int) -> None:
+        with pytest.raises(JSONTypeError, match=r"phase"):
+            decode_install([{"phase": phase, "argv": ["npm", "ci"]}], field="source.install")
+
+    @pytest.mark.parametrize("phase", ["install", "workspace-build", "test-database", "a1-b2"])
+    def test_the_phases_the_registry_uses_pass(self, phase: str) -> None:
+        assert [found.group(0) for found in PHASE_PATTERN.finditer(phase)] == [phase]
+
+    def test_a_step_with_no_argv_is_refused_by_index(self) -> None:
+        with pytest.raises(JSONTypeError, match=r"source\.install\[0\]\.argv must be a list"):
+            decode_install([{"phase": "install"}], field="source.install")
+
+    def test_an_empty_argv_is_refused_by_index(self) -> None:
+        with pytest.raises(JSONTypeError, match=r"source\.install\[0\]\.argv is empty"):
+            decode_install([_step()], field="source.install")
 
     @pytest.mark.parametrize(
         "token", ["npm ci", "rm;", "$HOME", "'quoted'", "a|b", "@splat", 7, None, "a\nb", ""]
@@ -131,8 +171,10 @@ class TestInstall:
     def test_a_token_carrying_shell_syntax_is_refused_by_position(
         self, token: str | int | None
     ) -> None:
-        with pytest.raises(JSONTypeError, match=r"source\.install\[0\]\[1\] must be a string"):
-            decode_install([["npm", token]], field="source.install")
+        with pytest.raises(
+            JSONTypeError, match=r"source\.install\[0\]\.argv\[1\] must be a string"
+        ):
+            decode_install([{"phase": "install", "argv": ["npm", token]}], field="source.install")
 
     @pytest.mark.parametrize(
         "token",
@@ -150,7 +192,9 @@ class TestInstall:
     )
     def test_the_tokens_the_registry_uses_pass(self, token: str) -> None:
         assert [found.group(0) for found in INSTALL_TOKEN.finditer(token)] == [token]
-        assert decode_install([["npm", token]], field="source.install") == (("npm", token),)
+        assert decode_install([_step("npm", token)], field="source.install") == (
+            InstallStep(phase="install", argv=("npm", token)),
+        )
 
 
 class TestCompanions:
@@ -243,7 +287,7 @@ class TestCompanions:
         assert encode_project_source(original) == {
             "remote": HTTPS,
             "path": "packages/wiki-search",
-            "install": [["npm", "ci"]],
+            "install": [{"phase": "install", "argv": ["npm", "ci"]}],
             "companions": [{"remote": HTTPS, "ref": "main", "directory": "MCPs"}],
         }
         assert decode_project_source(encode_project_source(original), field="source") == original

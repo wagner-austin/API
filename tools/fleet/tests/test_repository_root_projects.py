@@ -18,9 +18,12 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import load_json_str
 
-from fleet.contracts.source import ProjectCompanion, ProjectSource
+from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
+
+#: The install step of every npm repository's root check.
+NPM_CI = InstallStep(phase="install", argv=("npm", "ci"))
 
 #: MCPs, staged beside a project whose check runs MCPs' published maketools.
 MCPS_COMPANION = ProjectCompanion(
@@ -34,19 +37,22 @@ MCPS_COMPANION = ProjectCompanion(
         (
             "idle",
             (NodeTag.GPU, NodeTag.WINDOWS),
-            (("npm", "ci"), ("npx", "playwright", "install", "chromium")),
+            (
+                NPM_CI,
+                InstallStep(phase="install", argv=("npx", "playwright", "install", "chromium")),
+            ),
             (),
         ),
-        ("chat", (NodeTag.WINDOWS,), (("npm", "ci"),), (MCPS_COMPANION,)),
+        ("chat", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
         ("hardware-wiki", (), (), (MCPS_COMPANION,)),
         ("metabolomics-dashboard", (NodeTag.WINDOWS,), (), (MCPS_COMPANION,)),
-        ("corvis-stick", (NodeTag.WINDOWS,), (("npm", "ci"),), (MCPS_COMPANION,)),
+        ("corvis-stick", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
     ],
 )
 def test_each_repository_s_root_check_is_declared_with_what_it_reads(
     name: str,
     tags: tuple[NodeTag, ...],
-    install: tuple[tuple[str, ...], ...],
+    install: tuple[InstallStep, ...],
     companions: tuple[ProjectCompanion, ...],
 ) -> None:
     path = Path(__file__).resolve().parents[1] / "fleet.json"

@@ -18,18 +18,23 @@ import subprocess
 import pytest
 
 from fleet.contracts.project import ProjectConfig
+from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
 from fleet.core import dispatch, names
 from fleet.core.dialect_linux import PROLOGUE, LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
 from fleet.core.linux_isolated_build import EXEC_PATH, EXEC_USER
+from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT
 
 TARGET = "/home/corvis/fleet/stage/slime-execution-1790600000"
 
 
+NPM_CI = InstallStep(phase="install", argv=("npm", "ci"))
+
+
 def _isolated(
-    *, target: str = TARGET, path: str = DEMO_PROJECT, install: tuple[tuple[str, ...], ...] = ()
+    *, target: str = TARGET, path: str = DEMO_PROJECT, install: tuple[InstallStep, ...] = ()
 ) -> str:
     """Render the isolated build for one run.
 
@@ -107,7 +112,8 @@ class TestIsolatedText:
     def test_install_steps_run_in_order_as_execdocker_and_a_failure_ends_the_build(
         self,
     ) -> None:
-        lines = _isolated(install=(("npm", "ci"), ("npm", "rebuild"))).splitlines()
+        rebuild = InstallStep(phase="workspace-build", argv=("npm", "rebuild"))
+        lines = _isolated(install=(NPM_CI, rebuild)).splitlines()
         log = names.log_path(TARGET)
         result = f"{TARGET}/{names.RESULT_NAME}"
 
@@ -117,10 +123,15 @@ class TestIsolatedText:
             f"as_exec \"cd '$exec_root/{DEMO_PROJECT}' && make check\" >> '{log}' 2>&1"
         )
         assert first < second < recipe
-        assert lines[first - 2] == f"printf '$ %s\\n' 'npm ci' >> '{log}'"
-        assert lines[first + 1 : first + 8] == [
+        assert lines[first - 4] == f"printf '$ %s\\n' 'npm ci' >> '{log}'"
+        assert "fleet-phase %s started" in lines[first - 2] and "'install'" in lines[first - 2]
+        assert "'workspace-build'" in lines[second - 2]
+        assert "'check'" in lines[recipe - 2]
+        assert lines[first + 1 : first + 9] == [
             "status=$?",
             "set -e",
+            f"printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'install' {SH_UTC_STAMP} "
+            f'"$(( $(date +%s) - phase_started ))" "$status" >> \'{log}\'',
             'if [ "$status" -ne 0 ]; then',
             '  sudo -n rm -rf "$exec_root"',
             f"  printf '%s\\n' \"$status\" > '{result}'",
@@ -131,8 +142,11 @@ class TestIsolatedText:
     def test_the_copy_is_removed_before_the_status_is_written_last(self) -> None:
         lines = _isolated().splitlines()
 
-        assert lines[-3:] == [
-            "set -e",
+        assert lines[-4] == "set -e"
+        assert lines[-3].startswith(
+            "printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'check'"
+        )
+        assert lines[-2:] == [
             'sudo -n rm -rf "$exec_root"',
             f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'",
         ]
@@ -170,10 +184,10 @@ def test_a_windows_node_refuses_to_render_a_docker_project_s_build() -> None:
 def test_the_recipe_is_isolated_exactly_when_the_project_declares_docker(
     tags: tuple[NodeTag, ...], isolated: bool
 ) -> None:
-    recipe = dispatch.recipe_for(_plan(tags), path="slime", install=(("npm", "ci"),))
+    recipe = dispatch.recipe_for(_plan(tags), path="slime", install=(NPM_CI,))
 
     assert recipe == dispatch.Recipe(
-        path="slime", install=(("npm", "ci"),), isolated_docker=isolated, elevated=False
+        path="slime", install=(NPM_CI,), isolated_docker=isolated, elevated=False
     )
     assert dispatch.working_tree_recipe("libs/x", _plan(tags))["isolated_docker"] is isolated
 

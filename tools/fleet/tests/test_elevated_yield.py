@@ -19,7 +19,7 @@ from fleet.cli import node_agent
 from fleet.contracts.lease import Lease
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core import _test_hooks, elevated_yield, leases
-from tests._node_agent_fixtures import _credentials_in_env, node_argv, sourced_document
+from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, node_argv, sourced_document
 from tests._queue_fakes import QUEUE_CREDENTIALS, FakeQueue, queue_job, tick_body
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import (
@@ -285,7 +285,7 @@ def test_a_whole_ordinary_tick_claims_nothing_while_an_elevated_job_waits(
     """The measured case: lavender has room and a ready toolchain, and still
     takes nothing, so its elevated runner gets the slot."""
     config_path.write_text(
-        dump_json_str(_with_elevated(sourced_document((("npm", "ci"),)), node_elevated=True)),
+        dump_json_str(_with_elevated(sourced_document((NPM_CI,)), node_elevated=True)),
         encoding="utf-8",
     )
     _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23)])

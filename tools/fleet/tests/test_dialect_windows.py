@@ -29,6 +29,7 @@ import subprocess
 
 import pytest
 
+from fleet.contracts.source import InstallStep
 from fleet.contracts.toolchain import (
     PINNED_PYTHON,
     PYTHON_REGISTERED_GUARD,
@@ -40,6 +41,7 @@ from fleet.core.dialect_windows import (
     POWERSHELL_INVOCATION,
     WindowsDialect,
 )
+from fleet.core.names import CACHE_VARIABLE
 from fleet.core.windows_task import LAUNCH_TIMEOUT_SECONDS
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
@@ -73,10 +75,15 @@ def _python_registered_here(prefix: str) -> bool:
     return False
 
 
+def _step(phase: str, *argv: str) -> InstallStep:
+    """An install step of ``phase`` running ``argv``."""
+    return InstallStep(phase=phase, argv=argv)
+
+
 def _build(
     *,
     path: str = DEMO_PROJECT,
-    install: tuple[tuple[str, ...], ...] = (),
+    install: tuple[InstallStep, ...] = (),
     workers: int = 6,
     elevated: bool = False,
 ) -> str:
@@ -170,15 +177,36 @@ class TestBuildScript:
         assert '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"' in body
         assert '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"' in body
 
-    def test_the_install_steps_are_one_string_each_in_order(self) -> None:
-        body = _build(install=(("npm", "ci"), ("npx", "playwright", "install", "chromium")))
+    def test_the_install_steps_are_one_string_each_in_order_beside_their_phases(self) -> None:
+        body = _build(
+            install=(
+                _step("install", "npm", "ci"),
+                _step("workspace-build", "npx", "playwright", "install", "chromium"),
+            )
+        )
 
         assert "[string[]]$Install = @('npm ci', 'npx playwright install chromium')," in body
+        assert "[string[]]$InstallPhases = @('install', 'workspace-build')," in body
         assert "[string[]]$Install = @()," in _build(install=())
+        assert "[string[]]$InstallPhases = @()," in _build(install=())
 
     def test_an_install_token_that_cannot_be_embedded_is_refused(self) -> None:
-        with pytest.raises(ValueError, match='install token "it\'s"'):
-            _build(install=(("npm", "it's"),))
+        with pytest.raises(ValueError, match='install token "npm it\'s"'):
+            _build(install=(_step("install", "npm", "it's"),))
+
+    def test_each_step_and_the_recipe_are_timed_as_phases_and_the_cache_is_named(self) -> None:
+        body = _build()
+
+        assert (
+            '    $status = Invoke-Phase -Shell $Cmd -Name \'check\' -Command "`"$Make`" check"'
+        ) in body
+        assert (
+            "$status = Invoke-Phase -Shell $Cmd -Name $InstallPhases[$index] "
+            "-Command $Install[$index]"
+        ) in body
+        assert f"$env:{CACHE_VARIABLE} = $CacheRoot" in body
+        assert "fleet-phase $Name started $(Get-PhaseStamp)" in body
+        assert "fleet-phase $Name ended $(Get-PhaseStamp) after $seconds s, exit $code" in body
 
     def test_every_native_run_is_cmd_exes_redirection_under_the_strict_header(self) -> None:
         """So a tool's stderr never reaches PowerShell, and ``Stop`` holds."""
@@ -189,7 +217,7 @@ class TestBuildScript:
         assert "*>>" not in body
         assert '    & $Shell /d /s /c "$Command >> `"$log`" 2>&1"' in body
         assert f'$log = "$Target/{names.RESULT_NAME}.log"' in body
-        assert '    $status = Invoke-Logged $Cmd "`"$Make`" check"' in body
+        assert "    $code = Invoke-Logged $Shell $Command" in body
 
     def test_it_records_the_status_last_and_exits_0(self) -> None:
         """The result file's absence is how a run is known to be unfinished.

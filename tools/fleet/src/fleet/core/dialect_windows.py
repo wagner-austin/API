@@ -19,6 +19,7 @@ registration interpolates one path and no code.
 
 from __future__ import annotations
 
+from fleet.contracts.source import InstallStep
 from fleet.core import names, windows_build, windows_task
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
@@ -441,7 +442,7 @@ class WindowsDialect:
         target: str,
         path: str,
         workers: int,
-        install: tuple[tuple[str, ...], ...],
+        install: tuple[InstallStep, ...],
         cache_root: str,
         isolated_docker: bool,
         elevated: bool,
@@ -454,7 +455,7 @@ class WindowsDialect:
             path: The project's directory inside the export, ``""`` for the
                 root.
             workers: Test workers the capacity check granted.
-            install: The project's declared install steps, argv each.
+            install: The project's declared install steps and their phases.
             cache_root: The node's cache directory.
             isolated_docker: True for a project that declares the ``docker``
                 tag, which no Windows node carries.
@@ -465,8 +466,7 @@ class WindowsDialect:
 
         Returns:
             :func:`fleet.core.windows_build.build_script`'s text, which says
-            why every native run goes through cmd.exe and why the caches are
-            the node's.
+            why every native run goes through cmd.exe and the caches' owner.
 
         Raises:
             ValueError: When ``isolated_docker`` is True. No Windows node

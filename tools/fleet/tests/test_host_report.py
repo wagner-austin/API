@@ -22,7 +22,12 @@ from fleet.contracts.node import (
 )
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks, dialect, host_report, names
-from tests._node_agent_fixtures import _credentials_in_env, _sourced_config, sourced_document
+from tests._node_agent_fixtures import (
+    NPM_CI,
+    _credentials_in_env,
+    _sourced_config,
+    sourced_document,
+)
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed, ok, workspace_document
 
@@ -283,7 +288,7 @@ class TestTheTick:
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         document = _with_nodes(
-            sourced_document((("npm", "ci"),)), {"lavender-wsl": encode_node_config(_wsl_node())}
+            sourced_document((NPM_CI,)), {"lavender-wsl": encode_node_config(_wsl_node())}
         )
         sourced_config.write_text(dump_json_str(document), encoding="utf-8")
         _test_hooks.run = FakeRun(

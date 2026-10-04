@@ -20,7 +20,12 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import _config, node_agent
-from fleet.contracts.source import ProjectCompanion, ProjectSource, encode_project_source
+from fleet.contracts.source import (
+    InstallStep,
+    ProjectCompanion,
+    ProjectSource,
+    encode_project_source,
+)
 from fleet.core import _test_hooks, staging
 from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_env, queue_job
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
@@ -85,8 +90,12 @@ def _credentials_in_env() -> None:
     )
 
 
+#: The install step most sourced fixtures declare.
+NPM_CI = InstallStep(phase="install", argv=("npm", "ci"))
+
+
 def sourced_document(
-    install: tuple[tuple[str, ...], ...],
+    install: tuple[InstallStep, ...],
     companions: tuple[ProjectCompanion, ...] = (),
 ) -> JSONObject:
     """The shared workspace with the demo project given a source.
@@ -124,7 +133,7 @@ def _sourced_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    config_path.write_text(dump_json_str(sourced_document((("npm", "ci"),))), encoding="utf-8")
+    config_path.write_text(dump_json_str(sourced_document((NPM_CI,))), encoding="utf-8")
     return config_path
 
 

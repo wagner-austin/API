@@ -7,13 +7,16 @@ $ErrorActionPreference = 'Stop'
 # stand-ins for the install steps and make that record where they ran and
 # write to both streams, so what reaches the transcript, the order the steps
 # run in and the status written last are all measured. The render runs in
-# this process and sets its location and six environment variables, which
-# every case restores.
+# this process and sets its location and seven environment variables, which
+# every case restores. Every step and the recipe are timed as phases (MCPs
+# board task 74b13c20): the transcript's fleet-phase lines are compared with
+# their stamps and durations read as shapes, and one case reads the stamps
+# themselves.
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'PATH')
+    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'PATH')
 
     # A .cmd that records the directory it ran in and its arguments, writes
     # one line to each stream, and exits with the case's code. It lands in a
@@ -40,6 +43,14 @@ BeforeAll {
         param([string]$Target)
         return [System.IO.File]::ReadAllText((Join-Path $Target 'result.txt')).Trim()
     }
+
+    # The transcript with each phase line's stamps and duration read as
+    # their shapes, so a case states the order and the exit codes exactly.
+    function Read-TranscriptShape {
+        param([string]$Target)
+        return [System.IO.File]::ReadAllLines((Join-Path $Target 'result.txt.log')) |
+            ForEach-Object { $_ -replace '\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ', '<utc>' -replace 'after \d+ s', 'after <n> s' }
+    }
 }
 
 Describe 'The build' {
@@ -57,58 +68,80 @@ Describe 'The build' {
         }
     }
 
-    It 'records itself, runs each install step at the root and the recipe in the project, transcribes both streams, and writes 0 last' {
+    It 'records itself, runs each install step at the root and the recipe in the project, each as a phase, and writes 0 last' {
         $export = Initialize-Export
         $install = Initialize-Tool 'installer' 0
         $make = Initialize-Tool 'make' 0
         Invoke-Rendered 'dialect-build' @{
             Target = $export.Target; Recipe = $export.Recipe; Workers = 3; CacheRoot = $export.Cache
-            Install = @("`"$($install.Path)`" ci", "`"$($install.Path)`" second"); Make = $make.Path
+            Install = @("`"$($install.Path)`" ci", "`"$($install.Path)`" second"); InstallPhases = @('install', 'workspace-build'); Make = $make.Path
         }
         [System.IO.File]::ReadAllText((Join-Path $export.Target 'build.pid')).Trim() | Should -BeExactly "$PID"
         [System.IO.File]::ReadAllLines($install.Record) | Should -Be @("$($export.Target) ci", "$($export.Target) second")
         [System.IO.File]::ReadAllLines($make.Record) | Should -Be @("$($export.Recipe) check")
-        [System.IO.File]::ReadAllLines((Join-Path $export.Target 'result.txt.log')) | Should -Be @(
-            "`$ `"$($install.Path)`" ci", 'installer says out', 'installer says err',
-            "`$ `"$($install.Path)`" second", 'installer says out', 'installer says err',
-            'make says out', 'make says err')
+        Read-TranscriptShape $export.Target | Should -Be @(
+            "`$ `"$($install.Path)`" ci", 'fleet-phase install started <utc>', 'installer says out', 'installer says err', 'fleet-phase install ended <utc> after <n> s, exit 0',
+            "`$ `"$($install.Path)`" second", 'fleet-phase workspace-build started <utc>', 'installer says out', 'installer says err', 'fleet-phase workspace-build ended <utc> after <n> s, exit 0',
+            'fleet-phase check started <utc>', 'make says out', 'make says err', 'fleet-phase check ended <utc> after <n> s, exit 0')
         Read-Result $export.Target | Should -BeExactly '0'
         $env:npm_config_cache | Should -BeExactly "$($export.Cache)/npm"
         $env:POETRY_CACHE_DIR | Should -BeExactly "$($export.Cache)/pypoetry"
         $env:PLAYWRIGHT_BROWSERS_PATH | Should -BeExactly "$($export.Cache)/ms-playwright"
         $env:PYTEST_XDIST_AUTO_NUM_WORKERS | Should -BeExactly '3'
+        # The node's cache, for an install step that keeps state (MCPs board task 74b13c20).
+        $env:CORVIS_FLEET_CACHE | Should -BeExactly $export.Cache
         # The render is the ordinary lane's (MCPs board task a98d7083).
         $env:CORVIS_FLEET_ELEVATED | Should -BeExactly '0'
         # The example job's submitter (MCPs board task 6c4516af A4).
         $env:BOARD_AGENT_LABEL | Should -BeExactly 'opus-example-0929'
     }
-    It 'ends at the first install step that fails, with its status, and never runs the recipe' {
+    It 'stamps each phase in UTC, ends after it starts, and counts whole seconds between' {
+        $export = Initialize-Export
+        $make = Initialize-Tool 'make' 0
+        $before = [DateTime]::UtcNow.AddSeconds(-1)
+        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
+        $after = [DateTime]::UtcNow.AddSeconds(1)
+        $lines = [System.IO.File]::ReadAllLines((Join-Path $export.Target 'result.txt.log'))
+        $styles = [Globalization.DateTimeStyles]'AdjustToUniversal, AssumeUniversal'
+        $lines[0] -match '^fleet-phase check started (\S+)$' | Should -BeTrue
+        $started = [DateTime]::ParseExact($Matches[1], "yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture, $styles)
+        $lines[-1] -match '^fleet-phase check ended (\S+) after (\d+) s, exit 0$' | Should -BeTrue
+        $ended = [DateTime]::ParseExact($Matches[1], "yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture, $styles)
+        [int]$Matches[2] | Should -BeLessOrEqual ([int]($ended - $started).TotalSeconds + 1)
+        $started | Should -BeGreaterOrEqual $before.AddMilliseconds(-$before.Millisecond)
+        $ended | Should -BeLessOrEqual $after
+        $ended | Should -BeGreaterOrEqual $started
+    }
+    It 'ends at the first install step that fails, with its status in its phase line, and never runs the recipe' {
         $export = Initialize-Export
         $failing = Initialize-Tool 'installer' 5
         $after = Initialize-Tool 'after' 0
         $make = Initialize-Tool 'make' 0
         Invoke-Rendered 'dialect-build' @{
             Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache
-            Install = @("`"$($failing.Path)`" ci", "`"$($after.Path)`""); Make = $make.Path
+            Install = @("`"$($failing.Path)`" ci", "`"$($after.Path)`""); InstallPhases = @('install', 'install'); Make = $make.Path
         }
         Read-Result $export.Target | Should -BeExactly '5'
         Test-Path -LiteralPath $after.Record | Should -BeFalse
         Test-Path -LiteralPath $make.Record | Should -BeFalse
+        (Read-TranscriptShape $export.Target)[-1] | Should -BeExactly 'fleet-phase install ended <utc> after <n> s, exit 5'
     }
     It 'writes the status of a recipe that fails' {
         $export = Initialize-Export
         $make = Initialize-Tool 'make' 2
-        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); Make = $make.Path }
+        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
         Read-Result $export.Target | Should -BeExactly '2'
-        [System.IO.File]::ReadAllLines((Join-Path $export.Target 'result.txt.log')) | Should -Be @('make says out', 'make says err')
+        Read-TranscriptShape $export.Target | Should -Be @(
+            'fleet-phase check started <utc>', 'make says out', 'make says err', 'fleet-phase check ended <utc> after <n> s, exit 2')
     }
-    It 'runs its rendered install step, npm ci, as whichever npm PATH names' {
+    It 'runs its rendered install step, npm ci, as whichever npm PATH names, in the phase it declares' {
         $export = Initialize-Export
         $npm = Initialize-Tool 'npm' 0
         $make = Initialize-Tool 'make' 0
         $env:PATH = "$($npm.Directory);$env:PATH"
         Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Make = $make.Path }
         [System.IO.File]::ReadAllLines($npm.Record) | Should -Be @("$($export.Target) ci")
+        (Read-TranscriptShape $export.Target)[1] | Should -BeExactly 'fleet-phase install started <utc>'
         Read-Result $export.Target | Should -BeExactly '0'
     }
     It 'runs a bash install step as the bash in GitBin, ahead of any bash already on PATH (MCPs daae17f2)' {
@@ -119,10 +152,10 @@ Describe 'The build' {
         $env:PATH = "$($wsl.Directory);$env:PATH"
         Invoke-Rendered 'dialect-build' @{
             Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache
-            Install = @('bash scripts/testdb-setup.sh --container corvis-fleet-testdb'); Make = $make.Path; GitBin = $git.Directory
+            Install = @('bash scripts/testdb-setup.sh --port 5432'); InstallPhases = @('test-database'); Make = $make.Path; GitBin = $git.Directory
         }
         [System.IO.File]::ReadAllLines($git.Record) |
-            Should -Be @("$($export.Target) scripts/testdb-setup.sh --container corvis-fleet-testdb")
+            Should -Be @("$($export.Target) scripts/testdb-setup.sh --port 5432")
         Test-Path -LiteralPath $wsl.Record | Should -BeFalse
         $env:PATH | Should -BeLike "$($git.Directory);$($wsl.Directory);*"
         Read-Result $export.Target | Should -BeExactly '0'
@@ -132,7 +165,7 @@ Describe 'The build' {
         # ERRORLEVEL inside a session.
         $export = Initialize-Export
         $make = Initialize-Tool 'make' 0
-        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @('fleet-no-such-tool ci'); Make = $make.Path }
+        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @('fleet-no-such-tool ci'); InstallPhases = @('install'); Make = $make.Path }
         Read-Result $export.Target | Should -BeExactly '1'
         [System.IO.File]::ReadAllText((Join-Path $export.Target 'result.txt.log')) | Should -BeLike "*fleet-no-such-tool*not recognized*"
         Test-Path -LiteralPath $make.Record | Should -BeFalse

@@ -39,11 +39,14 @@ import shlex
 
 from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.runner_slice import CI_SLICE_NAME
+from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import POETRY_KEYRING_OFF, isolated_build_lines
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
+from fleet.core.names import CACHE_VARIABLE
+from fleet.core.phase_markers import sh_phase_lines
 
 #: How a script file is run by path.
 SH_INVOCATION = ("/bin/sh",)
@@ -299,7 +302,7 @@ class LinuxDialect:
         target: str,
         path: str,
         workers: int,
-        install: tuple[tuple[str, ...], ...],
+        install: tuple[InstallStep, ...],
         cache_root: str,
         isolated_docker: bool,
         elevated: bool,
@@ -312,7 +315,8 @@ class LinuxDialect:
         script, so each status is captured and written rather than ending the
         script before the write. Everything else is still fail-fast. The
         caches, the install steps and their order are the Windows dialect's,
-        whose docstring carries the why.
+        whose docstring carries the why. Each step, and the recipe as the
+        phase ``check``, is timed (:mod:`fleet.core.phase_markers`).
 
         A docker project's build is :mod:`fleet.core.linux_isolated_build`'s
         instead: the same steps in the same order, run as execdocker against
@@ -323,7 +327,8 @@ class LinuxDialect:
             path: The project's directory inside the export, ``""`` for the
                 root.
             workers: Test workers the capacity check granted.
-            install: The project's declared install steps, argv each.
+            install: The project's declared install steps, each with its
+                phase.
             cache_root: The node's cache directory, unread by a docker
                 project's build, whose caches are execdocker's.
             isolated_docker: True for a project that declares the ``docker``
@@ -355,6 +360,7 @@ class LinuxDialect:
             return PROLOGUE + "\n".join(lines) + "\n"
         log = names.log_path(target)
         result = f"{target}/{names.RESULT_NAME}"
+        written = f"printf '%s\\n' \"$status\" > '{result}'"
         lines = [
             f"{PROLOGUE}npm_config_cache='{cache_root}/npm'",
             f"POETRY_CACHE_DIR='{cache_root}/pypoetry'",
@@ -362,27 +368,20 @@ class LinuxDialect:
             f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
             f"{AGENT_LABEL_VARIABLE}='{label}'",
+            f"{CACHE_VARIABLE}='{cache_root}'",
             f"export npm_config_cache POETRY_CACHE_DIR {POETRY_KEYRING_OFF[0]} "
-            f"PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE}",
+            f"PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE} "
+            f"{CACHE_VARIABLE}",
             f"cd '{target}'",
         ]
         for step in install:
-            command = " ".join(step)
+            command = " ".join(step["argv"])
             lines.append(f"printf '$ %s\\n' '{command}' >> '{log}'")
-            lines.append("set +e")
-            lines.append(f"{command} >> '{log}' 2>&1")
-            lines.append("status=$?")
-            lines.append("set -e")
-            lines.append(
-                f"if [ \"$status\" -ne 0 ]; then printf '%s\\n' \"$status\" > '{result}'; "
-                f"exit 0; fi"
-            )
+            lines.extend(sh_phase_lines(phase=step["phase"], command=command, log=log))
+            lines.append(f'if [ "$status" -ne 0 ]; then {written}; exit 0; fi')
         lines.append(f"cd '{names.recipe_directory(target, path)}'")
-        lines.append("set +e")
-        lines.append(f"make {MAKE_TARGET} >> '{log}' 2>&1")
-        lines.append("status=$?")
-        lines.append("set -e")
-        lines.append(f"printf '%s\\n' \"$status\" > '{result}'")
+        lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=f"make {MAKE_TARGET}", log=log))
+        lines.append(written)
         return "\n".join(lines) + "\n"
 
     def log_tail_script(self, target: str, lines: int) -> str:

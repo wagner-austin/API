@@ -22,6 +22,7 @@ from fleet.contracts.source import ProjectSource, encode_project_source
 from fleet.core import _test_hooks, records, staging
 from tests._node_agent_fixtures import (
     NOTHING_LAUNCHED,
+    NPM_CI,
     PROBED,
     REMOTE,
     _credentials_in_env,
@@ -53,7 +54,7 @@ def _two_projects(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    document = sourced_document((("npm", "ci"),))
+    document = sourced_document((NPM_CI,))
     projects = document["projects"]
     assert isinstance(projects, dict)
     demo = projects[DEMO_PROJECT]
@@ -61,9 +62,7 @@ def _two_projects(config_path: pathlib.Path) -> pathlib.Path:
     projects[OTHER_PROJECT] = {
         **demo,
         "source": encode_project_source(
-            ProjectSource(
-                remote=REMOTE, path=OTHER_PROJECT, install=(("npm", "ci"),), companions=()
-            )
+            ProjectSource(remote=REMOTE, path=OTHER_PROJECT, install=(NPM_CI,), companions=())
         ),
     }
     config_path.write_text(dump_json_str(document), encoding="utf-8")

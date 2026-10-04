@@ -116,6 +116,13 @@ CACHE_DIRECTORY = "cache"
 LOGS_DIRECTORY = "logs"
 
 
+#: The variable every build exports naming :func:`cache_root`, for an install
+#: step that keeps state of its own between runs on the node: MCPs'
+#: ``fleet-prepare`` keeps a prepared tree there for the next row of the
+#: same commit (MCPs board task 74b13c20).
+CACHE_VARIABLE = "CORVIS_FLEET_CACHE"
+
+
 def cache_root(stage_root: str) -> str:
     """Where a node keeps the dependency caches its export runs share.
 

@@ -17,6 +17,7 @@ is measured on every harness run rather than remembered from sedona.
 
 from __future__ import annotations
 
+from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.dialect_windows import WindowsDialect
 from tests.conftest import DEMO_RUN_ID
@@ -45,7 +46,7 @@ class TestTheBuildRecordsItself:
             target="C:/s/run-1",
             path="",
             workers=2,
-            install=(("npm", "ci"),),
+            install=(InstallStep(phase="install", argv=("npm", "ci")),),
             cache_root="C:/c",
             isolated_docker=False,
             elevated=False,

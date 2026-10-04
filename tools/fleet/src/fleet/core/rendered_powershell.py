@@ -27,6 +27,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import RunnerSpec
+from fleet.contracts.source import InstallStep
 from fleet.core import (
     dialect,
     names,
@@ -65,7 +66,7 @@ EXAMPLE_PROJECT = "packages/maketools"
 EXAMPLE_WORKERS = 4
 
 #: The example dispatch's install steps.
-EXAMPLE_INSTALL: tuple[tuple[str, ...], ...] = (("npm", "ci"),)
+EXAMPLE_INSTALL: tuple[InstallStep, ...] = (InstallStep(phase="install", argv=("npm", "ci")),)
 
 #: The submitting label an example build exports as ``BOARD_AGENT_LABEL``.
 EXAMPLE_AGENT = "opus-example-0929"

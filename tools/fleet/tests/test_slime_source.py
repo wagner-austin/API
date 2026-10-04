@@ -6,7 +6,7 @@ from pathlib import Path
 
 from platform_core.json_utils import load_json_str
 
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import InstallStep, ProjectSource
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 
 
@@ -19,6 +19,11 @@ def test_slime_does_not_stage_an_unused_source_repository() -> None:
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/slime.git",
         path="",
-        install=(("npm", "ci"), ("npx", "playwright", "install", "chromium", "webkit")),
+        install=(
+            InstallStep(phase="install", argv=("npm", "ci")),
+            InstallStep(
+                phase="install", argv=("npx", "playwright", "install", "chromium", "webkit")
+            ),
+        ),
         companions=(),
     )

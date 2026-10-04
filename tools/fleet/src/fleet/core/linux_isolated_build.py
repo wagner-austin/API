@@ -43,8 +43,11 @@ suite's ``compose down -v`` does.
 from __future__ import annotations
 
 from fleet.contracts.project import MAKE_TARGET
+from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
+from fleet.core.names import CACHE_VARIABLE
+from fleet.core.phase_markers import sh_phase_lines
 
 #: The user whose rootless daemon a docker project's build runs against.
 EXEC_USER = "execdocker"
@@ -72,17 +75,21 @@ def isolated_build_lines(
     target: str,
     path: str,
     workers: int,
-    install: tuple[tuple[str, ...], ...],
+    install: tuple[InstallStep, ...],
     agent: str,
 ) -> list[str]:
     """The build's lines after the prologue, running every step as execdocker.
+
+    Each install step, and the recipe as the phase ``check``, is timed in
+    the runner's transcript (:mod:`fleet.core.phase_markers`), around the
+    ``sudo`` that runs it.
 
     Args:
         target: Absolute remote directory holding the staged tree, its root,
             owned by the runner.
         path: The project's directory inside the export, ``""`` for the root.
         workers: Test workers the capacity check granted.
-        install: The project's declared install steps, argv each.
+        install: The project's declared install steps, each with its phase.
         agent: The job's submitting agent label, already held to the board's
             grammar, carried into the cleared environment as
             ``BOARD_AGENT_LABEL``: MCPs' disposable deploy takes a fleet hold,
@@ -116,27 +123,30 @@ def isolated_build_lines(
         'PLAYWRIGHT_BROWSERS_PATH="$exec_cache/ms-playwright" '
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
         f"{AGENT_LABEL_VARIABLE}='{agent}' "
+        f'{CACHE_VARIABLE}="$exec_cache" '
         'sh -eu -c "$1"',
         "}",
         "status=0",
     ]
     for step in install:
-        command = " ".join(step)
+        command = " ".join(step["argv"])
         lines.append(f"printf '$ %s\\n' '{command}' >> '{log}'")
-        lines.append("set +e")
-        lines.append(f"as_exec \"cd '$exec_root' && {command}\" >> '{log}' 2>&1")
-        lines.append("status=$?")
-        lines.append("set -e")
+        lines.extend(
+            sh_phase_lines(
+                phase=step["phase"], command=f"as_exec \"cd '$exec_root' && {command}\"", log=log
+            )
+        )
         lines.append('if [ "$status" -ne 0 ]; then')
         lines.append('  sudo -n rm -rf "$exec_root"')
         lines.append(f"  printf '%s\\n' \"$status\" > '{result}'")
         lines.append("  exit 0")
         lines.append("fi")
     recipe = names.recipe_directory("$exec_root", path)
-    lines.append("set +e")
-    lines.append(f"as_exec \"cd '{recipe}' && make {MAKE_TARGET}\" >> '{log}' 2>&1")
-    lines.append("status=$?")
-    lines.append("set -e")
+    lines.extend(
+        sh_phase_lines(
+            phase=MAKE_TARGET, command=f"as_exec \"cd '{recipe}' && make {MAKE_TARGET}\"", log=log
+        )
+    )
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")
     return lines

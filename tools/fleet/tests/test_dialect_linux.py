@@ -22,6 +22,7 @@ import pytest
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
+from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.dialect_linux import (
     OBSERVE_SESSIONS_PYTHON,
@@ -30,6 +31,8 @@ from fleet.core.dialect_linux import (
     SH_INVOCATION,
     LinuxDialect,
 )
+from fleet.core.names import CACHE_VARIABLE
+from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 DIALECT = LinuxDialect()
@@ -113,8 +116,13 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         assert script.startswith(PROLOGUE)
 
 
+def _step(*argv: str) -> InstallStep:
+    """An install step of the install phase."""
+    return InstallStep(phase="install", argv=argv)
+
+
 def _build(
-    *, path: str = DEMO_PROJECT, install: tuple[tuple[str, ...], ...] = (), workers: int = 6
+    *, path: str = DEMO_PROJECT, install: tuple[InstallStep, ...] = (), workers: int = 6
 ) -> str:
     """Render the Linux build script for one run under the fixture's roots.
 
@@ -146,7 +154,8 @@ class TestBuildScript:
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\n" in body
         assert (
             "export npm_config_cache POETRY_CACHE_DIR POETRY_KEYRING_ENABLED "
-            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS BOARD_AGENT_LABEL\n"
+            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS BOARD_AGENT_LABEL "
+            "CORVIS_FLEET_CACHE\n"
         ) in body
         assert f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body
 
@@ -186,7 +195,7 @@ class TestBuildScript:
         """MCPs board task c837fd8d: left on, poetry blocks on the D-Bus
         SecretService on a headless node, and the build times out inside
         ``poetry install``."""
-        lines = _build(install=(("npm", "ci"),)).splitlines()
+        lines = _build(install=(_step("npm", "ci"),)).splitlines()
 
         keyring = lines.index("POETRY_KEYRING_ENABLED='false'")
         assert keyring < lines.index(f"printf '$ %s\\n' 'npm ci' >> '{names.log_path(TARGET)}'")
@@ -194,7 +203,8 @@ class TestBuildScript:
     def test_install_steps_run_at_the_root_before_the_recipe_and_end_it_when_they_fail(
         self,
     ) -> None:
-        body = _build(install=(("npm", "ci"), ("npm", "rebuild")))
+        rebuild = InstallStep(phase="workspace-build", argv=("npm", "rebuild"))
+        body = _build(install=(_step("npm", "ci"), rebuild))
         lines = body.splitlines()
 
         log = f"{TARGET}/{names.RESULT_NAME}.log"
@@ -203,22 +213,42 @@ class TestBuildScript:
         second = lines.index(f"npm rebuild >> '{log}' 2>&1")
         recipe = lines.index(f"cd '{TARGET}/{DEMO_PROJECT}'")
         assert root < first < second < recipe
-        assert lines[first - 2] == f"printf '$ %s\\n' 'npm ci' >> '{log}'"
-        assert lines[first - 1] == "set +e"
-        assert lines[first + 1] == "status=$?"
-        assert lines[first + 2] == "set -e"
-        assert lines[first + 3] == (
+        assert lines[first - 4 : first] == [
+            f"printf '$ %s\\n' 'npm ci' >> '{log}'",
+            'phase_started="$(date +%s)"',
+            f"printf 'fleet-phase %s started %s\\n' 'install' {SH_UTC_STAMP} >> '{log}'",
+            "set +e",
+        ]
+        assert lines[first + 1 : first + 4] == [
+            "status=$?",
+            "set -e",
+            f"printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'install' {SH_UTC_STAMP} "
+            f'"$(( $(date +%s) - phase_started ))" "$status" >> \'{log}\'',
+        ]
+        assert lines[first + 4] == (
             f'if [ "$status" -ne 0 ]; then printf \'%s\\n\' "$status" > '
             f"'{TARGET}/{names.RESULT_NAME}'; exit 0; fi"
         )
+        assert f"'workspace-build' {SH_UTC_STAMP}" in lines[second - 2]
+
+    def test_the_build_names_the_node_s_cache_for_install_steps_that_keep_state(self) -> None:
+        """MCPs' fleet-prepare keeps a prepared tree under it (MCPs board
+        task 74b13c20)."""
+        lines = _build().splitlines()
+
+        assert f"{CACHE_VARIABLE}='/s/cache'" in lines
+        assert any(line.startswith("export ") and CACHE_VARIABLE in line for line in lines)
 
     def test_a_failing_suite_is_recorded_not_fatal(self) -> None:
-        """The recipe runs with -e off and its status captured, so a red suite
-        still writes the result file; everything around it stays fail-fast."""
+        """The recipe runs with -e off and its status captured as the phase
+        ``check``, so a red suite still writes the result file; everything
+        around it stays fail-fast."""
         body = _build()
         lines = body.splitlines()
 
         recipe = f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1"
+        assert lines[lines.index(recipe) - 2].startswith("printf 'fleet-phase %s started %s")
+        assert "'check'" in lines[lines.index(recipe) - 2]
         assert lines.index("set +e") < lines.index(recipe)
         assert lines.index(recipe) + 1 == lines.index("status=$?")
         assert lines.index("status=$?") + 1 == lines.index("set -e")

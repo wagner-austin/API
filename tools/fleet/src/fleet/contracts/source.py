@@ -52,6 +52,16 @@ element is held to :data:`INSTALL_TOKEN` because the steps are rendered into
 a script the node runs in its own shell (:mod:`fleet.core.dialect`): no
 space, no quote, no metacharacter, so a token cannot compose an argument the
 registry did not spell.
+
+WHY EACH STEP NAMES ITS PHASE (MCPs board task 74b13c20). The build writes
+a timestamped ``fleet-phase`` line before and after every step, so a row's
+transcript says how long it spent installing, building and readying its
+database before its own recipe began: measured over the week to
+2026-10-04, the shortest MCPs rows ran 340-360 s whatever the package, and
+fleet-mcp's tests were 39.6 s of one. The phase is declared beside the
+step, in the registry's words, rather than guessed from the command, so
+the transcript reads ``install``, ``workspace-build`` and
+``test-database`` whatever tool each repository uses for them.
 """
 
 from __future__ import annotations
@@ -83,6 +93,11 @@ PATH_PATTERN: Final[re.Pattern[str]] = re.compile(
 #: character may not be one either shell reads (``@`` splats in PowerShell,
 #: ``$`` expands in both) and no position may carry whitespace or a quote.
 INSTALL_TOKEN: Final[re.Pattern[str]] = re.compile(r"\A[A-Za-z0-9-][A-Za-z0-9._/@:=-]*\Z")
+
+#: The phase an install step belongs to: lowercase words joined by single
+#: hyphens. It is written into the transcript's ``fleet-phase`` lines by both
+#: dialects, so it carries nothing either shell reads.
+PHASE_PATTERN: Final[re.Pattern[str]] = re.compile(r"\A[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
 
 #: The ref a companion's tip is exported from: a branch name, or its full
 #: ``refs/heads/`` spelling. Slash-joined segments that each begin
@@ -116,6 +131,19 @@ class ProjectCompanion(TypedDict):
     directory: str
 
 
+class InstallStep(TypedDict):
+    """One command run at the export root before the recipe.
+
+    Attributes:
+        phase: The phase it is timed as in the transcript, in
+            :data:`PHASE_PATTERN`.
+        argv: The command, each token in :data:`INSTALL_TOKEN`.
+    """
+
+    phase: str
+    argv: tuple[str, ...]
+
+
 class ProjectSource(TypedDict):
     """Where a project's commits are fetched from and how an export is readied.
 
@@ -124,8 +152,8 @@ class ProjectSource(TypedDict):
         path: The directory inside the repository the recipe runs in;
             ``""`` for a project that is the repository.
         install: The commands run at the EXPORT ROOT, in order, before
-            ``make check`` runs in ``path``; each one an argv. Empty for a
-            project whose recipe installs its own dependencies.
+            ``make check`` runs in ``path``; each one names its phase. Empty
+            for a project whose recipe installs its own dependencies.
         companions: The other repositories exported beside this one before
             the install steps run. Empty for a project whose check reads
             only its own tree, which is every project but ``slime``.
@@ -133,7 +161,7 @@ class ProjectSource(TypedDict):
 
     remote: str
     path: str
-    install: tuple[tuple[str, ...], ...]
+    install: tuple[InstallStep, ...]
     companions: tuple[ProjectCompanion, ...]
 
 
@@ -181,7 +209,59 @@ def decode_path(value: str, *, field: str) -> str:
     return value
 
 
-def decode_install(value: JSONValue, *, field: str) -> tuple[tuple[str, ...], ...]:
+def decode_argv(value: JSONValue, *, field: str) -> tuple[str, ...]:
+    """Decode one install step's command.
+
+    Args:
+        value: The value under ``field``.
+        field: The key it came from, for the message.
+
+    Returns:
+        The non-empty argv, each token in :data:`INSTALL_TOKEN`.
+
+    Raises:
+        JSONTypeError: If it is not a list, is empty, or a token is not a
+            string in the grammar.
+    """
+    if not isinstance(value, list):
+        raise JSONTypeError(f"{field} must be a list of argv tokens, got {type(value).__name__}")
+    if not value:
+        raise JSONTypeError(f"{field} is empty; a step names its executable")
+    tokens: list[str] = []
+    for position, token in enumerate(value):
+        if not isinstance(token, str) or INSTALL_TOKEN.fullmatch(token) is None:
+            raise JSONTypeError(
+                f"{field}[{position}] must be a string of [A-Za-z0-9._/@:=-] "
+                f"starting alphanumeric or with a dash, got {token!r}; the steps are "
+                "rendered into the "
+                "node's shell, so no token may carry whitespace, a quote or a metacharacter"
+            )
+        tokens.append(token)
+    return tuple(tokens)
+
+
+def decode_phase(value: str, *, field: str) -> str:
+    """Validate a phase name against :data:`PHASE_PATTERN`.
+
+    Args:
+        value: The declared phase.
+        field: The key it came from, for the message.
+
+    Returns:
+        The phase.
+
+    Raises:
+        JSONTypeError: If it is not lowercase words joined by single hyphens.
+    """
+    if PHASE_PATTERN.fullmatch(value) is None:
+        raise JSONTypeError(
+            f"{field} must be lowercase words joined by single hyphens, such as "
+            f"'workspace-build', got {value!r}"
+        )
+    return value
+
+
+def decode_install(value: JSONValue, *, field: str) -> tuple[InstallStep, ...]:
     """Decode the install steps.
 
     Args:
@@ -189,38 +269,35 @@ def decode_install(value: JSONValue, *, field: str) -> tuple[tuple[str, ...], ..
         field: The key it came from, for the message.
 
     Returns:
-        The steps, each a non-empty argv of tokens in :data:`INSTALL_TOKEN`.
+        The steps, in order.
 
     Raises:
-        JSONTypeError: If the key is absent, a step is not a list, a step is
-            empty, or a token is not a string in the grammar.
+        JSONTypeError: If the key is absent, a step is not an object, its
+            phase is outside :data:`PHASE_PATTERN`, or its argv is empty or
+            carries a token outside the grammar.
     """
     if value is None:
         raise JSONTypeError(
             f"{field} is required: [] for a project whose recipe installs its own "
-            "dependencies, else the argv lists run at the export root before make check"
+            "dependencies, else the steps run at the export root before make check"
         )
     if not isinstance(value, list):
-        raise JSONTypeError(f"{field} must be a list of argv lists, got {type(value).__name__}")
-    steps: list[tuple[str, ...]] = []
+        raise JSONTypeError(
+            f"{field} must be a list of {{phase, argv}} steps, got {type(value).__name__}"
+        )
+    steps: list[InstallStep] = []
     for index, step in enumerate(value):
-        if not isinstance(step, list):
+        if not isinstance(step, dict):
             raise JSONTypeError(
-                f"{field}[{index}] must be a list of argv tokens, got {type(step).__name__}"
+                f"{field}[{index}] must be an object naming its phase and argv, "
+                f"got {type(step).__name__}"
             )
-        if not step:
-            raise JSONTypeError(f"{field}[{index}] is empty; a step names its executable")
-        tokens: list[str] = []
-        for position, token in enumerate(step):
-            if not isinstance(token, str) or INSTALL_TOKEN.fullmatch(token) is None:
-                raise JSONTypeError(
-                    f"{field}[{index}][{position}] must be a string of [A-Za-z0-9._/@:=-] "
-                    f"starting alphanumeric or with a dash, got {token!r}; the steps are "
-                    "rendered into the "
-                    "node's shell, so no token may carry whitespace, a quote or a metacharacter"
-                )
-            tokens.append(token)
-        steps.append(tuple(tokens))
+        steps.append(
+            InstallStep(
+                phase=decode_phase(require_str(step, "phase"), field=f"{field}[{index}].phase"),
+                argv=decode_argv(step.get("argv"), field=f"{field}[{index}].argv"),
+            )
+        )
     return tuple(steps)
 
 
@@ -375,8 +452,9 @@ def encode_project_source(source: ProjectSource | None) -> JSONValue:
         return None
     steps: list[JSONValue] = []
     for step in source["install"]:
-        tokens: list[JSONValue] = list(step)
-        steps.append(tokens)
+        tokens: list[JSONValue] = list(step["argv"])
+        declared_step: JSONObject = {"phase": step["phase"], "argv": tokens}
+        steps.append(declared_step)
     companions: list[JSONValue] = []
     for companion in source["companions"]:
         declared: JSONObject = {
@@ -399,15 +477,19 @@ __all__ = [
     "COMPANION_REF_PATTERN",
     "INSTALL_TOKEN",
     "PATH_PATTERN",
+    "PHASE_PATTERN",
     "REMOTE_PATTERN",
+    "InstallStep",
     "ProjectCompanion",
     "ProjectSource",
+    "decode_argv",
     "decode_companion",
     "decode_companion_directory",
     "decode_companion_ref",
     "decode_companions",
     "decode_install",
     "decode_path",
+    "decode_phase",
     "decode_project_source",
     "decode_remote",
     "encode_project_source",
