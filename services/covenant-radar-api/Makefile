@@ -2,7 +2,7 @@ include ../../scripts/make/shell.mk
 
 MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
-.PHONY: lint test check native-deps
+.PHONY: lint test check _check-unbudgeted native-deps
 
 # cleargbm_rs is a maturin (Rust) package and the only path dependency declared
 # without develop = true, with its version frozen at 0.1.0. `poetry install`
@@ -34,5 +34,8 @@ test: native-deps
 	poetry sync --with dev
 	$(MAKETOOLS) test
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint | test
