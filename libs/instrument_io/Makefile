@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check
+.PHONY: lint test check _check-unbudgeted
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -28,5 +28,8 @@ test:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint | test
