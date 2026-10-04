@@ -9,6 +9,17 @@ one field replaced, so a cell CANNOT drift in a field its axis does not own,
 and a field added to :class:`~model_trainer.core.contracts.qa_plan.QaPlan`
 later reaches every cell through the base instead of through nineteen edits.
 
+THE NAMES ARE WRITTEN OUT EVEN THOUGH THE PLANS ARE NOT, and the reason is
+the other end of the lookup. A run document names a plan, and both a person
+and ``tools/hpc3``'s committed-run check find that plan by reading this
+source for the name as a quoted literal. A name assembled by an f-string is
+in no file anywhere, so the first version of this module -- which derived
+every name from its base model and value -- made every cell unfindable by
+grep and failed that check against image v55, whose run documents had to be
+cancelled. Each cell is therefore declared as a ``(name, value)`` pair: the
+name is stated once, beside the one value it stands for, and nothing derives
+it.
+
 WHY THE FULL WIKI AND NOT THE API-CODEBASE WIKI. The previous ladder top
 (``pythia-6.9b-api-wiki-qa``) and the previous capacity axis
 (``gpt2-large-api-wiki-qa-slots-*``) were declared against the api-codebase
@@ -52,7 +63,7 @@ from model_trainer.core.contracts.qa_plan import QaPlan
 #: The base every cell is one field away from, by name in the plan table.
 FULL_WIKI_BASE: Final[str] = "gpt2-full-wiki-qa"
 
-#: The rungs above the base, each with the precision its base loads at.
+#: The rungs above the base: name, base model, and the precision it loads at.
 #:
 #: THE LADDER RUNS TO pythia-6.9b BECAUSE THE CROSSING IT REPORTS IS AT ~774M:
 #: a ladder that stopped at gpt2-xl stopped one rung after its own finding.
@@ -60,21 +71,26 @@ FULL_WIKI_BASE: Final[str] = "gpt2-full-wiki-qa"
 #: (``gpu_pinned_because: bf16-7b-weights-13.8GB-plus-training-need-24GB``),
 #: so its profile is proven rather than assumed, and it loads at the declared
 #: ``stored-bf16`` because fp32 is 27.6GB against that card's 24GB.
-SCALE_RUNGS: Final[tuple[tuple[str, str], ...]] = (
-    ("gpt2-medium", "policy"),
-    ("gpt2-large", "policy"),
-    ("gpt2-xl", "policy"),
-    ("EleutherAI/pythia-6.9b", "stored-bf16"),
+SCALE_RUNGS: Final[tuple[tuple[str, str, str], ...]] = (
+    ("gpt2-medium-full-wiki-qa", "gpt2-medium", "policy"),
+    ("gpt2-large-full-wiki-qa", "gpt2-large", "policy"),
+    ("gpt2-xl-full-wiki-qa", "gpt2-xl", "policy"),
+    ("pythia-6.9b-full-wiki-qa", "EleutherAI/pythia-6.9b", "stored-bf16"),
 )
 
-#: The capacity axis sits on gpt2-large because that is the rung where the
+#: The rung the capacity axis sits on. gpt2-large, because that is where the
 #: cartridge was reported to cross retrieval, and the claim the axis tests --
 #: "a fixed slot budget loses to an unbounded index" -- is a claim about the
 #: crossing.
-SLOT_AXIS_MODEL: Final[str] = "gpt2-large"
+SLOT_AXIS_RUNG: Final[str] = "gpt2-large-full-wiki-qa"
 
-#: The slot counts, a doubling ladder through the 128 every older plan froze.
-SLOT_COUNTS: Final[tuple[int, ...]] = (32, 64, 128, 256)
+#: The capacity cells: a doubling ladder through the 128 every older plan froze.
+SLOT_CELLS: Final[tuple[tuple[str, int], ...]] = (
+    ("gpt2-large-full-wiki-qa-slots-32", 32),
+    ("gpt2-large-full-wiki-qa-slots-64", 64),
+    ("gpt2-large-full-wiki-qa-slots-128", 128),
+    ("gpt2-large-full-wiki-qa-slots-256", 256),
+)
 
 #: Every capacity cell is scored under the TIGHTEST common budget, 1024 less
 #: the largest prefix. Sizing each cell to ``1024 - num_slots`` would hand the
@@ -84,24 +100,19 @@ SLOT_COUNTS: Final[tuple[int, ...]] = (32, 64, 128, 256)
 SLOT_AXIS_MAX_SEQ_LEN: Final[int] = 768
 
 #: Training window sizes beside the base's 256.
-WINDOWS: Final[tuple[int, ...]] = (128, 512)
+WINDOW_CELLS: Final[tuple[tuple[str, int], ...]] = (
+    ("gpt2-full-wiki-qa-window-128", 128),
+    ("gpt2-full-wiki-qa-window-512", 512),
+)
 
 #: Passes over the training windows beside the base's 12. On the LOSS axis 12
 #: sits at the maximum and 24 halves the gain; whether that transfers to
 #: ANSWERABILITY is the open question, so the curve runs both sides of 12.
-EPOCHS: Final[tuple[int, ...]] = (3, 6, 24)
-
-
-def _rung_name(model_id: str) -> str:
-    """Name a scale rung after its base, without the hub organisation.
-
-    Args:
-        model_id: HuggingFace id of the rung's base.
-
-    Returns:
-        ``<base>-full-wiki-qa``, e.g. ``pythia-6.9b-full-wiki-qa``.
-    """
-    return f"{model_id.rsplit('/', 1)[-1]}-full-wiki-qa"
+EPOCH_CELLS: Final[tuple[tuple[str, int], ...]] = (
+    ("gpt2-full-wiki-qa-epochs-3", 3),
+    ("gpt2-full-wiki-qa-epochs-6", 6),
+    ("gpt2-full-wiki-qa-epochs-24", 24),
+)
 
 
 def scale_rungs(base: QaPlan) -> dict[str, QaPlan]:
@@ -111,11 +122,11 @@ def scale_rungs(base: QaPlan) -> dict[str, QaPlan]:
         base: The full-wiki base plan.
 
     Returns:
-        One plan per :data:`SCALE_RUNGS` entry, keyed by :func:`_rung_name`.
+        One plan per :data:`SCALE_RUNGS` entry, keyed by its declared name.
     """
     return {
-        _rung_name(model_id): {**base, "model_id": model_id, "precision_selector": selector}
-        for model_id, selector in SCALE_RUNGS
+        name: {**base, "model_id": model_id, "precision_selector": selector}
+        for name, model_id, selector in SCALE_RUNGS
     }
 
 
@@ -123,20 +134,14 @@ def slot_cells(rung: QaPlan) -> dict[str, QaPlan]:
     """Build the capacity axis on one rung, every cell under one budget.
 
     Args:
-        rung: The plan for :data:`SLOT_AXIS_MODEL`, from :func:`scale_rungs`.
+        rung: The plan named :data:`SLOT_AXIS_RUNG`, from :func:`scale_rungs`.
 
     Returns:
-        One plan per :data:`SLOT_COUNTS` entry, keyed
-        ``<rung name>-slots-<n>``.
+        One plan per :data:`SLOT_CELLS` entry, keyed by its declared name.
     """
-    prefix = _rung_name(rung["model_id"])
     return {
-        f"{prefix}-slots-{count}": {
-            **rung,
-            "num_slots": count,
-            "max_seq_len": SLOT_AXIS_MAX_SEQ_LEN,
-        }
-        for count in SLOT_COUNTS
+        name: {**rung, "num_slots": count, "max_seq_len": SLOT_AXIS_MAX_SEQ_LEN}
+        for name, count in SLOT_CELLS
     }
 
 
@@ -147,10 +152,9 @@ def window_cells(base: QaPlan) -> dict[str, QaPlan]:
         base: The full-wiki base plan.
 
     Returns:
-        One plan per :data:`WINDOWS` entry, keyed
-        ``gpt2-full-wiki-qa-window-<n>``.
+        One plan per :data:`WINDOW_CELLS` entry, keyed by its declared name.
     """
-    return {f"{FULL_WIKI_BASE}-window-{window}": {**base, "window": window} for window in WINDOWS}
+    return {name: {**base, "window": window} for name, window in WINDOW_CELLS}
 
 
 def epoch_cells(base: QaPlan) -> dict[str, QaPlan]:
@@ -160,10 +164,9 @@ def epoch_cells(base: QaPlan) -> dict[str, QaPlan]:
         base: The full-wiki base plan.
 
     Returns:
-        One plan per :data:`EPOCHS` entry, keyed
-        ``gpt2-full-wiki-qa-epochs-<n>``.
+        One plan per :data:`EPOCH_CELLS` entry, keyed by its declared name.
     """
-    return {f"{FULL_WIKI_BASE}-epochs-{epochs}": {**base, "epochs": epochs} for epochs in EPOCHS}
+    return {name: {**base, "epochs": epochs} for name, epochs in EPOCH_CELLS}
 
 
 def merged_plan_tables(*tables: Mapping[str, QaPlan]) -> dict[str, QaPlan]:
@@ -205,26 +208,26 @@ def full_wiki_family(base: QaPlan) -> dict[str, QaPlan]:
         each axis's point at its base value.
 
     Raises:
-        ValueError: From :func:`merged_plan_tables` if two axes name a cell
-            alike.
+        ValueError: From :func:`merged_plan_tables` if two axes declare a
+            cell alike.
     """
     rungs = scale_rungs(base)
     return merged_plan_tables(
         rungs,
-        slot_cells(rungs[_rung_name(SLOT_AXIS_MODEL)]),
+        slot_cells(rungs[SLOT_AXIS_RUNG]),
         window_cells(base),
         epoch_cells(base),
     )
 
 
 __all__ = [
-    "EPOCHS",
+    "EPOCH_CELLS",
     "FULL_WIKI_BASE",
     "SCALE_RUNGS",
     "SLOT_AXIS_MAX_SEQ_LEN",
-    "SLOT_AXIS_MODEL",
-    "SLOT_COUNTS",
-    "WINDOWS",
+    "SLOT_AXIS_RUNG",
+    "SLOT_CELLS",
+    "WINDOW_CELLS",
     "epoch_cells",
     "full_wiki_family",
     "merged_plan_tables",
