@@ -25,9 +25,12 @@ read the Makefile of ``make check`` (MCPs ``packages/maketools``
 ``check_budget.py``, board task 4080d695): a split would restart that clock
 at ``make test`` and pass a check whose lint and suite together are over
 budget, a different verdict from the same commit's ``make check`` anywhere
-else. The check lock prints its own split instead, in the same transcript:
-``CHECK BUDGET: <package> took Ns of 300s (lint and setup Ns, suite Ns,
-...)``.
+else. The check lock times the two inside ``check`` instead, in the same
+transcript and in this grammar: ``fleet-phase lint`` from make reading the
+Makefile to the lock being asked for, and ``fleet-phase test`` from there
+to the suite returning, with the suite's own exit (MCPs
+``packages/maketools`` ``check_phases.py``, the review of 2026-10-04 16:58Z),
+beside its ``CHECK BUDGET: <package> took Ns of 300s (...)`` line.
 """
 
 from __future__ import annotations
