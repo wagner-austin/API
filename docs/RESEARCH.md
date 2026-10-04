@@ -928,10 +928,11 @@ entry point that builds a `RunRecord` and is named nowhere here.
 - **What it measures, and why it is not the loss benchmark.**
   `cartridge_benchmark` reports held-out loss; a model can memorise text
   word-by-word and still fail every question about it. This scores a
-  multiple-choice question set built from held-out windows, over six arms:
+  multiple-choice question set built from held-out windows, over nine arms:
   base alone, cartridge, BM25 retrieval, dense retrieval, reciprocal-rank
-  fusion, and an oracle. `QA_EXPERIMENT` differs from `CARTRIDGE_EXPERIMENT`
-  so the comparability layer refuses to difference the two.
+  fusion, query-expanded BM25, model-reranked BM25, long context, and an
+  oracle. `QA_EXPERIMENT` differs from `CARTRIDGE_EXPERIMENT` so the
+  comparability layer refuses to difference the two.
 
 - **THE HEADLINE WAS RETRACTED THE DAY THIS SECTION WAS WRITTEN**
   (`a98769b5`, `dc5f2408`). "The cartridge arm beats lexical, dense and fused
@@ -951,14 +952,16 @@ entry point that builds a `RunRecord` and is named nowhere here.
   `cartridge_qa_power.require_resolvable_question_set` refuses the run —
   before the model loads — when the REALISED question set cannot resolve what
   the plan declares. Against the realised count, never `max_items`: the
-  32-item set came from a plan whose cap said 120. Every plan declares 0.05,
-  which is the effect size this literature reports (WRAP +0.020, arXiv
+  32-item set came from a plan whose cap said 120. Every plan declares 0.02,
+  the smallest non-noise effect this literature reports (WRAP +0.020, arXiv
   2401.16380; this machine's extraction ablation **as published** +0.061 for a
   removed 7:1 dilution, +0.029 for permuted copies, +0.004 for hub-slug
   markers — the last of which was noise *at the two rungs that run reached*,
-  and is no longer the standing verdict; see the four-rung redo below). That
-  needs 100 items, so **the four me-wiki plans are refused before they run** —
-  deliberately, since they are the plans that produced the retracted claim.
+  and is no longer the standing verdict; see the four-rung redo below). It
+  read 0.05 until 2026-09-09 and was corrected for sitting above two of its
+  own anchors. 0.02 needs 250 items under mid-p, so **the four me-wiki plans
+  are refused before they run** — deliberately, since they are the plans
+  that produced the retracted claim.
 
   It is a FALSIFIABILITY gate, not a power one: passing means some attainable
   outcome supports the declared effect, never that the outcome is likely.
@@ -970,68 +973,106 @@ entry point that builds a `RunRecord` and is named nowhere here.
   power reading that matters for this gate: *the extraction ablation's marker
   contrast across four scales*, at the end of this `mi` section.
 
-- **Two axes added at registration, both previously absent.**
-  `pythia-6.9b-api-wiki-qa` — the ladder had stopped at gpt2-xl, one rung
-  past its own ~774M crossing, while the cartridge sweeps have run this base
-  on an A30 since image v36; every field but `model_id` is the ladder's,
-  `max_seq_len` included, so scale is not confounded with the retriever's
-  budget. And `gpt2-large-api-wiki-qa-slots-{32,64,128,256}` — `num_slots`
-  was 128 in every plan while the programme's stated mechanism for why a
-  cartridge should lose to a retriever is that its slot budget is fixed and
-  an index is not. That is a claim about a curve, and it had been measured at
-  one point. All four cells hold `max_seq_len` at 768 rather than each
-  cell's own `1024 - num_slots`, or the smallest cartridge would also carry
-  the largest evidence budget.
+- **The axes live on the full wiki, built rather than copied** (`df9f9101`,
+  2026-10-04). `cartridge_qa_axes.full_wiki_family` builds every cell as
+  `gpt2-full-wiki-qa` with ONE field replaced, so a cell cannot drift in a
+  field its axis does not own:
 
-- **The two gaps filed at registration are closed** (`baca6369`,
-  `643757bd`). BM25's `K1`, `B` and `RETRIEVED_CHUNKS` were module constants,
-  so "the cartridge beats BM25" named one arbitrary point in a parameter
-  space; they are now `bm25_k1`, `bm25_b` and `retrieved_chunks` on the plan,
-  carried on the index so a record reports the retriever that actually ran.
-  And a **long-context arm** exists: `long_context_items` hands the model the
-  corpus whole and lets the window truncate it.
+  | axis | field | cells |
+  |---|---|---|
+  | scale | `model_id` (+ `precision_selector`) | gpt2-medium, gpt2-large, gpt2-xl, pythia-6.9b `-full-wiki-qa` |
+  | capacity | `num_slots`, on gpt2-large, all at `max_seq_len` 768 | `gpt2-large-full-wiki-qa-slots-{32,64,128,256}` |
+  | window | `window` | `gpt2-full-wiki-qa-window-{128,512}` (base is 256) |
+  | epochs | `epochs` | `gpt2-full-wiki-qa-epochs-{3,6,24}` (base is 12) |
+
+  **They replace the api-codebase-wiki rung and slot axis added at
+  registration, which could never run.** `pythia-6.9b-api-wiki-qa` and
+  `gpt2-large-api-wiki-qa-slots-*` were capped at 240 items against the 250
+  the declared 0.02 needs, on a corpus yielding 237 items on 2026-09-09 and
+  275 on 2026-10-04 — so the gate refused every one before a model loaded,
+  and criteria 1 and 2 of `e3c833f7` existed as plans and nowhere else. The
+  full wiki at commit `ee6e6d12` (885 pages, 1,634,715 gpt2 tokens) yields
+  **3,278 to 3,827 items per cell**, measured with the real question-set
+  builder: 3,753 at window 128, 3,827 at 256, 3,278 at 512, 3,793 under
+  pythia's tokenizer.
+
+  **The capacity axis holds every cell to 768 tokens** rather than each
+  cell's own `1024 - num_slots`, or the smallest cartridge would also carry
+  the largest evidence budget. It sits on gpt2-large because that is where
+  the crossing was reported.
+
+  **The window axis moves the question set and reads differently.** Items
+  are built from held-out windows, so a cell with another `window` asks other
+  questions; raw accuracy across window cells is not a curve. What the axis
+  compares is each cell's WITHIN-cell gap (cartridge against BM25, against
+  long context), paired on that cell's own items and gated by its own count.
+  The slot and epoch axes keep the base's items.
+
+  **Why epochs is swept after all.** This entry used to say it was not,
+  because the loss-axis epochs line had closed the knob (12 is the maximum,
+  24 halves the gain) and an accuracy sweep could not be resolved on any
+  corpus then planned. The second half no longer holds, and the first was
+  always about NATS: whether the loss-optimal 12 is also answerability-
+  optimal is the open question, and the curve runs both sides of it.
+
+- **The 7B rung could not have run, and nothing said so.** Until
+  2026-10-04 `cartridge_qa_benchmark` handed the loader `None` for every
+  base, so `pythia-6.9b` would have loaded **27.6GB of fp32 weights onto the
+  24GB A30** its rung was declared for. `QaPlan` now declares
+  `precision_selector`, resolved through `cartridge_solo_seeds.resolve_precision`
+  before the corpus is read — the same field and resolver the companion
+  sweeps use for the same base. The 7B rung loads `stored-bf16` (13.8GB) and
+  its label carries `-storedbf16`; every gpt2 plan resolves to policy fp32
+  and its label is unchanged.
+
+- **The search side is parameterised and widened** (`baca6369`,
+  `643757bd`, and the expansion and rerank arms after them). BM25's `K1`,
+  `B` and `RETRIEVED_CHUNKS` were module constants, so "the cartridge beats
+  BM25" named one arbitrary point in a parameter space; they are now
+  `bm25_k1`, `bm25_b` and `retrieved_chunks` on the plan, carried on the
+  index so a record reports the retriever that actually ran. A
+  **query-expansion** arm (`expansion_feedback_chunks`, `expansion_terms`:
+  pseudo-relevance feedback over the first search) and a **reranking** arm
+  (`rerank_candidates`: the BM25 shortlist re-scored by the model itself,
+  costing that many forward passes per item) are reported beside plain BM25
+  rather than replacing it. And a **long-context arm** exists:
+  `long_context_items` hands the model the corpus whole and lets the window
+  truncate it.
 
   **Read its coverage before its accuracy.** The arm reports
   `long_context_corpus_fraction`, and it has to. `with_evidence` keeps the
   OPENING of the evidence and drops the rest — its docstring claimed the
   opposite until 2026-09-09 — so where the corpus overflows the window this
   arm is not "the corpus in context" but "the first few per cent of it,
-  chosen by document order". At the current rungs the me-wiki corpus is
-  15,602 tokens against a 896-token budget, so the arm carries about 6% and a
-  cartridge beating it has beaten almost nothing. It becomes the honest
-  long-context baseline only as that fraction approaches 1, which is an
-  argument for the bigger bases and the bigger corpora rather than for the
-  arm's absence.
+  chosen by document order". The me-wiki corpus was 15,602 tokens against an
+  896-token budget, so the arm carried about 6%; the full wiki is 1.6M
+  tokens, so it carries well under 0.1% and a cartridge beating it has
+  beaten almost nothing. It becomes the honest long-context baseline only as
+  that fraction approaches 1, which no base on this ladder reaches. The
+  number is reported so the comparison cannot be read as more than it is.
 
-- **`window` and `epochs` are deliberately NOT swept here, and the reason is
-  a result rather than a backlog.** The registration task asked that they
-  stop being constants copied between plans. The epochs line above already
-  closed that knob on the LOSS axis — 12 sits at the maximum of every
-  training axis measured, doubling to 24 halves the mean gain and
-  quadrupling to 48 is catastrophic at nine of nine seeds negative — so a
-  sweep here would re-run a question whose dose-response is known to be
-  monotone down from the recorded value.
+- **The cluster path.** Corpus staged with `hpc3-stage` to
+  `/pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12`, every file's
+  SHA-256 verified on both sides and held against
+  `tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-digests.txt`, a listing read
+  from the wiki tree rather than from the snapshot staged (manifest:
+  `qa-corpus-wiki-full-ee6e6d12-stage.json`). Image v55
+  (`/pub/wagnera3/images/v55/abl`, sha256 `12d7be25…`) built from
+  `04d46ff9` by job 57747902 on `free`, 49 min, 54 of 54 smoke checks
+  passing; spec `c9b25ef0` rewrote the QA-family check to assert the cells
+  and the bf16 resolution, which v54 cannot pass. The 13 gpt2-family cells
+  go up as ONE job array (`tools/hpc3/runs/qa-full-wiki-v55.json`, A100,
+  throttle 6) and the 7B rung as its own A30 document
+  (`qa-full-wiki-pythia-6.9b-a30-v55.json`), because a sweep's members share
+  one GPU profile. Artifacts land under
+  `/pub/wagnera3/mi/cartridge/results/qa-v55/<plan>.json`.
 
-  **What is genuinely open is whether that transfers**, and it does not
-  follow. The epochs line is measured in NATS on held-out loss; this command
-  measures ACCURACY on a question set, and the two are kept in separate
-  experiments precisely because a model can memorise text word-by-word and
-  still fail every question about it. A knob that maximises loss-gain need
-  not maximise answerability.
-
-  It is not swept **yet** because it cannot be resolved yet: an epochs axis
-  over the me-wiki plans would produce cells the power gate refuses outright,
-  and over the api-codebase plans it would produce cells too close to their
-  floor to separate. Building plans that cannot run is how this axis got into
-  trouble the first time. The sweep belongs after the corpus is large enough
-  to carry it, and is filed here rather than left as an unexplained
-  difference between two plan tables.
-
-- **Still open.** No reranker and no query-expansion arm, so the search side
-  is parameterised but not yet widened. And **no run document is committed,
-  deliberately**: no registered image carries the post-`cdb84e12` code, so a
-  committed run naming one would assert something untrue — the same position
-  `cartridge_composition_sweep` held until image v32.
+  **The earlier full-wiki submissions never produced a number.** Ledger:
+  55898551 failed (image v50 predated the plan), 55901956 failed (dense
+  embedder OOM, fixed in `a9d1ba1b`), 55914185 was preempted at 1341s. Their
+  corpus, `corpus-me-wiki-full`, was copied by hand with no stage manifest;
+  `qa-full-wiki-gpt2-v52.json` names it and is superseded by the v55 array's
+  base member on the staged snapshot.
 
 #### the extraction ablation's marker contrast across four scales
 
