@@ -11,7 +11,7 @@
 # so without this project the Windows ones ran on no machine but the hub.
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check
+.PHONY: lint test check _check-unbudgeted
 
 # This directory holds no code of its own, only this recipe, so its lint is
 # the grammar every tracked Makefile keeps to.
@@ -25,5 +25,8 @@ lint:
 test:
 	make -C ../fleet execution
 
-check: lint test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint test
