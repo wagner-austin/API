@@ -7,7 +7,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check execution sources install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
+.PHONY: help lint test check _check-unbudgeted execution sources install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
 
 help:
 	@echo ""
@@ -121,10 +121,13 @@ sources:
 # commit touching this package read FAILED at Makefile:460 on a missing
 # .game/jvm64/bin/javac.exe (board tasks 4f228608 and 156c4745). The Java half
 # is not dropped: it is `make execution` below.
-check: lint sources | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo ""
 	@echo "=== ALL CHECKS PASSED ==="
 	@echo ""
+
+_check-unbudgeted: lint sources | test
 
 # The Java half, executed against the real target, as tools/hpc3 and tools/fleet
 # name theirs (board task 465689f5). agent-selftest patches every Targets entry
