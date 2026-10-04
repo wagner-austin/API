@@ -7,7 +7,8 @@ param(
     [string]$Script0 = 'C:/fleet/stage/mkdir-MCPs-packages-maketools-1790000000.ps1',
     [string]$Script1 = 'C:/fleet/stage/mkdir-MCPs-packages-maketools-1790000000.stage.ps1',
     [string]$Script2 = 'C:/fleet/stage/stop-MCPs-packages-maketools-1790000000.ps1',
-    [string]$Script3 = 'C:/fleet/stage/retire-MCPs-packages-maketools-1790000000.ps1'
+    [string]$Script3 = 'C:/fleet/stage/retire-MCPs-packages-maketools-1790000000.ps1',
+    [string]$Cmd = "$env:SystemRoot\System32\cmd.exe"
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -17,7 +18,11 @@ if (Test-Path -LiteralPath $Log) {
 }
 foreach ($directory in @($Target, $Staging)) {
     if (Test-Path -LiteralPath $directory) {
-        Remove-Item -Recurse -Force -LiteralPath $directory
+        $verbatim = '\\?\' + [IO.Path]::GetFullPath($directory)
+        & $Cmd /d /c rd /s /q $verbatim
+        if (Test-Path -LiteralPath $directory) {
+            throw "FLEET_RETIRE_INCOMPLETE: rd exited $LASTEXITCODE and left $directory"
+        }
     }
 }
 foreach ($script in @($Script0, $Script1, $Script2, $Script3)) {

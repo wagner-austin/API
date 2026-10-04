@@ -159,6 +159,37 @@ Describe 'Retiring a settled dispatch' {
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         [System.IO.Directory]::Exists($run.Staging) | Should -BeFalse
     }
+    It 'removes a tree past MAX_PATH and a junction in it, leaving what the junction points at (MCPs 74b13c20)' {
+        # Remove-Item in Windows PowerShell 5.1 cannot reach past 260
+        # characters on a node that does not enable long paths, which wedged
+        # loki's runner on 2026-10-04; the tree is made through cmd's
+        # verbatim path so this case needs no such node setting.
+        $root = Join-Path $TestDrive 'deep'
+        $run = Initialize-SettledRun -Root $root
+        $deep = '\\?\' + $run.Target + '\' + ((1..8 | ForEach-Object { 'd' * 40 }) -join '\')
+        & cmd.exe /d /c mkdir $deep
+        $LASTEXITCODE | Should -Be 0
+        & cmd.exe /d /c "echo x> `"$deep\f.txt`""
+        $LASTEXITCODE | Should -Be 0
+        $outside = Join-Path $TestDrive 'outside'
+        [void][System.IO.Directory]::CreateDirectory($outside)
+        [System.IO.File]::WriteAllText((Join-Path $outside 'keep.txt'), 'keep')
+        & cmd.exe /d /c mklink /J (Join-Path $run.Target 'link') $outside | Out-Null
+        $LASTEXITCODE | Should -Be 0
+        Invoke-Rendered 'dialect-retire' $run
+        [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+        [System.IO.File]::ReadAllText((Join-Path $outside 'keep.txt')) | Should -BeExactly 'keep'
+    }
+    It 'stops by name when a directory survives its removal' {
+        $root = Join-Path $TestDrive 'survived'
+        $run = Initialize-SettledRun -Root $root
+        $inert = Join-Path $TestDrive 'inert.cmd'
+        [System.IO.File]::WriteAllText($inert, "@echo off`r`nexit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $run.Cmd = $inert
+        { Invoke-Rendered 'dialect-retire' $run } |
+            Should -Throw -ExpectedMessage ([WildcardPattern]::Escape("FLEET_RETIRE_INCOMPLETE: rd exited 0 and left $($run.Target)"))
+        [System.IO.Directory]::Exists($run.Target) | Should -BeTrue
+    }
     It 'deletes the run''s own scheduled task, which nothing else ever removed, and a second retire finds none' {
         # A real root-folder task under a name no fleet run can carry, the
         # way launch_script leaves one behind for every finished run.
