@@ -45,11 +45,18 @@ import subprocess
 
 from tests._committed_tree import REPO, submissions
 
-#: Where the question-set plan table lives, relative to the monorepo root.
-#: Read out of a COMMIT rather than the working tree, because what a run
+#: Where the question-set plan table is declared, relative to the monorepo
+#: root. Read out of a COMMIT rather than the working tree, because what a run
 #: document's image contains is fixed by the commit its wheels came from.
-_QA_PLAN_TABLE = (
-    "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_plans.py"
+#:
+#: TWO MODULES SINCE 2026-10-04. ``cartridge_qa_plans`` holds the written
+#: plans and ``cartridge_qa_axes`` declares the full-wiki cells it merges in,
+#: each by a quoted literal name. A commit older than the split has no axes
+#: module, which is a fact about that commit and not a failure to read it, so
+#: an absent module contributes nothing rather than refusing.
+_QA_PLAN_SOURCES = (
+    "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_plans.py",
+    "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_axes.py",
 )
 
 
@@ -116,32 +123,62 @@ def _commit_is_in_this_clone(commit: str) -> bool:
     )
 
 
+def _path_is_in_commit(commit: str, path: str) -> bool:
+    """Say whether a commit already known to be present carries one path.
+
+    Asked of the object store rather than read off ``git show``'s stderr,
+    for the reason :func:`_commit_is_in_this_clone` gives: that message is the
+    same for a missing path and a missing commit.
+
+    Args:
+        commit: A commit present in this clone.
+        path: Repository-relative path.
+
+    Returns:
+        Whether ``commit:path`` names an object.
+    """
+    return (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}:{path}"],
+            cwd=REPO,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
 def _plan_table_at(commit: str) -> str:
-    """Read the question-set plan table as it stood at one commit.
+    """Read the question-set plan table's declaring modules at one commit.
 
     Args:
         commit: The commit the image's wheels were built from, already known
             to be present via :func:`_commit_is_in_this_clone`.
 
     Returns:
-        The module's source at that commit.
+        The source of every :data:`_QA_PLAN_SOURCES` module that commit
+        carries, joined.
 
     Raises:
-        AssertionError: If the read fails for any reason other than the
-            commit being absent, which the caller has already excluded.
+        AssertionError: If a module the commit carries cannot be read, or if
+            it carries none of them.
     """
-    result = subprocess.run(
-        ["git", "show", f"{commit}:{_QA_PLAN_TABLE}"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, (
-        f"{commit[:8]} is in this clone but {_QA_PLAN_TABLE} could not be read from it: "
-        f"{result.stderr.strip()}"
-    )
-    return result.stdout
+    present = [path for path in _QA_PLAN_SOURCES if _path_is_in_commit(commit, path)]
+    assert present, f"{commit[:8]} carries none of {_QA_PLAN_SOURCES}"
+    sources: list[str] = []
+    for path in present:
+        result = subprocess.run(
+            ["git", "show", f"{commit}:{path}"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"{commit[:8]} carries {path} but it could not be read: {result.stderr.strip()}"
+        )
+        sources.append(result.stdout)
+    return "\n".join(sources)
 
 
 class TestAQuestionSetRunNamesAPlanItsImageActuallyCarries:
