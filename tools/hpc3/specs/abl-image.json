@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "04d46ff9ec73d6600c8f019aa262ae07a0c738ea",
+  "git_commit": "0e9f177f56d5e6895b6a148f6ae86901d18d4e89",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
