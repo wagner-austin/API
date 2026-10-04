@@ -2,7 +2,7 @@ include ../../scripts/make/shell.mk
 
 MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
-.PHONY: lint test check rust-lint rust-test rust-cov python-lint python-test setup
+.PHONY: lint test check _check-unbudgeted rust-lint rust-test rust-cov python-lint python-test setup
 
 # Setup: create the uv venv and install the dev extras (a no-op when the
 # venv already answers; tools/maketools, ``uv-venv-check``).
@@ -47,5 +47,8 @@ lint: rust-lint python-lint
 test: rust-test python-test
 
 # Full check: lint, test, then Rust coverage
-check: lint test rust-cov
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint test rust-cov
