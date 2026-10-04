@@ -2,7 +2,7 @@ include ../../scripts/make/shell.mk
 
 MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
-.PHONY: help install lint test check
+.PHONY: help install lint test check _check-unbudgeted
 
 help:
 	@echo ""
@@ -48,7 +48,10 @@ test:
 	$(MAKETOOLS) test
 	@echo "[test] passed"
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo ""
 	@echo "=== ALL CHECKS PASSED ==="
 	@echo ""
+
+_check-unbudgeted: lint | test
