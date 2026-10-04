@@ -53,6 +53,7 @@ def _plan(effect: float, alpha: float = 0.05, test: McNemarTest = McNemarTest.MI
         expansion_feedback_chunks=3,
         expansion_terms=5,
         rerank_candidates=20,
+        precision_selector="policy",
     )
 
 
@@ -204,12 +205,13 @@ class TestTheShippedPlans:
         floor. Lowering the effect without growing the corpus is exactly what
         happened, and this assertion is where it surfaced.
 
-        The consequence is deliberate and is stated in the table's comment:
-        at 250 items EVERY plan in the registry is now refused, including the
-        two api-wiki plans added the same morning to fix the power problem
-        (235 raw and 224 reshaped items against the 250 required). The corpus
-        is what moves next. Raising the SEI back so the existing corpus
-        clears it would make this test pass and mean nothing.
+        The consequence was deliberate and is stated in the table's comment:
+        at 250 items every plan the registry held on 2026-09-09 was refused,
+        including the api-wiki plans added that morning to fix the power
+        problem (235 raw and 224 reshaped items against the 250 required).
+        The corpus is what moved: the full-wiki family yields over 3,000
+        items per cell. Raising the SEI back so a small corpus clears it
+        would make this test pass and mean nothing.
 
         Args:
             name: Plan name in the registry.

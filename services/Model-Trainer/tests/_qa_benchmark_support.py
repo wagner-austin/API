@@ -44,8 +44,14 @@ from model_trainer.core.types import LMModelProto
 #: Sized against the tiny rung's 64 positions, which is the binding
 #: constraint: a 48-token budget plus an 8-slot prefix is 56, leaving room for
 #: an item and some evidence without reaching the position embedding's end.
+#:
+#: ``model_id`` IS ``gpt2`` BECAUSE THE PRECISION IS RESOLVED FOR REAL.
+#: :func:`~model_trainer.cli.cartridge_solo_seeds.resolve_precision` refuses
+#: a base its policy does not name, and an invented id would have to be
+#: refused too. The loaders below are faked, so naming gpt2 loads nothing --
+#: it only lets the run resolve the precision a real gpt2 plan resolves.
 TINY_PLAN: QaPlan = {
-    "model_id": "tiny-under-test",
+    "model_id": "gpt2",
     "window": 8,
     "held_out_stride": 2,
     "num_slots": 8,
@@ -72,6 +78,7 @@ TINY_PLAN: QaPlan = {
     "expansion_feedback_chunks": 2,
     "expansion_terms": 3,
     "rerank_candidates": 4,
+    "precision_selector": "policy",
 }
 
 #: Six documents, each naming its own subject in several sentences.

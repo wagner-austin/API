@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from model_trainer.cli.cartridge_solo_seeds import resolve_precision
 from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
 from model_trainer.core.contracts.replicated_measurement import MIN_SEEDS
 from model_trainer.core.services.model.cartridge_plans import (
@@ -29,14 +30,6 @@ _SCALE_LADDER: tuple[str, ...] = (
     "gpt2-medium-wiki-qa",
     "gpt2-large-wiki-qa",
     "gpt2-xl-wiki-qa",
-)
-
-#: The capacity axis: one field moves, and it is the cartridge's slot count.
-_SLOT_AXIS: tuple[str, ...] = (
-    "gpt2-large-api-wiki-qa-slots-32",
-    "gpt2-large-api-wiki-qa-slots-64",
-    "gpt2-large-api-wiki-qa-slots-128",
-    "gpt2-large-api-wiki-qa-slots-256",
 )
 
 
@@ -81,6 +74,7 @@ def _redrawn(
         expansion_feedback_chunks=plan["expansion_feedback_chunks"],
         expansion_terms=plan["expansion_terms"],
         rerank_candidates=plan["rerank_candidates"],
+        precision_selector=plan["precision_selector"],
     )
 
 
@@ -160,38 +154,21 @@ class TestThePlanTable:
 
         assert windows == {896}
 
-    def test_the_slot_axis_holds_the_window_fixed_and_so_tests_only_capacity(self) -> None:
-        """The same discipline, for the axis that had never been varied.
+    @pytest.mark.parametrize("name", sorted(QA_PLANS))
+    def test_every_plan_s_precision_resolves(self, name: str) -> None:
+        """Resolved here, so an undeclared pair fails the suite, not a GPU job.
 
-        Every cell is held to 768 rather than to its own ``1024 - num_slots``.
-        Sizing each cell to its own prefix would hand the 32-slot cell 992
-        tokens of evidence and the 256-slot cell 768, so the cell with the
-        smallest cartridge would also have the largest retrieval budget and
-        the axis would measure two things moving in opposite directions.
+        The run resolves the same way before it reads the corpus, but by then
+        the job has been queued, scheduled and billed for its startup.
+
+        Args:
+            name: Plan name in the registry.
         """
-        cells = [QA_PLANS[name] for name in _SLOT_AXIS]
+        plan = QA_PLANS[name]
 
-        assert {cell["max_seq_len"] for cell in cells} == {768}
-        assert {cell["num_slots"] for cell in cells} == {32, 64, 128, 256}
+        _load, token = resolve_precision(plan["model_id"], plan["precision_selector"])
 
-    def test_the_slot_axis_varies_nothing_but_its_slot_count(self) -> None:
-        """Anything else moving with it would confound the capacity reading."""
-        base = QA_PLANS["gpt2-large-api-wiki-qa-slots-128"]
-
-        for name in _SLOT_AXIS:
-            cell = QA_PLANS[name]
-            expected: QaPlan = {**base, "num_slots": cell["num_slots"]}
-            assert cell == expected, name
-
-    def test_the_ladder_reaches_past_the_crossing_it_reports(self) -> None:
-        """A ladder that stops at its own finding cannot test it.
-
-        The crossing this programme reports is at ~774M, and until
-        2026-09-09 the table stopped at gpt2-xl -- one rung later. The base
-        added is the one the cartridge sweeps already run on an A30, so the
-        GPU profile is proven rather than assumed.
-        """
-        assert QA_PLANS["pythia-6.9b-api-wiki-qa"]["model_id"] == "EleutherAI/pythia-6.9b"
+        assert token in ("", "-storedbf16")
 
     def test_the_experiment_is_not_the_loss_experiment_s(self) -> None:
         """A loss record and a question-set record must never be differenced.
@@ -254,7 +231,9 @@ class TestTheFullWikiPlan:
 
 class TestQaPlanLabel:
     def test_every_field_that_moves_a_number_appears(self) -> None:
-        label = qa_plan_label("gpt2-wiki-qa", QA_PLANS["gpt2-wiki-qa"], digest="0123456789abcdef")
+        label = qa_plan_label(
+            "gpt2-wiki-qa", QA_PLANS["gpt2-wiki-qa"], digest="0123456789abcdef", precision_token=""
+        )
 
         assert label == (
             "gpt2-wiki-qa-gpt2-w256-s4-c128-m896-e12-lr0.01-d3-n120-seeds7.8.9-0123456789ab"
@@ -268,21 +247,42 @@ class TestQaPlanLabel:
         """
         plan = QA_PLANS["gpt2-wiki-qa"]
 
-        assert qa_plan_label("p", plan, digest="d" * 16) != qa_plan_label(
-            "p", _redrawn(plan, distractor_count=7), digest="d" * 16
+        assert qa_plan_label("p", plan, digest="d" * 16, precision_token="") != qa_plan_label(
+            "p", _redrawn(plan, distractor_count=7), digest="d" * 16, precision_token=""
         )
 
     def test_changing_the_token_budget_changes_the_label(self) -> None:
         """The budget bounds how much evidence the retrieval arm can carry."""
         plan = QA_PLANS["gpt2-wiki-qa"]
 
-        assert qa_plan_label("p", plan, digest="d" * 16) != qa_plan_label(
-            "p", _redrawn(plan, max_seq_len=512), digest="d" * 16
+        assert qa_plan_label("p", plan, digest="d" * 16, precision_token="") != qa_plan_label(
+            "p", _redrawn(plan, max_seq_len=512), digest="d" * 16, precision_token=""
         )
 
     def test_two_corpora_get_two_labels(self) -> None:
         plan = QA_PLANS["gpt2-wiki-qa"]
 
-        assert qa_plan_label("p", plan, digest=corpus_digest(["a"])) != qa_plan_label(
-            "p", plan, digest=corpus_digest(["b"])
+        assert qa_plan_label(
+            "p", plan, digest=corpus_digest(["a"]), precision_token=""
+        ) != qa_plan_label("p", plan, digest=corpus_digest(["b"]), precision_token="")
+
+    def test_the_precision_token_follows_the_base_in_the_label(self) -> None:
+        """Two precisions of one base never share a label, and policy adds nothing.
+
+        Asserted on the whole string rather than by inequality, so the token's
+        PLACE is pinned too: beside the base it qualifies, where the companion
+        sweeps' labels put theirs.
+        """
+        plan = QA_PLANS["pythia-6.9b-full-wiki-qa"]
+
+        label = qa_plan_label(
+            "pythia-6.9b-full-wiki-qa",
+            plan,
+            digest="0123456789abcdef",
+            precision_token="-storedbf16",
+        )
+
+        assert label == (
+            "pythia-6.9b-full-wiki-qa-EleutherAI/pythia-6.9b-storedbf16"
+            "-w256-s4-c128-m896-e12-lr0.01-d3-n4000-seeds7.8.9-0123456789ab"
         )

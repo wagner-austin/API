@@ -19,7 +19,7 @@ from __future__ import annotations
 import pathlib
 import runpy
 import sys
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 
 import pytest
 from platform_core.json_utils import load_json_str
@@ -31,8 +31,15 @@ from platform_ml.determinism import (
     SPLIT_K_SETTING,
 )
 
+from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli import cartridge_qa_benchmark as bench
-from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
+from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
+from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
+from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
+from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
+from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
+from model_trainer.core.types import LMModelProto
 from tests._qa_benchmark_support import (
     DOCUMENTS as _DOCUMENTS,
 )
@@ -172,9 +179,7 @@ class TestRunRecord:
         )
 
         assert record["experiment"] == QA_EXPERIMENT
-        assert record["label"].startswith(
-            "tiny-tiny-under-test-w8-s2-c8-m48-e1-lr0.05-d2-n6-seeds7.8.9-"
-        )
+        assert record["label"].startswith("tiny-gpt2-w8-s2-c8-m48-e1-lr0.05-d2-n6-seeds7.8.9-")
 
     def test_the_payload_digest_is_the_question_set_this_run_asked(
         self, tmp_path: pathlib.Path
@@ -232,6 +237,80 @@ class TestRunRecord:
         settings = dict(treated["fingerprint"]["determinism"]["settings"])
         assert settings[SPLIT_K_SETTING] == SPLIT_K_REMOVED
         assert settings[ATTENTION_SETTING] == ATTENTION_MATH_ONLY
+
+
+class TestThePlanDeclaresItsPrecision:
+    """The base loads at the precision the plan names, and the label says so.
+
+    Until 2026-10-04 this benchmark handed the loader ``None`` for every base,
+    so the pythia-6.9b rung would have loaded 27.6GB of fp32 weights onto the
+    24GB A30 it was declared for. These tests drive the real resolution
+    through the real run; only the loaders are faked.
+    """
+
+    def test_an_undeclared_precision_is_refused_before_the_corpus_is_read(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The cheapest refusal goes first, ahead of every corpus and model cost."""
+        reads: list[pathlib.Path] = []
+
+        def _recording_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
+            reads.append(corpus_dir)
+            return _DOCUMENTS
+
+        _test_hooks.read_corpus_documents = _recording_reader
+        plan: QaPlan = {**TINY_PLAN, "precision_selector": "fp8"}
+
+        with pytest.raises(ValueError, match="unknown precision selector 'fp8'"):
+            bench.measure_qa_plan(
+                "tiny", plan, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+            )
+
+        assert reads == []
+
+    def test_a_bf16_plan_loads_bf16_and_labels_itself_so(self, tmp_path: pathlib.Path) -> None:
+        """The 7B rung's declared load reaches the loader, and its token the label."""
+        model_id = "EleutherAI/pythia-6.9b"
+        loads: list[QuantizationConfig | StoredBf16Precision | None] = []
+
+        def _tokenizer(model_id_or_path: str) -> HFTokenizerProto:
+            assert model_id_or_path == model_id
+            return _Tokenizer()
+
+        def _model(
+            model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
+        ) -> LMModelProto:
+            assert model_id_or_path == model_id
+            loads.append(quantization)
+            model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+            return model
+
+        def _plans() -> Mapping[str, QaPlan]:
+            return {
+                "tiny-bf16": {
+                    **TINY_PLAN,
+                    "model_id": model_id,
+                    "precision_selector": "stored-bf16",
+                }
+            }
+
+        hf_hooks.Hooks.load_hf_tokenizer = _tokenizer
+        hf_hooks.Hooks.load_hf_model = _model
+        _measurement_hooks.qa_plans = _plans
+
+        record = bench.qa_run_record(
+            "tiny-bf16",
+            corpus=tmp_path,
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
+            remove_split_k=False,
+            math_attention=False,
+        )
+
+        assert loads == [{"torch_dtype": "bfloat16"}]
+        assert record["label"].startswith(
+            "tiny-bf16-EleutherAI/pythia-6.9b-storedbf16-w8-s2-c8-m48-e1-lr0.05-d2-n6-"
+        )
 
 
 class TestTheCommandLine:
