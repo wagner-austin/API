@@ -1067,6 +1067,16 @@ entry point that builds a `RunRecord` and is named nowhere here.
   one GPU profile. Artifacts land under
   `/pub/wagnera3/mi/cartridge/results/qa-v55/<plan>.json`.
 
+  **The image's commit was rebased before it was published, and that is
+  checked rather than waved through.** The image, its spec and both run
+  documents name `04d46ff9`, the worktree commit the wheels were built from.
+  Publishing rebased it onto 20 newer commits as `31893e45`, so `04d46ff9`
+  is reachable from no published branch. `git diff 04d46ff9 31893e45` over
+  the five wheel sources (`services/Model-Trainer`, `libs/platform_core`,
+  `libs/platform_ml`, `libs/platform_workers`, `clients/OrderedKernels`) is
+  empty, so `31893e45` holds byte-for-byte the code inside v55. Board task
+  `2cca4a98` is about exactly this class of declaration.
+
   **The earlier full-wiki submissions never produced a number.** Ledger:
   55898551 failed (image v50 predated the plan), 55901956 failed (dense
   embedder OOM, fixed in `a9d1ba1b`), 55914185 was preempted at 1341s. Their
