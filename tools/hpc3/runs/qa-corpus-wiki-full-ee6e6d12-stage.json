@@ -1,0 +1,4438 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12",
+  "files": [
+    {
+      "name": "235-east-42nd-street.md",
+      "sha256": "8163ac8e5d60bf0b9ad5ca3c664275384c1aee1a4db75532f70f4683a2a061eb",
+      "size_bytes": 13197
+    },
+    {
+      "name": "a-check-can-outlive-its-evidence.md",
+      "sha256": "b5864a0dd8a3518ab1fc61c0db9a7f7132fd9af20cc74170a0ddfe013df5f046",
+      "size_bytes": 8578
+    },
+    {
+      "name": "a-loss-agrees-where-the-computation-does-not.md",
+      "sha256": "d45e61f1dc252d9e10e75689060ce84c043966ef4f5b6cc65087cdff99e9c5f6",
+      "size_bytes": 119131
+    },
+    {
+      "name": "a-protocol-is-the-port-to-a-machine-without-services.md",
+      "sha256": "0905059cc7c94ed4f5e417453ce839f90edd06fbf3d8c338936a0eecabc5917e",
+      "size_bytes": 8449
+    },
+    {
+      "name": "a-regex-cannot-tell-a-mention-from-a-use.md",
+      "sha256": "76436e7ea2c17657ca708a397b129bfb4bde472f3059bcf93a90d331c73e7e9b",
+      "size_bytes": 7547
+    },
+    {
+      "name": "abbatt-2019-arctic-aerosol-climate-overview.md",
+      "sha256": "21ba777ae777962961e1eed052703e83192c35ad44c231cbb7f8de20ac5e9d9d",
+      "size_bytes": 6221
+    },
+    {
+      "name": "aclu-ccops-guiding-principles.md",
+      "sha256": "56126e6bafd8bd7a7262e0b03aa5c995293089224827b9be8cb7489bd4c88cd6",
+      "size_bytes": 5659
+    },
+    {
+      "name": "aclu-ccops-model-bill.md",
+      "sha256": "d38d14c62f0e9d7d91056a3a437957ccb2faf6e249f5252929381f8d47c8aef8",
+      "size_bytes": 7357
+    },
+    {
+      "name": "acpc-2025-apf-open-records-win.md",
+      "sha256": "c1e5e1fa1fff2eefc2117f3da7c96bbbb3dcfd3ba0457a78aa5d9bba4162bd1b",
+      "size_bytes": 5291
+    },
+    {
+      "name": "adamatzky-2022-fungal-electrical-language.md",
+      "sha256": "ecf067f6eaeea712066e37953b33a35c024f80d3c43b17f59d583121f5b9ff17",
+      "size_bytes": 7910
+    },
+    {
+      "name": "adjacent-frameworks-tic-recovery-personcentred.md",
+      "sha256": "0d2b6ff69b9c1aa7d671f56c5a5872c8b6a231580f27d79a85fca3423fd80f58",
+      "size_bytes": 23641
+    },
+    {
+      "name": "afp-code-of-ethical-standards-2024.md",
+      "sha256": "ae8ab50726c2fa3ebdcc39ff54b91a30afa03a0e5bb863fdbb500576031e4079",
+      "size_bytes": 6568
+    },
+    {
+      "name": "agilent-gc-ms-d-file-structure.md",
+      "sha256": "f9fe1825c1fff4047a34ed899f917a3bc07aff5b24233d0a8bd4beb647db9beb",
+      "size_bytes": 9752
+    },
+    {
+      "name": "ahn-chodroff-2022-voxcommunis.md",
+      "sha256": "eae036c748025f05b372040227cd1e35b986dab8230a10fa3bda0586d39a3dd1",
+      "size_bytes": 5070
+    },
+    {
+      "name": "aimo-prize-closure-2026.md",
+      "sha256": "928f83acb37b476aa80278f9b5cc9d7cad418974ac1bf370830ef9890982f3e2",
+      "size_bytes": 3709
+    },
+    {
+      "name": "ainsworth-2023-git-re-basin.md",
+      "sha256": "a49eeeabae946870c3ab0ede2d275b2e7434d7fd57f7bc492adb665eb0c9aec1",
+      "size_bytes": 8451
+    },
+    {
+      "name": "aliso-viejo-2025-fixed-lpr-camera-proposal.md",
+      "sha256": "e4707647818d3784c8192a67120fc03a7e50700c219e455e19b057893ae9d3f7",
+      "size_bytes": 8085
+    },
+    {
+      "name": "aliso-viejo-2026-police-services-ocsd.md",
+      "sha256": "1b8b47e8a82de4a90e0c42bd78db5c328768d4a07712dfc853679236bdcd27a8",
+      "size_bytes": 7902
+    },
+    {
+      "name": "aliso-viejo-mc-2-04-125-council-term-limits.md",
+      "sha256": "7d64a3b9d4a1f9ac9f71aa38980507aa0cf38df17618707c111c7c4f07e7029c",
+      "size_bytes": 5720
+    },
+    {
+      "name": "all-for-venezuela.md",
+      "sha256": "03cf05f10b8a4c1e05e9c8b1179d03e5a9219564ad3e116cef1c0cd62c45a933",
+      "size_bytes": 4251
+    },
+    {
+      "name": "allen-currier-2004-pes-restraints-pharm.md",
+      "sha256": "82c7703030de757825efd37e3c8d9a3ca0490293d21f351847e17afd5a5cc78c",
+      "size_bytes": 10124
+    },
+    {
+      "name": "allen-zhu-2024-knowledge-capacity-scaling.md",
+      "sha256": "061207d7bf2c89cace2700c670c2636228871b3a68d4f91e2a44f0bcbd5e7813",
+      "size_bytes": 4925
+    },
+    {
+      "name": "allen-zhu-2024-knowledge-storage-extraction.md",
+      "sha256": "f6a457f55bc70cfea7de772175c80281e4f230ef2cf22b5cb2d06081d97203b4",
+      "size_bytes": 4602
+    },
+    {
+      "name": "allwood-2021-targeted-untargeted-plant-metabolomics.md",
+      "sha256": "81f894511de4edae5749e3129fd360811ce2bcaee1af02a867b373059c636df2",
+      "size_bytes": 6690
+    },
+    {
+      "name": "alone-participant-protocol-benchmark.md",
+      "sha256": "341056cdac5887fa3a59b9b142b8c1fbae0b0a827f68df06b6d8ff460d3c7756",
+      "size_bytes": 6515
+    },
+    {
+      "name": "alpr-failure-modes-to-wrongful-arrests-synthesis.md",
+      "sha256": "435981c2ea6827ef257e2dbd07a4b8465b51c4f2e306e0cfce22a1f2b1b8183d",
+      "size_bytes": 12803
+    },
+    {
+      "name": "anaheim-2026-motorola-alpr-ocoa.md",
+      "sha256": "2bbd21ac2cae8f3a5f8a5c85b88858050baeea39137472498c0f2487ff6c8c95",
+      "size_bytes": 6303
+    },
+    {
+      "name": "anaheim-charter-503-5-council-term-limits.md",
+      "sha256": "fcca6d5ae0a978bc47b54058747ae07e11cf80ae4012a776f85bb3bbcbcb02d9",
+      "size_bytes": 8254
+    },
+    {
+      "name": "anderson-1933-positive-electron.md",
+      "sha256": "655ac9b7ab0dd75542a7326915826679d415e83ee5d3f5dfe8c5a9aba6317e5c",
+      "size_bytes": 9082
+    },
+    {
+      "name": "anderson-2001-permanova.md",
+      "sha256": "1c08f61ea390db6f0ab91ac62a73431f0e69db70b37548018b9c2a3e8e5e8ac6",
+      "size_bytes": 9853
+    },
+    {
+      "name": "anomalous-magnetic-moment-g-2.md",
+      "sha256": "5692a749356d3096a81b927d5e30ac9abe6f34a9f1de43da1eec2b87ada7a1df",
+      "size_bytes": 15168
+    },
+    {
+      "name": "apel-hirt-2004-ros.md",
+      "sha256": "2e386e320efc79fe544e26be8f59b043a90454dd1b0d9e6cf5d1845f3d43591b",
+      "size_bytes": 11894
+    },
+    {
+      "name": "apna-2018-seclusion-restraint-position-statement.md",
+      "sha256": "7ae7b569ddeb032ed23e3fcb36cb24f84c9bea56caf16442c37d23b1787c7b15",
+      "size_bytes": 12915
+    },
+    {
+      "name": "apna-2022-standards-of-practice-seclusion-restraint.md",
+      "sha256": "de9e2d43ab9a7488e9eaff7a81304791576ae21379a55495f69875ac15b45d54",
+      "size_bytes": 9677
+    },
+    {
+      "name": "appel-cocroft-2014-caterpillar-vibration.md",
+      "sha256": "cc385acc9c141a683424c3e34d02c2416beb2763bc5f4afc1ee2c121021c92d2",
+      "size_bytes": 7509
+    },
+    {
+      "name": "apptainer-on-hpc3.md",
+      "sha256": "52772917ba689a82cb18824046ac598bdafe1c07c5b37870c16bd63d95b959d7",
+      "size_bytes": 12263
+    },
+    {
+      "name": "arc-prize.md",
+      "sha256": "ebeadc7b4d346f6171253f2e14b80f6b5087b9bb4ad74141168ba8acee1aaa17",
+      "size_bytes": 5767
+    },
+    {
+      "name": "ariel-2015-rialto-bwc-rct.md",
+      "sha256": "97da6a3f6dac552868c9287303d0f67881a62d4c0a3e3ed294757791b411c609",
+      "size_bytes": 4707
+    },
+    {
+      "name": "arnett-bergen-2024-morphologically-complex-lms.md",
+      "sha256": "8c1c4e2c05c743424df1ade6638a5b4ddcb2f78422bfe19bd43d84a94f737bdf",
+      "size_bytes": 5604
+    },
+    {
+      "name": "arslan-2016-turkish-deasciification.md",
+      "sha256": "1282620a368f8adc507b672830a46b585856e675070f194358a4d61de766e657",
+      "size_bytes": 7483
+    },
+    {
+      "name": "association-and-causation.md",
+      "sha256": "1d80c685a1958c23a8667ac1101e87f56cb8159fa24aed075e17230e76212aa7",
+      "size_bytes": 8152
+    },
+    {
+      "name": "atkinson-arey-2003-atmospheric-voc-degradation.md",
+      "sha256": "a7e253d4cbdf302727d6c98e10d2336a6abe8c042ab3c9e0fec88103f2756b0e",
+      "size_bytes": 8210
+    },
+    {
+      "name": "atlas-of-surveillance-methodology.md",
+      "sha256": "c124265060c7def2a7d48ae2928d875652025c1bcad76fb518a96854478a510b",
+      "size_bytes": 7105
+    },
+    {
+      "name": "attack-rate.md",
+      "sha256": "d9ccf778f9aced25339e9c11ce93f82cbe06ec5090d2aa9a1a6ce5ad771a7621",
+      "size_bytes": 5700
+    },
+    {
+      "name": "attributable-risk-and-population-attributable-risk.md",
+      "sha256": "6fa45c733d436c598bf06095865656cac20557c7593fb4ff95a922f2c9d39093",
+      "size_bytes": 5916
+    },
+    {
+      "name": "augmentation-installs-what-repetition-never-does.md",
+      "sha256": "7428e12c5fd1507d05825b8af8f0adf471ec9b076195f51d171b7d83349b3a6a",
+      "size_bytes": 6785
+    },
+    {
+      "name": "ault-2016-sw-megadrought.md",
+      "sha256": "88ce617de53ef7d4fea9fdf9bb7b5ee0f75766a75052463d008b80b0fa124d6e",
+      "size_bytes": 6693
+    },
+    {
+      "name": "axon-2019-ethics-board-alpr-report.md",
+      "sha256": "f394b218c8d10d4f37fcd016fd8203f1dcdec601db420fb237f7cbaa99de9c3b",
+      "size_bytes": 6841
+    },
+    {
+      "name": "axon-2022-ai-ethics-board-resignation.md",
+      "sha256": "715fafe383e40b3634cf2d5b97593461297a5efe5f284e2d5896d3b460c83b0b",
+      "size_bytes": 6854
+    },
+    {
+      "name": "axon-2025-fixed-alpr-launch-release.md",
+      "sha256": "bffa867c81792ddda52d578877390bc3c07f0946678659ba0249315733991e42",
+      "size_bytes": 5051
+    },
+    {
+      "name": "axon-beyond-cjis-security-whitepaper.md",
+      "sha256": "efcd78d54fbc278fd0b2ab5247b6fab2a1d3a373550b154c774c7885511053bf",
+      "size_bytes": 5804
+    },
+    {
+      "name": "ayoola-2022-refined.md",
+      "sha256": "926f7945b9e531a050c84842b1e3fdc2d1212a2c10aefaa688e674f42f262a40",
+      "size_bytes": 6024
+    },
+    {
+      "name": "azarov-2023-russia-actions-crime-of-genocide.md",
+      "sha256": "d4957ea91ada43e9d7f751e7ea4b4267706d49c21d8efb65613f8f0a87c22994",
+      "size_bytes": 6960
+    },
+    {
+      "name": "baidildinova-wagner-2024-neurips-lstm-mi.md",
+      "sha256": "092b286e0d02d8d8c0a793e636dffc8c9cbe57711011e933aed6262a81ad266f",
+      "size_bytes": 15540
+    },
+    {
+      "name": "baker-2021-compare-review.md",
+      "sha256": "0455d7ab92848a998bbbab37dcaa3e052a0af8bafe470f64843267a04d153301",
+      "size_bytes": 14061
+    },
+    {
+      "name": "bakuage-collatz-conjecture-prize.md",
+      "sha256": "c285e9265b78a9be0ba36a0d6017c828193f702b5eae4fb9c47052c5792a739e",
+      "size_bytes": 6363
+    },
+    {
+      "name": "banon-bernabeu-2024-fastspell.md",
+      "sha256": "ab04d096bcd3860d8590acfcedeec58e79217f26cc03618aba9302d657777ff0",
+      "size_bytes": 4760
+    },
+    {
+      "name": "barbara-v-trump-2025-class-cert.md",
+      "sha256": "061aed72dfd64bb8d6bce13f314a050a16a1f74edc5da31ee26f987c6f7d8ede",
+      "size_bytes": 10632
+    },
+    {
+      "name": "barbieri-2023-raising-citizen-soldiers-donbas.md",
+      "sha256": "57b639eb50afef08e9926ed8535ebcdf4cd91cc6ba81a165791c23148349b39b",
+      "size_bytes": 5731
+    },
+    {
+      "name": "bartels-sunkar-2005-drought-salt.md",
+      "sha256": "87f417de1cccdec66633a01629cbc04eb528129c3f520d9810fcfc7de3f533ff",
+      "size_bytes": 12097
+    },
+    {
+      "name": "bayram-fincan-2025-turkish-tokenization-standards.md",
+      "sha256": "dec0e168a249927311db17cba7ae155f515c8240724fae9e86bf7b8698f161d3",
+      "size_bytes": 4387
+    },
+    {
+      "name": "beal-prize.md",
+      "sha256": "83fc7cff24369862b21d56f305a50f5ba350ad5445cdc241c457b235af8ae2b1",
+      "size_bytes": 5205
+    },
+    {
+      "name": "beghi-2013-restraint-systematic-review.md",
+      "sha256": "979578a315b38ef762d7a8a3afdc5145735c049def15ffd0dc51763ccea3fde7",
+      "size_bytes": 6639
+    },
+    {
+      "name": "beiler-2010-rhizopogon-douglas-fir-network.md",
+      "sha256": "14d99faffd09610a41e0ed3f09d84e00bf8a7877ceed765f7ebc3eeeac5ae25b",
+      "size_bytes": 7511
+    },
+    {
+      "name": "bellouin-2019-global-aerosol-radiative-forcing.md",
+      "sha256": "568cad4685bad826ff0d6faf2cc80e013fc5861f269ed0b8fa6586fc2116a28e",
+      "size_bytes": 6791
+    },
+    {
+      "name": "belrose-2023-tuned-lens.md",
+      "sha256": "000f7690d34f8b9bf6ef3fe8c86cca117876a14e5ecd0bff68c645999db0f07d",
+      "size_bytes": 4111
+    },
+    {
+      "name": "benjamini-hochberg-1995-fdr.md",
+      "sha256": "45a158335081f9c688de20cf8f193b15da2ada69620c10caf46871563b3a12f7",
+      "size_bytes": 6197
+    },
+    {
+      "name": "berges-2024-memory-layers.md",
+      "sha256": "a341089f6b24a0a65fc52fae915627e99785b26b28c370fe9cf56ccd30fcf754",
+      "size_bytes": 3325
+    },
+    {
+      "name": "berglund-2023-reversal-curse.md",
+      "sha256": "54fb9fcd371254f2498114227af277e1f5283b257d87de2e354b55d8dcc98a83",
+      "size_bytes": 4533
+    },
+    {
+      "name": "bethe-1947-electromagnetic-shift-energy-levels.md",
+      "sha256": "baf24169c5e9791a3a0875d96e5aafd8134824d4698986baad35f0578f3e8015",
+      "size_bytes": 9263
+    },
+    {
+      "name": "bias-in-epidemiologic-studies.md",
+      "sha256": "8c5bbb8e4496df123926c27e2b6b49fb5646bf2eedd4b26c137a97c61882443e",
+      "size_bytes": 6663
+    },
+    {
+      "name": "birthright-citizenship-litigation-2025.md",
+      "sha256": "e701d2cea75e8b0ef3e737ed82b73b3e794b723864c950dc4027c6b638f66ade",
+      "size_bytes": 16516
+    },
+    {
+      "name": "blande-2010-air-pollution-impedes-plant-communication.md",
+      "sha256": "35c44afd0bc3bbb6fbc301e416bfce3c09fe53fbc18a82d1bbc057745ecacabd",
+      "size_bytes": 6539
+    },
+    {
+      "name": "blas-thread-count-is-an-unrecorded-input.md",
+      "sha256": "bf99553497e58a72c9caf2711a3f5cf3a7a6862a8dbed277b9ca38a62a59ec72",
+      "size_bytes": 7703
+    },
+    {
+      "name": "blinken-2022-filtration-press-statement.md",
+      "sha256": "e5ac722f15b7c31f160528f56cb2db35a1f0e29cccc8d33a2135b1ed99ab952e",
+      "size_bytes": 4869
+    },
+    {
+      "name": "bogdziewicz-2018-masting-environmental-veto.md",
+      "sha256": "ec4d3f7d835315804ed2869f6378f1d5fc700cc3470620bef8f02017ac2b4c3c",
+      "size_bytes": 10122
+    },
+    {
+      "name": "bogdziewicz-2019-masting-mechanisms-agenda.md",
+      "sha256": "8d648f44253bf290f9bb1384ec5c1f977b65c571499f38ed024f1591419142f8",
+      "size_bytes": 15147
+    },
+    {
+      "name": "bonta-2023-ca-alpr-bulletin.md",
+      "sha256": "806b2a7b344430b2db673384d060350d9cc8570952fac10b7975945bab6498fc",
+      "size_bytes": 4551
+    },
+    {
+      "name": "bonta-2025-el-cajon-alpr-lawsuit.md",
+      "sha256": "6cd8eab3b7dcb7b03d7eb3d5f6880c19c880419be7f1e7a38253f7386ff4cde7",
+      "size_bytes": 6832
+    },
+    {
+      "name": "bora-sharma-2010-artemisia-genus-review.md",
+      "sha256": "b1dbd09fca5a1968649d0d1ffb2c0abfe4f0b2a63d1cd51a59cf2262078f78ba",
+      "size_bytes": 3091
+    },
+    {
+      "name": "borgeaud-2022-retro.md",
+      "sha256": "c7c182ad502c671e6e945a235b90eb9184a4b653edb5b6014c5f36c00c1a65ad",
+      "size_bytes": 3745
+    },
+    {
+      "name": "bourtsoukidis-2018-amazon-soil-sesquiterpene.md",
+      "sha256": "eadbf8f494504eb8e6e6101d44ed5a114f9abc448004604432c6b698a1226e79",
+      "size_bytes": 7654
+    },
+    {
+      "name": "bouvier-brown-2009-bearpex-monoterpenes-sesquiterpenes.md",
+      "sha256": "7592c6140a59e2f75950d25e015b8120c407c1f49e5a77966ed0f3031116181a",
+      "size_bytes": 6209
+    },
+    {
+      "name": "bowers-2014-safewards-model.md",
+      "sha256": "ab0e8b59329e17978062bd71c458f0edf0e26633a88a1f3b78507fa448e4eaae",
+      "size_bytes": 7085
+    },
+    {
+      "name": "bowers-2015-safewards-cluster-rct.md",
+      "sha256": "ff4a445bf2f09b281099a77ce94e52dc957642567effd6dd036e3e29087af64b",
+      "size_bytes": 17058
+    },
+    {
+      "name": "bowne-2012-wheat-drought-metabolomics.md",
+      "sha256": "4412ff0e0fb945642600036ab8f67848412ad9e67e0a5d4aec69a8c7434107b3",
+      "size_bytes": 9032
+    },
+    {
+      "name": "bpsd-dementia-agitation-deescalation.md",
+      "sha256": "3e98818547cd43ca3e01121d4463d92c2e4befef77b11df40db9ee5679720694",
+      "size_bytes": 11236
+    },
+    {
+      "name": "bratman-2024-olfactory-pathway.md",
+      "sha256": "f58c369ad973aa5c11f00abe6faf97e32749a6ce8b58e2b171cb83cf45ae7261",
+      "size_bytes": 7993
+    },
+    {
+      "name": "brea-mc-no-codified-council-term-limits.md",
+      "sha256": "11a891d6e8f2092d5b4200cd662294a273b29142fc1f8a06799fe2c856073249",
+      "size_bytes": 5839
+    },
+    {
+      "name": "browser-game-streaming-architectures-survey.md",
+      "sha256": "d730f2c03cb78f692ebdc9bbca036b9d7368e3b6d94da4383aa4ba21a33f8d3e",
+      "size_bytes": 16887
+    },
+    {
+      "name": "bruggemann-2020-organosulfates-review.md",
+      "sha256": "092cbb09c604a75ea576af2258e2fe679e0a70f9a6b5f2cf48f3f8ad3a10d2e1",
+      "size_bytes": 11635
+    },
+    {
+      "name": "bryant-2020-beijing-anthropogenic-isoprene-soa.md",
+      "sha256": "9313b13f221c110f094dfd6ba2a4a27e94d5b2e359bb51c73de89367968e357a",
+      "size_bytes": 4616
+    },
+    {
+      "name": "buena-park-2026-pd-flock-transparency.md",
+      "sha256": "cb6a401a2b8e9ff46e6dfbd27baeceab6f1a5e2ceceae1254c7845abdc56c5c3",
+      "size_bytes": 7042
+    },
+    {
+      "name": "buena-park-mc-council-term-limits.md",
+      "sha256": "02bb8a825dafa897425b2de8629c37a41bf82de024d92fe091351593f0c31217",
+      "size_bytes": 5993
+    },
+    {
+      "name": "buolamwini-2018-gender-shades.md",
+      "sha256": "451f1feff805f95cd179b6ce90c6271255b0b2891ea5c19196d008249be00a54",
+      "size_bytes": 4730
+    },
+    {
+      "name": "butterworth-2022-restrictive-practices-systematic-review.md",
+      "sha256": "0aef470dc9ef4b2f98cd8fdb0212e4bca7dea8598e140300437db05b326d7d49",
+      "size_bytes": 7797
+    },
+    {
+      "name": "bypassing-the-language-layer-feasibility.md",
+      "sha256": "677d290344f9d2d1eccd64001f0d028fd42e00a55cf0f2e31cf45532e9371ed0",
+      "size_bytes": 6851
+    },
+    {
+      "name": "ca-civ-code-alpr-title-1-81-23.md",
+      "sha256": "938461bccfef9f3cbd3fa7e84ebc6bb29d7dff03232379f0222ca267cd6d2da6",
+      "size_bytes": 7185
+    },
+    {
+      "name": "ca-elections-code-10403-city-election-consolidation.md",
+      "sha256": "ad1d201bfcc38db55fd8b4c4f7e39b89f2e28825dc3bafc2a6e582b7a9e959f0",
+      "size_bytes": 7044
+    },
+    {
+      "name": "ca-gov-code-12583-exemptions.md",
+      "sha256": "6ebdc499b1ed7f45934bef26ba1421b2136ac9b0d223f2c39fd72aef1de52488",
+      "size_bytes": 4357
+    },
+    {
+      "name": "ca-gov-code-12599-1-fundraising-counsel.md",
+      "sha256": "9a18f272768002b073169bda1ecc7f53817482fb05f42106ccb613a7f942a3cf",
+      "size_bytes": 5621
+    },
+    {
+      "name": "ca-gov-code-12599-commercial-fundraiser.md",
+      "sha256": "58f915eee39e29594fecfd2efb1fa6407f319c8ed129dcddaf4b1ad9f31f9105",
+      "size_bytes": 4508
+    },
+    {
+      "name": "ca-gov-code-34871-by-district-vs-from-district-elections.md",
+      "sha256": "e99447c1ec4dad42f5bc1a4a7b997990935532f04421dff1d6235d6e9b17b33b",
+      "size_bytes": 6455
+    },
+    {
+      "name": "ca-gov-code-36502-city-council-eligibility-and-term-limit-authorization.md",
+      "sha256": "2a60d1231ebd4c44e170643434142927e11ef9bbde14efd72a9143266a0cc22a",
+      "size_bytes": 7731
+    },
+    {
+      "name": "ca-gov-code-36512-city-council-vacancy-filling.md",
+      "sha256": "918dfcff1dd9f77349d4136b9fbc4be850001afa09347ec1f0dab8a551c72395",
+      "size_bytes": 8375
+    },
+    {
+      "name": "ca-oc-charter-vs-general-law-cities-2026.md",
+      "sha256": "5de6907057e534f6568429a7e98a193de72ba10ebc31520b2c1d441bb977a41a",
+      "size_bytes": 6376
+    },
+    {
+      "name": "ca-rn-licensure-cost-structure.md",
+      "sha256": "5a7fe90270a34a8b1a281f05d2fcc544ed5eb77f9cdb463f146f0e0f79e20cc6",
+      "size_bytes": 8781
+    },
+    {
+      "name": "ca-rn-licensure-examination-requirement.md",
+      "sha256": "6a1a46588ffaee11c25ca95132973fa554979ab2b0dd1573062e782fd3611058",
+      "size_bytes": 11979
+    },
+    {
+      "name": "ca-sb-274-2025-alpr-bill.md",
+      "sha256": "fd5b8d6457d03ed13d08594337c7c376e2c680b8a535b78d1d36590519b48b68",
+      "size_bytes": 8060
+    },
+    {
+      "name": "ca-sb-34-2015-alpr-statute.md",
+      "sha256": "c4bc8f426f1c4e9941df10db3e2eb46f45f0c245791ed54e6ec090abfb89ffc4",
+      "size_bytes": 6240
+    },
+    {
+      "name": "ca-state-auditor-2019-118-alpr.md",
+      "sha256": "c98689a2475b4c1f2e4b798306b6960b4ea7990368979c3cd7b550fdf824670d",
+      "size_bytes": 5591
+    },
+    {
+      "name": "cabagan-isabela-fieldwork-context.md",
+      "sha256": "8261b400af7ef53273b8bd8da6a34eb366f0dfa374df245cb0153d21e21bd55e",
+      "size_bytes": 5973
+    },
+    {
+      "name": "caccamise-1997-crow-roosting-group-territoriality.md",
+      "sha256": "9d880cba988b519f2627d9f325a43327deb591449b08d8b5cfe25f9894310fd9",
+      "size_bytes": 5553
+    },
+    {
+      "name": "caffrey-1992-delayed-dispersal-helping-american-crows.md",
+      "sha256": "0a11e1598295a4b91fdbed27e5379d5eb91f5a4ef0c33bc21ef93849f8195594",
+      "size_bytes": 4985
+    },
+    {
+      "name": "california-ab-1021-2023-reciprocity.md",
+      "sha256": "a59892769bcc9549f5914cae12368746e37b97e4cf0ff2f1a1a73e13f619620c",
+      "size_bytes": 10544
+    },
+    {
+      "name": "california-acr-128-solidarity-ukraine.md",
+      "sha256": "bb5dc814b21020775acf6ea4b6fc32b1294d9e68f9ead6fbc02f65ac9ea9be04",
+      "size_bytes": 6463
+    },
+    {
+      "name": "california-hsc-11390-11391-spore-cultivation.md",
+      "sha256": "7f3973d4acbbcf0e124f33793d133590760982010a0219f5d85fb77f3b442145",
+      "size_bytes": 13772
+    },
+    {
+      "name": "california-sb-1012-wiener-2024.md",
+      "sha256": "265cb0cf61c3eb3a4f1244bfb8e2b4573998f517b9e6bb09527d51b8cc1af828",
+      "size_bytes": 15157
+    },
+    {
+      "name": "california-sb-519-wiener-2021.md",
+      "sha256": "5e1f4d39d1a603b640c2db58bbfb6ab7aa80eb81eb9cfba375046d555939ed2e",
+      "size_bytes": 12243
+    },
+    {
+      "name": "california-sb-58-wiener-2023-newsom-veto.md",
+      "sha256": "38f6d95fef58faaa938a63f27301fe457fb0ad75d7bf9bfa79be70a51660f9ea",
+      "size_bytes": 9500
+    },
+    {
+      "name": "cambridge-2025-flock-termination.md",
+      "sha256": "69de9f7178e3821d63324307da7ef97159343eab5856bdba3bd3f954e308fb4b",
+      "size_bytes": 4467
+    },
+    {
+      "name": "cappa-wilson-2011-soa-volatility-evaporation.md",
+      "sha256": "d041f6148a25e49d6d37c35c4deb7891849e958b0319f2992bffff0e4499a396",
+      "size_bytes": 7397
+    },
+    {
+      "name": "carhart-harris-2016-trd-feasibility.md",
+      "sha256": "f19632c65ab8da1f059ff7406695bd88f0bbc519f71e77650dcc86eaa417c5c5",
+      "size_bytes": 10008
+    },
+    {
+      "name": "carpenter-2018-scotus-opinion.md",
+      "sha256": "c40efc649f1477ebbf871e803949cf206c6251b37267682841c15c514e9a5d4f",
+      "size_bytes": 5514
+    },
+    {
+      "name": "casa-v-trump-2025-md-pi.md",
+      "sha256": "5b1c234d89a74403aa8dad7ba2cb97b836c8e241628e31772566118cdfe28b26",
+      "size_bytes": 8259
+    },
+    {
+      "name": "case-campaign-guidance-active-campaigns.md",
+      "sha256": "553e28db35cf827ef20895bbee349d0fdd38b7c96d165a497f406efc039869cb",
+      "size_bytes": 5749
+    },
+    {
+      "name": "case-control-studies.md",
+      "sha256": "7073e468d95bacc7d381ceb51a74f346c0b629959f42a39a4f2c4a9ee05d0915",
+      "size_bytes": 4502
+    },
+    {
+      "name": "case-fatality.md",
+      "sha256": "40991ca0f9897e5ff215bd75f8ebb987453b58bc0da6d4d95ad9ea65f8ec9811",
+      "size_bytes": 4151
+    },
+    {
+      "name": "case-reports-and-case-series.md",
+      "sha256": "79010e7cdaf54324c14b54f7280e015ee6d2569d9dbe885cf4930b1b4551db67",
+      "size_bytes": 4976
+    },
+    {
+      "name": "casimir-1948-attraction-conducting-plates.md",
+      "sha256": "5706dc651996193ed918a1b633d167a486762508078897ea6013814d91494e73",
+      "size_bytes": 7748
+    },
+    {
+      "name": "cdc-mmwr-2026-diamond-shruumz-outbreak.md",
+      "sha256": "db6ba57bd960433b2f373a22bd59ce0abd04cc78e2a4f69dda39990013e04aad",
+      "size_bytes": 10446
+    },
+    {
+      "name": "celofiga-2022-deescalation-rct.md",
+      "sha256": "184411b8ba114f642c442ad3a6d56b7cf1842d080042ad765dc87a9875ab93e8",
+      "size_bytes": 21560
+    },
+    {
+      "name": "chambers-trudgill-1980-dialectology.md",
+      "sha256": "fc7d3e58f680d455eaae844639f5a04a050dfd7d3449ba4a3a27112f609b8359",
+      "size_bytes": 5816
+    },
+    {
+      "name": "chang-2010-kappa-ambient-organic.md",
+      "sha256": "1be1a1ab367ba68a4694209e2a3c6d1ec5fdcd62be698105a5772672684e334d",
+      "size_bytes": 9968
+    },
+    {
+      "name": "chang-2024-knowledge-acquisition-dynamics.md",
+      "sha256": "4e6f002f6e4dd532d7bf37d8bd79d8084459802c5f708a177a38382434bc4a8a",
+      "size_bytes": 5474
+    },
+    {
+      "name": "character-level-language-modeling.md",
+      "sha256": "199d4e30789b5ff5f6964308150a383f8d713a75e7a1f5e0e040a96cf93ae6af",
+      "size_bytes": 5211
+    },
+    {
+      "name": "chatrie-2026-scotus-opinion.md",
+      "sha256": "d0cc5196a6633210a98c1cd4ef70bc13fa9be6a116c262cb3fe2e9d290843604",
+      "size_bytes": 6654
+    },
+    {
+      "name": "chebrolu-2025-localized-activation-injection.md",
+      "sha256": "dfc223a95d9c9fce12e2795b24581bffa7cadde1f3fd5e6da8222dfdf328aa7c",
+      "size_bytes": 4938
+    },
+    {
+      "name": "chehab-2012-touch-morphogenesis-jasmonate.md",
+      "sha256": "1dfc4e0c887449f822494788e03bb2e53117c8fbe001f94d91b89b42a1dd32e8",
+      "size_bytes": 10662
+    },
+    {
+      "name": "chemodiversity-metrics.md",
+      "sha256": "ae9d0bdd356e793c60627347e6fce57b7c679d3017801114c51a95623e1eb5af",
+      "size_bytes": 5946
+    },
+    {
+      "name": "chen-2011-terpene-synthase-family.md",
+      "sha256": "9954dcc430da091759e619258417741f12ca11ab5a88ffdf183f549e13b117a5",
+      "size_bytes": 18681
+    },
+    {
+      "name": "chennabasappa-2025-llamafirewall.md",
+      "sha256": "e891c6bbb42ff5635974e5c00a5ea35d42c03d2cdffecfc2cac6a2e9902d008a",
+      "size_bytes": 6038
+    },
+    {
+      "name": "chieze-2019-seclusion-restraint-systematic-review.md",
+      "sha256": "8d0b78efaaa8d2dd74e0abd2bcbe9d3ede10f4fa720d33604c93acf666de0f0d",
+      "size_bytes": 10281
+    },
+    {
+      "name": "chiral-emissions-coelution-ion-extraction.md",
+      "sha256": "4369d3357d081ff534ed3d267f48df812212cb48efdd48d5c9d5696a30d32184",
+      "size_bytes": 12056
+    },
+    {
+      "name": "chiral-terpene-literature-review-progress.md",
+      "sha256": "db4c7acbefc52dfeae13c14e369ece6f7e4f98325b60716a55577e71b6f1a06b",
+      "size_bytes": 10155
+    },
+    {
+      "name": "christie-2007-phototropin.md",
+      "sha256": "60a88c0bbd35af048d117cc2e5265318204c7879f3b3f06503d752ea09d40b5d",
+      "size_bytes": 5846
+    },
+    {
+      "name": "chrome-88-timer-throttling-2021.md",
+      "sha256": "47a5f2e96d6a865f64935858eada70aa11e86053c5ce05cd4d7f5fd46b50b961",
+      "size_bytes": 5153
+    },
+    {
+      "name": "clark-2026-intercomprehension-smc.md",
+      "sha256": "2110096a76190f9cce51f52f245dfe09e3777e073de7fa20d1898314bcb7cfe9",
+      "size_bytes": 15823
+    },
+    {
+      "name": "claude-code-cli-packaging.md",
+      "sha256": "cc55fbe96981a6ca60948ae5fa806c339dc5e31ab56091aa22a0a80cbf42a68d",
+      "size_bytes": 3894
+    },
+    {
+      "name": "cleary-2019-blanka.md",
+      "sha256": "61769bab165d5978e905a9451242fba213f5770bd2cc8f46e7b4b614f27bbb5a",
+      "size_bytes": 5953
+    },
+    {
+      "name": "cloudflare-tunnel-portable-endpoints.md",
+      "sha256": "c19d8821e10fc45fa2bc9294c7d3dc7ed78679e51c27fbf22628afe51ae34101",
+      "size_bytes": 4218
+    },
+    {
+      "name": "coggon-2021-nyc-vcp-dominance.md",
+      "sha256": "f91b479bc57b64f7c51fd598f819b1fbe2096e9fe48757c57f1320fde480b8ec",
+      "size_bytes": 8255
+    },
+    {
+      "name": "cohen-2019-randomized-smoothing.md",
+      "sha256": "692a921c8512581442dc7961a4cd3f5fcd30808a328611bce33a327fb76f9b07",
+      "size_bytes": 4956
+    },
+    {
+      "name": "cohen-2024-ripple-effects.md",
+      "sha256": "2942a64d806b40adfe9d260ddabf4ad1b67d7338a6b2b43ec754066b1dc2bbe6",
+      "size_bytes": 4076
+    },
+    {
+      "name": "cohort-studies.md",
+      "sha256": "fd65d30a858cbe3de5b28d0bda8d9b12e43c7b715035fbb12913d5d667985fbd",
+      "size_bytes": 7134
+    },
+    {
+      "name": "coleman-2023-wellbeing-ordinary-people-factual-tv.md",
+      "sha256": "1d69445bbb6afc463de3dfb9f76d0782d24aac9ca0da014f1f4ada2eb87fdf61",
+      "size_bytes": 5699
+    },
+    {
+      "name": "collins-2021-archiving-with-elar.md",
+      "sha256": "b4cb5f1b10588ed589446d667706a2a4b6deff45349f93b36a0826d5a93e3301",
+      "size_bytes": 5221
+    },
+    {
+      "name": "collins-eldp-contract-sasi.md",
+      "sha256": "b2f655778bf72441cb85aeb150729212bd14d1a87c8af8d3b3d1027e5d0e55df",
+      "size_bytes": 5374
+    },
+    {
+      "name": "collins-eldp-small-grant-application-sasi.md",
+      "sha256": "9ae738688cdc02052718e1f682dab6af3bcd99469ea932f678dda5831790a13e",
+      "size_bytes": 7157
+    },
+    {
+      "name": "colorado-proposition-122-natural-medicine-2022.md",
+      "sha256": "fa05f2577948c4e8079f21be19e3fc65c9043cb121103f9e48000e9ed5989b77",
+      "size_bytes": 13706
+    },
+    {
+      "name": "common-turkic-alphabet-1991.md",
+      "sha256": "705947ee55c80e499b0eb6eeb08825ef25d56981c625ef9b6b990a88aaab0817",
+      "size_bytes": 5201
+    },
+    {
+      "name": "common-vehicle-and-propagated-outbreaks.md",
+      "sha256": "2258cc76e19a1f0ba78e67cb400c26bcde6d59518483b432e3c194c2e7b19009",
+      "size_bytes": 5192
+    },
+    {
+      "name": "comparability-is-the-question-standards-decline-to-answer.md",
+      "sha256": "894024090d6570cbd5b3562d406173909b9d5fd50d7ac22ee45ad58fc8deb6ca",
+      "size_bytes": 9448
+    },
+    {
+      "name": "confounding.md",
+      "sha256": "b9b73550c7b3c8ef92112c0265a0e7ea3fa7e4b6a1d6c7ac03e18749819655fb",
+      "size_bytes": 5030
+    },
+    {
+      "name": "cornfield-1951-comparative-rates.md",
+      "sha256": "acfba45a03288071235439a9d551ee03dd3ff165616bfb6f2f7607cd046f8c49",
+      "size_bytes": 12696
+    },
+    {
+      "name": "costa-mesa-2023-parking-lpr-report.md",
+      "sha256": "2a1756c2ba6b9650bfd9354552c462cde7bfca2a063fa3035fe1cf66bb16260c",
+      "size_bytes": 4082
+    },
+    {
+      "name": "costa-mesa-2024-alpr-lease-agreement-report.md",
+      "sha256": "177cad65592cc9ec954273a8619809a288456360be5e813e1ccefa4e9c4a5fae",
+      "size_bytes": 6160
+    },
+    {
+      "name": "costa-mesa-2026-07-21-public-comments.md",
+      "sha256": "cde5f7084c898d35f7b48394f39971fd0497ed1eecf2b5f760f2c1acf5be89d9",
+      "size_bytes": 6424
+    },
+    {
+      "name": "costa-mesa-2026-flock-alpr-council-report.md",
+      "sha256": "63fd6b84318a3f6cd4152ff31d54043788ebeb07022f2d28eabb1b057fff812e",
+      "size_bytes": 6760
+    },
+    {
+      "name": "costa-mesa-2026-pd-flock-transparency.md",
+      "sha256": "2d31077ba83a03a507de2e55e3a060e2b9bb8de812a244578ccdcb4c1cf38085",
+      "size_bytes": 7496
+    },
+    {
+      "name": "costa-mesa-flock-contract-attachments-26-315.md",
+      "sha256": "fff40d8f4679b4f4bc5febacb6e6dceaf438ed0cb89efea138a3aa521ff8323c",
+      "size_bytes": 7092
+    },
+    {
+      "name": "costa-mesa-mc-2-24-council-term-limits.md",
+      "sha256": "01c13bf33115fc79e6eaa64aeb2a4820900ece938b8727f068da5e985ee72d36",
+      "size_bytes": 3975
+    },
+    {
+      "name": "costa-mesa-pd-policy-429-alpr.md",
+      "sha256": "4c3eaa1188c7ed0637ce243dfdea9e938c5c9b077f962031940eb417aee71f12",
+      "size_bytes": 7828
+    },
+    {
+      "name": "counter-evidence-restraint-reduction-cautions.md",
+      "sha256": "982cd1627c3050f7e69bb703904cc0b2da467f8ac3ea71e502a6c140e63ac88d",
+      "size_bytes": 18804
+    },
+    {
+      "name": "cramer-2011-abiotic-stress-review.md",
+      "sha256": "ea4967424f7aa605415ee1f1567cd3e70c1a63b0b5b6a844039eeb3c53ad6760",
+      "size_bytes": 8969
+    },
+    {
+      "name": "croft-2019-arctic-marine-soa.md",
+      "sha256": "72fc7dc494ff17eb837553fdd4add410dc011e57fb488919d8f64847f727a2d9",
+      "size_bytes": 7674
+    },
+    {
+      "name": "cross-entropy-as-mi-proxy-lstm-methodology.md",
+      "sha256": "09feb5066adccd399c5b6ccff6640f11a062bb488c7d10b2b4eea9d62109a843",
+      "size_bytes": 8379
+    },
+    {
+      "name": "cross-gpu-agreement-is-not-an-architecture-property.md",
+      "sha256": "406efde7f560cd3883135ff0ad86fd4eed78e20e9f417278a08744f2e4af3053",
+      "size_bytes": 19402
+    },
+    {
+      "name": "cross-gpu-agreement-is-recoverable-by-disabling-split-k.md",
+      "sha256": "b4854c3afc877084ae426061461fa6613795312ea416a2f0504a0eddf99a9d44",
+      "size_bytes": 31764
+    },
+    {
+      "name": "cross-sectional-studies.md",
+      "sha256": "db7969bcced99a7da3609e278ba2c9531ae199c5838acee7226fbb45134fc2cc",
+      "size_bytes": 3717
+    },
+    {
+      "name": "culver-city-2025-alpr-data-sharing-limits.md",
+      "sha256": "16c1a81335470b4e4a8be6f3deea279544eba66b6bc45ebcfb4fab47f4cdc4fc",
+      "size_bytes": 4238
+    },
+    {
+      "name": "cunningham-2023-sparse-autoencoders.md",
+      "sha256": "df1ff6392359b85f150c83895c9fc27abb441303d8d05375b07a2213f5b4d6ef",
+      "size_bytes": 4417
+    },
+    {
+      "name": "cutler-2010-aba-receptors.md",
+      "sha256": "3cc1a5e8bae257b04c3170b36c423a9dcf7df745f9724435b463181994124d53",
+      "size_bytes": 11509
+    },
+    {
+      "name": "cypress-charter-400-council-term-limits.md",
+      "sha256": "b11361b6692fb884470d12af4eaf784095176dd4ec7f63097a52168ac45e74c7",
+      "size_bytes": 7276
+    },
+    {
+      "name": "dana-point-mc-2-05-082-council-term-limits.md",
+      "sha256": "d6506e841919239bff3194f1b214c2fe6b00f02398c00f0bf30d6a9b758cadd2",
+      "size_bytes": 6477
+    },
+    {
+      "name": "davari-2023-cka-reliability.md",
+      "sha256": "f1f1684469665b6023b8819f6be8a692c1afd0ec890de478ae34324e075d5e4b",
+      "size_bytes": 4594
+    },
+    {
+      "name": "davari-2024-model-breadcrumbs.md",
+      "sha256": "bfa89c0b47c6959e813992c79cddf44818a2eec65a9c1ad0d6b4ea8a30cf691e",
+      "size_bytes": 3955
+    },
+    {
+      "name": "david-inman-uci-linguist.md",
+      "sha256": "aac4a7ccf504e37aab8c3c3ec5936d980fd89d99335fbecb43ff6e6776f0cd4d",
+      "size_bytes": 5096
+    },
+    {
+      "name": "davis-2020-psilocybin-mdd-rct.md",
+      "sha256": "eef0fe0221f64101a3b144900528225dd930e42194055519a2646752eff6f916",
+      "size_bytes": 9127
+    },
+    {
+      "name": "davis-stirling-board-meeting-access.md",
+      "sha256": "0f00e07e4bf7c3d0f95e32520f348ed239d54fbc6f585f5b3a9f56b751fd3238",
+      "size_bytes": 10845
+    },
+    {
+      "name": "dawber-1951-framingham-study.md",
+      "sha256": "3f8c73870de4f50c0a4d6fbbed3412ce3fe51395d398f513b13f269640b7e236",
+      "size_bytes": 11873
+    },
+    {
+      "name": "de-vries-williams-2019-root-exudate-respiration-drought.md",
+      "sha256": "76e61218b1b1e6bcb9ecaddc2d6cc726a0930060a3465f6ec413350f6738fe50",
+      "size_bytes": 7511
+    },
+    {
+      "name": "debenedetti-2024-agentdojo.md",
+      "sha256": "10dfd13073056d67e3437f40766ec88213d7f3132c5a9dfb9b207d6bacda2843",
+      "size_bytes": 5573
+    },
+    {
+      "name": "decriminalize-nature-oakland-2019.md",
+      "sha256": "28407378c69893cfb27ab42e5eb002434fc6e4e813b4d4c27245a1e92d4f4719",
+      "size_bytes": 14884
+    },
+    {
+      "name": "deep-2024-della-merging.md",
+      "sha256": "a0770b4301b079e40b4c74d0c907a1343e412dd9ab60386b6445afc1d9b66db0",
+      "size_bytes": 3662
+    },
+    {
+      "name": "deflock-ilm-2026-wilmington-sting-center.md",
+      "sha256": "188b94a422e87dd5dd6a5c02452598bca3121a58e62576d1045c2b7b73713c52",
+      "size_bytes": 6956
+    },
+    {
+      "name": "defour-collange-2015-reproducible-atomic-add.md",
+      "sha256": "4533932cea6483066fd178751d3f96fa7848e193446e31238799275b50309674",
+      "size_bytes": 4666
+    },
+    {
+      "name": "dejonge-2022-good-practices-annotation-tools.md",
+      "sha256": "bff0e2a6a2d56efbb87ced354b1758c0d8935d1c3dd6c209ecd7d606dd8df791",
+      "size_bytes": 8686
+    },
+    {
+      "name": "depuydt-2014-root-self-nonself.md",
+      "sha256": "ae2b1f34276793d3e2afb1045f863e15f9c3a5030e373b96ee670bebcf81e5d9",
+      "size_bytes": 13136
+    },
+    {
+      "name": "devlin-2019-bert.md",
+      "sha256": "d0bee0e92bc76102776d1aa41fd544eec5bace574235c9905190948c85fbc0fc",
+      "size_bytes": 5471
+    },
+    {
+      "name": "dhuliawala-2023-chain-of-verification.md",
+      "sha256": "b67272352394bebd904b7b176bf9e43fdc78340ce89e9e364975668e0c916f62",
+      "size_bytes": 4869
+    },
+    {
+      "name": "di-guida-2016-metabolomics-data-pipeline.md",
+      "sha256": "4d5f17a812c20168934594578774a915a65df86f2d2124ee521f38ee043667f5",
+      "size_bytes": 6290
+    },
+    {
+      "name": "di-lorenzo-2012-italian-restraints.md",
+      "sha256": "033182fc386a1b550b3143933696999e55609bfe7927ac6f817a0a24879b6f8a",
+      "size_bytes": 8901
+    },
+    {
+      "name": "dieterle-2006-pqn.md",
+      "sha256": "af3b5d546a2a6098a84a506f1c6fa2e006887647c649a34c566c84c3fb995d48",
+      "size_bytes": 9780
+    },
+    {
+      "name": "dilution-damages-solidly-held-items.md",
+      "sha256": "b4e1b3484476775e3480edf2a89def3493bec464d062339d7a8d59ad226e8d5b",
+      "size_bytes": 4675
+    },
+    {
+      "name": "dirac-1928-quantum-theory-electron-part-2.md",
+      "sha256": "f1d0a6633811b297c8fd2adef0cfcd98d3d770adbc3dad136b97919ac35f4dc3",
+      "size_bytes": 8056
+    },
+    {
+      "name": "dirac-1928-quantum-theory-electron.md",
+      "sha256": "87db93daa5ab5e864a0d9f88c5e3100b71565cfa164516809d00ed61d765fa01",
+      "size_bytes": 7746
+    },
+    {
+      "name": "dirac-1930-theory-electrons-protons.md",
+      "sha256": "0e6e08c228d8996b97c41c75af2fcc38b56b385f7f54e92c2231c0140133a603",
+      "size_bytes": 11032
+    },
+    {
+      "name": "dita-2007-ibanag-reference-grammar.md",
+      "sha256": "48d1dfbe9f48cc8eb52b0c72e19a2e4dc82c38c263e7f7185ba5450efb823def",
+      "size_bytes": 14061
+    },
+    {
+      "name": "dita-2009-philippine-corpora.md",
+      "sha256": "af391034f858a9ece3da4f0e748c039754f1262ba1a2c358118fb2592f8f1784",
+      "size_bytes": 8055
+    },
+    {
+      "name": "dita-2010-philippine-pronouns.md",
+      "sha256": "acbe2056389e12e456461001c8f891311a5c9c562af7b575e9f73c0a26e57957",
+      "size_bytes": 6489
+    },
+    {
+      "name": "doe-v-trump-2025-mass-pi.md",
+      "sha256": "2844fc373ffca29eb0b38bd258f85ccf8c2d5a6cf0f7de0e248a003f5374ff80",
+      "size_bytes": 12319
+    },
+    {
+      "name": "dolatre-2021-ibanag-tuguegarao-cabagan.md",
+      "sha256": "f7227def2a5c3d3a9bfefe5032e6e107ef72409f5f4decf05417fafb8c4ae194",
+      "size_bytes": 9607
+    },
+    {
+      "name": "doll-hill-1950-smoking-carcinoma-lung.md",
+      "sha256": "c83b73169cdb6142bd7c4686121dc6e7d565f58e01528a520039c963c833090c",
+      "size_bytes": 14494
+    },
+    {
+      "name": "donabedian-1966-structure-process-outcome.md",
+      "sha256": "b5fbc22d0bee9a740f7ec82a874709a967250f1c50c58072901fbf2710ddc133",
+      "size_bytes": 11567
+    },
+    {
+      "name": "donat-2003-restraint-reduction-single-hospital.md",
+      "sha256": "187614faadbdd2fc6908dbc9e0969f4b5708778a0e888930fac53a502fc3355c",
+      "size_bytes": 7703
+    },
+    {
+      "name": "du-2017-cochrane-deescalation-psychosis.md",
+      "sha256": "255425ba5321ac2617ab4d6783bf7e318858276a94b80e096887c0bf106f4330",
+      "size_bytes": 12076
+    },
+    {
+      "name": "du-yamamoto-2007-reaction-wood-formation.md",
+      "sha256": "dd2cf47d46e51065b76d754f4f494055a42faebff33f134b1b6f94baf14d61a3",
+      "size_bytes": 6782
+    },
+    {
+      "name": "dudareva-2013-biosynthesis-function-vocs.md",
+      "sha256": "9bb4b818f7fe54b0f5fba37f7e4995a164c6ac1bdee0a3457ed8acc9ff18a9c5",
+      "size_bytes": 13660
+    },
+    {
+      "name": "duhrkop-2015-csi-fingerid.md",
+      "sha256": "a749f467943de28efd0000a01d58c648532b7576ae010eec7707de9dcf86811e",
+      "size_bytes": 6199
+    },
+    {
+      "name": "duhrkop-2019-sirius4.md",
+      "sha256": "bcd682c5f4ba7cf74686dfca33a2ddb8668197a97fda2fb0e7665c2dd3bfd500",
+      "size_bytes": 10696
+    },
+    {
+      "name": "duhrkop-2021-canopus-compound-classes.md",
+      "sha256": "d64569fc7738be63f0f60f7388d1cd10aa5e0b6972f9df9c547bb1cff92ec7e6",
+      "size_bytes": 5721
+    },
+    {
+      "name": "dunn-2011-husermet-qc.md",
+      "sha256": "9c674b734cbfcadcded41a972bbdf7651355cf42ff434e960dc3dc8390a0dc8c",
+      "size_bytes": 9019
+    },
+    {
+      "name": "dussutour-2010-nutritional-challenges.md",
+      "sha256": "6245aa159628ff1c37cf20dc4bc7d5e60eeaab8efb762ac38f868111711dd37d",
+      "size_bytes": 4392
+    },
+    {
+      "name": "duval-janbaz-2006-latin-script-uyghur.md",
+      "sha256": "5133355d100487a9b07b26a7c621e4b4f1153d464d0598918179d5a9d2727ff4",
+      "size_bytes": 12547
+    },
+    {
+      "name": "duxbury-2019-restrain-yourself-outcomes.md",
+      "sha256": "0a9db3ebecc2618325117e2ba77c02a97ab76f35ce25b84d26daa2a65fefd69c",
+      "size_bytes": 11919
+    },
+    {
+      "name": "duxbury-2019-restrain-yourself-qualitative.md",
+      "sha256": "1a91bf0624f3163b56f689b9b4e5149185eb1b4510861c6f053bd006fd8bf332",
+      "size_bytes": 8966
+    },
+    {
+      "name": "dyson-1949-radiation-theories-tsf.md",
+      "sha256": "9657e4c0ffca830fa0c7e7353168523ff4a628fe7c0191e044bb7c9c3bd68e40",
+      "size_bytes": 8412
+    },
+    {
+      "name": "ecologic-studies-and-the-ecologic-fallacy.md",
+      "sha256": "1b1da6a311af3b89e16d44b0521a28b2bf288a6c35eff0ab19ba8fc92e961b2e",
+      "size_bytes": 5780
+    },
+    {
+      "name": "economic-cost-arguments-restraint-reduction.md",
+      "sha256": "fdc214133ccaeb7154cce1bd4e81bc1646c6389bc2cfa9ca6183311884d26146",
+      "size_bytes": 23203
+    },
+    {
+      "name": "eff-2020-rtcc-surveillance-compounded.md",
+      "sha256": "d222398c82d5185671c589dc61c91dc4121b3b05a4e98297879042efed4e4e4b",
+      "size_bytes": 7101
+    },
+    {
+      "name": "eff-2023-fusus-records-campaign.md",
+      "sha256": "d13d0c87d5f4f8fd42a8429da6ad7ee8a7e6b914d22038c15b4c5afe752bfa13",
+      "size_bytes": 6874
+    },
+    {
+      "name": "eff-2024-human-toll-alpr-errors.md",
+      "sha256": "e68f56c304359e62f876cb7d2574e1dfee2e026c6bc7a82032d3cd21637bea85",
+      "size_bytes": 7183
+    },
+    {
+      "name": "eff-2024-lucy-parsons-labs-apf-records-suit.md",
+      "sha256": "24316726f9d885ba3051b2eddcc0130f2029633e391ed14278a15f65b0d5ff75",
+      "size_bytes": 4371
+    },
+    {
+      "name": "eff-2026-free-surveillance-grant-funding.md",
+      "sha256": "36ffe5f047fbd4ae8ef623dbabd2beec3b19c584f8ca8df065e69c2dda112a32",
+      "size_bytes": 6275
+    },
+    {
+      "name": "eff-cooperative-computing-awards.md",
+      "sha256": "e1dd20d1c05ad4cad63e77c947f0f6b25e4044d86973c5007ec19b50b9c8e800",
+      "size_bytes": 4803
+    },
+    {
+      "name": "egidi-2019-soil-ascomycota-dominance.md",
+      "sha256": "353e880a0c08c984aca7277b37c027e8bbb69c5c050a9c94c0a11483eba5c39a",
+      "size_bytes": 8243
+    },
+    {
+      "name": "ehn-2014-highly-oxidized-multifunctional-soa.md",
+      "sha256": "5e4eae30cedb028e4d4bec72240da103571097e70c91b7957e58ec1286ecaf72",
+      "size_bytes": 6419
+    },
+    {
+      "name": "elar-file-format-specifications.md",
+      "sha256": "a9a6cac3c4bcba01efaeb144cf0c3455ef6a7f01371ff881df2cd7b19a02da87",
+      "size_bytes": 6019
+    },
+    {
+      "name": "elar-northern-alta-deposit.md",
+      "sha256": "4f9779dff8469d4565b41f6b6e43bcdb88806d64f638e6ab1c4accc7ef237406",
+      "size_bytes": 6029
+    },
+    {
+      "name": "eldp-endangered-languages-documentation-programme.md",
+      "sha256": "028d27707092ff8164b61391a7a2fac789098d70098b8c0c960315346a21d3f0",
+      "size_bytes": 4631
+    },
+    {
+      "name": "eldp-philippines-funded-projects.md",
+      "sha256": "2d5a3acf9965d2d7fcfbf7bca5649517c8eec61a0863628e83ecc070c573ca97",
+      "size_bytes": 18856
+    },
+    {
+      "name": "electron-field.md",
+      "sha256": "52a4a212b4621d0faaa99dec1d66b817ef8c70e05d7a934f66f45ba7c55f3147",
+      "size_bytes": 13656
+    },
+    {
+      "name": "ellen-kazis-2023-nyc-conversions-flexibility.md",
+      "sha256": "3ab6dd92d82962d2ff7d7cb50e19f6be2cef78667fc39dbf7f335625ab772fab",
+      "size_bytes": 9227
+    },
+    {
+      "name": "ellington-1996-leading-edge-vortices.md",
+      "sha256": "e0dc0ddc2182d6f5c1fac8477ba8a836504ad7659c6db25d83e268881033b1a6",
+      "size_bytes": 6014
+    },
+    {
+      "name": "emily-truong-uci-css-metabolomics.md",
+      "sha256": "411bfcd51ebbd46cd0774b9c3221fa147b4049d4f20a3929e54a8bc60a0d93db",
+      "size_bytes": 103126
+    },
+    {
+      "name": "endangered-language-fund-grants.md",
+      "sha256": "97203a353f28887189beaa5c012f96460f572427db3fb42dece309184773c534",
+      "size_bytes": 7523
+    },
+    {
+      "name": "endemic-epidemic-and-pandemic.md",
+      "sha256": "07e0ad82ee2937fb15249d715a6eb979343d969834664e1524a1485529ea7570",
+      "size_bytes": 3866
+    },
+    {
+      "name": "entezari-2022-permutation-invariance-lmc.md",
+      "sha256": "aa05997eac0bbb8e285e33d8eb4e218132be8d24eaba7d3e0e7af3029ea7a371",
+      "size_bytes": 5215
+    },
+    {
+      "name": "eo-14160-birthright-citizenship.md",
+      "sha256": "6d1246ab99a09515ee71e8d2c771caaaa0118149014f666c52c262b19742e81f",
+      "size_bytes": 7257
+    },
+    {
+      "name": "epic-2026-schmidt-4th-cir-amicus.md",
+      "sha256": "a1ddd46ab19edc2308ea78957f40f0cb12085d1a3994eb1924233ceedacb8faf",
+      "size_bytes": 8576
+    },
+    {
+      "name": "epidemic-curves.md",
+      "sha256": "de016f927a1e1bd27c50c014d90902f7357cfd15cc68eaa725c9db071bbc0a5d",
+      "size_bytes": 4625
+    },
+    {
+      "name": "epidemiologic-triad.md",
+      "sha256": "dbed5739f366de9e62089e6239f9328bdc52648e14e16570fc5417c7dbf0ca01",
+      "size_bytes": 4216
+    },
+    {
+      "name": "epidemiology-study-guide-errata.md",
+      "sha256": "7bee7f1fb67c6bbfde7d6d4917757fa0121cb8df35efd681f387ee60b27a3c11",
+      "size_bytes": 9646
+    },
+    {
+      "name": "erb-2015-indole-maize-priming.md",
+      "sha256": "6503b4815af76ab94ea38c1e99711e1de20dac281501b03fb42f75d87e46e77d",
+      "size_bytes": 13670
+    },
+    {
+      "name": "erdos-problems-prizes.md",
+      "sha256": "ff85c64bd0497a3f6b6fc5ac4ce1ef682e119427816ca72164c17a2cca9ae746",
+      "size_bytes": 4663
+    },
+    {
+      "name": "espinal-mcnally-2011-bare-nominals-incorporating-verbs.md",
+      "sha256": "7022c1a917dd0230a0cc729ef5c639796e47b45da6577c6df9c76f4a535cfb42",
+      "size_bytes": 8242
+    },
+    {
+      "name": "eugene-2021-cahoots-program-analysis.md",
+      "sha256": "757cdb07ffc972b1940e5b2b1f3f728741c4853d33bcacd6fa8e018d8393e768",
+      "size_bytes": 5485
+    },
+    {
+      "name": "eugene-2025-aclu-flock-records-lawsuit.md",
+      "sha256": "f188a01975dd5f3dc5b00ad0d0cbcc2dd34ce690b78165fdb7b3d63fc94744d5",
+      "size_bytes": 7689
+    },
+    {
+      "name": "eyuboglu-2025-cartridges.md",
+      "sha256": "06a3161a1db43d3cc24c0c70cc05164b44a59e28fef7bb9312bed60c6cad7d76",
+      "size_bytes": 5392
+    },
+    {
+      "name": "faber-goldbach-conjecture-prize.md",
+      "sha256": "7c0f2cf370d4b788c694ca99d46b91ab87a104b6e51eb10580d6f1f774e0d86e",
+      "size_bytes": 4562
+    },
+    {
+      "name": "faiola-2012-bvoc-fid-quantification.md",
+      "sha256": "64ab2d9dae44b9fea9b5b1a0570ff1af86f0cd29fe2db4376f248795d05337ed",
+      "size_bytes": 7044
+    },
+    {
+      "name": "faiola-2013-soa-soil-leaf-litter.md",
+      "sha256": "b3ffb697461d5a218c439130716828db8b47a21470d25a67541b87af676e2583",
+      "size_bytes": 9618
+    },
+    {
+      "name": "faiola-2015-biogenic-soa-baseline-herbivory.md",
+      "sha256": "03c3b20b38200d3a2afbf3570c6a84cbd9645b89274771f29655481f91a638a4",
+      "size_bytes": 7741
+    },
+    {
+      "name": "faiola-2015-simulated-herbivory-voc-profiles.md",
+      "sha256": "d9caa8803014c63dc8d19042e4f97594dafff6f27ec6912aba513089a01365b7",
+      "size_bytes": 7489
+    },
+    {
+      "name": "faiola-2018-ptr-tofms-bvoc.md",
+      "sha256": "e90dfc4ea5b873dd273bb8d3bd04739f00e7ac010b7e27896b137d7ebc5b2816",
+      "size_bytes": 6410
+    },
+    {
+      "name": "faiola-2020-insect-herbivory-stress-volatiles-synthesis.md",
+      "sha256": "5bb63c21294cdb77a56eaf516b8372d340108699777469b8ca93c4fb2fc56e4a",
+      "size_bytes": 14789
+    },
+    {
+      "name": "faiola-2022-herbivory-radiative-forcing.md",
+      "sha256": "7d4177f35778045fafdc7dbcd1f3fc4b2c0bd2a100e1602eb14cd2758c057b03",
+      "size_bytes": 9568
+    },
+    {
+      "name": "faiola-2024-soa-photooxidation.md",
+      "sha256": "55c43760e34c14b131fd8a2cfd7de4b73351475bf410f0d422309baeec7ce795",
+      "size_bytes": 7774
+    },
+    {
+      "name": "faiola-chiral-gc-method-enantiomer-order.md",
+      "sha256": "031b32eaa7086a69ec469ac749f7319ba42ee699c4b0fa067a02f89606bf0b28",
+      "size_bytes": 12799
+    },
+    {
+      "name": "fan-2025-metadata-type-comparison.md",
+      "sha256": "269457d5e0c1aa7656ae81d032feb06fbd41ac5d953a7bd8d10da87970429e3c",
+      "size_bytes": 4220
+    },
+    {
+      "name": "fan-2026-when-is-your-llm-steerable.md",
+      "sha256": "975f199988272552fdb609ab63f5db55d0aabfedebdba1501dc617e722f9f423",
+      "size_bytes": 4535
+    },
+    {
+      "name": "fan-jia-2023-lstm-lipidomics-propane-diol.md",
+      "sha256": "902266da9d00a26f87575200476f6642e62190fc5fe9622fc8b08845094bb842",
+      "size_bytes": 7932
+    },
+    {
+      "name": "farquhar-2024-semantic-entropy.md",
+      "sha256": "8f8679a8a6dda6dfb1963cab9453b1586e9863c038d17a9f31e69d3d0d9eb2b2",
+      "size_bytes": 5451
+    },
+    {
+      "name": "farre-armengol-2016-phyllosphere-microbiota-voc.md",
+      "sha256": "608e800b9f392b0f8e735779e9611f1e3b174d404644fad025336b325dd8e0c5",
+      "size_bytes": 7319
+    },
+    {
+      "name": "fedus-2022-switch-transformer.md",
+      "sha256": "8f15e7db8fbeb9f09081f35c6ea7520116f6afe2d2225bbfc4f618a00c147431",
+      "size_bytes": 4473
+    },
+    {
+      "name": "fenn-1989-electrospray.md",
+      "sha256": "273d4662b7c0d9e8fe7483eab7ae6d2fe15b88b606f95336934e053d3a68698a",
+      "size_bytes": 5750
+    },
+    {
+      "name": "fermi-1932-quantum-theory-radiation.md",
+      "sha256": "02b753212c860e95b333ae8a6ae4ad793d922e871ccc15df48ab92b5cfcd8fb3",
+      "size_bytes": 11161
+    },
+    {
+      "name": "feynman-1949-space-time-approach-qed.md",
+      "sha256": "fe6ac52d2c8fcbcb4962cbde61559551187f67a86e11601da1b7a08c652b5fe6",
+      "size_bytes": 13626
+    },
+    {
+      "name": "feynman-1949-theory-of-positrons.md",
+      "sha256": "4d208f1155937134586f6690ce254bfb1144bb01f8d2858648a7e538c75beac6",
+      "size_bytes": 10208
+    },
+    {
+      "name": "feynman-diagrams.md",
+      "sha256": "f3b158ba7b2f7d23960033f05a39dc36a782c664641f36ebc945e27a5ea1eee2",
+      "size_bytes": 12128
+    },
+    {
+      "name": "fiesta-abs-mouse-offset-diagnosis-2026.md",
+      "sha256": "2338fd4b62eb39464c22685c5b5fff04a1f8f1f77997d6712095e5619b6f3026",
+      "size_bytes": 16640
+    },
+    {
+      "name": "fiesta-mobile-webrtc-reconnect-plan.md",
+      "sha256": "734b56f59ac69c471c7dc703fefefa3a893605b7581aafc002997c3fc8252270",
+      "size_bytes": 12800
+    },
+    {
+      "name": "finks-2021-loma-ridge-plant-community.md",
+      "sha256": "7fd6849c7c985948c0913e4d8dbf61d2b70cc83622a2b11d1bd36049fa951242",
+      "size_bytes": 7341
+    },
+    {
+      "name": "firebird-foundation-anthropological-research.md",
+      "sha256": "c2d6e8ad37ee372783a7bf5619d1eedb63bd2b582d5112f4c35601a7e3886d1d",
+      "size_bytes": 7246
+    },
+    {
+      "name": "flammer-steinert-2015-german-restraint.md",
+      "sha256": "8c9600874c33cb02700230d7a882869a8f3dde04686b3407320865dab6703173",
+      "size_bytes": 5829
+    },
+    {
+      "name": "fletcher-1957-annular-airfoils.md",
+      "sha256": "c88a51258ce2f2eb3913d138011e7154cbb5b8140ff64f105e21400bfd22820b",
+      "size_bytes": 5439
+    },
+    {
+      "name": "fletcher-2019-safewards-victoria-staff-perspectives.md",
+      "sha256": "a53ba02b25422307b70581cb7d27821acc5cfbad7017ec1cb4b3c6901deef9bd",
+      "size_bytes": 7649
+    },
+    {
+      "name": "flock-2025-axon-api-severance-statement.md",
+      "sha256": "f5c6f0f8c4a221457f5e940048eb277e37da1dbb384dc08a37943da629ec1c1e",
+      "size_bytes": 7136
+    },
+    {
+      "name": "flock-group-patent-list-justia.md",
+      "sha256": "87092200c0bc577af94ff6d938b43835e6b27bfeffbd864c5695ebc8144e28a7",
+      "size_bytes": 5201
+    },
+    {
+      "name": "flock-us11416545-object-based-query-patent.md",
+      "sha256": "02d8ba72cfc5f0d203412edea9f7f573d4e87d5f5676807283c8b55ea080f007",
+      "size_bytes": 9991
+    },
+    {
+      "name": "forbes-1916-russian-grammar.md",
+      "sha256": "576ac4a8a7317f7455c5939da63ee8da019b4c7eb030fa4782e3b732a881e871",
+      "size_bytes": 5405
+    },
+    {
+      "name": "forbes-2025-axon-flock-falling-out.md",
+      "sha256": "5208acd50c306b1e35d68f21a307d92f16e6a5ad80e4cef06a39ecd158eff8be",
+      "size_bytes": 4927
+    },
+    {
+      "name": "foresight-feynman-grand-prize.md",
+      "sha256": "cbc175c07fbb25d0dd334b200eae131935211e683978f0a34c589cf4d7b4c968",
+      "size_bytes": 4445
+    },
+    {
+      "name": "foundation-for-endangered-languages-grants.md",
+      "sha256": "444cbe326557a94ddd33f432b85233eab370f4cb12a3329caa5d97ff87e10076",
+      "size_bytes": 4080
+    },
+    {
+      "name": "fountain-valley-mc-2-04-230-council-term-limits.md",
+      "sha256": "bf20f0a023fe031dc0e2619a147f5df460a200b6f4f796ab1519938c2e704c17",
+      "size_bytes": 3611
+    },
+    {
+      "name": "fourteenth-amendment-citizenship-clause.md",
+      "sha256": "30775adb85152e31f02a0aafd91613fb1c57beb6a5ac7b38466a4391326459a7",
+      "size_bytes": 15896
+    },
+    {
+      "name": "frankie-boren-uci-language-science.md",
+      "sha256": "a7414f0c0d6b6632f101a2f9f658ce1432a4298a839be5172b40bcbc07a3fbb2",
+      "size_bytes": 11095
+    },
+    {
+      "name": "fricke-2017-psilocybin-biosynthesis.md",
+      "sha256": "620a4f2a4ae77280fbfbb48066f86f6d4add99c86447af3fba197072e07705bb",
+      "size_bytes": 8178
+    },
+    {
+      "name": "fronek-2023-taken-children-of-ukraine.md",
+      "sha256": "f5a9acf1c6ade11d5be39974509611697041583f79c2ddf4b0d110424e4e5712",
+      "size_bytes": 6050
+    },
+    {
+      "name": "ft-icr-ms-and-orbitrap-overview.md",
+      "sha256": "1291d2e18b60eb96a5bbe7635c6deff97bf564f8bd539913f404c7763a4e77ca",
+      "size_bytes": 8078
+    },
+    {
+      "name": "fu-2020-soybean-drought-metabolome.md",
+      "sha256": "6f3496ffa7bcf83765e8370edc23c5323f7b94a808a71c90bec708313c7d7efa",
+      "size_bytes": 7161
+    },
+    {
+      "name": "fulbright-us-scholar-philippines.md",
+      "sha256": "324948ee5aabc0127fa1e3920d6f1847c5b5995af6c668b21f4200c42c794cc5",
+      "size_bytes": 5272
+    },
+    {
+      "name": "fullerton-2026-pd-flock-transparency.md",
+      "sha256": "bac9b9a382744c9912d2063d6b13fac33980b615cae8227a7654eb0dc3579979",
+      "size_bytes": 4535
+    },
+    {
+      "name": "fullerton-mc-2-04-050-council-term-limits.md",
+      "sha256": "23d9a7ef232bd6366082b8893fd90a7147497a406ee03103f153f9ab69604ea2",
+      "size_bytes": 6544
+    },
+    {
+      "name": "functional-application-semantic-composition-montague-frege.md",
+      "sha256": "7342ec48239508b20afa56dbc19206ded07da13e3abca16db2d3d7bf357706a4",
+      "size_bytes": 8812
+    },
+    {
+      "name": "funvisis-2026-06-24-bulletin.md",
+      "sha256": "64144428baf3ad9ca7aef3c26885537e49670b12278bc109d5c13049237c09ae",
+      "size_bytes": 8091
+    },
+    {
+      "name": "gallego-2020-ibatan-babuyan-claro.md",
+      "sha256": "3e84f226f63d59776ff83398202169b9d85af09a4d629fbad19fe011c8f080f9",
+      "size_bytes": 12138
+    },
+    {
+      "name": "gao-1989-canopy-turbulent-organized-structure.md",
+      "sha256": "6390e53a37c7edcae51355d8136dc8956a9cfbfe00d910c55d0df641742580da",
+      "size_bytes": 4994
+    },
+    {
+      "name": "gao-2025-metadata-conditioning.md",
+      "sha256": "f4794282bb163d43e0da2f8b1cf4f85026b16444d7cec94bd8b0426d94019a4f",
+      "size_bytes": 6692
+    },
+    {
+      "name": "gap-statement-quantitative-baseline.md",
+      "sha256": "fe9ba46e7567de239dd57c32031702254d0b19ee01f8017a52f9ee3c74c77b48",
+      "size_bytes": 13717
+    },
+    {
+      "name": "garcia-2020-multiplatform-metabolomics-reproducibility.md",
+      "sha256": "d4a3470b304f8c0f35de07241e8653d4cf616eedccc19d6fa275d94a4c88c3cf",
+      "size_bytes": 5706
+    },
+    {
+      "name": "garden-grove-mc-council-term-limits.md",
+      "sha256": "42210b7e9741a150f8ab7568df4c4444d9cd41776d22985b0d130a3356bc52d5",
+      "size_bytes": 6940
+    },
+    {
+      "name": "gardengrove-2023-flock-sole-source-axon.md",
+      "sha256": "0333c54a8ced2415c2a102889839fe8794abc30df8e1feaf3a7e4f32b5bb7176",
+      "size_bytes": 9642
+    },
+    {
+      "name": "gardengrove-2024-axon-flock-integration.md",
+      "sha256": "d7703a7966f0d6361226f3a0b1eabf75a96931c9a4098b8c917c1f8e43593926",
+      "size_bytes": 6898
+    },
+    {
+      "name": "gardengrove-2025-axon-10-year-agreement.md",
+      "sha256": "5e2cb206a6269eecada44704ce8837b9961fa7d7a24405d9c41ffd0d9c3d5c81",
+      "size_bytes": 9014
+    },
+    {
+      "name": "garriga-2016-expert-consensus.md",
+      "sha256": "55013459890e34148bcd6244b965be620de79c6a04f03ab7a915dc526e970a59",
+      "size_bytes": 13160
+    },
+    {
+      "name": "garvie-2016-perpetual-lineup.md",
+      "sha256": "613b87070e261f13c57c872971abc19a2d06fe4a7e15ad657a0fbe4182d2f1f5",
+      "size_bytes": 7362
+    },
+    {
+      "name": "gauge-invariance-and-qed.md",
+      "sha256": "a72532e061382084eced747d7e540f74d69d87e4b39b55e3f5227a00e455b8bb",
+      "size_bytes": 13318
+    },
+    {
+      "name": "gaynes-2016-2017-ahrq-deescalation-systematic-review.md",
+      "sha256": "5c19729729ac4ba3787e19add063f2af4b8502efbe8fc89f11e5b2542e235160",
+      "size_bytes": 19867
+    },
+    {
+      "name": "ge-2023-in-context-autoencoder.md",
+      "sha256": "ec44994fc2cdf923f6ca7d8268ca000e02c20139f472d31535a47f3f213c726e",
+      "size_bytes": 5219
+    },
+    {
+      "name": "gekhman-2024-new-knowledge-hallucinations.md",
+      "sha256": "bae8c529e60a8d4e12326abd70e0fe6b7907ee22c463dfc35aa6c2037d97b7fb",
+      "size_bytes": 4669
+    },
+    {
+      "name": "genetic-epidemiology-and-gene-environment-interaction.md",
+      "sha256": "fe33edbb6513982eac8fb9d1fd0972026fddbe23b096b7526a5bb2c1355a8cc0",
+      "size_bytes": 5431
+    },
+    {
+      "name": "genocide-convention-1948.md",
+      "sha256": "1c9aaf5f45f99f0483f6e9d7e434187063ef7d3c422d28df5e59d8099e544e07",
+      "size_bytes": 6394
+    },
+    {
+      "name": "gilliam-2024-aurora-alpr-settlement.md",
+      "sha256": "194386aba5d86cd2e4b2c72a57bfd884ccb70cacd241df873b252f464e47b0c6",
+      "size_bytes": 6192
+    },
+    {
+      "name": "gkatzelis-2021-vcp-vs-mobile-soa.md",
+      "sha256": "a3d24400612f46ec822e0cd5e4f93c064be134ba818d2bb2b84410e2e6b0fb09",
+      "size_bytes": 8732
+    },
+    {
+      "name": "gomez-roldan-2008-strigolactone.md",
+      "sha256": "03d140849e38697fb36e55e1c5426268b34a0cf72bccd1932343121e05cc6f5b",
+      "size_bytes": 12407
+    },
+    {
+      "name": "google-2024-environmental-report.md",
+      "sha256": "86edb40b625c1605db21778b7d405d737d779e906b8e74701882909e693e4d82",
+      "size_bytes": 4749
+    },
+    {
+      "name": "gooskens-heuven-2021-mutual-intelligibility.md",
+      "sha256": "81131a1fef1fe3d03e27492c6329d11ba4ef3f80d2674e273c1497c9fd29465c",
+      "size_bytes": 10422
+    },
+    {
+      "name": "gordis-2014-epidemiology-5e.md",
+      "sha256": "2a887fcf8ad018139ec2d57e7259d3f52cbaa6b553a3e1613040cfd3624fc2e6",
+      "size_bytes": 4239
+    },
+    {
+      "name": "gorzelak-2015-mycorrhizal-network-adaptive.md",
+      "sha256": "ee3471901f600c0035e343e18d41b1353727d9edccc54f4db2610eeb85172bd6",
+      "size_bytes": 11375
+    },
+    {
+      "name": "green-2014-9th-cir-alpr-opinion.md",
+      "sha256": "ac499ccac499995378b30b22a7bbe3c083c0bf1a22c0eef5252657688947ad6e",
+      "size_bytes": 8550
+    },
+    {
+      "name": "gregory-scontras-uci.md",
+      "sha256": "e9caa4cc25ead603cc602bb201711340a5583d1bebd5de0dec740ff476153cad",
+      "size_bytes": 7976
+    },
+    {
+      "name": "greshake-2023-indirect-prompt-injection.md",
+      "sha256": "3185ecc4963b91f11beab96af0d36fd269ca04973c76b6fa5fcafe8a01c07147",
+      "size_bytes": 5535
+    },
+    {
+      "name": "grimes-1992-vocab-similarity-intelligibility.md",
+      "sha256": "4718858a1f51ec2ba9f691993dcc68623fb7a0d8c8956111618e0841228d7f5c",
+      "size_bytes": 10679
+    },
+    {
+      "name": "grother-2019-nistir-8280-frvt-demographics.md",
+      "sha256": "d01713ee05bc75c1279498e1559ed258859c58189a13daa458f7f0b22d3e3cc6",
+      "size_bytes": 8472
+    },
+    {
+      "name": "grother-2022-nistir-8429-frvt-part8-demographics.md",
+      "sha256": "22c48c8741d4e82444c2c21a12b86d3cf08324837276877f5dffa83222512b12",
+      "size_bytes": 4552
+    },
+    {
+      "name": "gu-2024-limonene-enantiomeric-ratios.md",
+      "sha256": "fe3582bd0c78b9377efbccc41b31f71e82a7f5f9c4e26859ab8609bbde1190f2",
+      "size_bytes": 11759
+    },
+    {
+      "name": "guenther-1994-us-woodland-voc-emissions.md",
+      "sha256": "2f8dcb556eed9f4580c42f259a6cfccea0067a668d71c8dcb1cb9cbe0982e53d",
+      "size_bytes": 4256
+    },
+    {
+      "name": "guenther-1995-first-bvoc-emission-model.md",
+      "sha256": "6f5a9418ede7ce8884a00113ec8c4fbb4c270d06775b293b7c6767c871f408de",
+      "size_bytes": 18216
+    },
+    {
+      "name": "guenther-2012-megan21.md",
+      "sha256": "d524708dc4cd98cb955c6504d4686f083cfb1abb48b8ad0d0055791cf72634ee",
+      "size_bytes": 13487
+    },
+    {
+      "name": "gunthe-2009-amazon-ccn.md",
+      "sha256": "d7318f83ff9115e39833a1b8ad1c3013e4053a549d117289ba578a0a7bdb94ed",
+      "size_bytes": 5278
+    },
+    {
+      "name": "gupta-2023-brown-offices-green-apartments.md",
+      "sha256": "45702bbd15b9039eb4f40af3fda29c427b8bc474ee1fcb1c59266b78df7cf289",
+      "size_bytes": 8431
+    },
+    {
+      "name": "gupta-2024-sequential-editing-forgetting.md",
+      "sha256": "504a5d7dbfae069b23870730b88e4207098d13754e5ecfec32d9e71df4d7faee",
+      "size_bytes": 4746
+    },
+    {
+      "name": "guterres-2022-children-armed-conflict-annual-report.md",
+      "sha256": "0b269b631b3782d56647c9a0d931c2d4ff598e18e0cde4cd0f9c52c0e9e92f46",
+      "size_bytes": 3609
+    },
+    {
+      "name": "ha-2013-strigolactone-drought-stress.md",
+      "sha256": "a611309b83ee40a23ccb6584e81fd2dd9169384ca1f93ae61f752920ae29266d",
+      "size_bytes": 9475
+    },
+    {
+      "name": "hallquist-2009-soa-mechanism-review.md",
+      "sha256": "00b91ed318f397e58bb4dedf3d86c27a2e1dac7c4a52309d7879f274f57155d2",
+      "size_bytes": 7333
+    },
+    {
+      "name": "hamann-2004-retroflex-fricatives-slavic.md",
+      "sha256": "ce1fd0aa02939ee39acaf230d9fb229b71331af5c88f283eee206b5373541324",
+      "size_bytes": 5163
+    },
+    {
+      "name": "han-2026-steer2adapt-composition.md",
+      "sha256": "5612c906b313c89ff4a9cb1fefeb61b76c698ae276bde150d2b90f76af18f9b9",
+      "size_bytes": 5297
+    },
+    {
+      "name": "hao-2024-coconut-latent-reasoning.md",
+      "sha256": "4f90eea92434d4b7539674321c69292065c686e8a3b22cf2bd5aa0fb053f9534",
+      "size_bytes": 6647
+    },
+    {
+      "name": "hartvigsen-2023-grace.md",
+      "sha256": "eca998f010ad67486c3d3011a075181beb840ca0eebafb44b8a30ace8788d472",
+      "size_bytes": 3372
+    },
+    {
+      "name": "hase-2023-localization-editing.md",
+      "sha256": "78d6720b3b7d7310878520c11b36e73fe681f00f0df648b25501345c3905ae11",
+      "size_bytes": 4518
+    },
+    {
+      "name": "hasler-2004-psilocybin-dose-effect.md",
+      "sha256": "e4ae10b5ef736ad1b62a66793a93162e2bc0c8ddd4336a80e300f4c25c92dea0",
+      "size_bytes": 6151
+    },
+    {
+      "name": "hawkins-2023-mycorrhizal-carbon-pool.md",
+      "sha256": "fcf261d39f161b6bc894ea2bc476e3b2c20074b55f7a7b47274e9efb24d9eb88",
+      "size_bytes": 9971
+    },
+    {
+      "name": "haywood-boucher-2000-aerosol-radiative-forcing-review.md",
+      "sha256": "afba712bcca04c54a56a7f43a33db58d8d50ab5971c7d852dfe710e77badeb4c",
+      "size_bytes": 4445
+    },
+    {
+      "name": "heckemann-2015-aggression-management-training-review.md",
+      "sha256": "2f0d10798940d6cab42febd1113f4dedbace93ba7dc0bff43225d34c0ff77a77",
+      "size_bytes": 6221
+    },
+    {
+      "name": "heggarty-2000-quantifying-phonetic-change.md",
+      "sha256": "dfae6e429bb2a8c1a79836d7bfbe43ec22d8d0036ab4cb164feb9a3711b4a5d0",
+      "size_bytes": 5979
+    },
+    {
+      "name": "help-for-venezuela-foundation.md",
+      "sha256": "7aa19a318f47d1ab107715c6fdd1961b6e65a6f3af1a7f9d84845059241b5e93",
+      "size_bytes": 10005
+    },
+    {
+      "name": "henriksson-2023-mother-tree-reexamined.md",
+      "sha256": "7544d87923724bef6a7bedbcad3adc214649f492b97e62836ca8c1aa0c1ac8a2",
+      "size_bytes": 6531
+    },
+    {
+      "name": "herd-immunity.md",
+      "sha256": "b04a3e70b7efdc7976918cc8bb98ef0f022eb3367caa55c16100d4d6a293130e",
+      "size_bytes": 3823
+    },
+    {
+      "name": "hevenf-2026-venezuela-earthquake-gofundme.md",
+      "sha256": "d883392cc565d305fc6fe8bb9a2f57872db9464169ec2aa10133b4be87b1b578",
+      "size_bytes": 5465
+    },
+    {
+      "name": "higgs-mechanism.md",
+      "sha256": "982f2362b820a50defb44f2e4ef6486843a3c8aff11a6797136c5c6908e9ef7b",
+      "size_bytes": 11439
+    },
+    {
+      "name": "hill-1965-association-or-causation.md",
+      "sha256": "6228aa069175d8129d6c32b28d84825709c9be2d65a76dcb8639d3f1cbf9b519",
+      "size_bytes": 20732
+    },
+    {
+      "name": "hoag-community-benefit-report-2024.md",
+      "sha256": "3882de91cb5fe58939e061344555fd5bc175f3183c7fb64d448ea6f6152dede0",
+      "size_bytes": 5827
+    },
+    {
+      "name": "hobo-environmental-data-protocol.md",
+      "sha256": "66dd6b380b7f9a711d9adeecaf9febe1c2899f64ad24476874c72cc3faf63bb7",
+      "size_bytes": 13549
+    },
+    {
+      "name": "hochreiter-schmidhuber-1997-lstm.md",
+      "sha256": "85e8919ed16df591edd5d988671ac885058e147b03f6b61cd9a8f82b947f2da6",
+      "size_bytes": 8158
+    },
+    {
+      "name": "hoffmann-2014-tidier-intervention-checklist.md",
+      "sha256": "ee1ab7e354abfff6efb4955c623b42b8cdab312fad184fcd91a423f48b74487a",
+      "size_bytes": 14821
+    },
+    {
+      "name": "hoffmann-2022-cosmic-confidence.md",
+      "sha256": "fbaf20f84e10f61e31776b30c9a26d0c5efcfbfb980adf38baaa50ea61c98843",
+      "size_bytes": 6847
+    },
+    {
+      "name": "holmes-1843-contagiousness-of-puerperal-fever.md",
+      "sha256": "127f8cbc3722774835ba623111ec7135320d11b1059b381d68b68fed46307b77",
+      "size_bytes": 15681
+    },
+    {
+      "name": "holopainen-blande-2013-where-do-hipvs-go.md",
+      "sha256": "c4bd1263aad1f6eefff920e67608c1750f35782452614910dbfb38c148836cc5",
+      "size_bytes": 7683
+    },
+    {
+      "name": "holopainen-gershenzon-2010-multiple-stress-vocs.md",
+      "sha256": "306b9128273c649576bfd0d709815297d42dd8d7d941e4400779eb47aa723a26",
+      "size_bytes": 10666
+    },
+    {
+      "name": "holtzman-2020-neural-text-degeneration.md",
+      "sha256": "1a5ee2710363fdcdafa08f015eb780296af3584deb68061ceb2b4c30979837bd",
+      "size_bytes": 5867
+    },
+    {
+      "name": "horai-2010-massbank.md",
+      "sha256": "ced423a2c650b98e723bfa715eaf1f16aa50643b494a62df9ed13904d26c2545",
+      "size_bytes": 8557
+    },
+    {
+      "name": "horn-2009-palm-lamina-anatomy.md",
+      "sha256": "011b8a938ad91f1b64208207a302c3df1bd50b2221f482e1bce73e907ff424a8",
+      "size_bytes": 9545
+    },
+    {
+      "name": "hpc3-cluster-facts-are-code-not-configuration.md",
+      "sha256": "b58d03da455aabc2fc9859d2b7b34f4e8c1930b7f779e482710e1aad700efa5b",
+      "size_bytes": 7035
+    },
+    {
+      "name": "hpc3-compute-capability-for-this-ablation.md",
+      "sha256": "ec38967667d130624212de16d4556a5209bcf78fc4b1c8704bcaaaa314bce485",
+      "size_bytes": 9617
+    },
+    {
+      "name": "hpc3-job-submission-tooling.md",
+      "sha256": "f8792003c1be03f5b14a661dc6b218aaa6f13f9abbd2431e819f8c00e2ef5ea3",
+      "size_bytes": 11596
+    },
+    {
+      "name": "hu-2005-orbitrap-mass-spec.md",
+      "sha256": "f94fcf57f6c8517b92e09b122cdef45833a6e253a3718a419e1b1c6d1379d3bf",
+      "size_bytes": 8234
+    },
+    {
+      "name": "huntington-beach-mc-council-term-limits.md",
+      "sha256": "bc2fa750d7a50238e834c03708dd7b56407a21e187f6a397f3e34854bc2c4776",
+      "size_bytes": 4772
+    },
+    {
+      "name": "hutter-prize.md",
+      "sha256": "8d7d6fcca781804c83cae2af41505bf46777447c5e4826d25288a7faa4f3e440",
+      "size_bytes": 5491
+    },
+    {
+      "name": "ibanag-diaspora-california.md",
+      "sha256": "1e7d77f5bc71bde857bbe6a172e3adc742087a2e7fc6d0a0b89bb27960a71bc0",
+      "size_bytes": 4302
+    },
+    {
+      "name": "ibanag-language-context.md",
+      "sha256": "c3f5c2745c1fc8e8035378ee7075945fa5a49c2182ff54fe2db35708d4bd1076",
+      "size_bytes": 6394
+    },
+    {
+      "name": "ibanag-tu-linker-modification-abstract.md",
+      "sha256": "d4e047a5a7649589acdc6427dd1a6101729622e61d45376a6f7078dc660e7746",
+      "size_bytes": 11372
+    },
+    {
+      "name": "icc-2023-arrest-warrants-putin-lvova-belova.md",
+      "sha256": "acec0986109b1902c5b9436431ef308e570c492c59b1ee3f85e30624e126e6e4",
+      "size_bytes": 4945
+    },
+    {
+      "name": "icu-uts35-ldml-transforms.md",
+      "sha256": "44d7f7c57963d49cb82d49691f880362cf027e5aa3b671ce2460d7f490b6a2c0",
+      "size_bytes": 11231
+    },
+    {
+      "name": "ido-2025-uzbek.md",
+      "sha256": "c58933564e025c60face140c3b24ffc795a005ddfbc0307c3d05d1fc8e96255e",
+      "size_bytes": 8877
+    },
+    {
+      "name": "iea-2025-energy-and-ai.md",
+      "sha256": "8c465c1bb1606a8c6c53663719ebfecfa6c1db5a16a8249ec8282c43df55459d",
+      "size_bytes": 5421
+    },
+    {
+      "name": "ihi-model-for-improvement.md",
+      "sha256": "3e0dba54b7704bf434a8d9b1784828a6ebaf9d926ba11afef730fcc2d55df1d6",
+      "size_bytes": 15107
+    },
+    {
+      "name": "ij-2026-enduring-indignity-alpr.md",
+      "sha256": "140138cf8664c08cd1636831169d1c9cb4d287cb8555be8b62ddb3df19ddd1a5",
+      "size_bytes": 12148
+    },
+    {
+      "name": "ilharco-2023-task-arithmetic.md",
+      "sha256": "7f5db6a11b2407233e765bc918002836fae50b2e2e1fed99cdb395b238ed0a10",
+      "size_bytes": 7328
+    },
+    {
+      "name": "illinois-sos-2025-flock-cbp-audit.md",
+      "sha256": "db116aa2d4ab2a110f406be85e6bf769af6400c8745d3415774dfa3bbdc9c6d8",
+      "size_bytes": 3820
+    },
+    {
+      "name": "implementation-fidelity-deescalation-training.md",
+      "sha256": "812ad52432e73d56495f105822113bca08e3fc38293e1322309253c043965a4c",
+      "size_bytes": 27467
+    },
+    {
+      "name": "implementation-precedents-restraint-reduction.md",
+      "sha256": "3a211805c78561dfc5721506a211b27081dd7635c7f63c81102a6fe68e75c807",
+      "size_bytes": 35862
+    },
+    {
+      "name": "inadvertent-2025-ocsd-flock-protester-tracking.md",
+      "sha256": "23f5d23e7a6d4ce6df430cef7d4861b964c853e539c12d3119fdd18b90e4dbf5",
+      "size_bytes": 6447
+    },
+    {
+      "name": "inan-2023-llama-guard.md",
+      "sha256": "1b2e5a64f44bd9a863acf6e6956464e03536e8221e7884aec78b4079f7b3deab",
+      "size_bytes": 5707
+    },
+    {
+      "name": "incidence-and-cumulative-incidence.md",
+      "sha256": "5ddf6c49046827b7925bd3e2610deda56681fd1cd629a99afbefdb7c0d8ec399",
+      "size_bytes": 5445
+    },
+    {
+      "name": "incidence-rate-and-person-time.md",
+      "sha256": "60074b372f5a6d56987629f4b091b6a5938be64df01a52eebf5b0efe6104890a",
+      "size_bytes": 4197
+    },
+    {
+      "name": "incubation-period-and-latent-period.md",
+      "sha256": "869830bddea991880b54b5153a70ea0471a35168dbc821038f0636f28abfad9d",
+      "size_bytes": 5392
+    },
+    {
+      "name": "inference-scoring-reproduces-where-training-does-not.md",
+      "sha256": "22bc3dc0fc157810ca83602d351648f508d2addb527e634d5a7938ea6a0d31a6",
+      "size_bytes": 11239
+    },
+    {
+      "name": "inman-2025-atlas-database.md",
+      "sha256": "f4edf5bf237f9381df9210dc4dbf32f00157d3bbb95c70afe070da8d24072360",
+      "size_bytes": 8774
+    },
+    {
+      "name": "insam-seewald-2010-soil-microbial-vocs.md",
+      "sha256": "684a4cb671e7bbaac2786afb4064e62e60c7b56c12910390792dc53297ec0d1e",
+      "size_bytes": 6725
+    },
+    {
+      "name": "intercept-2023-hoa-flock-partnerships.md",
+      "sha256": "30cc1f7cf7d2b1ea70ee6c7852a182124051b2b0777def7820247792df2aeb9e",
+      "size_bytes": 6418
+    },
+    {
+      "name": "ioffe-2023-forcibly-transferring-ukrainian-children-genocide.md",
+      "sha256": "c4b1a9954272eb48f18ca44e7f137aa03b0d6f1e64d327a9598b73fc472fcf4e",
+      "size_bytes": 4808
+    },
+    {
+      "name": "irs-2016-program-related-investment-examples.md",
+      "sha256": "442a663c2b164195fe19eb61dd8625ff8cc6e8d2bca84895c042904382630b70",
+      "size_bytes": 8168
+    },
+    {
+      "name": "irs-form-990-schedule-h-instructions.md",
+      "sha256": "70c44e4295b8732e9a0f29ae2d9c330ce78377b6a828d5d5474a4e867ef7e36c",
+      "size_bytes": 6860
+    },
+    {
+      "name": "irs-publication-526-charitable-contributions.md",
+      "sha256": "8a1df9a63366a86f1ec3b2db51148a659be603bc852cb4da1cdc899042c67bcf",
+      "size_bytes": 6090
+    },
+    {
+      "name": "irvine-2023-council-bscc-ort-grant-acceptance.md",
+      "sha256": "dfec65548207300d75bdbcedad431f08ff8ee2fcff0cedc20cf4bfe973648003",
+      "size_bytes": 6632
+    },
+    {
+      "name": "irvine-2024-real-time-crime-center-bscc.md",
+      "sha256": "4555f5399dcf208cc6404176dc283fe88eb58a627d34c78bc81d0547da681973",
+      "size_bytes": 6562
+    },
+    {
+      "name": "irvine-2025-axon-osp10-alpr-fusus.md",
+      "sha256": "a00c62b0bdddeb674d774acd011f9b15ec0a35d979fc2e3573792ce221bd4093",
+      "size_bytes": 9655
+    },
+    {
+      "name": "irvine-bus-stop-furniture-inventory-2024.md",
+      "sha256": "243ddbfd980c96888259b8c447ac4ce19a77abce0009a8b2d4abbd2f0ab1bd5e",
+      "size_bytes": 8007
+    },
+    {
+      "name": "irvine-mc-council-term-limits.md",
+      "sha256": "5e19234ad5b4a636353c602e290402b865c4907893328eeb0067a5fee493ba18",
+      "size_bytes": 8022
+    },
+    {
+      "name": "irvine-pd-policy-439-alpr.md",
+      "sha256": "3cd02a9817d7f86de25fbd3ebd1ee98416eeb599c5b4e65d4e802cbfd05ddac3",
+      "size_bytes": 9939
+    },
+    {
+      "name": "isabela-province-ethnolinguistic-composition.md",
+      "sha256": "25300c7e70b9f97a177e79f35c6ab0c98b29a1cf431bf02482c8d71e24eab1c7",
+      "size_bytes": 7753
+    },
+    {
+      "name": "ivanescu-2015-artemisia-sesquiterpene-lactones.md",
+      "sha256": "42aae8ec9b312163c5ce41e8cb35c8c0b6ddc06fae69f583d378e3ad3618a742",
+      "size_bytes": 3682
+    },
+    {
+      "name": "jacobs-research-funds.md",
+      "sha256": "cab935b70a0e0b0081bcf20b98154d6f41f55a1fd2e13317fec58a13dbb28797",
+      "size_bytes": 5877
+    },
+    {
+      "name": "jafferis-2019-untethered-insect-scale-flight.md",
+      "sha256": "705e433b638f758cadf09cccc733c0361d2c77827105c9ec85e6038320ce09a9",
+      "size_bytes": 5015
+    },
+    {
+      "name": "japna-2025-seclusion-rates-workplace-violence.md",
+      "sha256": "ceba84946d0060ba8bc327cf89327bdf5043a1233d03715c50a55f35e15b55d4",
+      "size_bytes": 10770
+    },
+    {
+      "name": "jasmine-uci-tropical-bvoc-thermal-stress.md",
+      "sha256": "d8c13b97b0b16963766bc7b01dd515074aee21213db509ed890a3ce7e638f38e",
+      "size_bytes": 15139
+    },
+    {
+      "name": "javorsky-2026-flock-sf-class-action.md",
+      "sha256": "783fb3a6c3bc5119e6934213370b2df38df9c6ce6989fadd3eb5e170da4b505e",
+      "size_bytes": 8247
+    },
+    {
+      "name": "jenner-1798-variolae-vaccinae.md",
+      "sha256": "cedd953058a7727ddb69ff7171efab4ff7da7c699058ca75d369ac532c43608e",
+      "size_bytes": 10662
+    },
+    {
+      "name": "jiang-2024-mixtral-of-experts.md",
+      "sha256": "4850a656a525f122d0583f94474e7cde10914bdce97b5dc1cc4dbfb57e0b4674",
+      "size_bytes": 5430
+    },
+    {
+      "name": "jin-2023-regmean.md",
+      "sha256": "86bdf8b4b168fdbd5d985c3361bf960e1ff91b28f81eec762b302487e5b8a6d5",
+      "size_bytes": 4860
+    },
+    {
+      "name": "joulin-2017-fasttext-bag-of-tricks.md",
+      "sha256": "6fbec9a6fe425f486501b8105438d7fb091df3c13e6bd8bb8dcf21058fbd01b0",
+      "size_bytes": 6420
+    },
+    {
+      "name": "joulin-2017-fasttext-zip.md",
+      "sha256": "a5d153fe42a388672fa7d1985d7fd15aaed00f586e8758d97e5c7153461a4e80",
+      "size_bytes": 4666
+    },
+    {
+      "name": "justin-sun-prize.md",
+      "sha256": "17923a187c06a329a43057e459cc7e273ffd279b43c06aa7d01d17ab4b1c119b",
+      "size_bytes": 9106
+    },
+    {
+      "name": "kadavath-2022-language-models-know.md",
+      "sha256": "dc4591207b65fd28c955bca8385e47e1c3d7dc0a9006127df77d30c2f2945603",
+      "size_bytes": 5594
+    },
+    {
+      "name": "kami-2010-light-regulated-plant-development.md",
+      "sha256": "16a4921f986791f2ae314bb4eadc1e5e31deb7c8fd18ae1e7e36c8a3beb53a0a",
+      "size_bytes": 9144
+    },
+    {
+      "name": "kandpal-2023-long-tail-knowledge.md",
+      "sha256": "3ace9eb412ef224401e54d9f9bd4be17eb64bba90be8985a04faf7c727fce158",
+      "size_bytes": 4253
+    },
+    {
+      "name": "kanehisa-2019-kegg.md",
+      "sha256": "dd6ffb4d7805411464d2435e635f1271bc3bff584639486461e93ac5a22d32f1",
+      "size_bytes": 8749
+    },
+    {
+      "name": "karasek-2018-tailless-robotic-flapper.md",
+      "sha256": "3692332dc5eb2fe53e7115ceb1030839d2450a8fdeced2844c71641ba0565d66",
+      "size_bytes": 5555
+    },
+    {
+      "name": "karban-2013-sagebrush-kin-recognition.md",
+      "sha256": "4375fd5d895d6413f9483d45efe63f4930d75fac8a6ab2e12188080353366348",
+      "size_bytes": 10946
+    },
+    {
+      "name": "karban-2014-volatile-communication-meta.md",
+      "sha256": "9ab719f6ccef4c75099ffde7519a4a8241322edfca1e37386a6adb0aa25bdb7b",
+      "size_bytes": 9457
+    },
+    {
+      "name": "karban-2016-sagebrush-geographic-dialects.md",
+      "sha256": "e14e3f1f4650bdc5125349f3be35f66a3c360eac584c233ae8f871e0c6ebe94b",
+      "size_bytes": 10979
+    },
+    {
+      "name": "karst-2023-mother-tree-critique.md",
+      "sha256": "fa7d304f7de0bd055b5c6347f8954c4b34f08f8ff05ef12f109dcd5120ca3650",
+      "size_bytes": 17954
+    },
+    {
+      "name": "kaya-tantug-2024-turkish-tokenization-granularity.md",
+      "sha256": "e4a3db675c3a1c22fcfb7c575b9ab7cb864bd0f34a6b9398a93619a15a938e72",
+      "size_bytes": 4515
+    },
+    {
+      "name": "kazakh-latin-alphabet-reform-2017.md",
+      "sha256": "22fb269ca43ac754eaa8867253639567644b50f160991372fd6bcd3bc7c245dd",
+      "size_bytes": 8731
+    },
+    {
+      "name": "kefale-2023-oilseeds-widely-targeted-profiling.md",
+      "sha256": "0987d9279ba1a0f1be5eee3b0168effd8db7e597e7d592ee544782e3b7b4d379",
+      "size_bytes": 7882
+    },
+    {
+      "name": "kenseth-2023-pinene-dimer-esters.md",
+      "sha256": "8ff63f4242d3c2535207eabaec8ea6cdbecb1cde27452302c956949bff589cb8",
+      "size_bytes": 10607
+    },
+    {
+      "name": "keskar-2019-ctrl-repetition-penalty.md",
+      "sha256": "e59f13e96844fcf0d1fbd9cc3d7e29b6e58be592b4f438599c02e467780dbe3d",
+      "size_bytes": 4979
+    },
+    {
+      "name": "kesselmeier-staudt-1999-bvoc-overview.md",
+      "sha256": "38b65fd97f1aafa4fda436c49eeec73cc8c6888157ce6ccbd43807f8818b2cf1",
+      "size_bytes": 22732
+    },
+    {
+      "name": "khadivi-2004-seclusion-restraint-patient-violence.md",
+      "sha256": "d0f1a0aa34006bafc0c1eb8197cc3802f8df29341d61c886e186df90bed092d1",
+      "size_bytes": 8149
+    },
+    {
+      "name": "khalaj-2024-oxygenated-terpenes-aerosol.md",
+      "sha256": "b1f404e070bc1b722bb1f9dcd2759b8ce11d3d8760a792502705013beb6e59af",
+      "size_bytes": 9117
+    },
+    {
+      "name": "khandelwal-2020-knn-lm.md",
+      "sha256": "10d7d205b33a55d24bdce89d733de3101d8daa1133c500a54f30be40d09a87bd",
+      "size_bytes": 3749
+    },
+    {
+      "name": "khare-2020-asphalt-soa-precursor.md",
+      "sha256": "cd63b9ea5794fc03fff6bf57e7fe8450cb10446b73400832ac6be6d60bc1c4be",
+      "size_bytes": 6511
+    },
+    {
+      "name": "kim-2020-5ht2a-cryoem-hallucinogen.md",
+      "sha256": "ab1e5097b07c423a64c22ffccedb7f633a10d9ddfafce4b3ae6a7490459f4803",
+      "size_bytes": 10017
+    },
+    {
+      "name": "kim-2025-hr4407-nursing-workforce.md",
+      "sha256": "b06ec3cd745df7edf8f9d4f1430066dcd7f2b11ac7c4cb831b521c0464f8552c",
+      "size_bytes": 11977
+    },
+    {
+      "name": "kimball-2014-lrgce-css-succession.md",
+      "sha256": "7275dafd78705d9b6674a24ce9f7fbccd4def59303f30f846efa6e5e521d3281",
+      "size_bytes": 6352
+    },
+    {
+      "name": "kind-2013-lipidblast-lipidomics-library.md",
+      "sha256": "93bc888030cd851049d1f1a2201aa72475d4e5c7b43c0a442bd02d438713712c",
+      "size_bytes": 6988
+    },
+    {
+      "name": "kind-fiehn-2007-seven-golden-rules.md",
+      "sha256": "07fc06761dbd33300114aa1fc87e9e59984f633a078088d0a15a031eafbcca8f",
+      "size_bytes": 6891
+    },
+    {
+      "name": "klare-2012-face-recognition-demographics.md",
+      "sha256": "1758e69651aff6ccdbe961a03126ccf2c9a0e17013873889e5fe77e19f356a8d",
+      "size_bytes": 6184
+    },
+    {
+      "name": "knox-holloman-2012-seclusion-restraint.md",
+      "sha256": "9ee5be57881955b523f09d00c427f14c3fb308381c4064a1c3dfbfac1d371939",
+      "size_bytes": 17805
+    },
+    {
+      "name": "koch-2007-formula-assignment-fundamentals.md",
+      "sha256": "7798e31e8c3f05e1f05346af796554712327176c610df5260d8f512edb7a2a77",
+      "size_bytes": 6227
+    },
+    {
+      "name": "koop-2011-organic-glass-transition-soa.md",
+      "sha256": "c9bb614db0cb56dc59c02cd87a5da28b5a1b47c52684a8cd45eed4d04b802de2",
+      "size_bytes": 7776
+    },
+    {
+      "name": "kornblith-2019-cka-representation-similarity.md",
+      "sha256": "42f4ca17c2f225b7645ab9cf71c3967a85d8534f50e34f045620381f4d6fc176",
+      "size_bytes": 4826
+    },
+    {
+      "name": "kosova-2021-plant-proteoforms-environmental-stress.md",
+      "sha256": "33150853d3b4c1f0778c5f6760d4a94e7c1545ab0e8ac6fb4fef1a616721b5ce",
+      "size_bytes": 10120
+    },
+    {
+      "name": "krishnamoorthi-garcia-2025-flock-investigation.md",
+      "sha256": "a457b55b7614f2d5fcb38e4336808b8667e95284b2edd235ea384c57e3123ca8",
+      "size_bytes": 4996
+    },
+    {
+      "name": "kroll-seinfeld-2008-soa-review.md",
+      "sha256": "cd271be96fd0099ad43c404d0ef0a1629cbbc8b01a35e213b32fba6fc677be34",
+      "size_bytes": 7106
+    },
+    {
+      "name": "kudo-richardson-2018-sentencepiece.md",
+      "sha256": "9079850215b47cc7baeb9326085b8bbe8b1bf42edb5fb50593c9d121f3d58f3d",
+      "size_bytes": 8156
+    },
+    {
+      "name": "kujawinski-behn-2006-formula-assignment.md",
+      "sha256": "4e0dd66c4b7b8893eadb48676b56e97033fdd730223626f34f3cafbc068575e6",
+      "size_bytes": 7419
+    },
+    {
+      "name": "la-habra-mc-no-codified-council-term-limits.md",
+      "sha256": "5fbbcff630afba4e3d030dc48234f96dd7754bc41ab0e8554d9141df1dbfe7d3",
+      "size_bytes": 5412
+    },
+    {
+      "name": "la-palma-mc-council-term-limits.md",
+      "sha256": "443177215266c0489ce74808adfa843cfc492a58146b3e6c2e19c7c0edf26436",
+      "size_bytes": 5625
+    },
+    {
+      "name": "laguna-beach-mc-no-codified-council-term-limits.md",
+      "sha256": "2ce47ae8b1d7ae5494041358095dc20a56ec1034f840cc9a3c623e83d7475be3",
+      "size_bytes": 5627
+    },
+    {
+      "name": "laguna-hills-mc-2-04-080-council-term-limits.md",
+      "sha256": "927b2e540d89dd666af088f1d3ebb9c8559fb1beee207cb78abd145f67a2f5cf",
+      "size_bytes": 5526
+    },
+    {
+      "name": "laguna-niguel-mc-council-term-limits.md",
+      "sha256": "0d7ac72e2cc47a67a6993b49282a1a1878dcf9092024decb1eef165f1cfbd759",
+      "size_bytes": 6426
+    },
+    {
+      "name": "laguna-woods-mc-no-codified-council-term-limits.md",
+      "sha256": "662d96dccdf3ed4f16ae544995423608d5c98db0d80a655423251ba7c03a86da",
+      "size_bytes": 6234
+    },
+    {
+      "name": "lake-forest-2026-alpr-transparency.md",
+      "sha256": "bcf68cec8499deac227b0f7914cac3cb571082d0ae8ab2f23e51ad141cb44a6a",
+      "size_bytes": 6073
+    },
+    {
+      "name": "lake-forest-mc-2-04-080-council-term-limits.md",
+      "sha256": "543a9e474c923eb3b757f9fadb45a4c5547bc385e88f6065eedf7c6b91fd5acf",
+      "size_bytes": 3406
+    },
+    {
+      "name": "lamb-retherford-1947-hydrogen-fine-structure.md",
+      "sha256": "79312a56c4ba755cb777d1f3284c05a19f311972defdabbff84f0b836fbc2073",
+      "size_bytes": 8903
+    },
+    {
+      "name": "lambe-2011-ccn-chamber-soa.md",
+      "sha256": "bdacf6975e2e77da5cdb42d3d7dc8108622b9827939b80c2901812e2d4713ae8",
+      "size_bytes": 7632
+    },
+    {
+      "name": "language-documentation-funding-for-ibanag-researcher.md",
+      "sha256": "c50fad7bfb5e522b0dc6e49dc885afad75bc12ef26b76e5481a514bb9ed39751",
+      "size_bytes": 12058
+    },
+    {
+      "name": "laothawornkitkul-2009-bvoc-earth-system.md",
+      "sha256": "999ad8f9e0501e85fcf76b5c96026b1acddcb82bac31b65066548b249212d1b3",
+      "size_bytes": 7105
+    },
+    {
+      "name": "lapd-2026-flock-non-renewal.md",
+      "sha256": "3d79a71d70cbedac2f85c08a7045c9548656babc25edabfae762475ddfce48f3",
+      "size_bytes": 4508
+    },
+    {
+      "name": "laroca-2018-yolo-alpr.md",
+      "sha256": "9af8b1c5939f095d922fb6261cf1b7035068ae936dac19bc0a58a7a788422956",
+      "size_bytes": 7242
+    },
+    {
+      "name": "leaders-beautiful-struggle-2021-4th-cir-en-banc.md",
+      "sha256": "8aa421dc393f56bad45cc2b524314161dff395a52815ed3b83c80cde4ae02adf",
+      "size_bytes": 8215
+    },
+    {
+      "name": "lebel-2004-massachusetts-child-adolescent-restraint-reduction.md",
+      "sha256": "56509179c1065b906f1c9a4dbfbfeb8d9dbdecdc52988951da8f66b81f0549c1",
+      "size_bytes": 10232
+    },
+    {
+      "name": "lee-2020-wikipron.md",
+      "sha256": "01fda6955aaeb8085a18eb8c00673c6dadf634a70c3c150d07616c0c54bbcf2c",
+      "size_bytes": 6472
+    },
+    {
+      "name": "levels-of-prevention.md",
+      "sha256": "04fe59fe9950e83bc777ac081672acba2ba93c5a4854ca424467e191be118964",
+      "size_bytes": 6160
+    },
+    {
+      "name": "levenshtein-1966-binary-codes.md",
+      "sha256": "3ba690e4f23aa0e7c488cba49302c389e955a2245d397b45428a91da94f007ac",
+      "size_bytes": 8192
+    },
+    {
+      "name": "li-2013-mummichog-pathway-prediction.md",
+      "sha256": "250217818dc9f0c2782b0d6f0c8033a99e120bf0538583566c01b6a7da92a2d4",
+      "size_bytes": 5357
+    },
+    {
+      "name": "li-liang-2021-prefix-tuning.md",
+      "sha256": "05986dbe33a8d7ad0b5906970297d2acfe8c894519a0eddc756d3bf80661a115",
+      "size_bytes": 4230
+    },
+    {
+      "name": "licensure-costs-in-federal-cost-of-attendance.md",
+      "sha256": "583f20dabd6cdb8c9467a69e8e187674b59ff3d5cf4fc53155b9dd58f7a1b50a",
+      "size_bytes": 7205
+    },
+    {
+      "name": "lichtenthaler-1999-dxp-mep-pathway.md",
+      "sha256": "19aa47f928e8e550df90a9de0f747996dcbfad6f5de9e4275abd65064b7c0ed0",
+      "size_bytes": 12025
+    },
+    {
+      "name": "lind-1753-treatise-of-the-scurvy.md",
+      "sha256": "36ca4969fea679da36983005d1d7c7edd26305700f1abaf3204b95c6fcf4b1fb",
+      "size_bytes": 22228
+    },
+    {
+      "name": "lindinger-1998-ptr-ms-original.md",
+      "sha256": "24dc0577d5cb1c61a1e7308d63724b7622f9e1c7896fde9d1271e4f4c532f6c8",
+      "size_bytes": 12181
+    },
+    {
+      "name": "lister-1867-antiseptic-principle.md",
+      "sha256": "c3595a856310a9d870cc51eb1cc488f4226954465cda627ba1f87402d5cd6f07",
+      "size_bytes": 14765
+    },
+    {
+      "name": "liu-2024-limonene-myrcene-mixture-soa.md",
+      "sha256": "8370b8be9a9350170ec4c7f0d37c614346c89626e4c42614b668f2b8f5f5752b",
+      "size_bytes": 11867
+    },
+    {
+      "name": "liu-2025-acyclic-terpene-viscosity-volatility.md",
+      "sha256": "290153e85b712b789a5989f33f84c0c2e6da41b7a4e0aedf0ce8ead46ad8a430",
+      "size_bytes": 11923
+    },
+    {
+      "name": "liu-2025-healing-spaces-outdoor-prn.md",
+      "sha256": "6c8be791027040741441cb585a81d0f7179c3d9e1d6b9febdd54b588d95d35aa",
+      "size_bytes": 9643
+    },
+    {
+      "name": "llm-hallucination-detection-synthesis.md",
+      "sha256": "18b0a5c5284258cfcd9c9fdd3485156f811b26b414d4efd02cae2de975836ddf",
+      "size_bytes": 12697
+    },
+    {
+      "name": "loma-ridge-global-change-experiment.md",
+      "sha256": "76779b161616ef243591d6f8b961d8351a95e953a26f485f8750afb28d4c1bdf",
+      "size_bytes": 4871
+    },
+    {
+      "name": "lopez-2014-shoot-bending-hydraulic-pulses.md",
+      "sha256": "161b2fac5a6d1e5833975e518bdc16e70f5a245f4a3f66b472598a0178bd04a5",
+      "size_bytes": 7762
+    },
+    {
+      "name": "loreto-schnitzler-2010-abiotic-volatile-emissions.md",
+      "sha256": "ca4cac2da7aea66854e9d2dc220fa708d1c8573c58379c66e6f591b4efafd9c9",
+      "size_bytes": 14938
+    },
+    {
+      "name": "loreto-velikova-2001-isoprene-ozone-protection.md",
+      "sha256": "0a7e969dd41fbfe8f20f03e3e41c1eaf8fc9a6543b28dcde68560eb21bca54ae",
+      "size_bytes": 10167
+    },
+    {
+      "name": "los-alamitos-mc-council-term-limits.md",
+      "sha256": "faaf2d17fef716c1acc375773949f6d280cbaedae0e3ff6d115d080ae0ec5792",
+      "size_bytes": 8002
+    },
+    {
+      "name": "loscerritos-2026-ice-office-leases-irvine.md",
+      "sha256": "994457e27f145ee5180c63a6cb574b6b95e2df6d0f04be63746eba2345fc08ce",
+      "size_bytes": 4964
+    },
+    {
+      "name": "lsci209-final-baidildinova.md",
+      "sha256": "ed23f5e5e3cac829d0b96ee08863976f6dc857880be224b1452287a0b773d3dd",
+      "size_bytes": 5751
+    },
+    {
+      "name": "ludwig-2020-zodiac.md",
+      "sha256": "b29e8fe4fb0ea7ac62b3e498a95f5b5419dc8e9458f0898df853b1a8a31f221f",
+      "size_bytes": 10380
+    },
+    {
+      "name": "macos-gatekeeper-quarantine.md",
+      "sha256": "3fbc1f3094b5ad4b46382d66b0d13c8244be88b27da8df2f1ddd3901465c89c2",
+      "size_bytes": 4572
+    },
+    {
+      "name": "madry-2017-pgd-adversarial-training.md",
+      "sha256": "c44ca3cc155543f4188e4aad976a07cec11d9e84030da330bc2aa012e27273c7",
+      "size_bytes": 4418
+    },
+    {
+      "name": "makarov-2000-orbitrap.md",
+      "sha256": "18964f82aa533a3ab65252c5cdce502da319630038e59156fb7acdae823e2f00",
+      "size_bytes": 8793
+    },
+    {
+      "name": "malik-2020-drought-plant-litter-microbial-metabolites.md",
+      "sha256": "dc21f210064989706e551a69fa3229e0c0879be8e1b4592b91e3f1cc982f6a91",
+      "size_bytes": 9451
+    },
+    {
+      "name": "manakul-2023-selfcheckgpt.md",
+      "sha256": "02764b3efa70a2c0786ec853489fa740954174ac560085da6c4c4a9ab019f804",
+      "size_bytes": 5252
+    },
+    {
+      "name": "many-personas-in-one-model-feasibility.md",
+      "sha256": "a923aebd7621a343ac5dba80a6b575feb95943a551fe4beb91d3904bc6e39757",
+      "size_bytes": 10103
+    },
+    {
+      "name": "marker-effect-across-four-scales.md",
+      "sha256": "fa048dca745ef2df831b27ea6473c0403bb3ba7c8c1365f4f96f8280d05b60e5",
+      "size_bytes": 12513
+    },
+    {
+      "name": "marker-loss-masking-null.md",
+      "sha256": "896eb1e11c3338d1965dfd25623e17d4c5de965972c51719ec34fddad16c1816",
+      "size_bytes": 9066
+    },
+    {
+      "name": "marks-2024-sparse-feature-circuits.md",
+      "sha256": "d36bbc4fea3ba5b027e806ac1a90a824333750fa9d69ff51a5d0693186f69c36",
+      "size_bytes": 5028
+    },
+    {
+      "name": "marzluff-1996-raven-roosts-mobile-information-centres.md",
+      "sha256": "acf95c3037c17e1214dee6be134f685944015f4c6da91584315857b370e3046f",
+      "size_bytes": 4895
+    },
+    {
+      "name": "massam-2001-pseudo-noun-incorporation-niuean.md",
+      "sha256": "2fc308a3c585af045890270dcacab2fee7064f9a1eb1d19ab83e81b859df126b",
+      "size_bytes": 6820
+    },
+    {
+      "name": "massoli-2010-soa-oxidation-hygroscopicity.md",
+      "sha256": "f32209d9e9c3fdbb6b0332d9937bbe2a198efc78a06289a02e4771b779cca47d",
+      "size_bytes": 6903
+    },
+    {
+      "name": "mata-2026-drn-alpr-harm.md",
+      "sha256": "a9e89d9bbe489eab4437c855f5323d487881bfb14c2457c7e5a08686d5b60f84",
+      "size_bytes": 7389
+    },
+    {
+      "name": "matching-in-case-control-studies.md",
+      "sha256": "7a23a5ec6f5309471408b942a86032f9e00c22062c06c5faaa8447bf6709e019",
+      "size_bytes": 5301
+    },
+    {
+      "name": "matena-2022-fisher-weighted-averaging.md",
+      "sha256": "816c67b3d779d4d30743af0232afbc123bf5cf45f2554bfd9dbff0b3e328ee87",
+      "size_bytes": 4408
+    },
+    {
+      "name": "matras-2012-language-contact.md",
+      "sha256": "10e12297363d81799e5857b6f1bd210e94a7496ece3fcfa68191d0624ff19231",
+      "size_bytes": 4582
+    },
+    {
+      "name": "matsui-2006-glv-biosynthesis.md",
+      "sha256": "cbe51c5e2d1ec8a596e2f8335383c579458e26381d9797b7aa2dae8ebf2e3078",
+      "size_bytes": 10200
+    },
+    {
+      "name": "maxutov-2024-do-llms-speak-kazakh.md",
+      "sha256": "f1076f04c840ff48c7eeaad658d1c9bbcd34551b7d18ea71d447fb447f0d2ef9",
+      "size_bytes": 5317
+    },
+    {
+      "name": "mayer-2021-uyghur-backness-harmony.md",
+      "sha256": "3dd339160cffe82846c8d2f754c58cab11ddb5881c945eed72d011fa8c8c6c32",
+      "size_bytes": 8877
+    },
+    {
+      "name": "mccaul-2025-fox-interview-abducted-children.md",
+      "sha256": "858ea4052643564dd8d5c460061d441de98331dcc9254ddafe95689e490b5059",
+      "size_bytes": 5574
+    },
+    {
+      "name": "mccollum-2020-kyrgyz.md",
+      "sha256": "f584c0501b700afd53757af297ee62a9ba2f1545ae6c93545d7ddc7fe2c25ee9",
+      "size_bytes": 7886
+    },
+    {
+      "name": "mccollum-2021-uyghur.md",
+      "sha256": "a2475b4c8d6be12bee4f24b1d3d74198f2f93433cf4435be19f3b98633c7672f",
+      "size_bytes": 7497
+    },
+    {
+      "name": "mccollum-chen-2021-kazakh.md",
+      "sha256": "b260a85ea227a603afd126f68a79b69c02b360437b4d3e82fbbf8f8d96553dfc",
+      "size_bytes": 8379
+    },
+    {
+      "name": "mcdonald-2018-volatile-chemical-products-urban-emissions.md",
+      "sha256": "20576fdf09fae78278bc9adfc9fef8231b7b0b3d9dac1aa9322b2bb8f0648b53",
+      "size_bytes": 7127
+    },
+    {
+      "name": "mcfiggans-2019-mixture-suppresses-soa.md",
+      "sha256": "39b309c0b2dacd63ab9f3c476e73d54118788dc811a7e2e6186f6b5ad42f8ad6",
+      "size_bytes": 5569
+    },
+    {
+      "name": "mcfiggans-2022-nonlinear-mixture-soa.md",
+      "sha256": "ac5339fc15614518a9b141310e2efbce10f2c9197def3c9711bad0eb002a6e4a",
+      "size_bytes": 6190
+    },
+    {
+      "name": "mcnally-2016-modification-cambridge-handbook.md",
+      "sha256": "6cb3f25f6a982558e34a462b8c2c43116952c80f12dbc2af47223a28e2bb2a8d",
+      "size_bytes": 10913
+    },
+    {
+      "name": "mehra-2020-oxygenated-monoterpenes-california-sage.md",
+      "sha256": "0cedf35c215d8ec49156bf8eff84d73269cd061c92892de2920bca7390243f56",
+      "size_bytes": 6881
+    },
+    {
+      "name": "mei-2022-uncrewed-systems-sgp-data.md",
+      "sha256": "c296664721c955d18de1da943c697ae5286c735cabfde8598413f78cba6002e9",
+      "size_bytes": 6472
+    },
+    {
+      "name": "meng-2022-rome.md",
+      "sha256": "a777f5f549ea91d3b4f3a0f5072a6d292ef3a156e1df91b612363c60c9cabac4",
+      "size_bytes": 5668
+    },
+    {
+      "name": "meng-2023-memit.md",
+      "sha256": "11c4568fe9aa359c130c0d40339f65efe6d369b9a3b769c0311e8d091b19dd15",
+      "size_bytes": 4232
+    },
+    {
+      "name": "microsoft-2024-environmental-sustainability-report.md",
+      "sha256": "94c97ea904013023e113cff2edd9379d0b42f93edcea3909c1f151211b393d8b",
+      "size_bytes": 4875
+    },
+    {
+      "name": "min-2023-factscore.md",
+      "sha256": "27cc6a01d3f297015875495b78c16ab4253ff6ece55075d347b4e081552cc119",
+      "size_bytes": 5528
+    },
+    {
+      "name": "minimal-actuator-flight-family-comparison.md",
+      "sha256": "15580a8ece0290d49e8614144430ed93e35d20d5fb30ffd7f89f0c53b3e60a87",
+      "size_bytes": 7186
+    },
+    {
+      "name": "mirzakhalov-2021-turkic-mt.md",
+      "sha256": "73abf093b4019c0c3d203e697ca40bc16622cf7f53fbca53ed13fb1faa02ed36",
+      "size_bytes": 4044
+    },
+    {
+      "name": "mission-viejo-mc-council-term-limits.md",
+      "sha256": "2bffd1c607bd12c1b715d6c1e738cf2b99a942349b6f5809956b45f08cbc3872",
+      "size_bytes": 7402
+    },
+    {
+      "name": "mitchell-2022-serac.md",
+      "sha256": "5fc6036292b3f6d7bd71e323dd36711fc5547f49e4b71f3ff913958f344caada",
+      "size_bytes": 3779
+    },
+    {
+      "name": "mittler-2006-abiotic-stress-ros.md",
+      "sha256": "b9fd67721d87822b212f5208be6619c5fd6d1169b436810184b84c715661f283",
+      "size_bytes": 7191
+    },
+    {
+      "name": "miyauchi-2020-mycorrhizal-genomics.md",
+      "sha256": "2b20faa5c860fff811fe631b5ac5ef82ff13f84ea8fe85552e96b43779b6ffd5",
+      "size_bytes": 10296
+    },
+    {
+      "name": "mock-2012-aspen-triploidy.md",
+      "sha256": "6833adaabc22e05be5adb84c2d83a2cf2e702d78f50bfe95aa3b9f0911dce540",
+      "size_bytes": 8006
+    },
+    {
+      "name": "mod-functional-head-rubin-scontras-nicolae.md",
+      "sha256": "c09589e1a9b5e8eee6b4ea337d8282483922c6b828e4faa706295537f0ccb6bd",
+      "size_bytes": 9796
+    },
+    {
+      "name": "modes-of-disease-transmission.md",
+      "sha256": "9f06a7dd6c7e666712384a0a1ed40dc6ec64500253b8882f733a8b4521f9d70c",
+      "size_bytes": 4213
+    },
+    {
+      "name": "mokari-werner-2017-azerbaijani.md",
+      "sha256": "a16c5956ec8690123e16314eb7bcea5718f7927f528c1c398abd77768d6e8702",
+      "size_bytes": 11060
+    },
+    {
+      "name": "monson-fall-1989-isoprene-aspen.md",
+      "sha256": "e81fcf5f01de59dfedb385e622fa884206898c8d0a02a6ae0135d6c27487fa5e",
+      "size_bytes": 14365
+    },
+    {
+      "name": "moonlight-limelight-input-api.md",
+      "sha256": "23ec53e2d97aa9591d0b59fd7cc48bc324f376b8ce8b6199627e2336c4b992a4",
+      "size_bytes": 6840
+    },
+    {
+      "name": "morris-2016-parenchyma-codit.md",
+      "sha256": "66f2b58f843acfd5d2e12b1014937e48b66b27e2a4d31f9111843c92daa294c5",
+      "size_bytes": 15480
+    },
+    {
+      "name": "mort-1962-ducted-fan-semispan-wing.md",
+      "sha256": "d41445ff67ba61e12520fa3783d86361596518dc3ed2e67b5c3544127d8222a1",
+      "size_bytes": 5298
+    },
+    {
+      "name": "mortality-rate-and-specific-rates.md",
+      "sha256": "96b2a9f3d59a1c0b03a7667eecf620800e256a4158300c90a66b89bc5b6351d5",
+      "size_bytes": 4211
+    },
+    {
+      "name": "motorola-2026-lpr-product-overview.md",
+      "sha256": "0e21a9650dea0d0a6cbdd49141443fee91ea959b0beae8c839a7f478522a7b96",
+      "size_bytes": 6268
+    },
+    {
+      "name": "mountain-view-2026-flock-termination.md",
+      "sha256": "2282c34e89f4f4660b8d7513643d3dd08df7ddd5a2b94c1f42ec1a140654c599",
+      "size_bytes": 4985
+    },
+    {
+      "name": "mrc-1948-streptomycin-tuberculosis-trial.md",
+      "sha256": "6943255c41b629a7b4d13b01ee8cb85e267dc39904fec76de6ab891c344fae15",
+      "size_bytes": 15935
+    },
+    {
+      "name": "mu-2023-gist-tokens.md",
+      "sha256": "ec6b91eaa8e69950ea0cd4fc741677313d0e6a9743145da4790c44c0c898cced",
+      "size_bytes": 4072
+    },
+    {
+      "name": "muckrock-2023-fusus-request-cluster.md",
+      "sha256": "246041979068f287dcb2bfb78a898a93b69f7be44ac85bd51eb8776a0e1346c9",
+      "size_bytes": 4972
+    },
+    {
+      "name": "mussakhojayeva-2023-multilingual-asr-turkic.md",
+      "sha256": "c6e3d4c02f8ba8bd14f480786643bcff1a5b07c2b29e0fc7efd88cc89f2e482f",
+      "size_bytes": 4472
+    },
+    {
+      "name": "nagarajan-2018-deterministic-deep-rl.md",
+      "sha256": "31f8fad40fddbafdd6d01ad1bd26852ea8e3b1085383098915e3678da85a2b17",
+      "size_bytes": 4316
+    },
+    {
+      "name": "nagata-2003-odor-threshold-triangle-bag.md",
+      "sha256": "19100ad46adb2068724a977e0b43276fb7ef3284d49920410ca5d3cc9384a1e0",
+      "size_bytes": 6075
+    },
+    {
+      "name": "nakagaki-2000-maze-solving.md",
+      "sha256": "049130ed7396bdac1e10d2f0a6c0eef156cb4426aa1c3c2ab7b25dfe742ada05",
+      "size_bytes": 3732
+    },
+    {
+      "name": "nasmhpd-2006-six-core-strategies-snapshot.md",
+      "sha256": "a54ab730d37b1421cf305ef551822c482be1b318c4185bd069c9afcaeaf8d2b1",
+      "size_bytes": 9977
+    },
+    {
+      "name": "national-academy-prize-sweep-2026.md",
+      "sha256": "40229ca12e56f99fcae9c252a5e223d4c43c2de556dabbd458172faba6a9b1a5",
+      "size_bytes": 8931
+    },
+    {
+      "name": "nault-2021-anthropogenic-voc-soa-mortality.md",
+      "sha256": "c8f8e272518a697e0cc5533cf7ca871555aa74e54c35ff58637c481f647b98d2",
+      "size_bytes": 7440
+    },
+    {
+      "name": "navier-stokes-2026-priority-dispute.md",
+      "sha256": "a7faca9640e19d1e1c11e8a84e1b2663da4f8e43bec82cfaf28add95ebbcab61",
+      "size_bytes": 11632
+    },
+    {
+      "name": "navier-stokes-millennium-problem-statement.md",
+      "sha256": "26444eb52739b547dbe11fe1615e43c01ebb395b927d56fdcb15aec168a305d2",
+      "size_bytes": 7492
+    },
+    {
+      "name": "nazaroff-weschler-2004-fragrance-cleaning-indoor.md",
+      "sha256": "a959260a3a9f76b3204a2b03036e9df4cd194d6bcd8ae5a83b5e5ac0bccc4b18",
+      "size_bytes": 9709
+    },
+    {
+      "name": "nclex-registration-fee-increase-2027.md",
+      "sha256": "6509b2749f3915e06684518c076502cc1ad90c773b0485b01e8c1c21261d8f97",
+      "size_bytes": 8488
+    },
+    {
+      "name": "netflix-prize.md",
+      "sha256": "adaf1016d99dd465ef2560789738a4d253798f59594b38a19f338c3fd1d13794",
+      "size_bytes": 5623
+    },
+    {
+      "name": "newport-beach-2026-pd-flock-transparency.md",
+      "sha256": "601103f54314e55c545dfa02b9c442658403f2c1a6c8dfdbfe2d9b685760a9c6",
+      "size_bytes": 5090
+    },
+    {
+      "name": "newport-beach-charter-400-401-from-district-elections.md",
+      "sha256": "4ab493bd92475a6bc4b2e08bda1a3b7fbfa0714a589b17c7abcb20de6a9868ca",
+      "size_bytes": 6756
+    },
+    {
+      "name": "newport-beach-mc-1-32-council-term-limits.md",
+      "sha256": "4fd0316a5f6e41ff9049a7a2ab2a63068aa51caa183be5438b0b1740b049ac11",
+      "size_bytes": 5796
+    },
+    {
+      "name": "newsom-2025-sb-274-veto.md",
+      "sha256": "a2158d9d53a1dde85a7c1a78f2ec002784b07be63b56af641b6d62370d628240",
+      "size_bytes": 4751
+    },
+    {
+      "name": "nice-ng10-2015-violence-aggression-shortterm.md",
+      "sha256": "b840afc563221d0b9424269c7ce05e9af0b5b90892fcf10f0547b7fdeade613b",
+      "size_bytes": 12130
+    },
+    {
+      "name": "nichols-2016-psychedelics-review.md",
+      "sha256": "0ad00ad5f4bf41b252c9bfe63a9c63967c153cb26e01c53383bb6b85456c5858",
+      "size_bytes": 11022
+    },
+    {
+      "name": "nieder-list-2024-computational-mi.md",
+      "sha256": "ee3bb60f4cf4851d2844f206bd5acbf7dbc90e1a456f5524bc2b6aff97d805d6",
+      "size_bytes": 6100
+    },
+    {
+      "name": "niinemets-2004-physicochemical-controls-voc.md",
+      "sha256": "77d2ea69f60ace76423e6664d16a2d342f775ff135c695dabd3ca148c41867fa",
+      "size_bytes": 7290
+    },
+    {
+      "name": "niinemets-2010-bvoc-emission-modeling-mismatch.md",
+      "sha256": "c0413377b712ea2a6b2bbd84d147c7e3e4b739dc26a7c8c69ea5952b1b711791",
+      "size_bytes": 13208
+    },
+    {
+      "name": "niinemets-2014-bidirectional-voc-exchange.md",
+      "sha256": "abd47be064774ab7a78e1fcaaca2e2f96a8bb9703fdfe27eeccfd6f0fabb4dd8",
+      "size_bytes": 9080
+    },
+    {
+      "name": "ninkovic-2020-plant-volatiles-cues-signals.md",
+      "sha256": "6bbebde836d4f9c249c4510217f626749a225825e539a3c0c66a0cac520c6c42",
+      "size_bytes": 11902
+    },
+    {
+      "name": "nllb-team-2022-no-language-left-behind.md",
+      "sha256": "5b3cab42e69b1acdbf7be3f805f304a31085056de441bd3d7d7bf0742527300a",
+      "size_bytes": 5932
+    },
+    {
+      "name": "nlrb-2024-unscripted-cast-employee-classification.md",
+      "sha256": "05d1676e2d15bad22d60258b9440de52a6949a1e73bf17092270ac18691f0720",
+      "size_bytes": 6883
+    },
+    {
+      "name": "nodejs-portable-zip-distribution.md",
+      "sha256": "ea9f94db2496a4e2d45e63abe6bc6db7c1d5825682f6a1909817329e7d585e25",
+      "size_bytes": 3442
+    },
+    {
+      "name": "nolscher-2016-amazon-oh-reactivity.md",
+      "sha256": "707560669b5595562b5a2fe41d087fb14f5d64c1cccd9f1a337d765bfac3ff41",
+      "size_bytes": 6611
+    },
+    {
+      "name": "novoplansky-2009-picking-battles.md",
+      "sha256": "a2f073b9abbd144eefbf389b0a061708dd9b62e14e59104c1ab7251d4e2bf6df",
+      "size_bytes": 7612
+    },
+    {
+      "name": "npr-2026-flock-cancellation-wave.md",
+      "sha256": "4dfb43d29237689d3abf4f7651d50a2f27c74879aae88312762a1dd7d4237998",
+      "size_bytes": 7506
+    },
+    {
+      "name": "nsf-dli-endangered-languages.md",
+      "sha256": "89a39dd545d099e0548c6d0bd27c7b4c7d038870527338b8f286fbaa5b331486",
+      "size_bytes": 5636
+    },
+    {
+      "name": "nyc-city-of-yes-housing-opportunity-2024.md",
+      "sha256": "1d6a1ccda77b66b773f812fd9daefda0b0cc5242feec7b3aca724e81006b9bd5",
+      "size_bytes": 3434
+    },
+    {
+      "name": "nyc-comptroller-2024-office-residential-conversions.md",
+      "sha256": "ad75c923f18ec7da4d4dacfc78a3d8a0c0c9e9415066b0d183260fe47401898f",
+      "size_bytes": 6068
+    },
+    {
+      "name": "nyc-post-act-2020-local-law-65.md",
+      "sha256": "2b7dae50dfdd4859b49267fd10cb5dcdb1fe1ec5b97d02d982123ebaf12e8e8a",
+      "size_bytes": 5793
+    },
+    {
+      "name": "oak-valley-2025-va-court-of-appeals-digital-gateway.md",
+      "sha256": "0d99ea5b06798e13f3b45343422554e6a7bc932750bf9845ad50101a38839d6b",
+      "size_bytes": 6439
+    },
+    {
+      "name": "oakland-2025-secure-justice-flock-lawsuit.md",
+      "sha256": "fafdca9c1bf7037485d0650add870b296fb0028b80475b8e71f9f5e65a0aafe9",
+      "size_bytes": 9775
+    },
+    {
+      "name": "obata-fernie-2012-drought-metabolomics.md",
+      "sha256": "207ee58032ed92af4454a4a62affde87bcd51285afb7133fa9a9fd49b6bac8b0",
+      "size_bytes": 12651
+    },
+    {
+      "name": "oburger-jones-2018-sampling-root-exudates.md",
+      "sha256": "d447934ea478ccba4197a1bf3329adff777c16bad0b21276c7d75be6566eef45",
+      "size_bytes": 9278
+    },
+    {
+      "name": "oc-2023-ort-grant-acceptance.md",
+      "sha256": "2ba47f7f9314b0596a92454828363c07eeb3fe7ffb87e31677f934f1af2653aa",
+      "size_bytes": 5810
+    },
+    {
+      "name": "oc-2025-abis-biometric-system-rfp.md",
+      "sha256": "9613f534e997b2d24f34150459fdd77d8f1f92ecd33fc2bece9c1670f5ac33cf",
+      "size_bytes": 9951
+    },
+    {
+      "name": "oc-2026-fy27-budget-alpr-drones-cameras.md",
+      "sha256": "bd550adc7503df82239510c248d331a60bd1d8e6b5c61ba52c747094bd3ae2a0",
+      "size_bytes": 5074
+    },
+    {
+      "name": "oc-2026-grants-report-mechanism.md",
+      "sha256": "76247c05b64cbeca78fe46eace727f712d163bd5f78648c99169123a83a3d978",
+      "size_bytes": 5478
+    },
+    {
+      "name": "oc-cities-without-codified-council-term-limits-2026-07-13.md",
+      "sha256": "b8f87d9d911cf1f8560009f47882a5a945fc5ed4f624044ff4d6f2805291d26e",
+      "size_bytes": 7727
+    },
+    {
+      "name": "oc-ran-board-cal-id-biometric-governance.md",
+      "sha256": "ea1b5fb073d004570362fce9d4a57495edacfce74774117db4f9eda478049ee8",
+      "size_bytes": 6918
+    },
+    {
+      "name": "ocda-2026-josett-flock-misuse.md",
+      "sha256": "fc88654abf6ca4620ecdfc3eff7e60f757ca200361100587ff8de3f8ae9a97ed",
+      "size_bytes": 6039
+    },
+    {
+      "name": "ocrov-canonical-certified-elections-source.md",
+      "sha256": "2c1c3e949baa496f0e3ba3180454fc7ea0c23e8d2532edb5993d10340099b1ef",
+      "size_bytes": 6162
+    },
+    {
+      "name": "ocsd-2026-axon-sourcewell-alpr-pricing.md",
+      "sha256": "043aa28e1d5c0aae9b8e40d59622062ddec58f652164521eb977dbba00dd521b",
+      "size_bytes": 8744
+    },
+    {
+      "name": "ocsd-2026-camera-ifb-portal-qa.md",
+      "sha256": "f14d3248fcf469b31f90c96d57e841c68f3da5b5b65dba1061610a8e24469c09",
+      "size_bytes": 8400
+    },
+    {
+      "name": "ocsd-2026-community-traffic-cameras-contract.md",
+      "sha256": "9291d2a7af5061b01073efac1692097c0b74fd5bc71cf0258d2a8897a1134a92",
+      "size_bytes": 12576
+    },
+    {
+      "name": "ocsd-policy-463-alpr.md",
+      "sha256": "7c1c09fe6a789ebd982b07b0c51ab114911c275da2807ca52e1f238ede58b58f",
+      "size_bytes": 6051
+    },
+    {
+      "name": "odds-ratio.md",
+      "sha256": "af34c5153d8944f4dd2dd84b14c1d240c1b89f8c085beeac3635326f9ccae60c",
+      "size_bytes": 6442
+    },
+    {
+      "name": "ogrinc-2016-squire-2-reporting-guidelines.md",
+      "sha256": "8df3fca9a727345a68b4243ea6609013eaf5a8aff795ded1a0d613544d5be284",
+      "size_bytes": 15144
+    },
+    {
+      "name": "openai-2026-navier-stokes-blowup-claim.md",
+      "sha256": "7945ee3b58d81dd5ea89678bffaad6a2698c2630f41af68550a7aaceaafcbd8a",
+      "size_bytes": 10033
+    },
+    {
+      "name": "openalpr-source-code-alpr-pipeline.md",
+      "sha256": "b0d761d27db6ef366d2a67a5a02ad14854278a39067caca0a129f1c12e47b52c",
+      "size_bytes": 12286
+    },
+    {
+      "name": "orange-mc-2-05-010-council-term-limits.md",
+      "sha256": "afe487d867385a8c35c530d44110edb40d42b98c7fd30d06c49ddb509580a45c",
+      "size_bytes": 7813
+    },
+    {
+      "name": "oregon-measure-109-psilocybin-services-2020.md",
+      "sha256": "84e658a334916d35f59d4cff5ece244b4426bfdbbf581f2d77fb574a571cc99c",
+      "size_bytes": 15024
+    },
+    {
+      "name": "ortega-2008-vegetation-enclosure-bvoc.md",
+      "sha256": "56b20c2884e3f53e5763dcf1a60a0670b9908b8e8c2978f01b079f1870a58bc2",
+      "size_bytes": 9165
+    },
+    {
+      "name": "ortiz-jimenez-2023-tangent-space-task-arithmetic.md",
+      "sha256": "5709ac62b798eb6598f935419b209afaa7b4ae3c5d63316490cfb73803296283",
+      "size_bytes": 5245
+    },
+    {
+      "name": "oscar-corpora-two-experiments.md",
+      "sha256": "84339271078e2f6d0e8828d431d6ea4faccc24d838d0b6f52e93db62033db1dd",
+      "size_bytes": 9845
+    },
+    {
+      "name": "outbreak-investigation-and-cross-tabulation.md",
+      "sha256": "d065095b806bd55a1c9c8043b16b29c1c45539e7509fc1eb7f24dc77736d807f",
+      "size_bytes": 5202
+    },
+    {
+      "name": "outcome-measurement-instruments.md",
+      "sha256": "e4c35f2cdfc131bd2a40c2586008ff1e96e9480c4909d334a0717b3051395cf2",
+      "size_bytes": 25502
+    },
+    {
+      "name": "outlast-jungle-jacobs-burn-evacuation.md",
+      "sha256": "9c8a50b64e95acecdf040a54a16ea53c129f3e11aace06be28d4a8b5e92e35fb",
+      "size_bytes": 5168
+    },
+    {
+      "name": "outlast-participant-compensation.md",
+      "sha256": "9ea1bd4d1c0522016b1bb589f6d4c44a00f9673d7dee8b998bb90c884db386d7",
+      "size_bytes": 4981
+    },
+    {
+      "name": "outlast-production-safety-provisions.md",
+      "sha256": "509e237d94950454d08c53fb7b3436953ad6673d6eccf2cc8de9bc44aa43b6d9",
+      "size_bytes": 4970
+    },
+    {
+      "name": "ovadia-2024-finetuning-or-retrieval.md",
+      "sha256": "134411b66ff4120f9847c4b6bd3cccbd60e55f406cf5d2d7568a32cb2a175211",
+      "size_bytes": 3801
+    },
+    {
+      "name": "pajunoja-2023-global-aerosol-hygroscopicity.md",
+      "sha256": "c0b939a6ec87a4340998066c20d5e8706a92f1ad9346495ced6eb484107dc0e1",
+      "size_bytes": 5387
+    },
+    {
+      "name": "panickssery-2024-contrastive-activation-addition.md",
+      "sha256": "5aacafe46026bb4825f0c937abe1d5b83f9d40015ac10982924c02e060bdb274",
+      "size_bytes": 3595
+    },
+    {
+      "name": "pantaleon-2026-isu-sociolinguistic.md",
+      "sha256": "439e1537fbfe85b54109cc5ea8b00378d053e0f80d209b49a705c197cea5e97d",
+      "size_bytes": 7878
+    },
+    {
+      "name": "parametric-corpus-attachment-feasibility.md",
+      "sha256": "46fab12d954be1824c3d168ab3467e212d1c93f31a1394e9437b48cbafa52329",
+      "size_bytes": 10986
+    },
+    {
+      "name": "pare-1910-journeys-in-diverse-places.md",
+      "sha256": "fd16a27ac1b359d4cd0193d66a68f8851c7c52430c2ed553c00597c2c30b7583",
+      "size_bytes": 14332
+    },
+    {
+      "name": "passie-2002-pharmacology-psilocybin.md",
+      "sha256": "19deac6b8a461452b45e7ec8b1c6604d1db991e8813ecb14817ce2f117236f6b",
+      "size_bytes": 5853
+    },
+    {
+      "name": "pasteur-1878-1880-germ-theory-applications.md",
+      "sha256": "251d02f03495e770cd08cf9c4c59c6ad000ec9f495060f9b4a28e3b75e5a9917",
+      "size_bytes": 17087
+    },
+    {
+      "name": "patel-2018-bap-napicu-consensus.md",
+      "sha256": "eea4009f93341daf500db44b8781008b81afbfd8bab842d215a818be286e0cbf",
+      "size_bytes": 21490
+    },
+    {
+      "name": "patti-2012-metabolomics-apogee.md",
+      "sha256": "73a315606fecbc5ca5c030dd917c010b7bc9b9735ebd57a2df0e5d83d2f6ba89",
+      "size_bytes": 8445
+    },
+    {
+      "name": "pca-fundamentals-for-omics.md",
+      "sha256": "98a856ace95e93b8459e9f9cb2035148e8123cbbd5aef5ceeb7280bc59085b68",
+      "size_bytes": 12628
+    },
+    {
+      "name": "penuelas-llusia-2003-bvoc-climate-buffer.md",
+      "sha256": "18580c4e9b4f25f0ec1da933180f89849fcdaed838f9aeccf9bfbf67715c7c20",
+      "size_bytes": 13713
+    },
+    {
+      "name": "perturbation-hierarchy-of-a-finetuning-measurement.md",
+      "sha256": "51d94fc02d3d0c6c76c6706c0fa5f1f13a71420c946e8f8eb889565211693b5d",
+      "size_bytes": 12238
+    },
+    {
+      "name": "petren-2024-chemodiversity-quantification.md",
+      "sha256": "d467337284786ec9a6a5a32ad4be996fa418bbe7e70987d62b0db9e58818bfdf",
+      "size_bytes": 12024
+    },
+    {
+      "name": "petters-kreidenweis-2007-kappa-single-param.md",
+      "sha256": "18ed135036fb5797b8c5ebb4a8a1ddae2e37d4ecc84b48e27265df8eb7377989",
+      "size_bytes": 10398
+    },
+    {
+      "name": "pfeiffer-2020-madx-adapters.md",
+      "sha256": "218627f64184e7a7113e5cdbf9d8adf74222faca6bdc0fe9279b54eb82538ea8",
+      "size_bytes": 4340
+    },
+    {
+      "name": "pfizer-hq-buckling-2026-07-07.md",
+      "sha256": "c54fa6273fa5ae911c894dce53250a3cf81fb1ebb5864a10b173e9c5c754400e",
+      "size_bytes": 16271
+    },
+    {
+      "name": "piasecka-2019-plant-metabolomes-stress.md",
+      "sha256": "9837d97cedc86f992074321372d7df798aded7d55304c355c42d8fb06e8a20c4",
+      "size_bytes": 11786
+    },
+    {
+      "name": "piccoli-2014-passive-stability-single-actuator.md",
+      "sha256": "718fb60016ee979921c525200182d75831dc4610726d1a3aeb15af3bbf90b3a5",
+      "size_bytes": 7181
+    },
+    {
+      "name": "piccoli-2017-piccolissimo.md",
+      "sha256": "10274c7c8c2d11e89629d76ab460f66af3e1dae3c22d1ec1cfde9141bcb1ac84",
+      "size_bytes": 7066
+    },
+    {
+      "name": "pichersky-gershenzon-2002-terpenes-ecology.md",
+      "sha256": "e8473d89eb1b2db06b95d617dc4e4cca657d30e9c2f37177d82685764eee10b7",
+      "size_bytes": 11828
+    },
+    {
+      "name": "placentia-mc-council-term-limits.md",
+      "sha256": "3b57f8fc1639d16e7cedc6c94f5498052f72cfda5b04c70d456e14496a8cced8",
+      "size_bytes": 6765
+    },
+    {
+      "name": "pluskal-2010-mzmine2.md",
+      "sha256": "7c2c78f45510ea2e47032f74ec610459148d2fbb6110f819506eee7a9478344b",
+      "size_bytes": 9965
+    },
+    {
+      "name": "positive-vs-negative-esi-mode-coverage.md",
+      "sha256": "e7e60b1e4f1f92c338c0b747525d2c8ca9e3209c6f0a7974ee80986c82b9e263",
+      "size_bytes": 9032
+    },
+    {
+      "name": "post-2022-evidence-sweep-status.md",
+      "sha256": "858b897b77c384cf2356226630eb8470f12849ee1675014c4690eba1d0137466",
+      "size_bytes": 12594
+    },
+    {
+      "name": "pratt-2014-artemisia-californica-latitudinal-chemistry.md",
+      "sha256": "303a51ee90a8875eb1a5d1e8cad78a39d846e06e72e252cdbe3d1b86fe466b17",
+      "size_bytes": 4758
+    },
+    {
+      "name": "predictive-value-and-prevalence.md",
+      "sha256": "278303e3a7db3cec9939569ce5ab41ae07d684eac1ccafa8099dfa7fe625225c",
+      "size_bytes": 6957
+    },
+    {
+      "name": "prevalence-incidence-and-disease-duration.md",
+      "sha256": "871fe400766187d757d8a530e3c71b0cc62a0211b177f5106f9e51b429016340",
+      "size_bytes": 4229
+    },
+    {
+      "name": "prevalence-point-and-period.md",
+      "sha256": "f7ee5efdb01e05065a9d96e8a5dcb35dfbf5fa7a11b35732faeb5a9f75779aa2",
+      "size_bytes": 4886
+    },
+    {
+      "name": "price-2015-deescalation-training-systematic-review.md",
+      "sha256": "93c6587bb9c8e14210a36d97e7a765f352653596db0c51d97c0084eafe76bf07",
+      "size_bytes": 10810
+    },
+    {
+      "name": "price-2024-edition-deescalation-trial.md",
+      "sha256": "f90003401188494baaac7b725be1af3738200ac76bcf25da4ebb823d46c0af4c",
+      "size_bytes": 11672
+    },
+    {
+      "name": "prize-problems-feasibility-inventory.md",
+      "sha256": "5232db6647835d1ef6269bf444f46d98a1c34d9e83caac6f1ee613a76103aaf4",
+      "size_bytes": 13720
+    },
+    {
+      "name": "progenesis-qi-waters.md",
+      "sha256": "8427b42acdcc39cd3d799950e62b745dfdc3faca470a5325677cf7f3a2935479",
+      "size_bytes": 6022
+    },
+    {
+      "name": "proportionate-mortality.md",
+      "sha256": "75f00212708a6014fea1ce8629541f802dd7869d29fa2ce3202cc87335088ad6",
+      "size_bytes": 4747
+    },
+    {
+      "name": "pruyn-2000-populus-mechanical-perturbation.md",
+      "sha256": "09088e6a60eee5c437dc1ff93f02932fa5c295346fcc425a19093f5fa632a4d7",
+      "size_bytes": 5149
+    },
+    {
+      "name": "pseudo-noun-incorporation-concept.md",
+      "sha256": "a3381ccf5f0eb2f64a6f3d439aba6f5fc9d7189934286ac3e28c050a231eddad",
+      "size_bytes": 11329
+    },
+    {
+      "name": "psilocybe-cubensis-biology-live-vs-dried.md",
+      "sha256": "3a16a2b9bc9a07494251c23fd0c2bfe7926639b0ccb46c3621fb80de62ec402a",
+      "size_bytes": 12949
+    },
+    {
+      "name": "psilocybe-cubensis-cultivation-methods.md",
+      "sha256": "9335daa9b08f30d98d62a681b9886ac5ec7ce3b651acd27d4095808707c0f3a2",
+      "size_bytes": 14491
+    },
+    {
+      "name": "psilocybin-biosynthesis-pathway.md",
+      "sha256": "e45dd38da4dc774d25109ec27826a12228df60deff32b97317e327f52677ebd7",
+      "size_bytes": 14204
+    },
+    {
+      "name": "psilocybin-federal-schedule-i-csa.md",
+      "sha256": "faaea6c2cac3a01fd26802421e5bd2814522d4833e961e88a9fdd10bec0e48fb",
+      "size_bytes": 15108
+    },
+    {
+      "name": "public-health-surveillance.md",
+      "sha256": "cec2c7e6a11f0781b36d7c0aeb8ebc986b4eca1c19c6cc0bb0f017ae80bca200",
+      "size_bytes": 6370
+    },
+    {
+      "name": "putkonen-2013-six-core-strategies-forensic-rct.md",
+      "sha256": "f81e91fa9e7bb22f8241ccc36ddc8190a23464c60cc0aab0470c95a421420a3b",
+      "size_bytes": 16976
+    },
+    {
+      "name": "qi-methodology-smart-dnp-com-b.md",
+      "sha256": "b4352b9c9fe77b2e454fe2406f7f1d22be06a9ffa047a98d154abbbd9438c91c",
+      "size_bytes": 21140
+    },
+    {
+      "name": "qtof-for-metabolomics.md",
+      "sha256": "10c700beca1923390cd714480134c8b67d53a18060ecdf2c3f2d8acadcc3b7d5",
+      "size_bytes": 6694
+    },
+    {
+      "name": "quantum-field-concept.md",
+      "sha256": "6641f3f8b5eaa5d1e1275575d68b4369ce91eda4e00548c55d15dbeff8ca78de",
+      "size_bytes": 10979
+    },
+    {
+      "name": "raffa-2008-bark-beetle-eruptive.md",
+      "sha256": "49414eee6d17dca17700fffdb26ce00bb249b78fee72b11d1bbe1cebd93b87d3",
+      "size_bytes": 8692
+    },
+    {
+      "name": "ragagnin-2021-azeri.md",
+      "sha256": "a0fa17aab42ba2e13e7a9b7e0e07961ae6dea20ce2432755f5b8fa8b5cd141d7",
+      "size_bytes": 7055
+    },
+    {
+      "name": "rai-2015-ozone-clothing-ultrafine-particles.md",
+      "sha256": "b1c2d8da3be2973fb078bc26e458cfbf4dc1c556d18b8dd8faf034866b490380",
+      "size_bytes": 7021
+    },
+    {
+      "name": "raikoti-venugopal-2025-language-detection.md",
+      "sha256": "2c4324ea5ccf6984ad83b2d536a56b5b495d1118eb6c2ac4a5278d3f8a5eb9c2",
+      "size_bytes": 3985
+    },
+    {
+      "name": "rameau-2015-shoot-branching-pathways.md",
+      "sha256": "b25c57317c0baf2a4bbe07d9be4838f3e3dda21c29c6cb98ee4b9836d53e8ea1",
+      "size_bytes": 15165
+    },
+    {
+      "name": "rancho-santa-margarita-mc-no-codified-council-term-limits.md",
+      "sha256": "c67e3a3908e636bb41563e2bb5b03b799162349f87d17dcdf5e22bc2ef570e77",
+      "size_bytes": 7003
+    },
+    {
+      "name": "ransford-2025-cure-violence-systematic-review.md",
+      "sha256": "56d56c220490e86e220d3275c64c70ee94c0f5fd43af8cc90fc39d769b7e1ee1",
+      "size_bytes": 6087
+    },
+    {
+      "name": "reid-2012-externalized-spatial-memory.md",
+      "sha256": "d2641c57a43a1bdc9eab0ba7a63467e1167cac5591a660a8de7ea2c7e8c8c268",
+      "size_bytes": 3963
+    },
+    {
+      "name": "reid-2016-two-armed-bandit.md",
+      "sha256": "85f9148a73895fed23169f0828228f6a8caee3979a690c8bcfe512d533584c04",
+      "size_bytes": 4938
+    },
+    {
+      "name": "relative-risk.md",
+      "sha256": "db81f0c983655298124a2c81b2fc13f03e48995c2576f14c7f291047de555823",
+      "size_bytes": 5601
+    },
+    {
+      "name": "reliability-and-observer-variation.md",
+      "sha256": "d040ec3cb2d71d847723206a7fee4b847ed8def22ccd13842141334e21d9230c",
+      "size_bytes": 4717
+    },
+    {
+      "name": "renormalization-in-qft.md",
+      "sha256": "75d9a70da94d6e50995c2ab8e491fe5ba3c73b78f97893eee35cd34ebc52a3ff",
+      "size_bytes": 14527
+    },
+    {
+      "name": "restrictive-practices-definitions.md",
+      "sha256": "eeff90c0ac176a4e7e851e1a209bf6670b301181b5717b93f03ef8cde38f3b74",
+      "size_bytes": 10479
+    },
+    {
+      "name": "reuters-2017-shock-tactics-taser-database.md",
+      "sha256": "4109a318b9ec45251403458c3cb0afb20c91d1f96c3a4fe6c885d72e022b3b04",
+      "size_bytes": 8664
+    },
+    {
+      "name": "rfc-8445-ice-restart-2018.md",
+      "sha256": "bb584da1657b4da795f90cb80f3052519ac903a924a740f208e1e1ff5671413c",
+      "size_bytes": 5088
+    },
+    {
+      "name": "richards-2013-dangers-of-surveillance.md",
+      "sha256": "4a120ce1fed44943c8e5d951869258308e2633276a0cb4f5e9c5893fafac5e48",
+      "size_bytes": 7370
+    },
+    {
+      "name": "richmond-2012-verbal-de-escalation.md",
+      "sha256": "c2f0e0f2e72d38dd0c77ad7d7a950bdbb50dbedfdaf14744cd9bdb02abdecc6a",
+      "size_bytes": 16846
+    },
+    {
+      "name": "rickards-2013-kappa-oc-ratio.md",
+      "sha256": "d38e302538407667cb55c6eff83039ac053c4adde73e2f352f95d35e13d1c2be",
+      "size_bytes": 7832
+    },
+    {
+      "name": "riekkinen-2021-latinizing-alphabet-kazakhstan.md",
+      "sha256": "efccaf0e00a89960c5ddcc9d5b0cde6ec6036865caf75c6c18bc7226f40269ce",
+      "size_bytes": 6221
+    },
+    {
+      "name": "riley-2013-unconscionability-reality-tv-contracts.md",
+      "sha256": "09ebbedd8d4ee106e76086b81299070ce5aae0f8c644b440b67228063afd4299",
+      "size_bytes": 6153
+    },
+    {
+      "name": "riordan-rundel-2009-css-modeling.md",
+      "sha256": "5e8a34869b49c3700feb33d1e9906af2e7d8b39462e32c62092cb49eb09c638c",
+      "size_bytes": 8077
+    },
+    {
+      "name": "rissanen-2014-cyclohexene-ozonolysis-highly-oxidized.md",
+      "sha256": "3fc4c83645828cd944834744ed8ffcb8032eff32e49ef7cde19dd3e1a7ea9d20",
+      "size_bytes": 8149
+    },
+    {
+      "name": "rodriguez-2009-fungal-endophytes.md",
+      "sha256": "c84680fb55f78c59ca3417cf816cd2ee77391ae80f8b6242fdabf95738e040e1",
+      "size_bytes": 16242
+    },
+    {
+      "name": "rogers-mcavoy-2018-pando-mule-deer.md",
+      "sha256": "1cdd0a060614587055ed0158aa1179545cc6fd64ca2d9f66cc21d505a755ee4f",
+      "size_bytes": 14085
+    },
+    {
+      "name": "roppolo-2020-project-beta.md",
+      "sha256": "c23bacccec99bcd190bbd85f34680575ce65651b2627f85833816ca7dce0e6a2",
+      "size_bytes": 20295
+    },
+    {
+      "name": "rosenfeld-2014-aerosol-cloud-precipitation.md",
+      "sha256": "1b80df7b37b623a3ea8f7e7b2ec06f2b72f36f0153879f2bed9733d0e92d5c73",
+      "size_bytes": 5588
+    },
+    {
+      "name": "rsm-2025-ocsd-flock-contract-partner.md",
+      "sha256": "57443917cd5cbdb452b2ffcc2a1488f9b43db12f41ca64e5f39c2d3c09a5aab9",
+      "size_bytes": 4130
+    },
+    {
+      "name": "sag-2022-bare-singulars-turkish.md",
+      "sha256": "ba55b6c189ecadbbdab92fe7f854c32b350b79b737caa8048e6b3a7bc57977ad",
+      "size_bytes": 9706
+    },
+    {
+      "name": "sailas-wahlbeck-2005-restraint-seclusion-cautionary.md",
+      "sha256": "0f9029d48f727c5dc3eec26b8b6daaf46f7e30dbffc76a45b1cfa4d2bd77843d",
+      "size_bytes": 10292
+    },
+    {
+      "name": "same-seed-gpt2-runs-diverge-without-determinism.md",
+      "sha256": "8fdb94c7985a73affd369ecb15a4a1103a8b4ce17af34fdf1de053963ddc5a17",
+      "size_bytes": 8729
+    },
+    {
+      "name": "san-clemente-mc-2-04-090-council-term-limits.md",
+      "sha256": "4c4bd4b1199a6bdb70a5cbee7d6490e5e65d7268f06474010e548e2e41f7a339",
+      "size_bytes": 6423
+    },
+    {
+      "name": "san-juan-capistrano-mc-no-codified-council-term-limits.md",
+      "sha256": "fb4708385586c92ad9862c1cfd8e2ee773ad7b694d14cddd0a313cc26d14aafd",
+      "size_bytes": 10863
+    },
+    {
+      "name": "san-sebastian-fault-system.md",
+      "sha256": "e72503eb457bdd18b8e3b54fa4783172d5cefc62632aab2969f2ab1bf0dddf92",
+      "size_bytes": 7593
+    },
+    {
+      "name": "sanchez-2012-legumes-drought-comparative-metabolomics.md",
+      "sha256": "6c689371dff4b16b6841451d6913d5ea94bca4e9c674d797931a66c903f41828",
+      "size_bytes": 8882
+    },
+    {
+      "name": "santa-ana-mc-council-term-limits.md",
+      "sha256": "7115f0efcaf874d2d334ec11fcac774471fceb4202799b9b5d0b1b815b417ea2",
+      "size_bytes": 8136
+    },
+    {
+      "name": "savelyev-robbeets-2020-bayesian-turkic-phylogeny.md",
+      "sha256": "eac98425224b3aaddd9200bebdd18c4b8b1936de7e197098d60cce0f32602155",
+      "size_bytes": 5420
+    },
+    {
+      "name": "schmidt-2024-norfolk-flock-complaint.md",
+      "sha256": "6adb20c8815e2940a381c682d81924b2df7e5485b11afc967e00b8c59d5848f3",
+      "size_bytes": 9041
+    },
+    {
+      "name": "schmidt-2025-norfolk-order-mtd-denied.md",
+      "sha256": "29c614b8a9fcfc0cf933043d0527c030a625822ef2bb23bc02be78addbaa5902",
+      "size_bytes": 5401
+    },
+    {
+      "name": "schmidt-2026-norfolk-summary-judgment.md",
+      "sha256": "89bfe5f7f16bfc374a77ce70c7d89910802e871fdcbb804e0f78b5cd0f1369c9",
+      "size_bytes": 5559
+    },
+    {
+      "name": "schum-2020-mfassignr.md",
+      "sha256": "331c4195394340e570c9ebf6d35a3615ec02122189badf4cccb93e9a3067c0eb",
+      "size_bytes": 7406
+    },
+    {
+      "name": "schwinger-1948-magnetic-moment-electron.md",
+      "sha256": "455545beb8e6c0c9df44b48f93bb4a83a62505ab96d71788b3a5a017cb19fe20",
+      "size_bytes": 8552
+    },
+    {
+      "name": "schymanski-2014-msi-identification-confidence.md",
+      "sha256": "5eff5c9163a747e038e8d7070ce2a5f0c818b559f798804835de042244f08d00",
+      "size_bytes": 5854
+    },
+    {
+      "name": "scontras-nicolae-2014-tagalog-linker.md",
+      "sha256": "97a45128f47cebe3fe10dae0341c3a8ca1468ff8ea6b49413796d2a7e2c68d8e",
+      "size_bytes": 7826
+    },
+    {
+      "name": "seal-beach-charter-422-council-term-limits.md",
+      "sha256": "de2b75bec24f92e181019afe607be5ed099bc0b8948b7c5dcf47eb97259e2a29",
+      "size_bytes": 4033
+    },
+    {
+      "name": "second-quantization.md",
+      "sha256": "d2bbd5cc7d1a9659c76a211dd33d4282317931af2f3408c1bf1a5232bc100ad1",
+      "size_bytes": 14737
+    },
+    {
+      "name": "seeded-lstm-training-reproduces-bitwise-on-one-card.md",
+      "sha256": "5792a63a4c341bb3afe69284f05a0dd5581411d3cfee39fe8f6a5399fab7ce3c",
+      "size_bytes": 10009
+    },
+    {
+      "name": "sensitivity-and-specificity.md",
+      "sha256": "f6ac8bfcafa49422e32f7bb9d2725e9d7ba78de686cf8c980a9c9cf65a3892a9",
+      "size_bytes": 5099
+    },
+    {
+      "name": "sequential-and-simultaneous-testing.md",
+      "sha256": "93ee229d76b00d47933d41aacece33f36b0144821fbed31241e6f303195a1781",
+      "size_bytes": 4628
+    },
+    {
+      "name": "shanker-2014-drought-stress-responses-crops.md",
+      "sha256": "24eb92884063297f2c5fc7378f057b287b3b6ffd03d94fbe08887b9e7c1a1d24",
+      "size_bytes": 9012
+    },
+    {
+      "name": "shanmugavelu-2024-fp-non-associativity.md",
+      "sha256": "61391b59967d40141a4b19ee59f6a66b8fa1cd1fd14a344b9b3510388466cef6",
+      "size_bytes": 5119
+    },
+    {
+      "name": "sharkey-singsaas-1995-isoprene-thermotolerance.md",
+      "sha256": "139abad0a6e3774646031f879c374b4c938c9249224a9f1aae233c84c6d74845",
+      "size_bytes": 8240
+    },
+    {
+      "name": "sharma-2026-contextcov-executable-constraints.md",
+      "sha256": "7b49bb031865c2b13070e36037a582e80a44f3a0f1fc0e94d340818d88000ee2",
+      "size_bytes": 4136
+    },
+    {
+      "name": "shashirangana-2020-alpr-survey.md",
+      "sha256": "6ef6929e307058c30ad1c76884392b286c6223532690bf4b24252936a621e419",
+      "size_bytes": 6841
+    },
+    {
+      "name": "shaw-2023-russia-genocidal-war-radicalization.md",
+      "sha256": "7244fb94788706219237f42f350e917137ecf3f935365fa9c90cf609286cf9da",
+      "size_bytes": 6162
+    },
+    {
+      "name": "shazeer-2017-sparsely-gated-moe.md",
+      "sha256": "c51cd0b2b183e83a72a12636aa712d1e577a1d80be104900e64f76c79cfc46ec",
+      "size_bytes": 5313
+    },
+    {
+      "name": "shehabi-2024-lbnl-data-center-energy.md",
+      "sha256": "23913297cff81d1e8e117d12facbf7d02aad973853563ddcfd98c921f630fe87",
+      "size_bytes": 5612
+    },
+    {
+      "name": "shipped-checkpoint-and-reported-score-can-be-different-models.md",
+      "sha256": "533693cdd8ee7392224209226f089756648c778ca0a9c46d70d05acbff75d02b",
+      "size_bytes": 11507
+    },
+    {
+      "name": "simard-1997-wood-wide-web.md",
+      "sha256": "7f99f5bdb5a234889e77d6f36931deda89cd50827b636d199d3e855885f49440",
+      "size_bytes": 6426
+    },
+    {
+      "name": "simulating-minimal-actuator-flight.md",
+      "sha256": "db75beea2ebffc5392498472997c2b646709df09b02c5a28df8f06ff8460b8ff",
+      "size_bytes": 5262
+    },
+    {
+      "name": "skip-mode-common-support-couples-every-pair-to-every-corpus.md",
+      "sha256": "0abf11c1f62d194b58746c70cd26b60f6b3ed89a0f9f233e6e7d4cff762c6fe0",
+      "size_bytes": 6175
+    },
+    {
+      "name": "skogan-2009-ceasefire-chicago.md",
+      "sha256": "0b1c214c1d68949d28b186e84066a0b6b59dad56dfa2dccccd03c983109f7051",
+      "size_bytes": 5678
+    },
+    {
+      "name": "sleighter-hatcher-2007-dom-characterization.md",
+      "sha256": "4810addcb3a01530e0c1dbfad56fbda43a352f56779f1ee750fd3eb9070c0e5c",
+      "size_bytes": 6842
+    },
+    {
+      "name": "slurm-billing-follows-the-job-qos-not-the-partition-qos.md",
+      "sha256": "17c6af65d32a51f3dc6424a5b1473fc1cf2e18f5933ea084e9b5707f2e6599ed",
+      "size_bytes": 8358
+    },
+    {
+      "name": "small-probe-agrees-across-gpus-where-real-work-does-not.md",
+      "sha256": "56029a695029fee92ca4ac613661dbca19c04507eec5c5b79b6f5ca2a0b6ce00",
+      "size_bytes": 24879
+    },
+    {
+      "name": "smith-2005-metlin.md",
+      "sha256": "8184598e1dd01f9f43ee431b98c48862ca5f2c8b56b26c253bd0c2b43dd20081",
+      "size_bytes": 7616
+    },
+    {
+      "name": "smith-2005-pennsylvania-seclusion-restraint-reduction.md",
+      "sha256": "001de795540ec2212f125f9c8234c5aee2ea7f858b82ed10f08374a12d4dad53",
+      "size_bytes": 8073
+    },
+    {
+      "name": "smith-2006-xcms.md",
+      "sha256": "fffd1f7370638aa006c1b2dafdb2f66971c09e9b922c92a0c63c5a52ac32ecff",
+      "size_bytes": 10833
+    },
+    {
+      "name": "smyth-2004-limma.md",
+      "sha256": "969ee00ec6b7dc5f8e1bfb6ced66a16098e108941b26a945f47908b529ff1b96",
+      "size_bytes": 10677
+    },
+    {
+      "name": "snow-1855-communication-of-cholera.md",
+      "sha256": "1224d0d493f75ba31fcc066ecaae2be062b3b88794a35e1d861d02a1ee0a79ea",
+      "size_bytes": 18782
+    },
+    {
+      "name": "solove-2007-nothing-to-hide.md",
+      "sha256": "9104a31f8e97299e181617bdd4fccdef761eb72f69f050c517465c1857c17c8d",
+      "size_bytes": 7792
+    },
+    {
+      "name": "sonerud-2001-hooded-crows-follow-roost-mates.md",
+      "sha256": "c1dbee3afd78a6d48871dd0390449f0edb8c7ad1c8282b9f8cb814121de63134",
+      "size_bytes": 5438
+    },
+    {
+      "name": "spectrum-of-disease-and-the-iceberg-concept.md",
+      "sha256": "b78129a94ecafb6830bf7bb47287ba51100d996d63b2d933e3909ef792d7eaa5",
+      "size_bytes": 4623
+    },
+    {
+      "name": "spencer-2018-cochrane-deescalation-non-psychosis.md",
+      "sha256": "8839ba1a37f6329f05ed78169e5ec7a85656579d508d92f67c415406652fc108",
+      "size_bytes": 8458
+    },
+    {
+      "name": "staggs-2015-us-seclusion-restraint-trends.md",
+      "sha256": "f294dd22431776ccca044398550afaaaae982354529bd1d7bcd0a73b35e800a4",
+      "size_bytes": 13567
+    },
+    {
+      "name": "standard-model-overview.md",
+      "sha256": "8a790acec0d7882ee952ce14fbdbe79fe0b143e8ba2aa503d00d38d9737a13da",
+      "size_bytes": 23000
+    },
+    {
+      "name": "stanton-mc-council-term-limits.md",
+      "sha256": "41380a0fcabd6cf61bc3596f0c0401f93ccbd53a7ab4c28d5e550f47a4da4c54",
+      "size_bytes": 6131
+    },
+    {
+      "name": "state-of-surveillance-2026-flock-30-cities.md",
+      "sha256": "2961d752d9378af0975bbfd6ffcdc3f4a7097f25efbb0c369a886ec167e68ae4",
+      "size_bytes": 9133
+    },
+    {
+      "name": "steidinger-2019-forest-symbiosis-biogeography.md",
+      "sha256": "85284e5651eee38820e4b7934d994b09da6c0c214af286fac11c92b1da806c70",
+      "size_bytes": 16193
+    },
+    {
+      "name": "stein-1994-nist-library-search-algorithm.md",
+      "sha256": "754cdf50c6f5e1ea6e185f92554f4a4ef328c5b08a7e317c2abcdab38af4255c",
+      "size_bytes": 17434
+    },
+    {
+      "name": "steinemann-2016-fragranced-consumer-products.md",
+      "sha256": "5aaad7736b08921c91c4e8bb023825deb72af3ab70ff6f71b95ee6b6d7f9e6cf",
+      "size_bytes": 8896
+    },
+    {
+      "name": "steinert-2010-international-restraint-survey.md",
+      "sha256": "4423d81fe46d7dcf6e7b53dc67918e6c1e8e3f5af2965a70bc21d4e43ef288c0",
+      "size_bytes": 8970
+    },
+    {
+      "name": "stenson-2003-dom-ftms.md",
+      "sha256": "f7c931fb6b9fe8b94b8af5326f7a8e90e02ed705bef35229ff7dab82345fcf17",
+      "size_bytes": 6557
+    },
+    {
+      "name": "stillwell-2010-picot-clinical-question.md",
+      "sha256": "37609314099b464c3fb5237309f194c4afd404bf01f122d3c6f8e1a7330c3ce9",
+      "size_bytes": 10007
+    },
+    {
+      "name": "stop-foil-failures-report.md",
+      "sha256": "43aeb924bf655c607e5e22c59576bf6a2af3740362c8b5dfa363b3b7a86ad57e",
+      "size_bytes": 5327
+    },
+    {
+      "name": "stouffer-1991-radio-tagged-crow-roosting.md",
+      "sha256": "fcbe171f7105413709feff9949fd7407127c3d028e1fba6dd4188d76608667c5",
+      "size_bytes": 5056
+    },
+    {
+      "name": "subbiah-2026-limits-of-steering-vectors.md",
+      "sha256": "2b275212a8a71e7e35001097e547f5e4f7d759b275e7998bb583647376ce9177",
+      "size_bytes": 5862
+    },
+    {
+      "name": "sud-2007-lmsd.md",
+      "sha256": "daa589a413526547d858331b1b752385726d55734cd99cf70c103f3799705f9c",
+      "size_bytes": 6935
+    },
+    {
+      "name": "suda-2014-functional-groups-ccn.md",
+      "sha256": "6bb49c4e49046a951536da2b1e3da52131458b0066cf78d84d7f4d1cbfadf3df",
+      "size_bytes": 8313
+    },
+    {
+      "name": "sudovda-sunshine-integration.md",
+      "sha256": "01036ff5140576fd8bf59450b36fef791b3bc1b3f7ebcd83825ae5d68b105779",
+      "size_bytes": 11040
+    },
+    {
+      "name": "sukhbaatar-2024-branch-train-mix.md",
+      "sha256": "68f04de1bc4fa9d94a27e537589a961ad0ad71a12ac2cbd67e956bf68a71aa56",
+      "size_bytes": 9580
+    },
+    {
+      "name": "sumner-2007-msi-reporting-standards.md",
+      "sha256": "2ddea3ee80e42a5994c5371dfbdba3ada24a76d30cede85223d9fa7f69ff05a7",
+      "size_bytes": 5785
+    },
+    {
+      "name": "sunshine-abs-mouse-multimonitor.md",
+      "sha256": "3be73850b1072bd2f84e8084b4fdbd21ee76269c130bf81a1d71b0cd3ab84e12",
+      "size_bytes": 14241
+    },
+    {
+      "name": "sunshine-touchport-model.md",
+      "sha256": "1ec5dcb6e8533c4e33e6410ea24322c2cac6059c2cf2d0426add86b406bb1d5e",
+      "size_bytes": 8130
+    },
+    {
+      "name": "suomi-toivanen-ylitalo-2008-finnish-sound-structure.md",
+      "sha256": "01030afffc82594c80438cc5075e91c6769023ff88952ff12208ebb8e95af23e",
+      "size_bytes": 16233
+    },
+    {
+      "name": "surratt-2010-iepox-isoprene-soa.md",
+      "sha256": "2f03bf7e02920cc6d25a11ebc215a8f6de795b8a2138acb056a635bd7b033f52",
+      "size_bytes": 8449
+    },
+    {
+      "name": "swadesh-1952-lexicostatistic-dating.md",
+      "sha256": "6d4fbabb5cda56e9abf4ef53c46ee5a7874c790f36aef4ef234b4f0e2694852f",
+      "size_bytes": 7410
+    },
+    {
+      "name": "t-hooft-1971-renormalizable-massive-yang-mills.md",
+      "sha256": "3d1a619476a3240a9f62ee32bb8bdfc96e370180a5cfd39eefafcb331dde1d75",
+      "size_bytes": 11622
+    },
+    {
+      "name": "tagalog-linker-na-ng-schachter-otanes.md",
+      "sha256": "608a0cfa36bb2dbaa428fa3290bf71e3c0bf14c81a0b758d82c3332f13441633",
+      "size_bytes": 7774
+    },
+    {
+      "name": "tang-heuven-2007-chinese-dialects-intelligibility.md",
+      "sha256": "4a56a53c53a79b9648dff1e845bd527848dd4f9653ab60b79248286d82c02c4b",
+      "size_bytes": 7259
+    },
+    {
+      "name": "tang-schurgers-rinnan-2019-soil-bvoc-review.md",
+      "sha256": "e83bddf25600379642e3bff853ce5f537b6c33301f8f8e26c52dc52313f1c17c",
+      "size_bytes": 11830
+    },
+    {
+      "name": "tardieu-2018-drought-tolerance.md",
+      "sha256": "61e3a6249a6e246a4ef5e6bd86ae04c73867932da5818ef7f8ef39c2b4716649",
+      "size_bytes": 8318
+    },
+    {
+      "name": "tarun-2020-ibanag-orthography.md",
+      "sha256": "1278711f032b447f3fc02a0212de5dc6b141dd41b3f56c79417070e0897bd5c1",
+      "size_bytes": 10560
+    },
+    {
+      "name": "telewski-jaffe-1986-abies-wind-thigmomorphogenesis.md",
+      "sha256": "37842b19d8f1df205fb25518451ebde673b7ce12dbc1c436f47fa9f22069d54b",
+      "size_bytes": 7899
+    },
+    {
+      "name": "terhonen-2019-forest-tree-endophytes.md",
+      "sha256": "f102cff73025c04f5d2c22e543ab587af5b2fd540c35906c2d77be6bf87a60f7",
+      "size_bytes": 12691
+    },
+    {
+      "name": "tero-2007-adaptive-transport-network-model.md",
+      "sha256": "728c8cfe3ab4b0f9741d3eb069e11b0a27d5a176a11c2f926211739035d79ad5",
+      "size_bytes": 4846
+    },
+    {
+      "name": "tero-2010-adaptive-network-design.md",
+      "sha256": "bf7aca680309f1dee209549c2f3d6d17b742ef376d20d7141541cfe3731a931a",
+      "size_bytes": 4605
+    },
+    {
+      "name": "tham-2016-indoor-air-quality-30-years-review.md",
+      "sha256": "c2673cf22c27d3dfd3e29bef90b5c617464f93f10361c9012607d4027de53582",
+      "size_bytes": 4502
+    },
+    {
+      "name": "tholl-2006-volatile-analysis-methods.md",
+      "sha256": "6da0d6ab11920573bd8bb0b54987903db3d47e3b95402355ceaa2f9c8d1d6d00",
+      "size_bytes": 13689
+    },
+    {
+      "name": "tholl-2021-trends-volatile-sampling.md",
+      "sha256": "310892125dfbff9e7f4f801d8433904f66617ba7ddeb8c67c1a5a2e82b745972",
+      "size_bytes": 16716
+    },
+    {
+      "name": "tleubayeva-2024-kazakh-multilingual-qa.md",
+      "sha256": "3427a3441d9c9edd142fdb4071bf32bbd296ddaedd7366c7af225e181598ac13",
+      "size_bytes": 5078
+    },
+    {
+      "name": "tomonaga-1946-relativistically-invariant-qft.md",
+      "sha256": "32c9bb2cbdf0422d05da37eaf7c2d81870ff3bbe1802e03f91afb0c42ce60c0f",
+      "size_bytes": 9836
+    },
+    {
+      "name": "toraman-yilmaz-2022-turkish-mi.md",
+      "sha256": "e74d8482c2e73bdf8635c80ba3e004c9fbcb674e33c3fb02716212b3820957f3",
+      "size_bytes": 6336
+    },
+    {
+      "name": "townsend-2018-winter-crows-partial-migration.md",
+      "sha256": "1cec6a12c9566261fdc90f5b40446c083171d8032230b94493abf4a5492cb99d",
+      "size_bytes": 4209
+    },
+    {
+      "name": "toyota-2018-glutamate-calcium-wave.md",
+      "sha256": "db03aa2d3ef57da5ccd1b9f1ad12a013c16e358ab5437620e87ed14173bbb526",
+      "size_bytes": 6017
+    },
+    {
+      "name": "train-eval-notation-consistency.md",
+      "sha256": "18bf89db735843b4fda6b3af2c7a56e0d5ea83f28f087be3b92ee1a5c2607c8d",
+      "size_bytes": 4050
+    },
+    {
+      "name": "training-curve-perplexity-understates-held-out-text.md",
+      "sha256": "82a532d6a9fa98e1d6c951a3a1ef96b904a1c4af5cca7ec0191032919ebd6892",
+      "size_bytes": 8319
+    },
+    {
+      "name": "transcription-error-inflated-a-directional-asymmetry.md",
+      "sha256": "4377d8b0e708f4a226ab013079cf24558fd33299017462508707327a767fab69",
+      "size_bytes": 12719
+    },
+    {
+      "name": "transport-verified-is-not-identity-verified.md",
+      "sha256": "6fe61dbe341e9fc4a94ec0da8a72ef482efa3fafff8a27c53ee90d1551922042",
+      "size_bytes": 8615
+    },
+    {
+      "name": "tree-bot-cartridge-reuse-provenance.md",
+      "sha256": "068897eefa94f4429b5bc61a8e0b52617c5cf6ed834ee4c73da32cd9c7908ec7",
+      "size_bytes": 9197
+    },
+    {
+      "name": "tree-bot-chromatogram-services.md",
+      "sha256": "e49f8d3b29a9cea09d47b1285213e6d58b987c8b6628726adfeb7d9345f4d670",
+      "size_bytes": 9759
+    },
+    {
+      "name": "tree-bot-compound-class-taxonomy.md",
+      "sha256": "5f41433436830d0638122ca33351dfefe3a692bcb9d804939644fff4697ffce9",
+      "size_bytes": 12033
+    },
+    {
+      "name": "tree-bot-pipeline-overview.md",
+      "sha256": "c448d92343b4483df21b6ddd2c39581db41bc682e81068f50f46db2bf5f7cb7a",
+      "size_bytes": 13590
+    },
+    {
+      "name": "tree-data-field-organization.md",
+      "sha256": "fa011d0cc1f0a54cbdf040c58ab12d10638b24b01c22d402e59a82cae84d2b1d",
+      "size_bytes": 14662
+    },
+    {
+      "name": "tree-data-plant-species-coverage.md",
+      "sha256": "00b4b4ba06051a91059bef8774e999813e0b106850f8e54e3c19e30e0d1f8520",
+      "size_bytes": 10280
+    },
+    {
+      "name": "trump-v-casa-2025-concurrences.md",
+      "sha256": "71eec38515c0d14eefca1558112b466498de3438a61b2964cfb281b1cdefa69d",
+      "size_bytes": 12476
+    },
+    {
+      "name": "trump-v-casa-2025-jackson-dissent.md",
+      "sha256": "0e590386af03c57536c39ee8d4bad8fbedf6db07ded5730692dfdcda6466104b",
+      "size_bytes": 15809
+    },
+    {
+      "name": "trump-v-casa-2025-majority.md",
+      "sha256": "63a92c6bafe04a8a6588a07450a813d338277d8694743c40872dd18835df1231",
+      "size_bytes": 9211
+    },
+    {
+      "name": "trump-v-casa-2025-sotomayor-dissent.md",
+      "sha256": "c444bf05d4cfd38de5759eda72f95f5b9fa85469483011aec86f86e72f9c57de",
+      "size_bytes": 16371
+    },
+    {
+      "name": "trygg-wold-2002-opls.md",
+      "sha256": "c5570af145f7b7c22fecc794bdd808c07f1a451dbf1f91d3713c09a2210888f2",
+      "size_bytes": 5833
+    },
+    {
+      "name": "tsugawa-2015-msdial.md",
+      "sha256": "d9d8dc5a623dd80bab1776415ceccf7f6285e23480c7f652c71a0031258eb1cb",
+      "size_bytes": 7456
+    },
+    {
+      "name": "tu11-submission.md",
+      "sha256": "380d6fe055ccaf39487cf954e3060f682e6c97bdbd7a2c592c90efcb4f08eff5",
+      "size_bytes": 5907
+    },
+    {
+      "name": "turkic-deterministic-transliteration-pipeline.md",
+      "sha256": "a06c1757b619e12faf74cc4e2f15bfc57a91fb469ffb44de9ae673b3da9b619d",
+      "size_bytes": 20776
+    },
+    {
+      "name": "turkic-language-family-classification.md",
+      "sha256": "617deed04667cfa200cd5f482054d71db5de5f4307f6d6bd88a60b381eed3bb7",
+      "size_bytes": 5491
+    },
+    {
+      "name": "turner-2013-plant-microbiome.md",
+      "sha256": "bf62895b39379164538ec767e98a478d1dbda34009f9ffc56a8a3ced5d388fe9",
+      "size_bytes": 8760
+    },
+    {
+      "name": "tustin-mc-council-term-limits.md",
+      "sha256": "4c3f1d40cf27488eeca5f7247449eb4039758357798957d4eda8e81bf46e94a0",
+      "size_bytes": 6557
+    },
+    {
+      "name": "twin-adoption-and-migrant-studies.md",
+      "sha256": "1b6133403b6975f521f1475e8916d3378830a9c9044c8461402345bde4917ff6",
+      "size_bytes": 6869
+    },
+    {
+      "name": "uci-irb-hrpp-for-fieldwork.md",
+      "sha256": "1d08512f4035a6b65a7a5a9adeacf8ecf6fe562813e2a94265503997584b070f",
+      "size_bytes": 10895
+    },
+    {
+      "name": "ulrich-2010-robotic-samara-nav.md",
+      "sha256": "72bba7d825cc037241ae3df5052c3f2f720479cf03485e2fbb6db280fbc5f081",
+      "size_bytes": 5782
+    },
+    {
+      "name": "umehara-2008-strigolactone.md",
+      "sha256": "ad53df58141d363f2a0b3db360c00fa0558c5afc7b9a08f17b0afae1623845e9",
+      "size_bytes": 11606
+    },
+    {
+      "name": "un-coi-2023-ukraine-a-hrc-52-62.md",
+      "sha256": "43c5647d36ff1e477e619182f5946d5018e1bb3692b247ebb9ba2b8b6092ddb7",
+      "size_bytes": 6277
+    },
+    {
+      "name": "universal-injunctions-doctrine.md",
+      "sha256": "a657e52a6205105d3dfa812fa0b847419f135a74981b2f80e9ac0aa0e148b38d",
+      "size_bytes": 14864
+    },
+    {
+      "name": "us-regulatory-frame-restraint-seclusion.md",
+      "sha256": "05dc4d1c337beedd2a73b2a980b5e40609dd8197b52b16fc18776cbd904d1a16",
+      "size_bytes": 28614
+    },
+    {
+      "name": "usgs-2026-venezuela-landslide-hazards.md",
+      "sha256": "589e8768fe888c6454f41217ef8838a18313f2ed5e611e2e398c700559b181c5",
+      "size_bytes": 9615
+    },
+    {
+      "name": "usgs-2026-venezuela-mw72-foreshock.md",
+      "sha256": "8756530cfb96af6018b5320b6952e38ef5e8bcb26e97758388259b1218ac5fd0",
+      "size_bytes": 4161
+    },
+    {
+      "name": "usgs-2026-venezuela-mw75-mainshock.md",
+      "sha256": "faae2247d6f5ed7664aa8c50adea3076ff0680dc1958899d81f4922c331a9591",
+      "size_bytes": 4806
+    },
+    {
+      "name": "usgs-2026-venezuela-pager-impact.md",
+      "sha256": "8acdcfcfe678a933423ea074f82a7a4944bc2cddca68014af0c5712785703a5b",
+      "size_bytes": 5436
+    },
+    {
+      "name": "uw-center-human-rights-2025-flock-washington.md",
+      "sha256": "9d7adcc62ee45e8e043cc8ad994fda8c25f68f80192eaeb046515601c54f6eb9",
+      "size_bytes": 4780
+    },
+    {
+      "name": "vacuum-fluctuations-and-casimir.md",
+      "sha256": "d18a771d1d5d5474a370096f4c1a469ef9284ca9644c7b2f6409767bfa37d063",
+      "size_bytes": 17185
+    },
+    {
+      "name": "vanbezooijen-gooskens-2005-mi-components.md",
+      "sha256": "1196cfa449f79fb44028edc4cf029d877db8d25154812878c9451e2d9a33b4ed",
+      "size_bytes": 7000
+    },
+    {
+      "name": "vaswani-2017-attention.md",
+      "sha256": "8f27465a8820bcdd7264031cce00ca93397f8670668b694eec9e2bbbba48f68c",
+      "size_bytes": 5302
+    },
+    {
+      "name": "vecchio-1966-predictive-value.md",
+      "sha256": "6448b4b48d03e1ec236b8bdd10ced7eb0fde9eea4eafa0c86ad871ccbc982c93",
+      "size_bytes": 9637
+    },
+    {
+      "name": "verbs-as-event-predicates-kratzer.md",
+      "sha256": "d45105f957b25da53e4e7ad87247fff2eebd41ac17ceee902516700cc921cdb7",
+      "size_bytes": 9815
+    },
+    {
+      "name": "verslues-2006-drought-methods.md",
+      "sha256": "01051019dbbab8e76a4be40f66f99cef2d8ab19e4808bb3a1ef20d4819907fbf",
+      "size_bytes": 11583
+    },
+    {
+      "name": "vesuvius-challenge-prizes.md",
+      "sha256": "b0a23a33b733dc18fc44e33da55b4319cbc0f573145f503dc2fae2994df18c56",
+      "size_bytes": 4939
+    },
+    {
+      "name": "vickers-2009-isoprenoid-abiotic-stress.md",
+      "sha256": "c9246b78d26f6498f36a2b8dbbee89cbdc66892fdccd21d5c2f2ed6d4019dfd3",
+      "size_bytes": 15325
+    },
+    {
+      "name": "villa-park-mc-council-term-limits.md",
+      "sha256": "c730c510aedbc2d14b3534135b57d860a30200f2bd95f84bbb3c7c1cf982014f",
+      "size_bytes": 4852
+    },
+    {
+      "name": "vocabulary-attestation-scoring-mask.md",
+      "sha256": "ccae308f2b908e0b60e84fcc528479f8694d317294cb5d6869116a13a19d8703",
+      "size_bytes": 9894
+    },
+    {
+      "name": "w3c-webrtc-restartice.md",
+      "sha256": "7a3eb2a18e90f43daec736ac56e90ad6ba087b939e607a9c849ba424b7e55cf7",
+      "size_bytes": 5361
+    },
+    {
+      "name": "wang-2016-gnps-molecular-networking.md",
+      "sha256": "037d603abc3cebab4aa84f83f08e8b5243d8e27769528cb6814a7635125aa771",
+      "size_bytes": 7198
+    },
+    {
+      "name": "wang-2018-shoot-architecture.md",
+      "sha256": "5016d2a36247fe000642893deb7c8442d36901a79ce02fa2a25fc9d5e34623d6",
+      "size_bytes": 8389
+    },
+    {
+      "name": "wang-2024-bvoc-emissions-2001-2020.md",
+      "sha256": "aefcb29110549c16640481ff60aff4173b0c9b4ebcd5fa1c44e22b659f82e22a",
+      "size_bytes": 6712
+    },
+    {
+      "name": "wang-2024-single-motor-nav-sensing.md",
+      "sha256": "417811072458d7d12651ca7783d5b258b2a04aa3378e594e275cd03baff81010",
+      "size_bytes": 5975
+    },
+    {
+      "name": "want-2013-global-profiling.md",
+      "sha256": "1f62e1b70ecedc10f8a8de8da457f4141350a4a1b8f6d613b8814771c94b79f3",
+      "size_bytes": 7147
+    },
+    {
+      "name": "ward-zahavi-1973-information-centres.md",
+      "sha256": "bb3c16f21c0dfac38270038747cbd9d9c5a9cfaa10bd459c05bf28984403ded8",
+      "size_bytes": 5017
+    },
+    {
+      "name": "wartmann-2024-peak-picking-software-benchmark.md",
+      "sha256": "2400e71eb7f19c8b834570f464bc879cadcd1f39d1ca3cec14bffa725d8f868f",
+      "size_bytes": 7315
+    },
+    {
+      "name": "washington-2020-turkic-multiscript-transducers.md",
+      "sha256": "743b2a0e8bb7428a487f3827ccdada058ba346dff808a29a48d5c7a68b29bd91",
+      "size_bytes": 6834
+    },
+    {
+      "name": "washington-v-trump-2025-tro.md",
+      "sha256": "7934f7e61c3aa545343b3d76aa729f3ba767449af82d56113d76fa1b6080970d",
+      "size_bytes": 10731
+    },
+    {
+      "name": "weinberg-1967-model-of-leptons.md",
+      "sha256": "d5cd1cd68a3e976a419231ef7ccf826f915d6d39096988875b8b838064839091",
+      "size_bytes": 9072
+    },
+    {
+      "name": "weiss-1998-hartford-courant-deadly-restraint.md",
+      "sha256": "de5611f676eb948ef243fe327ee8c796754ace8a7998d8509c83375d7d41dc1c",
+      "size_bytes": 7226
+    },
+    {
+      "name": "welch-1947-t-test.md",
+      "sha256": "18c099130e526e09a3c9ae4807a869d293c7798feb47ceecb54f031c8fe998fa",
+      "size_bytes": 5823
+    },
+    {
+      "name": "welleck-2020-unlikelihood-training.md",
+      "sha256": "38375564d19416357d37344aea1e7dfe304888c6155619eeaf22077659f978e6",
+      "size_bytes": 5941
+    },
+    {
+      "name": "wenner-gren-anthropology-programs.md",
+      "sha256": "b2f6c6cbade70f55c68d6a8bb994443df27cf795a9fbc192c29009961f551083",
+      "size_bytes": 4872
+    },
+    {
+      "name": "weschler-nazaroff-2008-semivolatile-indoor.md",
+      "sha256": "808f932c0dfa18495190df8ded8f736de500ca7edf0d4aa462e3338debc63c17",
+      "size_bytes": 7513
+    },
+    {
+      "name": "westminster-2026-pd-flock-transparency.md",
+      "sha256": "1555e3575e7b15f4662702c3536a22a771940a7b962e260689d0a43211090762",
+      "size_bytes": 7499
+    },
+    {
+      "name": "westminster-mc-2-04-125-council-term-limits.md",
+      "sha256": "4be54bedde54e568f7b7e9ba9b6d74501115a30d1717777edd3335bbb38abd9c",
+      "size_bytes": 7253
+    },
+    {
+      "name": "whatwg-html-page-visibility-2026.md",
+      "sha256": "58a7eef031b3c96b95f927be4b53ff0ef7772bdd6b4f99e81c1a23b7cb4d3cec",
+      "size_bytes": 5681
+    },
+    {
+      "name": "wiki-corpus-extraction-ablation.md",
+      "sha256": "2d584e7d2c0b5773826fc1f4625905767e5d4378604f5e11da399a335d75c4ac",
+      "size_bytes": 23164
+    },
+    {
+      "name": "williams-2024-detroit-fr-amended-complaint.md",
+      "sha256": "0842b4401f8c5dfc6fbb278a2369192dcba4ca7075e0e434537a4bd3268e364c",
+      "size_bytes": 7309
+    },
+    {
+      "name": "williams-2024-detroit-fr-settlement-agreement.md",
+      "sha256": "68e09cf26d9c95151ff816c11ac359f4049fc15f04b5fefdd4403a325ebc286d",
+      "size_bytes": 7817
+    },
+    {
+      "name": "williams-ringsdorf-2020-odour-thresholds-lifetimes.md",
+      "sha256": "3d00dd7ab91d86f64ea66bf42aab79cd052f95defb4b54b95154bb41d1977142",
+      "size_bytes": 8191
+    },
+    {
+      "name": "willis-2017-arctic-marine-aerosol.md",
+      "sha256": "652522b911cbf58896ed9d17649834ffce65b9b7c2969db7824fc7c65fe2989c",
+      "size_bytes": 8757
+    },
+    {
+      "name": "wilson-1971-renormalization-group-critical-phenomena-i.md",
+      "sha256": "14f1223d30871d0c478801d277e2689f578cbdccf04812a64ccb78a340d84d94",
+      "size_bytes": 13292
+    },
+    {
+      "name": "wilson-1971-renormalization-group-critical-phenomena-ii.md",
+      "sha256": "374335b69f40befacbadc8907773671bd8f2ecf2bd925f61d11e248756c5e989",
+      "size_bytes": 9856
+    },
+    {
+      "name": "wilson-2012-psychopharmacology-agitation.md",
+      "sha256": "bb96428af22ffdb95da9be763bc6b84b486401500aaeba4289335a4da0a99965",
+      "size_bytes": 14323
+    },
+    {
+      "name": "win-2021-agile-samara-single-actuator.md",
+      "sha256": "62a23527ad266eeb2f39b113a2328108673020944d28fef4baa13dbb2756c104",
+      "size_bytes": 7462
+    },
+    {
+      "name": "windows-autorun-usb-disable-kb971029.md",
+      "sha256": "6321900f10f1ea290e72b2059af5714f13e79f732ce8e1861562383011d90bd0",
+      "size_bytes": 3855
+    },
+    {
+      "name": "windows-idd-driver-model.md",
+      "sha256": "1e6359bc2a58b122788d55ca8b4996ed05afb43b04d1f22867e24715a9f88e16",
+      "size_bytes": 4988
+    },
+    {
+      "name": "wisconsin-sjr-103-ukrainian-children.md",
+      "sha256": "fae5ce452e8ded52a8851301305ea593bf233a804e38981b4ac2e12ff30911da",
+      "size_bytes": 5765
+    },
+    {
+      "name": "wishart-2018-hmdb4.md",
+      "sha256": "8974145d5ee75df6f78e2a8d5f0f57bf20132c0a1e3edadb96a3ed8c6186ec26",
+      "size_bytes": 8636
+    },
+    {
+      "name": "wisthaler-weschler-2010-ozone-skin-oil.md",
+      "sha256": "f5f350e4d057736322f03b2130ba23035023459596751183ec0385186f7fbe2c",
+      "size_bytes": 7816
+    },
+    {
+      "name": "wolfram-rule-30-prizes.md",
+      "sha256": "0993672cf2c7450a91a56e325adad0c344e96a2f0b939a6aa495396a52418dd9",
+      "size_bytes": 6274
+    },
+    {
+      "name": "wolfskehl-prize.md",
+      "sha256": "43b27dc5802c8231bfb2b58b7adfa97bcf29df6aaf6f0dececd6ecd4ba240ea0",
+      "size_bytes": 5059
+    },
+    {
+      "name": "wong-2020-jamanetworkopen-restraint-experience.md",
+      "sha256": "51914e1319904ee6b6d568775568bb157e4b02c8b944119d663d63b05485b883",
+      "size_bytes": 18991
+    },
+    {
+      "name": "wong-kim-ark-1898.md",
+      "sha256": "d99b910c6460f899d9e6e7b18465f18aafda720a632d91ce632bd580bc4f565c",
+      "size_bytes": 10531
+    },
+    {
+      "name": "woodbridge-village-association-bus-stop-furniture.md",
+      "sha256": "c25368074ee8c7c97c05681ea1a34c13d228526fb3e6d4a8510174ef4dada8cb",
+      "size_bytes": 12045
+    },
+    {
+      "name": "woodruff-2023-detroit-fr-complaint.md",
+      "sha256": "9b7ecee42eff574fed0114adb977ff305493ce1361fd5d21ff067a05af34a7a7",
+      "size_bytes": 5116
+    },
+    {
+      "name": "woodruff-2025-mied-summary-judgment.md",
+      "sha256": "e85ff7532b978a0d5c66f32ac4a2a699fcb09e1199aba9e201ff21afa59f22c9",
+      "size_bytes": 9312
+    },
+    {
+      "name": "wortsman-2022-model-soups.md",
+      "sha256": "c1ef6e47bf55e910ae0b2cc9478794caf7b891159bda52f9997da8eb8a1136c5",
+      "size_bytes": 9330
+    },
+    {
+      "name": "wright-2003-raven-roosts-structured-information-centres.md",
+      "sha256": "e8ea716edb9b7ed0046d5a6aec2a4c0747c014bc222d560cfc726e4e65349626",
+      "size_bytes": 4991
+    },
+    {
+      "name": "wu-2024-akew-editing-in-the-wild.md",
+      "sha256": "c1af5e944a892f85c4d7d8aedf102f5487c0b1123e40e21d33333c4cd26dcd17",
+      "size_bytes": 5287
+    },
+    {
+      "name": "xia-2018-metaboanalyst.md",
+      "sha256": "65bf66ebce2dfdf696150bed57f1948201bf74ce3711c55b37073a109324bbe2",
+      "size_bytes": 7505
+    },
+    {
+      "name": "xprize-quantum-applications.md",
+      "sha256": "a4b6b85ce6fd3f55d3898fe40ff9fca91ed302655b53f67c71e422dc533cf6a3",
+      "size_bytes": 7842
+    },
+    {
+      "name": "xu-2022-breaking-repetition-loops.md",
+      "sha256": "c85d055ed680b9b5efa80f7425df4ea180167d5216d3a02d7eced1ff77f50926",
+      "size_bytes": 5988
+    },
+    {
+      "name": "yadav-2023-ties-merging.md",
+      "sha256": "b7f10b828e830e4f6f24a444f300e5e7b6807e7bce1961f9af976202c5925c98",
+      "size_bytes": 5219
+    },
+    {
+      "name": "yale-hrl-2023-reeducation-adoption-ukraine-children.md",
+      "sha256": "a3dfc9744938a7dc69e067bfedc212cde70d091575364ff8acdad7f291b2dca9",
+      "size_bytes": 7148
+    },
+    {
+      "name": "yancey-2005-osmolytes.md",
+      "sha256": "9a8dc949a3aa2074ae05ba3a1155cfdfc0e8d7756aafbeabe09e9323f089d2b7",
+      "size_bytes": 7250
+    },
+    {
+      "name": "yang-2022-hydraulic-redistribution-meta.md",
+      "sha256": "94c306addc55ad18a1dbfc38334188929946f35ac8301795c03b8905eeb16d0a",
+      "size_bytes": 9578
+    },
+    {
+      "name": "yanushevskaya-buncic-2015-russian.md",
+      "sha256": "a4cc9856d94291e9406181d9460410d9b8d9ed1871b9f428c81ec07eb51e8a3e",
+      "size_bytes": 6018
+    },
+    {
+      "name": "ye-2021-crsce-deescalation-rct.md",
+      "sha256": "2eda18bc400f40ae05fcc7ec562d15d89ba829a2d521094ff8682ec2ad3b7950",
+      "size_bytes": 17872
+    },
+    {
+      "name": "years-of-potential-life-lost.md",
+      "sha256": "f77584ec58c5b0e1d71192d2af37b1158b732f0a859874bac66c4e5767a35127",
+      "size_bytes": 4061
+    },
+    {
+      "name": "yerushalmy-1947-sensitivity-specificity.md",
+      "sha256": "c872c08585b8d2fe090e1a9a35137b50f46f3eca089be88a019e92e5813ce5a7",
+      "size_bytes": 16487
+    },
+    {
+      "name": "yokum-2017-dc-bwc-rct.md",
+      "sha256": "196e363c70aacad947898c2fc2fc1cd7452758a53f74f1cb6fc2a22bcda8a12a",
+      "size_bytes": 6299
+    },
+    {
+      "name": "yorba-linda-mc-2-04-025-council-term-limits.md",
+      "sha256": "71e6e1b7235909a11274cf4898147ae6d3b7a0a04c502557894390266dfafd03",
+      "size_bytes": 6941
+    },
+    {
+      "name": "yu-2024-dare-delta-parameter-sparsity.md",
+      "sha256": "0808a8190bfd3719c12c35cd1f0083bcde2a8dc610572fb020b6da8b6d59a683",
+      "size_bytes": 8226
+    },
+    {
+      "name": "yu-2026-design-constraint-compliance.md",
+      "sha256": "03fd1a910080c6d3d2ee227516122b64cd99440293efdf22878a009d0fe536fd",
+      "size_bytes": 4619
+    },
+    {
+      "name": "yura-1971-effective-length-columns-unbraced-frames.md",
+      "sha256": "e2cc3c4d904a7cb016dcdc95458ba47fd0cea04e6a3d3bf05a8c256b55ac4b97",
+      "size_bytes": 7140
+    },
+    {
+      "name": "zaitova-2024-interspeech-cross-lingual-asr.md",
+      "sha256": "c73413b8347435362781f601b95c1ecbfd731db9d0fed7a8e98f77d85ef22857",
+      "size_bytes": 6293
+    },
+    {
+      "name": "zannoni-2022-human-oxidation-field.md",
+      "sha256": "e936b4f26d75db8671435817d6890c1146482e672b93ef1687ceb9bcafed5569",
+      "size_bytes": 9549
+    },
+    {
+      "name": "zelenyuk-2015-splat-minisplat-airborne.md",
+      "sha256": "08d90f74c6fbe5b01fdf00d2d61991567d7cab2b09e64ab7418e4b603b3a99a1",
+      "size_bytes": 6086
+    },
+    {
+      "name": "zhan-2025-adaptive-attacks-break-ipi-defenses.md",
+      "sha256": "63f2150540a07e98a6e83202d8df5e3dd3454f01c668fe88420ce06e4801975d",
+      "size_bytes": 6420
+    },
+    {
+      "name": "zhang-2015-alpha-pinene-soa-molecular-evolution.md",
+      "sha256": "16288fbfea7c3ed8e666dda95b14e2030544307d59d1045cde0c5df67fef0fd1",
+      "size_bytes": 6398
+    },
+    {
+      "name": "zheng-2023-mt-bench-llm-judge.md",
+      "sha256": "53c539ddd5684d4f61f109fd44551a6d0ee8e870219936d46c3be1fc0f6019df",
+      "size_bytes": 6277
+    },
+    {
+      "name": "zhou-pichersky-2020-terpene-diversity.md",
+      "sha256": "cb9d9a0ab595bd316bbbe513929d276506261561ca3b76c10bce0b1adb3cd7cd",
+      "size_bytes": 13291
+    },
+    {
+      "name": "zhu-2016-abiotic-stress-signaling.md",
+      "sha256": "3c82a45b356858d380673ba04f96573b8ff6aabfa63cbeeb4f57741bf34d7285",
+      "size_bytes": 12633
+    },
+    {
+      "name": "ziemann-atkinson-2012-soa-formation-mechanisms.md",
+      "sha256": "41590684a2a8d5da38f464e74748d24046519be3b6607881f44fc086ed53d072",
+      "size_bytes": 6128
+    },
+    {
+      "name": "zimmer-orgun-1992-turkish.md",
+      "sha256": "8fd2cd209a3d3ce9f497533f4124b79d69f01181a690589e47bcc4c416262250",
+      "size_bytes": 7308
+    },
+    {
+      "name": "zou-2023-representation-engineering.md",
+      "sha256": "5fc44cb911be1e1fa486e9b4096fada237e3afac86e685844ee0f3551d6798e6",
+      "size_bytes": 3623
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "wiki_commit": "ee6e6d12ec1e2690958bea9359dd49234aeec1e1",
+    "selection": "every *.md page under pages/: the whole personal wiki, 885 pages",
+    "corpus_digest": "a756664dbb4e, model_trainer cartridge_plans.corpus_digest over the frontmatter-stripped bodies",
+    "why": "the corpus every full-wiki question-set plan runs on: 1,634,715 gpt2 tokens, 3,278 to 3,827 items per cell",
+    "record": "qa-corpus-wiki-full-ee6e6d12-digests.txt, read from the wiki tree rather than from the snapshot staged"
+  }
+}
