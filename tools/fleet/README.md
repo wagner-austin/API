@@ -292,7 +292,24 @@ refuses one job, not the lane. Each pass leaves out of its claim what a lease
 on the node holds now (`fleet.core.run_lease.held_on_node`, below), so the
 pass after a launch never claims a second job of the project still running
 and refuses it `LEASE_HELD`; that job waits in the lane instead. Each
-runner's log ends every tick with `<alias> launched N job(s) this tick`.
+pass logs `<alias> launched N job(s) this tick`.
+
+**A tick closes a run when it ends, not on the next tick** (MCPs board task
+c1d48330, `fleet.cli.node_watch`). Measured 2026-10-04, a finished row was
+closed only by the tick after it ended, so every session waiting on a fleet
+verdict waited up to three minutes after its check had ended. After its
+passes, a runner still holding a run this machine's ledger calls running
+reads each one's result off the node every 10 s, and the moment one has
+ended it runs both passes again: the run is closed, its verdict posted and
+its room filled within ten seconds. The window is `fleet.json`'s
+`node_watch_seconds`, 100 s from the tick's start, declared there rather
+than passed by `fleet.cli.tick` because the registry rolls with the agent
+while `tick.py` runs from the checkout; its decoder refuses more than 110 s,
+which with a tick's start and one more pass stays inside the 3-minute
+repetition `IgnoreNew` would otherwise skip. A poll that finds nothing
+writes nothing to the queue, and a runner holding no running job makes no
+call at all past its passes: its log ends `<alias> holds no running job; no
+watch this tick`, and a watching tick's ends with its polls and reruns.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
