@@ -109,6 +109,18 @@ class QaPlan(TypedDict):
             retrieval side can be swept rather than assumed. The values below
             are the constants they replaced, so nothing already measured
             moves.
+        precision_selector: How the base loads, resolved by
+            :func:`~model_trainer.cli.cartridge_solo_seeds.resolve_precision`:
+            ``"policy"`` for the loading policy's declaration (fp32 for the
+            GPT-2 family) or ``"stored-bf16"`` for the declared bf16 load.
+
+            ADDED 2026-10-04 BECAUSE THE 7B RUNG COULD NOT HAVE RUN. Until
+            then this benchmark handed the loader ``None`` for every base,
+            so ``pythia-6.9b`` would have loaded in fp32 -- 27.6GB of
+            weights against the A30's 24GB, the profile the rung was
+            declared for. The companion sweeps carry the same field for the
+            same base, so it is declared here the same way rather than
+            decided by a size heuristic inside the CLI.
     """
 
     model_id: str
@@ -130,6 +142,7 @@ class QaPlan(TypedDict):
     expansion_feedback_chunks: int
     expansion_terms: int
     rerank_candidates: int
+    precision_selector: str
 
 
 #: Fixed rather than a flag, and distinct from the loss experiment's name.

@@ -69,7 +69,7 @@ def question_set_digest(items: Sequence[ClozeItem]) -> str:
     return f"{QUESTION_SET_DIGEST_PREFIX}{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
 
 
-def qa_plan_label(name: str, plan: QaPlan, *, digest: str) -> str:
+def qa_plan_label(name: str, plan: QaPlan, *, digest: str, precision_token: str) -> str:
     """Build the label that identifies one plan's numbers on one corpus.
 
     Args:
@@ -77,6 +77,12 @@ def qa_plan_label(name: str, plan: QaPlan, *, digest: str) -> str:
         plan: The plan.
         digest: Digest of the corpus, from
             :func:`~cartridge_plans.corpus_digest`.
+        precision_token: The segment
+            :func:`~model_trainer.cli.cartridge_solo_seeds.resolve_precision`
+            returns for the plan's ``precision_selector``: empty for the
+            policy precision, so a policy label reads exactly as it did
+            before the field existed, and ``-storedbf16`` for the bf16 load,
+            so two precisions of one base can never share a label.
 
     Returns:
         The label, e.g.
@@ -85,7 +91,7 @@ def qa_plan_label(name: str, plan: QaPlan, *, digest: str) -> str:
     seeds = ".".join(str(seed) for seed in plan["seeds"])
     return (
         f"{name}"
-        f"-{plan['model_id']}"
+        f"-{plan['model_id']}{precision_token}"
         f"-w{plan['window']}"
         f"-s{plan['held_out_stride']}"
         f"-c{plan['num_slots']}"

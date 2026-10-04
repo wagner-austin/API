@@ -44,6 +44,7 @@ from platform_core.run_record import (
 )
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
+from model_trainer.cli.cartridge_solo_seeds import resolve_precision
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.qa_checkpoint import SeedRecord, with_seed
 from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
@@ -141,7 +142,16 @@ def measure_qa_plan(
             evidence, ``CARTRIDGE_MEASUREMENT_UNREPLICATED`` when the plan
             names too few seeds, or ``CARTRIDGE_CHECKPOINT_FOREIGN`` when a
             checkpoint on disk describes a different measurement.
+        ValueError: From :func:`resolve_precision`, before the corpus is
+            read, when the plan's ``precision_selector`` or its
+            (base, precision) pair is undeclared.
     """
+    # FIRST, because it is the cheapest refusal and the one that used to be
+    # missing: an undeclared precision would otherwise surface as an OOM
+    # after the corpus, the question set and the power gate had all run.
+    load_precision, precision_token = resolve_precision(
+        plan["model_id"], plan["precision_selector"]
+    )
     documents = _test_hooks.read_corpus_documents(corpus)
     digest = corpus_digest(documents)
     tokenizer = hf_hooks.Hooks.load_hf_tokenizer(plan["model_id"])
@@ -181,7 +191,7 @@ def measure_qa_plan(
     windows = build_windows(encoded, window=plan["window"], device=device)
     train, _held = split_by_stride(windows, held_out_stride=plan["held_out_stride"])
 
-    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], None))
+    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], load_precision))
     base.to(device)
     max_seq = plan["max_seq_len"]
 
@@ -352,6 +362,7 @@ def measure_qa_plan(
         observations=tuple(observations),
         corpus_digest=digest,
         question_set_digest=question_set_digest(items),
+        precision_token=precision_token,
     )
 
 
@@ -386,6 +397,8 @@ def qa_run_record(
     Raises:
         KeyError: If the plan name is unknown, naming the plans that exist.
         AppError: Propagated from the arms.
+        ValueError: Propagated from :func:`measure_qa_plan` for an undeclared
+            precision.
     """
     plan = require_cartridge_plan(_measurement_hooks.qa_plans(), plan_name)
     fingerprint: RunFingerprint = capture_run_fingerprint(
@@ -397,7 +410,12 @@ def qa_run_record(
     )
     return run_record(
         experiment=QA_EXPERIMENT,
-        label=qa_plan_label(plan_name, plan, digest=measured["corpus_digest"]),
+        label=qa_plan_label(
+            plan_name,
+            plan,
+            digest=measured["corpus_digest"],
+            precision_token=measured["precision_token"],
+        ),
         fingerprint=fingerprint,
         observations=measured["observations"],
         # THE QUESTION SET, not the corpus, and the two are not the same

@@ -35,11 +35,16 @@ class QaMeasurement(TypedDict):
             :func:`~model_trainer.core.services.model.cartridge_plans.corpus_digest`.
         question_set_digest: Digest of the items derived from them, from
             :func:`~model_trainer.core.services.model.cloze.identity.question_set_digest`.
+        precision_token: The label segment for the precision the base
+            actually loaded at, carried out of the run that resolved it so
+            the label is built from the same resolution rather than a second
+            one.
     """
 
     observations: tuple[Observation, ...]
     corpus_digest: str
     question_set_digest: str
+    precision_token: str
 
 
 class ArmScores(TypedDict):
