@@ -382,6 +382,12 @@ class MaketoolsErrorCode(ErrorCodeBase):
     # ``target/wheels``, no ``.venv`` executable of the requested name.
     ARTIFACT_MISSING = "MAKETOOLS_ARTIFACT_MISSING"
 
+    # A lift refresh was asked for an MCPs commit the named checkout does not
+    # hold, or for a source path that commit does not carry (MCPs board task
+    # 1b152218). Nothing is written until every lifted file has been read, so
+    # the refusal leaves the lock and the lifted files as they were.
+    LIFT = "MAKETOOLS_LIFT"
+
 
 __all__ = [
     "BoardBridgeErrorCode",
