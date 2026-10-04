@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check execution
+.PHONY: lint test check _check-unbudgeted execution
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -28,8 +28,11 @@ test:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint | test
 
 # The case that asks the real scheduler (board task 465689f5): a preflight of
 # runs/execution-preflight.json over ssh to HPC3, which uploads the rendered
