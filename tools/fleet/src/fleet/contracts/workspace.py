@@ -28,6 +28,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     require_dict,
+    require_int,
     require_str,
 )
 from typing_extensions import TypedDict
@@ -41,6 +42,13 @@ from fleet.contracts.node import (
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import decode_path, decode_remote
+
+#: The longest watch a workspace may declare. Every node runner's task
+#: repeats every 180 s under IgnoreNew (``scripts/FleetSchedule.ps1``), so a
+#: tick still going at 180 s refuses the next; the hub's logs of 2026-10-04
+#: put a tick's start under 7 s and a collect-then-fill pass at up to 62 s
+#: (MCPs board task 74b13c20), which leaves 110 s for the watch itself.
+NODE_WATCH_CEILING_SECONDS = 110
 
 
 class FleetWorkspace(TypedDict):
@@ -103,6 +111,14 @@ class FleetWorkspace(TypedDict):
             which read as fleet-wide until lavender-wsl became a second
             testdb node on 2026-09-29 and closed every testdb job it
             claimed as held (MCPs board task c4fc4f3e).
+        node_watch_seconds: How long, from its start, a node runner's tick
+            keeps watching the runs it holds, so a run that ends inside the
+            window is closed then rather than on the next tick
+            (:mod:`fleet.cli.node_watch`, MCPs board task c1d48330). DECLARED
+            HERE because this document is what the scheduled tick runs
+            beside the rolled agent, so the value and the code that reads it
+            roll together. At most :data:`NODE_WATCH_CEILING_SECONDS`; zero
+            watches nothing.
         ledger: Path to the append-only dispatch record. Relative paths
             resolve against the workspace document's own directory, so a
             workspace can be moved without editing it.
@@ -115,6 +131,7 @@ class FleetWorkspace(TypedDict):
     projects: dict[str, ProjectConfig]
     data_paths: dict[str, tuple[str, ...]]
     node_local_resources: tuple[str, ...]
+    node_watch_seconds: int
     ledger: str
     feed: str
     leases: str
@@ -189,6 +206,7 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
         },
         "data_paths": {remote: list(paths) for remote, paths in workspace["data_paths"].items()},
         "node_local_resources": encode_names(workspace["node_local_resources"]),
+        "node_watch_seconds": workspace["node_watch_seconds"],
         "ledger": workspace["ledger"],
         "feed": workspace["feed"],
         "leases": workspace["leases"],
@@ -308,6 +326,29 @@ def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) ->
             )
         excluded[name] = reason
     return excluded
+
+
+def _decode_node_watch_seconds(value: JSONObject) -> int:
+    """Read how long a node runner's tick watches the runs it holds.
+
+    Args:
+        value: The workspace object.
+
+    Returns:
+        The window in seconds.
+
+    Raises:
+        JSONTypeError: If the field is missing, is not an integer, or lies
+            outside zero to :data:`NODE_WATCH_CEILING_SECONDS`.
+    """
+    seconds = require_int(value, "node_watch_seconds")
+    if not 0 <= seconds <= NODE_WATCH_CEILING_SECONDS:
+        raise JSONTypeError(
+            f"node_watch_seconds is {seconds}; it must lie between 0 and "
+            f"{NODE_WATCH_CEILING_SECONDS}, or a tick's watch and the pass it ends with "
+            "run into the next tick, which the scheduler then skips"
+        )
+    return seconds
 
 
 def _decode_data_paths(
@@ -452,8 +493,9 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, the node or project mapping is empty, a machine is both
             declared and excluded, a node-local resource is declared by no
-            project, a node's ``wsl_host`` is not another Windows node, or a
-            node or project fails its own decoder.
+            project, a node's ``wsl_host`` is not another Windows node, the
+            node watch lies outside its bounds, or a node or project fails
+            its own decoder.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"workspace must be a JSON object, got {type(value).__name__}")
@@ -470,6 +512,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         projects=projects,
         data_paths=_decode_data_paths(value, projects),
         node_local_resources=_decode_node_local_resources(value, projects),
+        node_watch_seconds=_decode_node_watch_seconds(value),
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),
         leases=require_str(value, "leases"),
@@ -477,6 +520,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
 
 
 __all__ = [
+    "NODE_WATCH_CEILING_SECONDS",
     "FleetWorkspace",
     "decode_fleet_workspace",
     "encode_fleet_workspace",
