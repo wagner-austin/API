@@ -2,7 +2,7 @@ include ../../scripts/make/shell.mk
 
 MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
-.PHONY: lint test check up down logs
+.PHONY: lint test check _check-unbudgeted up down logs
 
 lint:
 	$(MAKETOOLS) venv-check
@@ -23,8 +23,11 @@ test:
 	$(MAKETOOLS) test
 	make -C web test
 
-check: lint test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint test
 
 # The host-mode start/stop scripts and the log tail are Windows PowerShell
 # (scripts/start.ps1 and stop.ps1 over GrandmaService.ps1, which read the
