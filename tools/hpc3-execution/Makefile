@@ -11,7 +11,7 @@
 # cluster only when somebody submitted a job.
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check
+.PHONY: lint test check _check-unbudgeted
 
 # This directory holds no code of its own, only this recipe, so its lint is
 # the grammar every tracked Makefile keeps to.
@@ -23,5 +23,8 @@ lint:
 test:
 	make -C ../hpc3 execution
 
-check: lint test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint test
