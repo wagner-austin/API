@@ -9,7 +9,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow larder-probe mine-landing-probe corpus-audit release
 
 help:
 	@echo ""
@@ -110,10 +110,13 @@ test:
 	@echo ""
 	@echo "[test] passed"
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo ""
 	@echo "=== ALL CHECKS PASSED ==="
 	@echo ""
+
+_check-unbudgeted: lint | test
 
 # An empty OUTPUT unsets TANKPIT_OUTPUT (the sniffer then writes its default
 # path plus the timestamped archive); a value sets it.
