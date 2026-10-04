@@ -1,7 +1,10 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check lint-makefiles execution
+.PHONY: lint test check _check-unbudgeted lint-makefiles lift-check lift-refresh execution
 
+# lift-check runs LAST, after ruff has fixed and formatted the tree: a
+# lifted file the formatter rewrote would then fail it by name rather than
+# drift unseen (src/maketools/lift.py, MCPs board task 1b152218).
 lint:
 	$(PYTHON) scripts/run.py venv-check
 	poetry lock
@@ -11,6 +14,7 @@ lint:
 	poetry run ruff format .
 	poetry run mypy src tests scripts
 	$(PYTHON) scripts/run.py lint-makefiles
+	$(PYTHON) scripts/run.py lift-check
 
 # Coverage data goes to a per-run path under runs/, not the default fixed
 # .coverage: two overlapping runs would corrupt one file, and several
@@ -21,11 +25,25 @@ test:
 	poetry sync --with dev
 	$(PYTHON) scripts/run.py test
 
-check: lint | test
+# Every package's check runs under the five-minute budget (MCPs board task
+# 1b152218): check-budget runs _check-unbudgeted, the old prerequisites,
+# and fails a passing check past 300 s with exit 3, naming its time.
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint | test
 
 lint-makefiles:
 	$(PYTHON) scripts/run.py lint-makefiles
+
+lift-check:
+	$(PYTHON) scripts/run.py lift-check
+
+# Re-lift every file lift-lock.json names from a commit of the MCPs checkout
+# beside this repository: make lift-refresh REVISION=<sha>.
+lift-refresh:
+	$(PYTHON) scripts/run.py lift-refresh ../../../MCPs $(REVISION)
 
 # The cases that deploy a service for real (board task 465689f5): compose_up
 # builds each service's image from its committed Dockerfile, the container

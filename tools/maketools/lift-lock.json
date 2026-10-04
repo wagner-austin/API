@@ -1,0 +1,11 @@
+{
+  "remote": "https://github.com/wagner-austin/MCPs.git",
+  "revision": "5fbdb13100cbbfc9186c92d536d46a78a61b50ed",
+  "entries": [
+    {
+      "path": "src/maketools/check_budget.py",
+      "source": "packages/maketools/src/maketools/check_budget.py",
+      "sha256": "8dbeea4c82c85295723eed0f566d7d1082524a11de4605e1c26bf4fc3f24d12f"
+    }
+  ]
+}

@@ -16,9 +16,12 @@ from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
 
 from maketools import _test_hooks, workspace
+from maketools.budget_run import run_check_budget
 from maketools.env_run import run_env
 from maketools.guard_run import run_guard
+from maketools.lift import drifted_lifts, read_lift_lock, refresh_lifts
 from maketools.makefile_banner_rule import lint_banners
+from maketools.makefile_budget_rule import lint_budgets
 from maketools.makefile_grammar import lint_grammar, render_violation
 from maketools.ps_harness import run_pinned_harness
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
@@ -145,19 +148,20 @@ def command_reap_stale(arguments: Sequence[str]) -> int:
 
 
 def command_lint_makefiles(arguments: Sequence[str]) -> int:
-    """``lint-makefiles``: the grammar and the banner rule over every tracked Makefile.
+    """``lint-makefiles``: the grammar, banner and budget rules over every tracked Makefile.
 
     Args:
         arguments: None expected.
 
     Returns:
-        1 when any Makefile is outside the grammar or a ``check:`` target
-        does not print the pass banner last, else 0.
+        1 when any Makefile is outside the grammar, or a ``check:`` target
+        does not print the pass banner last or does not run under the
+        five-minute budget, else 0.
     """
     require_no_arguments("lint-makefiles", arguments)
     repo_root = repository_root()
     examined, grammar_violations = lint_grammar(repo_root)
-    violations = [*grammar_violations, *lint_banners(repo_root)]
+    violations = [*grammar_violations, *lint_banners(repo_root), *lint_budgets(repo_root)]
     for violation in violations:
         _test_hooks.write_error(render_violation(violation, repo_root))
     if violations:
@@ -167,7 +171,76 @@ def command_lint_makefiles(arguments: Sequence[str]) -> int:
         return 1
     _test_hooks.write_line(
         f"lint-makefiles: {examined} tracked Makefile(s) in the portable grammar, "
-        "every one beginning with the shell prologue and every check printing the pass banner"
+        "every one beginning with the shell prologue and every check printing the pass banner "
+        "under the five-minute budget"
+    )
+    return 0
+
+
+def command_check_budget(arguments: Sequence[str]) -> int:
+    """``check-budget``: run and time this package's ``_check-unbudgeted``.
+
+    Args:
+        arguments: None expected.
+
+    Returns:
+        The child make's exit code, or 3 when it passed past the five-minute
+        budget (:mod:`maketools.budget_run`).
+    """
+    require_no_arguments("check-budget", arguments)
+    package_directory = Path.cwd()
+    package = package_directory.resolve().relative_to(repository_root()).as_posix()
+    return run_check_budget(package_directory, package)
+
+
+def command_lift_check(arguments: Sequence[str]) -> int:
+    """``lift-check``: every lifted file against its pin in ``lift-lock.json``.
+
+    Args:
+        arguments: None expected.
+
+    Returns:
+        1 when any lifted file is missing or differs from its pin, else 0.
+    """
+    require_no_arguments("lift-check", arguments)
+    package_root = Path.cwd()
+    lock = read_lift_lock(package_root)
+    drifted = drifted_lifts(package_root, lock)
+    count = len(lock["entries"])
+    for line in drifted:
+        _test_hooks.write_error(line)
+    if drifted:
+        _test_hooks.write_error(
+            f"lift-check: {len(drifted)} of {count} lifted file(s) differ from their pins"
+        )
+        return 1
+    _test_hooks.write_line(
+        f"lift-check: {count} of {count} lifted file(s) hold their pinned bytes from MCPs "
+        f"{lock['revision']}"
+    )
+    return 0
+
+
+def command_lift_refresh(arguments: Sequence[str]) -> int:
+    """``lift-refresh MCPS REVISION``: re-lift every file from an MCPs commit.
+
+    Args:
+        arguments: The MCPs checkout and the revision to lift from.
+
+    Returns:
+        0 once every file is written and the lock re-pinned.
+
+    Raises:
+        AppError: ``MAKETOOLS_USAGE`` unless exactly two arguments are given.
+    """
+    if len(arguments) != 2:
+        raise AppError(
+            MaketoolsErrorCode.USAGE, f"lift-refresh takes MCPS REVISION, got {list(arguments)}"
+        )
+    refreshed = refresh_lifts(Path.cwd(), Path(arguments[0]), arguments[1])
+    _test_hooks.write_line(
+        f"lift-refresh: {len(refreshed['entries'])} lifted file(s) written from MCPs "
+        f"{refreshed['revision']} and pinned"
     )
     return 0
 
@@ -405,6 +478,9 @@ COMMANDS: Final[Mapping[str, Callable[[Sequence[str]], int]]] = {
     "test": command_test,
     "reap-stale": command_reap_stale,
     "lint-makefiles": command_lint_makefiles,
+    "check-budget": command_check_budget,
+    "lift-check": command_lift_check,
+    "lift-refresh": command_lift_refresh,
     "ps-harness": command_ps_harness,
     "env": command_env,
     "fan-out": command_fan_out,
@@ -473,12 +549,15 @@ __all__ = [
     "PROGRESS_FLAG",
     "RUNNER_FLAG",
     "SERIAL_FLAG",
+    "command_check_budget",
     "command_compose_down",
     "command_compose_up",
     "command_env",
     "command_fan_out",
     "command_guard",
     "command_hooks",
+    "command_lift_check",
+    "command_lift_refresh",
     "command_lint_makefiles",
     "command_native_wheel",
     "command_poetry_build",

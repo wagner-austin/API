@@ -27,12 +27,15 @@ def cwd(tmp_path: Path) -> Generator[Path, None, None]:
 
 def test_every_command_is_registered() -> None:
     assert sorted(COMMANDS) == [
+        "check-budget",
         "compose-down",
         "compose-up",
         "env",
         "fan-out",
         "guard",
         "hooks",
+        "lift-check",
+        "lift-refresh",
         "lint-makefiles",
         "native-wheel",
         "poetry-build",
@@ -180,17 +183,19 @@ def test_lint_makefiles_reports_the_count_and_the_violations(world: World) -> No
     assert dispatch(["lint-makefiles"]) == 0
     assert world.lines == [
         "lint-makefiles: 1 tracked Makefile(s) in the portable grammar, "
-        "every one beginning with the shell prologue and every check printing the pass banner"
+        "every one beginning with the shell prologue and every check printing the pass banner "
+        "under the five-minute budget"
     ]
     bad = root / "tools" / "maketools" / "runs" / "bad" / "Makefile"
     bad.parent.mkdir(parents=True, exist_ok=True)
     # The appended line lands in check's recipe after the banner, so it
     # breaks the grammar (a cmdlet) AND the banner rule (a command after the
-    # banner); the prologue at the wrong depth is the third.
+    # banner); the prologue at the wrong depth is the third, and the old
+    # check shape, with prerequisites and no budget call, is the last four.
     bad.write_text(PORTABLE + "\tWrite-Host x\n", encoding="utf-8")
     world.tracked = [bad.relative_to(root)]
     assert dispatch(["lint-makefiles"]) == 1
-    assert world.errors[-1] == "lint-makefiles: 3 violation(s) in 1 tracked Makefile(s)"
+    assert world.errors[-1] == "lint-makefiles: 7 violation(s) in 1 tracked Makefile(s)"
     assert world.errors[0].endswith(
         "Makefile:1: first line must be the shell prologue: "
         "include ../../../../scripts/make/shell.mk"
