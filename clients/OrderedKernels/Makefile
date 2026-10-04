@@ -2,7 +2,7 @@ include ../../scripts/make/shell.mk
 
 MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
-.PHONY: lint test check
+.PHONY: lint test check _check-unbudgeted
 
 # First-party wheels, rebuilt fresh and installed --no-deps every lint.
 # NOT poetry path-dependencies, deliberately: platform-ml -> shap 0.50.0
@@ -39,5 +39,8 @@ test:
 	poetry run pip install --quiet --force-reinstall --no-deps $(FIRST_PARTY_WHEELS)
 	$(MAKETOOLS) test --serial
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint | test
