@@ -16,13 +16,42 @@ from platform_core.mcp_client import McpCredentials
 from fleet.cli import _config
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS
 from fleet.cli.node_ready import Ready
-from fleet.contracts.dispatch import DispatchJob, DispatchLane, encode_job_line
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchLane, encode_job_line
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.runner_tick import RunnerTick
 from fleet.contracts.tags import NodeTag
 from fleet.core import elevated_yield, queue, tick_report
 
 _log = get_logger(__name__)
+
+
+def refuse(
+    credentials: McpCredentials, job: DispatchJob, identity: JSONObject, *, detail: str
+) -> None:
+    """Close a claimed job as refused, with its named reason, and log it.
+
+    Moved here from :mod:`fleet.cli.node_agent` when its tick's watch
+    (:mod:`fleet.cli.node_watch`) took that module to the file ceiling: a
+    refusal is how a claim ends when it cannot be launched.
+
+    Args:
+        credentials: The queue's endpoint and headers.
+        job: The claimed job.
+        identity: This runner's identity arguments.
+        detail: The ``CODE: message`` refusal for the queue.
+
+    Raises:
+        AppError: Only from the queue call itself.
+    """
+    queue.report_close(
+        credentials,
+        job_id=job["job_id"],
+        status=ClosingStatus.REFUSED,
+        exit_code=None,
+        detail=detail,
+        identity=identity,
+    )
+    _log.info("refused %s: %s", job["job_id"], detail)
 
 
 def ask_queue(
@@ -185,4 +214,4 @@ def decided(tick: RunnerTick, *, claiming: bool, verdict: str) -> RunnerTick:
     )
 
 
-__all__ = ["ask_queue", "claim_untagged", "decided", "untagged_note"]
+__all__ = ["ask_queue", "claim_untagged", "decided", "refuse", "untagged_note"]

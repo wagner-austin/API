@@ -38,8 +38,9 @@ never seen is refused with nothing held, judges the project's fit on the
 probe already taken, then takes the project's lease on this node, stages
 ``git archive`` of the commit through the same verified transport every
 dispatch uses, sends the build script with the project's install steps and
-the node's caches, launches it detached, and reports the run started. A
-later tick collects it (:mod:`fleet.cli.node_collect`): reads the result,
+the node's caches, launches it detached, and reports the run started. The
+same tick's watch, or a later tick, collects it
+(:mod:`fleet.cli.node_watch`, :mod:`fleet.cli.node_collect`): reads the result,
 reads the tail of the transcript, composes the verdict
 (:mod:`fleet.core.verdict`), posts it to the submitter's feed when the job
 names no task (the queue's close posts a task's row, MCPs board task
@@ -87,13 +88,13 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 from typing_extensions import TypedDict
 
-from fleet.cli import _config
+from fleet.cli import _config, node_watch
 from fleet.cli import run as run_cli
-from fleet.cli.node_claim import ask_queue
+from fleet.cli.node_claim import ask_queue, refuse
 from fleet.cli.node_collect import collect_pass, require_sha
 from fleet.cli.node_ready import Ready, ready_state
 from fleet.cli.node_start import report_started
-from fleet.contracts.dispatch import ClosingStatus, DispatchJob
+from fleet.contracts.dispatch import DispatchJob
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig
@@ -144,31 +145,6 @@ def node_identity(alias: str, *, elevated: bool) -> tuple[str, str]:
     return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}"))
 
 
-def refuse(
-    credentials: McpCredentials, job: DispatchJob, identity: JSONObject, *, detail: str
-) -> None:
-    """Close a job as refused, with its named reason, and log it.
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        job: The claimed job.
-        identity: This runner's identity arguments.
-        detail: The ``CODE: message`` refusal for the queue.
-
-    Raises:
-        AppError: Only from the queue call itself.
-    """
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status=ClosingStatus.REFUSED,
-        exit_code=None,
-        detail=detail,
-        identity=identity,
-    )
-    _log.info("refused %s: %s", job["job_id"], detail)
-
-
 def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
     """Whether the job requires a tag the registry does not declare for its project.
 
@@ -211,7 +187,7 @@ def claim_pass(
     alias: str,
     node: NodeConfig,
     elevated: bool,
-) -> bool:
+) -> str | None:
     """Take one job for this node and launch it, or report why it could not.
 
     Args:
@@ -241,9 +217,10 @@ def claim_pass(
     the jobs that need it for another node (MCPs board task 939ec5c7).
 
     Returns:
-        True when a job was claimed and launched; False when this node could
-        take nothing, nothing in the lane matched it, or the job it claimed
-        was refused, which :func:`fill_pass` reads as the end of the tick.
+        The run id of the job claimed and launched; None when this node
+        could take nothing, nothing in the lane matched it, or the job it
+        claimed was refused, which :func:`fill_pass` reads as the end of
+        the pass.
 
     Raises:
         AppError: Only from the queue calls themselves. A LOCAL refusal (an
@@ -257,22 +234,22 @@ def claim_pass(
     ready = gate["ready"]
     if ready is None:
         tick_report.record_tick(credentials, gate["tick"], identity=identity)
-        return False
+        return None
     tick = gate["tick"]
     job = ask_queue(
         loaded, credentials, identity, tick, ready, alias=alias, node=node, elevated=elevated
     )
     if job is None:
-        return False
+        return None
     sha = require_sha(job)
     try:
         prepared = prepare(loaded, job, node=node, ready=ready, sha=sha)
     except AppError as refusal:
         refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
-        return False
+        return None
     if isinstance(prepared, str):
         refuse(credentials, job, identity, detail=prepared)
-        return False
+        return None
 
     def build(run_id: str) -> dispatch.Payload:
         path = loaded.archives / f"{run_id}.tgz"
@@ -282,12 +259,12 @@ def claim_pass(
     row = launch_claimed(loaded, job, alias=alias, node=node, prepared=prepared, build=build)
     if isinstance(row, str):
         refuse(credentials, job, identity, detail=row)
-        return False
+        return None
     agent = node_identity(alias, elevated=elevated)[0]
     report_started(
         loaded, credentials, identity, job=job, row=row, alias=alias, node=node, agent=agent
     )
-    return True
+    return row["run_id"]
 
 
 def fill_pass(
@@ -298,7 +275,7 @@ def fill_pass(
     alias: str,
     node: NodeConfig,
     elevated: bool,
-) -> int:
+) -> tuple[str, ...]:
     """Claim and launch until this node has no room or the lane nothing it fits.
 
     ONE CLAIM PER TICK CAPPED THE FLEET BY THE CLOCK, NOT BY MEMORY (MCPs
@@ -312,10 +289,10 @@ def fill_pass(
     the ledger, which already charges the run just launched, re-probes the
     node, and leaves out the projects whose lease it now holds.
 
-    A PASS THAT LAUNCHES NOTHING ENDS THE TICK, a refusal included. A node
+    A CLAIM THAT LAUNCHES NOTHING ENDS THE PASS, a refusal included. A node
     that stopped answering while one job was being staged would refuse the
-    next and the next, closing the whole lane in one tick; stopping at the
-    first refusal leaves the rest for the next tick or another node.
+    next and the next, closing the whole lane in one pass; stopping at the
+    first refusal leaves the rest for the next pass or another node.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -326,16 +303,20 @@ def fill_pass(
         elevated: Whether this is the node's elevated runner.
 
     Returns:
-        How many jobs this tick launched.
+        The run ids this pass launched, in launch order.
 
     Raises:
         AppError: From :func:`claim_pass`.
     """
-    launched = 0
-    while claim_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated):
-        launched += 1
-    _log.info("%s launched %d job(s) this tick", alias, launched)
-    return launched
+    launched: list[str] = []
+    while (
+        run_id := claim_pass(
+            loaded, credentials, identity, alias=alias, node=node, elevated=elevated
+        )
+    ) is not None:
+        launched.append(run_id)
+    _log.info("%s launched %d job(s) this tick", alias, len(launched))
+    return tuple(launched)
 
 
 def launch_claimed(
@@ -505,7 +486,8 @@ def prepare(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick for one node: collect what finished, then fill its room.
+    """Run one tick for one node: collect what finished, fill its room, and
+    watch what it left running (:mod:`fleet.cli.node_watch`).
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -549,8 +531,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     credentials = queue.load_credentials()
-    collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
-    fill_pass(loaded, credentials, identity, alias=alias, node=node, elevated=elevated)
+
+    def passes() -> frozenset[str]:
+        running = collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
+        launched = fill_pass(
+            loaded, credentials, identity, alias=alias, node=node, elevated=elevated
+        )
+        return running | frozenset(launched)
+
+    node_watch.run_tick(loaded, alias=alias, node=node, passes=passes)
     return 0
 
 
@@ -587,6 +576,5 @@ __all__ = [
     "main",
     "node_identity",
     "prepare",
-    "refuse",
     "tags_refusal",
 ]

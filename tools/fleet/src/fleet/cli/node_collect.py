@@ -486,7 +486,7 @@ def collect_pass(
     *,
     agent: str,
     alias: str,
-) -> None:
+) -> frozenset[str]:
     """Settle every running job this runner holds, reconcile every claim an
     earlier tick left without a start, then stop what was cancelled.
 
@@ -497,6 +497,11 @@ def collect_pass(
         identity: This runner's identity arguments.
         agent: This runner's label.
         alias: This node's workspace name.
+
+    Returns:
+        The run ids of the running jobs this runner held when the pass
+        began, which the tick's watch (:mod:`fleet.cli.node_watch`) narrows
+        to those this machine's ledger still calls running.
 
     Raises:
         AppError: As :func:`collect_one_job`, :func:`reconcile_claim` and
@@ -518,6 +523,7 @@ def collect_pass(
         alias=alias,
         held=frozenset(job["run_id"] for job in held),
     )
+    return running
 
 
 def require_sha(job: DispatchJob) -> str:
