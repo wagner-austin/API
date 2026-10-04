@@ -20,12 +20,13 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_arms.py": b60467377d0cff03208d2a291a1303cc557a1a4d
   "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": 509132ebe55fc8717e973b3183bd3018d9b0ec58
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_question_set.py": 0bfe2ff9a9e2e2bd310898af8e5a980d0514bb01
-  "services/Model-Trainer/src/model_trainer/core/services/model/cloze/identity.py": 638aa75c4c0319ac343dee5eadfe214615a75e58
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 79755892f84071db345bae6bb74fe3e14a9a0a8d
+  "services/Model-Trainer/src/model_trainer/core/services/model/cloze/identity.py": fd6c3e3d3c3c11f07df8e07e8b5ed521507c9adb
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 0789465e4cc23a2ee2cc2ca735e0ee7e0697c096
   "services/Model-Trainer/src/model_trainer/core/contracts/cloze.py": c4e1e0ebaefc2fbb47a123d50d4c68ad4fa242ca
   "services/Model-Trainer/src/model_trainer/core/services/model/control_arms.py": d8d1e89ba5c1920464a501048a028d9b24b97acc
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 32427d62f7e123078e671532a78ea09f3feeeaae
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": c53942502b03a2239836fa7bebcf055dcca133f9
 provenance:
+  - "two pins repinned 2026-10-04 for df9f9101 (board task e3c833f7), checked by symbol. cloze/identity.py: qa_plan_label takes a precision_token and appends it to the base; it is empty for every policy-precision plan, so every label this page reports reads exactly as before. cartridge_qa_benchmark.py resolves the plan's precision before reading the corpus; measure_qa_plan, qa_run_record and main all resolve, and question_set_digest still fills payload_digest as this page says. cartridge_benchmark.py repinned the same day for 7db06d41, which changed only setup_logging's arguments to LogLevel and LogFormat members; cartridge_run_record is untouched."
   - "four pins repinned 2026-09-11, each checked rather than assumed. cartridge_qa_arms.py removed NOT ONE LINE; cloze/identity.py removed one blank; cartridge_question_set.py removed one import, QaPlan moving to its own contracts module. cartridge_qa_benchmark.py is the real change -- 177 non-comment lines removed as its checkpointing and plan handling moved into cartridge_qa_checkpoint and the qa_plan contract -- so its citations were verified by SYMBOL rather than by diff size: this page cites measure_qa_plan, qa_run_record and main there, plus latency_observations, build_question_set, CONTROL_ARMS and cartridge_run_record elsewhere, and all seven resolve at HEAD."
   - "WHAT THAT VERIFICATION DOES NOT COVER, stated so nobody reads it as more than it is: a symbol existing is not the same as it behaving as this page describes. The numbers on this page are historical records (qa-svc-gpt2.json and its siblings, listed below) and are unaffected by a refactor of the entry point that produced them; a claim here about what the code DOES today rests on the symbol check alone."
   - "CURRENT: record qa-svc-gpt2.json, measured 2026-09-08 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
