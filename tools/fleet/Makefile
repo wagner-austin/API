@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check execution render-powershell
+.PHONY: lint test check _check-unbudgeted execution render-powershell
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -28,8 +28,11 @@ test:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
-check: lint | test
+check:
+	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
 	@echo "=== ALL CHECKS PASSED ==="
+
+_check-unbudgeted: lint | test
 
 # The host cases, run on a host of their platform (board task 465689f5).
 # ``make check`` skips them wherever the platform differs, and API's CI is
