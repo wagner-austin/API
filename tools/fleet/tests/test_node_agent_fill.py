@@ -21,6 +21,7 @@ from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectSource, encode_project_source
 from fleet.core import _test_hooks, records, staging
 from tests._node_agent_fixtures import (
+    NO_WATCH,
     NOTHING_LAUNCHED,
     NPM_CI,
     PROBED,
@@ -155,7 +156,13 @@ class TestARoomyNode:
             "has room for nothing; claiming nothing: NODE_OWNER_RESERVED: "
         )
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-1] == "lavender launched 2 job(s) this tick"
+        # The workspace declares no watch, so the two runs are named and
+        # left for the next tick without a poll (MCPs board task c1d48330).
+        assert messages[-2:] == [
+            "lavender launched 2 job(s) this tick",
+            "lavender watch until 2025-09-04T15:33:20+00:00: 0 poll(s), 0 pass(es) rerun, "
+            "2 run(s) still watched",
+        ]
 
 
 class TestARefusedJobEndsTheTick:
@@ -180,7 +187,10 @@ class TestARefusedJobEndsTheTick:
         assert endpoint.arguments[2]["status"] == "refused"
         assert len(runner.calls) == len(PROBED)
         assert len(endpoint.ticks) == 1
-        assert [record.getMessage() for record in caplog.records][-1] == NOTHING_LAUNCHED
+        assert [record.getMessage() for record in caplog.records][-2:] == [
+            NOTHING_LAUNCHED,
+            NO_WATCH,
+        ]
 
 
 class TestAHeldProjectIsNotClaimed:

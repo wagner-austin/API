@@ -29,6 +29,7 @@ from tests._node_agent_fixtures import (
     COMPANION_REF,
     COMPANION_REMOTE,
     COMPANION_SHA,
+    NO_WATCH,
     NOTHING_LAUNCHED,
     NPM_CI,
     PROBED,
@@ -428,8 +429,8 @@ class TestClaimingNothing:
 
         assert endpoint.tools == ["dispatch_list"]
         messages = [record.getMessage() for record in caplog.records]
-        assert messages[-2].startswith("lavender did not answer; claiming nothing: ")
-        assert messages[-1] == NOTHING_LAUNCHED
+        assert messages[-3].startswith("lavender did not answer; claiming nothing: ")
+        assert messages[-2:] == [NOTHING_LAUNCHED, NO_WATCH]
 
     def test_a_node_with_room_for_nothing_claims_nothing(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture

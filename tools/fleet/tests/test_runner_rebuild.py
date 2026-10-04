@@ -24,7 +24,7 @@ from fleet.core import (
     runner_windows_provision,
 )
 from tests._runner_fixtures import a_base, a_ci_slice, quiet_rebuild_answers
-from tests.conftest import FakeClock, FakeRun, failed, ok
+from tests.conftest import FakeClock, FakeRun, FakeSleep, failed, ok
 
 
 def _host() -> HostRunnerSpec:
@@ -101,38 +101,6 @@ def _clean_transcript(spec: HostRunnerSpec) -> str:
         "\n".join(f"CHECK {check['check_id']} OK" for check in runner_audit.expected_checks(spec))
         + "\n"
     )
-
-
-class FakeSleep:
-    """A sleep that moves a :class:`FakeClock` instead of waiting.
-
-    Satisfies :class:`~fleet.core._test_hooks.SleepProtocol`.
-
-    Attributes:
-        clock: The clock each sleep advances.
-        slept: Every wait asked for, in order.
-    """
-
-    clock: FakeClock
-    slept: list[int]
-
-    def __init__(self, clock: FakeClock) -> None:
-        """Bind the clock.
-
-        Args:
-            clock: The clock to advance.
-        """
-        self.clock = clock
-        self.slept = []
-
-    def __call__(self, seconds: int) -> None:
-        """Advance the clock by the wait.
-
-        Args:
-            seconds: How long the caller asked to wait.
-        """
-        self.slept.append(seconds)
-        self.clock.seconds += seconds
 
 
 class TestAQuietRebuild:

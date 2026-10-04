@@ -90,6 +90,7 @@ def _document(
         },
         "data_paths": data_paths,
         "node_local_resources": [],
+        "node_watch_seconds": 0,
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",

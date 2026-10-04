@@ -142,6 +142,40 @@ class FakeClock:
         return self.seconds
 
 
+class FakeSleep:
+    """A sleep that moves a :class:`FakeClock` instead of waiting.
+
+    Satisfies :class:`~fleet.core._test_hooks.SleepProtocol`. Lifted from
+    ``test_runner_rebuild.py`` when the node runner's watch needed the same
+    clock (MCPs board task c1d48330).
+
+    Attributes:
+        clock: The clock each sleep advances.
+        slept: Every wait asked for, in order.
+    """
+
+    clock: FakeClock
+    slept: list[int]
+
+    def __init__(self, clock: FakeClock) -> None:
+        """Bind the clock.
+
+        Args:
+            clock: The clock to advance.
+        """
+        self.clock = clock
+        self.slept = []
+
+    def __call__(self, seconds: int) -> None:
+        """Advance the clock by the wait.
+
+        Args:
+            seconds: How long the caller asked to wait.
+        """
+        self.slept.append(seconds)
+        self.clock.seconds += seconds
+
+
 class FakeTempRoot:
     """A scratch root a test pins to its own directory.
 
@@ -377,6 +411,9 @@ def workspace_document() -> JSONObject:
         # the arrangement that let a 20.7 MB archive land beside fleet.json
         # and be staged by the next dispatch.
         "ledger": "runs/ledger.jsonl",
+        # No watch: a tick that leaves a run going ends with its passes, as
+        # every tick did before the watch; test_node_watch.py declares one.
+        "node_watch_seconds": 0,
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
     }

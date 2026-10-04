@@ -61,6 +61,10 @@ NOTHING_MATCHED = "lavender asked for 1 fitting project(s); nothing in the node 
 #: or refusal ended it (MCPs board task 48842bfd).
 NOTHING_LAUNCHED = "lavender launched 0 job(s) this tick"
 
+#: The line that ends every lavender tick whose passes left it holding no
+#: running job: its watch makes no call (MCPs board task c1d48330).
+NO_WATCH = "lavender holds no running job; no watch this tick"
+
 PROBED: tuple[_test_hooks.CommandResult, ...] = (
     ok(""),
     ok(PROBE_OK),
@@ -283,6 +287,7 @@ __all__ = [
     "COMPANION_SHA",
     "NOTHING_LAUNCHED",
     "NOTHING_MATCHED",
+    "NO_WATCH",
     "PASSING_TAIL",
     "PROBED",
     "REMOTE",

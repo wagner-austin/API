@@ -89,6 +89,7 @@ def _workspace_document() -> JSONObject:
                 "source": None,
             }
         },
+        "node_watch_seconds": 0,
         "ledger": "ledger.jsonl",
         "feed": "feed.jsonl",
         "leases": "leases.json",
