@@ -49,7 +49,7 @@ def _required(events: Sequence[LockEvent]) -> Announcement:
         AssertionError: When the slice produced no post -- the progress-only
             outcome, which the tests that expect it assert directly.
     """
-    post = announcement(tuple(events))
+    post = announcement(tuple(events), "hub")
     if post is None:
         raise AssertionError("expected an announcement, got the progress-only outcome")
     return post
@@ -85,12 +85,12 @@ class TestAnnouncement:
         assert post["holds"] == 1
         assert post["agents"] == ("opus-mosh-reboot-0909",)
         body = post["body"]
-        assert "FLEET-LOCK: 1 hold(s) transitioned" in body
+        assert "FLEET-LOCK on hub: 1 hold(s) transitioned" in body
         assert "up-transcriber (service-up, pid 2688):" in body
         assert "acquired 19:28:00Z" in body
         assert "RELEASED after 165s" in body
         assert "+1 step(s) this window" in body
-        assert "@opus-mosh-reboot-0909 your fleet-lock operation transitioned" in body
+        assert "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned" in body
 
     def test_a_failure_carries_its_detail(self) -> None:
         events = (
@@ -121,7 +121,7 @@ class TestAnnouncement:
             _event(ts="2026-09-09T19:28:01.0000000Z", kind="waiting", detail="pid=1 ..."),
             _event(ts="2026-09-09T19:28:02.0000000Z", kind="step", detail="build"),
         )
-        assert announcement(events) is None
+        assert announcement(events, "hub") is None
 
     def test_two_holds_share_one_post_and_deduplicated_mentions(self) -> None:
         events = (
@@ -148,7 +148,7 @@ class TestAnnouncement:
         # Each hold line attributes its own agent; the MENTION is the
         # trailer, once, deduplicated.
         assert post["body"].splitlines()[-1] == (
-            "@opus-mosh-reboot-0909 your fleet-lock operation transitioned"
+            "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned"
         )
 
     def test_a_waiting_hold_beside_a_boundary_hold_is_counted_not_lined(self) -> None:
@@ -272,9 +272,9 @@ class TestAnnouncement:
 
         post = _required(events)
         lines = post["body"].splitlines()
-        assert lines[0] == "FLEET-LOCK: 1 hold(s) transitioned"
+        assert lines[0] == "FLEET-LOCK on hub: 1 hold(s) transitioned"
         assert lines[2] == "CHECKS: 1 make test run(s) finished"
-        assert lines[-1] == "@opus-mosh-reboot-0909 your fleet-lock operation transitioned"
+        assert lines[-1] == "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned"
         assert post["agents"] == ("opus-mosh-reboot-0909",)
         assert (post["holds"], post["checks"]) == (1, 1)
         assert "RELEASED after 5s" in lines[1]
@@ -299,3 +299,20 @@ class TestAnnouncement:
         assert "(no BOARD_AGENT_LABEL)" in post["body"]
         assert post["agents"] == ()
         assert "@" not in post["body"]
+
+    def test_the_host_is_named_in_the_heading_and_the_mention(self) -> None:
+        # A deploy's hold on diphtheria (MCPs board task 03590bf9): the pid
+        # and target mean nothing until the reader knows whose lock it was.
+        events = (
+            _event(ts="2026-10-05T02:41:10.0000000Z", kind="acquired", label="deploy"),
+            _event(ts="2026-10-05T02:59:15.0000000Z", kind="released", label="deploy"),
+        )
+
+        post = announcement(events, "diphtheria")
+
+        assert post is not None
+        lines = post["body"].splitlines()
+        assert lines[0] == "FLEET-LOCK on diphtheria: 1 hold(s) transitioned"
+        assert lines[-1] == (
+            "@opus-mosh-reboot-0909 your fleet-lock operation on diphtheria transitioned"
+        )

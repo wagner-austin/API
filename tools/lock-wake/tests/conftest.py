@@ -22,7 +22,7 @@ shared with every sibling's suite rather than copied a fifth time.
 from __future__ import annotations
 
 import pathlib
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from typing import Final
 
 import pytest
@@ -39,6 +39,7 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from lock_wake import _test_hooks
 from lock_wake.identity import CURSOR_READER, TASK_ID_VARIABLE
+from lock_wake.remote import SSH_OPTIONS
 
 #: The standing task id every configured test posts into.
 TASK_ID: Final = "0b892f1e-0000-4000-8000-00000000c0de"
@@ -154,6 +155,97 @@ def stage_check_journal(tmp_path: pathlib.Path, content: bytes) -> pathlib.Path:
     journal = check_journal_path(tmp_path)
     journal.write_bytes(content)
     return journal
+
+
+class SshReply:
+    """A finished ssh, as the production seam's Protocol reads one.
+
+    Attributes:
+        returncode: The exit status.
+        stdout: Standard output.
+        stderr: Standard error.
+    """
+
+    def __init__(self, returncode: int, stdout: bytes, stderr: bytes) -> None:
+        """Record the outcome.
+
+        Args:
+            returncode: The exit status.
+            stdout: Standard output.
+            stderr: Standard error.
+        """
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+class FakeSsh:
+    """An ssh to one host, answering the window command from a REAL file.
+
+    The journal it serves is a file under ``tmp_path`` written in
+    diphtheria's own byte form, and the answer is computed from that file
+    exactly as ``stat -c %s`` and ``tail -c +N`` compute it on the host: the
+    size in bytes on one line, then every byte from offset ``N - 1``. A reply
+    passed in instead is returned as given, for ssh's own failures.
+
+    Attributes:
+        calls: Every argv received, in order, with its timeout.
+    """
+
+    def __init__(
+        self, host: str, journals: dict[str, pathlib.Path], reply: SshReply | None
+    ) -> None:
+        """Serve journals on one host.
+
+        Args:
+            host: The only host this ssh reaches.
+            journals: Remote path to the local file holding its bytes.
+            reply: A fixed answer to every call, or None to compute it.
+        """
+        self._host = host
+        self._journals = journals
+        self._reply = reply
+        self.calls: list[tuple[tuple[str, ...], int]] = []
+
+    def __call__(self, args: Sequence[str], timeout_seconds: int) -> SshReply:
+        """Answer one ssh.
+
+        Args:
+            args: The argv, ``ssh`` first.
+            timeout_seconds: The deadline the caller set.
+
+        Returns:
+            The reply.
+
+        Raises:
+            AssertionError: For an argv that is not ``ssh <options> <host>
+                <window command>`` against a served journal.
+        """
+        self.calls.append((tuple(args), timeout_seconds))
+        if self._reply is not None:
+            return self._reply
+        *head, host, command = args
+        assert tuple(head) == ("ssh", *SSH_OPTIONS)
+        assert host == self._host
+        tokens = command.split(" ")
+        assert len(tokens) == 11
+        assert tokens[:4] == ["stat", "-c", "%s", "--"]
+        assert tokens[5:8] == ["&&", "tail", "-c"]
+        assert tokens[9] == "--"
+        assert tokens[10] == tokens[4]
+        assert tokens[8].startswith("+")
+        data = self._journals[tokens[4]].read_bytes()
+        start = int(tokens[8][1:]) - 1
+        return SshReply(returncode=0, stdout=f"{len(data)}\n".encode() + data[start:], stderr=b"")
+
+
+def install_ssh(fake: FakeSsh) -> None:
+    """Bind the ssh seam to a fake.
+
+    Args:
+        fake: The fake to answer every ssh.
+    """
+    _test_hooks.run_ssh = fake
 
 
 @pytest.fixture(autouse=True)
