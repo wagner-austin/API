@@ -480,7 +480,8 @@ class TestJudgeAndRender:
         assert judged["banner"] is True
         assert verdict.render_verdict(judged) == (
             f"FLEET-CHECK 3f2a9c1e {PROJECT} sha={SHA} node=lavender exit=0 banner=yes "
-            "tests=771p/0f coverage=total=100.00% log=lavender:C:/fleet/stage/run-1/result.txt.log "
+            "tests=771p/0f coverage=total=100.00% budget=unread "
+            "log=lavender:C:/fleet/stage/run-1/result.txt.log "
             "run=run-1"
         )
 

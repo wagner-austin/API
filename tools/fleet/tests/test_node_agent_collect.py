@@ -66,7 +66,7 @@ class TestCollecting:
         assert line == (
             f"FLEET-CHECK {DEFAULT_JOB_ID[:8]} {DEMO_PROJECT} sha={DEFAULT_SHA} node=lavender "
             "exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% "
-            f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
+            f"budget=unread log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
         )
         # Retired after the tail was read and before the job was closed:
         # the fifth and sixth calls send the retire to the stage root and run it.
