@@ -183,6 +183,11 @@ A run — only what is specific to it, with the required `experiment` block
 }
 ```
 
+A run that names its code declares `repo_commit` together with `repo_tree`,
+the cluster checkout it runs from; preflight refuses it with
+`REPO_COMMIT_NOT_HEAD` unless that checkout's HEAD is the declared commit
+([run documents](wiki/pages/run-documents.md)).
+
 A run that overrides project defaults — the merged result goes through the
 same decoder:
 
