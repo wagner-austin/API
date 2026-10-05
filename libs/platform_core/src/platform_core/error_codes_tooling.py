@@ -307,6 +307,27 @@ class CiWakeErrorCode(ErrorCodeBase):
     ENROLMENT_FIELD_MALFORMED = "ENROLMENT_FIELD_MALFORMED"
 
 
+class LockWakeErrorCode(ErrorCodeBase):
+    """Reading a fleet-lock journal that lives on another host.
+
+    ``tools/lock-wake`` follows the hub's journal as a local file and, since
+    MCPs board task 03590bf9, diphtheria's over ssh, because every deploy now
+    takes its fleet lock there. A local read's failures are the filesystem's
+    own; what is here is what only the remote read can get wrong.
+    """
+
+    # ssh exited non-zero: the host was unreachable, the key was refused, or
+    # the journal is absent or unreadable there. One code, because ssh and
+    # ``stat`` report each on stderr, which the message carries, and the
+    # first step is the same: run the same ssh by hand.
+    REMOTE_JOURNAL_UNREADABLE = "LOCK_WAKE_REMOTE_JOURNAL_UNREADABLE"
+
+    # ssh exited 0 but the output did not open with the journal's size in
+    # bytes, so no position can be checked against it. Never read as an
+    # empty journal: that would hold the cursor still and report quiet.
+    REMOTE_JOURNAL_MALFORMED = "LOCK_WAKE_REMOTE_JOURNAL_MALFORMED"
+
+
 class SessionLabelErrorCode(ErrorCodeBase):
     """Resolving the acting session's board label against the ledger.
 
@@ -395,6 +416,7 @@ __all__ = [
     "CiWakeErrorCode",
     "Hpc3ErrorCode",
     "HpcWakeErrorCode",
+    "LockWakeErrorCode",
     "MaketoolsErrorCode",
     "McpClientErrorCode",
     "SessionLabelErrorCode",

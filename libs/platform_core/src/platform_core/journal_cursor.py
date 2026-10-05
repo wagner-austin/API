@@ -271,7 +271,30 @@ def read_complete_lines(
             f"{len(data)} bytes; it was truncated or replaced, and rewinding silently "
             f"would re-announce every event in its history"
         )
-    window = data[offset:]
+    return complete_lines_after(data[offset:], offset)
+
+
+def complete_lines_after(window: bytes, offset: int) -> LineSlice:
+    """Split the bytes a journal holds from a byte offset into complete lines.
+
+    The half of :func:`read_complete_lines` that does not care where the
+    bytes came from, so a reader that fetches only the window (``lock-wake``
+    following a journal on another host with ``tail -c``, MCPs board task
+    03590bf9) cuts lines and advances exactly as a local read does. The
+    caller has already refused a position past the journal's end.
+
+    Args:
+        window: The journal's bytes from ``offset`` to wherever the read
+            stopped, a torn tail included.
+        offset: The byte offset ``window`` starts at.
+
+    Returns:
+        The complete non-blank lines and the offset just past the last
+        complete line; ``offset`` itself when the window holds no newline.
+
+    Raises:
+        UnicodeDecodeError: Complete lines that are not UTF-8.
+    """
     last_newline = window.rfind(b"\n")
     if last_newline == -1:
         return LineSlice(lines=(), next_offset=offset)
@@ -290,6 +313,7 @@ __all__ = [
     "LineSlice",
     "ReadBytesProtocol",
     "WriteTextProtocol",
+    "complete_lines_after",
     "cursor_path",
     "file_is_present",
     "read_complete_lines",
