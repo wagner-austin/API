@@ -156,6 +156,44 @@ def process_teleport(
     return outcome
 
 
+def radar_covers(
+    window: tuple[int, int],
+    tank_tile: tuple[int, int],
+    rank: int,
+    consumed_extra: bool,
+    tile: tuple[int, int],
+) -> bool:
+    """Report whether one scan's coverage includes a tile (law 8, footprint).
+
+    The scan sees only the scanner's stored 16x16 window. An extra radar
+    covers all of it; the built-in radar covers the rank-scaled square
+    around the tank (``free_radar_radius``) inside it.
+
+    Public because the container census reads the archive's scans through
+    this same footprint: a census on a different footprint would measure
+    the census, not the field.
+
+    Args:
+        window: The scanner's 0x5A window origin ``(left, top)``.
+        tank_tile: The scanner's tile.
+        rank: The scanner's rank.
+        consumed_extra: Whether the scan spent an extra radar.
+        tile: The tile in question.
+
+    Returns:
+        True when the scan reveals the tile.
+    """
+    left, top = window
+    x, y = tile
+    span = 2 * VIEWPORT_RADIUS
+    if not (left <= x < left + span and top <= y < top + span):
+        return False
+    if consumed_extra:
+        return True
+    radius = free_radar_radius(rank)
+    return abs(x - tank_tile[0]) <= radius and abs(y - tank_tile[1]) <= radius
+
+
 def process_radar(
     world: SimWorldDict, tank_id: int, window: tuple[int, int] | None = None
 ) -> RadarOutcomeDict:
@@ -194,20 +232,13 @@ def process_radar(
     if tank["enabled"][SLOT_RADAR] and tank["counts"][SLOT_RADAR] > 0:
         tank["counts"][SLOT_RADAR] -= 1
         consumed = True
-        radius = VIEWPORT_RADIUS
-    else:
-        radius = free_radar_radius(tank["rank"])
     cx, cy = tank["x"], tank["y"]
-    span = 2 * VIEWPORT_RADIUS
-    left, top = window if window is not None else (cx - VIEWPORT_RADIUS, cy - VIEWPORT_RADIUS)
+    scan_window = window if window is not None else (cx - VIEWPORT_RADIUS, cy - VIEWPORT_RADIUS)
+    rank = tank["rank"]
 
     def inside(x: int, y: int) -> bool:
         """Report whether a tile lies inside the scan coverage."""
-        if not (left <= x < left + span and top <= y < top + span):
-            return False
-        if consumed:
-            return True
-        return abs(x - cx) <= radius and abs(y - cy) <= radius
+        return radar_covers(scan_window, (cx, cy), rank, consumed, (x, y))
 
     containers = []
     for c in world["containers"]:
@@ -368,4 +399,5 @@ __all__ = [
     "process_mine_press",
     "process_radar",
     "process_teleport",
+    "radar_covers",
 ]
