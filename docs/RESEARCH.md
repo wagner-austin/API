@@ -2406,20 +2406,32 @@ learning it from a `%post` failure twenty-five minutes into a build.
 
 Then, and only then:
 
-4. **Add the `projects` entry** to `tools/hpc3/runs/hpc3-<name>.json` —
-   resources, the built image's path and `sha256`, `env_path` (the in-image
-   prefix, normally `/opt/env`), `pinned_packages`, `budget` and `repo`. The
-   filename is not free: `test_committed_runs.py` requires
-   `hpc3-<name>.json` to declare exactly the project `<name>`, and requires
-   that no project is declared by two workspaces.
-5. **Add a section here.** `test_committed_runs.py` fails if a registered
-   project's name does not appear in this file. This is the one step nothing
-   can generate — it is where you say what the project measures and what its
-   provenance does not cover.
-6. **`hpc3-research-index --write`** to regenerate the table above. The
-   committed block is checked, so a stale one fails.
-7. **Emit `RunRecord`s** from whatever produces the numbers.
-8. **Submit through the hpc3 CLI** rather than a hand-written `sbatch` script,
+4. **Write the project's section here**, headed `` ### `<name>` — … `` under
+   "Registered with the hpc3 CLI". This is the one step nothing can generate —
+   it is where you say what the project measures and what its provenance does
+   not cover — so registration refuses without it, and
+   `test_committed_runs.py` fails for any registered project that lacks one.
+   The name appearing in the generated table does not count.
+5. **Register it, in one command:**
+
+   ```bash
+   hpc3-register --project <name> --partition free --gpu none --cpus 2 --mem-gb 4 \
+       --minutes 60 --requeue yes --resumes no --deterministic yes --certified-inputs no \
+       --image /pub/wagnera3/<name>/images/v1/<name>.sif --env-path /opt/env \
+       --pins <dist>==<version> --gpu-hours 0 --billing free --repo <path to its code>
+   ```
+
+   Every flag is required and none defaults; `--gpu none`, `--pins none` and
+   `--billing free` are how "nothing" is said. It refuses with EVERY unmet
+   precondition named at once (already declared, document exists, no section,
+   no repo), reads the image's `sha256` on the cluster rather than taking one,
+   proves `--env-path` and `--pins` inside that image with the probe
+   `hpc3-preflight` runs, and only then writes
+   `tools/hpc3/runs/hpc3-<name>.json` — the filename `test_committed_runs.py`
+   requires — and regenerates the table above from the workspace documents.
+   An image that has not been built cannot be registered.
+6. **Emit `RunRecord`s** from whatever produces the numbers.
+7. **Submit through the hpc3 CLI** rather than a hand-written `sbatch` script,
    so the run lands in the ledger and `hpc3-trace` can answer "which job
    produced this artifact".
 
@@ -2431,4 +2443,7 @@ project is cleaned up. Step 6 was absent, and until 2026-09-03 registration
 ALSO meant editing two hardcoded project lists inside
 `test_committed_runs.py`; both were met as surprise red tests rather than as
 steps. Those lists are now derived invariants, so a seventh project needs no
-test edit at all.
+test edit at all. What remained — writing the workspace document by hand and
+remembering to regenerate the table — was met the same way, as a filename
+rule and a stale table, until `hpc3-register` made it one command on
+2026-10-05 (board task `cf5f54c0`).
