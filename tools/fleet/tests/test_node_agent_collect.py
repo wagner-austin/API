@@ -181,6 +181,29 @@ class TestCollecting:
         assert renewed["leaseSeconds"] == node_collect.CLAIM_LEASE_SECONDS
         assert renewed["note"] == f"still running on lavender as {DEMO_RUN_ID}"
 
+    def test_a_node_that_does_not_answer_the_read_is_read_again_and_its_lease_left(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """At 10:30:01Z on 2026-10-05 lavender-wsl timed out this read's ssh
+        banner exchange and the raised error ended its serve (MCPs board
+        task 8993c306); the next pass reads it again instead."""
+        launch(sourced_config)
+        _test_hooks.run = FakeRun(
+            [failed(255, "Connection timed out during banner exchange"), *PROBED]
+        )
+        endpoint = FakeQueue([held_answer()])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.tools == ["dispatch_list"]
+        assert any(
+            ": did not answer the read: ssh to lavender failed while sending" in record.getMessage()
+            and "Connection timed out during banner exchange" in record.getMessage()
+            for record in caplog.records
+        )
+
     def test_a_job_whose_run_this_machine_never_had_is_left_alone(
         self, sourced_config: pathlib.Path
     ) -> None:
