@@ -10,7 +10,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 OUTPUT ?=
 CONFORMANCE_BASELINE := wiki/sources/conformance_baseline.json
 
-.PHONY: help lint test check _check-unbudgeted execution install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted _deps _lint-prep _lint-guard _lint-mypy _test-suite executioninstall digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
 
 help:
 	@echo ""
@@ -78,15 +78,22 @@ install:
 	poetry run playwright install chromium
 	@echo "[install] done"
 
-lint:
+lint: _lint-prep _lint-guard _lint-mypy
 	@echo ""
-	@echo "=== lint"
+	@echo "[lint] passed"
+
+# What lint and the suite both need first: a venv that answers, and the
+# lock and the dev dependencies synced.
+_deps:
 	$(MAKETOOLS) venv-check
 	poetry lock
 	poetry sync --with dev
+
+# The quick gates, and the two steps that REWRITE sources (ruff's fixes and
+# its formatter), which must finish before anything reads the tree.
+_lint-prep: _deps
 	@echo ""
-	@echo "  -- guard"
-	$(MAKETOOLS) guard
+	@echo "=== lint"
 	@echo ""
 	@echo "  -- undecoded-field check"
 	poetry run tankpit-check-undecoded-fields
@@ -97,23 +104,28 @@ lint:
 	@echo "  -- ruff check + format"
 	poetry run ruff check . --fix
 	poetry run ruff format .
+
+_lint-guard:
+	@echo ""
+	@echo "  -- guard"
+	$(MAKETOOLS) guard
+
+_lint-mypy:
 	@echo ""
 	@echo "  -- mypy"
 	poetry run mypy src tests scripts
-	@echo ""
-	@echo "[lint] passed"
 
 # Test running lives in the shared launcher, tools/maketools (the ``test``
 # command); see any sibling package's Makefile for what it adds over the
 # inline recipe and the incident behind it.
-test:
-	@echo ""
-	@echo "=== test"
-	poetry lock
-	poetry sync --with dev
-	$(MAKETOOLS) test
+test: _deps _test-suite
 	@echo ""
 	@echo "[test] passed"
+
+_test-suite:
+	@echo ""
+	@echo "=== test"
+	$(MAKETOOLS) test
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
@@ -121,7 +133,13 @@ check:
 	@echo "=== ALL CHECKS PASSED ==="
 	@echo ""
 
-_check-unbudgeted: lint | test
+# The guard, mypy and the suite read the tree and write nothing another of
+# them reads, so once _lint-prep has synced and formatted, they run side by
+# side (tools/maketools ``concurrent``) and the check is charged the longest
+# of the three instead of their sum (board task 28e47ae3: on sedona at
+# c20080a69 the suite took 371 s after about 154 s of lint).
+_check-unbudgeted: _lint-prep
+	$(MAKETOOLS) concurrent _lint-guard _lint-mypy _test-suite
 
 # The live demo case, run against austinwagner.org/tankpit (MCPs board task
 # 46934cd6). ``make check`` skips it on every machine, because that run is
