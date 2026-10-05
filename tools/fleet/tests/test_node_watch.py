@@ -204,6 +204,7 @@ class TestARunEndingWhileTheFillPassRuns:
         assert endpoint.watch.arguments[1]["status"] == "passed"
         closing = narrow_json_to_str(endpoint.watch.arguments[1]["detail"])
         assert closing.endswith(f"run={DEMO_RUN_ID}")
+        assert " ended=2025-09-04T15:34:32Z " in closing  # CHECK_ENDED, for closed_at to measure
         assert len(node.main.calls) == len(main_replies)
         assert len(node.watch.calls) == len(watch_replies)
         messages = _messages(caplog)

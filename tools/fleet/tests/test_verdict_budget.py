@@ -63,6 +63,7 @@ class TestTheBudgetOnTheLine:
             node="loki",
             exit_code=2,
             tail=OVER_TAIL,
+            ended_unix=1791168490,
             log_path="C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log",
             run_id="services-grandma-api-loki-1791168143",
         )
@@ -71,6 +72,7 @@ class TestTheBudgetOnTheLine:
         assert verdict.render_verdict(judged) == (
             f"FLEET-CHECK 56979410 services/grandma-api sha={SHA} node=loki exit=2 "
             "banner=no tests=unread coverage=unread budget=over:347s/300s "
+            "ended=2026-10-05T02:48:10Z "
             "log=loki:C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log "
             "run=services-grandma-api-loki-1791168143"
         )
