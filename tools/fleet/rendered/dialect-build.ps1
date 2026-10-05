@@ -108,6 +108,7 @@ $env:npm_config_cache = "$CacheRoot/npm"
 $env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"
 $env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"
 $env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"
+$env:CORVIS_TEST_MAX_WORKERS = "$Workers"
 $env:CORVIS_FLEET_ELEVATED = '0'
 $env:BOARD_AGENT_LABEL = 'opus-example-0929'
 $env:CORVIS_FLEET_CACHE = $CacheRoot
