@@ -1,0 +1,42 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "cartridge-qa": {
+      "partition": "free-gpu",
+      "gpu": {
+        "model": "A100",
+        "count": 1
+      },
+      "cpus": 8,
+      "mem_gb": 64,
+      "minutes": 720,
+      "requeue": true,
+      "resumes_from_checkpoint": true,
+      "image": {
+        "path": "/pub/wagnera3/images/v56/abl",
+        "sha256": "890e444560d4c5caa43860bfd3235849471eadc01acbe77b968ae30e6aa7d5be",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      },
+      "env_path": "/opt/env",
+      "pinned_packages": {
+        "torch": "2.6.0+cu124",
+        "transformers": "4.46.3",
+        "model-trainer-server": "0.1.0"
+      },
+      "deterministic": true,
+      "certified_inputs": false,
+      "budget": {
+        "self_imposed_gpu_hours": 200.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      },
+      "repo": "../../.."
+    }
+  }
+}
