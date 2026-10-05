@@ -105,6 +105,15 @@ pretty = true
 files = ["src", "tests", "scripts"]
 mypy_path = ["src"]
 explicit_package_bases = true
+# Eight worker processes, because a cold mypy over these 1304 files was the
+# largest single step of ``make check`` (board task 28e47ae3, budget 300 s):
+# on austinpc, 2026-10-05, a fresh cache dir took 107 s and 126 s serial
+# against 63 s and 46 s with eight workers, all clean, and a fleet export is
+# always cold. Parallel mode turns on
+# the native parser and needs local partial types, which mypy 2.3 defaults
+# on; with an injected ``int = "str"`` it still exits 1 naming the line,
+# cold and warm, so the workers lose no diagnostic.
+num_workers = 8
 
 [tool.ruff]
 line-length = 100
@@ -147,7 +156,11 @@ fail_under = 100
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-v -n auto --dist loadscope"
+addopts = "-v -n auto --dist loadscope --durations=25"
+# ``--durations=25`` prints the 25 slowest setups, calls and teardowns at the
+# end of every run, so a check that drifts toward its 300 s budget (board
+# task 28e47ae3) names the tests that moved it in its own output, rather than
+# needing a profiling run of its own to find them.
 # No ``--basetemp``. Pinning it to a fixed path inside the project makes two
 # concurrent runs destroy each other: pytest DELETES basetemp at session
 # start, so a second run (another agent, or a mutation sweep beside a
