@@ -33,7 +33,7 @@ _TEARDOWN_REMEDY_SECONDS = 15.0
 
 The close is normally sub-second, but this host's filesystem
 minifilter has been measured inspecting browser teardown for tens of
-seconds (``tests/browser/test_lifecycle.py`` fixture note), so a
+seconds (``tests/browser/test_real_chromium.py`` module note), so a
 short fuse would kill closes that were merely slow. Fifteen seconds
 is past every observed CLEAN close and well before the terminal
 watchdog, leaving the driver a full window to notice the engine's
