@@ -1372,10 +1372,56 @@ When the registry lands, `session_for` becomes a dict lookup and
 nothing at either call site changes. That is the whole reason to have
 drawn it before the registry rather than after.
 
-Multi-client items still open: the session registry, the
-`advance_tick` fan-out, per-connection command intake, and
-mid-session join. None of them is blocked on purity, and the window
-check no longer has to be remembered.
+### The registry, the fan-out and mid-field join (2026-10-05)
+
+The four multi-client items this section used to list as open — the
+session registry, the `advance_tick` fan-out, per-connection command
+intake, and mid-session join — landed together (board task
+`b008ab91`, Phase 1 of the multiplayer track).
+
+- **Registry.** `SimServer(world, terrain, roster_ids)` starts with no
+  connections; `connect(tank_id)` admits one for a living tank already
+  on the field and refuses an absent, dead or already-connected tank.
+  `session_for` is the dict lookup this section predicted, and
+  `require_session` is its non-nullable form for the one caller that
+  must have a connection (the join burst).
+- **Fan-out.** `advance_tick()` returns one batch per connected tank,
+  keyed by its id in join order. The routers write to a per-tick
+  `TickOutbox` (`sim/outbox.py`) in exactly three ways: `to` for a
+  receipt owed to one tank's connection (a 0x52, the 0x3F after a walk,
+  a 0x4C, a 0x49, a 0x56, a recentered 0x5A), `broadcast` for a field
+  event (a 0x4D chat, a corpse's 0x58, churn's 0x28/0x29, an
+  activation's 0x21), and `narrate` for an outcome each connection sees
+  through its own eyes (every `sim/narrate/` function, called once per
+  observer). A receipt for a tank with no connection goes nowhere,
+  which is the same fact `session_for`'s None states.
+- **Intake.** `SimCDPSession(server, tank_id, magic, lobby)` queues
+  under the tank its connection speaks for; nothing on the wire names
+  the commanding tank, so the connection supplies it.
+- **Join.** A connection joining a running field is announced to the
+  connections already there with the 0x28 a churn visitor draws — one
+  builder, `wire_statements.entry_statement`, for both arrivals — and
+  the joiner learns the room from `handshake(tank_id)`.
+
+Three ordering facts are load-bearing. Between ticks the NEXT tick's
+outbox is already open, so an activation, a ghost's recorded
+relocation or a join lands at the head of the next batches exactly as
+the old pending-announcement list did. The end of the tick runs in two
+passes over the connections — each one's viewport transitions, patch
+refresh, rank recovery and awards first, then everyone's syncs —
+because a promotion closed for one connection is part of the 0x2E
+every other connection reads of that tank. And the law-4 departure age
+a shot resolves with is read from the SHOOTER's own window; a shooter
+with no connection has no window for the target to have left.
+
+Verified byte-identical at N=1: a deterministic generation (arena,
+practice, ferry and larder runs on layout `bot-20260706-223721`,
+population seed 7, plus a ghost self-replay of the arena recording)
+hashed with clock fields stripped matched the pre-change generation on
+all 15 captures, worlds and event streams. Two pre-change generations
+matched each other first, which is what makes the comparison a
+control. The two-connection receipt and broadcast rules are pinned in
+`tests/sim/test_server_connections.py`.
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 

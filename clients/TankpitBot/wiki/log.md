@@ -6438,3 +6438,31 @@ block for both.
   death receipt and its fuel lines become a timed caption history on
   each public `/demo/fleet` row, in words from one table that covers
   every `ReasonKind`.
+
+---
+
+## [2026-10-05] update | The sim server takes any number of connections
+
+Board task b008ab91, Phase 1 of the multiplayer track, which the
+operator returned to room tankpit by SMS on 2026-10-05.
+[[physics-module-roadmap]] gains the as-built section "The registry,
+the fan-out and mid-field join", replacing the paragraph that listed
+those four items as open.
+- `SimServer` starts with no connections and `connect(tank_id)` admits
+  one into a running field; `advance_tick()` returns one batch per
+  connected tank; `SimCDPSession` queues under its own tank; the join
+  is announced to the room with the churn visitor's 0x28, now built by
+  `wire_statements.entry_statement` for both arrivals.
+- The routers write to a per-tick `TickOutbox`: `to` for a receipt,
+  `broadcast` for a field event, `narrate` for an outcome each
+  connection sees through its own eyes.
+- N=1 is byte-identical: a deterministic sim generation (four
+  scenarios and a ghost self-replay) matched the pre-change generation
+  on all 15 artifacts with clock fields stripped. The 2026-08-02
+  archive capture the 2026-08-03 lift replayed is not on this disk
+  (`runs/bot` holds only `demo-1`), so that recording could not be the
+  control this time.
+- The page's `src/tankpit_bot/sim` and `src/tankpit_bot/validate` pins
+  were already stale before this change (the auditor's
+  `git-blob-pin-stale-uncited` on both), and they are left as they
+  were, because the rest of the page was not re-audited.
