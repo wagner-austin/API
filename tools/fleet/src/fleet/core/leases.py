@@ -22,6 +22,8 @@ resource frees itself at the moment anybody looks.
 from __future__ import annotations
 
 import pathlib
+import threading
+from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str, load_json_str
@@ -37,6 +39,14 @@ from fleet.contracts.lease import (
     is_expired,
 )
 from fleet.core import _test_hooks
+
+#: Held while the file is read and rewritten. A node runner settles a run on
+#: its watch thread while its fill pass takes a lease on the main thread
+#: (:mod:`fleet.cli.node_watch`), and two rewrites of one file in one
+#: process, each from what it read before the other wrote, would lose one:
+#: a release lost brings a finished run's lease back to hold its project.
+#: Reentrant because :func:`release_if_held` reads before it releases.
+REWRITING: Final = threading.RLock()
 
 
 def read_leases(path: pathlib.Path) -> tuple[Lease, ...]:
@@ -194,24 +204,24 @@ def acquire(
             on the message, and a queue inside a command-line tool is a
             background process by another name.
     """
-    holder = find_holder(path, node=lease["node"], project=lease["project"], now_unix=now_unix)
-    if holder is not None:
-        raise AppError(
-            FleetErrorCode.LEASE_HELD,
-            f"cannot dispatch: {describe_lease(holder, now_unix=now_unix)}",
+    with REWRITING:
+        node, project = lease["node"], lease["project"]
+        holder = find_holder(path, node=node, project=project, now_unix=now_unix)
+        if holder is not None:
+            raise AppError(
+                FleetErrorCode.LEASE_HELD,
+                f"cannot dispatch: {describe_lease(holder, now_unix=now_unix)}",
+            )
+        contention = contended_by(path, wanted=lease["resources"], now_unix=now_unix)
+        if contention is not None:
+            blocking, names = contention
+            described = describe_contention(blocking, names=names, now_unix=now_unix)
+            raise AppError(FleetErrorCode.RESOURCE_HELD, f"cannot dispatch: {described}")
+        surviving = held_leases(path, now_unix=now_unix)
+        _test_hooks.write_text(
+            path,
+            dump_json_str([encode_lease(entry) for entry in (*surviving, lease)]),
         )
-    contention = contended_by(path, wanted=lease["resources"], now_unix=now_unix)
-    if contention is not None:
-        blocking, names = contention
-        raise AppError(
-            FleetErrorCode.RESOURCE_HELD,
-            f"cannot dispatch: {describe_contention(blocking, names=names, now_unix=now_unix)}",
-        )
-    surviving = held_leases(path, now_unix=now_unix)
-    _test_hooks.write_text(
-        path,
-        dump_json_str([encode_lease(entry) for entry in (*surviving, lease)]),
-    )
 
 
 def release(path: pathlib.Path, *, run_id: str, now_unix: int) -> None:
@@ -230,16 +240,17 @@ def release(path: pathlib.Path, *, run_id: str, now_unix: int) -> None:
             expired means the run outlived the window it declared and another
             dispatch may already be inside the environment.
     """
-    surviving = held_leases(path, now_unix=now_unix)
-    remaining = tuple(entry for entry in surviving if entry["run_id"] != run_id)
-    if len(remaining) == len(surviving):
-        raise AppError(
-            FleetErrorCode.LEASE_NOT_HELD,
-            f"run {run_id} holds no live lease in {path}; it was either released already, or "
-            "it expired while the run was still going and another dispatch may now be inside "
-            "the same environment",
-        )
-    _test_hooks.write_text(path, dump_json_str([encode_lease(entry) for entry in remaining]))
+    with REWRITING:
+        surviving = held_leases(path, now_unix=now_unix)
+        remaining = tuple(entry for entry in surviving if entry["run_id"] != run_id)
+        if len(remaining) == len(surviving):
+            raise AppError(
+                FleetErrorCode.LEASE_NOT_HELD,
+                f"run {run_id} holds no live lease in {path}; it was either released already, "
+                "or it expired while the run was still going and another dispatch may now be "
+                "inside the same environment",
+            )
+        _test_hooks.write_text(path, dump_json_str([encode_lease(entry) for entry in remaining]))
 
 
 def release_if_held(path: pathlib.Path, *, run_id: str, now_unix: int) -> str:
@@ -263,13 +274,15 @@ def release_if_held(path: pathlib.Path, *, run_id: str, now_unix: int) -> str:
     Returns:
         What happened, as a sentence for a log line.
     """
-    if find_by_run(path, run_id=run_id, now_unix=now_unix) is None:
-        return "its lease had already expired, so nothing was held to give back"
-    release(path, run_id=run_id, now_unix=now_unix)
-    return "lease released"
+    with REWRITING:
+        if find_by_run(path, run_id=run_id, now_unix=now_unix) is None:
+            return "its lease had already expired, so nothing was held to give back"
+        release(path, run_id=run_id, now_unix=now_unix)
+        return "lease released"
 
 
 __all__ = [
+    "REWRITING",
     "acquire",
     "contended_by",
     "find_by_run",
