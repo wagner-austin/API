@@ -76,10 +76,16 @@ that way. The argument handling it delegates to is covered once, in
 ``monorepo_guards/tests/test_shim.py``.
 
 What is left to check here is the thing that IS per-package: that this
-package's shim reaches the shared implementation at all, and that the guard
-actually passes on this package. The predecessors of this file accepted
-either outcome -- ``assert rc in (0, 2)`` and three other shapes that cannot
-fail -- across seventy assertions in nineteen packages.
+package's shim reaches the shared implementation at all, by refusing a tree
+that breaks a rule and passing an empty one. The predecessors of this file
+accepted either outcome -- ``assert rc in (0, 2)`` and three other shapes
+that cannot fail -- across seventy assertions in nineteen packages.
+
+Whether the guard passes on THIS package's real files is not asked here.
+``make lint`` asks it, running ``python -m scripts.guard`` with no arguments
+before the tests start, and a case that asked it again ran the whole guard a
+second time inside the suite, under the coverage tracer: 176 s on one worker
+of clients/TankpitBot's fleet check on 2026-10-05 (MCPs board task 46934cd6).
 """
 
 from __future__ import annotations
@@ -90,17 +96,6 @@ from pathlib import Path
 
 import pytest
 from scripts.guard import main
-
-
-def test_this_package_passes_its_own_guard() -> None:
-    """No --root, so this runs every rule over this package's real files.
-
-    Deliberately not an empty temp directory. A shim pointed at an empty tree
-    returns 0 without any rule having anything to look at, which is
-    indistinguishable from a shim that works -- and it leaves the rules'
-    file-skipping branches unexecuted, which is how this was first noticed.
-    """
-    assert main([]) == 0
 
 
 def test_a_tree_with_violations_fails(tmp_path: Path) -> None:
@@ -130,7 +125,6 @@ def test_running_as_a_module_exits_with_the_guard_code(tmp_path: Path) -> None:
 __all__ = [
     "test_a_tree_with_violations_fails",
     "test_running_as_a_module_exits_with_the_guard_code",
-    "test_this_package_passes_its_own_guard",
 ]
 '''
 """Verbatim contents of every ``tests/test_guard_shim.py``."""

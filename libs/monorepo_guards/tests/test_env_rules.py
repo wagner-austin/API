@@ -44,3 +44,12 @@ def test_env_rule_allows_builtins(tmp_path: Path) -> None:
     rule = EnvRule()
     violations = rule.run([allowed_core, allowed_guard, allowed_test])
     assert violations == []
+
+
+def test_env_rule_passes_lookalikes_of_os_and_tomllib(tmp_path: Path) -> None:
+    """``getenv`` reached through another object, and ``__import__`` of any
+    module but tomllib, are not the banned accesses."""
+    lookalike = tmp_path / "src" / "lookalike.py"
+    _write(lookalike, "import config\nx = config.os.getenv('X')\nmod = __import__('json')\n")
+
+    assert EnvRule().run([lookalike]) == []

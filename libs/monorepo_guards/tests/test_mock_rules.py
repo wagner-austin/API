@@ -277,3 +277,11 @@ class TestMockBanRuleObjectSetattr:
 
         assert len(violations) == 2
         assert all(v.kind == "object-setattr-banned" for v in violations)
+
+    def test_allows_plain_calls_and_calls_through_attribute_chains(self, tmp_path: Path) -> None:
+        """A bare ``helper()`` and ``client.session.setattr()`` are neither
+        ``monkeypatch.<method>`` nor ``object.__setattr__``."""
+        code = "def test_x():\n    helper()\n    client.session.setattr(obj, 'a', 1)\n"
+        test_file = _write_test_file(tmp_path, code)
+
+        assert MockBanRule().run([test_file]) == []

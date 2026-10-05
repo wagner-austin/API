@@ -49,3 +49,11 @@ def test_tests_rule_ignores_non_tests_paths(tmp_path: Path) -> None:
     rule = PolicyTestsRule()
     violations = rule.run([path])
     assert not violations
+
+
+def test_tests_rule_passes_a_test_that_builds_no_namespace(tmp_path: Path) -> None:
+    """A test file is read, and one without the call is not flagged."""
+    path = tmp_path / "pkg" / "tests" / "test_mod.py"
+    _write(path, "def test_x() -> None:\n    assert 1 + 1 == 2\n")
+
+    assert PolicyTestsRule().run([path]) == []

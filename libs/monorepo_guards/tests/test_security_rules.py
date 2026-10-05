@@ -112,6 +112,14 @@ class APIClient:
     assert len(violations) == 0
 
 
+def test_security_rule_passes_a_class_with_an_unrelated_base(tmp_path: Path) -> None:
+    """Only a ``BaseHTTPMiddleware`` base makes an auth-named class a middleware."""
+    ok = tmp_path / "services" / "demo" / "src" / "auth_models.py"
+    _write(ok, "class AuthRecord(BaseModel):\n    pass\n")
+
+    assert SecurityRule().run([ok]) == []
+
+
 def test_security_rule_raises_on_syntax_error(tmp_path: Path) -> None:
     bad = tmp_path / "services" / "demo" / "src" / "broken.py"
     _write(bad, "class Foo(\n")  # Invalid syntax

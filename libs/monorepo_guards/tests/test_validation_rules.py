@@ -74,3 +74,13 @@ def test_validation_rule_requires_import_in_service_validators(tmp_path: Path) -
     )
     violations = rule.run([svc_path])
     assert violations == []
+
+
+def test_validation_rule_leaves_the_guards_own_sources_alone(tmp_path: Path) -> None:
+    """The guard library names the banned helpers in order to ban them."""
+    rule = ValidationRule()
+    guard_path = _write(
+        tmp_path / "libs/monorepo_guards/src/monorepo_guards/validation_rules.py",
+        "def _decode_int_range(x, y):\n    return 1\n",
+    )
+    assert rule.run([guard_path]) == []

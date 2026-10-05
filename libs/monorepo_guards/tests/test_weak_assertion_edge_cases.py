@@ -423,3 +423,20 @@ def test_example():
         # Should not crash, d is not used as dict
         key_violations = [v for v in violations if v.kind == "weak-assertion-key-in-dict"]
         assert len(key_violations) == 0
+
+    def test_an_integer_subscript_verifies_no_key(self, tmp_path: Path) -> None:
+        """``d[0]`` in an assert reads an index, not a string key, so it does
+        not count as checking the value of ``"a"``."""
+        test_file = tmp_path / "tests" / "test_foo.py"
+        code = """
+def test_example():
+    d = load()
+    assert d[0] == 1
+    assert "a" in d
+"""
+        _write(test_file, code)
+
+        violations = WeakAssertionRule().run([test_file])
+
+        key_violations = [v for v in violations if v.kind == "weak-assertion-key-in-dict"]
+        assert len(key_violations) == 1
