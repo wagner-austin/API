@@ -30,6 +30,8 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue
 from tests._toolchain_fixtures import (
+    GO_REASON,
+    GO_WINGET,
     HOOKS_INSTALL,
     HOOKS_REASON,
     LAVENDER_2026_09_23,
@@ -89,9 +91,10 @@ class TestTheToolTagsAClaimCarries:
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg present; hooks absent",
+            "poetry, git, make, tar present; ffmpeg present; hooks absent; go absent",
             f"lavender claims without the tag of every tool it lacks: hooks -- {HOOKS_REASON}, "
-            f"so those jobs go to a node that has it -- {HOOKS_INSTALL}",
+            f"so those jobs go to a node that has it -- {HOOKS_INSTALL}; go -- {GO_REASON}, so "
+            f"those jobs go to a node that has it -- {GO_WINGET}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,
@@ -102,8 +105,13 @@ class TestTheToolTagsAClaimCarries:
     ) -> None:
         """sedona once its interpreter carries the claude-hooks check's tools
         (MCPs board task ec895824): the runner claims with hooks beside
-        windows, so the queue may hand it that package's check."""
-        found = "ffmpeg=yes=ffmpeg 7.1.1\nhooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
+        windows, so the queue may hand it that package's check; with go found
+        too (MCPs board task 1da15750) it claims with go, so rcs-bridge's check
+        may land here, and with every tagged tool present it logs no gap."""
+        found = (
+            "ffmpeg=yes=ffmpeg 7.1.1\nhooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
+            "go=yes=go version go1.27.1 windows/amd64\n"
+        )
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23 + found)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
@@ -111,11 +119,11 @@ class TestTheToolTagsAClaimCarries:
         with caplog.at_level("INFO"):
             assert node_agent.main(node_argv(sourced_config)) == 0
 
-        assert endpoint.arguments[1]["tags"] == ["ffmpeg", "hooks", "windows"]
+        assert endpoint.arguments[1]["tags"] == ["ffmpeg", "go", "hooks", "windows"]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-4:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg present; hooks present",
+            "poetry, git, make, tar present; ffmpeg present; hooks present; go present",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,
@@ -178,12 +186,13 @@ class TestAToolchainThatCanBuild:
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg absent; hooks absent",
+            "poetry, git, make, tar present; ffmpeg absent; hooks absent; go absent",
             "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
             "--accept-package-agreements --accept-source-agreements --disable-interactivity; "
-            f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- {HOOKS_INSTALL}",
+            f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- {HOOKS_INSTALL}; "
+            f"go -- {GO_REASON}, so those jobs go to a node that has it -- {GO_WINGET}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,

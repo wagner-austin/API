@@ -195,6 +195,23 @@ HOOKS_INSTALL = (
     "pytest-xdist==3.8.0 pytest-cov==7.1.0"
 )
 
+#: Why a node is told about go, in the tagged gap's words (MCPs board task
+#: 1da15750).
+GO_REASON = "MCPs rcs-bridge is a Go module whose check runs go vet, staticcheck and go test"
+
+#: The winget line a Windows node is offered for go.
+GO_WINGET = (
+    "winget install --id GoLang.Go -e --source winget --silent "
+    "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+)
+
+#: How the tagged gap reads go's entry on a node whose managers cover none
+#: of its installs, the tail every such gap line now ends with.
+GO_NO_INSTALL = (
+    f"; go -- {GO_REASON}, so those jobs go to a node that has it -- no automatic install on "
+    "this node"
+)
+
 
 def node(
     host: str = "lavender",

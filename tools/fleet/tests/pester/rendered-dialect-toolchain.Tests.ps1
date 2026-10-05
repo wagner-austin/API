@@ -59,6 +59,8 @@ Describe 'The toolchain probe' {
         [void](Initialize-Answer $first 'poetry' @('Poetry (version 1.8.3)') 3 -Stderr)
         [void](Initialize-Answer $first 'tar' @() 0)
         $ffmpegCalls = Initialize-Answer $first 'ffmpeg' @('ffmpeg version 9.0.1-essentials_build-www.gyan.dev', 'built with gcc') 0
+        # go has no --version flag; it is asked 'version' (MCPs 1da15750).
+        $goCalls = Initialize-Answer $first 'go' @('go version go1.27.1 windows/amd64') 0
         [void](Initialize-Answer $quoted 'make' @('GNU Make 4.4.1', 'Built for Windows32') 0)
         $vswhereCalls = Initialize-Answer (Join-Path $script:root 'vs') 'vswhere' @('17.11.35312.102') 0
         $env:PATH = "$first;;`"$quoted`""
@@ -75,11 +77,12 @@ Describe 'The toolchain probe' {
         $said | Should -Be @(
             'python=yes=Python 3.11.9', 'poetry=yes=Poetry (version 1.8.3)', 'git=yes=git version 2.46.0.windows.1',
             'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'ffmpeg=yes=ffmpeg version 9.0.1-essentials_build-www.gyan.dev',
-            'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
+            'go=yes=go version go1.27.1 windows/amd64', 'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
             'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'gpu=no=',
             'testdb=no=', 'docker=no=', 'hooks=no=', $integrity)
         [System.IO.File]::ReadAllLines($pythonCalls) | Should -Be @('--version', '-m pip --version')
         [System.IO.File]::ReadAllLines($ffmpegCalls) | Should -Be @('--version')
+        [System.IO.File]::ReadAllLines($goCalls) | Should -Be @('version')
         [System.IO.File]::ReadAllText($vswhereCalls).Trim() |
             Should -BeExactly '-products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion'
     }
@@ -90,8 +93,9 @@ Describe 'The toolchain probe' {
         $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'absent\vswhere.exe') })
         $said[0] | Should -BeExactly 'python=no='
         $said[5] | Should -BeExactly 'ffmpeg=no='
-        $said[10] | Should -BeExactly 'pip=no='
-        $said[11] | Should -BeExactly 'cxx=no='
+        $said[6] | Should -BeExactly 'go=no='
+        $said[11] | Should -BeExactly 'pip=no='
+        $said[12] | Should -BeExactly 'cxx=no='
         Test-Path -LiteralPath $calls | Should -BeFalse
     }
     It 'reports pip absent when the interpreter has none, and no VC tools when vswhere finds none' {
@@ -101,8 +105,8 @@ Describe 'The toolchain probe' {
         $env:PATH = $tools
         $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'vs\vswhere.cmd') })
         $said[0] | Should -BeExactly 'python=yes=Python 3.11.9'
-        $said[10] | Should -BeExactly 'pip=no='
-        $said[11] | Should -BeExactly 'cxx=no='
+        $said[11] | Should -BeExactly 'pip=no='
+        $said[12] | Should -BeExactly 'cxx=no='
     }
     It 'reports the CUDA device nvidia-smi lists, and none when it fails or lists nothing (MCPs 939ec5c7)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
@@ -110,35 +114,35 @@ Describe 'The toolchain probe' {
         $calls = Initialize-Answer $card 'nvidia-smi' @('NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6') 0
         $env:PATH = $card
         $found = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })
-        $found[12] | Should -BeExactly 'gpu=yes=NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6'
-        $found[13] | Should -BeExactly 'testdb=no='
+        $found[13] | Should -BeExactly 'gpu=yes=NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6'
+        $found[14] | Should -BeExactly 'testdb=no='
         [System.IO.File]::ReadAllText($calls).Trim() | Should -BeExactly '--query-gpu=name,compute_cap --format=csv,noheader'
         $failing = Join-Path $script:root 'failing'
         [void](Initialize-Answer $failing 'nvidia-smi' @('NVIDIA-SMI has failed') 9)
         $env:PATH = $failing
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[12] | Should -BeExactly 'gpu=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'gpu=no='
         $silent = Join-Path $script:root 'silent'
         [void](Initialize-Answer $silent 'nvidia-smi' @() 0)
         $env:PATH = $silent
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[12] | Should -BeExactly 'gpu=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'gpu=no='
     }
     It 'reports the image of the corvis-fleet-testdb container docker answers, and none when it fails or answers nothing (MCPs daae17f2)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
         $running = Join-Path $script:root 'running'
         $calls = Initialize-Answer $running 'docker' @('pgvector/pgvector:pg16-bookworm') 0
         $env:PATH = $running
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] |
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[14] |
             Should -BeExactly 'testdb=yes=pgvector/pgvector:pg16-bookworm'
         [System.IO.File]::ReadAllText($calls).Trim() |
             Should -BeExactly 'container inspect --format "{{.Config.Image}}" corvis-fleet-testdb'
         $missing = Join-Path $script:root 'missing'
         [void](Initialize-Answer $missing 'docker' @('Error: No such container: corvis-fleet-testdb') 1 -Stderr)
         $env:PATH = $missing
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'testdb=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[14] | Should -BeExactly 'testdb=no='
         $silent = Join-Path $script:root 'silent'
         [void](Initialize-Answer $silent 'docker' @() 0)
         $env:PATH = $silent
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'testdb=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[14] | Should -BeExactly 'testdb=no='
     }
     It 'reports the hooks route only when the file exists and one import of the check tools succeeds (MCPs ec895824)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
@@ -148,17 +152,17 @@ Describe 'The toolchain probe' {
         $ready = Join-Path $script:root 'ready'
         $readyCalls = Initialize-Python $ready 0 0
         $env:PATH = $ready
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[15] |
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[16] |
             Should -BeExactly "hooks=yes=$route"
         [System.IO.File]::ReadAllLines($readyCalls) |
             Should -Be @('--version', '-m pip --version', '-c "import ruff, mypy, pytest, xdist, pytest_cov"')
         $lacking = Join-Path $script:root 'lacking'
         [void](Initialize-Python $lacking 0 1)
         $env:PATH = $lacking
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[15] |
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[16] |
             Should -BeExactly 'hooks=no='
         $env:PATH = Join-Path $script:root 'empty'
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[15] |
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[16] |
             Should -BeExactly 'hooks=no='
     }
     It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {

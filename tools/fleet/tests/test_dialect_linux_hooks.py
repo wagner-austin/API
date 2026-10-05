@@ -4,7 +4,7 @@ The ``hooks`` tag routes MCPs ``packages/claude-hooks``'s check, which runs
 on the system interpreter and whose live suites read the build account's
 ``~/.claude/corvis-hooks.json``. So the line answers the route file only when
 the file exists AND one ``python3 -c`` imports every module of
-:data:`fleet.contracts.toolchain.HOOKS_CHECK_MODULES`. The line is RUN under
+:data:`fleet.contracts.tagged_tools.HOOKS_CHECK_MODULES`. The line is RUN under
 ``sh`` with a ``python3`` ahead on PATH that records its arguments and exits
 as told, and a ``HOME`` the case lays out.
 """
@@ -16,7 +16,7 @@ import subprocess
 
 import pytest
 
-from fleet.contracts.toolchain import HOOKS_CHECK_MODULES
+from fleet.contracts.tagged_tools import HOOKS_CHECK_MODULES
 from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
 from tests.test_dialect_linux import fields_of
 

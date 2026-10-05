@@ -68,12 +68,12 @@ class TestReadySummary:
         assert (
             toolchain.ready_summary(toolchain.read_reports(LAVENDER_2026_09_23))
             == "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent"
+            "hooks absent; go absent"
         )
         assert (
             toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23))
             == "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent"
+            "hooks absent; go absent"
         )
 
     def test_it_names_a_tagged_tool_the_probe_found(self) -> None:
@@ -82,7 +82,7 @@ class TestReadySummary:
         found = toolchain.read_reports(LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg version 7.1.1\n")
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg present; "
-            "hooks absent"
+            "hooks absent; go absent"
         )
 
     def test_it_names_the_hooks_environment_the_probe_found(self) -> None:
@@ -93,7 +93,18 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks present"
+            "hooks present; go absent"
+        )
+
+    def test_it_names_go_the_probe_found(self) -> None:
+        """A node once go is installed (MCPs board task 1da15750): its runner
+        claims with go, and the summary says so on the same line."""
+        found = toolchain.read_reports(
+            LAVENDER_2026_09_23 + "go=yes=go version go1.27.1 windows/amd64\n"
+        )
+        assert toolchain.ready_summary(found) == (
+            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
+            "hooks absent; go present"
         )
 
 

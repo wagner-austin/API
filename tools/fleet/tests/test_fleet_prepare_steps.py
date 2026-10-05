@@ -49,7 +49,8 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
         and name not in prepared
     )
 
-    assert len(prepared) == 53
+    # 54 since MCPs/sms-gateway joined (MCPs board task 1da15750).
+    assert len(prepared) == 54
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",

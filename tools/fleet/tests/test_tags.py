@@ -163,10 +163,10 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_platforms_and_nine_capabilities(self) -> None:
+    def test_the_vocabulary_is_the_platforms_and_ten_capabilities(self) -> None:
         """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571,
-        615, 622, 639 and 648) is these eleven words, so the members' values are
-        pinned in order."""
+        615, 622, 639, 648 and 668) is these twelve words, so the members' values
+        are pinned in order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
             "linux",
@@ -179,15 +179,17 @@ class TestNodeTags:
             "stack",
             "ffmpeg",
             "hooks",
+            "go",
         ]
 
     def test_no_declaration_carries_a_tool_tag(self) -> None:
-        """ffmpeg and hooks come only from the toolchain probe
+        """ffmpeg, hooks and go come only from the toolchain probe
         (:func:`tool_tags`), so a node with every declaration set carries
-        neither."""
+        none of them."""
         loaded = _node(test_database=True, rust="1.98.1", cxx="13.3.0", elevated=True)
         assert NodeTag.FFMPEG not in node_tags(loaded)
         assert NodeTag.HOOKS not in node_tags(loaded)
+        assert NodeTag.GO not in node_tags(loaded)
 
 
 class TestToolTags:
@@ -216,8 +218,15 @@ class TestToolTags:
         assert tool_tags(absent) == frozenset()
         assert tool_tags(()) == frozenset()
 
+    def test_a_probe_that_found_go_gives_its_tag(self) -> None:
+        """The hub's answer, go1.27.1, the one machine with go on 2026-10-05
+        (MCPs board task 1da15750); every fleet node answered go=no=."""
+        found = (ToolReport(name="go", present=True, version="go version go1.27.1 windows/amd64"),)
+        assert tool_tags(found) == frozenset({NodeTag.GO})
+        assert tool_tags((ToolReport(name="go", present=False, version=""),)) == frozenset()
+
     def test_only_the_tagged_tools_have_tags(self) -> None:
-        assert TOOL_TAG == {"ffmpeg": NodeTag.FFMPEG, "hooks": NodeTag.HOOKS}
+        assert TOOL_TAG == {"ffmpeg": NodeTag.FFMPEG, "hooks": NodeTag.HOOKS, "go": NodeTag.GO}
         assert tool_tags((ToolReport(name="make", present=True, version="4.4"),)) == frozenset()
 
 
@@ -289,7 +298,7 @@ class TestDecodeNodeTag:
         with pytest.raises(
             JSONTypeError,
             match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, "
-            r"stack, ffmpeg, hooks, got 'podman'; .* a Rust or C\+\+ toolchain, the execution "
+            r"stack, ffmpeg, hooks, go, got 'podman'; .* a Rust or C\+\+ toolchain, the execution "
             r"suite's rootless Docker daemon, an elevated runner, the corvis compose stack, or a "
             r"tool or the hooks check's environment its probe found\), and one it does not carry "
             r"could never be satisfied$",
