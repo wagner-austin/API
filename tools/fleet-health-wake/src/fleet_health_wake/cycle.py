@@ -11,6 +11,10 @@ keeps the delivery atomic -- a second post failing after a first succeeded
 would re-post the first on the next cycle, where one post either lands
 whole or not at all.
 
+THEN THE OPERATOR ASKS (MCPs board task 1acbf53e): the audit's statement
+beside the journal is stated to the board's writer whenever it changed,
+:mod:`fleet_health_wake.asks`.
+
 AND NOTHING IS CAUGHT. A refused post ends the cycle with a non-zero exit
 for the pump to record, and the offset is not written, so the next cycle
 tries again.
@@ -23,8 +27,10 @@ import pathlib
 from board_watch.config import load_credentials
 from platform_core.board import post_to_task, register_service_session
 from platform_core.journal_cursor import cursor_path, read_offset, write_offset
+from platform_core.mcp_client import McpCredentials
 
 from fleet_health_wake import _test_hooks
+from fleet_health_wake.asks import OPERATOR_ASKS_FILENAME, state_asks
 from fleet_health_wake.identity import CURSOR_READER, HARNESS, IDENTITY, PURPOSE, load_task_id
 from fleet_health_wake.journal import HealthEvent, read_health_slice
 
@@ -43,24 +49,47 @@ def post_body(events: tuple[HealthEvent, ...]) -> str:
 
 
 def run_cycle(journal: pathlib.Path) -> None:
-    """Run one bridge cycle against the fleet health journal.
+    """Run one bridge cycle: the health journal's unread lines, then the operator asks.
+
+    The asks file is the journal's sibling in ``fleet-mcp/state``, where the
+    audit writes both (MCPs ``fleet-mcp/src/operator-asks.ts``), and is
+    stated after the journal so a refused post leaves both for the next cycle.
 
     Args:
         journal: Path to ``health-events.jsonl`` in MCPs ``fleet-mcp/state``.
 
     Raises:
         AppError: Configuration (missing credentials or task id) or the
-            board refusing a post.
-        JSONTypeError: A journal line or position file that does not decode.
-        InvalidJsonError: A journal line or position file that is not JSON.
+            board refusing a post or a statement.
+        JSONTypeError: A journal line, position, statement or marker file
+            that does not decode.
+        InvalidJsonError: A journal line, position or statement file that is
+            not JSON.
         ValueError: A position into an absent journal or past its end --
             the journal was deleted, truncated or replaced, and the
             operator decides, not this reader.
-        OSError: A journal or position file that cannot be read or written.
+        OSError: A file that cannot be read or written.
     """
     credentials = load_credentials()
-    task_id = load_task_id()
+    post_health(journal, credentials, load_task_id())
+    state_asks(journal.parent / OPERATOR_ASKS_FILENAME, credentials)
 
+
+def post_health(journal: pathlib.Path, credentials: McpCredentials, task_id: str) -> None:
+    """Post the health journal's unread lines as one note, then advance the offset.
+
+    Args:
+        journal: Path to ``health-events.jsonl``.
+        credentials: Endpoint and both board secrets.
+        task_id: The standing task the note lands in.
+
+    Raises:
+        AppError: The board refusing the checkin or the note.
+        JSONTypeError: A journal line or position file that does not decode.
+        InvalidJsonError: A journal line or position file that is not JSON.
+        ValueError: A position into an absent journal or past its end.
+        OSError: A journal or position file that cannot be read or written.
+    """
     marks = cursor_path(journal, CURSOR_READER)
     health = read_health_slice(
         journal, read_offset(_test_hooks.file_exists, _test_hooks.read_bytes, marks)
@@ -93,4 +122,4 @@ def run_cycle(journal: pathlib.Path) -> None:
     )
 
 
-__all__ = ["post_body", "run_cycle"]
+__all__ = ["post_body", "post_health", "run_cycle"]

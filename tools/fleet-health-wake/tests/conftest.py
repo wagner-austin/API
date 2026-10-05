@@ -82,6 +82,18 @@ REFUSED_LINE: Final = (
 )
 
 
+def no_statement(tmp_path: pathlib.Path) -> str:
+    """The report line of a cycle whose audit has written no operator-ask statement.
+
+    Args:
+        tmp_path: The test's temporary directory, the journal's.
+
+    Returns:
+        The line :func:`fleet_health_wake.asks.state_asks` emits.
+    """
+    return f"operator asks: no statement at {tmp_path / 'operator-asks.json'} yet; nothing stated"
+
+
 def stage_journal(tmp_path: pathlib.Path, content: bytes) -> pathlib.Path:
     """Write the health journal with exact bytes.
 

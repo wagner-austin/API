@@ -24,6 +24,7 @@ from tests.conftest import (
     TASK_ID,
     TRANSITIONS_BODY,
     TRANSITIONS_LINE,
+    no_statement,
     offset_of,
     pin_env,
     set_offset,
@@ -49,7 +50,10 @@ class TestRunCycle:
         assert note["kind"] == "note"
         assert require_str(note, "body") == TRANSITIONS_BODY + "\n\n" + REFUSED_BODY
         assert offset_of(journal) == len(content)
-        assert emitted == [f"posted 2 health line(s) (transitions, refused); offset {len(content)}"]
+        assert emitted == [
+            f"posted 2 health line(s) (transitions, refused); offset {len(content)}",
+            no_statement(tmp_path),
+        ]
 
     def test_registers_on_the_session_ledger_before_posting(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -66,7 +70,7 @@ class TestRunCycle:
         assert checkin["sessionId"] == IDENTITY["session_id"]
         assert checkin["harness"] == HARNESS
         assert PURPOSE in require_str(checkin, "body")
-        assert len(emitted) == 1
+        assert len(emitted) == 2
 
     def test_posts_only_what_is_past_the_recorded_offset(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -116,7 +120,7 @@ class TestRunCycle:
         run_cycle(journal)
 
         assert poster.bodies == []
-        assert emitted == [f"health journal quiet; offset {len(content)}"]
+        assert emitted == [f"health journal quiet; offset {len(content)}", no_statement(tmp_path)]
 
     def test_a_torn_tail_is_left_for_the_next_cycle(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -128,7 +132,7 @@ class TestRunCycle:
         run_cycle(journal)
 
         assert offset_of(journal) == 0
-        assert emitted == ["health journal quiet; offset 0"]
+        assert emitted == ["health journal quiet; offset 0", no_statement(tmp_path)]
 
     def test_an_unset_task_id_refuses_before_reading_anything(
         self, tmp_path: pathlib.Path, emitted: list[str]

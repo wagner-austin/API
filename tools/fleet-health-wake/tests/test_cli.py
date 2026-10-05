@@ -11,7 +11,14 @@ from platform_core.mcp_testing import FakeHttpPost, announcing_poster
 
 from fleet_health_wake import _test_hooks
 from fleet_health_wake.cli import wake
-from tests.conftest import CONFIGURED_ENV, TRANSITIONS_LINE, offset_of, pin_env, stage_journal
+from tests.conftest import (
+    CONFIGURED_ENV,
+    TRANSITIONS_LINE,
+    no_statement,
+    offset_of,
+    pin_env,
+    stage_journal,
+)
 
 
 class TestMain:
@@ -25,7 +32,7 @@ class TestMain:
 
         assert wake.main(["--journal", str(journal)]) == 0
         assert offset_of(journal) == len(content)
-        assert len(emitted) == 1
+        assert len(emitted) == 2
 
     def test_a_missing_journal_flag_refuses(self) -> None:
         with pytest.raises(ValueError, match="--journal"):
@@ -47,7 +54,7 @@ class TestInvocationForms:
         finally:
             sys.argv[:] = saved_argv
         assert caught.value.code == 0
-        assert emitted == ["health journal quiet; offset 0"]
+        assert emitted == ["health journal quiet; offset 0", no_statement(tmp_path)]
 
     def test_running_as_a_module_actually_runs(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -69,4 +76,4 @@ class TestInvocationForms:
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
-        assert emitted == ["health journal quiet; offset 0"]
+        assert emitted == ["health journal quiet; offset 0", no_statement(tmp_path)]
