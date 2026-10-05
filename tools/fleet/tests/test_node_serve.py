@@ -162,6 +162,14 @@ class Steps:
         self.calls.append(f"rolled@{self._at()}")
         return self._rolled.pop(0)
 
+    def launching(self) -> int:
+        """Count the launches under way, which these cases never start.
+
+        Returns:
+            None under way; not recorded, as no case here varies it.
+        """
+        return 0
+
     def bound(self) -> node_serve.ServeSteps:
         """The steps as the loop takes them.
 
@@ -169,8 +177,43 @@ class Steps:
             Them.
         """
         return node_serve.ServeSteps(
-            collect=self.collect, fill=self.fill, queued=self.queued, rolled=self.rolled
+            collect=self.collect,
+            fill=self.fill,
+            queued=self.queued,
+            rolled=self.rolled,
+            launching=self.launching,
         )
+
+
+class LaunchingSteps(Steps):
+    """Steps whose count of launches under way is scripted, one per handover asked.
+
+    Attributes:
+        counted: When the loop counted them, seconds after DEMO_NOW.
+    """
+
+    counted: list[int]
+
+    def __init__(self, clock: FakeClock, *, under_way: Sequence[int]) -> None:
+        """Bind the counts; nothing is queued, the roll is never read, and a
+        fill launches nothing.
+
+        Args:
+            clock: The pinned clock.
+            under_way: One count per time the loop asks.
+        """
+        super().__init__(clock, queued=_nothing_queued, rolled=(), fill=_fill_does_nothing)
+        self.counted = []
+        self._under_way = list(under_way)
+
+    def launching(self) -> int:
+        """The next scripted count.
+
+        Returns:
+            How many launches are under way.
+        """
+        self.counted.append(self.clock.seconds - DEMO_NOW)
+        return self._under_way.pop(0)
 
 
 def _nothing_queued(at: int) -> frozenset[str]:
@@ -235,6 +278,22 @@ class TestAServeOfZeroSeconds:
             fills=1,
             reason="its node_serve_seconds is 0",
         )
+
+    def test_waits_for_a_launch_under_way_and_hands_over_at_the_next_boundary(self) -> None:
+        """A handover beside a launch would leave the process draining it
+        past the fire, which the scheduler then skips (job 6c568ecb on
+        diphtheria, 2026-10-05); the watch is not even asked to close."""
+        clock = pin_clock(DEMO_NOW)
+        steps = LaunchingSteps(clock, under_way=[1, 0])
+        watch = ScriptedWatch([True])
+
+        served = _serve(steps, watch, serve_seconds=0)
+
+        assert steps.calls == ["collect@0", "fill@0", "collect@150"]
+        assert served["handed_over"] == SECOND_FIRE - node_serve.HANDOVER_SECONDS
+        assert served["fires"] == 1
+        assert watch.asked == 1
+        assert steps.counted == [150, 330]
 
     def test_refused_while_a_settle_runs_renews_at_the_fire_and_hands_over_at_the_next(
         self,

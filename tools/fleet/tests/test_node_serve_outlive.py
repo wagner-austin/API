@@ -189,6 +189,15 @@ def _rolled() -> str:
     return "roll-1"
 
 
+def _none_launching() -> int:
+    """The launches under way, of which this serve starts none.
+
+    Returns:
+        None.
+    """
+    return 0
+
+
 class TestAServeWhoseQueueListingIsRefused:
     def test_settles_the_run_that_ends_afterwards_then_raises_the_refusal(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -214,7 +223,11 @@ class TestAServeWhoseQueueListingIsRefused:
             watch.hold(frozenset({DEMO_RUN_ID}))
 
         steps = node_serve.ServeSteps(
-            collect=collect, fill=_fills_nothing, queued=_refused, rolled=_rolled
+            collect=collect,
+            fill=_fills_nothing,
+            queued=_refused,
+            rolled=_rolled,
+            launching=_none_launching,
         )
 
         with caplog.at_level("INFO"), pytest.raises(urllib.error.URLError, match="10061"):
