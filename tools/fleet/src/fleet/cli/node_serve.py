@@ -26,7 +26,8 @@ yield, unchanged. At every fire boundary it runs the collect pass again,
 which renews each running job's queue lease as each start did.
 
 WHEN IT HANDS OVER. Only :data:`HANDOVER_SECONDS` before a fire boundary,
-and only while no settle is under way (:meth:`fleet.cli.node_watch.RunWatch.close_if_idle`),
+and only while no settle is under way (:meth:`fleet.cli.node_watch.RunWatch.close_if_idle`)
+and no claimed job is still being launched (:mod:`fleet.cli.node_launch`),
 once it has served the workspace's ``node_serve_seconds`` or
 ``refs/fleet/rolled`` has moved off the commit it runs, so a roll takes
 effect at the next boundary as it did before. The scheduler's fires that
@@ -118,12 +119,20 @@ class ServeSteps(TypedDict):
         queued: The ids of the queued jobs naming this node or no node.
         rolled: What ``refs/fleet/rolled`` names now
             (:func:`fleet.core.rolled.rolled_state`).
+        launching: How many claimed jobs are still being launched
+            (:mod:`fleet.cli.node_launch`); a serve does not hand over while
+            any is, since its process would outlive the fire boundary
+            draining it, the scheduler would skip that fire, and the run
+            would go unwatched until the next (job 6c568ecb on diphtheria,
+            2026-10-05: launched 17 s after a 10:05:50Z handover, ended
+            10:06:43Z, closed 10:09:14Z).
     """
 
     collect: Callable[[], None]
     fill: Callable[[], None]
     queued: Callable[[], frozenset[str]]
     rolled: Callable[[], str]
+    launching: Callable[[], int]
 
 
 class Handover(TypedDict):
@@ -301,7 +310,12 @@ def serve_loop(
             continue
         if reason is None:
             reason = policy["due"](now)
-        if reason is not None and now < fire and watch.close_if_idle():
+        if (
+            reason is not None
+            and now < fire
+            and steps["launching"]() == 0
+            and watch.close_if_idle()
+        ):
             return Served(
                 started=started,
                 handed_over=now,

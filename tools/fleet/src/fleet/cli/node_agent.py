@@ -378,6 +378,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     def rolled_now() -> str:
         return rolled.rolled_state(loaded.directory)
 
+    def launching() -> int:
+        return launcher.launching()["load"]["runs"]
+
     with launcher:
         node_serve.serve(
             watch,
@@ -386,7 +389,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             serve_seconds=loaded.workspace["node_serve_seconds"],
             poll_seconds=loaded.workspace["node_poll_seconds"],
             steps=node_serve.ServeSteps(
-                collect=collect, fill=fill, queued=queued, rolled=rolled_now
+                collect=collect,
+                fill=fill,
+                queued=queued,
+                rolled=rolled_now,
+                launching=launching,
             ),
         )
     return 0
