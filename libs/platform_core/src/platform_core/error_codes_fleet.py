@@ -177,6 +177,14 @@ class FleetErrorCode(ErrorCodeBase):
     # line. One code would send half its readers to the wrong repository.
     QUEUE_ANSWER_MALFORMED = "QUEUE_ANSWER_MALFORMED"
     QUEUE_CREDENTIALS_MISSING = "QUEUE_CREDENTIALS_MISSING"
+    # The queue (or the board beside it) gave NO answer: the connection was
+    # refused, reset or timed out before any HTTP status came back. Distinct
+    # from an answer the runner cannot use, because a serving node runner
+    # asks again at its next poll instead of ending: a deploy recreating
+    # mcp-fleet refuses every call for a minute or two, and on 2026-10-05 one
+    # such refusal at 11:54:58Z cost row bde22e57 a whole tick (MCPs board
+    # task 8993c306).
+    QUEUE_UNANSWERED = "QUEUE_UNANSWERED"
 
     # The CI runner roster (`tools/fleet/runners.json`) -- which GitHub
     # Actions runner installs each machine carries, and the host assets their
