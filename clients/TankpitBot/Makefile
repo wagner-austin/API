@@ -10,7 +10,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 OUTPUT ?=
 CONFORMANCE_BASELINE := wiki/sources/conformance_baseline.json
 
-.PHONY: help lint test check _check-unbudgeted execution installdigest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted execution installdigest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
 
 help:
 	@echo ""
@@ -23,6 +23,7 @@ help:
 	@echo "  make test                        pytest + coverage"
 	@echo "  make audit                       re-derive wiki physics claims, replay captures vs the sim"
 	@echo "  make conformance-baseline        rewrite the conformance ratchet from a fresh replay"
+	@echo "  make container-census            container sites per field from radar scans, held-out fit"
 	@echo "  make corpus-audit                diff every archived run's analyzers against its wire receipts"
 	@echo "  make wiki-anchors                report wiki pages owed an audit (never gates)"
 	@echo "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
@@ -342,6 +343,12 @@ audit:
 # commit the file with that change: the bar only moves on purpose.
 conformance-baseline:
 	poetry run tankpit-conformance --write-baseline $(CONFORMANCE_BASELINE)
+
+# Where containers stand on each field, read from the archive's radar
+# scans, with the terrain shape fitted on each field and scored on every
+# other. A measurement, not a gate; see wiki/pages/container-census.md.
+container-census:
+	poetry run tankpit-container-census
 
 # Reports which wiki pages are owed an audit. NOT part of `make check`:
 # a stale anchor is a to-do marker, not a defect, and gating on it would
