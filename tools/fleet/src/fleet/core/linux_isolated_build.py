@@ -42,11 +42,13 @@ suite's ``compose down -v`` does.
 
 from __future__ import annotations
 
+import shlex
+
 from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
-from fleet.core.names import CACHE_VARIABLE
+from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import sh_phase_lines
 
 #: The user whose rootless daemon a docker project's build runs against.
@@ -124,6 +126,7 @@ def isolated_build_lines(
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
         f"{AGENT_LABEL_VARIABLE}='{agent}' "
         f'{CACHE_VARIABLE}="$exec_cache" '
+        f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')} "
         'sh -eu -c "$1"',
         "}",
         "status=0",

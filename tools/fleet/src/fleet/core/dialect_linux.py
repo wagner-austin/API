@@ -45,7 +45,7 @@ from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import POETRY_KEYRING_OFF, isolated_build_lines
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
-from fleet.core.names import CACHE_VARIABLE
+from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import sh_phase_lines
 
 #: How a script file is run by path.
@@ -369,9 +369,10 @@ class LinuxDialect:
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
             f"{AGENT_LABEL_VARIABLE}='{label}'",
             f"{CACHE_VARIABLE}='{cache_root}'",
+            f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')}",
             f"export npm_config_cache POETRY_CACHE_DIR {POETRY_KEYRING_OFF[0]} "
             f"PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE} "
-            f"{CACHE_VARIABLE}",
+            f"{CACHE_VARIABLE} {WORKSPACE_VARIABLE}",
             f"cd '{target}'",
         ]
         for step in install:

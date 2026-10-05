@@ -122,6 +122,9 @@ LOGS_DIRECTORY = "logs"
 #: same commit (MCPs board task 74b13c20).
 CACHE_VARIABLE = "CORVIS_FLEET_CACHE"
 
+#: Project directory used by preparation to select its dependency closure.
+WORKSPACE_VARIABLE = "CORVIS_FLEET_WORKSPACE"
+
 
 def cache_root(stage_root: str) -> str:
     """Where a node keeps the dependency caches its export runs share.

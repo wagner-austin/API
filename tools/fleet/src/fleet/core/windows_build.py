@@ -26,7 +26,7 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
-from fleet.core.names import CACHE_VARIABLE
+from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import PHASE_MARKER
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
@@ -161,6 +161,7 @@ def build_script(
         f"$env:CORVIS_FLEET_ELEVATED = '{1 if elevated else 0}'",
         f"$env:{AGENT_LABEL_VARIABLE} = '{label}'",
         f"$env:{CACHE_VARIABLE} = $CacheRoot",
+        f"$env:{WORKSPACE_VARIABLE} = '{scriptable(path or '.', label='workspace')}'",
         '$env:PATH = "$GitBin;$env:PATH"',
         "function Invoke-Logged {",
         "    param([string]$Shell, [string]$Command)",
