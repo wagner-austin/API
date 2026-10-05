@@ -269,7 +269,8 @@ def _boot(
     # placed its own keeps them ([[ferry-mechanics]]).
     log.info("ferries: %d afloat", seed_ferries(world, terrain))
     _require_seeds_passable(world, terrain)
-    server = SimServer(world, terrain, client_id=SIM_CLIENT_ID, roster_ids=roster_ids)
+    server = SimServer(world, terrain, roster_ids=roster_ids)
+    server.connect(SIM_CLIENT_ID)
     bot = Bot("https://sim.tankpit.local/", headless=True)
     # The bot lifts the magic off the page client's AUTH frame live, via
     # a CDP event stream the sim has no counterpart for; the link sends
@@ -278,7 +279,7 @@ def _boot(
     # the wire ([[session-state-deglobalisation]]).
     bot._magic = SIM_MAGIC
     bot._on_magic_captured(SIM_MAGIC)
-    link = SimCDPSession(server, SIM_MAGIC, SimLobby(SIM_ACCOUNT))
+    link = SimCDPSession(server, SIM_CLIENT_ID, SIM_MAGIC, SimLobby(SIM_ACCOUNT))
     bot._cdp = link
     # The link is the page too: it satisfies the narrow page protocols
     # the poll-and-read flows take, so the PRODUCTION autoscroll
@@ -298,7 +299,7 @@ def _boot(
     # archived lobby frames per session finally have a sim counterpart.
     if not join_room(link, link, bot.world):
         raise RuntimeError("sim lobby: the production join flow did not reach a room")
-    deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
+    deliver_batch(bot._cdp_message_buffer, server.handshake(SIM_CLIENT_ID), link)
     return bot, server, link, driver
 
 

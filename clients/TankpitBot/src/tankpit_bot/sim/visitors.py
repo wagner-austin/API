@@ -30,8 +30,9 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import fuel_capacity
-from tankpit_bot.protocol.types import BinaryMessage, TankEntryDict, TankExitDict
+from tankpit_bot.protocol.types import BinaryMessage, TankExitDict
 from tankpit_bot.sim.spawn import find_open_tile
+from tankpit_bot.sim.wire_statements import entry_statement
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 
 VISITOR_ARRIVAL_PERIOD_TICKS = 1692
@@ -39,11 +40,6 @@ VISITOR_ARRIVAL_PERIOD_TICKS = 1692
 
 VISITOR_STAY_TICKS = 59
 """How long a visitor stays: the median of the ten paired visits."""
-
-VISITOR_ENTRY_X = 0
-VISITOR_ENTRY_Y = 0
-"""The position an entry reports: none. 15 of 16 archived entries
-carry ``(0, 0)`` — the joining tank is not in the client's view."""
 
 VISITOR_ID_BASE = 3000
 """Visitor ids start past every seeded roster and scripted opponent."""
@@ -117,20 +113,7 @@ class RoomChurn:
         )
         self.visitor_id = tank_id
         self.arrived_tick = world["tick"]
-        messages.append(
-            TankEntryDict(
-                msg_type=0x28,
-                team=team,
-                tank_id=tank_id,
-                rank=rank,
-                # Damage 3 (full) on every archived entry — a tank
-                # joins at capacity.
-                damage_state=3,
-                score=0,
-                x=VISITOR_ENTRY_X,
-                y=VISITOR_ENTRY_Y,
-            )
-        )
+        messages.append(entry_statement(world, tank_id))
 
     def _retire(self, world: SimWorldDict, tank_id: int, messages: list[BinaryMessage]) -> None:
         """Send the visitor home and announce it.
@@ -161,8 +144,6 @@ class RoomChurn:
 
 __all__ = [
     "VISITOR_ARRIVAL_PERIOD_TICKS",
-    "VISITOR_ENTRY_X",
-    "VISITOR_ENTRY_Y",
     "VISITOR_ID_BASE",
     "VISITOR_STAY_TICKS",
     "RoomChurn",

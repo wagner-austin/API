@@ -13,6 +13,7 @@ from tankpit_bot.protocol.types import (
     MovementDict,
     MovementResponseDict,
     StatisticsDict,
+    TankEntryDict,
     TankInfoDict,
     TankStatusDict,
     TankStatusSyncDict,
@@ -25,6 +26,12 @@ from tankpit_bot.sim.world import SimWorldDict
 
 _NO_AWARDS = pack_decorations((0,) * DECORATION_SLOTS)
 """A tank that has earned nothing — every opponent the sim seeds."""
+
+ENTRY_X = 0
+ENTRY_Y = 0
+"""The position a 0x28 entry reports: none. 15 of 16 archived entries
+carry ``(0, 0)`` — the joining tank is not in the client's view
+([[session-state-deglobalisation]])."""
 
 
 def queued_tank_id(entry: tuple[int, ClientCommandDict]) -> int:
@@ -146,6 +153,34 @@ def identity_statement(
     )
 
 
+def entry_statement(world: SimWorldDict, tank_id: int) -> TankEntryDict:
+    """Build the 0x28 a room's connections receive when a tank joins it.
+
+    One builder for both arrivals the sim models — a churn visitor and
+    a connection admitted to a running field — because the real server
+    has one entry message, not two. Damage 3 (full) on every archived
+    entry: a tank joins at capacity.
+
+    Args:
+        world: Simulated world (the tank is already on it).
+        tank_id: The joining tank.
+
+    Returns:
+        The entry message.
+    """
+    tank = world["tanks"][tank_id]
+    return TankEntryDict(
+        msg_type=0x28,
+        team=tank["team"],
+        tank_id=tank_id,
+        rank=tank["rank"],
+        damage_state=3,
+        score=0,
+        x=ENTRY_X,
+        y=ENTRY_Y,
+    )
+
+
 def statistics_statement(tick: int, destroyed: int, deactivated: int) -> StatisticsDict:
     """Build the 0x56 answer to a client statistics request.
 
@@ -245,6 +280,9 @@ def position_statement(world: SimWorldDict, tank_id: int) -> MovementResponseDic
 
 
 __all__ = [
+    "ENTRY_X",
+    "ENTRY_Y",
+    "entry_statement",
     "full_status_statement",
     "identity_statement",
     "movement_echo",

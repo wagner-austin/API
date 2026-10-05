@@ -215,7 +215,7 @@ def run_sim_session(
             enemy_id = _queue_round_opponents(
                 server, driver, opponent, ghost_spec, enemy_id, round_index
             )
-            batch = server.advance_tick()
+            batch = server.advance_tick()[SIM_CLIENT_ID]
             if driver is not None:
                 driver.note_batch(server.world, batch)
             deliver_batch(bot._cdp_message_buffer, batch, link)

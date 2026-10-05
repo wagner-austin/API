@@ -115,8 +115,14 @@ class SimCDPSession:
     every decoded command for assertions and diagnostics.
     """
 
-    def __init__(self, server: SimServer, magic: str, lobby: SimLobby | None = None) -> None:
-        """Bind the session to a sim server and its session magic.
+    def __init__(
+        self,
+        server: SimServer,
+        tank_id: int,
+        magic: str,
+        lobby: SimLobby | None = None,
+    ) -> None:
+        """Bind the session to a sim server, its tank and its session magic.
 
         The magic is the parameter rather than the table because the
         table is DERIVED from it and the AUTH frame carries it — a link
@@ -124,6 +130,9 @@ class SimCDPSession:
 
         Args:
             server: The sim server this link speaks to.
+            tank_id: The connected tank this link speaks for. The
+                CONNECTION supplies the commanding tank, as a real
+                socket does: nothing on the wire names it.
             magic: The session magic. Its table is built here, and the
                 bot must end up with the same one.
             lobby: The pre-play protocol half. When given, the link
@@ -135,6 +144,7 @@ class SimCDPSession:
                 want ([[session-state-deglobalisation]]).
         """
         self.server = server
+        self.tank_id = tank_id
         self.magic = magic
         self.table = build_session_xor_table(magic)
         self.lobby = lobby
@@ -303,7 +313,7 @@ class SimCDPSession:
                 self.map_visible = True
             if command["kind"] is ClientCommandKind.TELEPORT:
                 self.map_visible = False
-            self.server.queue_command(self.server.session.client_id, command)
+            self.server.queue_command(self.tank_id, command)
         now = get_current_time_ms()
         self._last_send_ms = now
         self.wire_log.append(

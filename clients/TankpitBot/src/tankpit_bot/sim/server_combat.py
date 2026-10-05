@@ -5,7 +5,7 @@ The shoot family and the clock it drives, mixed into
 :class:`~tankpit_bot.sim.server_move.SimServerMoveMixin`. Both routers
 have the same shape and it is the shape the whole emission side now
 follows: RESOLVE the action once against the world, BOOK what the field
-must remember, then NARRATE the outcome for one connection
+must remember, then NARRATE the outcome once per connection
 ([[recipient-policy]]).
 """
 
@@ -15,13 +15,13 @@ from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.supervisor import shot_refusal
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_CANT_DO
-from tankpit_bot.protocol.types import BinaryMessage, SupervisorDict
+from tankpit_bot.protocol.types import SupervisorDict
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
-from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat import process_shot
 from tankpit_bot.sim.combat_clock import CombatClock
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.narrate import narrate_corpse_removals, narrate_shot
+from tankpit_bot.sim.outbox import TickOutbox
 from tankpit_bot.sim.server_sessions import SimServerSessionsMixin
 from tankpit_bot.sim.world import SimWorldDict
 
@@ -35,7 +35,6 @@ class SimServerCombatMixin(SimServerSessionsMixin):
 
     world: SimWorldDict
     terrain: TerrainMapProtocol
-    session: ClientSession
     combat: CombatClock
     _roster_ids: frozenset[int]
 
@@ -87,7 +86,7 @@ class SimServerCombatMixin(SimServerSessionsMixin):
         self,
         tank_id: int,
         command: ClientCommandDict,
-        messages: list[BinaryMessage],
+        outbox: TickOutbox,
         ammo_changed: set[int],
         moved: set[int],
     ) -> None:
@@ -99,39 +98,45 @@ class SimServerCombatMixin(SimServerSessionsMixin):
         only BOOKS or REPORTS it: the firing cost goes to the clock for
         next tick (measured charge latency), a deactivation opens the
         corpse window and scores the kill, and the narrator turns the
-        outcome into this connection's wire. Nothing below mutates the
+        outcome into each connection's wire. Nothing below mutates the
         world, which is what makes a second connection a second
         ``narrate_shot`` call rather than a second shot.
 
         A victim whose shields absorbed the hit has its counts moved,
         and so does a killer paid the mercy bundle — both feed the
-        end-of-tick 0x49 for whichever of them is the client.
+        end-of-tick 0x49 for whichever of them is connected.
 
         Args:
             tank_id: The firing tank.
             command: The queued shoot command.
-            messages: This tick's outgoing batch (appended).
+            outbox: This tick's outgoing batches (appended).
             ammo_changed: Accumulator of tanks whose counts moved.
             moved: Tanks that relocated earlier this tick (drives the
                 homing selection).
         """
         refusal = self._refuse_shot(tank_id, command)
         if refusal is not None:
-            if tank_id == self.session.client_id:
-                # Measured field values, 2026-09-02: code 0 carries
-                # (0, 1) in 47 of 47 archived shoot windows and code 3
-                # carries (1, 0) in 45 of 45. They are NOT the move
-                # family's values and must not be copied from there.
-                messages.append(
-                    SupervisorDict(
-                        msg_type=0x52,
-                        reset_action=0 if refusal == SUPERVISOR_ERROR_CANT_DO else 1,
-                        close_map=1 if refusal == SUPERVISOR_ERROR_CANT_DO else 0,
-                        error_code=refusal,
-                    )
-                )
+            # Measured field values, 2026-09-02: code 0 carries (0, 1)
+            # in 47 of 47 archived shoot windows and code 3 carries
+            # (1, 0) in 45 of 45. They are NOT the move family's values
+            # and must not be copied from there.
+            outbox.to(
+                tank_id,
+                SupervisorDict(
+                    msg_type=0x52,
+                    reset_action=0 if refusal == SUPERVISOR_ERROR_CANT_DO else 1,
+                    close_map=1 if refusal == SUPERVISOR_ERROR_CANT_DO else 0,
+                    error_code=refusal,
+                ),
+            )
             return
-        removed_tick = self.session.viewport.removed_at.get(command["target_id"])
+        # The law-4 reroute clock starts when the target left the
+        # SHOOTER's own view; a shooter with no connection has no view
+        # for it to have left.
+        shooter = self.session_for(tank_id)
+        removed_tick = (
+            None if shooter is None else shooter.viewport.removed_at.get(command["target_id"])
+        )
         departed_age_ms = (
             None if removed_tick is None else (self.world["tick"] - removed_tick) * TICK_RATE_MS
         )
@@ -152,9 +157,9 @@ class SimServerCombatMixin(SimServerSessionsMixin):
             self.combat.record_deactivation(tank_id, outcome["victim_id"])
         if outcome["mercy"] is not None:
             ammo_changed.add(tank_id)
-        messages.extend(narrate_shot(outcome, self.session.client_id))
+        outbox.narrate(lambda observer_id: narrate_shot(outcome, observer_id))
 
-    def _close_corpse_windows(self, messages: list[BinaryMessage]) -> None:
+    def _close_corpse_windows(self, outbox: TickOutbox) -> None:
         """Emit the 0x58 of every corpse whose 22 s window came due.
 
         Roster bots come back the same tick their corpse clears: same
@@ -167,10 +172,10 @@ class SimServerCombatMixin(SimServerSessionsMixin):
         clock and the narrator were separated.
 
         Args:
-            messages: This tick's outgoing batch (appended).
+            outbox: This tick's outgoing batches (appended).
         """
         cleared = self.combat.expire_corpses()
-        messages.extend(narrate_corpse_removals(cleared))
+        outbox.broadcast(narrate_corpse_removals(cleared))
         for tank_id in cleared:
             if tank_id in self._roster_ids:
                 reactivate_practice_bot(self.world, self.terrain, tank_id)

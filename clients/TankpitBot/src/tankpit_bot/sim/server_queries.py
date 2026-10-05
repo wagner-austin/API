@@ -22,9 +22,9 @@ from tankpit_bot.protocol.types import (
     InventoryDict,
     SyncDict,
 )
-from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat_clock import CombatClock
 from tankpit_bot.sim.commands import ClientCommandKind
+from tankpit_bot.sim.outbox import TickOutbox
 from tankpit_bot.sim.server_sessions import SimServerSessionsMixin
 from tankpit_bot.sim.wire_statements import (
     full_status_statement,
@@ -46,11 +46,10 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
     """
 
     world: SimWorldDict
-    session: ClientSession
     combat: CombatClock
 
-    def handshake(self) -> list[BinaryMessage]:
-        """Build the session-start burst the client receives on join.
+    def handshake(self, tank_id: int) -> list[BinaryMessage]:
+        """Build the session-start burst one connection receives on join.
 
         Mirrors the real server's join choreography (and the scenario
         harness's ``place_self``). The whole burst was re-measured
@@ -95,10 +94,17 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         — joining IS the common case
         ([[session-state-deglobalisation]]).
 
+        Args:
+            tank_id: The connected tank joining.
+
         Returns:
             The decoded messages of the join burst, in order.
+
+        Raises:
+            SimError: If nothing is connected for the tank.
         """
-        client = self.world["tanks"][self.session.client_id]
+        session = self.require_session(tank_id)
+        client = self.world["tanks"][tank_id]
         inventory = InventoryDict(
             msg_type=0x49,
             show=True,
@@ -107,17 +113,11 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
             enabled=list(client["enabled"]),
         )
         messages: list[BinaryMessage] = [
-            identity_statement(
-                self.world, self.session.client_id, self.session.awards.decoration_state
-            ),
-            full_status_statement(
-                self.world, self.session.client_id, self.session.awards.decoration_state
-            ),
-            self.session.viewport.build_update(),
-            position_statement(self.world, self.session.client_id),
-            status_sync(
-                self.session.client_id, self.world, True, self.session.progression.promo_state
-            ),
+            identity_statement(self.world, tank_id, session.awards.decoration_state),
+            full_status_statement(self.world, tank_id, session.awards.decoration_state),
+            session.viewport.build_update(),
+            position_statement(self.world, tank_id),
+            status_sync(tank_id, self.world, True, session.progression.promo_state),
         ]
         # The identity run is PURE 0x21 — no position statements ride
         # it. Measured 340/340 (2026-09-01, [[recipient-policy]]): with
@@ -125,11 +125,11 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         # about 13% of the time, so zero of 340 is not sampling, it is
         # the law. Other tanks' positions arrive from the in-play
         # membership diff, never from the join burst.
-        for tank_id in sorted(self.world["tanks"]):
-            tank = self.world["tanks"][tank_id]
-            if tank_id == self.session.client_id or not tank["alive"]:
+        for other_id in sorted(self.world["tanks"]):
+            other = self.world["tanks"][other_id]
+            if other_id == tank_id or not other["alive"]:
                 continue
-            messages.append(identity_statement(self.world, tank_id))
+            messages.append(identity_statement(self.world, other_id))
         # The burst TAIL, measured 340/340: the inventory arrives
         # TWICE, then the equipment-enabled state, then the sync — and
         # the pair sits AFTER the identity run, not in the self block
@@ -147,7 +147,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         self,
         tank_id: int,
         kind: ClientCommandKind,
-        messages: list[BinaryMessage],
+        outbox: TickOutbox,
     ) -> bool:
         """Answer the commands that ask about the CONNECTION, not the world.
 
@@ -168,7 +168,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         Args:
             tank_id: The commanding tank.
             kind: The command kind.
-            messages: This tick's outgoing batch (appended).
+            outbox: This tick's outgoing batches (appended).
 
         Returns:
             True when ``kind`` was a connection query and is now
@@ -177,14 +177,14 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         if kind is ClientCommandKind.STATISTICS:
             # Per-connection, like every other answer: the statistics
             # of the tank that asked, and only to that tank.
-            if tank_id == self.session.client_id:
-                messages.append(
-                    statistics_statement(
-                        self.world["tick"],
-                        self.combat.destroyed_by(self.session.client_id),
-                        self.combat.deactivations_of(self.session.client_id),
-                    )
-                )
+            outbox.to(
+                tank_id,
+                statistics_statement(
+                    self.world["tick"],
+                    self.combat.destroyed_by(tank_id),
+                    self.combat.deactivations_of(tank_id),
+                ),
+            )
             return True
         if kind is ClientCommandKind.ENTER_GAME:
             # THE JOIN BURST IS AN ANSWER, NOT A PUSH. Measured over
@@ -198,25 +198,26 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
             # OUR bot never sends this command: ``enter_game()`` sat
             # in two production classes with zero callers while the
             # bot joined through the lobby's ``join_room`` instead. A
-            # real client asks, so the server now answers.
-            if tank_id == self.session.client_id:
-                messages.extend(self.handshake())
+            # real client asks, so the server now answers — the
+            # connection that asked, and only a connection can ask.
+            if self.session_for(tank_id) is not None:
+                outbox.batch(tank_id).extend(self.handshake(tank_id))
             return True
         if kind is ClientCommandKind.INVENTORY:
             # The 'i' key. Four archived sends, every one answered
             # with a 0x49 — thin, but the command's own name and its
             # answer agree, and the snapshot builder already exists.
-            if tank_id == self.session.client_id:
-                client = self.world["tanks"][tank_id]
-                messages.append(
-                    InventoryDict(
-                        msg_type=0x49,
-                        show=True,
-                        alternate=False,
-                        counts=list(client["counts"]),
-                        enabled=list(client["enabled"]),
-                    )
-                )
+            tank = self.world["tanks"][tank_id]
+            outbox.to(
+                tank_id,
+                InventoryDict(
+                    msg_type=0x49,
+                    show=True,
+                    alternate=False,
+                    counts=list(tank["counts"]),
+                    enabled=list(tank["enabled"]),
+                ),
+            )
             return True
         # THE HEARTBEAT DRAWS SILENCE, and this is the one query
         # answered by RETURNING rather than by appending. Measured over
