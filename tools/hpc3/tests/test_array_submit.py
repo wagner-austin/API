@@ -98,6 +98,24 @@ class TestSelectingMembers:
 
 
 class TestRefusals:
+    def test_a_template_declaring_another_commit_is_refused_before_any_upload(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """Rung 5's shape: the declared commit is one the checkout never fetched."""
+        script_healthy_environment(fake_run)
+        fake_run.add(
+            "rev-parse",
+            stdout="head=80221ea1056e08aacd3f5ee01e6c599e166970be declared= ancestor=\n",
+        )
+        spec = _sweep(experiment={"repo_commit": "20d9159", "repo_tree": "/pub/wagnera3/api"})
+
+        with pytest.raises(AppError) as caught:
+            _submit(spec, (0, 1, 2), tmp_path)
+
+        assert caught.value.code is Hpc3ErrorCode.REPO_COMMIT_NOT_HEAD
+        assert not any("sbatch" in c for c in fake_run.commands())
+        assert not (tmp_path / "ledger.jsonl").exists()
+
     def test_a_scheduler_rejection_names_the_array_and_uploads_nothing_twice(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:

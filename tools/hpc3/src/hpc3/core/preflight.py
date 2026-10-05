@@ -26,7 +26,7 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
-from hpc3.core import env_probe, gpu_supply, image_exec, remote, sbatch
+from hpc3.core import code_claim, env_probe, gpu_supply, image_exec, remote, sbatch
 
 _START_ANCHOR = " to start at "
 _USING_ANCHOR = " using "
@@ -241,7 +241,10 @@ def preflight(
             ``ENV_PACKAGE_MISMATCH`` if it exists but does not contain what
             the project pinned, ``ENV_PROBE_UNREADABLE`` if it cannot say what
             it contains, ``ENV_INTERPRETER_BORROWED`` if its interpreter
-            belongs to another installation, ``GPU_MODEL_EXHAUSTED`` if the job pins a GPU model
+            belongs to another installation, ``REPO_COMMIT_NOT_HEAD`` or
+            ``REPO_COMMIT_PROBE_UNREADABLE`` if the run declares a commit its
+            checkout is not at or cannot be read about,
+            ``GPU_MODEL_EXHAUSTED`` if the job pins a GPU model
             the partition has none of free while another model idles,
             ``PREFLIGHT_REJECTED`` if Slurm refuses the job -- carrying its
             own reason, which is the diagnostic -- or ``PREFLIGHT_UNPARSABLE``
@@ -254,6 +257,10 @@ def preflight(
     env_probe.verify_environment(
         host, spec["env_path"], spec["pinned_packages"], image=spec["image"]
     )
+    # Then the code: a run that names the commit it executes is held to it
+    # against the checkout it runs from. See `hpc3.core.code_claim` for the
+    # rung that declared a commit its checkout had never fetched.
+    code_claim.check_code_claim(host, spec["experiment"])
     # Then whether the card it pinned exists free. `sbatch --test-only` below
     # answers "would this be ADMITTED", and a job queued behind an exhausted
     # GPU model is admitted -- it just does not run. That gap cost five hours

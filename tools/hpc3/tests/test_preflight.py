@@ -375,6 +375,33 @@ class TestPreflight:
         assert "Invalid account" in excinfo.value.message
 
 
+_CHECKOUT_HEAD = "80221ea1056e08aacd3f5ee01e6c599e166970be"
+_CLAIMING: dict[str, JSONValue] = {"repo_commit": "80221ea", "repo_tree": "/pub/wagnera3/api"}
+
+
+class TestPreflightHoldsARunToItsDeclaredCommit:
+    def test_a_claim_the_checkout_bears_out_is_admitted(self, fake_run: FakeRun) -> None:
+        _script_abl_pinned(fake_run)
+        fake_run.add(
+            "rev-parse", stdout=f"head={_CHECKOUT_HEAD} declared={_CHECKOUT_HEAD} ancestor=0\n"
+        )
+        fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
+
+        assert _run_preflight(_spec(experiment=_CLAIMING))["partition"] == "free-gpu"
+        assert any(c.startswith("cd /pub/wagnera3/api && ") for c in fake_run.commands())
+
+    def test_a_claim_naming_another_commit_stops_before_anything_is_uploaded(
+        self, fake_run: FakeRun
+    ) -> None:
+        _script_abl_pinned(fake_run)
+        fake_run.add("rev-parse", stdout=f"head={_CHECKOUT_HEAD} declared= ancestor=\n")
+
+        with pytest.raises(AppError) as excinfo:
+            _run_preflight(_spec(experiment={**_CLAIMING, "repo_commit": "20d9159"}))
+        assert excinfo.value.code is Hpc3ErrorCode.REPO_COMMIT_NOT_HEAD
+        assert not any("sbatch" in c for c in fake_run.commands())
+
+
 class TestPreflightChecksEnvironmentIdentity:
     """Existence, then identity, then the scheduler -- in that order.
 

@@ -35,7 +35,7 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.preflight import PreflightResult
 from hpc3.contracts.sweep import SweepSpec, expand_sweep
-from hpc3.core import audit, env_probe, ledger, remote
+from hpc3.core import audit, code_claim, env_probe, ledger, remote
 from hpc3.core.array_sbatch import render_array_sbatch
 from hpc3.core.inflight import check_artifact_is_free, claimed_artifacts
 from hpc3.core.preflight import check_env_path, dependency_hint, parse_test_only
@@ -131,7 +131,8 @@ def array_preflight(
     Raises:
         AppError: With ``ENV_PATH_MISSING`` / ``ENV_PACKAGE_MISMATCH`` /
             ``ENV_PROBE_UNREADABLE`` / ``ENV_INTERPRETER_BORROWED`` from the
-            environment checks,
+            environment checks, ``REPO_COMMIT_NOT_HEAD`` /
+            ``REPO_COMMIT_PROBE_UNREADABLE`` from the code claim,
             ``PREFLIGHT_REJECTED`` when Slurm refuses -- carrying Slurm's own
             reason plus the dependency hint when the base waits on a job that
             can no longer satisfy it -- or ``PREFLIGHT_UNPARSABLE`` when the
@@ -142,6 +143,9 @@ def array_preflight(
     env_probe.verify_environment(
         host, base["env_path"], base["pinned_packages"], image=base["image"]
     )
+    # One claim for the whole array, like the environment: every member runs
+    # from the template's checkout, and only `member` is added per row.
+    code_claim.check_code_claim(host, base["experiment"])
 
     remote.make_directory(host, script_dir)
     remote.make_directory(host, log_dir)

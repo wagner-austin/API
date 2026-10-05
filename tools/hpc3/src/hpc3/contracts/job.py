@@ -55,6 +55,7 @@ from hpc3.contracts.cluster import (
     encode_gpu_request,
     require_partition,
 )
+from hpc3.contracts.code_claim import code_claim
 from hpc3.contracts.dependency import Dependency, decode_dependency, encode_dependency
 from hpc3.contracts.experiment import encode_experiment, require_experiment
 from hpc3.contracts.image import (
@@ -381,6 +382,13 @@ def decode_job_spec(
                 "there is no GPU pin to justify"
             )
 
+    experiment = require_experiment(value, "experiment")
+    # Decoded for its refusals only: a run naming its commit without the
+    # checkout it describes is refused here, where a shallow CI clone can see
+    # it, so a committed document cannot carry a claim that submission could
+    # never check. The claim itself is read again where it is checked.
+    code_claim(experiment)
+
     return JobSpec(
         project=require_project(value, "project"),
         name=_require_nonempty_str(value, "name"),
@@ -398,7 +406,7 @@ def decode_job_spec(
         env_path=_require_env_path(value, image),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=deterministic,
-        experiment=require_experiment(value, "experiment"),
+        experiment=experiment,
         command=command,
         artifact=require_artifact_in_command(value, command),
     )
