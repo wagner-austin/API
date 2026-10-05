@@ -297,19 +297,30 @@ pass logs `<alias> launched N job(s) this tick`.
 **A tick closes a run when it ends, not on the next tick** (MCPs board task
 c1d48330, `fleet.cli.node_watch`). Measured 2026-10-04, a finished row was
 closed only by the tick after it ended, so every session waiting on a fleet
-verdict waited up to three minutes after its check had ended. After its
-passes, a runner still holding a run this machine's ledger calls running
-reads each one's result off the node every 10 s, and the moment one has
-ended it runs both passes again: the run is closed, its verdict posted and
-its room filled within ten seconds. The window is `fleet.json`'s
-`node_watch_seconds`, 100 s from the tick's start, declared there rather
-than passed by `fleet.cli.tick` because the registry rolls with the agent
-while `tick.py` runs from the checkout; its decoder refuses more than 110 s,
-which with a tick's start and one more pass stays inside the 3-minute
-repetition `IgnoreNew` would otherwise skip. A poll that finds nothing
-writes nothing to the queue, and a runner holding no running job makes no
-call at all past its passes: its log ends `<alias> holds no running job; no
-watch this tick`, and a watching tick's ends with its polls and reruns.
+verdict waited up to three minutes after its check had ended. The watch
+runs on a thread of its own from the tick's start, beside the passes: the
+collect pass hands it the runs the queue says this runner holds running as
+soon as it has asked, the fill pass each run the moment it launches, and
+every 5 s it reads each held run's result off the node and settles one that
+has ended (one `dispatch_list`, then the same `collect_one_job` the collect
+pass uses, under one lock so a run is settled once), while the passes go on.
+So a run ending during a launch, which takes about 15 s on diphtheria, 42 s
+on serendipity and up to 155 s on loki, is closed within about one poll and
+one settle, not when the pass ends. The watch reruns no pass: the first
+watch (fcf2aa507) ran both again when a run ended, and loki's 22:30:04Z tick
+on 2026-10-04 reran its fill pass, launched two jobs, exited at 401 s and
+skipped the next two ticks; the room a settled run frees is filled by the
+next tick. The window is `fleet.json`'s `node_watch_seconds`, 100 s from the
+tick's start, declared there rather than passed by `fleet.cli.tick` because
+the registry rolls with the agent while `tick.py` runs from the checkout; no
+poll starts whose wait would end past it, so only one settle under way can
+outlast it, and its decoder refuses more than 110 s, which stays inside the
+3-minute repetition `IgnoreNew` would otherwise skip. A poll that finds
+nothing writes nothing to the queue, and a runner holding no running job
+makes no call at all past its passes, its watch thread waiting on a
+condition without a sleep: its log ends `<alias> holds no running job; no
+watch this tick`, and a watching tick's ends `<alias> watch until <time>: N
+poll(s), M run(s) closed, K run(s) still watched`.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
