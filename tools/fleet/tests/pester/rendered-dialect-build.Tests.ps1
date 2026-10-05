@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'PATH')
+    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH')
 
     # A .cmd that records the directory it ran in and its arguments, writes
     # one line to each stream, and exits with the case's code. It lands in a
@@ -90,6 +90,7 @@ Describe 'The build' {
         $env:PYTEST_XDIST_AUTO_NUM_WORKERS | Should -BeExactly '3'
         # The node's cache, for an install step that keeps state (MCPs board task 74b13c20).
         $env:CORVIS_FLEET_CACHE | Should -BeExactly $export.Cache
+        $env:CORVIS_FLEET_WORKSPACE | Should -BeExactly 'packages/maketools'
         # The render is the ordinary lane's (MCPs board task a98d7083).
         $env:CORVIS_FLEET_ELEVATED | Should -BeExactly '0'
         # The example job's submitter (MCPs board task 6c4516af A4).
