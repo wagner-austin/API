@@ -7,14 +7,14 @@ Only the clocks are injected, because a test that spent the real
 ten-second readiness deadline would cost ten seconds to prove one
 branch. Waits are the one exception: a bounded wait is recorded, and
 asserted, instead of spent against the host's load
-(``tests/_capture_process.py`` says why).
+(``tests/_capture_process.py`` says why). The argv builders are pinned
+in ``test_capture_commands.py``.
 """
 
 from __future__ import annotations
 
 import subprocess
 import sys
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -22,222 +22,25 @@ import pytest
 from tankpit_bot import _test_hooks as root_hooks
 from tankpit_bot.stream import _test_hooks as stream_hooks
 from tankpit_bot.stream.capture import (
-    DISPLAY_READY_TIMEOUT_SECONDS,
-    HLS_LIST_SEGMENTS,
     HLS_PLAYLIST_FILENAME,
-    HLS_SEGMENT_TEMPLATE,
-    PROCESS_END_TIMEOUT_SECONDS,
-    CaptureError,
     DisplayCapture,
     ffmpeg_command,
     x11_socket_path,
     xvfb_command,
 )
-from tankpit_bot.stream.hls import SEGMENT_NAME_PATTERN
-from tankpit_bot.stream.types import StreamConfigDict
+from tankpit_bot.stream.helper_process import (
+    PROCESS_END_TIMEOUT_SECONDS,
+    SOCKET_READY_TIMEOUT_SECONDS,
+    CaptureError,
+)
 from tests._capture_process import PatientCaptureProcess
-
-
-def _config(hls_dir: Path) -> StreamConfigDict:
-    """Build one capture configuration rooted in a test directory.
-
-    Args:
-        hls_dir: Where the encoder would write.
-
-    Returns:
-        The configuration.
-    """
-    return StreamConfigDict(
-        display=91,
-        width=704,
-        height=544,
-        scale=2,
-        fps=30,
-        bitrate_kbps=1000,
-        segment_seconds=2,
-        hls_dir=str(hls_dir),
-    )
-
-
-def _sleeper_argv() -> list[str]:
-    """A child that runs until terminated.
-
-    Returns:
-        Argv for a 60-second sleeper.
-    """
-    return [sys.executable, "-c", "import time; time.sleep(60)"]
-
-
-class _SubstitutingSpawner:
-    """Spawn REAL children while recording the commands asked for.
-
-    The capture code asks for ``Xvfb``/``ffmpeg``, which do not exist
-    on the test host; this seam records that request and runs a
-    ``sys.executable`` stand-in through the REAL spawner, so log-file
-    plumbing and process semantics stay production code. Each handle
-    is a :class:`PatientCaptureProcess`, so the bound of every wait is
-    recorded for the test to assert.
-    """
-
-    def __init__(self, argv_per_call: list[list[str]]) -> None:
-        """Bind the substitute argv for each successive call.
-
-        Args:
-            argv_per_call: What to actually run, call by call.
-        """
-        self._argv_per_call = argv_per_call
-        self.commands: list[list[str]] = []
-        self.log_paths: list[Path] = []
-        self.processes: list[PatientCaptureProcess] = []
-
-    def __call__(self, command: list[str], log_path: Path) -> stream_hooks.CaptureProcessProtocol:
-        """Record the request and spawn the substitute.
-
-        Args:
-            command: What the capture code wanted to run.
-            log_path: Where it wanted the console.
-
-        Returns:
-            The substitute process handle.
-        """
-        self.commands.append(command)
-        self.log_paths.append(log_path)
-        process = PatientCaptureProcess(
-            stream_hooks._real_spawn_capture_process(
-                self._argv_per_call[len(self.processes)], log_path
-            )
-        )
-        self.processes.append(process)
-        return process
-
-
-class _SteppingClock:
-    """Monotonic clock that advances a fixed step per read."""
-
-    def __init__(self, step: float) -> None:
-        """Start at zero, advancing ``step`` per read.
-
-        Args:
-            step: Seconds each read advances.
-        """
-        self._now = 0.0
-        self._step = step
-
-    def __call__(self) -> float:
-        """Read and advance the clock.
-
-        Returns:
-            The pre-advance reading.
-        """
-        now = self._now
-        self._now += self._step
-        return now
-
-
-def _noop_sleep(seconds: float) -> None:
-    """Sleep hook that spends no wall clock.
-
-    Args:
-        seconds: Ignored.
-    """
-    del seconds
-
-
-@pytest.fixture(autouse=True)
-def _reap() -> Generator[list[stream_hooks.CaptureProcessProtocol], None, None]:
-    """Kill every child a test's spawner left running, and wait for its end.
-
-    The wait has no timeout: after ``kill`` the child will end, and on a
-    loaded Windows host its rundown has outlasted a fixed ten seconds
-    (board task 06fc3195; ``scripts/killed_wait_rules.py`` records the
-    measurement and keeps the bound from coming back).
-
-    Yields:
-        The list the test's spawner should append processes to.
-    """
-    spawned: list[stream_hooks.CaptureProcessProtocol] = []
-    yield spawned
-    for process in spawned:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
-
-
-class TestCommandLines:
-    """The argv builders and their agreement with the serving layer."""
-
-    def test_xvfb_command_is_exactly_the_documented_argv(self, tmp_path: Path) -> None:
-        """The server argv, whole: display, screen geometry, no TCP."""
-        assert xvfb_command(_config(tmp_path / "hls")) == [
-            "Xvfb",
-            ":91",
-            "-screen",
-            "0",
-            "704x544x24",
-            "-nolisten",
-            "tcp",
-        ]
-
-    def test_ffmpeg_command_is_exactly_the_documented_argv(self, tmp_path: Path) -> None:
-        """The encoder argv, whole — keyframes aligned to segments,
-        atomic segment writes, and the rolling live window."""
-        hls_dir = tmp_path / "hls"
-        assert ffmpeg_command(_config(hls_dir)) == [
-            "ffmpeg",
-            "-loglevel",
-            "error",
-            "-nostdin",
-            "-f",
-            "x11grab",
-            "-draw_mouse",
-            "0",
-            "-framerate",
-            "30",
-            "-video_size",
-            "704x544",
-            "-i",
-            ":91",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
-            "-g",
-            "60",
-            "-keyint_min",
-            "60",
-            "-sc_threshold",
-            "0",
-            "-b:v",
-            "1000k",
-            "-maxrate",
-            "1500k",
-            "-bufsize",
-            "3000k",
-            "-f",
-            "hls",
-            "-hls_time",
-            "2",
-            "-hls_list_size",
-            str(HLS_LIST_SEGMENTS),
-            "-hls_flags",
-            "delete_segments+independent_segments+temp_file",
-            "-hls_segment_filename",
-            str(hls_dir / HLS_SEGMENT_TEMPLATE),
-            str(hls_dir / HLS_PLAYLIST_FILENAME),
-        ]
-
-    def test_the_segment_template_matches_the_serving_grammar(self) -> None:
-        """What the encoder names, the HTTP filename gate admits."""
-        example = HLS_SEGMENT_TEMPLATE % 7
-        assert example == "seg00007.ts"
-        if SEGMENT_NAME_PATTERN.fullmatch(example) is None:
-            raise AssertionError(f"{example!r} does not match the serving grammar")
-
-    def test_x11_socket_path_is_the_display_socket(self) -> None:
-        """The readiness poll watches the socket X clients dial."""
-        assert x11_socket_path(91) == Path("/tmp/.X11-unix/X91")
+from tests.stream._capture_fixtures import (
+    SteppingClock,
+    SubstitutingSpawner,
+    noop_sleep,
+    sleeper_argv,
+    stream_config,
+)
 
 
 class TestRealClockHooks:
@@ -285,30 +88,30 @@ class TestStartDisplay:
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """A socket that exists ends the wait; the Xvfb argv was asked for."""
-        spawner = _SubstitutingSpawner([_sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
 
         def socket_only(path: Path) -> bool:
             return path == x11_socket_path(91)
 
         root_hooks.path_exists = socket_only
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
 
         capture.start_display()
         _reap.extend(spawner.processes)
 
         assert capture.display_env == ":91"
-        assert spawner.commands == [xvfb_command(_config(tmp_path / "hls"))]
+        assert spawner.commands == [xvfb_command(stream_config(tmp_path / "hls"))]
         assert spawner.log_paths == [tmp_path / "xvfb.log"]
 
     def test_second_start_is_refused(
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """One capture owns one display; a second start is a defect."""
-        spawner = _SubstitutingSpawner([_sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         capture.start_display()
         _reap.extend(spawner.processes)
 
@@ -317,10 +120,10 @@ class TestStartDisplay:
 
     def test_a_server_that_dies_is_reported_with_its_exit_code(self, tmp_path: Path) -> None:
         """An Xvfb that exits reads as what it is, not as a timeout."""
-        spawner = _SubstitutingSpawner([[sys.executable, "-c", "raise SystemExit(3)"]])
+        spawner = SubstitutingSpawner([[sys.executable, "-c", "raise SystemExit(3)"]])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: False
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         # The stand-in must be DEAD before the poll reads it, or the
         # test races its own child.
         original_spawn = spawner.__call__
@@ -341,12 +144,12 @@ class TestStartDisplay:
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """Past the deadline with a live server, the wait gives up loudly."""
-        spawner = _SubstitutingSpawner([_sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: False
-        stream_hooks.monotonic_seconds = _SteppingClock(DISPLAY_READY_TIMEOUT_SECONDS)
-        stream_hooks.sleep_seconds = _noop_sleep
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        stream_hooks.monotonic_seconds = SteppingClock(SOCKET_READY_TIMEOUT_SECONDS)
+        stream_hooks.sleep_seconds = noop_sleep
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
 
         with pytest.raises(CaptureError, match="not ready after"):
             capture.start_display()
@@ -356,18 +159,18 @@ class TestStartDisplay:
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """A socket appearing on the second look ends the wait normally."""
-        spawner = _SubstitutingSpawner([_sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
         answers = [False, True]
         root_hooks.path_exists = lambda path: answers.pop(0)
-        stream_hooks.monotonic_seconds = _SteppingClock(0.01)
+        stream_hooks.monotonic_seconds = SteppingClock(0.01)
         slept: list[float] = []
 
         def record_sleep(seconds: float) -> None:
             slept.append(seconds)
 
         stream_hooks.sleep_seconds = record_sleep
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
 
         capture.start_display()
         _reap.extend(spawner.processes)
@@ -380,7 +183,7 @@ class TestStartEncoder:
 
     def test_encoder_before_display_is_refused(self, tmp_path: Path) -> None:
         """There is nothing to record without a display."""
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         with pytest.raises(CaptureError, match="start_display must run"):
             capture.start_encoder()
 
@@ -395,10 +198,10 @@ class TestStartEncoder:
         wait_for_release = (
             f"import os, time\nwhile not os.path.exists({str(release)!r}): time.sleep(0.01)"
         )
-        spawner = _SubstitutingSpawner([[sys.executable, "-c", wait_for_release]])
+        spawner = SubstitutingSpawner([[sys.executable, "-c", wait_for_release]])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         capture.start_display()
         release.touch()
         spawner.processes[0].wait(30.0)
@@ -415,10 +218,10 @@ class TestStartEncoder:
         (hls_dir / "seg00007.ts").write_bytes(b"stale")
         (hls_dir / HLS_PLAYLIST_FILENAME).write_bytes(b"stale")
         (hls_dir / "unrelated.txt").write_bytes(b"kept")
-        spawner = _SubstitutingSpawner([_sleeper_argv(), _sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv(), sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(hls_dir))
+        capture = DisplayCapture(stream_config(hls_dir))
         capture.start_display()
 
         capture.start_encoder()
@@ -427,17 +230,17 @@ class TestStartEncoder:
         assert not (hls_dir / "seg00007.ts").exists()
         assert not (hls_dir / HLS_PLAYLIST_FILENAME).exists()
         assert (hls_dir / "unrelated.txt").read_bytes() == b"kept"
-        assert spawner.commands[1] == ffmpeg_command(_config(hls_dir))
+        assert spawner.commands[1] == ffmpeg_command(stream_config(hls_dir))
         assert spawner.log_paths[1] == tmp_path / "ffmpeg.log"
 
     def test_second_encoder_is_refused(
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """One capture owns one encoder."""
-        spawner = _SubstitutingSpawner([_sleeper_argv(), _sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv(), sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         capture.start_display()
         capture.start_encoder()
         _reap.extend(spawner.processes)
@@ -512,10 +315,10 @@ class TestStop:
         self, tmp_path: Path, _reap: list[stream_hooks.CaptureProcessProtocol]
     ) -> None:
         """Both children end; a second stop has nothing left to do."""
-        spawner = _SubstitutingSpawner([_sleeper_argv(), _sleeper_argv()])
+        spawner = SubstitutingSpawner([sleeper_argv(), sleeper_argv()])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         capture.start_display()
         capture.start_encoder()
         _reap.extend(spawner.processes)
@@ -539,14 +342,14 @@ class TestStop:
 
     def test_stop_with_nothing_started_is_a_noop(self, tmp_path: Path) -> None:
         """A capture that never started stops cleanly."""
-        DisplayCapture(_config(tmp_path / "hls")).stop()
+        DisplayCapture(stream_config(tmp_path / "hls")).stop()
 
     def test_an_already_exited_helper_is_not_terminated_again(self, tmp_path: Path) -> None:
         """A child that ended on its own is logged, not signalled."""
-        spawner = _SubstitutingSpawner([[sys.executable, "-c", "raise SystemExit(0)"]])
+        spawner = SubstitutingSpawner([[sys.executable, "-c", "raise SystemExit(0)"]])
         stream_hooks.spawn_capture_process = spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         capture.start_display()
         spawner.processes[0].wait()
 
@@ -569,7 +372,7 @@ class TestStop:
         ) -> stream_hooks.CaptureProcessProtocol:
             del command
             inner = PatientCaptureProcess(
-                stream_hooks._real_spawn_capture_process(_sleeper_argv(), log_path)
+                stream_hooks._real_spawn_capture_process(sleeper_argv(), log_path)
             )
             stuck = _StuckProcess(inner)
             inner_holder.append(inner)
@@ -578,7 +381,7 @@ class TestStop:
 
         stream_hooks.spawn_capture_process = stuck_spawner
         root_hooks.path_exists = lambda path: True
-        capture = DisplayCapture(_config(tmp_path / "hls"))
+        capture = DisplayCapture(stream_config(tmp_path / "hls"))
         capture.start_display()
         _reap.extend(real_holder)
 
