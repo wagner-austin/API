@@ -30,6 +30,7 @@ aiohttp = "^3.10"
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 platform-core = { path = "../../libs/platform_core", develop = true }
 psutil = "^7.0"
+psycopg = {version = "^3.3", extras = ["binary"]}
 
 [tool.poetry.scripts]
 tankpit-sniff = "tankpit_bot.sniffer.core:main"
@@ -62,6 +63,7 @@ tankpit-shadow = "tankpit_bot.validate.shadow:main"
 tankpit-roundtrip = "tankpit_bot.validate.roundtrip:main"
 tankpit-sim-run = "tankpit_bot.sim.run:main"
 tankpit-sim-serve = "tankpit_bot.sim.net_server:main"
+tankpit-sim-accounts = "tankpit_bot.sim.net_accounts_cli:main"
 tankpit-smoke = "scripts.smoke:main"
 tankpit-bot-runs = "tankpit_bot.diagnostics.bot_runs_cli:main"
 tankpit-bot-query = "tankpit_bot.diagnostics.bot_query:main"
