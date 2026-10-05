@@ -107,6 +107,29 @@ Describe 'Retiring a settled dispatch' {
             $scheduler.Connect()
             return @($scheduler.GetFolder('\').GetTasks(1) | Where-Object { $_.Name -eq $Name }).Count -gt 0
         }
+        function Start-TranscriptHolder {
+            <#
+            .SYNOPSIS
+                A process that holds a file open the way a build's leftover
+                holds its transcript: open for writing, shared for reading
+                and writing as cmd.exe's >> shares it, and not for delete,
+                so the file cannot be moved while it runs.
+            .PARAMETER Path
+                The file it holds.
+            .OUTPUTS
+                System.Diagnostics.Process, returned once it holds the file.
+            #>
+            param([string]$Path)
+            $ready = "$Path.holding"
+            $command = "`$held = [IO.File]::Open('$Path', 'Open', 'Write', 'ReadWrite'); [IO.File]::WriteAllText('$ready', 'held'); Start-Sleep 600"
+            $holder = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList '-NoProfile', '-Command', $command -PassThru -WindowStyle Hidden
+            while (-not (Test-Path -LiteralPath $ready)) {
+                $holder.HasExited | Should -BeFalse
+                Start-Sleep -Milliseconds 100
+            }
+            Remove-Item -LiteralPath $ready
+            return $holder
+        }
         function Initialize-SettledRun {
             param([string]$Root, [switch]$Transcript)
             $target = Join-Path $Root 'run-[1]'
@@ -149,6 +172,37 @@ Describe 'Retiring a settled dispatch' {
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         @([System.IO.Directory]::GetFileSystemEntries($root) | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object) |
             Should -Be @('cache', 'logs')
+    }
+    It 'ends a leftover process holding the transcript, names it by pid and image, then keeps the transcript (MCPs e40bca34)' {
+        # On sedona two orphaned bash.exe of a hung install step held a
+        # run's transcript, and every retire stopped on Move-Item's
+        # IOException for 26 hours; the retire now ends the holder first.
+        $root = Join-Path $TestDrive 'held'
+        $run = Initialize-SettledRun -Root $root -Transcript
+        $holder = Start-TranscriptHolder $run.Log
+        { Move-Item -LiteralPath $run.Log -Destination (Join-Path $root 'moved.log') } |
+            Should -Throw -ExpectedMessage '*being used by another process*'
+        $said = @(Invoke-Rendered 'dialect-retire' $run)
+        $said | Should -HaveCount 1
+        $said[0] | Should -BeLike ("FLEET_RETIRE_HOLDER_ENDED: pid $($holder.Id) powershell.exe (*Start-Sleep 600*) held " + [WildcardPattern]::Escape($run.Log))
+        $holder.HasExited | Should -BeTrue
+        [System.IO.File]::ReadAllText($run.Retained) | Should -BeExactly '887 passed'
+        [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+    }
+    It 'refuses by name to end a holder of a kind it may not end, leaving it and the transcript where they are' {
+        # A service or critical process is not the run's to end; with no
+        # kind allowed, an ordinary holder reads as one.
+        $root = Join-Path $TestDrive 'protected'
+        $run = Initialize-SettledRun -Root $root -Transcript
+        $holder = Start-TranscriptHolder $run.Log
+        $run.EndableTypes = [int[]]@()
+        { Invoke-Rendered 'dialect-retire' $run } |
+            Should -Throw -ExpectedMessage ("FLEET_RETIRE_HOLDER_PROTECTED: pid $($holder.Id) powershell.exe (*), of Restart Manager type 5, holds " + [WildcardPattern]::Escape($run.Log))
+        $holder.HasExited | Should -BeFalse
+        Stop-Process -Id $holder.Id -Force
+        $holder.WaitForExit()
+        [System.IO.File]::ReadAllText($run.Log) | Should -BeExactly '887 passed'
+        Test-Path -LiteralPath $run.Retained | Should -BeFalse
     }
     It 'retires a run that wrote no transcript, and a second retire finds nothing left and is not an error' {
         $root = Join-Path $TestDrive 'untranscribed'

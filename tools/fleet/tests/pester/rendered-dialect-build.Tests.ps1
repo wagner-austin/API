@@ -171,3 +171,49 @@ Describe 'The build' {
         Test-Path -LiteralPath $make.Record | Should -BeFalse
     }
 }
+
+Describe 'Nothing the build starts outlives it (MCPs e40bca34)' {
+    It 'ends an install step''s orphan, which taskkill /T cannot reach, when the stop ends the build, and frees the transcript' {
+        # sedona, 2026-10-04: a hung test-database step left two bash.exe
+        # whose parent had exited; the stop's taskkill /T walks parent
+        # links, never reached them, and they held the transcript for 26
+        # hours. Here the install step starts a process with start /b, which
+        # inherits the transcript, and exits; the orphan also inherits
+        # cmd.exe's output pipe, so the build cannot end on its own while it
+        # lives. The build runs as a node runs it, $Target/build.ps1 in its
+        # own powershell.exe, so the committed stop render can end it.
+        $export = Initialize-Export
+        $orphanPid = Join-Path $TestDrive ('orphan-' + [guid]::NewGuid().ToString('N') + '.pid')
+        $orphaning = Initialize-Batch 'orphaning' @(
+            "start `"`" /b `"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -Command `"`$PID | Set-Content -LiteralPath '$orphanPid'; Start-Sleep 600`"",
+            ':wait',
+            "if not exist `"$orphanPid`" goto wait",
+            'exit /b 0')
+        $make = Initialize-Tool 'make' 0
+        $build = "$($export.Target)/build.ps1"
+        Copy-Item -LiteralPath (Join-Path $script:rendered 'dialect-build.ps1') -Destination $build
+        $running = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -PassThru -WindowStyle Hidden -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$build`"", '-Target', "`"$($export.Target)`"", '-Recipe', "`"$($export.Recipe)`"",
+            '-CacheRoot', "`"$($export.Cache)`"", '-Install', "`"$($orphaning.Path)`"", '-InstallPhases', 'test-database', '-Make', "`"$($make.Path)`"")
+        while (-not (Test-Path -LiteralPath $orphanPid)) {
+            $running.HasExited | Should -BeFalse
+            Start-Sleep -Milliseconds 200
+        }
+        $orphan = [int]([System.IO.File]::ReadAllText($orphanPid).Trim())
+        $parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$orphan").ParentProcessId
+        Get-CimInstance Win32_Process -Filter "ProcessId=$parent" | Should -BeNullOrEmpty
+        $global:LASTEXITCODE = 0
+        & (Join-Path $script:rendered 'dialect-stop.ps1') -Target $export.Target -TaskName "fleet-pester-absent-$([guid]::NewGuid().ToString('N'))" | Out-Null
+        $LASTEXITCODE | Should -Be 0
+        $running.WaitForExit()
+        # The kernel ends a job's processes as it closes the job's last
+        # handle, so the orphan is gone within moments of the build.
+        $deadline = (Get-Date).AddSeconds(10)
+        while (($null -ne (Get-CimInstance Win32_Process -Filter "ProcessId=$orphan")) -and ((Get-Date) -lt $deadline)) {
+            Start-Sleep -Milliseconds 100
+        }
+        Get-CimInstance Win32_Process -Filter "ProcessId=$orphan" | Should -BeNullOrEmpty
+        Move-Item -LiteralPath (Join-Path $export.Target 'result.txt.log') -Destination (Join-Path $TestDrive 'freed.log')
+        Read-CallRecord $orphaning | Should -HaveCount 1
+    }
+}
