@@ -77,7 +77,7 @@ def _watch(loaded: _config.LoadedWorkspace, settle: node_watch.Settle) -> node_w
     return node_watch.RunWatch(loaded, alias="lavender", node=node, settle=settle)
 
 
-def _never_settles(run_id: str) -> str:
+def _never_settles(*, run_id: str) -> str:
     """A settle a case asserts is never reached.
 
     Args:
@@ -167,7 +167,7 @@ class TestARunThatEnds:
         release = threading.Event()
         settled: list[str] = []
 
-        def settle(run_id: str) -> str:
+        def settle(*, run_id: str) -> str:
             settling.set()
             await_event(release, what="the case's go-ahead to finish the settle")
             settled.append(run_id)
@@ -238,7 +238,7 @@ class TestASettleThatRaises:
         loaded = _poll_every_second(sourced_config)
         _test_hooks.run = FakeRun(list(ENDED))
 
-        def settle(run_id: str) -> str:
+        def settle(*, run_id: str) -> str:
             raise AppError(FleetErrorCode.QUEUE_ANSWER_MALFORMED, f"{run_id}: nonsense")
 
         watch = _watch(loaded, settle)
