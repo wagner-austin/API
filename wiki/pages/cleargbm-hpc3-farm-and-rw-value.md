@@ -13,7 +13,11 @@ source_paths:
   - libs/covenant_ml/src/covenant_ml/datasets/xlsx_reader.py
   - libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md
+  - tools/hpc3/runs/sweep-cleargbm-p6-rung5.json
+  - tools/hpc3/src/hpc3/core/code_claim.py
 source_git_blobs:
+  "tools/hpc3/runs/sweep-cleargbm-p6-rung5.json": 046840c974fd8fc473e316173e8985f8eaaa6dda
+  "tools/hpc3/src/hpc3/core/code_claim.py": b7227746e7b2574728de89fc55a9bd63adc7e207
   "tools/hpc3/runs/hpc3.json": 6265d6ba9ad76de416cc1aa914abf65253b72ceb
   "tools/hpc3/runs/sweep-cleargbm-p6-rung1.json": 3a10d80f404ce7dce29abb754f309178052ad8ff
   "libs/covenant_ml/scripts/derive_rw_value.py": ea009dd9bbe34ff6786df7b9af24e9e4a51469e1
@@ -25,6 +29,7 @@ source_git_blobs:
 provenance:
   - "hpc3.json repinned 2026-09-11 after RE-READING the claim against the new file, not on a mechanical argument: the workspace gained certified_inputs and resumes_from_checkpoint and lost checkpoint_steps, none of which this page cites. Its actual claim -- the cleargbm project block is 4 cpus, 16 GB, 60 minutes, gpu null, deterministic true, with numpy/lightgbm/xgboost pinned -- reads back from HEAD as cpus 4, mem_gb 16, minutes 60, gpu None, deterministic True, numpy 2.3.5 / lightgbm 4.6.0 / xgboost 3.1.2. Every clause holds."
   - "the benchmark document repinned on a mechanical argument: its diff is +52/-0, a Power section appended by the power audit (board 1e4ab572), so no cited line moved. THE APPENDED SECTION IS ADVERSE and a reader should know it: it argues every 'per-seed wins: a/b/c' verdict in that document is a sign test that resolves nothing at n=5."
+  - "rung 5's attribution, measured 2026-10-05 over ssh hpc3 (board task 2cca4a98): the reflog of /pub/wagnera3/api ends at the 01:30:07 PDT 2026-08-25 fast-forward to 80221ea; `git rev-parse --verify --quiet 20d9159^{commit}` there resolves nothing; sacct puts jobs 55571926-55571942 at submit 03:05, end by 03:24:46; their ledger rows carry image_digest null; `git status` shows no tracked source modified, only optimizer outputs under services/covenant-radar-api/models/. Rungs 1-4b's declared commits match the checkout at their ledger submit times (2e8b8e1, dd5f7ea, 57fd5ab, 80221ea, 80221ea)."
 fact_checked: "2026-08-24"
 confidence: high
 hubs: [libs]
@@ -196,3 +201,20 @@ successor: search-space parity. Three of four ClearGBM winners tuned a
 coarseness floor; taiwan's winner chose none — a dial, not a default.
 P6 closed with this rung
 (`BENCHMARK_RESULTS_2026-08-25_p6_rung5_tuned_vs_tuned.md`).
+
+**These numbers were produced by `80221ea`, not by the `20d9159` the rung's
+sweep document declared until 2026-10-05** (board task `2cca4a98`). Every
+member ran out of the cluster checkout `/pub/wagnera3/api` with no image:
+the ledger rows (jobs 55571926-55571942) carry a null image digest and
+the rendered batch scripts `cd` into that checkout. Its reflog's last entry
+is the 01:30:07 PDT fast-forward to `80221ea`; the jobs were submitted at
+03:05 and finished by 03:24, and that clone has never fetched `20d9159`,
+which was the workstation's HEAD at submission and was copied into the
+document by hand. Rungs 1 through 4b each declared the commit their
+checkout was at when they were submitted. So the figures above stand, and
+only their attribution moves: the document now declares `80221ea` with the
+checkout it names (`repo_tree`), and `hpc3-preflight` refuses any run
+whose declared commit is not that checkout's HEAD
+(`tools/hpc3/src/hpc3/core/code_claim.py`)[^rung5-commit].
+
+[^rung5-commit]: `tools/hpc3/runs/sweep-cleargbm-p6-rung5.json:10`, `repo_commit`.
