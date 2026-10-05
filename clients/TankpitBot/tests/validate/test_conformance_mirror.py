@@ -124,7 +124,7 @@ def test_a_fresh_mirror_anchors_nothing_but_a_living_client() -> None:
     client["alive"] = False
     mirror = ArchiveMirror()
     assert mirror.self_id is None
-    assert mirror.window is None
+    assert (mirror.window, mirror.tile, mirror.rank) == (None, None, None)
     mirror.anchor(world, client)
     assert (client["x"], client["y"], client["fuel"], client["alive"]) == (50, 50, 900, True)
     assert world["containers"] == [SimContainerDict(x=10, y=10, volume=500, dotted=True)]
@@ -170,7 +170,7 @@ def test_own_statements_anchor_the_client_tank() -> None:
     assert (client["fuel"], client["rank"]) == (650, 5)
     assert client["counts"] == [1, 2, 3, 4, 5]
     assert client["enabled"] == [False] * 5
-    assert mirror.window == (24, 25)
+    assert (mirror.window, mirror.tile, mirror.rank) == ((24, 25), (32, 33), 5)
 
 
 def test_a_killed_client_is_anchored_dead_until_placed_again() -> None:
