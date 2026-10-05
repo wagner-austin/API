@@ -1,6 +1,6 @@
 """A real capture child whose waits record their bound instead of spending it.
 
-``stream/capture.py`` ends a helper with ``terminate`` and then
+``stream/helper_process.py`` ends a helper with ``terminate`` and then
 ``wait(PROCESS_END_TIMEOUT_SECONDS)``, escalating to ``kill`` and a second
 bounded wait. On the Linux fleet that bound is deliberate: a helper stuck in
 uninterruptible sleep fails the stop loudly. A test that runs that stop
