@@ -6493,3 +6493,24 @@ registry section gains the paragraph on it.
 - The terrain stand-in both baseline script tests need moved to
   `tests/_baseline_field.py` rather than being copied into the new
   test.
+
+---
+
+## [2026-10-05] update | Several production bots on one sim field
+
+Board task b008ab91, Phase 2 of the multiplayer track. New page
+[[multiplayer-field]] (architecture hub; 84 pages).
+- `tankpit-sim-run --clients N` / `make sim-field` seats N production
+  bots on one `SimServer`, each over its own connection and inside its
+  own contextvars context with its own event stream; `--practice` adds
+  the bot_policy roster.
+- A bot whose production exit fires quits and leaves through the new
+  `SimServer.disconnect`; the room reads a 0x29 from
+  `wire_statements.exit_statement`, now shared with churn visitors.
+- `connect` announces a joiner only to connections already sent their
+  join burst, and they re-place it with a 0x3D. Found by the first
+  field run, where each bot believed its rival stood at `(0, 0)`.
+- N=1 control on this tree: IDENTICAL on all 21 artifacts.
+- First live arena on field01: bot 9 landed six dual shots on bot 10,
+  then bot 10's engagement model judged the mirror duel unwinnable
+  ("needs 1305, capacity 1100") and both bots left by round 9.
