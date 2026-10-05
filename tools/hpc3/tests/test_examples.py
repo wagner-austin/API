@@ -59,10 +59,9 @@ def _fields(name: str) -> list[str]:
 def _readme_json_blocks() -> list[str]:
     """Extract every fenced ``json`` block from the README.
 
-    A block that opens with a quote is a fragment meant to be pasted INTO an
-    enclosing object -- the "add one entry to ``projects``" snippet -- so it
-    is wrapped in braces here exactly as a reader would paste it. That keeps
-    the documented gesture and the tested gesture the same one.
+    Every block is a whole document. The README carried a pasteable
+    ``projects`` fragment until 2026-10-05, when ``hpc3-register`` became the
+    only way a project is added and the hand-pasted path was deleted.
 
     Returns:
         Each block's text, in document order, parseable as JSON.
@@ -72,8 +71,7 @@ def _readme_json_blocks() -> list[str]:
     current: list[str] = []
     for line in _README.read_text(encoding="utf-8").splitlines():
         if collecting and line.startswith(_FENCE):
-            body = "\n".join(current)
-            blocks.append("{" + body + "}" if body.startswith('"') else body)
+            blocks.append("\n".join(current))
             collecting = False
             current = []
         elif collecting:
@@ -86,10 +84,8 @@ def _readme_json_blocks() -> list[str]:
 def _readme_project_configs() -> list[JSONValue]:
     """Collect every project entry the README shows.
 
-    Both shapes count: the entries inside a full workspace document, and the
-    standalone fragment shown under "Adding a project". They are found by
-    carrying a ``partition``, not by which block they came from, so a new
-    example is covered the moment it is written.
+    They are found by carrying a ``partition``, not by which block they came
+    from, so a new example is covered the moment it is written.
 
     Returns:
         One value per documented project entry.
@@ -128,17 +124,14 @@ class TestTheReadmeIsAnExampleToo:
 
     def test_every_documented_json_block_parses(self) -> None:
         blocks = _readme_json_blocks()
-        assert len(blocks) == 8
-        assert [isinstance(load_json_str(block), dict) for block in blocks] == [True] * 8
+        assert len(blocks) == 7
+        assert [isinstance(load_json_str(block), dict) for block in blocks] == [True] * 7
 
     def test_every_documented_project_entry_decodes(self) -> None:
-        """Including the standalone fragment, which is what a reader pastes."""
         configs = _readme_project_configs()
-        assert len(configs) == 3
         assert [decode_project_config(config)["partition"] for config in configs] == [
             "free-gpu",
             "free",
-            "free-gpu",
         ]
 
     def test_the_documented_cpu_only_entry_really_is_cpu_only(self) -> None:

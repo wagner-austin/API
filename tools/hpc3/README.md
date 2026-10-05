@@ -64,6 +64,11 @@ inside it, writes `runs/hpc3-newcomer.json` and regenerates the research
 index's table from the workspace documents. Every unmet precondition is named
 in one refusal; nothing is written until every check has passed.
 
+From Git Bash, run it with `MSYS_NO_PATHCONV=1`: MSYS rewrites an argument
+that begins with `/` into a Windows path, so `--image /pub/wagnera3/…` reaches
+the cluster as `C:/Program Files/Git/pub/wagnera3/…` and the digest read
+fails (measured registering `cartridge-qa`, 2026-10-05).
+
 ---
 
 ## The workspace
@@ -87,13 +92,15 @@ are written down.
 reasons are measured, not stylistic
 ([budget model](wiki/pages/budget-model.md)).
 
-**Adding a project** is one entry in `projects` for any single-node job, GPU
-or CPU (see `examples/` for complete workspaces). Every project must declare
-an `image` ([image build flow](wiki/pages/image-build-flow.md)) — CPU-only
-projects included, because what an image pins is not the card, it is the
-compiler, the libc and the BLAS build that decide a timing. `"gpu": null` is
-the one spelling of CPU-only. Project names are lowercase letters, digits and
-hyphens, at most 24 characters.
+**Adding a project** is `hpc3-register` (above), which writes one workspace
+document holding one entry in `projects` for any single-node job, GPU or CPU;
+a document is not written by hand, because the image digest in it must be read
+on the cluster and the research index's table regenerated beside it. Every
+project declares an `image` ([image build flow](wiki/pages/image-build-flow.md))
+— CPU-only projects included, because what an image pins is not the card, it
+is the compiler, the libc and the BLAS build that decide a timing.
+`"gpu": null` (`--gpu none`) is the one spelling of CPU-only. Project names are
+lowercase letters, digits and hyphens, at most 24 characters.
 
 **Run, sweep and chain documents** say only what is specific to that work:
 see [run documents](wiki/pages/run-documents.md),
@@ -161,29 +168,6 @@ A full workspace — two projects, one GPU and one CPU:
       "repo": "../../../../metabolomics-dashboard"
     }
   }
-}
-```
-
-Adding a project is one entry in `projects` — this fragment pastes in whole
-([image build flow](wiki/pages/image-build-flow.md) for why the GPU entry
-carries an image):
-
-```json
-"turkic-lstm": {
-  "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
-  "cpus": 4, "mem_gb": 32, "minutes": 240,
-  "requeue": true, "resumes_from_checkpoint": true,
-  "image": {
-    "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
-    "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
-    "binds": ["/pub/wagnera3"]
-  },
-  "env_path": "/opt/env",
-  "pinned_packages": { "torch": "2.6.0+cu124", "numpy": "2.3.5" },
-  "deterministic": false,
-  "certified_inputs": false,
-  "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" },
-  "repo": "../../../../LSTM"
 }
 ```
 
