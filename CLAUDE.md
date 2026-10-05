@@ -107,8 +107,8 @@ file, not an oversight in it.
 
 It is enforced, not decorative: the machine-readable half is the `projects`
 table in the hpc3 workspace documents (`tools/hpc3/runs/hpc3*.json`), and
-`tools/hpc3/tests/test_committed_runs.py` fails when a registered project is
-missing from `RESEARCH.md`. Registered today, one per workspace document:
+`tools/hpc3/tests/test_committed_runs.py` fails when a registered project has
+no section in `RESEARCH.md`. Registered today, one per workspace document:
 `cleargbm`, `mi` (Model-Trainer probes), `floor` (cloze floor scoring),
 `turkic-lstm` (`~/PROJECTS/LSTM`), `rusted` (RustedWarfareBot), `tankpit`
 (TankpitBot), `code-style`. Enumerate rather than trust this line —
@@ -121,8 +121,9 @@ invocation refuses by design; neither form is the default).
 not "fix" it by registering it.
 
 **Adding a research project** — the procedure is at the bottom of
-`RESEARCH.md`. In one line: register it in a `tools/hpc3/runs/` workspace
-document, add its section to `RESEARCH.md`, emit `RunRecord`s from whatever
+`RESEARCH.md`. In one line: once its image is built, write its section in
+`RESEARCH.md`, run `hpc3-register` (which writes the `tools/hpc3/runs/`
+workspace document and regenerates the table), emit `RunRecord`s from whatever
 produces the numbers, and submit through the hpc3 CLI so the run lands in the
 ledger and `hpc3-trace` can answer "which job produced this artifact".
 
@@ -179,8 +180,8 @@ hpc3-trace       which job trained this?
 hpc3-cancel      stop it, and say what actually stopped
 ```
 
-Seven more exist (`bootstrap`, `campaign`, `image`, `image-build`,
-`image-capture`, `stage`, `research-index`) — `hpc3-<tab>` or the README
+Eight more exist (`bootstrap`, `campaign`, `image`, `image-build`,
+`image-capture`, `register`, `stage`, `research-index`) — `hpc3-<tab>` or the README
 enumerates them. Every command refuses a bare invocation: you name the action
 or you get nothing.
 
