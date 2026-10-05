@@ -6535,3 +6535,22 @@ Board task b008ab91, Phase 3 of the multiplayer track. New page
   sent (48% of divergent ticks differ only there), and the
   [[serve-cadence]] one-command-per-tick queue the sim does not model
   (872 multi-command ticks, 5.5% matched).
+
+---
+
+## [2026-10-05] update | Container census: field01 fitted, field05 held out
+
+Board task b008ab91, Phase 4 of the multiplayer track. New page
+[[container-census]] (game-mechanics hub; 86 pages).
+- `tankpit-container-census` / `make container-census` reads every
+  lone-radar tick through the sim's footprint law, now public as
+  `sim/actions.radar_covers`; 51 and 60 listed containers fell outside
+  the computed footprint over 13,249 and 2,963 scans.
+- No rock tile held a container on either field. Water holds them at
+  0.794 (field01) and 0.801 (field05) of ground's rate.
+- Scan-time density transfers (0.66% and 0.80% of revealed tiles); the
+  share of tiles ever occupied does not (27.8% and 8.2% of ground),
+  because sites turn over and field01 was watched for five months.
+- The terrain shape fitted on either field beats the held-out field's
+  own constant rate in both directions. Written up as a fitted
+  distribution, not a recovered generator.

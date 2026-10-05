@@ -12,3 +12,4 @@ How TankPit works at the game level. Viewport geometry, movement, scanning, fuel
 [Map Mechanics](../pages/map-mechanics.md) -- CMD_MAP_OPEN is one-way, no wire close, client-side toggle, server-cached data
 [Ferry Mechanics](../pages/ferry-mechanics.md) -- free water movement, boarding/landing each cost one queue slot, terrain type 5
 [Game Rules](../pages/game-rules.md) -- official How To Play screens: rank/promotion table, equipment capacity, demotion, radar scales with rank
+[Container Census](../pages/container-census.md) -- where containers stand, from every archived radar scan: no rock sites, water at 0.8 of ground on both field01 and field05, scan-time density that transfers, and the terrain shape scored held-out (2026-10-05)
