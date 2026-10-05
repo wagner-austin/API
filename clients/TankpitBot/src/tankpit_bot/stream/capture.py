@@ -1,9 +1,11 @@
 """Xvfb and ffmpeg lifecycle for one bot's display capture.
 
-The bot owns two helper processes while streaming: an Xvfb server that
-IS the display Chromium renders onto, and an ffmpeg that records that
-display into HLS segments. This module builds their command lines from
-one :class:`~tankpit_bot.stream.types.StreamConfigDict` and walks both
+The bot owns two helper processes here while streaming: an Xvfb server
+that IS the display Chromium renders onto, and an ffmpeg that records
+that display, and the game sound the bot's
+:class:`~tankpit_bot.stream.audio.AudioSink` carries, into HLS
+segments. This module builds their command lines from one
+:class:`~tankpit_bot.stream.types.StreamConfigDict` and walks both
 through start and stop, in the only order that works — display up
 before the browser launches, encoder up once there is something to
 record, encoder down before the display it records.
@@ -16,13 +18,18 @@ work on those, and the whole point of this design is that it cannot.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from platform_core.logging import get_logger
 
-from tankpit_bot import _test_hooks as root_hooks
 from tankpit_bot.stream import _test_hooks
+from tankpit_bot.stream.audio import (
+    AUDIO_CHANNELS,
+    AUDIO_SAMPLE_RATE,
+    AUDIO_SINK_NAME,
+    pulse_server_address,
+)
+from tankpit_bot.stream.helper_process import CaptureError, await_socket, end_process
 from tankpit_bot.stream.types import StreamConfigDict
 
 log = get_logger(__name__)
@@ -33,26 +40,18 @@ XVFB_PROGRAM = "Xvfb"
 FFMPEG_PROGRAM = "ffmpeg"
 """The encoder, expected on PATH in the image."""
 
-DISPLAY_READY_TIMEOUT_SECONDS = 10.0
-"""How long to wait for Xvfb's socket before declaring it dead.
+AUDIO_BITRATE_KBPS = 128
+"""AAC bitrate of the game sound. The effects are short and sharp;
+128k stereo carries them without the smearing lower rates add, and is
+a small fraction of the video's bitrate."""
 
-Xvfb binds its socket within tens of milliseconds on an idle machine;
-ten seconds covers a container under heavy fleet spawn load with a
-wide margin, and past it the honest reading is that the server is not
-coming up.
-"""
+INPUT_QUEUE_PACKETS = 1024
+"""ffmpeg's per-input packet queue (``-thread_queue_size``).
 
-DISPLAY_POLL_INTERVAL_SECONDS = 0.05
-"""Cadence of the readiness poll. Short, because readiness gates the
-browser launch and every tick of waiting here is startup latency."""
-
-PROCESS_END_TIMEOUT_SECONDS = 5.0
-"""How long ``stop`` waits after SIGTERM before escalating to SIGKILL.
-
-ffmpeg flushes and finalises the open segment on SIGTERM in well under
-a second; a helper that has not exited after five is stuck, and the
-session teardown behind this call must not hang on it.
-"""
+Two live inputs are read on their own threads; the default queue of 8
+fills while the encoder is busy on a keyframe, and a full queue drops
+packets from a live source, which is heard as clicks and seen as
+stutter."""
 
 HLS_PLAYLIST_FILENAME = "index.m3u8"
 """The playlist ffmpeg maintains, and the file viewers ask for first."""
@@ -65,10 +64,6 @@ HLS_LIST_SEGMENTS = 6
 """Live-window length in segments. Six two-second segments is twelve
 seconds of joinable history — enough for a player to buffer, small
 enough that the directory never accumulates a session's worth of video."""
-
-
-class CaptureError(Exception):
-    """A capture helper failed to start, come ready, or already ran."""
 
 
 def x11_socket_path(display: int) -> Path:
@@ -114,14 +109,22 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
 
     * ``x11grab`` at the configured rate records the display itself —
       capture rides the compositor, not the page's main thread.
-    * ``libx264 veryfast`` with ``yuv420p``: software encode is cheap
-      at this resolution and every browser decodes it.
+    * The second input is the monitor of the bot's own sound sink
+      (:mod:`tankpit_bot.stream.audio`). Both live inputs stamp their
+      packets with the wall clock as they are read, so the sound lands
+      in the same segment as the frame it belongs to with no offset to
+      tune.
+    * ``libx264 veryfast`` with ``yuv420p`` and AAC: software encode is
+      cheap at this resolution and every browser decodes both.
     * The keyframe interval equals one segment exactly
       (``fps * segment_seconds``, scene-cut detection off), so every
       segment opens decodable and a viewer can join at any boundary.
     * ``delete_segments`` keeps the directory at the live window;
       ``temp_file`` makes each segment appear atomically, so the HTTP
       surface can never serve a half-written file.
+    * ``program_date_time`` writes each segment's wall-clock start into
+      the playlist, which is how the demo page lines the bot's caption
+      up with the frame on screen rather than with the live edge.
 
     Args:
         config: The capture session's parameters.
@@ -136,6 +139,8 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         "-loglevel",
         "error",
         "-nostdin",
+        "-thread_queue_size",
+        str(INPUT_QUEUE_PACKETS),
         "-f",
         "x11grab",
         # The X cursor parks wherever it last was — the bot plays over
@@ -150,6 +155,22 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         f"{config['width']}x{config['height']}",
         "-i",
         f":{config['display']}",
+        "-thread_queue_size",
+        str(INPUT_QUEUE_PACKETS),
+        "-f",
+        "pulse",
+        "-server",
+        pulse_server_address(config["display"]),
+        "-sample_rate",
+        str(AUDIO_SAMPLE_RATE),
+        "-channels",
+        str(AUDIO_CHANNELS),
+        "-i",
+        f"{AUDIO_SINK_NAME}.monitor",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
         "-c:v",
         "libx264",
         "-preset",
@@ -168,6 +189,14 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         f"{config['bitrate_kbps'] * 3 // 2}k",
         "-bufsize",
         f"{config['bitrate_kbps'] * 3}k",
+        "-c:a",
+        "aac",
+        "-b:a",
+        f"{AUDIO_BITRATE_KBPS}k",
+        "-ar",
+        str(AUDIO_SAMPLE_RATE),
+        "-ac",
+        str(AUDIO_CHANNELS),
         "-f",
         "hls",
         "-hls_time",
@@ -175,74 +204,11 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         "-hls_list_size",
         str(HLS_LIST_SEGMENTS),
         "-hls_flags",
-        "delete_segments+independent_segments+temp_file",
+        "delete_segments+independent_segments+temp_file+program_date_time",
         "-hls_segment_filename",
         str(hls_dir / HLS_SEGMENT_TEMPLATE),
         str(hls_dir / HLS_PLAYLIST_FILENAME),
     ]
-
-
-def _await_display(
-    process: _test_hooks.CaptureProcessProtocol, display: int, log_path: Path
-) -> None:
-    """Block until the X server's socket exists.
-
-    Args:
-        process: The Xvfb process, polled so an early death is
-            reported as what it is rather than as a timeout.
-        display: The display number whose socket is awaited.
-        log_path: Where the server's console went, named in errors so
-            the reader is one ``cat`` from the real reason.
-
-    Raises:
-        CaptureError: The server exited, or the deadline passed.
-    """
-    deadline = _test_hooks.monotonic_seconds() + DISPLAY_READY_TIMEOUT_SECONDS
-    socket = x11_socket_path(display)
-    while True:
-        code = process.poll()
-        if code is not None:
-            raise CaptureError(
-                f"Xvfb exited {code} before display :{display} came up; see {log_path}"
-            )
-        if root_hooks.path_exists(socket):
-            return
-        if _test_hooks.monotonic_seconds() >= deadline:
-            raise CaptureError(
-                f"display :{display} not ready after {DISPLAY_READY_TIMEOUT_SECONDS}s;"
-                f" Xvfb pid {process.pid} still running, see {log_path}"
-            )
-        _test_hooks.sleep_seconds(DISPLAY_POLL_INTERVAL_SECONDS)
-
-
-def _end_process(process: _test_hooks.CaptureProcessProtocol, name: str) -> None:
-    """Terminate one helper, escalating to kill if it lingers.
-
-    The ``TimeoutExpired`` arm is a typed translation, not a swallow:
-    that one exception means "still running", which is exactly the
-    state the escalation exists for, and every other failure
-    propagates.
-
-    Args:
-        process: The helper to end.
-        name: Human name for the log line.
-    """
-    if process.poll() is not None:
-        log.info("Capture: %s pid %d already exited %d", name, process.pid, process.poll())
-        return
-    process.terminate()
-    try:
-        code = process.wait(PROCESS_END_TIMEOUT_SECONDS)
-    except subprocess.TimeoutExpired:
-        log.warning(
-            "Capture: %s pid %d ignored SIGTERM for %.0fs; killing",
-            name,
-            process.pid,
-            PROCESS_END_TIMEOUT_SECONDS,
-        )
-        process.kill()
-        code = process.wait(PROCESS_END_TIMEOUT_SECONDS)
-    log.info("Capture: %s pid %d ended %d", name, process.pid, code)
 
 
 class DisplayCapture:
@@ -284,7 +250,7 @@ class DisplayCapture:
         process = _test_hooks.spawn_capture_process(xvfb_command(self._config), log_path)
         self._xvfb = process
         log.info("Capture: Xvfb pid %d serving display %s", process.pid, self.display_env)
-        _await_display(process, self._config["display"], log_path)
+        await_socket(process, XVFB_PROGRAM, x11_socket_path(self._config["display"]), log_path)
 
     def start_encoder(self) -> None:
         """Start ffmpeg recording the display into a fresh HLS dir.
@@ -320,23 +286,21 @@ class DisplayCapture:
     def stop(self) -> None:
         """End whatever is running, encoder first. Safe to call twice."""
         if self._ffmpeg is not None:
-            _end_process(self._ffmpeg, FFMPEG_PROGRAM)
+            end_process(self._ffmpeg, FFMPEG_PROGRAM)
             self._ffmpeg = None
         if self._xvfb is not None:
-            _end_process(self._xvfb, XVFB_PROGRAM)
+            end_process(self._xvfb, XVFB_PROGRAM)
             self._xvfb = None
 
 
 __all__ = [
-    "DISPLAY_POLL_INTERVAL_SECONDS",
-    "DISPLAY_READY_TIMEOUT_SECONDS",
+    "AUDIO_BITRATE_KBPS",
     "FFMPEG_PROGRAM",
     "HLS_LIST_SEGMENTS",
     "HLS_PLAYLIST_FILENAME",
     "HLS_SEGMENT_TEMPLATE",
-    "PROCESS_END_TIMEOUT_SECONDS",
+    "INPUT_QUEUE_PACKETS",
     "XVFB_PROGRAM",
-    "CaptureError",
     "DisplayCapture",
     "ffmpeg_command",
     "x11_socket_path",

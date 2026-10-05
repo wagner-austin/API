@@ -122,8 +122,33 @@ class SleepSecondsProtocol(Protocol):
         ...
 
 
-#: Spawns Xvfb / ffmpeg. Tests rebind to spawn processes they control.
+class SocketRootProtocol(Protocol):
+    """Names the directory a helper server's socket directory sits in."""
+
+    def __call__(self) -> Path:
+        """Return the directory.
+
+        Returns:
+            An absolute directory on a filesystem that holds Unix sockets.
+        """
+        ...
+
+
+def _real_socket_root() -> Path:
+    """Production socket root: ``/tmp``, the container's own filesystem.
+
+    Returns:
+        ``/tmp``.
+    """
+    return Path("/tmp")
+
+
+#: Spawns Xvfb / PulseAudio / ffmpeg. Tests rebind to spawn processes they control.
 spawn_capture_process: SpawnCaptureProcessProtocol = _real_spawn_capture_process
+
+#: Where the PulseAudio socket directories go. Tests rebind to a temp dir,
+#: so a test run never creates directories outside its own tree.
+socket_root: SocketRootProtocol = _real_socket_root
 
 
 def _real_sleep_seconds(seconds: float) -> None:
@@ -156,11 +181,14 @@ __all__ = [
     "CaptureProcessProtocol",
     "MonotonicSecondsProtocol",
     "SleepSecondsProtocol",
+    "SocketRootProtocol",
     "SpawnCaptureProcessProtocol",
     "_real_monotonic_seconds",
     "_real_sleep_seconds",
+    "_real_socket_root",
     "_real_spawn_capture_process",
     "monotonic_seconds",
     "sleep_seconds",
+    "socket_root",
     "spawn_capture_process",
 ]
