@@ -4,7 +4,8 @@ The CLI's impure acts beyond what the core already routes through hooks are
 writing its report to stdout, its refusals to stderr, reading the wall clock,
 for the follow mode sleeping between polls, and -- for every submitting
 command -- one POST to the taskboard on loopback asking which board label
-the acting session is bound to (MCPs board task 3843d29f). All go through
+the acting session is bound to (MCPs board task 3843d29f) -- and, for the
+commands that rewrite committed documents, locating the checkout. All go through
 hooks so a test asserts what a command reported rather than what pytest
 managed to capture, drives a polling loop without waiting through it, and
 answers the board's question without a board.
@@ -13,6 +14,7 @@ answers the board's question without a board.
 from __future__ import annotations
 
 import datetime
+import pathlib
 import sys
 import time
 from collections.abc import Callable
@@ -63,6 +65,16 @@ def _default_sleep(seconds: float) -> None:
     time.sleep(seconds)
 
 
+def _default_monorepo_root() -> pathlib.Path:
+    """Locate the monorepo checkout this package is installed from.
+
+    Returns:
+        The directory holding ``docs/`` and ``tools/``, five levels above
+        this module.
+    """
+    return pathlib.Path(__file__).resolve().parents[5]
+
+
 emit: Callable[[str], None] = _default_emit
 emit_error: Callable[[str], None] = _default_emit_error
 now_iso: Callable[[], str] = _default_now_iso
@@ -71,16 +83,30 @@ sleep: Callable[[float], None] = _default_sleep
 #: urllib poster every bridge in this monorepo uses, bound here rather than
 #: in ``platform_core`` so this package's seams stay in one module.
 http_post: McpPostProtocol = urllib_mcp_post
+#: Where the committed registry and research index are read and written. A
+#: hook so a test drives ``hpc3-register`` end to end against a copy of the
+#: tree: the command WRITES both, and a test writing the real ones would race
+#: every test reading them.
+monorepo_root: Callable[[], pathlib.Path] = _default_monorepo_root
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global emit, emit_error, now_iso, sleep, http_post
+    global emit, emit_error, now_iso, sleep, http_post, monorepo_root
     emit = _default_emit
     emit_error = _default_emit_error
     now_iso = _default_now_iso
     sleep = _default_sleep
     http_post = urllib_mcp_post
+    monorepo_root = _default_monorepo_root
 
 
-__all__ = ["emit", "emit_error", "http_post", "now_iso", "reset_hooks", "sleep"]
+__all__ = [
+    "emit",
+    "emit_error",
+    "http_post",
+    "monorepo_root",
+    "now_iso",
+    "reset_hooks",
+    "sleep",
+]

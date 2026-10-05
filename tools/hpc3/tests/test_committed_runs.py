@@ -46,7 +46,9 @@ from platform_core.json_utils import JSONValue
 from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, decode_workspace
+from hpc3.core.index_sections import projects_without_section
 from hpc3.core.inputs import declared_inputs
+from hpc3.core.registry import ORIGINAL_WORKSPACE, workspace_filename
 from tests._committed_tree import documents, submissions
 
 _RUNS = pathlib.Path(__file__).parent.parent / "runs"
@@ -115,32 +117,25 @@ def _sweep_member_artifacts() -> dict[str, list[JSONValue]]:
     return artifacts
 
 
-_ORIGINAL_WORKSPACE = "hpc3.json"
-"""The first workspace, which predates one-file-per-project.
-
-It declares ``cleargbm`` rather than a project named after itself. Every
-workspace added since is ``hpc3-<project>.json``.
-"""
-
-_WORKSPACE_PREFIX = "hpc3-"
-_WORKSPACE_SUFFIX = ".json"
-
-
-def _expected_projects_for(filename: str) -> list[str]:
+def _expected_projects_for(filename: str, declared: list[str]) -> list[str]:
     """The projects a workspace filename commits it to declaring.
 
     Args:
         filename: A workspace document's filename, e.g. ``hpc3-rusted.json``.
+        declared: What the document actually declares, sorted.
 
     Returns:
-        The single project the name implies, or ``cleargbm`` for the original
-        workspace. A one-element list rather than a bare name, so the caller
-        compares it against ``sorted(workspace["projects"])`` directly and a
-        document declaring TWO projects fails on the same comparison.
+        ``cleargbm`` for the original workspace, which predates the
+        convention; otherwise every declared project whose
+        :func:`~hpc3.core.registry.workspace_filename` is this filename. A
+        list compared against ``declared`` directly, so a document declaring
+        TWO projects, or one its name does not name, fails the comparison.
+        Stated through the function ``hpc3-register`` names documents with,
+        so the command and this check cannot disagree about the convention.
     """
-    if filename == _ORIGINAL_WORKSPACE:
+    if filename == ORIGINAL_WORKSPACE:
         return ["cleargbm"]
-    return [filename[len(_WORKSPACE_PREFIX) : -len(_WORKSPACE_SUFFIX)]]
+    return [project for project in declared if workspace_filename(project) == filename]
 
 
 class TestTheCommittedWorkspaces:
@@ -183,7 +178,8 @@ class TestTheCommittedWorkspaces:
         wrong = {
             filename: sorted(workspace["projects"])
             for filename, workspace in _workspaces().items()
-            if sorted(workspace["projects"]) != _expected_projects_for(filename)
+            if sorted(workspace["projects"])
+            != _expected_projects_for(filename, sorted(workspace["projects"]))
         }
 
         assert wrong == {}
@@ -214,10 +210,18 @@ class TestTheResearchIndexNamesEveryProject:
     two match exactly would be satisfied by deleting the entries that matter.
     """
 
-    def test_every_declared_project_appears_in_the_index(self) -> None:
+    def test_every_declared_project_has_a_section_in_the_index(self) -> None:
+        """A heading under the registered part, not the name anywhere.
+
+        This asserted `` `name` `` appeared ANYWHERE in the file until
+        2026-10-05, and the generated table writes every registered name in
+        exactly that form -- so after ``hpc3-research-index --write`` a
+        project with no section passed on the strength of its own table row.
+        ``hpc3-register`` refuses a project without a section through the
+        same function, so the command and this check agree on what one is.
+        """
         text = _INDEX.read_text(encoding="utf-8")
-        missing = sorted(name for name in _by_project() if f"`{name}`" not in text)
-        assert missing == []
+        assert projects_without_section(text, _by_project()) == []
 
     def test_every_declared_repo_inside_this_monorepo_exists(self) -> None:
         """A path nobody checks is a path that is eventually wrong.
@@ -264,7 +268,7 @@ class TestTheResearchIndexNamesEveryProject:
         ]
 
         assert outside != []
-        assert [name for name in outside if f"`{name}`" not in text] == []
+        assert projects_without_section(text, outside) == []
 
     def test_the_index_states_which_surfaces_are_unregistered(self) -> None:
         """The entries no tool can see are the ones a reader most needs.

@@ -13,14 +13,11 @@ import pathlib
 
 import pytest
 
-from hpc3.cli.research_index import (
-    declared_projects,
-    index_path,
-    main,
-    runs_directory,
-)
+from hpc3.cli._paths import index_path, runs_directory
+from hpc3.cli.research_index import main
 from hpc3.contracts.cluster import GpuRequest
 from hpc3.core import _test_hooks as core_hooks
+from hpc3.core.registry import declared_projects
 from hpc3.core.research_index import (
     BLOCK_END,
     BLOCK_START,

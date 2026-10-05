@@ -52,6 +52,18 @@ modules are 2.7, 3.8, 3.10 and 3.14, and everything here needs 3.11. Bootstrap
 goes through `miniconda3` instead, and refuses to hand back an environment that
 borrowed its interpreter from another project.
 
+**Registering it** is the last step, once the image is built and the project's
+section is written in [`docs/RESEARCH.md`](../../docs/RESEARCH.md):
+
+```bash
+hpc3-register --project newcomer --partition free --gpu none --cpus 2 --mem-gb 4 --minutes 60     --requeue yes --resumes no --deterministic yes --certified-inputs no     --image /pub/wagnera3/newcomer/images/v1/newcomer.sif --env-path /opt/env     --pins newcomer==0.1.0 --gpu-hours 0 --billing free --repo ../../clients/Newcomer
+```
+
+It reads the image's digest on the cluster, proves the environment and pins
+inside it, writes `runs/hpc3-newcomer.json` and regenerates the research
+index's table from the workspace documents. Every unmet precondition is named
+in one refusal; nothing is written until every check has passed.
+
 ---
 
 ## The workspace
@@ -309,6 +321,7 @@ dependencies, CPU-only, and job arrays (a sweep IS one `--array` call now,
 | `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
 | `hpc3-image --spec S --out-dir D --image-name N` | renders the spec into definition, requirements, self-check and build script. Pure; builds nothing |
 | `hpc3-image-build --config C --project P --name N --image-dir D --image-name I` | preflight → submit the rendered build → record it in the ledger ([why this command exists](wiki/pages/image-ledger-lessons.md)) |
+| `hpc3-register --project P …` | the LAST onboarding step: refuses with every unmet precondition named (already declared, document exists, no section in `docs/RESEARCH.md`, no repo), reads the built image's digest on the cluster, proves `--env-path` and `--pins` inside it, then writes `runs/hpc3-P.json` and regenerates the research index's table from the workspace documents. Every flag is required |
 
 Every command that could break something has a rule that refuses first:
 [submission rules](wiki/pages/submission-rules.md). Identity checks —

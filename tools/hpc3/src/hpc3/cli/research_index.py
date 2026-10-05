@@ -16,17 +16,14 @@ because a number nobody reread was wrong for a day.
 
 from __future__ import annotations
 
-import pathlib
 import sys
 from collections.abc import Sequence
 from typing import Final
 
-from platform_core.json_utils import load_json_str, narrow_json_to_dict
-
 from hpc3.cli import _fatal
-from hpc3.contracts.project import ProjectConfig
-from hpc3.contracts.workspace import decode_workspace
+from hpc3.cli._paths import index_path, runs_directory
 from hpc3.core import _test_hooks as core_hooks
+from hpc3.core.registry import declared_projects, read_document
 from hpc3.core.research_index import (
     REGENERATE_HINT,
     extract_projects_block,
@@ -57,69 +54,6 @@ CLAIM_GUIDANCE: Final[str] = (
     "because updating is what left the last three stale; a moved review marker means "
     "new evidence landed, so re-read that entry against it and bump the marker\n"
 )
-
-
-def _read_document(path: pathlib.Path) -> str:
-    """Read a text document with its line endings normalised.
-
-    ``read_bytes`` is the package's file seam and does no newline
-    translation, unlike ``pathlib.read_text``. Git checks this repository out
-    with CRLF on Windows while the renderer emits LF, so a byte comparison
-    reported a document as stale whose every line was already correct --
-    a false verdict that would have had someone rewrite a correct file.
-
-    Args:
-        path: The document.
-
-    Returns:
-        Its text, with CRLF collapsed to LF.
-    """
-    return core_hooks.read_bytes(path).decode("utf-8").replace("\r\n", "\n")
-
-
-def runs_directory() -> pathlib.Path:
-    """Locate the workspace documents.
-
-    Returns:
-        The ``runs`` directory of this package.
-    """
-    return pathlib.Path(__file__).resolve().parents[3] / "runs"
-
-
-def index_path() -> pathlib.Path:
-    """Locate the research index.
-
-    Returns:
-        ``docs/RESEARCH.md`` at the monorepo root. It names work in other
-        repositories, so it lives above the tool that submits some of it.
-    """
-    return pathlib.Path(__file__).resolve().parents[5] / "docs" / "RESEARCH.md"
-
-
-def declared_projects(runs: pathlib.Path) -> dict[str, ProjectConfig]:
-    """Read every project the committed workspaces declare.
-
-    Args:
-        runs: Directory holding the workspace documents.
-
-    Returns:
-        Every declared project, keyed by name.
-
-    Raises:
-        ValueError: If two workspaces declare the same project, which leaves
-            no answer to which one governs a run naming it.
-    """
-    projects: dict[str, ProjectConfig] = {}
-    for path in sorted(runs.glob("*.json")):
-        document = narrow_json_to_dict(load_json_str(_read_document(path)))
-        if "projects" not in document:
-            continue
-        workspace = decode_workspace(document, config_dir=runs)
-        for name, config in workspace["projects"].items():
-            if name in projects:
-                raise ValueError(f"project {name!r} is declared twice, one place is {path.name}")
-            projects[name] = config
-    return projects
 
 
 def tracked_counts(globs: tuple[str, ...]) -> dict[str, int]:
@@ -187,7 +121,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     projects = declared_projects(runs_directory())
     block = render_projects_block(projects)
     path = index_path()
-    text = _read_document(path)
+    text = read_document(path)
 
     markers = parse_review_markers(text)
     claims = (
@@ -233,11 +167,8 @@ __all__ = [
     "CLAIM_GUIDANCE",
     "FLAGS",
     "WRITE_FLAG",
-    "declared_projects",
     "entrypoint",
-    "index_path",
     "main",
-    "runs_directory",
     "tracked_counts",
 ]
 

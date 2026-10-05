@@ -23,16 +23,11 @@ from collections.abc import Sequence
 
 import pytest
 
-from hpc3.cli.research_index import (
-    CLAIM_GUIDANCE,
-    declared_projects,
-    index_path,
-    main,
-    runs_directory,
-    tracked_counts,
-)
+from hpc3.cli._paths import index_path, runs_directory
+from hpc3.cli.research_index import CLAIM_GUIDANCE, main, tracked_counts
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core._test_hooks import CommandResult
+from hpc3.core.registry import declared_projects
 from hpc3.core.research_index import (
     LEDGER_ROW_UNIT,
     REVIEW_MARKER_PREFIX,
