@@ -107,7 +107,7 @@ Describe 'Retiring a settled dispatch' {
             $scheduler.Connect()
             return @($scheduler.GetFolder('\').GetTasks(1) | Where-Object { $_.Name -eq $Name }).Count -gt 0
         }
-        function Start-TranscriptHolder {
+        function Initialize-TranscriptHolder {
             <#
             .SYNOPSIS
                 A process that holds a file open the way a build's leftover
@@ -179,7 +179,7 @@ Describe 'Retiring a settled dispatch' {
         # IOException for 26 hours; the retire now ends the holder first.
         $root = Join-Path $TestDrive 'held'
         $run = Initialize-SettledRun -Root $root -Transcript
-        $holder = Start-TranscriptHolder $run.Log
+        $holder = Initialize-TranscriptHolder $run.Log
         { Move-Item -LiteralPath $run.Log -Destination (Join-Path $root 'moved.log') } |
             Should -Throw -ExpectedMessage '*being used by another process*'
         $said = @(Invoke-Rendered 'dialect-retire' $run)
@@ -194,7 +194,7 @@ Describe 'Retiring a settled dispatch' {
         # kind allowed, an ordinary holder reads as one.
         $root = Join-Path $TestDrive 'protected'
         $run = Initialize-SettledRun -Root $root -Transcript
-        $holder = Start-TranscriptHolder $run.Log
+        $holder = Initialize-TranscriptHolder $run.Log
         $run.EndableTypes = [int[]]@()
         { Invoke-Rendered 'dialect-retire' $run } |
             Should -Throw -ExpectedMessage ("FLEET_RETIRE_HOLDER_PROTECTED: pid $($holder.Id) powershell.exe (*), of Restart Manager type 5, holds " + [WildcardPattern]::Escape($run.Log))
