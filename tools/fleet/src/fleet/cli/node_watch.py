@@ -137,10 +137,12 @@ def collect_ended(
 class RunWatch:
     """The runs a serving runner holds, watched on a thread of their own.
 
-    The serving loop calls :meth:`hold` and :meth:`close_if_idle` from the
-    main thread inside ``with watch``, whose exit closes the watch whatever
-    happened; :meth:`watch` runs on the watch thread. Every field the two
-    share while both run is read and written under one condition.
+    The serving loop calls :meth:`hold` and :meth:`close_if_idle` from its
+    own thread, and :func:`fleet.cli.node_serve.serve_on` calls
+    :meth:`close_if_idle` from the main thread once that loop has failed,
+    all inside ``with watch``, whose exit closes the watch whatever
+    happened; :meth:`watch` runs on the watch thread. Every field they
+    share while they run is read and written under one condition.
 
     Attributes:
         polls: How many times the watch read the held runs' results.

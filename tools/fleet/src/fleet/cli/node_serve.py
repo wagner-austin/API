@@ -16,7 +16,7 @@ WHAT A SERVE DOES. It runs a start's two passes as every start did
 :func:`fleet.cli.node_agent.fill_pass`) and then keeps going: its watch
 thread (:mod:`fleet.cli.node_watch`) reads each held run every
 ``node_poll_seconds`` of the workspace and settles one the moment it has
-ended, and at the same pace the main thread lists the queued jobs (one
+ended, and at the same pace the loop's thread lists the queued jobs (one
 ``dispatch_list`` call, :func:`fleet.core.queue.queued_for`) and runs the
 fill pass again when a job naming this node or no node has arrived since
 its last fill, or the watch has settled a run since then. The
@@ -35,6 +35,21 @@ next fire after the handover starts the next serve: the node is unwatched
 only for those seconds and the next start's few, once a serve rather than
 for 80 s of every start. A serve past its time claims nothing more, so it
 reaches an idle boundary within a fire or two.
+
+WHEN THE LOOP FAILS, THE WATCH SERVES ON TO THE BOUNDARY. The loop runs on
+a thread of its own beside the watch's. Until 2026-10-05 it ran on the main
+thread and its error closed the watch at once: at 07:24:56Z that day the
+dispatch endpoint refused one ``dispatch_list`` (URLError, WinError 10061),
+all 7 serving runners ended, and lavender-wsl's run that ended 16 s later
+closed at the 07:27 start, 120.9 s after its check (row 62734702). Now an
+error from the loop, a refused listing or a failed pass alike, ends the
+claiming and nothing else: the watch goes on settling what this runner
+holds until :data:`HANDOVER_SECONDS` before the next fire boundary
+(:func:`serve_on`), and only then is the loop's error raised, unchanged, so
+the start still fails with it and the next fire starts the next serve, as
+it would have anyway. A run ending in those seconds closes on the watch's
+next poll once the queue answers again; a job queued in them waits for the
+next fire, the one wait a queue outage still costs.
 
 THE BOUNDARIES ARE THE SCHEDULE'S. FleetSchedule.ps1 registers each
 runner's task once at local midnight, repeating every 3 minutes; local
@@ -59,6 +74,9 @@ from fleet.core import _test_hooks, queue
 from fleet.core.rolled import ROLLED_REF
 
 _log = get_logger(__name__)
+
+#: The prefix of the serving loop's thread's name; the executor appends ``_0``.
+LOOP_PREFIX: Final = "fleet-serve"
 
 #: The scheduled tasks' repetition, in seconds (``scripts/FleetSchedule.ps1``).
 TICK_SECONDS: Final[int] = 180
@@ -301,6 +319,33 @@ def serve_loop(
             settled = watch.closed()
 
 
+def serve_on(watch: Watched, watching: Future[None], *, poll_seconds: int) -> int:
+    """Keep the watch settling after the loop has failed, until the handover.
+
+    The handover is :data:`HANDOVER_SECONDS` before the first fire boundary
+    after the failure, the moment a serving loop would have handed over at,
+    and it waits, as the loop's does, until no settle is under way. A
+    failure inside those last seconds hands over at once.
+
+    Args:
+        watch: The watch the loop handed its runs to.
+        watching: The watch thread, whose end stops the wait at once.
+        poll_seconds: The workspace's ``node_poll_seconds``, the pace at
+            which the thread's end and the handover are looked for.
+
+    Returns:
+        When the watch was closed, or when its thread was found ended.
+    """
+    handover = next_fire(_test_hooks.now()) - HANDOVER_SECONDS
+    while True:
+        now = _test_hooks.now()
+        if watching.done():
+            return now
+        if now >= handover and watch.close_if_idle():
+            return now
+        _test_hooks.sleep(min(poll_seconds, handover - now) if now < handover else poll_seconds)
+
+
 def _utc(seconds: int) -> str:
     """A moment as the serve's line prints it.
 
@@ -322,11 +367,11 @@ def serve(
     poll_seconds: int,
     steps: ServeSteps,
 ) -> Served:
-    """Serve one node with the watch beside the loop, then say what was done.
+    """Serve one node with the watch and the loop each on a thread, then say what was done.
 
     Args:
         watch: The watch the passes hand their runs to.
-        alias: This node's workspace name, which names the thread.
+        alias: This node's workspace name, which names both threads.
         started: When the serve started.
         serve_seconds: The workspace's ``node_serve_seconds``.
         poll_seconds: The workspace's ``node_poll_seconds``.
@@ -336,14 +381,22 @@ def serve(
         What the serve did.
 
     Raises:
-        AppError: From the loop, once the watch has ended; or from the
-            watch, once the loop has stopped. Neither is caught: the next
-            start meets the same runs.
+        AppError: From the loop, once the watch has served on to the
+            handover (:func:`serve_on`) and ended; or from the watch, once
+            the loop has stopped. Neither is caught: the next start meets
+            the same runs. Any other error the loop raised, a refused
+            connection's ``URLError`` among them, is raised the same way.
     """
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"{THREAD_PREFIX}-{alias}") as pool:
-        watching = pool.submit(watch.watch)
+    with (
+        ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix=f"{THREAD_PREFIX}-{alias}"
+        ) as watch_pool,
+        ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"{LOOP_PREFIX}-{alias}") as loop_pool,
+    ):
+        watching = watch_pool.submit(watch.watch)
         with watch:
-            served = serve_loop(
+            looping = loop_pool.submit(
+                serve_loop,
                 watch,
                 watching,
                 started=started,
@@ -351,6 +404,22 @@ def serve(
                 poll_seconds=poll_seconds,
                 steps=steps,
             )
+            failure = looping.exception()
+            if failure is not None:
+                failed = _test_hooks.now()
+                handed_over = serve_on(watch, watching, poll_seconds=poll_seconds)
+                _log.info(
+                    "%s: its serving loop failed at %s (%s: %s); its watch served on to %s "
+                    "with %d run(s) closed, %d still watched, and the failure ends this start",
+                    alias,
+                    _utc(failed),
+                    type(failure).__name__,
+                    failure,
+                    _utc(handed_over),
+                    watch.closed(),
+                    watch.still_watched(),
+                )
+            served = looping.result()
         watching.result()
     _log.info(
         "%s served %d s from %s: %d fire(s), %d fill pass(es), %d poll(s), %d run(s) closed, "
@@ -372,6 +441,7 @@ def serve(
 
 __all__ = [
     "HANDOVER_SECONDS",
+    "LOOP_PREFIX",
     "TICK_SECONDS",
     "Handover",
     "ServeSteps",
@@ -382,4 +452,5 @@ __all__ = [
     "queued_here",
     "serve",
     "serve_loop",
+    "serve_on",
 ]
