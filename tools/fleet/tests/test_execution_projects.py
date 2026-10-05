@@ -88,3 +88,23 @@ def test_each_games_suite_runs_isolated_on_a_rootless_daemon(game: str) -> None:
         install=(InstallStep(phase="install", argv=("npm", "ci")),),
         companions=(),
     )
+
+
+def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
+    """clients/TankpitBot's live demo case lands on a Windows node with ffmpeg.
+
+    The case reads a segment the public demo served with ``ffprobe`` to
+    require its AAC audio stream (MCPs board task 46934cd6), so a node
+    without the ``ffmpeg`` tag could only fail it; ``windows`` is the
+    platform the package's own check is registered for.
+    """
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    project = require_project(workspace, "clients/TankpitBot-execution")
+    assert project["required_tags"] == (NodeTag.WINDOWS, NodeTag.FFMPEG)
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path="clients/TankpitBot-execution",
+        install=(),
+        companions=(),
+    )
