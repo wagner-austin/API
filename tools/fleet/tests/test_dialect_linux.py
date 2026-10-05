@@ -153,11 +153,13 @@ class TestBuildScript:
 
         assert f"cd '{TARGET}/{DEMO_PROJECT}'\n" in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\n" in body
+        assert "CORVIS_TEST_MAX_WORKERS='6'\n" in body
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT}\n" in body
         assert "CORVIS_FLEET_WORKSPACE=.\n" in _build(path="")
         assert (
             "export npm_config_cache POETRY_CACHE_DIR POETRY_KEYRING_ENABLED "
-            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS BOARD_AGENT_LABEL "
+            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
+            "BOARD_AGENT_LABEL "
             "CORVIS_FLEET_CACHE CORVIS_FLEET_WORKSPACE\n"
         ) in body
         assert f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body

@@ -14,18 +14,33 @@ from fleet.core.dialect_linux import LinuxDialect
 
 @pytest.mark.skipif(sys.platform == "win32", reason="The rendered build uses POSIX sh and make")
 @pytest.mark.parametrize("workspace", ["", "packages/demo"])
-def test_preparation_and_recipe_receive_the_same_workspace(tmp_path: Path, workspace: str) -> None:
-    """Run actual printenv in both phases, including the repository-root sentinel."""
+@pytest.mark.parametrize("workers", [1, 3, 6])
+def test_preparation_and_recipe_receive_the_same_workspace(
+    tmp_path: Path, workspace: str, workers: int
+) -> None:
+    """Execute both phases with the project and granted Python/TypeScript worker budget."""
     recipe = tmp_path / workspace
     recipe.mkdir(parents=True, exist_ok=True)
     (recipe / "Makefile").write_text(
-        "check:\n\tprintenv CORVIS_FLEET_WORKSPACE\n", encoding="utf-8"
+        "check:\n\tprintenv CORVIS_FLEET_WORKSPACE PYTEST_XDIST_AUTO_NUM_WORKERS "
+        "CORVIS_TEST_MAX_WORKERS\n",
+        encoding="utf-8",
     )
     body = LinuxDialect().build_script(
         target=tmp_path.as_posix(),
         path=workspace,
-        workers=1,
-        install=(InstallStep(phase="install", argv=("printenv", "CORVIS_FLEET_WORKSPACE")),),
+        workers=workers,
+        install=(
+            InstallStep(
+                phase="install",
+                argv=(
+                    "printenv",
+                    "CORVIS_FLEET_WORKSPACE",
+                    "PYTEST_XDIST_AUTO_NUM_WORKERS",
+                    "CORVIS_TEST_MAX_WORKERS",
+                ),
+            ),
+        ),
         cache_root=(tmp_path / "cache").as_posix(),
         isolated_docker=False,
         elevated=False,
@@ -36,3 +51,4 @@ def test_preparation_and_recipe_receive_the_same_workspace(tmp_path: Path, works
     assert (tmp_path / "result.txt").read_text(encoding="utf-8") == "0\n"
     lines = (tmp_path / "result.txt.log").read_text(encoding="utf-8").splitlines()
     assert lines.count(workspace or ".") == 2
+    assert lines.count(str(workers)) == 4

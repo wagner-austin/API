@@ -135,6 +135,7 @@ class TestBuildScript:
 
         assert "[int]$Workers = 6," in body
         assert '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"' in body
+        assert '$env:CORVIS_TEST_MAX_WORKERS = "$Workers"' in body
 
     def test_it_tells_the_suite_which_lane_launched_it(self) -> None:
         """So MCPs' execution suite can assert its token is the one the fleet
