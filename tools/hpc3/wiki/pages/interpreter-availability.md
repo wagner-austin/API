@@ -11,7 +11,7 @@ source_paths:
   - "README.md"
   - "pyproject.toml"
 source_git_blobs:
-  "src/hpc3/clusters/hpc3.py": "7bb86a2753a78657365f4bd69c3a0dedd0f1e82c"
+  "src/hpc3/clusters/hpc3.py": "ab26dc348ecfa27716bc6d0bf2f08e359c2676b6"
   "src/hpc3/core/bootstrap.py": "4b8e0a34981b22430f8465bdafe040a579db03b7"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "src/hpc3/core/interpreter.py": "44152c39c9674c78771a2f01288110c0438c5617"
@@ -192,7 +192,7 @@ re-capture has to start from an environment `hpc3-bootstrap` built.
 [^4]: `for e in /pub/wagnera3/envs/*/; do "$e/bin/python" -V; done` on hpc3 login-i15 at 2026-09-03 20:11 UTC: `/pub/wagnera3/envs/abl-pinned/`, `/pub/wagnera3/envs/cleargbm/` and `/pub/wagnera3/envs/tankpit/` each report `Python 3.11.16`. The first two carry `/pub/wagnera3/envs/<name>/conda-meta/`; the third does not, and is a venv (see below).
 [^5]: Both greps were empty when measured on 2026-09-03 before the command existed: `grep -n "3\.11\|python_version\|module load\|module avail" README.md` and `grep -n -i bootstrap README.md`. The README's "Onboarding a project that does not exist yet" block and its `hpc3-bootstrap` row in the command table were added the same day, in the commit that added the command.
 [^6]: `ls -l /pub/wagnera3/envs/tankpit/bin/python3.11` at 2026-09-03 20:12 UTC → `lrwxr-xr-x ... -> /pub/wagnera3/envs/cleargbm/bin/python3.11` (42-byte link, dated Sep 2 22:15); `sys.base_prefix` read from that same interpreter in the same call returns `/pub/wagnera3/envs/cleargbm`. The venv resolves today, so this is a latent dependency rather than a current breakage.
-[^7]: `grep -n -i "python\|interpreter" src/hpc3/clusters/hpc3.py` → no matches, 2026-09-03.
+[^7]: `grep -n -i "python\|interpreter" src/hpc3/clusters/hpc3.py` → no matches, 2026-09-03, and again 2026-10-05 on the blob now pinned.
 [^8]: Before 2026-10-05, `src/hpc3/core/env_probe.py`'s `_PROBE_SOURCE` iterated `importlib.metadata.distributions()` and printed name, version and wheel tag, never reading `sys.version_info`, and `verify_env_packages` returned before the round trip when `pinned == {}`. Both are gone: `_PROBE_SOURCE` now prepends `IDENTITY_LINES`, and `verify_environment` always probes.
 [^9]: `src/hpc3/core/bootstrap.py`, `CONDA_MODULE` and `create_command`. The join is asserted by `test_module_load_and_conda_create_are_one_command`, which exists because separate calls fail only against a real cluster and look correct in review.
 [^10]: `src/hpc3/core/interpreter.py`, `IDENTITY_LINES`, `split_identity` and `check_interpreter_home` (raising `ENV_INTERPRETER_BORROWED`, which replaced `BOOTSTRAP_ENV_NOT_SELF_CONTAINED`); `src/hpc3/core/env_probe.py`, `probe_environment` and `verify_environment`; `src/hpc3/core/bootstrap.py`, `check_identity`, which keeps `BOOTSTRAP_PYTHON_MISMATCH` and delegates the base check. Measured against all three host environments 2026-09-03 20:11 UTC: `abl-pinned` and `cleargbm` report their own paths as `base_prefix`; `tankpit` reports `/pub/wagnera3/envs/cleargbm`.
