@@ -31,6 +31,8 @@ from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
+from fleet.cli import collect as collect_cli
+from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
@@ -132,20 +134,25 @@ def stop_lost(
         if job is None or still_held(job, agent=agent):
             continue
         holder = job["claimed_by"] if job["claimed_by"] is not None else "no runner"
-        stop.stop_and_finish(
-            loaded.leases,
-            loaded.ledger,
-            loaded.feed,
-            node=node,
-            row=row,
-            outcome=LedgerOutcome.LOST,
-            exit_code=NO_EXIT_CODE,
-            detail=(
-                f"queue job {job['job_id']} left {agent} while this run was live: it is "
-                f"{job['status']} and held by {holder}; stopped by {agent}; was dispatched "
-                f"by {row['agent']}"
-            ),
-        )
+        # Under the run's lock, and only while the ledger still calls it live,
+        # since the serve's watch settles runs beside this pass.
+        with SETTLING.holding(row["run_id"]):
+            if not collect_cli.live_rows(loaded, run_id=row["run_id"]):
+                continue
+            stop.stop_and_finish(
+                loaded.leases,
+                loaded.ledger,
+                loaded.feed,
+                node=node,
+                row=row,
+                outcome=LedgerOutcome.LOST,
+                exit_code=NO_EXIT_CODE,
+                detail=(
+                    f"queue job {job['job_id']} left {agent} while this run was live: it is "
+                    f"{job['status']} and held by {holder}; stopped by {agent}; was dispatched "
+                    f"by {row['agent']}"
+                ),
+            )
         _log.info("stopped lost run %s: %s", row["run_id"], encode_job_line(job))
         stopped += 1
     return stopped

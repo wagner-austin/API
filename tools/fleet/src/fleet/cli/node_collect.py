@@ -45,7 +45,6 @@ fails leaves the row live, matching the node.
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from typing import Final
 
@@ -57,6 +56,7 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config, node_lost
 from fleet.cli import collect as collect_cli
+from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
@@ -84,18 +84,6 @@ _log = get_logger(__name__)
 #: ``timeout`` gives a command it ended for running too long, which is what
 #: happened, rather than a number a reader would have to look up.
 TIMED_OUT_EXIT_CODE: Final = 124
-
-#: Held while a run on the node is read, settled or stopped: by the collect
-#: pass for each held job (:func:`collect_one_job`) and around its stops
-#: (:func:`collect_pass`), and by the serve's watch across each poll and the
-#: settle it starts (:mod:`fleet.cli.node_watch`). The poll sends its script
-#: INTO the run's directory, so a poll beside a retire put ``collect.sh`` back
-#: into a directory being removed: on 2026-10-05 at 07:00Z the retire of
-#: tools-fleet-execution-linux-lavender-wsl-1791183483 exited ``Directory not
-#: empty`` with its result already moved, and every later pass read the run
-#: as still going (MCPs board task 8993c306). Reentrant, because the watch
-#: holds it while the settle it starts takes it again.
-SETTLING: Final = threading.RLock()
 
 
 def settle(
@@ -222,12 +210,13 @@ def collect_one_job(
             which the queue's pin makes impossible. Not caught: those mean
             this machine's own records and the fleet disagree.
 
-    ONE AT A TIME, under :data:`SETTLING`: the serve's watch settles a run
+    ONE AT A TIME PER RUN, under the run's lock in
+    :data:`fleet.cli.run_locks.SETTLING`: the serve's watch settles a run
     that ends while the collect pass is still going
     (:mod:`fleet.cli.node_watch`), and the run each finds live is read
     under the same lock, so the second to reach one finds it closed.
     """
-    with SETTLING:
+    with SETTLING.holding(job["run_id"]):
         row: LedgerEntry | None = None
         for candidate in collect_cli.live_rows(loaded, run_id=job["run_id"]):
             row = candidate
@@ -457,8 +446,8 @@ def stop_cancelled(
             row = candidates.pop(job["run_id"] if launched is None else launched["run_id"], None)
             if row is None:
                 continue
-            stop_cancelled_run(loaded, node=node, row=row, job=job, agent=agent)
-            stopped += 1
+            if stop_cancelled_run(loaded, node=node, row=row, job=job, agent=agent):
+                stopped += 1
         offset = page["next_offset"]
     # What no cancel accounts for may be a run whose job was taken over by
     # another runner (board task fd402617); what nothing accounts for stays.
@@ -475,7 +464,7 @@ def stop_cancelled_run(
     row: LedgerEntry,
     job: DispatchJob,
     agent: str,
-) -> None:
+) -> bool:
     """Stop one run whose queue job was cancelled, and close its row cancelled.
 
     The one stop for a cancel, whichever tick finds it: a later tick's
@@ -490,23 +479,31 @@ def stop_cancelled_run(
         job: The cancelled queue job.
         agent: This runner's label.
 
+    Returns:
+        True when it stopped the run; False when the run was no longer live
+        once its lock was held, settled meanwhile by the serve's watch.
+
     Raises:
         AppError: A node failure from the stop, which leaves the row live.
     """
-    stop.stop_and_finish(
-        loaded.leases,
-        loaded.ledger,
-        loaded.feed,
-        node=node,
-        row=row,
-        outcome=LedgerOutcome.CANCELLED,
-        exit_code=NO_EXIT_CODE,
-        detail=(
-            f"queue job {job['job_id']} was cancelled while it ran; stopped by "
-            f"{agent}; was dispatched by {row['agent']}"
-        ),
-    )
+    with SETTLING.holding(row["run_id"]):
+        if not collect_cli.live_rows(loaded, run_id=row["run_id"]):
+            return False
+        stop.stop_and_finish(
+            loaded.leases,
+            loaded.ledger,
+            loaded.feed,
+            node=node,
+            row=row,
+            outcome=LedgerOutcome.CANCELLED,
+            exit_code=NO_EXIT_CODE,
+            detail=(
+                f"queue job {job['job_id']} was cancelled while it ran; stopped by "
+                f"{agent}; was dispatched by {row['agent']}"
+            ),
+        )
     _log.info("stopped %s: %s", row["run_id"], encode_job_line(job))
+    return True
 
 
 def collect_pass(
@@ -548,14 +545,13 @@ def collect_pass(
         else:
             line = reconcile_claim(loaded, credentials, job, identity, alias=alias, running=running)
             _log.info("%s", line)
-    with SETTLING:
-        stop_cancelled(
-            loaded,
-            credentials,
-            agent=agent,
-            alias=alias,
-            held=frozenset(job["run_id"] for job in held),
-        )
+    stop_cancelled(
+        loaded,
+        credentials,
+        agent=agent,
+        alias=alias,
+        held=frozenset(job["run_id"] for job in held),
+    )
 
 
 def require_sha(job: DispatchJob) -> str:
