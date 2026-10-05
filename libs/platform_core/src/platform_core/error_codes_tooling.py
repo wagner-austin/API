@@ -117,6 +117,12 @@ class Hpc3ErrorCode(ErrorCodeBase):
     BOOTSTRAP_ENV_EXISTS = "BOOTSTRAP_ENV_EXISTS"
     BOOTSTRAP_PYTHON_MISMATCH = "BOOTSTRAP_PYTHON_MISMATCH"
 
+    # Registration -- writing a project into the registry, the last on-ramp
+    # step. One code for every unmet precondition because the refusal names
+    # ALL of them in one message: a registration discovered one red check at a
+    # time is the defect the command exists to remove.
+    REGISTRATION_INCOMPLETE = "REGISTRATION_INCOMPLETE"
+
     # Preflight -- validating a job against the live scheduler before running it.
     PREFLIGHT_REJECTED = "PREFLIGHT_REJECTED"
     PREFLIGHT_UNPARSABLE = "PREFLIGHT_UNPARSABLE"
