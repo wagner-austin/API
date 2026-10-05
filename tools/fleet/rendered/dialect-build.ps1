@@ -111,6 +111,7 @@ $env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"
 $env:CORVIS_FLEET_ELEVATED = '0'
 $env:BOARD_AGENT_LABEL = 'opus-example-0929'
 $env:CORVIS_FLEET_CACHE = $CacheRoot
+$env:CORVIS_FLEET_WORKSPACE = 'packages/maketools'
 $env:PATH = "$GitBin;$env:PATH"
 function Invoke-Logged {
     param([string]$Shell, [string]$Command)
