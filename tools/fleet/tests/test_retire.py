@@ -19,7 +19,7 @@ from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import _test_hooks, dialect, names, retire
 from fleet.core.dialect_linux import PROLOGUE
 from tests._host_bash import host_bash
-from tests.conftest import DEMO_RUN_ID, FakeRun, retire_replies
+from tests.conftest import DEMO_RUN_ID, FakeRun, ok, retire_replies
 
 #: Each platform's stage root, as the roster declares them.
 STAGE_ROOTS = {
@@ -102,6 +102,27 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
     ).encode("utf-8")
     assert script_path in " ".join(runner.calls[0])
     assert runner.calls[1][-1].endswith(script_path)
+
+
+def test_each_holder_the_retire_ended_is_logged_by_its_line(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ended = (
+        "FLEET_RETIRE_HOLDER_ENDED: pid 8728 bash.exe "
+        "(bash /c/fleet/stage/run/scripts/ci-bootstrap-testdb.sh) "
+        "held C:/fleet/stage/run/result.txt.log"
+    )
+    replies = retire_replies()
+    replies[1] = ok(f"{ended}\n")
+    _test_hooks.run = FakeRun(replies)
+
+    with caplog.at_level("INFO"):
+        retire.retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert [message for message in messages if message.startswith("retire ")] == [
+        f"retire {DEMO_RUN_ID} on node-1: {ended}"
+    ]
 
 
 class TestTheShScriptRunsForReal:
