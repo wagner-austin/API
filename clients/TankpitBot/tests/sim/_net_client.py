@@ -38,6 +38,7 @@ ACCOUNT = NetAccountDict(
     name="austin",
     rank=3,
     game_start="Oct. 05, 2026",
+    decorations=[1, 2, 0, 0, 0, 0, 0, 0, 0],
 )
 OTHER_ACCOUNT = NetAccountDict(
     account_id="1002",
@@ -45,12 +46,25 @@ OTHER_ACCOUNT = NetAccountDict(
     name="kestrel",
     rank=0,
     game_start="Oct. 05, 2026",
+    decorations=[0] * 9,
 )
 
 
 def account_book() -> MemoryAccountBook:
-    """The two test accounts, in a book."""
-    return MemoryAccountBook((ACCOUNT, OTHER_ACCOUNT))
+    """The two test accounts, in a book of their own copies, so a test may record into it."""
+    return MemoryAccountBook(
+        tuple(
+            NetAccountDict(
+                account_id=account["account_id"],
+                token_sha256=account["token_sha256"],
+                name=account["name"],
+                rank=account["rank"],
+                game_start=account["game_start"],
+                decorations=list(account["decorations"]),
+            )
+            for account in (ACCOUNT, OTHER_ACCOUNT)
+        )
+    )
 
 
 def payload(*bodies: bytes) -> str:

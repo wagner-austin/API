@@ -20,24 +20,32 @@ from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close, CloseCode
 
 from tankpit_bot.protocol.commands import TICK_RATE_MS
+from tankpit_bot.sim.lobby import LobbyError
 from tankpit_bot.sim.net_accounts import encode_account_book
+from tankpit_bot.sim.net_host import NetHost
 from tankpit_bot.sim.net_room import NET_PLAYER_ID_BASE, NetError
 from tankpit_bot.sim.net_server import (
     DEFAULT_BIND,
     DEFAULT_PORT,
     DEFAULT_ROOM,
+    AccountSource,
     NetServer,
     ServeArgs,
     build_host,
     main,
+    open_account_book,
     parse_serve_args,
     serve_rooms,
 )
+from tankpit_bot.sim.net_store import SCHEMA
+from tests.sim._fake_db import DSN, DSN_VARIABLE, FakeDatabase
 from tests.sim._net_client import (
     ACCOUNT,
     ENTER,
     OTHER_ACCOUNT,
     SELECT,
+    TOKEN,
+    account_book,
     auth,
     enter_game,
     plaintext,
@@ -53,13 +61,18 @@ def _args(
     return ServeArgs(
         bind="127.0.0.1",
         port=0,
-        accounts=accounts,
+        accounts=AccountSource("file", str(accounts)),
         rooms=rooms,
         ticks=ticks,
         tick_ms=0,
         layout="bot-20260706-223721",
         population_seed=7,
     )
+
+
+def _host(args: ServeArgs) -> NetHost:
+    """The flags' rooms over the two test accounts."""
+    return build_host(args, account_book())
 
 
 @pytest.fixture()
@@ -84,7 +97,7 @@ async def _received(socket: ClientConnection) -> str:
 
 async def test_a_client_joins_and_plays_over_a_real_socket(accounts: Path) -> None:
     """AUTH, lobby, entry and the join burst, all over WebSocket bytes."""
-    server = NetServer(build_host(_args(accounts)))
+    server = NetServer(_host(_args(accounts)))
     async with serve(server.handle, "127.0.0.1", 0) as listening:
         bound: tuple[str, int] = next(iter(listening.sockets)).getsockname()
         async with connect(f"ws://127.0.0.1:{bound[1]}") as socket:
@@ -111,7 +124,7 @@ async def test_a_client_joins_and_plays_over_a_real_socket(accounts: Path) -> No
 
 async def test_a_text_message_ends_only_that_connection(accounts: Path) -> None:
     """The wire is binary; the handler raises, the library closes with 1011."""
-    server = NetServer(build_host(_args(accounts)))
+    server = NetServer(_host(_args(accounts)))
     async with serve(server.handle, "127.0.0.1", 0) as listening:
         bound: tuple[str, int] = next(iter(listening.sockets)).getsockname()
         async with connect(f"ws://127.0.0.1:{bound[1]}") as socket:
@@ -124,7 +137,7 @@ async def test_a_text_message_ends_only_that_connection(accounts: Path) -> None:
 
 async def test_the_server_ticks_for_its_count_then_returns(accounts: Path) -> None:
     """A tick count is how a smoke run ends; nobody seated is still a tick."""
-    server = NetServer(build_host(_args(accounts)))
+    server = NetServer(_host(_args(accounts)))
     assert await server.tick_for(3, 0) == 3
     assert server.host.rooms[0].server.world["tick"] == 3
     assert await serve_rooms(server, _args(accounts, ticks=2)) == 2
@@ -145,7 +158,7 @@ def test_flags_default_to_one_practice_room_on_localhost(accounts: Path) -> None
     assert parse_serve_args(["--accounts", str(accounts)]) == ServeArgs(
         bind=DEFAULT_BIND,
         port=DEFAULT_PORT,
-        accounts=accounts,
+        accounts=AccountSource("file", str(accounts)),
         rooms=(DEFAULT_ROOM,),
         ticks=None,
         tick_ms=TICK_RATE_MS,
@@ -154,15 +167,15 @@ def test_flags_default_to_one_practice_room_on_localhost(accounts: Path) -> None
     )
 
 
-def test_every_flag_is_read(accounts: Path) -> None:
+def test_every_flag_is_read() -> None:
     """Rooms repeat; the rest name one value each."""
-    argv = ["--bind", "0.0.0.0", "--port", "9000", "--accounts", str(accounts)]
+    argv = ["--bind", "0.0.0.0", "--port", "9000", "--database-env", DSN_VARIABLE]
     argv += ["--room", "1:field01:p", "--room", "5:field05:n", "--ticks", "4", "--tick-ms", "50"]
     argv += ["--layout", "bot-20260706-223721", "--population-seed", "3"]
     assert parse_serve_args(argv) == ServeArgs(
         bind="0.0.0.0",
         port=9000,
-        accounts=accounts,
+        accounts=AccountSource("database", DSN_VARIABLE),
         rooms=("1:field01:p", "5:field05:n"),
         ticks=4,
         tick_ms=50,
@@ -174,7 +187,8 @@ def test_every_flag_is_read(accounts: Path) -> None:
 @pytest.mark.parametrize(
     ("argv", "says"),
     [
-        (["--port", "1"], "--accounts PATH names this server's account file"),
+        (["--port", "1"], "name the accounts once"),
+        (["--accounts", "a.json", "--database-env", "X"], "name the accounts once"),
         (["--accounts"], "unknown flag or missing value at '--accounts'"),
         (["--player", "x"], "unknown flag or missing value at '--player'"),
     ],
@@ -187,7 +201,7 @@ def test_bad_flags_are_refused_by_name(argv: list[str], says: str) -> None:
 
 def test_rooms_are_built_from_their_specs(accounts: Path) -> None:
     """A practice room and an open room, each on its own field."""
-    host = build_host(_args(accounts, rooms=("1:field01:p", "5:field05:n")))
+    host = _host(_args(accounts, rooms=("1:field01:p", "5:field05:n")))
     assert [(r.info["room_id"], r.info["name"], r.info["mode_code"]) for r in host.rooms] == [
         ("1", "Practice", "p"),
         ("5", "World (field05)", "n"),
@@ -198,4 +212,23 @@ def test_rooms_are_built_from_their_specs(accounts: Path) -> None:
 def test_a_room_spec_that_is_not_id_field_mode_is_refused(accounts: Path, spec: str) -> None:
     """Three parts, an id, and mode p or n."""
     with pytest.raises(NetError, match=r"SIM_SERVE_ROOM: .* is not ID:FIELD:MODE"):
-        build_host(_args(accounts, rooms=(spec,)))
+        _host(_args(accounts, rooms=(spec,)))
+
+
+def test_an_account_file_opens_as_a_book_of_its_records(accounts: Path) -> None:
+    """The file named is the book the rooms admit from."""
+    with open_account_book(AccountSource("file", str(accounts))) as book:
+        assert book.verify("1001", TOKEN).account["name"] == "austin"
+
+
+def test_the_database_book_is_schema_checked_and_closed_with_the_server(
+    fake_db: FakeDatabase,
+) -> None:
+    """The tables are made sure of before serving; the connection closes after."""
+    with open_account_book(AccountSource("database", DSN_VARIABLE)) as book:
+        fake_db.answers.append([])
+        with pytest.raises(LobbyError, match="SIM_LOBBY_DENIED"):
+            book.verify("1001", TOKEN)
+        assert fake_db.closed == 0
+    assert [sql for sql, _ in fake_db.executed][: len(SCHEMA)] == list(SCHEMA)
+    assert (fake_db.dsns, fake_db.closed) == ([DSN], 1)

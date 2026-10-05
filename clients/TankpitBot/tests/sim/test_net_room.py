@@ -6,7 +6,7 @@ import pytest
 
 from tankpit_bot.sim.commands import SimError
 from tankpit_bot.sim.field_choice import FieldChoiceError
-from tankpit_bot.sim.lobby import SimAccountDict
+from tankpit_bot.sim.net_accounts import AdmittedAccount, SeatResult
 from tankpit_bot.sim.net_room import (
     MAX_ROOM_PLAYERS,
     NET_PLAYER_ID_BASE,
@@ -25,7 +25,7 @@ from tests.sim._net_client import TOKEN, account_book
 _LAYOUT = "bot-20260706-223721"
 
 
-def _player() -> SimAccountDict:
+def _player() -> AdmittedAccount:
     """The first test account, as the book admits it."""
     return account_book().verify("1001", TOKEN)
 
@@ -100,6 +100,26 @@ def test_a_seated_player_stands_on_open_ground_under_its_account() -> None:
     assert list(room.advance()) == [tank_id]
 
 
+def test_a_seat_carries_the_accounts_levels_in_and_reports_what_it_came_to() -> None:
+    """The account's decorations ride its session; leaving reads the seat before it goes."""
+    room = _arena()
+    tank_id = room.seat(_player(), 1)
+    assert room.server.require_session(tank_id).awards.levels == [1, 2, 0, 0, 0, 0, 0, 0, 0]
+    for _ in range(3):
+        room.advance()
+
+    assert room.leave(tank_id) == SeatResult(
+        room_id="1",
+        field=SIM_FIELD,
+        ticks=3,
+        rank=3,
+        kills=0,
+        deaths=0,
+        decorations=(1, 2, 0, 0, 0, 0, 0, 0, 0),
+    )
+    assert tank_id not in room.server.world["tanks"]
+
+
 @pytest.mark.parametrize("troop", [-1, 4])
 def test_a_troop_that_is_no_team_is_refused(troop: int) -> None:
     """Teams are 0 to 3, the wire's own color ids."""
@@ -137,5 +157,5 @@ def test_a_field_with_no_open_tile_seats_nobody() -> None:
 
 def test_leaving_without_a_seat_is_a_harness_error() -> None:
     """Only a connected tank can leave."""
-    with pytest.raises(SimError, match="has no connection to close"):
+    with pytest.raises(SimError, match=f"tank {NET_PLAYER_ID_BASE} has no connection"):
         _arena().leave(NET_PLAYER_ID_BASE)

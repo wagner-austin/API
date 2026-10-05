@@ -5,11 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONValue, dump_json_str
 
 from tankpit_bot.sim.lobby import SIM_ACCOUNT, LobbyError, SimAccountDict
 from tankpit_bot.sim.net_accounts import (
+    AdmittedAccount,
     MemoryAccountBook,
+    SeatResult,
     decode_account_book,
     decode_net_account,
     encode_account_book,
@@ -18,7 +20,7 @@ from tankpit_bot.sim.net_accounts import (
     token_digest,
 )
 from tests.conftest import FakeFileSystem
-from tests.sim._net_client import ACCOUNT, OTHER_ACCOUNT, TOKEN
+from tests.sim._net_client import ACCOUNT, OTHER_ACCOUNT, TOKEN, account_book
 
 _FILE = Path("config") / "net_accounts.json"
 
@@ -53,6 +55,15 @@ def test_an_invalid_record_is_refused(field: str, value: str | int) -> None:
         decode_net_account(record)
 
 
+@pytest.mark.parametrize("levels", [[0] * 8, [0] * 8 + [4], [-1] + [0] * 8])
+def test_decoration_levels_must_be_nine_of_zero_to_three(levels: list[JSONValue]) -> None:
+    """Nine two-bit slots, as the wire packs them."""
+    record = encode_net_account(ACCOUNT)
+    record["decorations"] = levels
+    with pytest.raises(LobbyError, match="SIM_ACCOUNT_INVALID: account '1001' needs 9 decoration"):
+        decode_net_account(record)
+
+
 def test_a_file_listing_an_id_twice_is_refused() -> None:
     """One id, one account."""
     with pytest.raises(LobbyError, match=r"SIM_ACCOUNT_DUPLICATE: .*\['1001'\]"):
@@ -60,13 +71,30 @@ def test_a_file_listing_an_id_twice_is_refused() -> None:
 
 
 def test_the_book_admits_an_account_by_its_token_and_reports_it() -> None:
-    """A matching token yields what the join confirm reports."""
-    assert MemoryAccountBook((ACCOUNT,)).verify("1001", TOKEN) == SimAccountDict(
-        game_start="Oct. 05, 2026",
-        name="austin",
-        rank=3,
-        active_forces=SIM_ACCOUNT["active_forces"],
+    """A matching token yields what the join confirm reports and the levels it carries."""
+    assert account_book().verify("1001", TOKEN) == AdmittedAccount(
+        account=SimAccountDict(
+            game_start="Oct. 05, 2026",
+            name="austin",
+            rank=3,
+            active_forces=SIM_ACCOUNT["active_forces"],
+        ),
+        decorations=(1, 2, 0, 0, 0, 0, 0, 0, 0),
     )
+
+
+def test_a_recorded_seat_is_what_the_account_rejoins_as() -> None:
+    """Rank and levels move onto the account; the seat is kept in order."""
+    book = account_book()
+    seat = SeatResult("1", "field01_r.gif", 12, 4, 1, 0, (1, 2, 1, 0, 0, 0, 0, 0, 0))
+
+    book.record("1001", seat)
+
+    rejoined = book.verify("1001", TOKEN)
+    assert (rejoined.account["rank"], rejoined.decorations) == (4, seat.decorations)
+    assert book.results == [("1001", seat)]
+    with pytest.raises(LobbyError, match="SIM_ACCOUNT_UNKNOWN: no account '9999' to record"):
+        book.record("9999", seat)
 
 
 @pytest.mark.parametrize(("account_id", "token"), [("1001", "wrong"), ("9999", TOKEN)])
@@ -82,4 +110,4 @@ def test_an_account_file_loads_into_a_book(fake_fs: FakeFileSystem) -> None:
     """The file on disk is the book the server admits from."""
     fake_fs.write_text(_FILE, dump_json_str(encode_account_book((ACCOUNT, OTHER_ACCOUNT))))
     book = load_account_book(_FILE)
-    assert book.verify("1001", TOKEN)["name"] == "austin"
+    assert book.verify("1001", TOKEN).account["name"] == "austin"

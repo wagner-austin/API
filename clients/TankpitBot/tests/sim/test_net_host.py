@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.sim.lobby import LobbyError
+from tankpit_bot.sim.net_accounts import MemoryAccountBook, SeatResult
 from tankpit_bot.sim.net_host import NetHost
 from tankpit_bot.sim.net_room import NET_PLAYER_ID_BASE, NetError, field_room_info, open_field_room
 from tankpit_bot.wire.helpers import DecodeError
@@ -34,14 +35,14 @@ _JOIN_BURST = [0x21, 0x3E, 0x5A, 0x3D, 0x2E, 0x49, 0x49, 0x74, 0x3F]
 """The archived join burst for a room with no other tank: self block, then the tail."""
 
 
-def _host() -> NetHost:
-    """One open room on field01, no roster, over the two test accounts."""
+def _host(book: MemoryAccountBook | None = None) -> NetHost:
+    """One open room on field01, no roster, over the two test accounts or a given book."""
     room = open_field_room(
         field_room_info("1", "Arena", "field01.gif", practice=False),
         layout="bot-20260706-223721",
         population_seed=7,
     )
-    return NetHost((room,), account_book())
+    return NetHost((room,), account_book() if book is None else book)
 
 
 def _seated(host: NetHost) -> int:
@@ -131,6 +132,26 @@ def test_closing_a_connection_takes_its_tank_off_the_field() -> None:
     assert host.connections == 0
     with pytest.raises(NetError, match=f"SIM_NET_UNKNOWN: no open connection {connection}"):
         host.receive(connection, payload(SELECT))
+
+
+def test_a_seat_that_leaves_is_recorded_and_the_account_rejoins_as_it_left() -> None:
+    """Quit and close both record; a later join seats the recorded rank and levels."""
+    book = account_book()
+    host = _host(book)
+    quitter = _seated(host)
+    host.tick()
+    host.tick()
+    host.receive(quitter, payload(QUIT))
+    host.close(quitter)
+
+    assert book.results == [
+        ("1001", SeatResult("1", "field01_r.gif", 2, 3, 0, 0, (1, 2, 0, 0, 0, 0, 0, 0, 0)))
+    ]
+    book.record("1001", SeatResult("1", "field01_r.gif", 9, 5, 4, 1, (1, 2, 1, 0, 0, 0, 0, 0, 0)))
+    _seated(host)
+    tank = host.rooms[0].server.world["tanks"][NET_PLAYER_ID_BASE + 1]
+    session = host.rooms[0].server.require_session(NET_PLAYER_ID_BASE + 1)
+    assert (tank["rank"], session.awards.levels) == (5, [1, 2, 1, 0, 0, 0, 0, 0, 0])
 
 
 def test_a_connection_that_has_not_entered_is_sent_nothing() -> None:
