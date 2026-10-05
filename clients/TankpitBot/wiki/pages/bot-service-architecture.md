@@ -23,6 +23,25 @@ hubs: [architecture]
 
 # Bot Service Architecture
 
+> **STATUS 2026-10-05 — THE STREAM CARRIES SOUND, AND THE DEMO ROW
+> CARRIES CAPTIONS** (MCPs board task 46934cd6). Each streamed bot now
+> also owns a PulseAudio server with one null sink (`stream/audio.py`),
+> started before Chromium, which launches with `PULSE_SERVER` naming
+> its socket under `/tmp` and `--autoplay-policy=no-user-gesture-required`
+> so the game's WebAudio context runs unclicked. The same ffmpeg reads
+> `game.monitor` as a second live input and cuts AAC into the same HLS
+> segments; both inputs stamp packets with the wall clock, measured on
+> sedona at 50 ms apart at segment start. The playlist now carries
+> `EXT-X-PROGRAM-DATE-TIME`. The socket wait and the terminate-then-kill
+> stop are shared by all three helpers (`stream/helper_process.py`).
+> Captions: the executor's decision event carries `behavior_reason_kind`;
+> `service/demo_caption.py` folds decisions, the `self_deactivated`
+> receipt and fuel lines into a 30 s timed history, and
+> `service/demo_caption_words.py` gives every `ReasonKind` plain words
+> (a test holds the table to the enum). `/demo/fleet` rows carry that
+> history as `captions`, and the page shows the one in force at the
+> frame its player is showing (hls.js `playingDate`).
+
 > **STATUS 2026-09-05 — VIDEO CHANGED CLASS. The in-page canvas
 > caster, the frame/chunk bus, and the MJPEG relay described below
 > were all DELETED.** A streamed bot now runs Chromium HEADED on its

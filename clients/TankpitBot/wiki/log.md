@@ -6421,3 +6421,20 @@ it, and a rename would split the corpus into two vocabularies. In code,
 the scorecard's broadcast-derived pickup tallies are deleted (the
 bot's own receipts are its `collect:*` outcome counts), and the digest's
 radar-yield window now closes on the bot's own `pickup_*` command.
+
+## [2026-10-05] update | The demo stream gains game sound and plain-word captions
+
+MCPs board task 46934cd6, from the operator's two questions about
+austinwagner.org/tankpit: "there's no sound?" and "if I don't know the
+game Idk what it's doing". [[bot-service-architecture]] gains a status
+block for both.
+- Sound: every demo account's page carries `sound: 1` (volumes 10 to
+  40, read from each account's `/play` page on sedona), so the game was
+  making sound all along and the container simply had no sound server.
+  A per-bot PulseAudio null sink plus a second ffmpeg input fixes it;
+  a probe in the fleet image on sedona recorded a test tone into the
+  HLS segments at -21 dB mean, audio and video starting 50 ms apart.
+- Captions: the bot's own decision reason (`behavior_reason_kind`), its
+  death receipt and its fuel lines become a timed caption history on
+  each public `/demo/fleet` row, in words from one table that covers
+  every `ReasonKind`.
