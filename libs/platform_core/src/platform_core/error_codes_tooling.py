@@ -116,7 +116,6 @@ class Hpc3ErrorCode(ErrorCodeBase):
     # on-ramps.
     BOOTSTRAP_ENV_EXISTS = "BOOTSTRAP_ENV_EXISTS"
     BOOTSTRAP_PYTHON_MISMATCH = "BOOTSTRAP_PYTHON_MISMATCH"
-    BOOTSTRAP_ENV_NOT_SELF_CONTAINED = "BOOTSTRAP_ENV_NOT_SELF_CONTAINED"
 
     # Preflight -- validating a job against the live scheduler before running it.
     PREFLIGHT_REJECTED = "PREFLIGHT_REJECTED"
@@ -124,6 +123,12 @@ class Hpc3ErrorCode(ErrorCodeBase):
     ENV_PATH_MISSING = "ENV_PATH_MISSING"
     ENV_PACKAGE_MISMATCH = "ENV_PACKAGE_MISMATCH"
     ENV_PROBE_UNREADABLE = "ENV_PROBE_UNREADABLE"
+    # An environment whose interpreter belongs to another installation: a host
+    # environment not built on its own interpreter, or an image environment
+    # whose interpreter lives on a mounted filesystem rather than in the image.
+    # Raised by bootstrap, preflight and image capture alike, because the
+    # borrowed interpreter breaks all three the day its owner is deleted.
+    ENV_INTERPRETER_BORROWED = "ENV_INTERPRETER_BORROWED"
 
     # Workspace configuration -- the one document every command reads.
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
