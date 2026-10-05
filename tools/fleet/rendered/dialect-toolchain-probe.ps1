@@ -35,15 +35,19 @@ if ($python -like '*\Microsoft\WindowsApps\*') {
     $python = ''
 }
 $tools = @(
-    'python', 'poetry', 'git', 'make', 'node', 'ffmpeg', 'tar', 'cargo', 'winget', 'choco'
+    'python', 'poetry', 'git', 'make', 'node', 'ffmpeg', 'go', 'tar', 'cargo', 'winget', 'choco'
 )
 foreach ($tool in $tools) {
     $found = $python
     if ($tool -ne 'python') {
         $found = Find-Tool $tool
     }
+    $asked = '--version'
+    if ($tool -eq 'go') {
+        $asked = 'version'
+    }
     if ($found -ne '') {
-        "$tool=yes=" + (Invoke-Answer $Cmd $found '--version').First
+        "$tool=yes=" + (Invoke-Answer $Cmd $found $asked).First
     } else {
         "$tool=no="
     }
