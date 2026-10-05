@@ -63,6 +63,7 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
             _Completed("lock-out\n", "lock-err\n", 0),
             _Completed("health-out\n", "health-err\n", 0),
             _Completed("tunnel-out\n", "tunnel-err\n", 0),
+            _Completed("diphtheria-out\n", "diphtheria-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake
@@ -215,6 +216,9 @@ class TestMain:
             mark5,
             out5,
             err5,
+            mark6,
+            out6,
+            err6,
         ) = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
         assert mark1 == "-- hpc-wake"
@@ -227,6 +231,8 @@ class TestMain:
         assert (out4, err4) == ("health-out", "health-err")
         assert mark5 == "-- hub-tunnel-wake"
         assert (out5, err5) == ("tunnel-out", "tunnel-err")
+        assert mark6 == "-- lock-wake-diphtheria"
+        assert (out6, err6) == ("diphtheria-out", "diphtheria-err")
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -285,6 +291,18 @@ class TestMain:
         ]
         assert tunnel_cwd == (root / "..\\fleet-health-wake").resolve()
         assert tunnel_env == env
+        remote_args, remote_cwd, remote_env = runner.calls[5]
+        assert list(remote_args) == [
+            "poetry",
+            "run",
+            "lock-wake",
+            "--remote-journal",
+            "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
+            "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ]
+        assert remote_cwd == (root / "..\\lock-wake").resolve()
+        assert remote_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
         assert ci_env == env
@@ -303,7 +321,7 @@ class TestMain:
         root = _staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 5
+        assert len(runner.calls) == 6
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -363,9 +381,25 @@ class TestHealthRecord:
             "lock-wake",
             "fleet-health-wake",
             "hub-tunnel-wake",
+            "lock-wake-diphtheria",
         }
         assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
         assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
+
+    def test_the_diphtheria_row_is_recorded_published(
+        self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
+    ) -> None:
+        """MCPs board task 03590bf9, A2: the row reading diphtheria's
+        fleet-lock journal is a publisher like the others, so its tick's
+        exit 0 lands in the health record as published."""
+        root = _staged_root(tmp_path, GOOD_ENV)
+
+        run_cycle.main(["--package-root", str(root)])
+
+        entry = _publisher(root, "lock-wake-diphtheria")
+        assert entry["exit_code"] == 0
+        assert entry["consecutive_failures"] == 0
+        assert entry["last_ok"] == "2026-09-21T20:43:15Z"
 
     def test_a_publisher_failing_twice_is_recorded_as_a_streak_of_two(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
@@ -376,6 +410,7 @@ class TestHealthRecord:
         runner.results = [
             _Completed("", "", 0),
             _Completed("", "TASK_SESSION_UNLEDGERED\n", 1),
+            _Completed("", "", 0),
             _Completed("", "", 0),
             _Completed("", "", 0),
             _Completed("", "", 0),
@@ -394,7 +429,7 @@ class TestHealthRecord:
 
 
 class TestPublishers:
-    def test_the_inventory_is_the_five_bridges_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_six_rows_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
         become sibling scheduled tasks -- has a diff to point at."""
@@ -404,6 +439,7 @@ class TestPublishers:
             "lock-wake",
             "fleet-health-wake",
             "hub-tunnel-wake",
+            "lock-wake-diphtheria",
         ]
         assert run_cycle.PUBLISHERS[0]["cwd"] == "."
         assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
@@ -431,6 +467,16 @@ class TestPublishers:
             "fleet-health-wake",
             "--journal",
             "C:\\Users\\Test\\PROJECTS\\MCPs\\logs\\hub-tunnel\\health-events.jsonl",
+        )
+        # The same flags tools/lock-wake's test_remote_cycle.py drives
+        # against a journal in diphtheria's form (MCPs board task 03590bf9).
+        assert run_cycle.PUBLISHERS[5]["cwd"] == "..\\lock-wake"
+        assert run_cycle.PUBLISHERS[5]["args"][2:] == (
+            "lock-wake",
+            "--remote-journal",
+            "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
+            "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
         )
 
 

@@ -141,6 +141,27 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         ),
         "cwd": "..\\fleet-health-wake",
     },
+    # lock-wake-diphtheria (MCPs board task 03590bf9): diphtheria's
+    # fleet-lock journal -> board, through the same bridge and standing task
+    # as the lock-wake row. Every deploy takes its lock there, and until this
+    # row nothing read that journal, so a deploy's released or failed
+    # boundary reached no session. The bridge reads only the unread window
+    # over one ssh per tick and keeps its cursor on this machine, in the MCPs
+    # clone root beside the hub's own (.fleet-events.jsonl.lock-wake-
+    # diphtheria-offset.json, under that root's /.fleet-events.jsonl.* ignore).
+    {
+        "name": "lock-wake-diphtheria",
+        "args": (
+            "poetry",
+            "run",
+            "lock-wake",
+            "--remote-journal",
+            "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
+            "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ),
+        "cwd": "..\\lock-wake",
+    },
 )
 
 

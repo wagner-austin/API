@@ -121,6 +121,8 @@ scheduled tasks — the random-task count goes down, not up.
 | ci-wake | GitHub Actions + push enrolment | `c5593c56` | enrolment `agent` |
 | lock-wake | fleet-lock journal | `5d86be8d` | journal `agent` |
 | fleet-health-wake | MCPs fleet audit's health journal | `88b20894` | none: a fleet change has no actor to tag |
+| hub-tunnel-wake | the hub tunnel's health journal | `88b20894` | none |
+| lock-wake-diphtheria | diphtheria's fleet-lock journal, over ssh (MCPs `03590bf9`: every deploy locks there) | `5d86be8d` | journal `agent` |
 
 Every publisher batches per tick (a 103-job Slurm batch or a 126-line
 lock-journal backlog is ONE post) and mentions only whoever acted — the
@@ -133,7 +135,8 @@ DELIBERATE EXCLUSIONS, so the next reader knows they are decisions:
   harness's background-task notification, which already works.
 - **Deploy/rebuild completions have no separate publisher.** The locked
   compose targets already write the fleet-lock journal at their
-  boundaries, so lock-wake's posts carry cascade start/end; a dedicated
+  boundaries (the hub's, and diphtheria's for every deploy, read by the
+  two lock-wake rows), so lock-wake's posts carry cascade start/end; a dedicated
   publisher would announce the same transitions twice.
 
 ## Stated limitations
