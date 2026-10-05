@@ -43,12 +43,18 @@ from fleet.contracts.project import ProjectConfig, decode_project_config, encode
 from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import decode_path, decode_remote
 
-#: The longest watch a workspace may declare. Every node runner's task
-#: repeats every 180 s under IgnoreNew (``scripts/FleetSchedule.ps1``), so a
-#: tick still going at 180 s refuses the next; the hub's logs of 2026-10-04
-#: put a tick's start under 7 s and a collect-then-fill pass at up to 62 s
-#: (MCPs board task 74b13c20), which leaves 110 s for the watch itself.
-NODE_WATCH_CEILING_SECONDS = 110
+#: The longest serve a workspace may declare (MCPs board task 8993c306). A
+#: node runner hands over at the first fire boundary after its serve at
+#: which it is idle (:mod:`fleet.cli.node_serve`), and its launcher ends it
+#: at 39 minutes (:data:`fleet.cli.rolled.AGENT_WALL_SECONDS`), so 30 minutes
+#: leaves nine for the drain: a serve past its time claims nothing more,
+#: and loki's longest launch measured on 2026-10-04 took 155 s.
+NODE_SERVE_CEILING_SECONDS = 1800
+
+#: The slowest poll a workspace may declare: one scheduled start's
+#: repetition (``scripts/FleetSchedule.ps1``), since the collect pass at
+#: every fire boundary already reads every held run at that rate.
+NODE_POLL_CEILING_SECONDS = 180
 
 
 class FleetWorkspace(TypedDict):
@@ -111,14 +117,20 @@ class FleetWorkspace(TypedDict):
             which read as fleet-wide until lavender-wsl became a second
             testdb node on 2026-09-29 and closed every testdb job it
             claimed as held (MCPs board task c4fc4f3e).
-        node_watch_seconds: How long, from its start, a node runner's tick
-            keeps watching the runs it holds, so a run that ends inside the
-            window is closed then rather than on the next tick
-            (:mod:`fleet.cli.node_watch`, MCPs board task c1d48330). DECLARED
-            HERE because this document is what the scheduled tick runs
-            beside the rolled agent, so the value and the code that reads it
-            roll together. At most :data:`NODE_WATCH_CEILING_SECONDS`; zero
-            watches nothing.
+        node_serve_seconds: How long, from its start, a node runner serves
+            before it hands over to the next scheduled start at an idle fire
+            boundary (:mod:`fleet.cli.node_serve`, MCPs board task 8993c306),
+            which bounds how long a runner reads the registry it started
+            with. DECLARED HERE because this document is what the scheduled
+            start runs beside the rolled agent, so the value and the code
+            that reads it roll together. At most
+            :data:`NODE_SERVE_CEILING_SECONDS`; zero hands over at the first
+            boundary.
+        node_poll_seconds: How often a serving runner's watch reads the
+            runs it holds and its main thread lists the queued jobs
+            (:mod:`fleet.cli.node_watch`, :mod:`fleet.cli.node_serve`), so
+            how long an ended run or an arrived job can wait before the
+            runner sees it. From 1 to :data:`NODE_POLL_CEILING_SECONDS`.
         ledger: Path to the append-only dispatch record. Relative paths
             resolve against the workspace document's own directory, so a
             workspace can be moved without editing it.
@@ -131,7 +143,8 @@ class FleetWorkspace(TypedDict):
     projects: dict[str, ProjectConfig]
     data_paths: dict[str, tuple[str, ...]]
     node_local_resources: tuple[str, ...]
-    node_watch_seconds: int
+    node_serve_seconds: int
+    node_poll_seconds: int
     ledger: str
     feed: str
     leases: str
@@ -206,7 +219,8 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
         },
         "data_paths": {remote: list(paths) for remote, paths in workspace["data_paths"].items()},
         "node_local_resources": encode_names(workspace["node_local_resources"]),
-        "node_watch_seconds": workspace["node_watch_seconds"],
+        "node_serve_seconds": workspace["node_serve_seconds"],
+        "node_poll_seconds": workspace["node_poll_seconds"],
         "ledger": workspace["ledger"],
         "feed": workspace["feed"],
         "leases": workspace["leases"],
@@ -328,25 +342,49 @@ def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) ->
     return excluded
 
 
-def _decode_node_watch_seconds(value: JSONObject) -> int:
-    """Read how long a node runner's tick watches the runs it holds.
+def _decode_node_serve_seconds(value: JSONObject) -> int:
+    """Read how long a node runner serves before it hands over.
 
     Args:
         value: The workspace object.
 
     Returns:
-        The window in seconds.
+        The serve in seconds.
 
     Raises:
         JSONTypeError: If the field is missing, is not an integer, or lies
-            outside zero to :data:`NODE_WATCH_CEILING_SECONDS`.
+            outside zero to :data:`NODE_SERVE_CEILING_SECONDS`.
     """
-    seconds = require_int(value, "node_watch_seconds")
-    if not 0 <= seconds <= NODE_WATCH_CEILING_SECONDS:
+    seconds = require_int(value, "node_serve_seconds")
+    if not 0 <= seconds <= NODE_SERVE_CEILING_SECONDS:
         raise JSONTypeError(
-            f"node_watch_seconds is {seconds}; it must lie between 0 and "
-            f"{NODE_WATCH_CEILING_SECONDS}, or a tick's watch and the pass it ends with "
-            "run into the next tick, which the scheduler then skips"
+            f"node_serve_seconds is {seconds}; it must lie between 0 and "
+            f"{NODE_SERVE_CEILING_SECONDS}, or a runner still draining at its launcher's "
+            "39-minute wall is ended mid-launch"
+        )
+    return seconds
+
+
+def _decode_node_poll_seconds(value: JSONObject) -> int:
+    """Read how often a serving node runner looks at its runs and the queue.
+
+    Args:
+        value: The workspace object.
+
+    Returns:
+        The poll in seconds.
+
+    Raises:
+        JSONTypeError: If the field is missing, is not an integer, or lies
+            outside 1 to :data:`NODE_POLL_CEILING_SECONDS`.
+    """
+    seconds = require_int(value, "node_poll_seconds")
+    if not 1 <= seconds <= NODE_POLL_CEILING_SECONDS:
+        raise JSONTypeError(
+            f"node_poll_seconds is {seconds}; it must lie between 1 and "
+            f"{NODE_POLL_CEILING_SECONDS}: zero would read the node and the queue without "
+            "pause, and a poll slower than a fire boundary sees nothing the boundary's "
+            "collect pass does not"
         )
     return seconds
 
@@ -494,7 +532,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
             mistyped, the node or project mapping is empty, a machine is both
             declared and excluded, a node-local resource is declared by no
             project, a node's ``wsl_host`` is not another Windows node, the
-            node watch lies outside its bounds, or a node or project fails
+            node serve or poll lies outside its bounds, or a node or project fails
             its own decoder.
     """
     if not isinstance(value, dict):
@@ -512,7 +550,8 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         projects=projects,
         data_paths=_decode_data_paths(value, projects),
         node_local_resources=_decode_node_local_resources(value, projects),
-        node_watch_seconds=_decode_node_watch_seconds(value),
+        node_serve_seconds=_decode_node_serve_seconds(value),
+        node_poll_seconds=_decode_node_poll_seconds(value),
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),
         leases=require_str(value, "leases"),
@@ -520,7 +559,8 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
 
 
 __all__ = [
-    "NODE_WATCH_CEILING_SECONDS",
+    "NODE_POLL_CEILING_SECONDS",
+    "NODE_SERVE_CEILING_SECONDS",
     "FleetWorkspace",
     "decode_fleet_workspace",
     "encode_fleet_workspace",
