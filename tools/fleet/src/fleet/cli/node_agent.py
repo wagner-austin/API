@@ -1,9 +1,15 @@
-"""CLI: one tick of a node's runner on the queue's node lane.
+"""CLI: one serve of a node's runner on the queue's node lane.
 
 Usage:
     fleet-node-agent --config fleet.json --node sedona
     fleet-node-agent --config fleet.json --node sedona --announce
     fleet-node-agent --config fleet.json --node serendipity --elevated
+
+A run without ``--announce`` SERVES the node until it hands over before a
+fire boundary (:mod:`fleet.cli.node_serve`, MCPs board task 8993c306),
+reading ``refs/fleet/rolled`` from the git checkout its records directory
+is in when it starts and at each boundary, so it hands over once a roll
+moves the ref (:func:`fleet.core.rolled.rolled_state`).
 
 ONE RUNNER PER ENABLED NODE, ALL OF THEM ON THE HUB (MCPs board task
 fd5cabfa, A1 and A5). Until this command the queue had one runner, the hub's
@@ -39,7 +45,7 @@ probe already taken, then takes the project's lease on this node, stages
 ``git archive`` of the commit through the same verified transport every
 dispatch uses, sends the build script with the project's install steps and
 the node's caches, launches it detached, and reports the run started. The
-same tick's watch, or a later tick, collects it
+serve's watch, or a later serve's collect pass, collects it
 (:mod:`fleet.cli.node_watch`, :mod:`fleet.cli.node_collect`): reads the result,
 reads the tail of the transcript, composes the verdict
 (:mod:`fleet.core.verdict`), posts it to the submitter's feed when the job
@@ -74,41 +80,35 @@ one condition it exists to keep reporting.
 
 from __future__ import annotations
 
-import pathlib
 import sys
 import uuid
 from collections.abc import Callable, Sequence
 
 from board_watch import config as board_config
 from platform_core import cli_args
-from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
-from typing_extensions import TypedDict
 
-from fleet.cli import _config, node_watch
-from fleet.cli import run as run_cli
+from fleet.cli import _config, node_serve, node_watch
 from fleet.cli.node_claim import ask_queue, refuse
 from fleet.cli.node_collect import collect_pass, require_sha
-from fleet.cli.node_ready import Ready, ready_state
+from fleet.cli.node_prepare import Prepared, prepare
+from fleet.cli.node_ready import ready_state
 from fleet.cli.node_start import report_started
 from fleet.contracts.dispatch import DispatchJob
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.project import ProjectConfig
-from fleet.contracts.source import ProjectSource
 from fleet.contracts.tags import runner_tags
-from fleet.contracts.workspace import require_node, require_project
+from fleet.contracts.workspace import require_node
 from fleet.core import (
     _test_hooks,
-    archive_scope,
-    capacity,
     dispatch,
     export,
     names,
     queue,
+    rolled,
     run_lease,
     tick_report,
 )
@@ -143,40 +143,6 @@ def node_identity(alias: str, *, elevated: bool) -> tuple[str, str]:
     if elevated:
         return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}/elevated"))
     return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}"))
-
-
-def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
-    """Whether the job requires a tag the registry does not declare for its project.
-
-    WHAT A JOB NEEDS IS ITS PROJECT'S DECLARATION; the job's own tags only
-    route it through the queue. Every claim names the projects its runner
-    fits (:func:`fleet.core.capacity.fitting_projects`), each assessed
-    against the declaration and the runner's tags, and :func:`prepare`
-    assesses it again, so a job that names FEWER tags than its project
-    still runs only on a runner that carries all of them, and runs. MCPs
-    board task 939ec5c7: MCPs/scripts/ps-harness job 7c16305c, submitted on
-    2026-10-03 with ``[windows]`` for a project declaring ``[windows,
-    elevated]``, waited from 17:16Z on a node with room, because no runner
-    would take it and this rule, then an equality, would have refused it.
-
-    Args:
-        job: The claimed job.
-        declared: The project's ``required_tags`` in the registry.
-
-    Returns:
-        The ``PROJECT_TAGS_MISMATCH`` refusal when the job requires a tag
-        the project does not declare, which asks for a node the registry
-        never said the project needs; None when every tag it names is
-        declared.
-    """
-    extra = sorted(set(job["required_tags"]) - set(declared))
-    if not extra:
-        return None
-    return (
-        f"{FleetErrorCode.PROJECT_TAGS_MISMATCH.value}: the job requires "
-        f"[{', '.join(extra)}], which fleet.json does not declare for {job['project']} "
-        f"(it declares [{', '.join(declared)}]); resubmit with the registry's tags"
-    )
 
 
 def claim_pass(
@@ -302,7 +268,7 @@ def fill_pass(
         alias: This node's workspace name.
         node: Its declaration.
         elevated: Whether this is the node's elevated runner.
-        hold: Given each run the moment it is launched, so the tick's watch
+        hold: Given each run the moment it is launched, so the serve's watch
             (:mod:`fleet.cli.node_watch`) reads it while the pass goes on.
 
     Returns:
@@ -319,7 +285,7 @@ def fill_pass(
     ) is not None:
         hold(frozenset({run_id}))
         launched.append(run_id)
-    _log.info("%s launched %d job(s) this tick", alias, len(launched))
+    _log.info("%s launched %d job(s) this pass", alias, len(launched))
     return tuple(launched)
 
 
@@ -395,103 +361,10 @@ def launch_claimed(
         return detail
 
 
-class Prepared(TypedDict):
-    """Everything a claimed job needs before its lease is taken.
-
-    Attributes:
-        plan: The project's declaration.
-        source: Its source, present by construction here.
-        mirror: The mirror on the hub, holding the commit.
-        companions: The bundles of the repositories staged beside the
-            export, each at the commit its declared ref names now.
-        scope: The pathspec the export's archive is built with, leaving out
-            the data directories this repository declares that this project
-            does not own (:func:`fleet.core.archive_scope.archive_pathspec`).
-            Empty for a repository that declares none.
-        workers: Test workers the capacity check granted on this node.
-    """
-
-    plan: ProjectConfig
-    source: ProjectSource
-    mirror: pathlib.Path
-    companions: tuple[export.CompanionExport, ...]
-    scope: tuple[str, ...]
-    workers: int
-
-
-def prepare(
-    loaded: _config.LoadedWorkspace,
-    job: DispatchJob,
-    *,
-    node: NodeConfig,
-    ready: Ready,
-    sha: str,
-) -> Prepared | str:
-    """Resolve, check and fetch everything a job needs before its lease.
-
-    In this order because each step is cheaper than the next and each
-    refusal is more the submitter's than the last: the registry line, the
-    tags against it, the remote, the commit on the remote, the companions
-    the project's check reads beside it, and only then the project's fit on
-    this node, judged on the probe the claim pass already took, so no second
-    ssh is paid. The companions are fetched and bundled HERE, with the
-    commit, so a declared ref the remote does not serve refuses with no
-    lease held and nothing copied to a node.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        job: The claimed job.
-        node: This node's declaration.
-        ready: What it reported when probed this tick, and the tags its
-            runner claimed with, the project's fit judged against both.
-        sha: The job's commit.
-
-    The archive's scope is resolved here too, with the rest of what the
-    dispatch needs and before the lease: it reads only the registry and the
-    project's own path, so a repository whose data declaration contradicts
-    its project list has already been refused by the workspace decoder and
-    never reaches a node.
-
-    Returns:
-        What the dispatch needs, or the ``PROJECT_TAGS_MISMATCH`` refusal
-        (:func:`tags_refusal`) as its ``CODE: message`` line.
-
-    Raises:
-        AppError: ``WORKSPACE_PROJECT_UNKNOWN``, ``PROJECT_REMOTE_MISSING``,
-            ``SHA_NOT_ON_REMOTE``, ``INSTALL_PATH_NOT_IN_COMMIT``,
-            ``COMPANION_REF_NOT_ON_REMOTE``,
-            ``EXPORT_FAILED``, ``RESOURCE_HELD`` from
-            :func:`fleet.cli.run.require_resources_free`, or the capacity
-            codes :func:`fleet.core.capacity.plan_dispatch` raises; every
-            one a local refusal the caller reports to the queue verbatim.
-    """
-    plan = require_project(loaded.workspace, job["project"])
-    mismatch = tags_refusal(job, plan["required_tags"])
-    if mismatch is not None:
-        return mismatch
-    source = export.require_source(job["project"], plan["source"])
-    mirror = export.prepare_mirror(
-        loaded.mirrors, project=job["project"], remote=source["remote"], sha=sha
-    )
-    export.require_install_paths(mirror, sha, source["install"])
-    companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
-    run_cli.require_resources_free(loaded, plan)
-    workers = capacity.plan_dispatch(node, ready["state"], plan, ready["tags"])
-    return Prepared(
-        plan=plan,
-        source=source,
-        mirror=mirror,
-        companions=companions,
-        scope=archive_scope.archive_pathspec(
-            loaded.workspace["data_paths"], remote=source["remote"], project_path=source["path"]
-        ),
-        workers=workers,
-    )
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick for one node: collect what finished, fill its room, and
-    watch what it left running (:mod:`fleet.cli.node_watch`).
+    """Serve one node: collect what finished, fill its room, watch what it
+    runs, and claim what arrives, until the serve hands over
+    (:mod:`fleet.cli.node_serve`).
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -543,10 +416,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
 
-    def passes() -> None:
+    def collect() -> None:
         collect_pass(
             loaded, credentials, board, identity, agent=agent, alias=alias, hold=watch.hold
         )
+
+    def fill() -> None:
         fill_pass(
             loaded,
             credentials,
@@ -557,7 +432,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             hold=watch.hold,
         )
 
-    node_watch.run_tick(watch, alias=alias, passes=passes)
+    def queued() -> frozenset[str]:
+        return node_serve.queued_here(credentials, alias=alias)
+
+    def rolled_now() -> str:
+        return rolled.rolled_state(loaded.directory)
+
+    node_serve.serve(
+        watch,
+        alias=alias,
+        started=_test_hooks.now(),
+        serve_seconds=loaded.workspace["node_serve_seconds"],
+        poll_seconds=loaded.workspace["node_poll_seconds"],
+        steps=node_serve.ServeSteps(collect=collect, fill=fill, queued=queued, rolled=rolled_now),
+    )
     return 0
 
 
@@ -587,12 +475,9 @@ __all__ = [
     "ELEVATED_FLAG",
     "IDENTITY_NAMESPACE",
     "NODE_FLAG",
-    "Prepared",
     "claim_pass",
     "entrypoint",
     "fill_pass",
     "main",
     "node_identity",
-    "prepare",
-    "tags_refusal",
 ]

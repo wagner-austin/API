@@ -71,6 +71,7 @@ from fleet.core import (
     remote,
     retire,
     stop,
+    venv_sweep,
     verdict,
 )
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
@@ -85,7 +86,7 @@ _log = get_logger(__name__)
 TIMED_OUT_EXIT_CODE: Final = 124
 
 #: Held while a held job's run is read and settled, by the collect pass and
-#: by the tick's watch thread alike (:func:`collect_one_job`).
+#: by the serve's watch thread alike (:func:`collect_one_job`).
 SETTLING: Final = threading.Lock()
 
 
@@ -103,7 +104,8 @@ def settle(
     detail: str,
     stopped: str | None,
 ) -> str:
-    """Post a task-less run's verdict, close its row, then close its queue job.
+    """Post a task-less run's verdict, close its row and its queue job, then
+    sweep the node's orphaned virtualenvs.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -179,6 +181,9 @@ def settle(
         detail=line,
         identity=identity,
     )
+    # After the queue close, so the session waiting on this row is not kept
+    # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
+    venv_sweep.sweep_on_node(node)
     return line
 
 
@@ -209,7 +214,7 @@ def collect_one_job(
             which the queue's pin makes impossible. Not caught: those mean
             this machine's own records and the fleet disagree.
 
-    ONE AT A TIME, under :data:`SETTLING`: the tick's watch settles a run
+    ONE AT A TIME, under :data:`SETTLING`: the serve's watch settles a run
     that ends while the collect pass is still going
     (:mod:`fleet.cli.node_watch`), and the run each finds live is read
     under the same lock, so the second to reach one finds it closed.
@@ -518,7 +523,7 @@ def collect_pass(
         alias: This node's workspace name.
         hold: Given the run ids of the running jobs this runner holds as
             soon as the queue has said, before any is settled, so the
-            tick's watch (:mod:`fleet.cli.node_watch`) reads them while
+            serve's watch (:mod:`fleet.cli.node_watch`) reads them while
             this pass goes on.
 
     Raises:

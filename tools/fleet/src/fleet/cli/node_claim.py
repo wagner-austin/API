@@ -30,7 +30,7 @@ def refuse(
 ) -> None:
     """Close a claimed job as refused, with its named reason, and log it.
 
-    Moved here from :mod:`fleet.cli.node_agent` when its tick's watch
+    Moved here from :mod:`fleet.cli.node_agent` when its serve's watch
     (:mod:`fleet.cli.node_watch`) took that module to the file ceiling: a
     refusal is how a claim ends when it cannot be launched.
 
