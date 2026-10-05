@@ -131,8 +131,13 @@ def shape_token(message: BinaryMessage, self_id: int | None) -> str | None:
     return _PLAIN_TOKENS.get(message["msg_type"])
 
 
-def _decoded_frame(frame: DecodedFrameDict) -> BinaryMessage | None:
+def decode_received_frame(frame: DecodedFrameDict) -> BinaryMessage | None:
     """Decode one received frame, or None when it is not binary.
+
+    Public because the capture-replay conformance walk
+    (:mod:`tankpit_bot.validate.conformance_wire`) reads received frames
+    exactly as this differ does, and two decoders of one archive would
+    drift.
 
     Plaintext acks and text-route frames are discriminated BEFORE the
     cipher, exactly as production does: 0x3D is dual-use (lobby text
@@ -229,7 +234,7 @@ def mine_session(scanned: ScannedSessionDict) -> list[CommandWindowDict]:
             open_window = fresh
             continue
 
-        message = _decoded_frame(frame)
+        message = decode_received_frame(frame)
         if message is None:
             continue
         if message["msg_type"] == _TANK_INFO and self_id is None:
@@ -542,6 +547,7 @@ def format_response_shape_diff(diff: ResponseShapeDiffDict, limit: int) -> str:
 __all__ = [
     "WINDOW_MS",
     "analyze_response_shapes",
+    "decode_received_frame",
     "diff_shapes",
     "format_response_shape_diff",
     "mine_session",
