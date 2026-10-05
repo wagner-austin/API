@@ -28,6 +28,7 @@ from fleet.contracts.source import (
 )
 from fleet.core import _test_hooks, staging
 from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_env, queue_job
+from tests._thread_fakes import in_order_executor
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import (
     DEMO_PROJECT,
@@ -89,7 +90,14 @@ PASSING_TAIL = (
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
-    """Give every test the queue's and the board's variables."""
+    """Give every test the queue's and the board's variables, and its launches in order.
+
+    Each claimed job's launch finishes before its claim goes on, because the
+    runner's answers are scripted in one order, which a launch beside the
+    next claim would interleave (:mod:`tests._thread_fakes`); a case about
+    launching beside the claim binds the real pool after this.
+    """
+    _test_hooks.executor = in_order_executor
     _test_hooks.env = queue_env()
     board_watch_hooks.env = FakeEnv(
         {
