@@ -9,14 +9,18 @@ hit that dropped them would silently re-enable the row-split leak.
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
 import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from covenant_ml.datasets.loaders._cache_keys import csv_config_hash
 from covenant_ml.datasets.loaders.arff_loader import ARFFLoader
 from covenant_ml.datasets.loaders.csv_loader import CSVLoader
+from covenant_ml.datasets.loaders.parquet_cache import check_cache, get_cache_dir
 from covenant_ml.datasets.loaders.timeseries_csv_loader import TimeSeriesCSVLoader
 from covenant_ml.datasets.types import (
     AggregationStrategy,
@@ -74,10 +78,22 @@ def _grouped_config(group_column: str | None = "match") -> DatasetConfig:
     return config
 
 
+#: How far before now the source CSV's modification time is set. check_cache
+#: takes a cache only when it is strictly newer than its source, and Windows
+#: stamps both files from a clock that can advance in 15.6 ms ticks, so a
+#: cache written in the CSV's own tick read as stale and the second load
+#: re-parsed the CSV (fleet job c855271e on serendipity, MCPs board task
+#: 1b152218: parquet_cache.py lines 377-378 unrun, 99.98 percent).
+_SOURCE_AGE_SECONDS = 3600.0
+
+
 def _write_dataset(tmp_path: Path) -> Path:
     folder = tmp_path / "grouped"
     folder.mkdir()
-    (folder / "data.csv").write_text(_CSV, encoding="utf-8")
+    source = folder / "data.csv"
+    source.write_text(_CSV, encoding="utf-8")
+    aged = time.time() - _SOURCE_AGE_SECONDS
+    os.utime(source, (aged, aged))
     return tmp_path
 
 
@@ -93,6 +109,8 @@ def test_group_column_is_factorized_and_never_a_feature(tmp_path: Path) -> None:
 def test_groups_survive_the_parquet_cache_round_trip(tmp_path: Path) -> None:
     external = _write_dataset(tmp_path)
     first = CSVLoader().load(_grouped_config(), external)
+    cache_dir = get_cache_dir(external, "grouped", csv_config_hash(_grouped_config()))
+    assert check_cache(external / "grouped" / "data.csv", cache_dir)["is_valid"] is True
     second = CSVLoader().load(_grouped_config(), external)
     assert _codes(first["groups"]) == [0, 0, 1, 1, 0]
     assert _codes(second["groups"]) == [0, 0, 1, 1, 0]
