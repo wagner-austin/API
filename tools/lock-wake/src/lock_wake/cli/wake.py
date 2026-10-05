@@ -2,6 +2,7 @@
 
 Usage:
     lock-wake --journal /path/to/.fleet-events.jsonl --check-journal /path/to/.check-events.jsonl
+    lock-wake --remote-journal host:/abs/path/.fleet-events.jsonl --cursor-dir /local/dir
 
 One cycle, then exit. The interval belongs to the pump that calls this
 (``tools/hpc-wake/scripts/run_cycle.py``'s PUBLISHERS table), where it is
@@ -30,17 +31,28 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 
-from lock_wake.cycle import run_cycle
+from lock_wake.cycle import run_cycle, run_remote_cycle
+from lock_wake.remote import parse_remote_journal
 
 JOURNAL_FLAG = "--journal"
 
 CHECK_JOURNAL_FLAG = "--check-journal"
 
-ALLOWED_FLAGS = (JOURNAL_FLAG, CHECK_JOURNAL_FLAG)
+REMOTE_JOURNAL_FLAG = "--remote-journal"
+
+CURSOR_DIR_FLAG = "--cursor-dir"
+
+ALLOWED_FLAGS = (JOURNAL_FLAG, CHECK_JOURNAL_FLAG, REMOTE_JOURNAL_FLAG, CURSOR_DIR_FLAG)
 
 
 def main(argv: Sequence[str]) -> int:
-    """Run one cycle against the two journals named on the command line.
+    """Run one cycle against the journals named on the command line.
+
+    Two forms, one per pump row. ``--journal`` with ``--check-journal`` reads
+    the hub's two local journals. ``--remote-journal <host>:<path>`` with
+    ``--cursor-dir <dir>`` reads one journal on another host over ssh and
+    keeps its position in ``dir`` (MCPs board task 03590bf9). A flag of one
+    form beside the other is refused, never ignored.
 
     Args:
         argv: Arguments excluding the program name.
@@ -50,15 +62,33 @@ def main(argv: Sequence[str]) -> int:
         non-zero exit rather than a status line nobody reads.
 
     Raises:
-        AppError: Any configuration or board failure, from
-            :func:`lock_wake.cycle.run_cycle`.
+        AppError: Any configuration, board or ssh failure, from
+            :func:`lock_wake.cycle.run_cycle` or
+            :func:`lock_wake.cycle.run_remote_cycle`.
         JSONTypeError: A journal line or position file that does not
             decode.
-        ValueError: A missing ``--journal`` or ``--check-journal`` flag, or
-            a position past a journal's end.
+        ValueError: A missing flag, the two forms mixed, a remote journal
+            that is not ``host:/path``, or a position past a journal's end.
         OSError: A file that cannot be read or written.
     """
     parsed = cli_args.parse_single_flags(argv, ALLOWED_FLAGS)
+    if REMOTE_JOURNAL_FLAG in parsed:
+        mixed = [flag for flag in (JOURNAL_FLAG, CHECK_JOURNAL_FLAG) if flag in parsed]
+        if mixed:
+            raise ValueError(
+                f"{REMOTE_JOURNAL_FLAG} reads one remote journal and takes no "
+                f"{' or '.join(mixed)}; the hub's local journals are a row of their own"
+            )
+        run_remote_cycle(
+            parse_remote_journal(parsed[REMOTE_JOURNAL_FLAG]),
+            pathlib.Path(cli_args.require_flag(parsed, CURSOR_DIR_FLAG)),
+        )
+        return 0
+    if CURSOR_DIR_FLAG in parsed:
+        raise ValueError(
+            f"{CURSOR_DIR_FLAG} belongs to {REMOTE_JOURNAL_FLAG}; a local journal's "
+            f"position lives beside it"
+        )
     run_cycle(
         pathlib.Path(cli_args.require_flag(parsed, JOURNAL_FLAG)),
         pathlib.Path(cli_args.require_flag(parsed, CHECK_JOURNAL_FLAG)),

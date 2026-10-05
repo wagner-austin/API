@@ -66,11 +66,11 @@ class TestRunCycle:
         assert arguments["taskId"] == TASK_ID
         assert arguments["agent"] == BRIDGE_AGENT
         body = require_str(arguments, "body")
-        assert "FLEET-LOCK: 1 hold(s) transitioned" in body
+        assert "FLEET-LOCK on hub: 1 hold(s) transitioned" in body
         assert "RELEASED after 165s" in body
         assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
         assert emitted == [
-            "posted 1 hold(s) and 0 check run(s) from 3 line(s): tagged @opus-mosh-reboot-0909"
+            "hub: posted 1 hold(s) and 0 check run(s) from 3 line(s): tagged @opus-mosh-reboot-0909"
         ]
 
     def test_a_refused_post_leaves_the_offset_unmoved(
@@ -123,7 +123,7 @@ class TestRunCycle:
         run_cycle(journal, check_journal_path(tmp_path))
 
         assert poster.bodies == []
-        assert emitted == [f"journals quiet; offsets {len(COMPLETED_HOLD.encode('utf-8'))} and 0"]
+        assert emitted == [f"hub journals quiet; offsets {len(COMPLETED_HOLD.encode('utf-8'))}, 0"]
 
     def test_progress_only_lines_advance_without_a_post(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -142,7 +142,7 @@ class TestRunCycle:
 
         assert poster.bodies == []
         assert offset_of(journal) == len(content)
-        assert emitted == [f"2 progress line(s), no boundary; offsets {len(content)} and 0"]
+        assert emitted == [f"hub: 2 progress line(s), no boundary; offsets {len(content)}, 0"]
 
     def test_an_unlabelled_hold_posts_unaddressed_and_says_so(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -157,7 +157,7 @@ class TestRunCycle:
 
         run_cycle(journal, check_journal_path(tmp_path))
 
-        assert emitted == ["posted 1 hold(s) and 0 check run(s) from 2 line(s): unaddressed"]
+        assert emitted == ["hub: posted 1 hold(s) and 0 check run(s) from 2 line(s): unaddressed"]
 
     def test_a_finished_check_run_in_the_check_journal_posts_unaddressed(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -175,7 +175,7 @@ class TestRunCycle:
         assert "@" not in body
         assert offset_of(checks) == len(CHECK_RUN.encode("utf-8"))
         assert offset_of(journal) == 0
-        assert emitted == ["posted 0 hold(s) and 1 check run(s) from 1 line(s): unaddressed"]
+        assert emitted == ["hub: posted 0 hold(s) and 1 check run(s) from 1 line(s): unaddressed"]
 
     def test_a_hold_and_a_check_run_share_one_post_and_both_offsets_advance(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -190,7 +190,7 @@ class TestRunCycle:
 
         (note,) = notes_sent(poster)
         body = require_str(note, "body")
-        assert "FLEET-LOCK: 1 hold(s) transitioned" in body
+        assert "FLEET-LOCK on hub: 1 hold(s) transitioned" in body
         assert "CHECKS: 1 make test run(s) finished" in body
         assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
         assert offset_of(checks) == len(CHECK_RUN.encode("utf-8"))

@@ -41,6 +41,33 @@ The cursor itself (the offset file and the complete-line reader) is
 `tools/fleet-health-wake` needed the same one (MCPs board task `ebc80a03`);
 what stays here is the lock journal's line decoder and the announcement.
 
+## A journal on another host (MCPs board task `03590bf9`)
+
+Every deploy takes its fleet lock on diphtheria, so its boundaries are in
+diphtheria's own `~/PROJECTS/MCPs/.fleet-events.jsonl`, which nothing read
+until 2026-10-05. The pump's `lock-wake-diphtheria` row runs
+
+```
+lock-wake --remote-journal diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl --cursor-dir C:\Users\Test\PROJECTS\MCPs
+```
+
+and `lock_wake.remote` reads it with one ssh per tick:
+`stat -c %s` then `tail -c` from the cursor's offset, so only the unread
+window crosses the wire and a truncated journal is refused by its size
+exactly as a local read refuses it. The path rides one remote command line,
+so a path holding any character the remote shell would need quoted is
+refused rather than quoted. An absent remote journal, an unreachable host or
+a refused key fails the tick with `LOCK_WAKE_REMOTE_JOURNAL_UNREADABLE`
+carrying ssh's stderr; output that does not open with the size is
+`LOCK_WAKE_REMOTE_JOURNAL_MALFORMED`.
+
+The cursor stays on the hub: `<cursor-dir>/.fleet-events.jsonl.lock-wake-diphtheria-offset.json`,
+ignored by the MCPs root's `/.fleet-events.jsonl.*`. It was seeded at the
+journal's size (596416 bytes) before the row went live, so the first tick did
+not announce the journal's history. A new remote row needs the same seed.
+The post's heading and mention line name the host (`FLEET-LOCK on
+diphtheria: ...`), and the hub's say `on hub`.
+
 ## The noise budget (board 9406cfd9, acceptance 6)
 
 One cycle produces AT MOST ONE post, covering every hold that crossed a
@@ -78,7 +105,7 @@ is retried whole on the next tick.
 
 ## Identity
 
-The bridge posts as `bridge-lock-wake-0909` with a deterministic UUIDv5
+Both rows post as the same bridge. It posts as `bridge-lock-wake-0909` with a deterministic UUIDv5
 session id, pinned as a literal in `tests/test_identity.py`. Restarts do
 not mint identities.
 

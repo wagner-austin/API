@@ -45,6 +45,38 @@ class TestMain:
         with pytest.raises(ValueError, match="--check-journal"):
             wake.main(["--journal", str(tmp_path / ".fleet-events.jsonl")])
 
+    def test_a_remote_journal_beside_a_local_one_refuses(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="takes no --journal or --check-journal"):
+            wake.main(
+                [
+                    "--remote-journal",
+                    "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
+                    "--journal",
+                    str(tmp_path / ".fleet-events.jsonl"),
+                    "--check-journal",
+                    str(tmp_path / ".check-events.jsonl"),
+                    "--cursor-dir",
+                    str(tmp_path),
+                ]
+            )
+
+    def test_a_remote_journal_without_a_cursor_dir_refuses(self) -> None:
+        with pytest.raises(ValueError, match="--cursor-dir is required"):
+            wake.main(["--remote-journal", "diphtheria:/home/corvis/j.jsonl"])
+
+    def test_a_cursor_dir_for_local_journals_refuses(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="--cursor-dir belongs to --remote-journal"):
+            wake.main(
+                [
+                    "--journal",
+                    str(tmp_path / ".fleet-events.jsonl"),
+                    "--check-journal",
+                    str(tmp_path / ".check-events.jsonl"),
+                    "--cursor-dir",
+                    str(tmp_path),
+                ]
+            )
+
 
 class TestInvocationForms:
     def test_the_console_entry_point_runs_and_exits_zero(
@@ -67,7 +99,7 @@ class TestInvocationForms:
         finally:
             sys.argv[:] = saved_argv
         assert caught.value.code == 0
-        assert emitted == ["journals quiet; offsets 0 and 0"]
+        assert emitted == ["hub journals quiet; offsets 0, 0"]
 
     def test_running_as_a_module_actually_runs(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -96,4 +128,4 @@ class TestInvocationForms:
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
-        assert emitted == ["journals quiet; offsets 0 and 0"]
+        assert emitted == ["hub journals quiet; offsets 0, 0"]
