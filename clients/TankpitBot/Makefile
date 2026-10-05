@@ -9,7 +9,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check _check-unbudgeted install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
 
 help:
 	@echo ""
@@ -25,6 +25,7 @@ help:
 	@echo "  make wiki-anchors                report wiki pages owed an audit (never gates)"
 	@echo "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
 	@echo "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
+	@echo "  make sim-field ARGS=...          two production bots on one field (ARGS=--practice, --rounds N)"
 	@echo "  make install                     poetry install + playwright chromium"
 	@echo ""
 	@echo "Live action probes (need browser + accounts.json):"
@@ -338,6 +339,10 @@ sim-run:
 sim-run-practice:
 	@echo "=== sim-run-practice (production bot vs the certified practice-bot roster)"
 	poetry run tankpit-sim-run --practice
+
+sim-field:
+	@echo "=== sim-field (several production bots on one sim field, two in the arena by default)"
+	poetry run tankpit-sim-run --clients 2 $(ARGS)
 
 roundtrip:
 	@echo "=== roundtrip (encode(decode(x)) == x for every archived binary message)"
