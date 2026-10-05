@@ -17,6 +17,7 @@ from platform_core.errors import AppError
 
 from maketools import _test_hooks, workspace
 from maketools.budget_run import run_check_budget
+from maketools.concurrent_run import command_concurrent
 from maketools.env_run import run_env
 from maketools.guard_run import run_guard
 from maketools.lift import drifted_lifts, read_lift_lock, refresh_lifts
@@ -479,6 +480,7 @@ COMMANDS: Final[Mapping[str, Callable[[Sequence[str]], int]]] = {
     "reap-stale": command_reap_stale,
     "lint-makefiles": command_lint_makefiles,
     "check-budget": command_check_budget,
+    "concurrent": command_concurrent,
     "lift-check": command_lift_check,
     "lift-refresh": command_lift_refresh,
     "ps-harness": command_ps_harness,

@@ -323,6 +323,7 @@ def restore_defaults() -> None:
     """Point every hook back at its real implementation."""
     _test_hooks.run_inheriting = _test_hooks._default_run_inheriting
     _test_hooks.run_capturing = _test_hooks._default_run_capturing
+    _test_hooks.run_concurrently = _test_hooks._default_run_concurrently
     _test_hooks.now = _test_hooks._default_now
     _test_hooks.sleep = _test_hooks._default_sleep
     _test_hooks.write_line = _test_hooks._default_write_line

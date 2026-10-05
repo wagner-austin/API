@@ -63,6 +63,7 @@ says why.
 | `reap-stale [--older-than-minutes N]` | the standalone sweep, the port of `scripts/reap-test-processes.ps1`: candidates older than N minutes whose ancestry names this project, reaped only when the whole set is idle across a 5-second CPU sample |
 | `lint-makefiles` | the grammar, the pass-banner rule and the budget rule over every tracked Makefile |
 | `check-budget` | run this package's `_check-unbudgeted` and time it: print `CHECK BUDGET` with its seconds, or exit 3 with a `CHECK OVER BUDGET` block when it passed but took over 300 s (below) |
+| `concurrent TARGET TARGET...` | `make TARGET` for each target as concurrent children of one package, each child's output captured to its own file and printed as one block headed by its verdict and seconds, in the order named; exits with the first failed target's code, naming every failure. Portable where `make -j` is not: GNU Make 3.81 on pendragon and serendipity has no `--output-sync`. The targets must not depend on each other (below) |
 | `lift-check`, `lift-refresh MCPS REVISION` | hold each file `lift-lock.json` names to its pinned bytes from MCPs; re-lift them all from an MCPs commit and re-pin (below) |
 | `env [NAME=VALUE \| NAME?=VALUE \| NAME=]... [--draw NAME=LOW-HIGH]... [--then "cmd"] -- argv...` | run a command with variables set, defaulted, unset or drawn from a range, every assigned name substituted into the argv as `@NAME@`; `--then` runs a second command whatever the first's status and the first non-zero status of the two is the verdict |
 | `fan-out TARGET PARENT...` | `make -C <child> TARGET` in every child directory of each parent that has a Makefile, running all of them and naming every failure |
@@ -93,6 +94,15 @@ sha256 of its LF bytes; `make lint` ends with `lift-check`, so an edit to
 the copy fails by name, and `make lift-refresh REVISION=<sha>` (reading
 the MCPs checkout beside this one) is the only way the copy and its pin
 move.
+
+A package whose lint is long can run it BESIDE its suite instead of before
+it: `_check-unbudgeted` runs what every half needs first (`venv-check`,
+`poetry lock`, `poetry sync`, and the steps that rewrite sources, such as
+`ruff --fix` and `ruff format`), then `concurrent` with targets that need
+nothing from one another, for example the guard, mypy and the suite.
+`make lint` and `make test` keep their own recipes. clients/TankpitBot is
+the first (board task `28e47ae3`): on sedona at `c20080a69` its tests took
+371 s on four workers after about 154 s of lint, all of it charged.
 
 ## Where the process table comes from
 

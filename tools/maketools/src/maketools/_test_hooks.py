@@ -34,7 +34,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final, Protocol
 
-from maketools.commands import CommandResult, RunCapturingProtocol, RunInheritingProtocol
+from maketools.commands import (
+    CommandResult,
+    RunCapturingProtocol,
+    RunConcurrentlyProtocol,
+    RunInheritingProtocol,
+)
+from maketools.concurrent_children import run_children_concurrently
 from maketools.job import JobApi, kernel32_job_api
 from maketools.processes import (
     LINUX_PROC_ROOT,
@@ -480,6 +486,8 @@ def _default_tracked_files(repo_root: Path, pathspec: str) -> Sequence[Path]:
 
 run_inheriting: RunInheritingProtocol = _default_run_inheriting
 run_capturing: RunCapturingProtocol = _default_run_capturing
+_default_run_concurrently: RunConcurrentlyProtocol = run_children_concurrently
+run_concurrently: RunConcurrentlyProtocol = _default_run_concurrently
 now: NowProtocol = _default_now
 sleep: SleepProtocol = _default_sleep
 write_line: WriteLineProtocol = _default_write_line
@@ -521,6 +529,7 @@ __all__ = [
     "RemoveFileProtocol",
     "RemoveTreeProtocol",
     "RunCapturingProtocol",
+    "RunConcurrentlyProtocol",
     "RunInheritingProtocol",
     "SleepProtocol",
     "TokenProtocol",
@@ -538,6 +547,7 @@ __all__ = [
     "remove_file",
     "remove_tree",
     "run_capturing",
+    "run_concurrently",
     "run_inheriting",
     "sleep",
     "token",

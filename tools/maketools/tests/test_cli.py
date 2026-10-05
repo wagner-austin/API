@@ -30,6 +30,7 @@ def test_every_command_is_registered() -> None:
         "check-budget",
         "compose-down",
         "compose-up",
+        "concurrent",
         "env",
         "fan-out",
         "guard",

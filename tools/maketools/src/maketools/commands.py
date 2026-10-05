@@ -80,6 +80,54 @@ class RunInheritingProtocol(Protocol):
         ...
 
 
+class ConcurrentOutcome(TypedDict):
+    """What one of several children run side by side produced.
+
+    Attributes:
+        returncode: Process exit status.
+        output: Standard output and standard error interleaved as the child
+            wrote them, decoded as UTF-8.
+        seconds: Wall time from the start of the batch to this child's exit.
+    """
+
+    returncode: int
+    output: str
+    seconds: float
+
+
+class RunConcurrentlyProtocol(Protocol):
+    """Runs several children at once, each with its output captured."""
+
+    def __call__(
+        self,
+        argvs: Sequence[Sequence[str]],
+        *,
+        cwd: Path,
+        env: Mapping[str, str],
+        timeout_seconds: int,
+    ) -> list[ConcurrentOutcome]:
+        """Start every child, then wait for all of them.
+
+        Args:
+            argvs: One executable-and-arguments list per child, never a
+                shell string.
+            cwd: The working directory every child shares.
+            env: Every child's complete environment.
+            timeout_seconds: Wall-clock bound on the whole batch, named by
+                the caller for the reason :class:`RunInheritingProtocol`
+                gives.
+
+        Returns:
+            One outcome per child, in the order of ``argvs``; a failure is
+            an exit status, not an exception.
+
+        Raises:
+            subprocess.TimeoutExpired: When the batch outlives the bound.
+                Every child still running is killed first.
+        """
+        ...
+
+
 class RunCapturingProtocol(Protocol):
     """Runs a short command and collects its output."""
 
@@ -96,4 +144,10 @@ class RunCapturingProtocol(Protocol):
         ...
 
 
-__all__ = ["CommandResult", "RunCapturingProtocol", "RunInheritingProtocol"]
+__all__ = [
+    "CommandResult",
+    "ConcurrentOutcome",
+    "RunCapturingProtocol",
+    "RunConcurrentlyProtocol",
+    "RunInheritingProtocol",
+]
