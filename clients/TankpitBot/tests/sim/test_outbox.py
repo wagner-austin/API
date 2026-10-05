@@ -95,6 +95,26 @@ def test_admitting_a_connection_twice_is_refused() -> None:
         TickOutbox((20, 20))
 
 
+def test_dismissing_a_connection_discards_its_batch_and_spares_the_rest() -> None:
+    """A departed connection's batch is closed with whatever it held."""
+    outbox = TickOutbox((9, 20))
+    outbox.to(20, SyncDict(msg_type=0x3F))
+    outbox.broadcast([_remove(30)])
+
+    outbox.dismiss(20)
+    outbox.broadcast([_remove(31)])
+
+    assert outbox.batches() == {9: [_remove(30), _remove(31)]}
+
+
+def test_dismissing_a_tank_without_a_batch_is_refused() -> None:
+    """Closing a connection that has no batch is a harness bug."""
+    outbox = TickOutbox((9,))
+
+    with pytest.raises(SimError, match="tank 20 has no batch in this tick's outbox to close"):
+        outbox.dismiss(20)
+
+
 def test_the_batch_of_an_unconnected_tank_is_refused() -> None:
     """Asking for a connection's own batch where none exists is a bug."""
     outbox = TickOutbox((9,))

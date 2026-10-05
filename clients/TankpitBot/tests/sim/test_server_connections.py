@@ -67,13 +67,27 @@ def test_batches_are_keyed_by_connection_in_join_order() -> None:
     assert list(batches) == [9, 20]
 
 
+def _joined_host() -> SimServer:
+    """Tank 9 connected and sent its join burst; 20 and 30 on the field, unconnected."""
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 100, 100, 1000)
+    world["tanks"][20] = make_sim_tank(20, 1, 1, 104, 100, 1000)
+    world["tanks"][30] = make_sim_tank(30, 2, 1, 200, 200, 1000)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
+    server.handshake(9)
+    return server
+
+
 def test_a_joiner_is_announced_to_the_room_and_not_to_itself() -> None:
     """The 0x28 a churn visitor draws announces a connection joining.
 
-    Tank 9 was already connected, so it learns of 20; tank 20 learns
+    Tank 9 was already in the room, so it learns of 20; tank 20 learns
     the room from its own join burst instead.
     """
-    batches = _field().advance_tick()
+    server = _joined_host()
+    server.connect(20)
+    batches = server.advance_tick()
 
     entries = [m for m in batches[9] if m["msg_type"] == 0x28]
     assert entries == [
@@ -89,6 +103,42 @@ def test_a_joiner_is_announced_to_the_room_and_not_to_itself() -> None:
         }
     ]
     assert 0x28 not in _types(batches[20])
+
+
+def test_a_connection_still_joining_is_not_told_of_an_arrival() -> None:
+    """Its own join burst lists the room, so no 0x28 is owed to it.
+
+    Neither tank in the plain field has been sent its burst, so neither
+    is told of the other's arrival.
+    """
+    batches = _field().advance_tick()
+
+    assert 0x28 not in _types(batches[9])
+    assert 0x28 not in _types(batches[20])
+
+
+def test_a_joiner_in_view_is_placed_again_after_its_positionless_entry() -> None:
+    """An entry reports (0, 0), so a joiner already in view is re-placed.
+
+    Tank 20 stands in 9's window, so 9's view already holds it; when
+    20's player connects, 9 gets the 0x28 and then, from the membership
+    pass, the 0x3D that says where the tank really is.
+    """
+    server = _joined_host()
+    session = server.require_session(9)
+    assert 20 in session.viewport.visible
+
+    server.connect(20)
+    batch = server.advance_tick()[9]
+
+    entry = _types(batch).index(0x28)
+    placements = [
+        index
+        for index, message in enumerate(batch)
+        if message["msg_type"] == 0x3D and message["tank_id"] == 20
+    ]
+    assert len(placements) == 1
+    assert placements[0] > entry
 
 
 def test_connecting_an_absent_dead_or_connected_tank_is_refused() -> None:

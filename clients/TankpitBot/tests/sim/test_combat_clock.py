@@ -133,6 +133,42 @@ def test_the_kill_book_scores_both_sides_of_one_deactivation() -> None:
     assert clock.destroyed_by(TARGET) == 0
 
 
+def test_a_departed_tank_takes_its_open_clocks_and_leaves_its_record() -> None:
+    """Forgetting drops the departed tank's debit and corpse, nobody else's.
+
+    The departed shooter's cost is never billed (there is no tank left
+    to bill) and its corpse never comes due, while the target's debit
+    still lands and its own kill and death stay on the record.
+    """
+    world = _world()
+    clock = CombatClock(world)
+    clock.defer_debit(SHOOTER, 6)
+    clock.defer_debit(TARGET, 4)
+    clock.record_deactivation(TARGET, SHOOTER)
+
+    clock.forget(SHOOTER)
+    del world["tanks"][SHOOTER]
+    clock.apply_pending_debits()
+    world["tick"] = CORPSE_WINDOW_TICKS
+
+    assert world["tanks"][TARGET]["fuel"] == 36
+    assert clock.expire_corpses() == []
+    assert clock.deactivations_of(SHOOTER) == 1
+    assert clock.destroyed_by(TARGET) == 1
+
+
+def test_forgetting_a_tank_with_no_open_clocks_changes_nothing() -> None:
+    """A departure with nothing pending is not an error."""
+    world = _world()
+    clock = CombatClock(world)
+    clock.defer_debit(SHOOTER, 6)
+
+    clock.forget(4242)
+    clock.apply_pending_debits()
+
+    assert world["tanks"][SHOOTER]["fuel"] == 994
+
+
 def test_an_unscored_tank_reads_zero_rather_than_missing() -> None:
     """The 0x56 answer needs a number for a tank that has done nothing."""
     clock = CombatClock(_world())
