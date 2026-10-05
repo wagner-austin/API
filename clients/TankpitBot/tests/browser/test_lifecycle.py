@@ -1,15 +1,16 @@
-"""Tests for browser lifecycle standalone functions."""
+"""Tests for browser lifecycle standalone functions.
+
+The cases that need a real headless Chromium live in
+``tests/browser/test_real_chromium.py``, which launches the suite's only
+browser; the cases here run against recorded and fake pages.
+"""
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator
 
 import pytest
 
-from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import BrowserProtocol, CDPSessionProtocol, PageProtocol
-from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
 from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
     wait_for_game_ready,
@@ -24,104 +25,6 @@ from tests.action_lab._replay_page import (
 )
 from tests.conftest import FakeFileSystem
 from tests.fakes import FakeCDPSession
-
-_PAGE_HTML = (
-    '<!DOCTYPE html><html><head><script src="/tpclient.js"></script></head><body></body></html>'
-)
-_TEST_PAGE_URL = "http://localhost:9999/test-page"
-
-_OPEN_INTEL_PAGES: list[PageProtocol] = []
-"""Pages :func:`_intel_page` opened for the test currently running.
-
-Module state rather than a return value the callers have to thread
-through a ``finally``: five tests open one of these, and a page closed
-only on the success path is not closed at all on the day one of them
-fails.
-"""
-
-
-@pytest.fixture(autouse=True)
-def _close_intel_pages() -> Generator[None, None, None]:
-    """Close every page :func:`_intel_page` opened, pass or fail.
-
-    The browser is module-scoped, so a page left open outlives its test
-    and holds a renderer process for the rest of the module. Registered
-    autouse so a new test cannot forget: the leak this replaces was
-    invisible precisely because nothing had to opt in to it.
-
-    Yields:
-        None, once, between the test and the teardown.
-    """
-    yield
-    while _OPEN_INTEL_PAGES:
-        _OPEN_INTEL_PAGES.pop().close()
-
-
-@pytest.fixture(scope="module")
-def headless_browser() -> Generator[BrowserProtocol, None, None]:
-    """Launch one real headless Chromium shared by this module's browser tests.
-
-    ``launch()`` is the expensive call and its cost is paid per launch,
-    not per test: on hosts where a filesystem minifilter inspects the
-    browser's teardown, terminating one has been measured at tens of
-    seconds. The real-browser tests below therefore share one instance
-    and take their own context each, mirroring the ``live_cdp`` fixture
-    in ``tests/conftest.py``. ``--dist loadscope`` keeps a module's
-    tests on one xdist worker, so a module-scoped browser is never
-    shared across processes.
-
-    A context is the isolation these tests actually need -- cache,
-    cookies and routes are all per-context -- and none of them asserts
-    anything about launch or close semantics.
-
-    Yields:
-        A live headless Chromium browser.
-    """
-    factory = _test_hooks.sync_playwright
-    if factory is None:
-        factory = _test_hooks.get_sync_playwright()
-    if factory is None:
-        pytest.skip("Playwright not available")
-    with factory() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            browser.close()
-
-
-def _intel_page(
-    browser: BrowserProtocol,
-    js_content: str,
-) -> tuple[PageProtocol, CDPSessionProtocol]:
-    """Open a page in a fresh context serving ``js_content`` as ``tpclient.js``.
-
-    The page markup, both fulfilled routes and the navigation are
-    identical across the real-browser tests; only the script body
-    differs, so it is the only parameter.
-
-    Args:
-        browser: Browser to open a fresh context in.
-        js_content: Body served for ``tpclient.js``.
-
-    Returns:
-        The navigated page and a CDP session attached to it.
-    """
-
-    def _fulfill_page(route: RouteFulfillTarget) -> None:
-        route.fulfill(content_type="text/html", body=_PAGE_HTML)
-
-    def _fulfill_tpclient(route: RouteFulfillTarget) -> None:
-        route.fulfill(content_type="application/javascript", body=js_content)
-
-    context = browser.new_context()
-    page = context.new_page()
-    cdp = context.new_cdp_session(page)
-    _OPEN_INTEL_PAGES.append(page)
-    page.route("**/test-page", _fulfill_page)
-    page.route("**/tpclient.js", _fulfill_tpclient)
-    page.goto(_TEST_PAGE_URL)
-    return page, cdp
 
 
 class TestWaitForGameReady:
@@ -272,18 +175,6 @@ class TestGatherIntel:
         written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
         assert written == []
 
-    @pytest.mark.usefixtures("fake_fs")
-    def test_capture_static_key_with_real_headless_browser(
-        self,
-        headless_browser: BrowserProtocol,
-    ) -> None:
-        """Real Playwright headless browser extracts a 1000-char static key."""
-        from tankpit_bot.browser.lifecycle import _capture_static_key
-
-        static_key = "K" * 1000
-        page, _ = _intel_page(headless_browser, f'var config = "{static_key}";')
-        assert _capture_static_key(page) == static_key
-
     def test_an_unrotated_key_writes_nothing_and_says_nothing(
         self,
         fake_fs: FakeFileSystem,
@@ -338,63 +229,3 @@ class TestGatherIntel:
         # The shipped asset is untouched — that write is the defect.
         assert after[str(static_key_file_path())] == "Y" + "A" * 999
         assert any("STATIC KEY ROTATED" in record.message for record in caplog.records)
-
-    @pytest.mark.usefixtures("fake_fs")
-    def test_gather_intel_with_real_headless_browser(
-        self,
-        headless_browser: BrowserProtocol,
-    ) -> None:
-        """Real Playwright headless browser runs gather_intel end to end."""
-        from tankpit_bot.browser.lifecycle import gather_intel
-
-        static_key = "J" * 1000
-        page, cdp = _intel_page(headless_browser, f'var config = "{static_key}";')
-        assert gather_intel(page, cdp) == static_key
-
-    def test_an_empty_tpclient_body_is_not_saved_over_the_tracked_copy(
-        self,
-        fake_fs: FakeFileSystem,
-        headless_browser: BrowserProtocol,
-    ) -> None:
-        """Real browser: a tpclient.js that serves nothing is not written.
-
-        The script tag exists and its URL resolves, so the fetch runs and
-        legitimately returns the empty string. The checked-in
-        ``tpclient.js`` is the reference copy later sessions read, so
-        saving an empty fetch over it destroys the artifact -- which is
-        what the old ``else ""`` did with a fetch that returned nothing
-        at all.
-        """
-        from tankpit_bot.browser.lifecycle import _capture_static_key
-
-        page, _ = _intel_page(headless_browser, "")
-
-        assert _capture_static_key(page) is None
-        written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
-        assert written == []
-
-    def test_control_a_served_body_is_saved(
-        self,
-        fake_fs: FakeFileSystem,
-        headless_browser: BrowserProtocol,
-    ) -> None:
-        """Control: real source IS written, so the silence above is the check."""
-        from tankpit_bot.browser.lifecycle import _capture_static_key
-
-        static_key = "L" * 1000
-        page, _ = _intel_page(headless_browser, f'var config = "{static_key}";')
-
-        assert _capture_static_key(page) == static_key
-        written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
-        assert len(written) == 1
-
-    @pytest.mark.usefixtures("fake_fs")
-    def test_capture_static_key_no_key_in_content(
-        self,
-        headless_browser: BrowserProtocol,
-    ) -> None:
-        """Real browser: tpclient.js exists but has no 1000-char string."""
-        from tankpit_bot.browser.lifecycle import _capture_static_key
-
-        page, _ = _intel_page(headless_browser, "var x = 1;")
-        assert _capture_static_key(page) is None

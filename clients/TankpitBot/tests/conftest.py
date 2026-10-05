@@ -11,13 +11,14 @@ from platform_core.json_utils import JSONObject
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import (
     AppendTextProtocol,
-    CDPSessionProtocol,
     PathExistsProtocol,
     ReadTextProtocol,
 )
 from tankpit_bot.analysis import _test_hooks as analysis_test_hooks
 from tankpit_bot.replay import _test_hooks as replay_test_hooks
 from tankpit_bot.stream import _test_hooks as stream_test_hooks
+
+pytest_plugins = ("tests._host",)
 
 
 class FakeCDPSessionSimple:
@@ -574,27 +575,3 @@ def fake_cdp() -> FakeCDPSessionSimple:
         FakeCDPSessionSimple instance.
     """
     return FakeCDPSessionSimple()
-
-
-@pytest.fixture(scope="module")
-def live_cdp() -> Generator[CDPSessionProtocol, None, None]:
-    """Yield a real CDP session attached to a rendered headless page.
-
-    Launches one genuine headless Chromium per test module (loadscope
-    keeps a module's tests on one worker) and tears it down afterwards,
-    so the launch cost is paid once. Used to exercise CDP screenshot
-    capture against a real browser rather than a substitute.
-
-    Yields:
-        A live CDP session whose page has visible rendered content.
-    """
-    factory = _test_hooks.get_sync_playwright()
-    with factory() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        try:
-            context = browser.new_context()
-            page = context.new_page()
-            page.goto("data:text/html,<body style='margin:0;background:#33aa66'>tankpit</body>")
-            yield context.new_cdp_session(page)
-        finally:
-            browser.close()
