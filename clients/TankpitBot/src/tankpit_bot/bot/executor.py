@@ -512,7 +512,10 @@ def execute(
     # behavior's mode is the PROPOSER (a collect-owned tick can emit a
     # HUNT-scored divert), so the durable owner and the held lock from
     # the decision's own updated state are printed beside it — the two
-    # facts that took three artifacts to triangulate live.
+    # facts that took three artifacts to triangulate live. The bare
+    # reason kind rides beside its rendered form so a reader of the
+    # events (the public demo's captions) keys on the closed vocabulary
+    # rather than parsing ``kind(k=v)`` back apart.
     updated_state = decision["updated_ai_state"]
     emit_ai(
         "%s score=%d target=(%d,%d) cmd=%s equip=%s reason=%s owner=%s lock=%d",
@@ -532,6 +535,7 @@ def execute(
         combat_target_id=behavior["target_id"],
         command_type=command["cmd_type"],
         behavior_reason=render_reason(behavior),
+        behavior_reason_kind=behavior["reason_kind"].value,
         owner_mode=updated_state["mode"],
         held_lock_id=updated_state["combat_target_id"],
     )

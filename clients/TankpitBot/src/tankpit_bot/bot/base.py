@@ -63,6 +63,7 @@ from tankpit_bot.sniffer.chrome_launch import (
     _maximize_via_cdp,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.stream.audio import AudioSink
 from tankpit_bot.stream.capture import DisplayCapture
 from tankpit_bot.stream.types import StreamConfigDict
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
@@ -292,11 +293,14 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         # config was chosen for content AT this factor, so the two
         # travel together. Scrollbars are hidden because a layout that
         # outgrows the screen by a pixel would otherwise draw them
-        # into every captured frame (observed live at 1152x672).
+        # into every captured frame (observed live at 1152x672). The
+        # autoplay policy lets the game's WebAudio context run without
+        # a click nobody will ever make, or the stream's sound is mute.
         launch_args = _chrome_stream_display_args() + (
             [
                 f"--force-device-scale-factor={self._stream_config['scale']}",
                 "--hide-scrollbars",
+                "--autoplay-policy=no-user-gesture-required",
             ]
             if self._stream_config is not None
             else []
@@ -310,6 +314,12 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             capture: DisplayCapture | None = None
             launch_env: dict[str, str] | None = None
             if self._stream_config is not None:
+                # The sound server is registered FIRST so LIFO stops it
+                # LAST: the encoder records its monitor and must end
+                # before its input does.
+                audio = AudioSink(self._stream_config)
+                stack.callback(audio.stop)
+                audio.start()
                 capture = DisplayCapture(self._stream_config)
                 # Registered BEFORE start_display: a display that
                 # timed out waiting still has a server process to
@@ -324,6 +334,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 # so the overlay rides a full copy of the parent's.
                 launch_env = dict(_test_hooks.child_environment())
                 launch_env["DISPLAY"] = capture.display_env
+                launch_env["PULSE_SERVER"] = audio.server_address
             playwright = stack.enter_context(_test_hooks.sync_playwright())
             browser = playwright.chromium.launch(
                 headless=self._headless,
