@@ -34,6 +34,45 @@ STRICT_HEADER = ("Set-StrictMode -Version Latest", "$ErrorActionPreference = 'St
 _PARAMETER = re.compile(r"^[A-Z][A-Za-z]*$")
 _BINARY = re.compile(r"^[a-z][a-z0-9]*\.exe$")
 
+#: What a compiled type's namespace-qualified name may be.
+_QUALIFIED_TYPE = re.compile(r"^[A-Z][A-Za-z]*\.[A-Z][A-Za-z]*$")
+
+
+def add_type_lines(qualified: str, source: str) -> tuple[str, ...]:
+    """Lines that compile a C# type into the session unless it is already there.
+
+    A render reaches a Win32 call PowerShell has no cmdlet for through a type
+    compiled by ``Add-Type``, and a type cannot be compiled twice into one
+    session: a Pester suite runs a render in its own process once per case,
+    so the second case finds the type already loaded and skips the compile,
+    which is the guard's other arm.
+
+    Args:
+        qualified: The type's ``Namespace.Type`` name, which the guard
+            looks up.
+        source: The C# source declaring it, embedded in a single-quoted
+            here-string.
+
+    Returns:
+        The lines, the here-string's terminator at column 0 as PowerShell
+        requires.
+
+    Raises:
+        ValueError: When the name is not of that plain shape, or the source
+            holds the here-string's own terminator.
+    """
+    if not _QUALIFIED_TYPE.match(qualified):
+        raise ValueError(f"a compiled type must be named Namespace.Type, not {qualified!r}")
+    if "\n'@" in f"\n{source}":
+        raise ValueError(f"the source of {qualified} would end its here-string early")
+    return (
+        f"if ($null -eq ('{qualified}' -as [type])) {{",
+        "    Add-Type -TypeDefinition @'",
+        *source.splitlines(),
+        "'@",
+        "}",
+    )
+
 
 def system32_parameter(name: str, binary: str) -> str:
     """A param-block line naming one System32 binary by its absolute path.
@@ -57,4 +96,23 @@ def system32_parameter(name: str, binary: str) -> str:
     return f'[string]${name} = "$env:SystemRoot\\System32\\{binary}"'
 
 
-__all__ = ["STRICT_HEADER", "system32_parameter"]
+def indented(lines: tuple[str, ...], *, depth: int) -> tuple[str, ...]:
+    """Lines nested ``depth`` blocks deep, four spaces a block.
+
+    A blank line stays blank, so no line ends in whitespace, and a
+    here-string's terminator stays at column 0, where PowerShell requires
+    it; the lines between a here-string's markers are its text, which the
+    indent does not change the meaning of for C#.
+
+    Args:
+        lines: The lines, as written at the top level.
+        depth: How many blocks deep they go.
+
+    Returns:
+        The nested lines.
+    """
+    prefix = "    " * depth
+    return tuple(line if line in ("", "'@") else f"{prefix}{line}" for line in lines)
+
+
+__all__ = ["STRICT_HEADER", "add_type_lines", "indented", "system32_parameter"]

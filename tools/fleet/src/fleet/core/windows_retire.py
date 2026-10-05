@@ -20,13 +20,20 @@ junction inside the tree without entering it, so a link pointing out of
 the export never empties its target. ``rd`` can report success while
 leaving something behind, so the directory is looked for again afterwards
 and its survival is an error by name.
+
+A HELD TRANSCRIPT IS RELEASED, NOT FAILED ON (MCPs board task e40bca34).
+Before the move, every leftover process of the run still holding the
+transcript is named and ended (:mod:`fleet.core.windows_holders`), so one
+orphan can no longer stop every tick of its node's runner, which it did on
+sedona for 26 hours.
 """
 
 from __future__ import annotations
 
 from fleet.core import names
-from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
+from fleet.core.powershell_text import STRICT_HEADER, indented, system32_parameter
 from fleet.core.script_values import scriptable
+from fleet.core.windows_holders import ENDABLE_APP_TYPES, end_holders_lines
 
 #: The prefix that exempts an absolute Windows path from MAX_PATH, as the
 #: rendered PowerShell spells it (a single-quoted literal).
@@ -64,7 +71,9 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
     Returns:
         The script's text. Each removal is guarded by ``Test-Path`` or by the
         task being listed, because a retire that failed part way is run again
-        by the next tick and meets exactly what is already gone.
+        by the next tick and meets exactly what is already gone. It prints
+        one ``FLEET_RETIRE_HOLDER_ENDED`` line for each process it ended
+        because it held the transcript, and nothing else.
 
     Raises:
         ValueError: When a path cannot be embedded verbatim.
@@ -85,6 +94,7 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
             for parameter, script in zip(parameters, scripts, strict=True)
         ),
         f"    {system32_parameter('Cmd', 'cmd.exe')}",
+        f"    [int[]]$EndableTypes = @({', '.join(str(kind) for kind in ENDABLE_APP_TYPES)})",
     ]
     body = [
         "param(",
@@ -93,6 +103,7 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
         *STRICT_HEADER,
         "[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Retained)) | Out-Null",
         "if (Test-Path -LiteralPath $Log) {",
+        *indented(end_holders_lines(path_variable="$Log"), depth=1),
         "    Move-Item -Force -LiteralPath $Log -Destination $Retained",
         "}",
         "foreach ($directory in @($Target, $Staging)) {",

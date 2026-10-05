@@ -30,6 +30,7 @@ from fleet.core.names import CACHE_VARIABLE
 from fleet.core.phase_markers import PHASE_MARKER
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
+from fleet.core.windows_job import enter_job_lines
 
 
 def _array(values: tuple[str, ...], *, label: str) -> str:
@@ -102,6 +103,15 @@ def build_script(
     ``[DateTime]::UtcNow``. ``$InstallPhases`` runs parallel to ``$Install``,
     one phase per step.
 
+    NOTHING THE BUILD STARTS OUTLIVES IT (MCPs board task e40bca34). Right
+    after recording itself, before it starts any process, it puts its own
+    process in a kill-on-close job object (:mod:`fleet.core.windows_job`),
+    so an install step's orphan, which the stop's ``taskkill /T`` cannot
+    reach, ends with the build instead of holding the transcript and
+    wedging the node's retire. The record comes first because the launch
+    waits on it (:func:`fleet.core.windows_task.launch_script`), and the
+    job's compile takes a second or more.
+
     Args:
         target: Absolute remote directory holding the export, its root.
         path: The project's directory inside the export, ``""`` for the root.
@@ -141,6 +151,7 @@ def build_script(
         ")",
         *STRICT_HEADER,
         f'$PID | Set-Content -LiteralPath "$Target/{names.PID_NAME}"',
+        *enter_job_lines(),
         f'$log = "{names.log_path("$Target")}"',
         f'$result = "$Target/{names.RESULT_NAME}"',
         '$env:npm_config_cache = "$CacheRoot/npm"',

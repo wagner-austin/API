@@ -30,8 +30,12 @@ not remove, since it removes every orphan it finds, not the run's alone.
 
 from __future__ import annotations
 
+from platform_core.logging import get_logger
+
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import dialect, names, remote
+
+_log = get_logger(__name__)
 
 
 def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
@@ -76,12 +80,17 @@ def retire_on_node(node: NodeConfig, *, run_id: str) -> str:
             could not be moved or removed.
     """
     stage_root = node["stage_root"]
-    remote.run_script(
+    said = remote.run_script(
         node["host"],
         dialect.for_platform(node["platform"]).script_path(stage_root, names.retire_stem(run_id)),
         script_for(node["platform"], stage_root=stage_root, run_id=run_id),
         platform=node["platform"],
     )
+    # A Windows retire prints one line per leftover process it ended for
+    # holding the transcript (MCPs board task e40bca34); the tick log is
+    # where a reader looks for what a runner killed.
+    for line in said.splitlines():
+        _log.info("retire %s on %s: %s", run_id, node["host"], line)
     return names.retained_log_path(stage_root, run_id)
 
 
