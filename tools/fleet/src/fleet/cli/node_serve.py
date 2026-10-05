@@ -43,14 +43,21 @@ thread and its error closed the watch at once: at 07:24:56Z that day the
 dispatch endpoint refused one ``dispatch_list`` (URLError, WinError 10061),
 all 7 serving runners ended, and lavender-wsl's run that ended 16 s later
 closed at the 07:27 start, 120.9 s after its check (row 62734702). Now an
-error from the loop, a refused listing or a failed pass alike, ends the
-claiming and nothing else: the watch goes on settling what this runner
-holds until :data:`HANDOVER_SECONDS` before the next fire boundary
-(:func:`serve_on`), and only then is the loop's error raised, unchanged, so
-the start still fails with it and the next fire starts the next serve, as
-it would have anyway. A run ending in those seconds closes on the watch's
-next poll once the queue answers again; a job queued in them waits for the
-next fire, the one wait a queue outage still costs.
+error from the loop ends the claiming and nothing else: the watch goes on
+settling what this runner holds until :data:`HANDOVER_SECONDS` before the
+next fire boundary (:func:`serve_on`), and only then is the loop's error
+raised, unchanged, so the start still fails with it and the next fire
+starts the next serve, as it would have anyway.
+
+A QUEUE THAT DID NOT ANSWER IS NOT SUCH AN ERROR. The watch above still
+ended at the first settle the outage refused: at 11:54:58Z on 2026-10-05
+the listing was refused while a deploy recreated mcp-fleet, row bde22e57's
+run ended at 11:55:29Z, its settle met the same refusal, and it closed at
+the 11:57 fire, 105 s after its check. A call nothing answered now raises
+``QUEUE_UNANSWERED`` (:mod:`fleet.core.queue_transport`), and the loop
+(:func:`serve_loop`) and the watch each ask again at their next poll, so a
+run ending in an outage closes, and a job queued in one is claimed, within
+a poll of the queue answering again.
 
 THE BOUNDARIES ARE THE SCHEDULE'S. FleetSchedule.ps1 registers each
 runner's task once at local midnight, repeating every 3 minutes; local
@@ -68,10 +75,10 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Final, Protocol, TypedDict
 
 from platform_core.logging import get_logger
-from platform_core.mcp_client import McpCredentials
 
+from fleet.cli.node_serve_claim import Claiming
 from fleet.cli.node_watch import THREAD_PREFIX, RunWatch
-from fleet.core import _test_hooks, queue
+from fleet.core import _test_hooks
 from fleet.core.rolled import ROLLED_REF
 
 _log = get_logger(__name__)
@@ -116,7 +123,9 @@ class ServeSteps(TypedDict):
             runner holds, and stops what was cancelled.
         fill: The fill pass: claims and launches until the node has no room
             or the lane nothing it fits.
-        queued: The ids of the queued jobs naming this node or no node.
+        queued: The ids of the queued jobs naming this node or no node, or
+            None when the queue did not answer
+            (:func:`fleet.cli.node_serve_claim.queued_here`).
         rolled: What ``refs/fleet/rolled`` names now
             (:func:`fleet.core.rolled.rolled_state`).
         launching: How many claimed jobs are still being launched
@@ -126,13 +135,17 @@ class ServeSteps(TypedDict):
             would go unwatched until the next (job 6c568ecb on diphtheria,
             2026-10-05: launched 17 s after a 10:05:50Z handover, ended
             10:06:43Z, closed 10:09:14Z).
+        start_unreported: Whether a launch's start report went unanswered
+            since the last ask (:meth:`fleet.cli.node_launch.Launcher.take_unreported`),
+            which the loop recovers from as from any unanswered pass.
     """
 
     collect: Callable[[], None]
     fill: Callable[[], None]
-    queued: Callable[[], frozenset[str]]
+    queued: Callable[[], frozenset[str] | None]
     rolled: Callable[[], str]
     launching: Callable[[], int]
+    start_unreported: Callable[[], bool]
 
 
 class Handover(TypedDict):
@@ -181,30 +194,6 @@ def next_fire(now: int) -> int:
     return (now // TICK_SECONDS + 1) * TICK_SECONDS
 
 
-def queued_here(credentials: McpCredentials, *, alias: str) -> frozenset[str]:
-    """The queued jobs a serve watches for: those naming this node or no node.
-
-    Tags are not read here: a job whose tags this runner lacks starts one
-    fill pass, whose claim the queue answers with nothing, and its id is
-    then seen, so it starts no other.
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        alias: This node's workspace name.
-
-    Returns:
-        Their job ids.
-
-    Raises:
-        AppError: From the queue listing.
-    """
-    return frozenset(
-        job["job_id"]
-        for job in queue.queued_for(credentials, project=None)
-        if job["requested_node"] in (None, alias)
-    )
-
-
 def handover_policy(*, started: int, serve_seconds: int, rolled: Callable[[], str]) -> Handover:
     """Decide, at a serve's start, how it will decide to hand over.
 
@@ -246,6 +235,7 @@ def serve_loop(
     watch: Watched,
     watching: Future[None],
     *,
+    alias: str,
     started: int,
     serve_seconds: int,
     poll_seconds: int,
@@ -253,15 +243,17 @@ def serve_loop(
 ) -> Served:
     """Run the passes, then claim and renew until a handover or the watch's end.
 
-    A job counts as arrived when a listing shows it and the last one did
-    not, the first listing's every job included, so a job that waited
-    through the opening fill pass, untaken for its tags or the node's room,
-    costs one more fill pass at the first poll and none after.
+    Between boundaries each poll is :meth:`fleet.cli.node_serve_claim.Claiming.poll`,
+    and A QUEUE THAT DID NOT ANSWER costs a poll there, not the serve (MCPs
+    board task 8993c306). The watch rides the same outage on its own,
+    settling a run that ended in it at the first poll the queue answers
+    (:mod:`fleet.cli.node_watch`).
 
     Args:
         watch: The watch the passes hand their runs to.
         watching: The watch thread, whose end before a handover means it
             raised.
+        alias: This node's workspace name, for the log.
         started: When the serve started.
         serve_seconds: The workspace's ``node_serve_seconds``.
         poll_seconds: The workspace's ``node_poll_seconds``.
@@ -272,16 +264,21 @@ def serve_loop(
         says so and :func:`serve` raises the thread's error.
 
     Raises:
-        AppError: From the passes and the queue listing. Not caught: the
-            next start meets the same runs.
+        AppError: From the passes and the queue listing, but for
+            ``QUEUE_UNANSWERED``. Not caught: the next start meets the same
+            runs.
     """
     policy = handover_policy(started=started, serve_seconds=serve_seconds, rolled=steps["rolled"])
     fire = next_fire(started)
-    seen: frozenset[str] = frozenset()
-    steps["collect"]()
-    steps["fill"]()
-    fills = 1
-    settled = watch.closed()
+    claiming = Claiming(
+        alias=alias,
+        collect=steps["collect"],
+        fill=steps["fill"],
+        queued=steps["queued"],
+        start_unreported=steps["start_unreported"],
+        closed=watch.closed,
+    )
+    claiming.passes(fill=True)
     fires = 0
     reason = policy["at_start"]
     while True:
@@ -292,21 +289,14 @@ def serve_loop(
                 handed_over=now,
                 fire=fire,
                 fires=fires,
-                fills=fills,
+                fills=claiming.fills,
                 reason="its watch thread ended",
             )
         handover = fire - HANDOVER_SECONDS
         if now < handover:
             _test_hooks.sleep(min(poll_seconds, handover - now))
-            if reason is not None:
-                continue
-            queued = steps["queued"]()
-            arrived = queued - seen
-            seen = queued
-            if arrived or watch.closed() != settled:
-                settled = watch.closed()
-                steps["fill"]()
-                fills += 1
+            if reason is None:
+                claiming.poll()
             continue
         if reason is None:
             reason = policy["due"](now)
@@ -321,16 +311,12 @@ def serve_loop(
                 handed_over=now,
                 fire=fire,
                 fires=fires,
-                fills=fills,
+                fills=claiming.fills,
                 reason=reason,
             )
         fire = next_fire(max(now, fire))
         fires += 1
-        steps["collect"]()
-        if reason is None:
-            steps["fill"]()
-            fills += 1
-            settled = watch.closed()
+        claiming.passes(fill=reason is None)
 
 
 def serve_on(watch: Watched, watching: Future[None], *, poll_seconds: int) -> int:
@@ -398,8 +384,9 @@ def serve(
         AppError: From the loop, once the watch has served on to the
             handover (:func:`serve_on`) and ended; or from the watch, once
             the loop has stopped. Neither is caught: the next start meets
-            the same runs. Any other error the loop raised, a refused
-            connection's ``URLError`` among them, is raised the same way.
+            the same runs. Any other error the loop raised is raised the
+            same way; a queue that did not answer is not one
+            (:func:`serve_loop`).
     """
     with (
         ThreadPoolExecutor(
@@ -413,6 +400,7 @@ def serve(
                 serve_loop,
                 watch,
                 watching,
+                alias=alias,
                 started=started,
                 serve_seconds=serve_seconds,
                 poll_seconds=poll_seconds,
@@ -467,7 +455,6 @@ __all__ = [
     "Watched",
     "handover_policy",
     "next_fire",
-    "queued_here",
     "serve",
     "serve_loop",
     "serve_on",

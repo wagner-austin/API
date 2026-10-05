@@ -94,12 +94,13 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, node_serve, node_watch
+from fleet.cli import _config, node_serve, node_serve_claim, node_watch
 from fleet.cli.node_claim import ask_queue, refuse
-from fleet.cli.node_collect import collect_pass, require_sha
+from fleet.cli.node_collect import collect_pass
 from fleet.cli.node_launch import Launcher
 from fleet.cli.node_prepare import admit
 from fleet.cli.node_ready import ready_state
+from fleet.cli.node_settle import require_sha
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.tags import runner_tags
 from fleet.contracts.workspace import require_node
@@ -372,8 +373,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             launcher=launcher,
         )
 
-    def queued() -> frozenset[str]:
-        return node_serve.queued_here(credentials, alias=alias)
+    def queued() -> frozenset[str] | None:
+        return node_serve_claim.queued_here(credentials, alias=alias)
 
     def rolled_now() -> str:
         return rolled.rolled_state(loaded.directory)
@@ -394,6 +395,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 queued=queued,
                 rolled=rolled_now,
                 launching=launching,
+                start_unreported=launcher.take_unreported,
             ),
         )
     return 0

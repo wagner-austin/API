@@ -1,0 +1,165 @@
+"""Settle one ended run: its verdict, its queue close, its ledger row, its directory.
+
+Split out of :mod:`fleet.cli.node_collect`, which had reached the file
+ceiling, when its order became the point (MCPs board task 8993c306).
+
+THE QUEUE IS CLOSED BEFORE ANYTHING ON THIS MACHINE OR THE NODE CHANGES.
+Until 2026-10-05 the settle retired the run's directory, finished its ledger
+row and only then closed its queue job. A queue that did not answer that
+close (a deploy recreating mcp-fleet, :mod:`fleet.core.queue_transport`) left
+the job running on the queue with no live row behind it, which every later
+collect pass leaves alone, so the waiting session waited out the claim's
+hour-long lease; and a retire done before a refused call cannot be done
+again, since the result it reads goes with the directory. Now every queue
+and board call comes first: a refusal anywhere in them leaves the row live
+and the directory where it was, so the next poll settles the run again from
+the start, as if it had just ended. The verdict names the transcript where
+the retire will keep it (:func:`fleet.core.names.retained_log_path`, the
+path :func:`fleet.core.retire.retire_on_node` returns).
+
+What a refusal can still repeat: a task-less job's verdict, posted to its
+submitter's feed before the close, is posted again when the close is refused
+and the settle runs again. A second line is visible and harmless; a verdict
+posted only after a close that then failed would be one nobody ever saw.
+
+After the close, the ledger row is finished (this machine's files) and the
+directory retired (the node). A retire that fails there leaves the run's
+directory on the node and the verdict naming a transcript not yet moved;
+it raises, so the serve's log says so, but the row and the queue job are
+both already closed and nothing else waits on it.
+"""
+
+from __future__ import annotations
+
+from platform_core.error_codes_fleet import FleetErrorCode
+from platform_core.errors import AppError
+from platform_core.json_utils import JSONObject
+from platform_core.mcp_client import McpCredentials
+
+from fleet.cli import _config
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob
+from fleet.contracts.ledger import LedgerEntry
+from fleet.contracts.node import NodeConfig
+from fleet.core import collect, dialect, dispatch, names, queue, remote, retire, venv_sweep, verdict
+
+
+def settle(
+    loaded: _config.LoadedWorkspace,
+    credentials: McpCredentials,
+    board: McpCredentials,
+    job: DispatchJob,
+    identity: JSONObject,
+    *,
+    row: LedgerEntry,
+    node: NodeConfig,
+    exit_code: int,
+    ended_unix: int,
+    detail: str,
+    stopped: str | None,
+) -> str:
+    """Judge a run, post a task-less run's verdict, close its queue job, then
+    finish its row, retire its directory and sweep the node's orphaned virtualenvs.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        credentials: The queue's endpoint and headers.
+        board: The board's endpoint and headers, for the verdict.
+        job: The queue job this runner holds.
+        identity: This runner's identity arguments.
+        row: The run's live ledger row.
+        node: The node it ran on.
+        exit_code: The status to record.
+        ended_unix: When the check ended: its result's time, or the stop's.
+        detail: What the ledger and the feed say about it.
+        stopped: Why the runner stopped the build, appended to the verdict
+            line, or None when the build finished on its own.
+
+    Returns:
+        The verdict line, as posted and as the queue job's detail.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries no sha;
+            ``QUEUE_UNANSWERED`` when the board or the queue did not answer,
+            with nothing on this machine or the node changed; or a node,
+            board or queue failure. Not caught.
+    """
+    sha = require_sha(job)
+    target = names.dispatch_directory(node["stage_root"], row["run_id"])
+    spoken = dialect.for_platform(node["platform"])
+    tail = remote.run_script(
+        node["host"],
+        spoken.script_path(target, names.LOG_TAIL_STEM),
+        spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
+        platform=node["platform"],
+    )
+    judged = verdict.judge(
+        job_id=job["job_id"],
+        project=row["project"],
+        sha=sha,
+        node=row["node"],
+        exit_code=exit_code,
+        tail=tail,
+        ended_unix=ended_unix,
+        log_path=names.retained_log_path(node["stage_root"], row["run_id"]),
+        run_id=row["run_id"],
+    )
+    rendered = verdict.render_verdict(judged)
+    line = rendered if stopped is None else f"{rendered} stopped: {stopped}"
+    # A job naming a task gets its row from the queue's close below, on the
+    # task's thread and addressed to the submitter (MCPs board task
+    # 2fecad69); only a task-less job's verdict is this runner's to post.
+    if job["task_id"] is None:
+        queue.post_verdict(
+            board,
+            submitted_by=job["submitted_by"],
+            line=line,
+            identity=identity,
+        )
+    queue.report_close(
+        credentials,
+        job_id=job["job_id"],
+        status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
+        exit_code=exit_code,
+        detail=line,
+        identity=identity,
+    )
+    dispatch.finish(
+        loaded.leases,
+        loaded.ledger,
+        loaded.feed,
+        row=row,
+        outcome=collect.outcome_for(exit_code),
+        exit_code=exit_code,
+        detail=detail,
+    )
+    retire.retire_on_node(node, run_id=row["run_id"])
+    # After the queue close, so the session waiting on this row is not kept
+    # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
+    venv_sweep.sweep_on_node(node)
+    return line
+
+
+def require_sha(job: DispatchJob) -> str:
+    """The commit a node-lane job names.
+
+    Args:
+        job: The claimed job.
+
+    Returns:
+        Its sha.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries none,
+            which the queue's pin (MCPs mig 532) makes impossible for a
+            node-lane row; a null here means the contract moved.
+    """
+    sha = job["sha"]
+    if sha is None:
+        raise AppError(
+            code=FleetErrorCode.QUEUE_ANSWER_MALFORMED,
+            message=f"node-lane job {job['job_id']} carries no sha; the queue's pin forbids it",
+        )
+    return sha
+
+
+__all__ = ["require_sha", "settle"]

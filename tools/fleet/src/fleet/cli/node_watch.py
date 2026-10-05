@@ -63,6 +63,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from types import TracebackType
 from typing import Final, Protocol
 
+from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
@@ -74,6 +75,7 @@ from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import DispatchStatus
 from fleet.contracts.node import NodeConfig
 from fleet.core import collect, queue
+from fleet.core.queue_transport import unanswered
 
 _log = get_logger(__name__)
 
@@ -365,9 +367,14 @@ class RunWatch:
         Args:
             run_id: The run.
 
+        A settle the queue did not answer (``QUEUE_UNANSWERED``) changed
+        nothing (:mod:`fleet.cli.node_settle`), so the run stays held, its
+        row still live, and is read and settled again at the next poll.
+
         Raises:
-            AppError: From the read or the settle. Not caught: the watch
-                stops and raises it (:meth:`watch`).
+            AppError: From the read or the settle, but for
+                ``QUEUE_UNANSWERED``. Not caught: the watch stops and raises
+                it (:meth:`watch`).
         """
         try:
             with SETTLING.holding(run_id):
@@ -376,6 +383,17 @@ class RunWatch:
                 _log.info("%s: %s has ended; collecting it now", self._alias, run_id)
                 try:
                     line = self._settle(run_id=run_id)
+                except AppError as refusal:
+                    if not unanswered(refusal):
+                        raise
+                    _log.info(
+                        "%s: the queue did not answer the settle of %s; it is settled "
+                        "again at the next poll: %s",
+                        self._alias,
+                        run_id,
+                        refusal.message,
+                    )
+                    return
                 finally:
                     self._end_settle()
             _log.info("%s", line)

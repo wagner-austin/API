@@ -47,6 +47,7 @@ from fleet.contracts.dispatch import DispatchJob
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad, NodeConfig
 from fleet.core import _test_hooks, dispatch, export, run_lease
+from fleet.core.queue_transport import unanswered
 
 _log = get_logger(__name__)
 
@@ -197,6 +198,7 @@ class Launcher:
         self._changed = threading.Lock()
         self._in_flight: dict[str, _InFlight] = {}
         self._failed: Future[str | None] | None = None
+        self._unreported = False
 
     def launching(self) -> Launching:
         """What the launches under way hold on the node now.
@@ -237,6 +239,19 @@ class Launcher:
         launch = self._executor.submit(self._launch, job, admitted, sha)
         launch.add_done_callback(self._launched)
         return launch
+
+    def take_unreported(self) -> bool:
+        """Whether a launch's start report went unanswered since the last ask.
+
+        Returns:
+            True once for any number of them, then False until another; the
+            serve then runs its collect pass, which adopts each such run
+            (:func:`fleet.cli.node_serve.serve_loop`).
+        """
+        with self._changed:
+            unreported = self._unreported
+            self._unreported = False
+        return unreported
 
     def raise_failed(self) -> None:
         """Raise the first launch that raised, if one has.
@@ -298,26 +313,46 @@ class Launcher:
 
         Returns:
             The run id, or None when a local refusal was reported instead.
+            A start report the queue did not answer leaves the job claimed
+            with its run launched, which is what
+            :func:`fleet.cli.node_collect.reconcile_claim` adopts, so it is
+            logged and counted for :meth:`take_unreported` instead of
+            raised, and the run is left to that adoption rather than held.
 
         Raises:
-            AppError: From the queue's start report or refusal, or the stop
-                of a job cancelled while it launched. Not caught: the serve
-                raises it (:meth:`raise_failed`).
+            AppError: From the queue's start report or refusal, but for an
+                unanswered start report, or the stop of a job cancelled
+                while it launched. Not caught: the serve raises it
+                (:meth:`raise_failed`).
         """
         try:
             row = self._launch_row(job, admitted, sha)
             if row is None:
                 return None
-            report_started(
-                self._loaded,
-                self._credentials,
-                self._identity,
-                job=job,
-                row=row,
-                alias=self._alias,
-                node=self._node,
-                agent=self._agent,
-            )
+            try:
+                report_started(
+                    self._loaded,
+                    self._credentials,
+                    self._identity,
+                    job=job,
+                    row=row,
+                    alias=self._alias,
+                    node=self._node,
+                    agent=self._agent,
+                )
+            except AppError as refusal:
+                if not unanswered(refusal):
+                    raise
+                _log.info(
+                    "%s: the queue did not answer the start report of %s; the next collect "
+                    "pass adopts it: %s",
+                    job["job_id"],
+                    row["run_id"],
+                    refusal.message,
+                )
+                with self._changed:
+                    self._unreported = True
+                return row["run_id"]
             self._hold(frozenset({row["run_id"]}))
             return row["run_id"]
         finally:

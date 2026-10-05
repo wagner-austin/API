@@ -6,8 +6,9 @@ runner holds and settles every run it launched in one of four ways:
 
 * FINISHED. The node wrote a result: read the transcript's tail, compose the
   verdict (:mod:`fleet.core.verdict`), post it to the submitter's feed when
-  the job names no task, and close the job on both sides; the queue's close
-  posts a task-naming job's outcome to its thread (MCPs board task 2fecad69).
+  the job names no task, and close the job on both sides, the queue's side
+  first (:mod:`fleet.cli.node_settle`); the queue's close posts a
+  task-naming job's outcome to its thread (MCPs board task 2fecad69).
 * STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim and leave it.
 * STILL RUNNING, PAST ITS LEASE (MCPs board task fd5cabfa). Stop it. Until
   this, a renewal had no deadline, so a suite that hung kept its claim and
@@ -56,24 +57,13 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config, node_lost
 from fleet.cli import collect as collect_cli
+from fleet.cli.node_settle import settle
 from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import (
-    _test_hooks,
-    collect,
-    dialect,
-    dispatch,
-    names,
-    queue,
-    remote,
-    retire,
-    stop,
-    venv_sweep,
-    verdict,
-)
+from fleet.core import _test_hooks, collect, queue, stop
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
 
 _log = get_logger(__name__)
@@ -84,103 +74,6 @@ _log = get_logger(__name__)
 #: ``timeout`` gives a command it ended for running too long, which is what
 #: happened, rather than a number a reader would have to look up.
 TIMED_OUT_EXIT_CODE: Final = 124
-
-
-def settle(
-    loaded: _config.LoadedWorkspace,
-    credentials: McpCredentials,
-    board: McpCredentials,
-    job: DispatchJob,
-    identity: JSONObject,
-    *,
-    row: LedgerEntry,
-    node: NodeConfig,
-    exit_code: int,
-    ended_unix: int,
-    detail: str,
-    stopped: str | None,
-) -> str:
-    """Post a task-less run's verdict, close its row and its queue job, then
-    sweep the node's orphaned virtualenvs.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers, for the verdict.
-        job: The queue job this runner holds.
-        identity: This runner's identity arguments.
-        row: The run's live ledger row.
-        node: The node it ran on.
-        exit_code: The status to record.
-        ended_unix: When the check ended: its result's time, or the stop's.
-        detail: What the ledger and the feed say about it.
-        stopped: Why the runner stopped the build, appended to the verdict
-            line, or None when the build finished on its own.
-
-    Returns:
-        The verdict line, as posted and as the queue job's detail.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries no sha, or
-            a node, board or queue failure. Not caught.
-    """
-    sha = require_sha(job)
-    target = names.dispatch_directory(node["stage_root"], row["run_id"])
-    spoken = dialect.for_platform(node["platform"])
-    tail = remote.run_script(
-        node["host"],
-        spoken.script_path(target, names.LOG_TAIL_STEM),
-        spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
-        platform=node["platform"],
-    )
-    # Retired once its tail is read and before anything is posted, so a
-    # retire that fails leaves the job held and the row live for the next
-    # tick, and the verdict names the transcript where it now stays.
-    retained = retire.retire_on_node(node, run_id=row["run_id"])
-    judged = verdict.judge(
-        job_id=job["job_id"],
-        project=row["project"],
-        sha=sha,
-        node=row["node"],
-        exit_code=exit_code,
-        tail=tail,
-        ended_unix=ended_unix,
-        log_path=retained,
-        run_id=row["run_id"],
-    )
-    rendered = verdict.render_verdict(judged)
-    line = rendered if stopped is None else f"{rendered} stopped: {stopped}"
-    # A job naming a task gets its row from the queue's close below, on the
-    # task's thread and addressed to the submitter (MCPs board task
-    # 2fecad69); only a task-less job's verdict is this runner's to post.
-    if job["task_id"] is None:
-        queue.post_verdict(
-            board,
-            submitted_by=job["submitted_by"],
-            line=line,
-            identity=identity,
-        )
-    dispatch.finish(
-        loaded.leases,
-        loaded.ledger,
-        loaded.feed,
-        row=row,
-        outcome=collect.outcome_for(exit_code),
-        exit_code=exit_code,
-        detail=detail,
-    )
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
-        exit_code=exit_code,
-        detail=line,
-        identity=identity,
-    )
-    # After the queue close, so the session waiting on this row is not kept
-    # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
-    venv_sweep.sweep_on_node(node)
-    return line
 
 
 def collect_one_job(
@@ -564,37 +457,12 @@ def collect_pass(
     )
 
 
-def require_sha(job: DispatchJob) -> str:
-    """The commit a node-lane job names.
-
-    Args:
-        job: The claimed job.
-
-    Returns:
-        Its sha.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries none,
-            which the queue's pin (MCPs mig 532) makes impossible for a
-            node-lane row; a null here means the contract moved.
-    """
-    sha = job["sha"]
-    if sha is None:
-        raise AppError(
-            code=FleetErrorCode.QUEUE_ANSWER_MALFORMED,
-            message=f"node-lane job {job['job_id']} carries no sha; the queue's pin forbids it",
-        )
-    return sha
-
-
 __all__ = [
     "CLAIM_LEASE_SECONDS",
     "SETTLING",
     "TIMED_OUT_EXIT_CODE",
     "collect_one_job",
     "collect_pass",
-    "require_sha",
-    "settle",
     "stop_cancelled",
     "stop_cancelled_run",
 ]
