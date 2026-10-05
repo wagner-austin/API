@@ -6583,3 +6583,16 @@ Board task b008ab91, Phase 5 (WebSocket transport). New page
 - The join burst read back through the production decoder is the
   archived `21 3E 5A 3D 2E 49 49 74 3F`; a second player draws 0x28 and
   its quit 0x29. `sim_control`: IDENTICAL on all 21 N=1 artifacts.
+
+---
+
+## [2026-10-05] update | Sim accounts persist in Postgres
+
+Board task b008ab91, Phase 5 (persistence). [[sim-network-server]]
+gains "Accounts are this server's own, and they keep what they earn".
+- A seat that leaves is recorded; the account rejoins at the rank and
+  decoration levels it left with. The `tankpit_sim` database on the
+  running platform-postgres holds `sim_accounts` and `sim_sessions`;
+  `tankpit-sim-accounts` makes the tables and issues accounts.
+- Live: account 1001 joined field05 over a WebSocket for 5 ticks; one
+  `sim_sessions` row was written and the account kept rank 2.

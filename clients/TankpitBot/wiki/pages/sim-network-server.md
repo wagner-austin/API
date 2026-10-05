@@ -12,23 +12,30 @@ source_paths:
   - "src/tankpit_bot/sim/net_host.py"
   - "src/tankpit_bot/sim/net_room.py"
   - "src/tankpit_bot/sim/net_accounts.py"
+  - "src/tankpit_bot/sim/net_store.py"
+  - "src/tankpit_bot/sim/net_accounts_cli.py"
+  - "tests/sim/test_net_store.py"
   - "src/tankpit_bot/sim/lobby.py"
   - "src/tankpit_bot/sim/transport.py"
   - "tests/sim/test_net_server.py"
   - "tests/sim/test_net_host.py"
   - "tests/sim/test_net_room.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/net_server.py": "1924ad82df74b5a7e97558117a952680843c691c"
-  "src/tankpit_bot/sim/net_host.py": "74a81debfb856e5c85c06542657bab98e148442a"
-  "src/tankpit_bot/sim/net_room.py": "5d0a532f26530f462f46f84e608282592826dbbb"
-  "src/tankpit_bot/sim/net_accounts.py": "aafd809e455a90755cd03bb9e1c99b5d914ffb5c"
+  "src/tankpit_bot/sim/net_server.py": "b999e30c2c1666f3270a8ba48a09cdf071541a0d"
+  "src/tankpit_bot/sim/net_host.py": "faaa8be06944b58216788115e4cbc7192a83ad83"
+  "src/tankpit_bot/sim/net_room.py": "f242a4ba888b471670e9f58f92847b12fe18c27e"
+  "src/tankpit_bot/sim/net_accounts.py": "1b08e40f5533385aad8e9c5cca88514fbdb9328d"
+  "src/tankpit_bot/sim/net_store.py": "caf69b7492df5bb0d8c306b3e2ebd65978b361d7"
+  "src/tankpit_bot/sim/net_accounts_cli.py": "d1e35b45f62ac8987de0bb1f492d2cd50e9116f6"
+  "tests/sim/test_net_store.py": "37e21282a3bceb279091f9d161eaaf74f479bced"
   "src/tankpit_bot/sim/lobby.py": "a3c4eedb0230aca2f075c0434c8caeb54656674e"
   "src/tankpit_bot/sim/transport.py": "b84317e74e3aca75c007b1e26bff8d8b633e4b03"
-  "tests/sim/test_net_server.py": "4d7f6defb23c0f5fbf755af8d665f8a1bb456a84"
-  "tests/sim/test_net_host.py": "45d2d6becb4b72a3870a70775bf974892fc6af77"
-  "tests/sim/test_net_room.py": "bb61a285b2c03bdf7bcc12fd17eb0a1bb0a32628"
+  "tests/sim/test_net_server.py": "6c940a431b0db9ff30f85d3cb480d8c9be1ba08c"
+  "tests/sim/test_net_host.py": "c16b92cc112c7a223e18231b00b9373440d8c7b0"
+  "tests/sim/test_net_room.py": "dd1d028f8c670d461558eaaa28310e2047fe2d49"
 provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 5, 2026-10-05: the scripts/sim_control.py comparison and the tankpit-sim-serve run quoted below, both from the committed tree"
+  - "2026-10-05 live persistence check: tankpit_sim created on the local platform-postgres container (host port 55432); tankpit-sim-accounts init/add/list, then a scratch WebSocket client joining field05 room 1 as account 1001 for 5 ticks; rows read back with psql from sim_sessions and sim_accounts"
 fact_checked: "2026-10-05"
 confidence: high
 hubs: [architecture]
@@ -104,13 +111,43 @@ that only tests still called.[^2]
   1011, every other connection plays on, and the handler's `finally`
   unseats the tank.[^3]
 
-## Accounts are this server's own
+## Accounts are this server's own, and they keep what they earn
 
 An account record holds the SHA-256 of its token, never the token, and
-`MemoryAccountBook.verify` compares digests in constant time. A wrong
-token and an unknown account draw the same `SIM_LOBBY_DENIED`, so a
-refusal tells a guesser nothing. One account plays on one connection at
-a time. `AccountBookProtocol` is the seam a persistent book implements.[^4]
+both books compare digests in constant time. A wrong token and an
+unknown account draw the same `SIM_LOBBY_DENIED`, so a refusal tells a
+guesser nothing. One account plays on one connection at a time.[^4]
+
+A seat that leaves, by quit frame or closed socket, is recorded. The
+account rejoins at the rank and the nine decoration levels it left
+with, where a session alone starts every join afresh. Awards only ever
+go up, so the restored levels are never granted twice. The thresholds
+for the kill and death awards still count the current session's kills
+and deaths, not a career total.
+
+Two books answer the same `AccountBookProtocol`:
+
+- **A JSON file** (`--accounts PATH`), kept in memory for the life of
+  the process. It is for tests and local play.
+- **The `tankpit_sim` database** (`--database-env NAME`) on the
+  platform's running `platform-postgres`: a database, not another
+  container. `sim_accounts` holds one row per account and `sim_sessions`
+  one row per seat that left (room, field, ticks, and the rank, kills,
+  deaths and levels it left with). The account update and its session
+  row commit together. The connection string is named by the variable
+  that holds it, never written on a command line, and psycopg is reached
+  only through the `_test_hooks.connect_database` seam.[^7]
+
+```
+docker exec platform-postgres createdb -U covenant tankpit_sim
+export TANKPIT_SIM_DATABASE_URL=postgresql://covenant:covenant@127.0.0.1:55432/tankpit_sim
+poetry run tankpit-sim-accounts init --database-env TANKPIT_SIM_DATABASE_URL
+poetry run tankpit-sim-accounts add --database-env TANKPIT_SIM_DATABASE_URL --id 1001 --name austin
+poetry run tankpit-sim-serve --database-env TANKPIT_SIM_DATABASE_URL
+```
+
+`add` prints the new token once; the database keeps only its digest.
+The server also creates any missing tables when it starts.
 
 ## What was checked
 
@@ -127,13 +164,19 @@ a time. `AccountBookProtocol` is the seam a persistent book implements.[^4]
 - **The CLI serves.** A 20-tick run of a practice room on field01 and an
   open room on field05 served both rooms; the field05 room settled 6
   field01-placed seeds onto open ground.
+- **Against the real database.** On 2026-10-05 `tankpit_sim` was created
+  on `platform-postgres` (host port 55432), `init` made its tables, and
+  `add` issued account 1001 at rank 2. A WebSocket client then joined an
+  open field05 room with that token, played 5 ticks and quit. One
+  `sim_sessions` row was written (`1001|1|field05_r.gif|5|2|0|0`), and
+  the account kept rank 2.
 
 ## Not done here
 
-Persistence of accounts and results in Postgres, Traefik labels for a
-public route, and the TypeScript renderer are the rest of Phase 5. The
-production bot still reaches a server through a browser page. A bot or
-renderer speaking this socket directly is the next client.
+Traefik labels for a public route and the TypeScript renderer are the
+rest of Phase 5. The production bot still reaches a server through a
+browser page. A bot or renderer speaking this socket directly is the
+next client.
 
 [^1]: `src/tankpit_bot/sim/net_server.py`, `parse_serve_args`, `build_host` and `main`; `tests/sim/test_net_server.py`, `test_the_command_line_serves_its_rooms_for_its_ticks` and `test_every_flag_is_read`.
 [^2]: `src/tankpit_bot/sim/lobby.py`, `parse_auth_frame` and `SimLobby._enter`; `src/tankpit_bot/sim/transport.py`, `route_client_frames`.
@@ -141,3 +184,4 @@ renderer speaking this socket directly is the next client.
 [^4]: `src/tankpit_bot/sim/net_accounts.py`, `MemoryAccountBook.verify` and `decode_net_account`; `tests/sim/test_net_host.py`, `test_a_wrong_token_is_denied` and `test_an_account_joins_once_at_a_time`.
 [^5]: `tests/sim/test_net_host.py`, `test_enter_game_is_answered_with_the_join_burst_on_the_next_tick` and `test_a_second_player_is_announced_to_the_first_and_its_quit_too`.
 [^6]: `tests/sim/test_net_server.py`, `test_a_client_joins_and_plays_over_a_real_socket`.
+[^7]: `src/tankpit_bot/sim/net_store.py`, `PostgresAccountBook`, `SCHEMA` and `connect_store`; `src/tankpit_bot/sim/net_room.py`, `NetRoom.leave`; `src/tankpit_bot/sim/net_host.py`, `NetHost._unseat`; `tests/sim/test_net_host.py`, `test_a_seat_that_leaves_is_recorded_and_the_account_rejoins_as_it_left`; `tests/sim/test_net_store.py`, `test_a_seat_updates_the_account_and_adds_a_session_in_one_commit`.
