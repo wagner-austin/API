@@ -203,12 +203,11 @@ def collect_one_job(
         One line saying what happened, for the log.
 
     Raises:
-        AppError: With a node or workspace code when the node cannot be
-            reached or its declaration has gone, ``LEASE_NOT_HELD`` when the
-            build finished after its lease lapsed, or
-            ``QUEUE_ANSWER_MALFORMED`` when a node-lane job carries no sha,
-            which the queue's pin makes impossible. Not caught: those mean
-            this machine's own records and the fleet disagree.
+        AppError: With a node or workspace code when the node failed a read
+            it answered or its declaration has gone, ``LEASE_NOT_HELD`` when
+            the build finished after its lease lapsed, or
+            ``QUEUE_ANSWER_MALFORMED`` when a node-lane job carries no sha.
+            Not caught: those mean this machine's records and the fleet disagree.
 
     ONE AT A TIME PER RUN, under the run's lock in
     :data:`fleet.cli.run_locks.SETTLING`: the serve's watch settles a run
@@ -224,7 +223,12 @@ def collect_one_job(
             return f"{encode_job_line(job)}: no live run on this machine, leaving it"
         node = require_node(loaded.workspace, row["node"])
         plan = require_project(loaded.workspace, row["project"])
-        result = collect.poll_result(node, run_id=row["run_id"])
+        # A node that does not answer is read again at the next pass, its
+        # lease left as it is (MCPs board task 8993c306: lavender-wsl, 10:30Z).
+        polled = collect.attempt_poll_result(node, run_id=row["run_id"])
+        if polled["unreachable"] is not None:
+            return f"{encode_job_line(job)}: did not answer the read: {polled['unreachable']}"
+        result = polled["result"]
         if result is None:
             deadline = collect.lease_deadline(row, plan)
             now = _test_hooks.now()
