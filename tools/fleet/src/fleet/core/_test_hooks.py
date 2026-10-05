@@ -44,6 +44,7 @@ import subprocess
 import tempfile
 import time
 from collections.abc import Sequence
+from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import Protocol
 
 from platform_core.config import _optional_env_str, config_test_hooks
@@ -298,6 +299,21 @@ class MakeDirectoryProtocol(Protocol):
         """
 
 
+class ExecutorProtocol(Protocol):
+    """Makes the pool a serving node runner launches claimed jobs on."""
+
+    def __call__(self, *, workers: int, name: str) -> Executor:
+        """Make the pool.
+
+        Args:
+            workers: How many launches it runs at once.
+            name: The prefix of its threads' names.
+
+        Returns:
+            The executor, which its owner shuts down.
+        """
+
+
 class WriteTextProtocol(Protocol):
     """Replaces a file's whole contents, creating it if absent."""
 
@@ -504,6 +520,19 @@ def _default_env(name: str) -> str | None:
     return _optional_env_str(name)
 
 
+def _default_executor(*, workers: int, name: str) -> Executor:
+    """A real pool of threads.
+
+    Args:
+        workers: How many it runs at once.
+        name: The prefix of their names.
+
+    Returns:
+        The pool.
+    """
+    return ThreadPoolExecutor(max_workers=workers, thread_name_prefix=name)
+
+
 run: RunProtocol = _default_run
 now: NowProtocol = _default_now
 sleep: SleepProtocol = _default_sleep
@@ -524,6 +553,7 @@ temp_root: TempRootProtocol = _default_temp_root
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
 hostname: HostnameProtocol = _default_hostname
+executor: ExecutorProtocol = _default_executor
 
 
 __all__ = [
@@ -531,6 +561,7 @@ __all__ = [
     "AppendTextProtocol",
     "CommandResult",
     "DirectoryExistsProtocol",
+    "ExecutorProtocol",
     "FileExistsProtocol",
     "HostnameProtocol",
     "MakeDirectoryProtocol",
@@ -543,6 +574,7 @@ __all__ = [
     "WriteTextProtocol",
     "append_text",
     "directory_exists",
+    "executor",
     "file_exists",
     "hostname",
     "make_directory",
