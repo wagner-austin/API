@@ -6514,3 +6514,24 @@ Board task b008ab91, Phase 2 of the multiplayer track. New page
 - First live arena on field01: bot 9 landed six dual shots on bot 10,
   then bot 10's engagement model judged the mirror duel unwinnable
   ("needs 1305, capacity 1100") and both bots left by round 9.
+
+---
+
+## [2026-10-05] update | Capture conformance: the archive replayed tick by tick
+
+Board task b008ab91, Phase 3 of the multiplayer track. New page
+[[capture-conformance]] (protocol hub; 85 pages).
+- `tankpit-conformance` (`validate/conformance*.py`) reads each capture
+  as server ticks, anchors the sim to the archive's last statements
+  before each tick, plays the tick's real commands and compares both
+  batches in the response-shape alphabet.
+- `make audit` now runs it against
+  `wiki/sources/conformance_baseline.json` and fails on any command
+  group whose rate falls. `make conformance-baseline` moves the bar.
+- First run: 437 captures, 133,528 commanded ticks, 79.7% matched.
+  field01 80.1%, field05 78.3%. A sim-served capture replays with every
+  tick matching.
+- Two open laws found: the tick in which auto-pick 0x43 records are
+  sent (48% of divergent ticks differ only there), and the
+  [[serve-cadence]] one-command-per-tick queue the sim does not model
+  (872 multi-command ticks, 5.5% matched).
