@@ -11,7 +11,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/core/sbatch.py": "0a247eba2978d1fc73886bf5153003ed127fc5e7"
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
-  "src/hpc3/core/preflight.py": "d2716452af30f8fa11119716b65b8d51d24e5853"
+  "src/hpc3/core/preflight.py": "87e0e78c26f696fd02d60245a82928ed8a45d699"
   "src/hpc3/core/remote.py": "10c5e4e3a13c6f0004fd05cdb01d2ebbc251d8ea"
 provenance:
   - "probe job 55675199 on hpc3-l18-04, 2026-09-01"

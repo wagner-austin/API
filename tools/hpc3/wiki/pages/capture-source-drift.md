@@ -6,10 +6,12 @@ related: ["[[environment-pins]]", "[[image-build-flow]]", "[[image-ledger-lesson
 source_paths:
   - "src/hpc3/cli/image_capture.py"
   - "src/hpc3/core/image_capture.py"
+  - "src/hpc3/core/env_probe.py"
   - "specs/abl-image.json"
 source_git_blobs:
-  "src/hpc3/cli/image_capture.py": "af0766bc1d4da403e2e566d6f0540bc3e1766f40"
-  "src/hpc3/core/image_capture.py": "dc635e24b966209acc57e44e0f130c55015a9417"
+  "src/hpc3/cli/image_capture.py": "0f69c719d6d77b7154cb84a7c21ae8f34a2495bf"
+  "src/hpc3/core/image_capture.py": "93694214e390085f1920ccd78d7aaa4fcb836bd5"
+  "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "specs/abl-image.json": "fa51c3bd9abe519a9ccc54fdc38e5e532b0f0cc5"
 provenance:
   - "cluster environment /pub/wagnera3/envs/abl-pinned (not in this repo)"
@@ -50,10 +52,11 @@ whatever job first needed it.
 ## The probe follows the image, not the host
 
 Once a project declares an image the capture stops reading the host
-environment at all. `probe_command(source["env_path"])` builds the probe, and
-when `source["image"]` is not None it is wrapped in `run_inside_image`
-(`cli/image_capture.py`, section `capture_spec`). `env_path` is `/opt/env`
-for an imaged project, which exists only inside the `.sif`.
+environment at all. `probe_environment(source["host"], source["env_path"],
+image=source["image"])` builds the probe and, when the image is not None,
+wraps it in `run_inside_image` (`core/env_probe.py`, called from
+`cli/image_capture.py`'s `main`). `env_path` is `/opt/env` for an imaged
+project, which exists only inside the `.sif`.
 
 **This paragraph used to end "that means the drift above is not reachable by
 re-running capture as-is", and it is no longer true.** `--env-path` was added
@@ -61,7 +64,10 @@ on 2026-09-03 to unblock onboarding, and it does exactly the thing this page
 said was unreachable: it names a host directory to probe and skips the
 registry entirely (`cli/image_capture.py`, section `_environment_to_probe`,
 and its module docstring's "TWO ROUTES"). So the host env CAN be re-captured
-now.
+now — provided it owns its interpreter. Since 2026-10-05 the probe refuses,
+before any spec is written, a host directory whose `sys.base_prefix` is not
+itself, which is exactly `envs/tankpit`, the environment the tankpit image's
+label names as its source ([[interpreter-availability]]).
 
 What has not changed is that the two routes answer different questions. The
 registered route probes what the IMAGE contains; `--env-path` probes what a

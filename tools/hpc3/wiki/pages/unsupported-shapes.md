@@ -5,9 +5,11 @@ hubs: [submission]
 related: ["[[chains]]", "[[submission-rules]]", "[[facts-are-code]]"]
 source_paths:
   - "src/hpc3/contracts/job.py"
+  - "src/hpc3/core/env_probe.py"
   - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/job.py": "1bc6b5aaafdbf0f5dc0e8b3c8b61ddca89db936f"
+  "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
 fact_checked: 2026-09-14
 confidence: high
@@ -38,9 +40,10 @@ script-is-the-member-table design are in [[job-arrays]].
 
 **CPU-only** was on it and is not any more. `"gpu": null` on a CPU partition
 submits, so `cleargbm_rs`, SIRIUS and ZODIAC are reachable. One caveat worth
-stating: `pinned_packages` verification runs the environment's own
-`bin/python`, and an empty pin map makes **no round trip at all**. A JVM
-project is therefore submittable while getting only `test -d` on its
-environment — the weakest guarantee here, and exactly the "both paths exist,
-both pass, the results aren't comparable" failure the pin check was built for
-([[environment-pins]]).
+stating: a JVM project pins no Python packages, so the pin check holds
+nothing about its payload to a version. Since 2026-10-05 its environment is
+still probed — `verify_environment` runs the environment's own `bin/python`
+whatever the pins say, and refuses one whose interpreter belongs to another
+installation — but what the JVM itself is goes unchecked, which is the "both
+paths exist, both pass, the results aren't comparable" failure the pin check
+was built for ([[environment-pins]]).

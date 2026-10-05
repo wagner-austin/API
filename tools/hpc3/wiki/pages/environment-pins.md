@@ -8,7 +8,7 @@ source_paths:
   - "src/hpc3/core/env_probe.py"
 source_git_blobs:
   "src/hpc3/contracts/pins.py": "258a892f9f7b32394bfd72940cebb516ea25fd4a"
-  "src/hpc3/core/env_probe.py": "e83c330acd07bdb53dfdcc8fe1ee8a64de3af529"
+  "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
 fact_checked: 2026-09-01
 confidence: high
 ---
@@ -30,9 +30,14 @@ McNemar comparison against published arms that silently means nothing.
 Declaring `{}` is allowed and deliberate — a project whose payload is a
 compiled binary has no Python packages to pin — but the field is required, so
 the empty map is a statement someone made rather than a default nobody
-noticed. The cost of that statement is real: an empty pin map makes no
-interpreter round trip at all, which leaves a JVM project with only
-`test -d` on its environment ([[unsupported-shapes]]).
+noticed. Until 2026-10-05 the statement had a cost: an empty pin map made no
+interpreter round trip at all, which left a JVM project with only `test -d`
+on its environment ([[unsupported-shapes]]). It no longer does. The probe now
+opens by asking the interpreter for its version and `sys.base_prefix`, and
+`verify_environment` makes the round trip whatever the pins say, because the
+interpreter check is not about packages: it refuses an environment running
+another installation's Python ([[interpreter-availability]]). An empty map
+now means "no package is held to a version", and nothing more.
 
 ## The refusal, verbatim
 
