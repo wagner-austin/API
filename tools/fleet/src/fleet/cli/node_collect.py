@@ -85,9 +85,17 @@ _log = get_logger(__name__)
 #: happened, rather than a number a reader would have to look up.
 TIMED_OUT_EXIT_CODE: Final = 124
 
-#: Held while a held job's run is read and settled, by the collect pass and
-#: by the serve's watch thread alike (:func:`collect_one_job`).
-SETTLING: Final = threading.Lock()
+#: Held while a run on the node is read, settled or stopped: by the collect
+#: pass for each held job (:func:`collect_one_job`) and around its stops
+#: (:func:`collect_pass`), and by the serve's watch across each poll and the
+#: settle it starts (:mod:`fleet.cli.node_watch`). The poll sends its script
+#: INTO the run's directory, so a poll beside a retire put ``collect.sh`` back
+#: into a directory being removed: on 2026-10-05 at 07:00Z the retire of
+#: tools-fleet-execution-linux-lavender-wsl-1791183483 exited ``Directory not
+#: empty`` with its result already moved, and every later pass read the run
+#: as still going (MCPs board task 8993c306). Reentrant, because the watch
+#: holds it while the settle it starts takes it again.
+SETTLING: Final = threading.RLock()
 
 
 def settle(
@@ -540,13 +548,14 @@ def collect_pass(
         else:
             line = reconcile_claim(loaded, credentials, job, identity, alias=alias, running=running)
             _log.info("%s", line)
-    stop_cancelled(
-        loaded,
-        credentials,
-        agent=agent,
-        alias=alias,
-        held=frozenset(job["run_id"] for job in held),
-    )
+    with SETTLING:
+        stop_cancelled(
+            loaded,
+            credentials,
+            agent=agent,
+            alias=alias,
+            held=frozenset(job["run_id"] for job in held),
+        )
 
 
 def require_sha(job: DispatchJob) -> str:

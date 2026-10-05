@@ -20,9 +20,10 @@ moment it is launched (:func:`fleet.cli.node_agent.fill_pass`), and every
 ``node_poll_seconds`` of the workspace it reads each held run's result off the node
 (:func:`fleet.core.collect.poll_result`, one ssh read) and settles one that
 has ended (:func:`collect_ended`), while the passes go on in the main
-thread. A run is never settled twice: both paths settle through
-:func:`fleet.cli.node_collect.collect_one_job`, which holds one lock and
-finds a settled run no longer live.
+thread. A run is never settled twice, and never read while it is retired:
+the watch holds :data:`fleet.cli.node_collect.SETTLING` across each read and
+the settle it starts, the collect pass holds it for each job it settles and
+each run it stops, and a run the ledger no longer calls running is not read.
 
 WHY IT ENDS ONLY WHEN IT IS CLOSED (MCPs board task 8993c306). Until
 2026-10-05 the watch ended at a fixed window, 100 s into each 180 s start,
@@ -56,7 +57,7 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
 from fleet.cli import collect as collect_cli
-from fleet.cli.node_collect import collect_one_job
+from fleet.cli.node_collect import SETTLING, collect_one_job
 from fleet.contracts.dispatch import DispatchStatus
 from fleet.contracts.node import NodeConfig
 from fleet.core import collect, queue
@@ -324,19 +325,38 @@ class RunWatch:
         """
         while watched := self._next():
             self.polls += 1
-            for run_id in sorted(live_among(self._loaded, watched)):
-                if collect.poll_result(self._node, run_id=run_id) is None:
-                    continue
-                if not self._begin_settle():
-                    return
-                _log.info("%s: %s has ended; collecting it now", self._alias, run_id)
-                try:
-                    line = self._settle(run_id=run_id)
-                finally:
-                    self._end_settle()
+            for run_id in sorted(watched):
+                with SETTLING:
+                    if not self.ended(run_id):
+                        continue
+                    if not self._begin_settle():
+                        return
+                    _log.info("%s: %s has ended; collecting it now", self._alias, run_id)
+                    try:
+                        line = self._settle(run_id=run_id)
+                    finally:
+                        self._end_settle()
                 _log.info("%s", line)
                 self._settled(run_id)
             self._drop(watched - live_among(self._loaded, watched))
+
+    def ended(self, run_id: str) -> bool:
+        """Read one held run's result, if this machine still calls it running.
+
+        The watch calls it under :data:`fleet.cli.node_collect.SETTLING`, so the ledger's
+        answer cannot change before the read: a run the collect pass settled
+        or stopped meanwhile is not read, since the read sends its script
+        into the run's directory, the one its retire removes.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            True when it is live and the node has written its result.
+        """
+        if run_id not in live_among(self._loaded, frozenset({run_id})):
+            return False
+        return collect.poll_result(self._node, run_id=run_id) is not None
 
 
 __all__ = [
