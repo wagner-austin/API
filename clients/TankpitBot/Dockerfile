@@ -120,8 +120,11 @@ RUN playwright install --with-deps chromium \
 # bot runs Chromium HEADED on its own Xvfb display and records it with
 # ffmpeg into HLS segments. Its own layer, after the browser install,
 # so a Playwright bump does not re-pull ffmpeg and vice versa.
+# pulseaudio is the per-bot sound server (tankpit_bot.stream.audio):
+# Chromium plays the game's sound into it and ffmpeg records it into
+# the same segments as the picture.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends xvfb ffmpeg \
+    && apt-get install -y --no-install-recommends xvfb ffmpeg pulseaudio \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
