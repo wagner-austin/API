@@ -33,4 +33,8 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 
 [Reduction order is an environment variable read once](../pages/determinism-env-read-once-at-library-load.md) -- `platform_core.determinism_env`: why the cuBLAS / cuBLASLt / BLAS-thread strings live in the dependency-free tier, the read-once-at-load timing trap, and `SetEnvProtocol`'s deliberately absent read side
 
+[RunRecord and RunFingerprint as Model-Trainer emits them](../pages/model-trainer-run-record-provenance.md) -- `platform_core.run_record` and `platform_core.comparability` from their reference adopter: the six fingerprint axes, the identical / offset / uncalibrated verdicts, and the different-experiment refusal
+
+[The known-answer registry](../pages/model-trainer-known-answer-registry.md) -- `platform_core.known_answer` and `known_answer_registry`: three outcomes, discrimination controls at registration, and the two invariants the collection layer enforces
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
