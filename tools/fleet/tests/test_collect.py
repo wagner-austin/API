@@ -34,6 +34,7 @@ from tests.conftest import (
     FakeClock,
     FakeRun,
     dispatch_replies,
+    failed,
     ok,
     prebuilt_archive,
     retire_replies,
@@ -160,6 +161,32 @@ class TestPollResult:
             core_collect.poll_result(_node(), run_id=DEMO_RUN_ID)
 
         assert refusal.value.code is FleetErrorCode.RUN_RESULT_UNREADABLE
+
+    def test_a_node_that_did_not_answer_is_a_value_to_the_attempt_and_raised_by_the_poll(
+        self,
+    ) -> None:
+        """The serve's watch reads it again at its next poll (MCPs board
+        task 8993c306); every other caller still meets NODE_UNREACHABLE."""
+        timed_out = failed(255, "Connection timed out during banner exchange")
+        _test_hooks.run = FakeRun([timed_out, timed_out])
+
+        polled = core_collect.attempt_poll_result(_node(), run_id=DEMO_RUN_ID)
+        with pytest.raises(AppError) as refusal:
+            core_collect.poll_result(_node(), run_id=DEMO_RUN_ID)
+
+        assert polled["result"] is None
+        assert polled["unreachable"] == refusal.value.message
+        assert "Connection timed out during banner exchange" in refusal.value.message
+        assert refusal.value.code is FleetErrorCode.NODE_UNREACHABLE
+
+    def test_a_read_that_failed_on_the_node_is_raised_by_the_attempt_too(self) -> None:
+        _test_hooks.run = FakeRun([ok(""), failed(1, "Permission denied")])
+
+        with pytest.raises(AppError) as refusal:
+            core_collect.attempt_poll_result(_node(), run_id=DEMO_RUN_ID)
+
+        assert refusal.value.code is FleetErrorCode.DISPATCH_FAILED
+        assert "Permission denied" in refusal.value.message
 
 
 class TestOutcome:

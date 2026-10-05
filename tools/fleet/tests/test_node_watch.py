@@ -36,7 +36,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue, queue_job
 from tests._thread_fakes import await_event
-from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, ok, retire_replies
+from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -254,6 +254,46 @@ class TestARunTheLedgerNoLongerCallsRunning:
         assert watch.ended(DEMO_RUN_ID) is False
         assert watch.ended(DEMO_RUN_ID) is True
         assert len(node.calls) == len(STILL_RUNNING) + len(ENDED)
+
+
+class TestANodeThatMissesARead:
+    def test_is_read_again_at_the_next_poll_and_the_run_settled_then(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """At 09:26:24Z on 2026-10-05 lavender-wsl's sshd timed out a read's
+        banner exchange with its host down to 2.6 GB free, and the watch's
+        error ended the serve; now the read is retried at the next poll."""
+        launch(sourced_config)
+        loaded = _poll_every_second(sourced_config)
+        node = FakeRun([failed(255, "Connection timed out during banner exchange"), *ENDED])
+        _test_hooks.run = node
+        settled: list[str] = []
+        settling = threading.Event()
+
+        def settle(*, run_id: str) -> str:
+            settled.append(run_id)
+            settling.set()
+            return f"{run_id}: settled"
+
+        watch = _watch(loaded, settle)
+        with caplog.at_level("INFO"), ThreadPoolExecutor(max_workers=1) as pool:
+            watching = pool.submit(watch.watch)
+            with watch:
+                watch.hold(frozenset({DEMO_RUN_ID}))
+                await_event(settling, what="the run to be settled")
+            watching.result()
+
+        assert settled == [DEMO_RUN_ID]
+        assert watch.closed() == 1
+        assert watch.polls == 2
+        assert len(node.calls) == 1 + len(ENDED)
+        assert any(
+            record.getMessage().startswith(
+                f"lavender did not answer the read of {DEMO_RUN_ID}; it is read again at the "
+                "next poll: ssh to lavender failed while sending"
+            )
+            for record in caplog.records
+        )
 
 
 class TestASettleThatRaises:
