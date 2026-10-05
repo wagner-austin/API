@@ -1,0 +1,203 @@
+"""A serve whose loop fails keeps its watch to the handover (MCPs board task 8993c306).
+
+At 07:24:56Z on 2026-10-05 the dispatch endpoint refused one queue listing,
+every serving runner ended with it, and lavender-wsl's run that ended 16 s
+later closed at the next start, 120.9 s after its check (row 62734702). The
+:func:`fleet.cli.node_serve.serve_on` cases drive the wait with a pinned
+clock and the scripted watch of ``test_node_serve.py``: it closes the watch
+10 s before the first fire boundary after the failure, later while a settle
+is under way, at once inside those last 10 s, and stops waiting the moment
+the watch thread has ended. The end-to-end case runs
+:func:`fleet.cli.node_serve.serve` with the real watch on a launched run
+whose loop's first queue listing is refused: the run that ends afterwards
+is settled, and only then does the refusal end the serve.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import threading
+import urllib.error
+from concurrent.futures import Future
+
+import pytest
+from platform_core.json_utils import dump_json_str
+
+from fleet.cli import _config, node_serve, node_watch
+from fleet.core import _test_hooks
+from tests._node_agent_fixtures import (
+    NPM_CI,
+    _credentials_in_env,
+    _sourced_config,
+    launch,
+    sourced_document,
+)
+from tests._thread_fakes import await_event
+from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeClock, FakeRun, ok, pin_clock
+from tests.test_node_serve import FIRST_FIRE, ScriptedWatch
+
+__all__ = ["_credentials_in_env", "_sourced_config"]
+
+#: When :func:`fleet.cli.node_serve.serve_on` closes the watch after a
+#: failure at DEMO_NOW, 20 s past a fire boundary.
+HANDOVER = FIRST_FIRE - node_serve.HANDOVER_SECONDS
+
+#: The refusal the endpoint answered every serving runner with at
+#: 07:24:56Z on 2026-10-05.
+REFUSED = "No connection could be made because the target machine actively refused it"
+
+
+def _still_watching() -> Future[None]:
+    """A watch thread that has not ended.
+
+    Returns:
+        A future nothing has completed.
+    """
+    return Future()
+
+
+class TestServingOnAfterTheLoopFailed:
+    def test_closes_the_watch_ten_seconds_before_the_next_fire(self) -> None:
+        pin_clock(DEMO_NOW)
+        watch = ScriptedWatch([True])
+
+        handed_over = node_serve.serve_on(watch, _still_watching(), poll_seconds=5)
+
+        assert handed_over == HANDOVER
+        assert watch.asked == 1
+
+    def test_waits_a_poll_while_a_settle_is_under_way(self) -> None:
+        pin_clock(DEMO_NOW)
+        watch = ScriptedWatch([False, True])
+
+        handed_over = node_serve.serve_on(watch, _still_watching(), poll_seconds=5)
+
+        assert handed_over == HANDOVER + 5
+        assert watch.asked == 2
+
+    def test_hands_over_at_once_inside_the_last_seconds_before_a_fire(self) -> None:
+        pin_clock(FIRST_FIRE - 3)
+        watch = ScriptedWatch([True])
+
+        handed_over = node_serve.serve_on(watch, _still_watching(), poll_seconds=5)
+
+        assert handed_over == FIRST_FIRE - 3
+        assert watch.asked == 1
+
+    def test_stops_waiting_once_the_watch_thread_has_ended(self) -> None:
+        clock = pin_clock(DEMO_NOW)
+        ended: Future[None] = Future()
+        ended.set_result(None)
+        watch = ScriptedWatch([])
+
+        handed_over = node_serve.serve_on(watch, ended, poll_seconds=5)
+
+        assert handed_over == DEMO_NOW
+        assert watch.asked == 0
+        assert clock.seconds == DEMO_NOW
+
+
+class SleepAfterTheSettle:
+    """A sleep that moves the clock, the main thread's only once a run is settled.
+
+    Satisfies :class:`~fleet.core._test_hooks.SleepProtocol`. The serving
+    loop sleeps on its own thread and moves the clock at once; the main
+    thread's sleeps are :func:`fleet.cli.node_serve.serve_on`'s, and the
+    first of them waits for the watch thread's settle, standing for the
+    seconds a real sleep lets the watch poll, so the case fixes the order a
+    real serve takes rather than racing the watch to the handover.
+    """
+
+    def __init__(self, clock: FakeClock, settled: threading.Event) -> None:
+        """Bind the clock and the settle's event.
+
+        Args:
+            clock: The clock each sleep advances.
+            settled: Set once the watch has settled the run.
+        """
+        self._clock = clock
+        self._settled = settled
+
+    def __call__(self, seconds: int) -> None:
+        """Wait for the settle when on the main thread, then advance the clock.
+
+        Args:
+            seconds: How long the caller asked to wait.
+        """
+        if threading.current_thread() is threading.main_thread():
+            await_event(self._settled, what="the watch to settle the run")
+        self._clock.seconds += seconds
+
+
+def _refused() -> frozenset[str]:
+    """A queue listing the endpoint refused.
+
+    Raises:
+        URLError: Always, as ``urllib`` raised it at 07:24:56Z.
+    """
+    raise urllib.error.URLError(ConnectionRefusedError(10061, REFUSED))
+
+
+def _fills_nothing() -> None:
+    """A fill pass that launches nothing."""
+
+
+def _rolled() -> str:
+    """The roll, which never moves here.
+
+    Returns:
+        Its commit.
+    """
+    return "roll-1"
+
+
+class TestAServeWhoseQueueListingIsRefused:
+    def test_settles_the_run_that_ends_afterwards_then_raises_the_refusal(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        launch(sourced_config)
+        document = sourced_document((NPM_CI,))
+        document["node_poll_seconds"] = 1
+        sourced_config.write_text(dump_json_str(document), encoding="utf-8")
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        clock = pin_clock(DEMO_NOW)
+        settled = threading.Event()
+        _test_hooks.sleep = SleepAfterTheSettle(clock, settled)
+        # Read once still going, then once with its result written.
+        _test_hooks.run = FakeRun([ok(""), ok(""), ok(""), ok(f"0 {DEMO_NOW + 72}")])
+        closed: list[str] = []
+
+        def settle(*, run_id: str) -> str:
+            closed.append(run_id)
+            settled.set()
+            return f"{run_id}: settled"
+
+        node = loaded.workspace["nodes"]["lavender"]
+        watch = node_watch.RunWatch(loaded, alias="lavender", node=node, settle=settle)
+
+        def collect() -> None:
+            watch.hold(frozenset({DEMO_RUN_ID}))
+
+        steps = node_serve.ServeSteps(
+            collect=collect, fill=_fills_nothing, queued=_refused, rolled=_rolled
+        )
+
+        with caplog.at_level("INFO"), pytest.raises(urllib.error.URLError, match="10061"):
+            node_serve.serve(
+                watch,
+                alias="lavender",
+                started=DEMO_NOW,
+                serve_seconds=60,
+                poll_seconds=1,
+                steps=steps,
+            )
+
+        assert closed == [DEMO_RUN_ID]
+        assert watch.closed() == 1
+        assert clock.seconds == HANDOVER
+        assert caplog.records[-1].getMessage() == (
+            "lavender: its serving loop failed at 2025-09-04T15:33:21+00:00 (URLError: "
+            f"<urlopen error [Errno 10061] {REFUSED}>); its watch served on to "
+            "2025-09-04T15:35:50+00:00 with 1 run(s) closed, 0 still watched, and the "
+            "failure ends this start"
+        )
