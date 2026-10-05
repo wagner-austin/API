@@ -405,22 +405,26 @@ def serve(
                 steps=steps,
             )
             failure = looping.exception()
-            if failure is not None:
-                failed = _test_hooks.now()
-                handed_over = serve_on(watch, watching, poll_seconds=poll_seconds)
-                _log.info(
-                    "%s: its serving loop failed at %s (%s: %s); its watch served on to %s "
-                    "with %d run(s) closed, %d still watched, and the failure ends this start",
-                    alias,
-                    _utc(failed),
-                    type(failure).__name__,
-                    failure,
-                    _utc(handed_over),
-                    watch.closed(),
-                    watch.still_watched(),
-                )
-            served = looping.result()
-        watching.result()
+            failed = _test_hooks.now()
+            handed_over = (
+                failed if failure is None else serve_on(watch, watching, poll_seconds=poll_seconds)
+            )
+    # Both threads have ended here, so a settle the watch finished before it
+    # was closed is in its count.
+    if failure is not None:
+        _log.info(
+            "%s: its serving loop failed at %s (%s: %s); its watch served on to %s "
+            "with %d run(s) closed, %d still watched, and the failure ends this start",
+            alias,
+            _utc(failed),
+            type(failure).__name__,
+            failure,
+            _utc(handed_over),
+            watch.closed(),
+            watch.still_watched(),
+        )
+    served = looping.result()
+    watching.result()
     _log.info(
         "%s served %d s from %s: %d fire(s), %d fill pass(es), %d poll(s), %d run(s) closed, "
         "%d still watched; handed over at %s before the %s fire: %s",
