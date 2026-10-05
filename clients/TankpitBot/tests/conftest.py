@@ -171,6 +171,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
+    _test_hooks.connect_database = _test_hooks._real_connect_database
     _test_hooks.get_argv = _test_hooks._real_get_argv
     # Watchdog hooks default to INERT fakes: a real daemon timer armed by
     # one test would os._exit the xdist worker, killing unrelated tests.
@@ -211,6 +212,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
+    _test_hooks.connect_database = _test_hooks._real_connect_database
     _test_hooks.get_argv = _test_hooks._real_get_argv
     replay_test_hooks.process_received_message_hook = (
         replay_test_hooks._real_process_received_message
