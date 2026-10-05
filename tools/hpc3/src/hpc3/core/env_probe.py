@@ -1,4 +1,4 @@
-"""Asking an environment what is actually installed in it.
+"""Asking an environment what is actually installed in it, and by which interpreter.
 
 :func:`~hpc3.core.preflight.check_env_path` proves a directory exists. That
 catches a typo'd path and nothing else, and the failure it cannot catch is the
@@ -31,16 +31,30 @@ from typing_extensions import TypedDict
 from hpc3.contracts.image import ImageReference
 from hpc3.contracts.pins import normalise_name
 from hpc3.core import image_exec, remote
+from hpc3.core.interpreter import (
+    IDENTITY_IMPORTS,
+    IDENTITY_LINES,
+    InterpreterIdentity,
+    check_interpreter_home,
+    split_identity,
+)
 
 _PROBE_SOURCE = (
-    "import importlib.metadata as m;"
+    f"{IDENTITY_IMPORTS},importlib.metadata as m;"
     "t=lambda d:next((l.split(':',1)[1].strip() "
     "for l in (d.read_text('WHEEL') or '').splitlines() if l.startswith('Tag:')),'');"
-    "print(chr(10).join("
+    f"print(chr(10).join({IDENTITY_LINES}+["
     "(d.metadata['Name'] or '?')+'=='+(d.version or '?')+'=='+t(d) "
-    "for d in m.distributions()))"
+    "for d in m.distributions()]))"
 )
-"""Print every installed distribution as ``Name==version==wheel_tag``, per line.
+"""Print the interpreter's identity, then every distribution as ``Name==version==wheel_tag``.
+
+THE INTERPRETER IS ASKED ABOUT ITSELF FIRST. Until 2026-10-05 this listed
+distributions only, so an environment whose interpreter belonged to another
+project -- ``envs/tankpit``, a venv over ``envs/cleargbm`` -- passed every
+check. The identity lines of :mod:`hpc3.core.interpreter` now lead the output,
+in the same round trip, and a probe whose answer does not start with them is
+unreadable rather than "nothing to say about the interpreter".
 
 THE WHEEL TAG IS READ, NOT ASSUMED. Capture used to synthesise every
 first-party wheel filename as ``py3-none-any``, which is right for a pure
@@ -92,28 +106,40 @@ class InstalledDistribution(TypedDict):
     wheel_tag: str
 
 
-def parse_installed(output: str) -> dict[str, InstalledDistribution]:
-    """Parse the probe's output into normalised name to what it reported.
+class EnvironmentReport(TypedDict):
+    """Everything one probe of an environment reports.
+
+    Attributes:
+        interpreter: What the environment's interpreter says about itself.
+        installed: Every distribution it reports, keyed by normalised name.
+    """
+
+    interpreter: InterpreterIdentity
+    installed: dict[str, InstalledDistribution]
+
+
+def parse_probe(output: str) -> EnvironmentReport:
+    """Parse the probe's output into the interpreter and its distributions.
 
     Args:
         output: The probe command's standard output.
 
     Returns:
-        Every distribution the environment reports, keyed by normalised name.
+        The interpreter's identity and every distribution the environment
+        reports, keyed by normalised name.
 
     Raises:
-        AppError: With ``ENV_PROBE_UNREADABLE`` if no line carries the
-            ``name==version`` separator. An interpreter that printed a
+        AppError: With ``ENV_PROBE_UNREADABLE`` if the output does not open
+            with the interpreter's identity, or if no line after it carries
+            the ``name==version`` separator. An interpreter that printed a
             traceback, or a path that is a directory but not an environment,
             lands here rather than being read as "nothing is installed" --
             which would make every pin fail with a misleading message.
     """
+    interpreter, lines = split_identity(output)
     installed: dict[str, InstalledDistribution] = {}
-    for line in output.splitlines():
-        stripped = line.strip()
-        if stripped == "":
-            continue
-        name, separator, rest = stripped.partition("==")
+    for line in lines:
+        name, separator, rest = line.partition("==")
         if separator == "":
             continue
         version, _, wheel_tag = rest.partition("==")
@@ -128,7 +154,7 @@ def parse_installed(output: str) -> dict[str, InstalledDistribution]:
             f"its interpreter printed {output.strip()!r}. "
             "The path exists but does not look like a Python environment.",
         )
-    return installed
+    return EnvironmentReport(interpreter=interpreter, installed=installed)
 
 
 def check_pins(
@@ -168,47 +194,82 @@ def check_pins(
             )
 
 
-def verify_env_packages(
+def probe_environment(
+    host: str, env_path: str, *, image: ImageReference | None
+) -> EnvironmentReport:
+    """Ask an environment what it is, refusing one that borrowed its interpreter.
+
+    ``image`` is keyword-only and has NO default. A default of None would let
+    a call site probe the host for a container environment by omission, and
+    the answer would be an empty listing read as "torch is missing" -- a
+    confident, wrong diagnosis of the image rather than of the probe. It also
+    selects which shape of the borrowed-interpreter rule applies.
+
+    Args:
+        host: SSH destination.
+        env_path: Absolute path to the environment, on the cluster for a host
+            environment and inside the image for an image one.
+        image: The image the environment lives inside, or None when it is a
+            cluster directory.
+
+    Returns:
+        The interpreter's identity and the installed distributions, the
+        interpreter already proven to belong to the environment.
+
+    Raises:
+        AppError: With ``ENV_PROBE_UNREADABLE`` if the environment's answer
+            cannot be read, ``ENV_INTERPRETER_BORROWED`` if its interpreter
+            belongs to another installation, or ``REMOTE_COMMAND_FAILED`` if
+            the probe could not be run at all.
+    """
+    command = probe_command(env_path)
+    if image is not None:
+        command = image_exec.run_inside_image(image, command)
+    report = parse_probe(remote.run_remote(host, command))
+    check_interpreter_home(report["interpreter"], env_path=env_path, image=image)
+    return report
+
+
+def verify_environment(
     host: str,
     env_path: str,
     pinned: Mapping[str, str],
     *,
     image: ImageReference | None,
 ) -> None:
-    """Ask an environment what it contains and hold it to the project's pins.
+    """Hold an environment to its own interpreter and to the project's pins.
 
-    ``image`` is keyword-only and has NO default. A default of None would let
-    a call site probe the host for a container environment by omission, and
-    the answer would be an empty listing read as "torch is missing" -- a
-    confident, wrong diagnosis of the image rather than of the probe.
+    The probe runs whether or not the project pins anything. It used to
+    return before the round trip when ``pinned`` was empty, which made the
+    projects with the least other evidence -- ``rusted`` pins nothing -- the
+    ones whose interpreter nobody ever asked about.
 
     Args:
         host: SSH destination.
         env_path: Absolute path to the environment, on the cluster for a host
             run and inside the image for an image run.
         pinned: Required versions, keyed by normalised name. Empty means the
-            project declared no pins, and no round trip is made.
+            project declared no pins; the interpreter is still checked.
         image: The image the environment lives inside, or None when it is a
             cluster directory.
 
     Raises:
         AppError: With ``ENV_PROBE_UNREADABLE`` if the environment's answer
-            cannot be read, ``ENV_PACKAGE_MISMATCH`` if it does not match, or
-            ``REMOTE_COMMAND_FAILED`` if the probe could not be run at all.
+            cannot be read, ``ENV_INTERPRETER_BORROWED`` if its interpreter
+            belongs to another installation, ``ENV_PACKAGE_MISMATCH`` if its
+            packages do not match, or ``REMOTE_COMMAND_FAILED`` if the probe
+            could not be run at all.
     """
-    if pinned == {}:
-        return
-    command = probe_command(env_path)
-    if image is not None:
-        command = image_exec.run_inside_image(image, command)
-    output = remote.run_remote(host, command)
-    check_pins(parse_installed(output), pinned, env_path=env_path)
+    report = probe_environment(host, env_path, image=image)
+    check_pins(report["installed"], pinned, env_path=env_path)
 
 
 __all__ = [
+    "EnvironmentReport",
     "InstalledDistribution",
     "check_pins",
-    "parse_installed",
+    "parse_probe",
     "probe_command",
-    "verify_env_packages",
+    "probe_environment",
+    "verify_environment",
 ]

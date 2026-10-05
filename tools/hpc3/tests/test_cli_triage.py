@@ -21,6 +21,7 @@ from tests.conftest import (
     FakeRun,
     ledger_row,
     project_config,
+    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
@@ -76,7 +77,7 @@ class TestTriageCli:
             ).encode("utf-8"),
         )
         config = write_workspace(tmp_path / "hpc3.json", workspace_document())
-        fake_run.add("test -d", stdout="PRESENT\n")
+        script_healthy_environment(fake_run)
         fake_run.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
         fake_run.add("sbatch", stdout="Submitted batch job 55519937\n")
         submit_cli.main(["--config", config, "--run", str(tmp_path / "run.json")])

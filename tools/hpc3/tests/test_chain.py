@@ -28,6 +28,7 @@ from tests.conftest import (
     LoggedEvent,
     cluster,
     project_config,
+    script_healthy_environment,
     workspace_document,
 )
 
@@ -96,7 +97,7 @@ def _healthy(fake_run: FakeRun, ids: tuple[str, ...]) -> None:
         fake_run: The command recorder to script.
         ids: Job ids to hand back, in submission order.
     """
-    fake_run.add("test -d", stdout="PRESENT\n")
+    script_healthy_environment(fake_run)
     fake_run.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
     for job_id in ids:
         # "&& sbatch " rather than "sbatch", because the UPLOAD command is
@@ -303,7 +304,7 @@ class TestSubmitChain:
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
         """Nothing is rolled back: stage one is a real job and it is fine."""
-        fake_run.add("test -d", stdout="PRESENT\n")
+        script_healthy_environment(fake_run)
         fake_run.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
         fake_run.add("&& sbatch ", stdout="Submitted batch job 101\n", once=True)
         fake_run.add("&& sbatch ", returncode=1, stderr="Invalid account\n", once=True)

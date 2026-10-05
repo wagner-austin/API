@@ -18,7 +18,7 @@ from platform_core.json_utils import JSONValue
 from hpc3.contracts.sweep import SweepSpec
 from hpc3.core.array_submit import selected_members, submit_array
 from tests.against_hpc3 import decode_sweep_spec
-from tests.conftest import FakeRun, cluster, gpus
+from tests.conftest import FakeRun, cluster, gpus, script_healthy_environment
 
 _AT = "2026-09-01T22:00:00+00:00"
 
@@ -101,7 +101,7 @@ class TestRefusals:
     def test_a_scheduler_rejection_names_the_array_and_uploads_nothing_twice(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
-        fake_run.add("test -d", stdout="PRESENT\n")
+        script_healthy_environment(fake_run)
         fake_run.add("--test-only", returncode=0, stdout="some refusal\nrc=1\n")
 
         with pytest.raises(AppError) as caught:

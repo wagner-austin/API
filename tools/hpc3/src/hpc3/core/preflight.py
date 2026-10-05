@@ -240,7 +240,8 @@ def preflight(
         AppError: With ``ENV_PATH_MISSING`` if the environment is absent,
             ``ENV_PACKAGE_MISMATCH`` if it exists but does not contain what
             the project pinned, ``ENV_PROBE_UNREADABLE`` if it cannot say what
-            it contains, ``GPU_MODEL_EXHAUSTED`` if the job pins a GPU model
+            it contains, ``ENV_INTERPRETER_BORROWED`` if its interpreter
+            belongs to another installation, ``GPU_MODEL_EXHAUSTED`` if the job pins a GPU model
             the partition has none of free while another model idles,
             ``PREFLIGHT_REJECTED`` if Slurm refuses the job -- carrying its
             own reason, which is the diagnostic -- or ``PREFLIGHT_UNPARSABLE``
@@ -248,8 +249,9 @@ def preflight(
     """
     check_env_path(host, spec)
     # Existence, then identity. The path check catches a typo; this catches
-    # the more expensive mistake of a real environment that is the wrong one.
-    env_probe.verify_env_packages(
+    # the more expensive mistake of a real environment that is the wrong one,
+    # or one running another installation's interpreter.
+    env_probe.verify_environment(
         host, spec["env_path"], spec["pinned_packages"], image=spec["image"]
     )
     # Then whether the card it pinned exists free. `sbatch --test-only` below

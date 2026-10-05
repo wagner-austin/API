@@ -311,6 +311,56 @@ answering anything else means the run would not be comparable to them. The
 the distribution actually reports, and normalisation has to survive it.
 """
 
+IMAGE_INTERPRETER = "3.11\n/usr/local\nTrue\n"
+"""What ``/opt/env``'s interpreter says about itself inside a registered image.
+
+Measured 2026-10-05 inside all eight registered images: ``/opt/env`` is a venv
+over the image's own ``/usr/local`` Python, whose base sits on the container's
+root filesystem. These are the identity lines every probe now opens with.
+"""
+
+IMAGE_PROBE = IMAGE_INTERPRETER + ABL_PINNED_DISTRIBUTIONS
+"""The whole probe answer of a healthy imaged ``abl`` environment."""
+
+
+def host_interpreter(base_prefix: str) -> str:
+    """Build the identity lines a host environment's interpreter prints.
+
+    Args:
+        base_prefix: The ``sys.base_prefix`` it reports -- the environment's
+            own path when it owns its interpreter, another one when borrowed.
+
+    Returns:
+        The three identity lines. A host environment's base is on BeeGFS,
+        never on ``/``'s device, so the third line is always ``False``.
+    """
+    return f"3.11\n{base_prefix}\nFalse\n"
+
+
+HOST_ENV = "/pub/envs/abl-pinned"
+"""The host environment the hand-built job specs in these tests name."""
+
+
+def script_healthy_environment(fake: FakeRun) -> None:
+    """Script the tests' environments as present and answering the probe.
+
+    Preflight asks every environment two questions -- does it exist, and what
+    is its interpreter and what does it contain -- whether or not the project
+    pins anything. Scripting both here keeps a test about the scheduler from
+    failing on an environment it never meant to be about.
+
+    Each environment answers for ITSELF, matched by the interpreter path in
+    the probe, because the two shapes differ the way the cluster's do: the
+    host environment :data:`HOST_ENV` is its own base, and an image's
+    ``/opt/env`` is a venv over the image's ``/usr/local``.
+
+    Args:
+        fake: The runner to script.
+    """
+    fake.add("test -d", stdout="PRESENT\n")
+    fake.add(f"{HOST_ENV}/bin/python", stdout=host_interpreter(HOST_ENV) + ABL_PINNED_DISTRIBUTIONS)
+    fake.add("/opt/env/bin/python", stdout=IMAGE_PROBE)
+
 
 def script_healthy_cluster(fake: FakeRun, *, job_id: str = "55519937") -> None:
     """Script a cluster that admits and accepts everything.
@@ -324,8 +374,7 @@ def script_healthy_cluster(fake: FakeRun, *, job_id: str = "55519937") -> None:
         fake: The runner to script.
         job_id: Id the real submission should report.
     """
-    fake.add("test -d", stdout="PRESENT\n")
-    fake.add("importlib.metadata", stdout=ABL_PINNED_DISTRIBUTIONS)
+    script_healthy_environment(fake)
     fake.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
     fake.add("sbatch", stdout=f"Submitted batch job {job_id}\n")
 

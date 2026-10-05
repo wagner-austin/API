@@ -21,6 +21,7 @@ from tests.conftest import (
     budget_document,
     gpus,
     project_config,
+    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
@@ -81,7 +82,7 @@ def _healthy(fake: FakeRun) -> None:
     Args:
         fake: The runner to script.
     """
-    fake.add("test -d", stdout="PRESENT\n")
+    script_healthy_environment(fake)
     fake.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
 
 

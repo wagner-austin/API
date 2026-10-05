@@ -130,7 +130,8 @@ def array_preflight(
 
     Raises:
         AppError: With ``ENV_PATH_MISSING`` / ``ENV_PACKAGE_MISMATCH`` /
-            ``ENV_PROBE_UNREADABLE`` from the environment checks,
+            ``ENV_PROBE_UNREADABLE`` / ``ENV_INTERPRETER_BORROWED`` from the
+            environment checks,
             ``PREFLIGHT_REJECTED`` when Slurm refuses -- carrying Slurm's own
             reason plus the dependency hint when the base waits on a job that
             can no longer satisfy it -- or ``PREFLIGHT_UNPARSABLE`` when the
@@ -138,7 +139,7 @@ def array_preflight(
     """
     base = spec["base"]
     check_env_path(host, base)
-    env_probe.verify_env_packages(
+    env_probe.verify_environment(
         host, base["env_path"], base["pinned_packages"], image=base["image"]
     )
 

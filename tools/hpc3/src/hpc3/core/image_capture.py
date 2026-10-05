@@ -8,7 +8,7 @@ environment it came from. A project adopting an image should not have to do
 it.
 
 This module is the repeatable half, and it works from what
-:func:`~hpc3.core.env_probe.parse_installed` already returns rather than
+:func:`~hpc3.core.env_probe.parse_probe` already returns rather than
 re-parsing the probe's output: one parser for what an environment reports,
 so a spec and a preflight cannot disagree about what is installed.
 
@@ -117,7 +117,7 @@ def third_party_versions(
 
     Args:
         installed: Distribution name to version, as
-            :func:`~hpc3.core.env_probe.parse_installed` returns it.
+            :func:`~hpc3.core.env_probe.parse_probe` reports it.
         first_party: Distributions built from the repository, in any spelling.
 
     Returns:
@@ -138,7 +138,7 @@ def capture_layers(
 
     Args:
         installed: Distribution name to version, as
-            :func:`~hpc3.core.env_probe.parse_installed` returns it. Keys are
+            :func:`~hpc3.core.env_probe.parse_probe` reports it. Keys are
             already normalised.
         first_party: Distributions built from the repository, in any
             spelling; normalised here so either spelling matches.

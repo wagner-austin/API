@@ -26,6 +26,7 @@ from tests.conftest import (
     cluster,
     gpus,
     script_healthy_cluster,
+    script_healthy_environment,
 )
 
 _AT = "2026-08-22T16:00:00+00:00"
@@ -125,7 +126,7 @@ class TestSubmit:
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
         """A rejected job is never queued, and there is no flag to force it."""
-        fake_run.add("test -d", stdout="PRESENT\n")
+        script_healthy_environment(fake_run)
         fake_run.add("--test-only", stdout="allocation failure: bad account\nrc=1\n")
 
         with pytest.raises(AppError) as excinfo:
@@ -165,7 +166,7 @@ class TestSubmit:
     def test_a_rejected_submission_propagates(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
-        fake_run.add("test -d", stdout="PRESENT\n")
+        script_healthy_environment(fake_run)
         fake_run.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
         fake_run.add("sbatch", returncode=1, stderr="Invalid account\n")
         with pytest.raises(AppError) as excinfo:

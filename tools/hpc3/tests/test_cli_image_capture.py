@@ -17,7 +17,14 @@ from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 
 from hpc3.cli import image_capture as capture_cli
 from hpc3.contracts.image_spec import decode_image_spec
-from tests.conftest import FakeRun, project_config, workspace_document, write_workspace
+from tests.conftest import (
+    IMAGE_INTERPRETER,
+    FakeRun,
+    host_interpreter,
+    project_config,
+    workspace_document,
+    write_workspace,
+)
 
 _FREEZE = "\n".join(
     [
@@ -36,6 +43,15 @@ a conda-installed package genuinely has no ``WHEEL`` metadata to report. Only
 the first-party distributions, which become wheel FILES the staging step has
 to find, carry a tag.
 """
+
+_NEWCOMER = "/pub/envs/newcomer"
+"""The host environment the onboarding route names with ``--env-path``."""
+
+_REGISTERED_PROBE = IMAGE_INTERPRETER + _FREEZE
+"""A registered project's ``/opt/env``, probed inside its image."""
+
+_NEWCOMER_PROBE = host_interpreter(_NEWCOMER) + _FREEZE
+"""An onboarding environment built by hpc3-bootstrap, so its own base."""
 
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
@@ -98,7 +114,7 @@ def _capture(tmp_path: pathlib.Path, fake_run: FakeRun, **overrides: str) -> pat
         Path to the spec the command wrote.
     """
     _workspace(tmp_path)
-    fake_run.add("bin/python", stdout=_FREEZE)
+    fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
     assert capture_cli.main(_args(tmp_path, **overrides)) == 0
     return tmp_path / "specs" / "abl-image.json"
 
@@ -185,10 +201,10 @@ class TestOnboardingAProjectThatIsNotRegisteredYet:
         _ = write_workspace(
             tmp_path / "hpc3.json", workspace_document(projects={"newcomer": unimaged})
         )
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_NEWCOMER_PROBE)
 
         code = capture_cli.main(
-            _args(tmp_path, **{"--project": "newcomer", "--env-path": "/pub/envs/newcomer"})
+            _args(tmp_path, **{"--project": "newcomer", "--env-path": _NEWCOMER})
         )
 
         assert code == 0
@@ -204,14 +220,37 @@ class TestOnboardingAProjectThatIsNotRegisteredYet:
             emitted: Captured summary lines.
         """
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_NEWCOMER_PROBE)
 
-        _ = capture_cli.main(_args(tmp_path, **{"--env-path": "/pub/envs/newcomer"}))
+        _ = capture_cli.main(_args(tmp_path, **{"--env-path": _NEWCOMER}))
 
         probes = [c.remote_command for c in fake_run.calls if "bin/python" in c.remote_command]
         assert len(probes) == 1
         assert "apptainer" not in probes[0]
-        assert "/pub/envs/newcomer" in probes[0]
+        assert _NEWCOMER in probes[0]
+
+    def test_an_environment_on_a_borrowed_interpreter_is_refused(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The measured source of the tankpit image: envs/tankpit on envs/cleargbm.
+
+        A spec captured from it would name as its source an environment that
+        stops having a Python the day cleargbm's is removed, so nothing is
+        written.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
+        _workspace(tmp_path)
+        fake_run.add("bin/python", stdout=host_interpreter("/pub/wagnera3/envs/cleargbm") + _FREEZE)
+
+        with pytest.raises(AppError) as excinfo:
+            _ = capture_cli.main(_args(tmp_path, **{"--env-path": "/pub/wagnera3/envs/tankpit"}))
+
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_INTERPRETER_BORROWED
+        assert not (tmp_path / "specs").exists()
 
     def test_the_spec_asserts_the_versions_it_captured(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -229,9 +268,9 @@ class TestOnboardingAProjectThatIsNotRegisteredYet:
             emitted: Captured summary lines.
         """
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_NEWCOMER_PROBE)
 
-        _ = capture_cli.main(_args(tmp_path, **{"--env-path": "/pub/envs/newcomer"}))
+        _ = capture_cli.main(_args(tmp_path, **{"--env-path": _NEWCOMER}))
 
         spec = decode_image_spec(
             load_json_str((tmp_path / "specs" / "abl-image.json").read_text(encoding="utf-8"))
@@ -258,7 +297,7 @@ class TestOnboardingAProjectThatIsNotRegisteredYet:
         """
         config = project_config(env_path="/pub/envs/abl", pinned_packages={})
         _ = write_workspace(tmp_path / "hpc3.json", workspace_document(projects={"abl": config}))
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
 
         assert capture_cli.main(_args(tmp_path)) == 0
 
@@ -281,7 +320,7 @@ class TestOnboardingAProjectThatIsNotRegisteredYet:
             emitted: Captured summary lines.
         """
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
 
         _ = capture_cli.main(_args(tmp_path))
 
@@ -331,7 +370,7 @@ class TestCapture:
         default index as an addition to the default index.
         """
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
         tokens = _args(tmp_path)
         flag_at = tokens.index("--extra-index-url")
         del tokens[flag_at : flag_at + 2]
@@ -430,7 +469,7 @@ class TestCapture:
             gpu=None,
         )
         _ = write_workspace(tmp_path / "hpc3.json", workspace_document(projects={"abl": config}))
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
         assert capture_cli.main(_args(tmp_path)) == 0
 
         probes = [c.remote_command for c in fake_run.calls if "bin/python" in c.remote_command]
@@ -448,7 +487,8 @@ class TestCapture:
     ) -> None:
         _ = _capture(tmp_path, fake_run)
         assert emitted[0] == (
-            "probed /pub/wagnera3/envs/abl-pinned: 5 distribution(s), 2 requirement(s), 2 wheel(s)"
+            "probed /pub/wagnera3/envs/abl-pinned: python 3.11 from /usr/local, "
+            "5 distribution(s), 2 requirement(s), 2 wheel(s)"
         )
 
 
@@ -459,7 +499,7 @@ class TestItRefusesRatherThanWrites:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
         with pytest.raises(JSONTypeError, match="bind-mounts over"):
             _ = capture_cli.main(_args(tmp_path, **{"--env-prefix": "/pub/envs/abl"}))
         assert not (tmp_path / "specs").exists()
@@ -468,7 +508,7 @@ class TestItRefusesRatherThanWrites:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
         with pytest.raises(AppError) as excinfo:
             _ = capture_cli.main(_args(tmp_path, **{"--first-party": "typo-package"}))
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PROBE_UNREADABLE
@@ -513,7 +553,7 @@ class TestEntrypoint:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], argv: list[str]
     ) -> None:
         _workspace(tmp_path)
-        fake_run.add("bin/python", stdout=_FREEZE)
+        fake_run.add("bin/python", stdout=_REGISTERED_PROBE)
         argv[:] = ["prog", *_args(tmp_path)]
 
         with pytest.raises(SystemExit) as excinfo:

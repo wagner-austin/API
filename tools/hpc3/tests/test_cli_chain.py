@@ -20,6 +20,7 @@ from tests.conftest import (
     FakeRun,
     budget_document,
     project_config,
+    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
@@ -78,7 +79,7 @@ def _healthy(fake: FakeRun) -> None:
     Args:
         fake: The runner to script.
     """
-    fake.add("test -d", stdout="PRESENT\n")
+    script_healthy_environment(fake)
     fake.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
     fake.add("sbatch abl.pipeline-extract", stdout="Submitted batch job 101\n")
     fake.add("sbatch abl.pipeline-evaluate", stdout="Submitted batch job 102\n")

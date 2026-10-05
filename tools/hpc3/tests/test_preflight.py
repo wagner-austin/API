@@ -15,7 +15,28 @@ from hpc3.contracts.job import JobSpec
 from hpc3.contracts.preflight import PreflightResult, encode_preflight_result
 from hpc3.core.preflight import check_env_path, preflight
 from tests.against_hpc3 import decode_job_spec, decode_preflight_result, parse_test_only
-from tests.conftest import ABL_PINNED_DISTRIBUTIONS, FakeRun, cluster, gpus
+from tests.conftest import (
+    ABL_PINNED_DISTRIBUTIONS,
+    FakeRun,
+    cluster,
+    gpus,
+    host_interpreter,
+)
+
+_ABL_PINNED = "/pub/wagnera3/envs/abl-pinned"
+"""The host environment :func:`_spec` names, which owns its interpreter."""
+
+
+def _script_abl_pinned(fake_run: FakeRun) -> None:
+    """Script ``_spec``'s environment as present and self-contained.
+
+    Args:
+        fake_run: The runner to script.
+    """
+    fake_run.add("test -d", stdout="PRESENT\n")
+    fake_run.add(
+        "importlib.metadata", stdout=host_interpreter(_ABL_PINNED) + ABL_PINNED_DISTRIBUTIONS
+    )
 
 
 def _run_preflight(job: JobSpec) -> PreflightResult:
@@ -239,7 +260,7 @@ class TestADependencyRefusalIsTranslated:
             fake_run: The runner to script.
             text: Slurm's refusal wording.
         """
-        fake_run.add("test -d", stdout="PRESENT\n")
+        _script_abl_pinned(fake_run)
         fake_run.add("--test-only", stdout=f"allocation failure: {text}\nrc=1\n")
 
     def test_the_already_failed_wording_is_explained(self, fake_run: FakeRun) -> None:
@@ -309,7 +330,7 @@ class TestADependencyRefusalIsTranslated:
 
 class TestPreflight:
     def test_a_clean_preflight_returns_the_verdict(self, fake_run: FakeRun) -> None:
-        fake_run.add("test -d", stdout="PRESENT\n")
+        _script_abl_pinned(fake_run)
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
 
         result = _run_preflight(_spec())
@@ -319,7 +340,7 @@ class TestPreflight:
 
     def test_it_tests_the_real_rendered_script_by_path(self, fake_run: FakeRun) -> None:
         """A reconstruction from flags could pass while the real script fails."""
-        fake_run.add("test -d", stdout="PRESENT\n")
+        _script_abl_pinned(fake_run)
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
         _run_preflight(_spec())
 
@@ -328,7 +349,7 @@ class TestPreflight:
         assert any("sbatch --test-only abl.arm-b-42.sbatch" in c for c in commands)
 
     def test_nothing_is_queued(self, fake_run: FakeRun) -> None:
-        fake_run.add("test -d", stdout="PRESENT\n")
+        _script_abl_pinned(fake_run)
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
         _run_preflight(_spec())
 
@@ -343,7 +364,7 @@ class TestPreflight:
         assert not any("--test-only" in c for c in fake_run.commands())
 
     def test_a_rejection_carries_slurms_own_reason(self, fake_run: FakeRun) -> None:
-        fake_run.add("test -d", stdout="PRESENT\n")
+        _script_abl_pinned(fake_run)
         fake_run.add(
             "--test-only",
             stdout="allocation failure: Invalid account or account/partition\nrc=1\n",
@@ -362,8 +383,7 @@ class TestPreflightChecksEnvironmentIdentity:
     """
 
     def test_a_pinned_environment_that_matches_is_admitted(self, fake_run: FakeRun) -> None:
-        fake_run.add("test -d", stdout="PRESENT\n")
-        fake_run.add("importlib.metadata", stdout=ABL_PINNED_DISTRIBUTIONS)
+        _script_abl_pinned(fake_run)
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
 
         spec = _spec(pinned_packages={"torch": "2.6.0+cu124", "transformers": "4.46.3"})
@@ -375,7 +395,10 @@ class TestPreflightChecksEnvironmentIdentity:
     ) -> None:
         """envs/abl instead of envs/abl-pinned: transformers 5.15.1, torch 2.11.0."""
         fake_run.add("test -d", stdout="PRESENT\n")
-        fake_run.add("importlib.metadata", stdout="torch==2.11.0+cu128\ntransformers==5.15.1\n")
+        fake_run.add(
+            "importlib.metadata",
+            stdout=host_interpreter(_ABL_PINNED) + "torch==2.11.0+cu128\ntransformers==5.15.1\n",
+        )
 
         spec = _spec(pinned_packages={"transformers": "4.46.3"})
         with pytest.raises(AppError) as excinfo:
@@ -385,13 +408,23 @@ class TestPreflightChecksEnvironmentIdentity:
         assert not any("--test-only" in c for c in fake_run.commands())
         assert not any(c.startswith("cat >") for c in fake_run.commands())
 
-    def test_an_unpinned_project_never_asks_the_environment(self, fake_run: FakeRun) -> None:
-        """A compiled payload should not pay for a round trip it cannot use."""
-        fake_run.add("test -d", stdout="PRESENT\n")
-        fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
+    def test_an_unpinned_project_still_has_its_interpreter_checked(self, fake_run: FakeRun) -> None:
+        """No pins used to mean no probe, so pin-less projects were never asked.
 
-        _run_preflight(_spec())
-        assert not any("importlib.metadata" in c for c in fake_run.commands())
+        The measured case: envs/tankpit runs envs/cleargbm's interpreter, and
+        a project pinning nothing on it would have sailed through preflight.
+        """
+        fake_run.add("test -d", stdout="PRESENT\n")
+        fake_run.add(
+            "importlib.metadata",
+            stdout=host_interpreter("/pub/wagnera3/envs/cleargbm") + "numpy==2.1.3\n",
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            _run_preflight(_spec())
+
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_INTERPRETER_BORROWED
+        assert not any("--test-only" in c for c in fake_run.commands())
 
 
 class TestPreflightResultContract:

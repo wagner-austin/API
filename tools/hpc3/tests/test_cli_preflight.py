@@ -12,6 +12,7 @@ from hpc3.cli import preflight as preflight_cli
 from tests.conftest import (
     FakeRun,
     project_config,
+    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
@@ -59,7 +60,7 @@ def _ok(fake_run: FakeRun) -> None:
     Args:
         fake_run: The runner to script.
     """
-    fake_run.add("test -d", stdout="PRESENT\n")
+    script_healthy_environment(fake_run)
     fake_run.add("--test-only", stdout=_LINE + "\nrc=0\n")
 
 
@@ -185,7 +186,7 @@ class TestPreflightCli:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         _write(tmp_path / "doc.json", _run_payload())
-        fake_run.add("test -d", stdout="PRESENT\n")
+        script_healthy_environment(fake_run)
         fake_run.add("--test-only", stdout="allocation failure: bad account\nrc=1\n")
 
         with pytest.raises(AppError) as excinfo:

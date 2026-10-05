@@ -12,7 +12,14 @@ from hpc3.contracts.sweep import SweepSpec
 from hpc3.core import audit
 from hpc3.core.sweep import submit_sweep
 from tests.against_hpc3 import decode_sweep_spec, read_ledger
-from tests.conftest import PREFLIGHT_LINE, FakeRun, LoggedEvent, cluster, gpus
+from tests.conftest import (
+    PREFLIGHT_LINE,
+    FakeRun,
+    LoggedEvent,
+    cluster,
+    gpus,
+    script_healthy_environment,
+)
 
 _AT = "2026-08-22T16:00:00+00:00"
 
@@ -59,7 +66,7 @@ def _healthy(fake: FakeRun) -> None:
     Args:
         fake: The runner to script.
     """
-    fake.add("test -d", stdout="PRESENT\n")
+    script_healthy_environment(fake)
     fake.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
 
 

@@ -21,14 +21,36 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.cli import bootstrap as bootstrap_cli
 from hpc3.core import bootstrap
-from tests.conftest import FakeRun, LoggedEvent, workspace_document, write_workspace
+from hpc3.core.interpreter import InterpreterIdentity
+from tests.conftest import (
+    FakeRun,
+    LoggedEvent,
+    host_interpreter,
+    workspace_document,
+    write_workspace,
+)
 
 _ENV = "/pub/wagnera3/envs/newcomer"
 _PYTHON = "3.11"
 
-# What the identity probe prints: version, then base_prefix.
-_SELF_CONTAINED = f"{_PYTHON}\n{_ENV}\n"
-_BORROWED = f"{_PYTHON}\n/pub/wagnera3/envs/cleargbm\n"
+# What the identity probe prints: version, base_prefix, base on the root device.
+_SELF_CONTAINED = host_interpreter(_ENV)
+_BORROWED = host_interpreter("/pub/wagnera3/envs/cleargbm")
+
+
+def _identity(version: str, base_prefix: str) -> InterpreterIdentity:
+    """Build a host environment's identity.
+
+    Args:
+        version: The reported ``major.minor``.
+        base_prefix: The reported ``sys.base_prefix``.
+
+    Returns:
+        The identity, its base off the root device as on any host env.
+    """
+    return InterpreterIdentity(
+        version=version, base_prefix=base_prefix, base_on_root_filesystem=False
+    )
 
 
 def _args(tmp_path: pathlib.Path, **overrides: str) -> list[str]:
@@ -101,50 +123,16 @@ class TestTheCommandItSends:
         """A prompt over BatchMode ssh hangs rather than failing."""
         assert "-y" in bootstrap.create_command(_ENV, _PYTHON)
 
-    def test_the_probe_runs_the_environments_own_interpreter_by_path(self) -> None:
-        """Through PATH it would answer for whatever a login shell activates."""
-        assert bootstrap.identity_command(_ENV).startswith(f"'{_ENV}/bin/python' -c ")
-
-    def test_the_probe_carries_no_newline(self) -> None:
-        """A real newline would be split by the remote shell before Python saw it."""
-        assert "\n" not in bootstrap.identity_command(_ENV)
-
-
-class TestParseIdentity:
-    """An unreadable answer must not be read as a wrong version."""
-
-    def test_two_lines_become_version_and_base_prefix(self) -> None:
-        identity = bootstrap.parse_identity(_SELF_CONTAINED)
-
-        assert identity == {"version": "3.11", "base_prefix": _ENV}
-
-    def test_surrounding_blank_lines_are_ignored(self) -> None:
-        identity = bootstrap.parse_identity(f"\n  {_PYTHON}  \n\n  {_ENV}  \n\n")
-
-        assert identity == {"version": "3.11", "base_prefix": _ENV}
-
-    @pytest.mark.parametrize("output", ["", "3.11\n", "3.11\n/a\n/b\n", "Traceback...\n"])
-    def test_anything_that_is_not_two_lines_is_refused(self, output: str) -> None:
-        """Read as a version of '' this would blame conda for a failed probe."""
-        with pytest.raises(AppError) as excinfo:
-            _ = bootstrap.parse_identity(output)
-
-        assert excinfo.value.code is Hpc3ErrorCode.ENV_PROBE_UNREADABLE
-
 
 class TestCheckIdentity:
     """What was built is held to what was asked for."""
 
     def test_a_matching_self_contained_environment_passes(self) -> None:
-        bootstrap.check_identity(
-            {"version": _PYTHON, "base_prefix": _ENV}, env_path=_ENV, python_version=_PYTHON
-        )
+        bootstrap.check_identity(_identity(_PYTHON, _ENV), env_path=_ENV, python_version=_PYTHON)
 
     def test_a_different_version_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            bootstrap.check_identity(
-                {"version": "3.10", "base_prefix": _ENV}, env_path=_ENV, python_version=_PYTHON
-            )
+            bootstrap.check_identity(_identity("3.10", _ENV), env_path=_ENV, python_version=_PYTHON)
 
         assert excinfo.value.code is Hpc3ErrorCode.BOOTSTRAP_PYTHON_MISMATCH
         assert "3.10" in str(excinfo.value)
@@ -159,12 +147,12 @@ class TestCheckIdentity:
         """
         with pytest.raises(AppError) as excinfo:
             bootstrap.check_identity(
-                {"version": _PYTHON, "base_prefix": "/pub/wagnera3/envs/cleargbm"},
+                _identity(_PYTHON, "/pub/wagnera3/envs/cleargbm"),
                 env_path=_ENV,
                 python_version=_PYTHON,
             )
 
-        assert excinfo.value.code is Hpc3ErrorCode.BOOTSTRAP_ENV_NOT_SELF_CONTAINED
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_INTERPRETER_BORROWED
         assert "/pub/wagnera3/envs/cleargbm" in str(excinfo.value)
 
 
@@ -194,7 +182,7 @@ class TestBootstrapEnvironment:
 
         identity = bootstrap.bootstrap_environment("hpc3", _ENV, _PYTHON)
 
-        assert identity == {"version": _PYTHON, "base_prefix": _ENV}
+        assert identity == _identity(_PYTHON, _ENV)
 
     def test_an_occupied_path_stops_before_conda_runs(self, fake_run: FakeRun) -> None:
         """A mistyped path must not cost an environment build first."""
@@ -215,7 +203,7 @@ class TestBootstrapEnvironment:
         with pytest.raises(AppError) as excinfo:
             _ = bootstrap.bootstrap_environment("hpc3", _ENV, _PYTHON)
 
-        assert excinfo.value.code is Hpc3ErrorCode.BOOTSTRAP_ENV_NOT_SELF_CONTAINED
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_INTERPRETER_BORROWED
 
     def test_a_conda_failure_surfaces_with_the_clusters_own_stderr(self, fake_run: FakeRun) -> None:
         fake_run.add("test -e", stdout="absent\n")

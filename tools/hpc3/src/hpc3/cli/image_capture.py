@@ -78,10 +78,8 @@ from hpc3.contracts.image_spec import (
 )
 from hpc3.contracts.workspace import require_project_config
 from hpc3.core import _test_hooks as core_hooks
-from hpc3.core.env_probe import InstalledDistribution, parse_installed, probe_command
+from hpc3.core.env_probe import InstalledDistribution, probe_environment
 from hpc3.core.image_capture import capture_layers, third_party_versions
-from hpc3.core.image_exec import run_inside_image
-from hpc3.core.remote import run_remote
 
 _PROJECT_FLAG = "--project"
 _ENV_PATH_FLAG = "--env-path"
@@ -295,7 +293,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             not satisfy the image contract -- which is checked here, before
             writing, so an unusable spec never reaches a build.
         AppError: If the project is not declared, the environment cannot be
-            probed, or it does not contain a named first-party distribution.
+            probed, its interpreter belongs to another installation
+            (``ENV_INTERPRETER_BORROWED``), or it does not contain a named
+            first-party distribution.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
@@ -330,14 +330,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     # tracked as its own change; this path is the version bump, which was
     # always the recurring job and was being done by hand-editing
     # ``git_commit`` in the generated spec.
-    probe = probe_command(source["env_path"])
-    image = source["image"]
-    if image is not None:
-        probe = run_inside_image(image, probe)
-    installed = parse_installed(run_remote(source["host"], probe))
+    #
+    # THE SOURCE MUST OWN ITS INTERPRETER. The probe refuses an environment
+    # whose interpreter belongs to another installation, so a spec can never
+    # again name as its source an environment like ``envs/tankpit``, which
+    # stops having a Python the day ``envs/cleargbm`` is removed.
+    report = probe_environment(source["host"], source["env_path"], image=source["image"])
+    installed = report["installed"]
     requirements, wheels = capture_layers(installed, first_party)
     _test_hooks.emit(
-        f"probed {source['env_path']}: {len(installed)} distribution(s), "
+        f"probed {source['env_path']}: python {report['interpreter']['version']} "
+        f"from {report['interpreter']['base_prefix']}, {len(installed)} distribution(s), "
         f"{len(requirements)} requirement(s), {len(wheels)} wheel(s)"
     )
 

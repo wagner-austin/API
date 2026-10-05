@@ -22,18 +22,25 @@ environments already run.
 WHAT THIS REFUSES, AND WHY IT IS NOT ANOTHER GATE. Three refusals, all about
 what this command itself just created: a path that already holds something, an
 interpreter that is not the version asked for, and an environment that borrowed
-its interpreter from somewhere else. None of them can fire at a project that
-already works. That is deliberate -- this package had thirty-four refusals and
-no command that creates anything, and adding a thirty-fifth gate on the running
-path would have deepened exactly the asymmetry this command exists to close.
+its interpreter from somewhere else. The first two cannot fire at a project that
+already works -- this package had thirty-four refusals and no command that
+creates anything, and this command exists to close that asymmetry. The third is
+the one exception, and deliberately so: a borrowed interpreter is a defect in a
+running project too, so the rule lives in :mod:`hpc3.core.interpreter` and
+preflight and capture hold every environment to it as well.
 """
 
 from __future__ import annotations
 
 from platform_core.errors import AppError, Hpc3ErrorCode
-from typing_extensions import TypedDict
 
 from hpc3.core import remote
+from hpc3.core.interpreter import (
+    InterpreterIdentity,
+    check_interpreter_home,
+    identity_command,
+    parse_identity,
+)
 
 CONDA_MODULE = "miniconda3/24.9.2"
 """The module that puts ``conda`` on PATH, measured on hpc3 2026-09-03.
@@ -44,53 +51,6 @@ cluster currently defaults to, and an environment built by a different conda
 is a different environment. ``module show`` reports this one prepends
 ``/opt/apps/miniconda3/24.9.2/bin`` to PATH, which is the whole mechanism.
 """
-
-
-class InterpreterIdentity(TypedDict):
-    """What a created environment's own interpreter reports about itself.
-
-    Attributes:
-        version: ``major.minor``, e.g. ``"3.11"``. The patch level is
-            deliberately not carried: a project declares the language version
-            it needs, and conda picks the newest patch for it, so comparing
-            patches would refuse a correct environment for being current.
-        base_prefix: ``sys.base_prefix``. For a self-contained environment
-            this is the environment's own path; for a venv it is whatever
-            installation the venv was created FROM, which is how a borrowed
-            interpreter becomes visible.
-    """
-
-    version: str
-    base_prefix: str
-
-
-_IDENTITY_PROBE = "import sys;print('%d.%d' % sys.version_info[:2]);print(sys.base_prefix)"
-"""Ask an interpreter its version and where it actually lives.
-
-Two lines rather than a parsed banner. ``python -V`` prints a string that has
-changed format before and carries no prefix at all, and ``sys.base_prefix`` is
-the only field that distinguishes an environment which owns its interpreter
-from one pointing at somebody else's.
-
-Written as a single ``-c`` expression with no embedded newline: the probe
-travels as one argument through ``ssh`` to a remote shell, which would split on
-a real newline before Python ever saw it.
-"""
-
-
-def identity_command(env_path: str) -> str:
-    """Build the command that asks an environment's interpreter about itself.
-
-    Args:
-        env_path: Absolute path to the environment on the cluster.
-
-    Returns:
-        A shell command running that environment's own interpreter by
-        absolute path rather than through ``PATH``, so the answer describes
-        the environment named here and not whichever one a login shell
-        activates.
-    """
-    return f"'{env_path}/bin/python' -c \"{_IDENTITY_PROBE}\""
 
 
 def create_command(env_path: str, python_version: str) -> str:
@@ -118,33 +78,6 @@ def create_command(env_path: str, python_version: str) -> str:
     )
 
 
-def parse_identity(output: str) -> InterpreterIdentity:
-    """Read the identity probe's two lines.
-
-    Args:
-        output: The probe command's standard output.
-
-    Returns:
-        What the interpreter reported about itself.
-
-    Raises:
-        AppError: With ``ENV_PROBE_UNREADABLE`` if the output does not carry
-            two non-empty lines. A traceback, an empty answer, or a directory
-            that is not an environment lands here rather than being read as a
-            version of ``""``, which would then be compared against the
-            requested version and produce a mismatch message blaming conda for
-            a probe that never ran.
-    """
-    lines = [line.strip() for line in output.splitlines() if line.strip() != ""]
-    if len(lines) != 2:
-        raise AppError(
-            Hpc3ErrorCode.ENV_PROBE_UNREADABLE,
-            f"The interpreter did not report a version and a base prefix; "
-            f"it printed {output.strip()!r}.",
-        )
-    return InterpreterIdentity(version=lines[0], base_prefix=lines[1])
-
-
 def check_identity(identity: InterpreterIdentity, *, env_path: str, python_version: str) -> None:
     """Hold a freshly created environment to what was asked for.
 
@@ -155,30 +88,21 @@ def check_identity(identity: InterpreterIdentity, *, env_path: str, python_versi
 
     Raises:
         AppError: With ``BOOTSTRAP_PYTHON_MISMATCH`` if the interpreter is
-            not the requested version, or
-            ``BOOTSTRAP_ENV_NOT_SELF_CONTAINED`` if it belongs to a different
-            installation. The second is the one worth having: an environment
-            that borrowed its interpreter works perfectly until the
-            environment it borrowed FROM is deleted, and nothing else in this
-            package would ever notice.
+            not the requested version, or ``ENV_INTERPRETER_BORROWED`` from
+            :func:`~hpc3.core.interpreter.check_interpreter_home` if it
+            belongs to a different installation -- the same rule preflight
+            and capture hold every host environment to, applied here to the
+            one this command just built.
     """
     if identity["version"] != python_version:
         raise AppError(
             Hpc3ErrorCode.BOOTSTRAP_PYTHON_MISMATCH,
             f"{env_path} reports Python {identity['version']}, but "
             f"{python_version} was requested. The environment was created and "
-            "is not the one asked for; nothing downstream checks the "
-            "interpreter, so this is the only place it can be caught.",
+            "is not the one asked for, and no run document declares the "
+            "version a later check could hold it to.",
         )
-    if identity["base_prefix"] != env_path:
-        raise AppError(
-            Hpc3ErrorCode.BOOTSTRAP_ENV_NOT_SELF_CONTAINED,
-            f"{env_path} runs an interpreter belonging to "
-            f"{identity['base_prefix']}. An environment that borrows another "
-            "installation's interpreter stops working the day that "
-            "installation is moved or deleted, and no run document records "
-            "the dependency.",
-        )
+    check_interpreter_home(identity, env_path=env_path, image=None)
 
 
 def refuse_existing(host: str, env_path: str) -> None:
@@ -228,8 +152,8 @@ def bootstrap_environment(host: str, env_path: str, python_version: str) -> Inte
         AppError: With ``BOOTSTRAP_ENV_EXISTS`` if the path is occupied,
             ``REMOTE_COMMAND_FAILED`` if conda fails,
             ``ENV_PROBE_UNREADABLE`` if the new interpreter cannot be read, or
-            ``BOOTSTRAP_PYTHON_MISMATCH`` / ``BOOTSTRAP_ENV_NOT_SELF_CONTAINED``
-            if it is not the environment that was requested.
+            ``BOOTSTRAP_PYTHON_MISMATCH`` / ``ENV_INTERPRETER_BORROWED`` if it
+            is not the environment that was requested.
     """
     refuse_existing(host, env_path)
     _ = remote.run_remote(host, create_command(env_path, python_version))
@@ -240,11 +164,8 @@ def bootstrap_environment(host: str, env_path: str, python_version: str) -> Inte
 
 __all__ = [
     "CONDA_MODULE",
-    "InterpreterIdentity",
     "bootstrap_environment",
     "check_identity",
     "create_command",
-    "identity_command",
-    "parse_identity",
     "refuse_existing",
 ]

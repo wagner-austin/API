@@ -68,8 +68,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             ``REMOTE_COMMAND_FAILED`` if conda fails,
             ``ENV_PROBE_UNREADABLE`` if the new interpreter cannot be read,
             or ``BOOTSTRAP_PYTHON_MISMATCH`` /
-            ``BOOTSTRAP_ENV_NOT_SELF_CONTAINED`` if what was built is not what
-            was asked for. Nothing is caught: an environment that exists and
+            ``ENV_INTERPRETER_BORROWED`` if what was built is not what was
+            asked for. Nothing is caught: an environment that exists and
             is wrong is worse than none, because the next command probes it
             and believes it.
     """
