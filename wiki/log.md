@@ -208,3 +208,21 @@ one machine, tracked by nothing, since 2026-09-04 for v1. Every source_paths
 entry is blob-pinned, including the outcome and manifest records the tables
 recompute from, so a later reader can re-derive every number rather than trust
 the table.
+
+## [2026-10-05] batch | covenant-radar and Model-Trainer service architecture
+Pages written: covenant-radar-service-architecture, covenant-radar-domain-protocol,
+covenant-radar-kafka-streaming, covenant-radar-optuna-optimisation,
+model-trainer-service-architecture, model-trainer-finetune-strategy-seam,
+model-trainer-run-record-provenance, model-trainer-known-answer-registry,
+model-trainer-cloze-scoring-path
+Hubs updated: services (+9), libs (+2, cross-listed), index 39 -> 48
+Notes: board task 418aba78. Model-Trainer's existing pages were all research
+results; these are the harness a session extends. Written from code, not the
+loose docs under services/*/docs, which turned out stale in two places (the
+ERNIE doc's "unsloth" strategy, removed 2026-08-17; the README's "three
+domains", of which covenant is not one). Three findings are defects, not
+documentation, and are recorded on the pages rather than fixed here:
+the generic streaming worker the container runs never commits offsets and has
+no dead-letter path; scripts.optimize discards its own determinism record and
+fingerprints every run as unpinned; and RESEARCH.md's cleargbm entry says the
+opposite of the second.
