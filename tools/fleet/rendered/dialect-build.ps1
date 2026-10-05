@@ -12,6 +12,96 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PID | Set-Content -LiteralPath "$Target/build.pid"
+if ($null -eq ('FleetNode.KillOnCloseJob' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace FleetNode {
+    public static class KillOnCloseJob {
+        [StructLayout(LayoutKind.Sequential)]
+        struct BasicLimits {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct IoCounters {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct ExtendedLimits {
+            public BasicLimits Basic;
+            public IoCounters Io;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
+
+        const int ExtendedLimitInformation = 9;
+        const uint KillOnJobClose = 0x2000;
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        static extern IntPtr CreateJobObjectW(IntPtr attributes, string name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetInformationJobObject(
+            IntPtr job, int infoClass, ref ExtendedLimits info, uint length);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetCurrentProcess();
+
+        static IntPtr held = IntPtr.Zero;
+
+        static void Fail(string code) {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), code);
+        }
+
+        // The handle is kept and never closed: the kernel closes it when this
+        // process ends, and that close is what ends the job's processes.
+        public static IntPtr Enter() {
+            if (held != IntPtr.Zero) {
+                return held;
+            }
+            IntPtr job = CreateJobObjectW(IntPtr.Zero, null);
+            if (job == IntPtr.Zero) {
+                Fail("FLEET_BUILD_JOB_CREATE_FAILED");
+            }
+            ExtendedLimits limits = new ExtendedLimits();
+            limits.Basic.LimitFlags = KillOnJobClose;
+            uint size = (uint)Marshal.SizeOf(typeof(ExtendedLimits));
+            if (!SetInformationJobObject(job, ExtendedLimitInformation, ref limits, size)) {
+                Fail("FLEET_BUILD_JOB_LIMIT_FAILED");
+            }
+            if (!AssignProcessToJobObject(job, GetCurrentProcess())) {
+                Fail("FLEET_BUILD_JOB_ASSIGN_FAILED");
+            }
+            held = job;
+            return held;
+        }
+    }
+}
+'@
+}
+[void][FleetNode.KillOnCloseJob]::Enter()
 $log = "$Target/result.txt.log"
 $result = "$Target/result.txt"
 $env:npm_config_cache = "$CacheRoot/npm"
