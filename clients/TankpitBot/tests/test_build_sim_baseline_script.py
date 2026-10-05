@@ -32,12 +32,9 @@ from scripts.build_sim_baseline import (
 )
 
 from scripts import _test_hooks as script_hooks
-from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.analysis import _test_hooks as analysis_hooks
 from tankpit_bot.protocol.command_builders import build_teleport_command
-from tankpit_bot.resources import data_directory
-from tankpit_bot.sim.scenarios import SIM_FIELD
+from tests._baseline_field import baseline_field
 from tests.analysis._capture_fixtures import (
     OWN_TANK,
     _command,
@@ -49,10 +46,6 @@ from tests.analysis._capture_fixtures import (
     _tank_info,
 )
 from tests.conftest import FakeFileSystem
-from tests.in_memory_terrain_map import InMemoryTerrainMap
-
-#: The ferry scenario's own water tile (``make_ferry_sim_world``).
-_FERRY_TILE = (118, 112)
 
 #: One live window whose teleport draws a 0x46 the sim never produces,
 #: so the missing-law side of the diff has a row to report.
@@ -67,38 +60,14 @@ _LIVE_SESSION = _session_json(
 
 @pytest.fixture()
 def _sim_world(fake_fs: FakeFileSystem) -> Generator[FakeFileSystem, None, None]:
-    """Give the sim a field GIF and an all-passable terrain loader.
+    """Give the sim a field GIF and the baseline terrain.
 
     Yields:
         The installed fake file system, holding whatever the sessions
         wrote.
     """
-    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
-    real_terrain = _test_hooks.load_terrain_map
-
-    def load_fake_terrain(gif_path: Path) -> TerrainMapProtocol:
-        """Return an in-memory terrain the whole sweep can seed on.
-
-        Open ground everywhere except the ferry scenario's own tile,
-        which has to be WATER — the scenario floats a ferry there and
-        the seed validator refuses to start a session whose furniture
-        is on the wrong surface. On a real ``make sim-baseline`` the
-        field GIF supplies that water; here the fixture must.
-
-        Args:
-            gif_path: Ignored.
-
-        Returns:
-            The terrain map every baseline scenario can seed on.
-        """
-        del gif_path
-        return InMemoryTerrainMap(terrain_data={_FERRY_TILE: "W"})
-
-    _test_hooks.load_terrain_map = load_fake_terrain
-    try:
+    with baseline_field(fake_fs):
         yield fake_fs
-    finally:
-        _test_hooks.load_terrain_map = real_terrain
 
 
 @pytest.fixture()
