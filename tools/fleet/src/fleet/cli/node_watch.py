@@ -418,11 +418,26 @@ class RunWatch:
             run_id: The run.
 
         Returns:
-            True when it is live and the node has written its result.
+            True when it is live and the node has written its result; False
+            too when the node did not answer, which is logged and read again
+            at the next poll (:func:`fleet.core.collect.attempt_poll_result`).
+
+        Raises:
+            AppError: When the node answered and the read failed there, or
+                its answer was unreadable.
         """
         if run_id not in live_among(self._loaded, frozenset({run_id})):
             return False
-        return collect.poll_result(self._node, run_id=run_id) is not None
+        polled = collect.attempt_poll_result(self._node, run_id=run_id)
+        if polled["unreachable"] is not None:
+            _log.info(
+                "%s did not answer the read of %s; it is read again at the next poll: %s",
+                self._alias,
+                run_id,
+                polled["unreachable"],
+            )
+            return False
+        return polled["result"] is not None
 
 
 __all__ = [
