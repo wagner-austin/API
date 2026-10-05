@@ -147,11 +147,15 @@ def _check_line(event: LockEvent) -> str:
     return f"{event['label']} {event['ts'][11:19]}Z: {event['detail']}{runner}"
 
 
-def announcement(events: tuple[LockEvent, ...]) -> Announcement | None:
+def announcement(events: tuple[LockEvent, ...], host: str) -> Announcement | None:
     """Fold one slice's events into one post, or nothing worth posting.
 
     Args:
         events: The slice's events, in file order.
+        host: The machine whose journal the events came from (``hub``,
+            ``diphtheria``), named in the heading and the mention line: a
+            pid and a target label mean nothing until the reader knows which
+            machine's lock they held (MCPs board task 03590bf9).
 
     Returns:
         The post, or None when no hold crossed a boundary and no check run
@@ -173,7 +177,7 @@ def announcement(events: tuple[LockEvent, ...]) -> Announcement | None:
     lines: list[str] = []
     agents: list[str] = []
     if len(announced) > 0:
-        lines.append(f"FLEET-LOCK: {len(announced)} hold(s) transitioned")
+        lines.append(f"FLEET-LOCK on {host}: {len(announced)} hold(s) transitioned")
         for hold_events in announced.values():
             lines.append(_hold_line(hold_events))
             agent = hold_events[0]["agent"]
@@ -184,7 +188,7 @@ def announcement(events: tuple[LockEvent, ...]) -> Announcement | None:
         lines.extend(_check_line(event) for event in checks)
     if len(agents) > 0:
         mentions = " ".join(f"@{agent}" for agent in agents)
-        lines.append(f"{mentions} your fleet-lock operation transitioned")
+        lines.append(f"{mentions} your fleet-lock operation on {host} transitioned")
     return Announcement(
         body="\n".join(lines), agents=tuple(agents), holds=len(announced), checks=len(checks)
     )

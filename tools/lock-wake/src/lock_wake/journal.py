@@ -28,7 +28,7 @@ from __future__ import annotations
 import pathlib
 from typing import Final, Literal
 
-from platform_core.journal_cursor import read_complete_lines
+from platform_core.journal_cursor import LineSlice, read_complete_lines
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
@@ -258,7 +258,28 @@ def read_journal_slice(journal: pathlib.Path, offset: int) -> JournalSlice:
             operator decides, not this reader.
         OSError: A journal that exists but cannot be read.
     """
-    lines = read_complete_lines(_test_hooks.file_exists, _test_hooks.read_bytes, journal, offset)
+    return decode_lines(
+        read_complete_lines(_test_hooks.file_exists, _test_hooks.read_bytes, journal, offset)
+    )
+
+
+def decode_lines(lines: LineSlice) -> JournalSlice:
+    """Decode every complete line a read yielded, wherever it read them from.
+
+    Shared by the local read above and :mod:`lock_wake.remote`, which fetches
+    only the unread window of a journal on another host, so both decode and
+    refuse a line identically.
+
+    Args:
+        lines: The complete lines and the offset just past them.
+
+    Returns:
+        The decoded events and the same next offset.
+
+    Raises:
+        JSONTypeError: A complete line that is not a valid event.
+        InvalidJsonError: A complete line that is not JSON at all.
+    """
     return JournalSlice(
         events=tuple(
             decode_lock_event(load_json_str(line["text"]), line["number"])
@@ -297,6 +318,7 @@ __all__ = [
     "EVENT_KINDS",
     "JournalSlice",
     "LockEvent",
+    "decode_lines",
     "decode_lock_event",
     "read_journal_slice",
     "require_check_rows",
