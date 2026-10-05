@@ -24,12 +24,13 @@ source_git_blobs:
   "libs/covenant_ml/scripts/build_metab_corpus.py": 3b7eb28d5db3e72dded3d3092fc96e590416e2f7
   "libs/covenant_ml/scripts/build_voc_corpus.py": fbc511ae75148199c2ed706d154a2d67bb4ee8a3
   "libs/covenant_ml/src/covenant_ml/datasets/xlsx_reader.py": f490a898b0b7b7b37312aab6e90d82febff69408
-  "libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py": c7eead0886cb87eb9d5a7de355add58db819aa3a
+  "libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py": 792422e66ee79463e2a7541c0a6f1054b9810d8a
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md": 0dfe8e7fb905d390a0d2c02f6cd65662dc19f4d1
 provenance:
   - "hpc3.json repinned 2026-09-11 after RE-READING the claim against the new file, not on a mechanical argument: the workspace gained certified_inputs and resumes_from_checkpoint and lost checkpoint_steps, none of which this page cites. Its actual claim -- the cleargbm project block is 4 cpus, 16 GB, 60 minutes, gpu null, deterministic true, with numpy/lightgbm/xgboost pinned -- reads back from HEAD as cpus 4, mem_gb 16, minutes 60, gpu None, deterministic True, numpy 2.3.5 / lightgbm 4.6.0 / xgboost 3.1.2. Every clause holds."
   - "the benchmark document repinned on a mechanical argument: its diff is +52/-0, a Power section appended by the power audit (board 1e4ab572), so no cited line moved. THE APPENDED SECTION IS ADVERSE and a reader should know it: it argues every 'per-seed wins: a/b/c' verdict in that document is a sign test that resolves nothing at n=5."
   - "rung 5's attribution, measured 2026-10-05 over ssh hpc3 (board task 2cca4a98): the reflog of /pub/wagnera3/api ends at the 01:30:07 PDT 2026-08-25 fast-forward to 80221ea; `git rev-parse --verify --quiet 20d9159^{commit}` there resolves nothing; sacct puts jobs 55571926-55571942 at submit 03:05, end by 03:24:46; their ledger rows carry image_digest null; `git status` shows no tracked source modified, only optimizer outputs under services/covenant-radar-api/models/. Rungs 1-4b's declared commits match the checkout at their ledger submit times (2e8b8e1, dd5f7ea, 57fd5ab, 80221ea, 80221ea)."
+  - "regression_quality.py repinned 2026-10-05 from c7eead08 to 792422e6 after reading the diff: +3/-3, the GradientBoostingConfig call passing GrowthStrategy.LEAF_WISE/DEPTH_WISE and Objective.SQUARED_ERROR where it passed the strings 'leaf_wise'/'depth_wise' and 'squared_error', plus the import that names them. The page cites the file for the regression benchmark's arms, which this does not change."
 fact_checked: "2026-08-24"
 confidence: high
 hubs: [libs]
