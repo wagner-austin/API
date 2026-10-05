@@ -360,6 +360,18 @@
         "companions": []
       }
     },
+    "services/procart-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/procart-api",
+        "install": [],
+        "companions": []
+      }
+    },
     "services/covenant-radar-api": {
       "worker_ram_gb": 1.6,
       "minimum_workers": 2,
