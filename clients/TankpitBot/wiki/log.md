@@ -6568,3 +6568,18 @@ another field".
 - First live practice session on field05's real terrain: 120/120 ticks,
   24 pickups and 22 radars, no seed needed moving for layout
   bot-20260706-223721.
+
+---
+
+## [2026-10-05] create | Sim network server
+
+Board task b008ab91, Phase 5 (WebSocket transport). New page
+[[sim-network-server]], linked from the architecture hub (28 pages),
+[[multiplayer-field]] and the index (87 pages).
+- `tankpit-sim-serve` hosts sim rooms on any shipped field behind a
+  WebSocket; clients send the page client's own bytes, AUTH against
+  this server's accounts (token digests only), and are seated on the
+  troop they entered with.
+- The join burst read back through the production decoder is the
+  archived `21 3E 5A 3D 2E 49 49 74 3F`; a second player draws 0x28 and
+  its quit 0x29. `sim_control`: IDENTICAL on all 21 N=1 artifacts.

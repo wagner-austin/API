@@ -1,0 +1,143 @@
+---
+title: Sim Network Server (the sim's rooms over WebSockets)
+tags: [sim, architecture, multiplayer, protocol]
+related:
+  - "[[multiplayer-field]]"
+  - "[[container-census]]"
+  - "[[session-state-deglobalisation]]"
+  - "[[recipient-policy]]"
+  - "[[sim-world-parameterization]]"
+source_paths:
+  - "src/tankpit_bot/sim/net_server.py"
+  - "src/tankpit_bot/sim/net_host.py"
+  - "src/tankpit_bot/sim/net_room.py"
+  - "src/tankpit_bot/sim/net_accounts.py"
+  - "src/tankpit_bot/sim/lobby.py"
+  - "src/tankpit_bot/sim/transport.py"
+  - "tests/sim/test_net_server.py"
+  - "tests/sim/test_net_host.py"
+  - "tests/sim/test_net_room.py"
+source_git_blobs:
+  "src/tankpit_bot/sim/net_server.py": "1924ad82df74b5a7e97558117a952680843c691c"
+  "src/tankpit_bot/sim/net_host.py": "74a81debfb856e5c85c06542657bab98e148442a"
+  "src/tankpit_bot/sim/net_room.py": "5d0a532f26530f462f46f84e608282592826dbbb"
+  "src/tankpit_bot/sim/net_accounts.py": "aafd809e455a90755cd03bb9e1c99b5d914ffb5c"
+  "src/tankpit_bot/sim/lobby.py": "a3c4eedb0230aca2f075c0434c8caeb54656674e"
+  "src/tankpit_bot/sim/transport.py": "b84317e74e3aca75c007b1e26bff8d8b633e4b03"
+  "tests/sim/test_net_server.py": "4d7f6defb23c0f5fbf755af8d665f8a1bb456a84"
+  "tests/sim/test_net_host.py": "45d2d6becb4b72a3870a70775bf974892fc6af77"
+  "tests/sim/test_net_room.py": "bb61a285b2c03bdf7bcc12fd17eb0a1bb0a32628"
+provenance:
+  - "Board task b008ab91 (the multiplayer track), Phase 5, 2026-10-05: the scripts/sim_control.py comparison and the tankpit-sim-serve run quoted below, both from the committed tree"
+fact_checked: "2026-10-05"
+confidence: high
+hubs: [architecture]
+---
+
+# Sim network server: the sim's rooms over WebSockets
+
+*Phase 5 of the multiplayer track (board task `b008ab91`), 2026-10-05.*
+
+[[multiplayer-field]] put several production bots on one `SimServer` in
+one process. This page puts the server behind a socket. A client in
+another process, or on another machine, joins a room over a WebSocket,
+plays on it and leaves. The game is TankPit-derived and the client,
+name and accounts are this project's own. The server never mirrors
+tankpit.com and never handles anyone's tankpit.com credentials.
+
+## How to run it
+
+```
+poetry run tankpit-sim-serve --accounts net_accounts.json
+poetry run tankpit-sim-serve --accounts net_accounts.json --room 1:field01:p --room 5:field05:n --port 8765
+```
+
+`--room ID:FIELD:MODE` repeats. Mode `p` is a practice room with the
+bot_policy roster and mode `n` an open field, and any of the 44 shipped
+fields plays ([[container-census]], "Playing another field"). The
+default is one practice room on field01 at `127.0.0.1:8765`. `--ticks N`
+stops after N ticks and `--tick-ms` shortens the wire's 2 s tick, for a
+smoke run.[^1]
+
+## The wire is the page client's
+
+Each binary WebSocket message is one wire payload: length-prefixed
+frames, plaintext in the lobby and `!`-led XOR'd commands in play. These
+are the bytes the page client puts on the real socket. A connection
+goes through four steps:
+
+1. **AUTH first.** `%AUTH !be <account>|<token>|<stamp> <magic>`, read by
+   `parse_auth_frame`, the inverse of the builder the in-process link
+   already used. The account must be one this server issued, and the
+   magic builds the connection's cipher table.
+2. **Lobby.** The room list, select and enter are the archive's own
+   exchange ([[session-state-deglobalisation]]). Entry now records the
+   troop as well as the room (`LobbyEntry`), and the room seats a tank
+   at an open tile on that team, under the account's name and rank.
+3. **Play.** The client asks for its join burst with CMD_ENTER_GAME, as
+   a real client does. From then on each tick sends it its batch,
+   enveloped and ciphered as the real server sends it.
+4. **Leave.** A quit frame is echoed and takes the tank off the field.
+   A closed socket does the same. The others see the 0x29.
+
+One function now splits a payload into commands and lobby frames
+(`route_client_frames`), and both the in-process link and the network
+host call it. It replaced `decode_client_payload`, a commands-only copy
+that only tests still called.[^2]
+
+## Three layers, one decision-maker
+
+- **`NetRoom`** is one `SimServer` and its lobby row. Its world is built
+  the way a field session builds one, and the practice layout's client
+  spawn is taken off the field because players are seated as they
+  enter. Player ids start at 2000, above the roster (500-535) and below
+  churn visitors (3000), and are never reused. At most 32 players sit at
+  once.
+- **`NetHost`** holds the rooms and every connection. It is synchronous
+  and knows nothing of sockets: a payload in, the replies out, and one
+  payload per seated connection each tick. A seated connection's batch
+  is never empty, because every tick carries a status sync for each
+  living tank.
+- **`NetServer`** maps WebSockets to host connection ids and moves
+  bytes. A text message, a refused AUTH or an undecodable frame raises
+  in that client's handler. The library closes that one socket with
+  1011, every other connection plays on, and the handler's `finally`
+  unseats the tank.[^3]
+
+## Accounts are this server's own
+
+An account record holds the SHA-256 of its token, never the token, and
+`MemoryAccountBook.verify` compares digests in constant time. A wrong
+token and an unknown account draw the same `SIM_LOBBY_DENIED`, so a
+refusal tells a guesser nothing. One account plays on one connection at
+a time. `AccountBookProtocol` is the seam a persistent book implements.[^4]
+
+## What was checked
+
+- **The join burst is the archived shape.** Read back through the
+  production capture decoder, a lone player's burst is
+  `21 3E 5A 3D 2E 49 49 74 3F`, the shape [[recipient-policy]] measured
+  340/340. A second player is announced to the first with a 0x28, and
+  its quit with a 0x29.[^5]
+- **Over a real socket.** The tests listen on an ephemeral localhost
+  port and join with a real WebSocket client sending the page client's
+  bytes.[^6]
+- **N=1 is unchanged.** `scripts/sim_control.py` recorded the tree
+  before the shared split and after it: IDENTICAL on all 21 artifacts.
+- **The CLI serves.** A 20-tick run of a practice room on field01 and an
+  open room on field05 served both rooms; the field05 room settled 6
+  field01-placed seeds onto open ground.
+
+## Not done here
+
+Persistence of accounts and results in Postgres, Traefik labels for a
+public route, and the TypeScript renderer are the rest of Phase 5. The
+production bot still reaches a server through a browser page. A bot or
+renderer speaking this socket directly is the next client.
+
+[^1]: `src/tankpit_bot/sim/net_server.py`, `parse_serve_args`, `build_host` and `main`; `tests/sim/test_net_server.py`, `test_the_command_line_serves_its_rooms_for_its_ticks` and `test_every_flag_is_read`.
+[^2]: `src/tankpit_bot/sim/lobby.py`, `parse_auth_frame` and `SimLobby._enter`; `src/tankpit_bot/sim/transport.py`, `route_client_frames`.
+[^3]: `src/tankpit_bot/sim/net_room.py`, `NetRoom.seat` and `open_field_room`; `src/tankpit_bot/sim/net_host.py`, `NetHost.receive` and `NetHost.tick`; `src/tankpit_bot/sim/net_server.py`, `NetServer.handle`; `tests/sim/test_net_server.py`, `test_a_text_message_ends_only_that_connection`.
+[^4]: `src/tankpit_bot/sim/net_accounts.py`, `MemoryAccountBook.verify` and `decode_net_account`; `tests/sim/test_net_host.py`, `test_a_wrong_token_is_denied` and `test_an_account_joins_once_at_a_time`.
+[^5]: `tests/sim/test_net_host.py`, `test_enter_game_is_answered_with_the_join_burst_on_the_next_tick` and `test_a_second_player_is_announced_to_the_first_and_its_quit_too`.
+[^6]: `tests/sim/test_net_server.py`, `test_a_client_joins_and_plays_over_a_real_socket`.

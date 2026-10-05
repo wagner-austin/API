@@ -130,6 +130,9 @@ all of the above and compared it with the Phase 1 tree: IDENTICAL on all
   every round and neither scored a kill; each spent its time collecting
   (about 300 actions and 175 pickups apiece).
 
+The same field over a socket, for clients in other processes, is
+[[sim-network-server]].
+
 The deterministic version of the arena run is pinned in the test suite
 on all-ground terrain, where the same sequence happens on schedule:
 bot 9 fires at bot 10, tank 10 leaves at round 8, tank 9 reads its 0x29,

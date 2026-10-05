@@ -641,8 +641,10 @@ in-memory terrain):[^2]
 `encode_tick_payload` turns a tick's batch into length-prefixed 0x2E
 envelope frames (step-(a) encoders + the session XOR table, framed
 exactly as `process_received_message` ingests), and
-`decode_client_payload` turns the bot's real `!`-command frames back
-into typed commands. `SimServer.handshake()` emits the join burst
+`decode_client_payload` turned the bot's real `!`-command frames back
+into typed commands (since 2026-10-05 `route_client_frames`, which
+also hands the lobby its plaintext frames, for the in-process link and
+the [[sim-network-server]] alike). `SimServer.handshake()` emits the join burst
 (own 0x3D/0x44/0x49, then 0x21+0x3D per living tank — the scenario
 harness's `place_self`/`place_enemy` choreography, on the wire).[^2]
 

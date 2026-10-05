@@ -154,7 +154,7 @@ a 0x3D riding every viewport-visible tank. The burst is now emitted as
 measured and pinned by test; the shape and its consequences are in the
 2026-09-01 `log.md` entry.[^11]
 
-[^1]: Archive sweep 2026-09-01 over 341 of 342 capture sessions in `runs/bot` and `runs/sniff` (one carries no magic and cannot be XOR-decoded), decoded through `capture.frames.split_payload_frames` + `capture.xor.build_session_xor_table` + `protocol.try_decode_binary_message`, with client commands decoded through `sim.transport.decode_client_payload`. Re-runnable as `scripts/analyze_recipient_policy.py`.
+[^1]: Archive sweep 2026-09-01 over 341 of 342 capture sessions in `runs/bot` and `runs/sniff` (one carries no magic and cannot be XOR-decoded), decoded through `capture.frames.split_payload_frames` + `capture.xor.build_session_xor_table` + `protocol.try_decode_binary_message`, with client commands decoded through `sim.transport.decode_client_payload` (folded on 2026-10-05 into `sim.transport.route_client_frames`, which decodes commands the same way). Re-runnable as `scripts/analyze_recipient_policy.py`.
 [^2]: `runs/bot/bot-20260826-003928.capture_session.json`; decoded 0x42 body `{tank_id: 709, source_x: 253, source_y: 9, drop_x: 254, drop_y: 9, direction: 0, obstacle_type: 2, flag: 0}`. `direction=0` is a DROP and `obstacle_type=2` is placed-on-land per [[movable-blocks]].
 [^3]: `src/tankpit_bot/sim/emissions.py::emit_mine_press` docstring, archive-cited.
 [^4]: `src/tankpit_bot/sim/emissions.py::emit_chat` docstring; sniff-20260729-214411.
