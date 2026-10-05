@@ -10,7 +10,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 OUTPUT ?=
 CONFORMANCE_BASELINE := wiki/sources/conformance_baseline.json
 
-.PHONY: help lint test check _check-unbudgeted install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted execution installdigest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
 
 help:
 	@echo ""
@@ -121,6 +121,17 @@ check:
 	@echo ""
 
 _check-unbudgeted: lint | test
+
+# The live demo case, run against austinwagner.org/tankpit (MCPs board task
+# 46934cd6). ``make check`` skips it on every machine, because that run is
+# also API's CI and the case presses the public spawn button; the fleet runs
+# this target as clients/TankpitBot-execution on a Windows node with ffmpeg.
+# It keeps only that case and fails with HOST_EXECUTION_INCOMPLETE when it is
+# skipped or none ran. Coverage is off because one case is not the suite;
+# ``make check`` holds the 100.
+execution:
+	poetry sync --with dev
+	$(MAKETOOLS) test --host-execution --no-cov
 
 # An empty OUTPUT unsets TANKPIT_OUTPUT (the sniffer then writes its default
 # path plus the timestamped archive); a value sets it.
