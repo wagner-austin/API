@@ -127,6 +127,8 @@ class TestBuildScript:
 
     def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:
         assert "[string]$Recipe = 'C:/s/run-1'," in _build(path="")
+        assert "$env:CORVIS_FLEET_WORKSPACE = '.'" in _build(path="")
+        assert f"$env:CORVIS_FLEET_WORKSPACE = '{DEMO_PROJECT}'" in _build()
 
     def test_it_pins_the_worker_count(self) -> None:
         body = _build()
