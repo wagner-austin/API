@@ -6554,3 +6554,17 @@ Board task b008ab91, Phase 4 of the multiplayer track. New page
 - The terrain shape fitted on either field beats the held-out field's
   own constant rate in both directions. Written up as a fitted
   distribution, not a recovered generator.
+
+---
+
+## [2026-10-05] update | The sim plays any shipped field
+
+Board task b008ab91, Phase 4. [[container-census]] gains "Playing
+another field".
+- `tankpit-sim-run --field field05` (one bot or `--clients N`) plays any
+  of the 44 shipped minimaps; `sim/field_choice.py` resolves the name,
+  settles field01-placed seeds onto open ground, and refuses the ferry,
+  larder, atlas and ghost scenarios off field01.
+- First live practice session on field05's real terrain: 120/120 ticks,
+  24 pickups and 22 radars, no seed needed moving for layout
+  bot-20260706-223721.
