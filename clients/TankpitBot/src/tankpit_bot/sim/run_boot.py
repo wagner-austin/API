@@ -123,7 +123,7 @@ def resolve_named_world(
     return run_stamp, run_layout, run_population_seed
 
 
-def _seed_ghost_world(
+def seed_ghost_world(
     world: SimWorldDict,
     terrain: _test_hooks.TerrainMapProtocol,
     ghost_spec: GhostSpecDict,
@@ -273,7 +273,7 @@ def _seed_world(
         else:
             seed_field_population(world, terrain, seed=population_seed)
     elif ghost_spec is not None:
-        _seed_ghost_world(world, terrain, ghost_spec, atlas_path)
+        seed_ghost_world(world, terrain, ghost_spec, atlas_path)
         # Reactive ghosts (2026-08-03): bot-named ghosts carry the
         # certified roster policy UNDER their recorded timeline — the
         # live bot's shots draw the mined shot-for-shot return fire
@@ -538,4 +538,5 @@ __all__ = [
     "TickPacedClock",
     "log",
     "resolve_named_world",
+    "seed_ghost_world",
 ]
