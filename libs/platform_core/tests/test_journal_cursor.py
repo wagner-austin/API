@@ -12,6 +12,7 @@ import pathlib
 import pytest
 
 from platform_core.journal_cursor import (
+    complete_lines_after,
     cursor_path,
     file_is_present,
     read_complete_lines,
@@ -169,3 +170,21 @@ class TestReadCompleteLines:
             ValueError, match=f"holds only {len(LINE_A)} bytes; it was truncated or replaced"
         ):
             read_complete_lines(file_is_present, read_file_bytes, journal, 10_000)
+
+
+class TestCompleteLinesAfter:
+    """The window split alone, as a reader that fetched only the window uses it."""
+
+    def test_numbers_and_offsets_count_from_the_window_start(self) -> None:
+        start = 4096
+        window = (LINE_A + LINE_B).encode("utf-8") + b'{"ts":"2026'
+        result = complete_lines_after(window, start)
+        assert [line["text"] for line in result["lines"]] == [
+            LINE_A.rstrip("\n"),
+            LINE_B.rstrip("\n"),
+        ]
+        assert [line["number"] for line in result["lines"]] == [1, 2]
+        assert result["next_offset"] == start + len(LINE_A) + len(LINE_B)
+
+    def test_an_empty_window_holds_position(self) -> None:
+        assert complete_lines_after(b"", 77) == {"lines": (), "next_offset": 77}
