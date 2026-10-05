@@ -21,6 +21,7 @@ one that says it could not read it.
 
 from __future__ import annotations
 
+import datetime
 import re
 from typing import Final
 
@@ -89,6 +90,11 @@ class Verdict(TypedDict):
         tests: ``<passed>p/<failed>f`` read off the tail, or ``unread``.
         coverage: The coverage figures read off the tail, or ``unread``.
         budget: The check budget verdict read off the tail, or ``unread``.
+        ended: When the check ended, ``YYYY-MM-DDTHH:MM:SSZ``: the time
+            the node's result records, or when the runner stopped it. The
+            queue row's ``closed_at`` minus this is how long a finished
+            check waited to be closed (MCPs board task c1d48330), which no
+            other record held.
         log_path: The transcript's absolute path on the node.
         run_id: The fleet ledger's run id.
     """
@@ -102,6 +108,7 @@ class Verdict(TypedDict):
     tests: str
     coverage: str
     budget: str
+    ended: str
     log_path: str
     run_id: str
 
@@ -200,6 +207,7 @@ def judge(
     node: str,
     exit_code: int,
     tail: str,
+    ended_unix: int,
     log_path: str,
     run_id: str,
 ) -> Verdict:
@@ -212,12 +220,14 @@ def judge(
         node: Where it ran.
         exit_code: The status the node recorded.
         tail: The transcript's last lines, as the node printed them.
+        ended_unix: When the check ended, whole seconds since the epoch.
         log_path: The transcript's absolute path on the node.
         run_id: The fleet ledger's run id.
 
     Returns:
         The verdict, with the counts read or marked unread.
     """
+    ended = datetime.datetime.fromtimestamp(ended_unix, tz=datetime.UTC)
     return Verdict(
         job_id=job_id,
         project=project,
@@ -228,6 +238,7 @@ def judge(
         tests=read_tests(tail),
         coverage=read_coverage(tail),
         budget=read_budget(tail),
+        ended=ended.strftime("%Y-%m-%dT%H:%M:%SZ"),
         log_path=log_path,
         run_id=run_id,
     )
@@ -242,15 +253,15 @@ def render_verdict(verdict: Verdict) -> str:
     Returns:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
-        log=<node>:<path> run=<run id>``, one line, so a closure can quote it
-        and a reader can grep a thread for the prefix.
+        ended=<time> log=<node>:<path> run=<run id>``, one line, so a
+        closure can quote it and a reader can grep a thread for the prefix.
     """
     return (
         f"{VERDICT_PREFIX} {verdict['job_id'][:8]} {verdict['project']} "
         f"sha={verdict['sha']} node={verdict['node']} exit={verdict['exit_code']} "
         f"banner={'yes' if verdict['banner'] else 'no'} tests={verdict['tests']} "
         f"coverage={verdict['coverage']} budget={verdict['budget']} "
-        f"log={verdict['node']}:{verdict['log_path']} "
+        f"ended={verdict['ended']} log={verdict['node']}:{verdict['log_path']} "
         f"run={verdict['run_id']}"
     )
 
