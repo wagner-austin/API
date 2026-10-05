@@ -8,7 +8,8 @@
     "datasets": "weather_tmax-voc_match_quality",
     "arms": "4",
     "seeds": "42-46",
-    "repo_commit": "dd5f7ea"
+    "repo_commit": "dd5f7ea",
+    "repo_tree": "/pub/wagnera3/api"
   },
   "members": [
     {

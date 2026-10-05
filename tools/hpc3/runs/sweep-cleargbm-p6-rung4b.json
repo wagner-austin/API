@@ -6,7 +6,8 @@
     "goal": "replay-winners-capture-dial-choice",
     "trials": "20",
     "compare_to": "p6-rung4",
-    "repo_commit": "80221ea"
+    "repo_commit": "80221ea",
+    "repo_tree": "/pub/wagnera3/api"
   },
   "members": [
     {

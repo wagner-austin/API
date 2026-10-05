@@ -7,7 +7,8 @@
     "grid": "4-dataset-best-preset-x-2-backends",
     "trials": "100x3-40x1",
     "compare_to": "p6-rung4",
-    "repo_commit": "20d9159"
+    "repo_commit": "80221ea",
+    "repo_tree": "/pub/wagnera3/api"
   },
   "members": [
     {

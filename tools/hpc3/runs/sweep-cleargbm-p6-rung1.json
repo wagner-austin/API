@@ -6,7 +6,8 @@
     "backend": "cleargbm",
     "trials": "20",
     "grid": "4x4-dataset-preset",
-    "repo_commit": "2e8b8e1"
+    "repo_commit": "2e8b8e1",
+    "repo_tree": "/pub/wagnera3/api"
   },
   "members": [
     {
