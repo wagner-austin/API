@@ -168,6 +168,7 @@ class TestExecute:
         record = decision_records[0]
         assert record["owner_mode"] == "COLLECT"
         assert record["held_lock_id"] == 77
+        assert record["behavior_reason_kind"] == "opportunity_shot"
         assert require_str(record, "message").endswith("owner=COLLECT lock=77")
 
     def test_execute_hold_records_no_decision(self, fake_env: FakeEnv) -> None:

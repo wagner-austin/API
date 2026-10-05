@@ -78,12 +78,13 @@ class TestBotRunWithCapture:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.stream import _test_hooks as stream_hooks
-        from tankpit_bot.stream.capture import (
-            PROCESS_END_TIMEOUT_SECONDS,
-            ffmpeg_command,
-            x11_socket_path,
-            xvfb_command,
+        from tankpit_bot.stream.audio import (
+            pulse_server_address,
+            pulse_socket_path,
+            pulseaudio_command,
         )
+        from tankpit_bot.stream.capture import ffmpeg_command, x11_socket_path, xvfb_command
+        from tankpit_bot.stream.helper_process import PROCESS_END_TIMEOUT_SECONDS
         from tankpit_bot.stream.types import StreamConfigDict
         from tests._capture_process import PatientCaptureProcess
         from tests.fakes.bot import FakeSyncPlaywrightContextManagerBot
@@ -118,10 +119,19 @@ class TestBotRunWithCapture:
             return process
 
         stream_hooks.spawn_capture_process = substituting_spawner
+        stream_hooks.socket_root = lambda: tmp_path / "sockets"
+        # Sound server first, so Chromium finds it on its first sound;
+        # then the display it draws on; the encoder once the game is up.
+        expected_commands = [
+            pulseaudio_command(config),
+            xvfb_command(config),
+            ffmpeg_command(config),
+        ]
+        expected_server = pulse_server_address(7)
         saved_path_exists = _test_hooks.path_exists
 
         def socket_or_saved(path: Path) -> bool:
-            if path == x11_socket_path(7):
+            if path in (x11_socket_path(7), pulse_socket_path(7)):
                 return True
             return saved_path_exists(path)
 
@@ -140,30 +150,38 @@ class TestBotRunWithCapture:
             bot.run(session_seconds=0, stop_file_path=_STOP)
         finally:
             browser_hooks.ensure_autoscroll_off = original_autoscroll
+            stream_hooks.socket_root = stream_hooks._real_socket_root
             for process in processes:
                 if process.poll() is None:
                     process.kill()
                     process.wait()
 
-        assert commands == [xvfb_command(config), ffmpeg_command(config)]
+        assert commands == expected_commands
         playwright = playwright_cm._playwright
         if playwright is None:
             raise AssertionError("the fake playwright was never started")
         browser_type = playwright._chromium
-        assert browser_type.launch_envs == [{"KEEP": "1", "DISPLAY": ":7"}]
+        assert browser_type.launch_envs == [
+            {"KEEP": "1", "DISPLAY": ":7", "PULSE_SERVER": expected_server}
+        ]
         launch_args = browser_type.launch_args[0]
         if launch_args is None:
             raise AssertionError("the launch was handed no args at all")
         # The config's scale travels to Chromium (the client's picture
         # size is entirely DPR, and geometry was chosen for factor 2),
-        # and scrollbars are hidden so an overflowing layout can never
-        # draw them into a frame.
-        assert launch_args == ["--force-device-scale-factor=2", "--hide-scrollbars"]
+        # scrollbars are hidden so an overflowing layout can never draw
+        # them into a frame, and the game's sound may start unclicked.
+        assert launch_args == [
+            "--force-device-scale-factor=2",
+            "--hide-scrollbars",
+            "--autoplay-policy=no-user-gesture-required",
+        ]
         # Ended by run()'s own teardown, not the reaper in the finally.
-        for name, process in zip(("Xvfb", "ffmpeg"), processes, strict=True):
+        for name, process in zip(("pulseaudio", "Xvfb", "ffmpeg"), processes, strict=True):
             if process.poll() is None:
                 raise AssertionError(f"{name} stand-in still running after run()")
         assert [process.wait_timeouts for process in processes] == [
+            [PROCESS_END_TIMEOUT_SECONDS],
             [PROCESS_END_TIMEOUT_SECONDS],
             [PROCESS_END_TIMEOUT_SECONDS],
         ]
