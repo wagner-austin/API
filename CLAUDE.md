@@ -111,7 +111,8 @@ table in the hpc3 workspace documents (`tools/hpc3/runs/hpc3*.json`), and
 no section in `RESEARCH.md`. Registered today, one per workspace document:
 `cleargbm`, `mi` (Model-Trainer probes), `floor` (cloze floor scoring),
 `turkic-lstm` (`~/PROJECTS/LSTM`), `rusted` (RustedWarfareBot), `tankpit`
-(TankpitBot), `code-style`. Enumerate rather than trust this line —
+(TankpitBot), `code-style`, `mi-cu128`, `cartridge-qa` (cartridge-vs-retrieval
+QA, the first registered with `hpc3-register`). Enumerate rather than trust this line —
 `python -c "import json,glob; [print(list(json.load(open(f))['projects']))
 for f in glob.glob('tools/hpc3/runs/hpc3*.json')]"` — and regenerate the
 `RESEARCH.md` table with `hpc3-research-index --check` / `--write` (a bare
