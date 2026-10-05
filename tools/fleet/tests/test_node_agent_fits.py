@@ -20,9 +20,9 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.resources import encode_names
 from fleet.core import _test_hooks, leases
 from tests._node_agent_fixtures import (
-    NO_WATCH,
     NOTHING_LAUNCHED,
     PROBED,
+    SERVED_HOLDING_NOTHING,
     _credentials_in_env,
     _sourced_config,
     node_argv,
@@ -118,7 +118,7 @@ def test_a_node_with_room_for_one_worker_but_no_project_s_minimum_claims_nothing
     assert [record.getMessage() for record in caplog.records][-3:] == [
         "lavender has room for one worker but not for any project's minimum; claiming nothing",
         NOTHING_LAUNCHED,
-        NO_WATCH,
+        SERVED_HOLDING_NOTHING,
     ]
 
 
@@ -197,5 +197,5 @@ class TestWhatALeaseOnTheNodeHolds:
             "lavender has room, but every project it fits is held by a lease on it; "
             "claiming nothing",
             NOTHING_LAUNCHED,
-            NO_WATCH,
+            SERVED_HOLDING_NOTHING,
         ]

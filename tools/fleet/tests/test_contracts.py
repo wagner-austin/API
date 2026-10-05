@@ -134,7 +134,8 @@ def _workspace() -> FleetWorkspace:
             )
         },
         node_local_resources=(),
-        node_watch_seconds=100,
+        node_serve_seconds=1200,
+        node_poll_seconds=5,
         ledger="ledger.jsonl",
         feed="feed.jsonl",
         leases="leases.json",

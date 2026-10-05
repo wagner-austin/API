@@ -229,6 +229,36 @@ class TestRealExtraction:
         assert pathlib.Path(tree["config"]).read_text(encoding="utf-8") == '{"rolled": true}\n'
         assert not (destination / "tools/fleet/pyproject.toml").exists()
 
+    def test_the_state_a_serve_compares_is_read_from_its_records_directory_for_real(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A serving agent knows only its records directory, tools/fleet in
+        the checkout, and reads the ref from there; a roll moves what it
+        reads (MCPs board task 8993c306)."""
+        api = tmp_path / "api"
+        first = committed_repository(api, ROLLED_FILES, rolled.ROLLED_REF)
+        records = api / pathlib.PurePosixPath(rolled.RECORDS_DIR)
+
+        assert rolled.rolled_state(records) == first
+
+        (api / "tools/fleet/fleet.json").write_text('{"rolled": "again"}\n', encoding="utf-8")
+        git(api, "commit", "--quiet", "--all", "-m", "the next roll")
+        second = git(api, "rev-parse", "HEAD")
+        git(api, "update-ref", rolled.ROLLED_REF, second)
+
+        assert rolled.rolled_state(records) == second
+        assert second != first
+
+    def test_a_repository_never_rolled_answers_with_the_refusal(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        api = tmp_path / "api"
+        committed_repository(api, ROLLED_FILES, "refs/heads/elsewhere")
+
+        assert rolled.rolled_state(api).startswith(
+            f"FLEET_ROLL_REF_UNRESOLVED: refs/fleet/rolled in {api} did not resolve"
+        )
+
     def test_a_repository_never_rolled_refuses_for_real(self, tmp_path: pathlib.Path) -> None:
         api = tmp_path / "api"
         committed_repository(api, ROLLED_FILES, "refs/heads/elsewhere")

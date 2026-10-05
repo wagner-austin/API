@@ -33,7 +33,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
-from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeClock, FakeRun, ok, retire_replies
+from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, ok, pin_clock, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -108,7 +108,7 @@ class TestPastItsLease:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        _test_hooks.now = FakeClock(PAST_THE_LEASE)
+        pin_clock(PAST_THE_LEASE)
         runner = FakeRun(
             [
                 ok(""),
@@ -160,7 +160,7 @@ class TestPastItsLease:
         """The deadline is the last second the lease covers, so the stop
         begins one second after it and not on it."""
         launch(sourced_config)
-        _test_hooks.now = FakeClock(PAST_THE_LEASE - 1)
+        pin_clock(PAST_THE_LEASE - 1)
         _test_hooks.run = FakeRun([ok(""), ok(""), *PROBED])
         endpoint = FakeQueue(
             [

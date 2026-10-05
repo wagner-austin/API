@@ -57,13 +57,19 @@ COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
 #: queue for the one registered project and the lane held nothing for it.
 NOTHING_MATCHED = "lavender asked for 1 fitting project(s); nothing in the node lane matched"
 
-#: The last line of every lavender tick that launched nothing, whichever gate
-#: or refusal ended it (MCPs board task 48842bfd).
-NOTHING_LAUNCHED = "lavender launched 0 job(s) this tick"
+#: The last line of every lavender fill pass that launched nothing, whichever
+#: gate or refusal ended it (MCPs board task 48842bfd).
+NOTHING_LAUNCHED = "lavender launched 0 job(s) this pass"
 
-#: The line that ends every lavender tick whose passes left it holding no
-#: running job: its watch makes no call (MCPs board task c1d48330).
-NO_WATCH = "lavender holds no running job; no watch this tick"
+#: The line that ends every lavender serve of zero seconds whose passes left
+#: it holding no running job, started at DEMO_NOW, 20 s after a fire
+#: boundary: it sleeps to 10 s before the next and hands over there, its
+#: watch having read nothing (MCPs board task 8993c306).
+SERVED_HOLDING_NOTHING = (
+    "lavender served 150 s from 2025-09-04T15:33:20+00:00: 0 fire(s), 1 fill pass(es), "
+    "0 poll(s), 0 run(s) closed, 0 still watched; handed over at 2025-09-04T15:35:50+00:00 "
+    "before the 2025-09-04T15:36:00+00:00 fire: its node_serve_seconds is 0"
+)
 
 PROBED: tuple[_test_hooks.CommandResult, ...] = (
     ok(""),
@@ -287,10 +293,10 @@ __all__ = [
     "COMPANION_SHA",
     "NOTHING_LAUNCHED",
     "NOTHING_MATCHED",
-    "NO_WATCH",
     "PASSING_TAIL",
     "PROBED",
     "REMOTE",
+    "SERVED_HOLDING_NOTHING",
     "VERDICT_TASK",
     "claim_replies",
     "held_answer",

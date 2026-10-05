@@ -91,7 +91,8 @@ def _workspace_document() -> JSONObject:
                 "source": None,
             }
         },
-        "node_watch_seconds": 0,
+        "node_serve_seconds": 0,
+        "node_poll_seconds": 180,
         "ledger": "ledger.jsonl",
         "feed": "feed.jsonl",
         "leases": "leases.json",

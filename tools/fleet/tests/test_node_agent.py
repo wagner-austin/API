@@ -19,7 +19,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_str
 
-from fleet.cli import _config, node_agent
+from fleet.cli import _config, node_agent, node_prepare
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.source import ProjectCompanion
@@ -29,11 +29,11 @@ from tests._node_agent_fixtures import (
     COMPANION_REF,
     COMPANION_REMOTE,
     COMPANION_SHA,
-    NO_WATCH,
     NOTHING_LAUNCHED,
     NPM_CI,
     PROBED,
     REMOTE,
+    SERVED_HOLDING_NOTHING,
     _credentials_in_env,
     _sourced_config,
     claim_replies,
@@ -430,7 +430,7 @@ class TestClaimingNothing:
         assert endpoint.tools == ["dispatch_list"]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-3].startswith("lavender did not answer; claiming nothing: ")
-        assert messages[-2:] == [NOTHING_LAUNCHED, NO_WATCH]
+        assert messages[-2:] == [NOTHING_LAUNCHED, SERVED_HOLDING_NOTHING]
 
     def test_a_node_with_room_for_nothing_claims_nothing(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -518,7 +518,7 @@ class TestRefusals:
         row = queue_job(status="claimed", requiredTags=["windows"])
         job = decode_job(row, answer=dump_json_str(row))
 
-        assert node_agent.tags_refusal(job, ("elevated", "windows")) is None
+        assert node_prepare.tags_refusal(job, ("elevated", "windows")) is None
 
     def test_a_project_with_no_remote_is_refused_by_name(self, config_path: pathlib.Path) -> None:
         """The shared fixture's project declares ``source: null``."""

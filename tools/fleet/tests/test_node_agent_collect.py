@@ -32,7 +32,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, DEFAULT_SHA, FakeQueue, queue_job
-from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok, retire_replies
+from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -83,6 +83,39 @@ class TestCollecting:
         assert closed["action"] == "close"
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
+        ledger = (sourced_config.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
+        assert "passed" in ledger
+
+    def test_the_queue_job_is_closed_before_the_venv_sweep_whose_failure_goes_on(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """The sweep is housekeeping no waiting session reads, so it runs
+        after the close (MCPs board task 8993c306): a sweep that fails has
+        already left the job closed, and its error still ends the serve."""
+        launch(sourced_config)
+        node = FakeRun(
+            [
+                ok(""),
+                ok("0 1757000060"),
+                ok(""),
+                ok(PASSING_TAIL),
+                *retire_replies()[:2],
+                ok(""),  # venv sweep: send the script
+                failed(1, "Remove-Item: access denied"),  # venv sweep: run it
+            ]
+        )
+        _test_hooks.run = node
+        endpoint = FakeQueue(
+            [held_answer(taskId=VERDICT_TASK), dump_json_str({"job": queue_job(status="passed")})]
+        )
+        _test_hooks.http_post = endpoint
+
+        with pytest.raises(AppError, match="access denied"):
+            node_agent.main(node_argv(sourced_config))
+
+        assert endpoint.tools == ["dispatch_list", "dispatch_report"]
+        assert endpoint.arguments[1]["action"] == "close"
+        assert len(node.calls) == 8
         ledger = (sourced_config.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
         assert "passed" in ledger
 

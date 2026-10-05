@@ -79,12 +79,15 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
     node = _node(platform)
     spoken = dialect.for_platform(platform)
     root = STAGE_ROOTS[platform]
-    runner = FakeRun(retire_replies())
+    runner = FakeRun(retire_replies()[:2])
     _test_hooks.run = runner
 
     kept = retire.retire_on_node(node, run_id=DEMO_RUN_ID)
 
     assert kept == f"{root}/logs/{DEMO_RUN_ID}.log"
+    # The script sent and run, and no sweep: each caller sweeps once its row
+    # is closed (MCPs board task 8993c306).
+    assert len(runner.calls) == 2
     script_path = spoken.script_path(root, f"retire-{DEMO_RUN_ID}")
     assert runner.stdin[0] == spoken.retire_script(
         target=f"{root}/{DEMO_RUN_ID}",

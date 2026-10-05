@@ -342,13 +342,13 @@ def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
 
 
 def retire_replies() -> list[_test_hooks.CommandResult]:
-    """Every command a retire runs, in order (:mod:`fleet.core.retire`).
+    """Every command a settle or a stop runs on the node from its retire on, in order.
 
     Named for the same reason :func:`dispatch_replies` is: every settle and
-    every stop now ends with these calls, the retire script and then the
-    virtualenv sweep (:mod:`fleet.core.venv_sweep`), each sent and run, and
-    a bare run of ``ok("")`` at the end of a list does not say which step it
-    answers.
+    every stop ends with these calls, the retire script and then, once the
+    row is closed, the virtualenv sweep (:mod:`fleet.core.retire`,
+    :mod:`fleet.core.venv_sweep`), each sent and run, and a bare run of
+    ``ok("")`` at the end of a list does not say which step it answers.
 
     Returns:
         One result per call.
@@ -411,9 +411,13 @@ def workspace_document() -> JSONObject:
         # the arrangement that let a 20.7 MB archive land beside fleet.json
         # and be staged by the next dispatch.
         "ledger": "runs/ledger.jsonl",
-        # No watch: a tick that leaves a run going ends with its passes, as
-        # every tick did before the watch; test_node_watch.py declares one.
-        "node_watch_seconds": 0,
+        # A serve of zero seconds: the opening passes and a handover at the
+        # first fire boundary, the shape of one scheduled start, with no
+        # queue listing and no read of the roll; test_node_serve.py declares
+        # a longer one. The slowest poll, so a watch holding a run is closed
+        # by the handover before its first read of the node.
+        "node_serve_seconds": 0,
+        "node_poll_seconds": 180,
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
     }
@@ -463,9 +467,32 @@ def _repo(tmp_path: pathlib.Path) -> pathlib.Path:
     return root
 
 
+def pin_clock(seconds: int) -> FakeClock:
+    """Pin the clock at a moment, with a sleep that moves it.
+
+    One helper, so a test that moves the clock past a lease cannot leave the
+    sleep moving a clock nothing reads: a serve sleeps to its fire boundary
+    (:mod:`fleet.cli.node_serve`) and would never reach it.
+
+    Args:
+        seconds: Whole seconds since the epoch.
+
+    Returns:
+        The clock.
+    """
+    clock = FakeClock(seconds)
+    _test_hooks.now = clock
+    _test_hooks.sleep = FakeSleep(clock)
+    return clock
+
+
 @pytest.fixture(name="config_path")
 def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Write a workspace document and pin the clock.
+    """Write a workspace document and pin the clock, which sleeps move.
+
+    A node runner's serve sleeps to its first fire boundary
+    (:mod:`fleet.cli.node_serve`), so the sleep moves this clock rather than
+    waiting.
 
     Args:
         tmp_path: pytest's per-test temporary directory.
@@ -473,7 +500,7 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
     Returns:
         Path to the written document.
     """
-    _test_hooks.now = FakeClock(DEMO_NOW)
+    pin_clock(DEMO_NOW)
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
     path = tmp_path / "fleet.json"
     path.write_text(dump_json_str(workspace_document()), encoding="utf-8")

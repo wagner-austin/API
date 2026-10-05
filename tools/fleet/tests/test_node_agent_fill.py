@@ -21,11 +21,11 @@ from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectSource, encode_project_source
 from fleet.core import _test_hooks, records, staging
 from tests._node_agent_fixtures import (
-    NO_WATCH,
     NOTHING_LAUNCHED,
     NPM_CI,
     PROBED,
     REMOTE,
+    SERVED_HOLDING_NOTHING,
     _credentials_in_env,
     _sourced_config,
     claim_replies,
@@ -156,12 +156,15 @@ class TestARoomyNode:
             "has room for nothing; claiming nothing: NODE_OWNER_RESERVED: "
         )
         messages = [record.getMessage() for record in caplog.records]
-        # The workspace declares no watch, so the two runs are named and
-        # left for the next tick without a poll (MCPs board task c1d48330).
+        # The workspace declares a serve of zero seconds and the slowest
+        # poll, so the two runs are named and left for the next start
+        # without a read of the node (MCPs board task 8993c306).
         assert messages[-2:] == [
-            "lavender launched 2 job(s) this tick",
-            "lavender watch until 2025-09-04T15:33:20+00:00: 0 poll(s), 0 run(s) closed, "
-            "2 run(s) still watched",
+            "lavender launched 2 job(s) this pass",
+            "lavender served 150 s from 2025-09-04T15:33:20+00:00: 0 fire(s), 1 fill pass(es), "
+            "0 poll(s), 0 run(s) closed, 2 still watched; handed over at "
+            "2025-09-04T15:35:50+00:00 before the 2025-09-04T15:36:00+00:00 fire: its "
+            "node_serve_seconds is 0",
         ]
 
 
@@ -189,7 +192,7 @@ class TestARefusedJobEndsTheTick:
         assert len(endpoint.ticks) == 1
         assert [record.getMessage() for record in caplog.records][-2:] == [
             NOTHING_LAUNCHED,
-            NO_WATCH,
+            SERVED_HOLDING_NOTHING,
         ]
 
 

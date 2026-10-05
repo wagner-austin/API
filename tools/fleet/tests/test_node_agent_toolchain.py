@@ -20,10 +20,10 @@ from fleet.cli import node_agent
 from fleet.contracts.toolchain import install_command
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
-    NO_WATCH,
     NOTHING_LAUNCHED,
     NOTHING_MATCHED,
     PROBED,
+    SERVED_HOLDING_NOTHING,
     _credentials_in_env,
     _sourced_config,
     node_argv,
@@ -94,7 +94,7 @@ class TestTheToolTagsAClaimCarries:
             f"so those jobs go to a node that has it -- {HOOKS_INSTALL}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
-            NO_WATCH,
+            SERVED_HOLDING_NOTHING,
         ]
 
     def test_a_node_whose_probe_found_the_hooks_environment_claims_with_its_tag(
@@ -118,7 +118,7 @@ class TestTheToolTagsAClaimCarries:
             "poetry, git, make, tar present; ffmpeg present; hooks present",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
-            NO_WATCH,
+            SERVED_HOLDING_NOTHING,
         ]
 
     def test_a_node_without_ffmpeg_claims_without_it(
@@ -159,7 +159,7 @@ class TestTheToolTagsAClaimCarries:
             "it claims with the cxx tag; set cxx to '17.14.37710.0' in fleet.json",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
-            NO_WATCH,
+            SERVED_HOLDING_NOTHING,
         ]
 
 
@@ -186,7 +186,7 @@ class TestAToolchainThatCanBuild:
             f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- {HOOKS_INSTALL}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
-            NO_WATCH,
+            SERVED_HOLDING_NOTHING,
         ]
 
 
@@ -203,7 +203,7 @@ class TestAToolchainThatCannotBuild:
         )
         assert install_command("python", ("winget", "choco")) in refusal
         assert "poetry -- " in refusal
-        assert messages[-3:] == [refusal, NOTHING_LAUNCHED, NO_WATCH]
+        assert messages[-3:] == [refusal, NOTHING_LAUNCHED, SERVED_HOLDING_NOTHING]
 
     def test_a_wrong_minor_python_claims_nothing_with_its_own_code(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
