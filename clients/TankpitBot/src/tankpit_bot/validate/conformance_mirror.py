@@ -58,6 +58,16 @@ class ArchiveMirror:
         """The client's stored window origin, as the last 0x5A stated it."""
         return self._own.window
 
+    @property
+    def tile(self) -> tuple[int, int] | None:
+        """The client's tile, as the last placement or walk stated it."""
+        return self._own.tile
+
+    @property
+    def rank(self) -> int | None:
+        """The client's rank, as the last own 0x2E sync stated it."""
+        return self._own.rank
+
     def observe(self, message: BinaryMessage) -> None:
         """Record what one received message states.
 
