@@ -8,6 +8,8 @@ This package replaces the previous monolithic ``_test_hooks.py``.
 Every public name remains importable from ``tankpit_bot._test_hooks``
 exactly as before; the submodules group hooks by domain:
 
+* :mod:`tankpit_bot._test_hooks.db` -- the Postgres connection the
+  networked sim keeps its accounts in.
 * :mod:`tankpit_bot._test_hooks.env` -- environment-variable resolution.
 * :mod:`tankpit_bot._test_hooks.fs` -- filesystem operations.
 * :mod:`tankpit_bot._test_hooks.cdp` -- Playwright Page / CDP / Keyboard
@@ -48,6 +50,13 @@ from tankpit_bot._test_hooks.cdp import (
     KeyboardProtocol,
     PageProtocol,
     ResponseProtocol,
+)
+from tankpit_bot._test_hooks.db import (
+    ConnectDatabaseProtocol,
+    DbConnectionProtocol,
+    DbCursorProtocol,
+    _real_connect_database,
+    connect_database,
 )
 from tankpit_bot._test_hooks.env import (
     ChildEnvironmentProtocol,
@@ -137,7 +146,10 @@ __all__ = [
     "BufferedMessageSourceProtocol",
     "CDPSessionProtocol",
     "ChildEnvironmentProtocol",
+    "ConnectDatabaseProtocol",
     "CreateTextExclusiveProtocol",
+    "DbConnectionProtocol",
+    "DbCursorProtocol",
     "FileMarkerProtocol",
     "GamePageProtocol",
     "GlobPathsProtocol",
@@ -167,6 +179,7 @@ __all__ = [
     "_kill_browser_engines",
     "_real_append_text",
     "_real_child_environment",
+    "_real_connect_database",
     "_real_create_text_exclusive",
     "_real_file_marker",
     "_real_get_argv",
@@ -189,6 +202,7 @@ __all__ = [
     "_real_write_text",
     "append_text",
     "child_environment",
+    "connect_database",
     "create_text_exclusive",
     "file_marker",
     "force_exit",
