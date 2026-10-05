@@ -50,36 +50,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-
-class RequiredTool(TypedDict):
-    """One thing a node must have, and how to get it on each package manager.
-
-    Attributes:
-        name: The executable, as it is spelled on a PATH, or for the one
-            tagged entry that is not an executable, ``hooks``, the probe
-            line that answers for the hooks check's environment.
-        reason: Why a dispatch needs it. Carried so a refusal explains
-            itself rather than naming a binary and leaving the reader to
-            infer what it was for.
-        install: The command per package manager, keyed by the manager's own
-            executable name. An EMPTY MAPPING means this package does not
-            install that tool at all, which is a real state rather than a
-            gap: ``tar`` ships with the platform, and a manager that cannot
-            supply the version the fleet runs (Ubuntu's Node 18.19.1) is
-            left out rather than allowed to install the wrong one.
-
-            A MAPPING RATHER THAN ONE COMMAND, and this was a defect before
-            it was a design. The first version hardcoded ``choco install`` --
-            inferred from loki's ``make`` living under
-            ``C:\\ProgramData\\chocolatey``, one node generalised to three.
-            Measured 2026-09-04: sedona has both managers, lavender has ONLY
-            winget, loki has ONLY choco. No single command works fleet-wide,
-            so the manager is chosen per node from what that node reported.
-    """
-
-    name: str
-    reason: str
-    install: dict[str, str]
+from fleet.contracts.tagged_tools import TAGGED_TOOLS, RequiredTool
 
 
 class ToolReport(TypedDict):
@@ -163,7 +134,7 @@ PYTHON_REGISTERED_GUARD: Final = (
 #: tool every build required it idled a whole node for one project, which is
 #: how pendragon claimed nothing on every tick of 2026-10-02 until 02:48Z
 #: while tag-free jobs waited (MCPs board task 939ec5c7). It is a tag now:
-#: :data:`TAGGED_TOOLS`.
+#: :data:`fleet.contracts.tagged_tools.TAGGED_TOOLS`.
 REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="python",
@@ -222,61 +193,6 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         name="tar",
         reason="staging sends a gzipped tar and the node unpacks it",
         install={},
-    ),
-)
-
-#: The route file a node's Claude Code hooks reach the board through, under
-#: the build account's home: what MCPs ``packages/claude-hooks``
-#: ``install-hooks-node.py`` writes, and what that package's live suites read.
-HOOKS_ROUTE_FILE: Final = (".claude", "corvis-hooks.json")
-
-#: The modules MCPs ``packages/claude-hooks``'s make check imports from the
-#: system interpreter it runs on: ruff, mypy, pytest, pytest-xdist and
-#: pytest-cov. The probe's ``hooks`` line answers present only when one
-#: ``import`` of all of them succeeds.
-HOOKS_CHECK_MODULES: Final = ("ruff", "mypy", "pytest", "xdist", "pytest_cov")
-
-#: The distributions that provide :data:`HOOKS_CHECK_MODULES`, at the versions
-#: the hub's interpreter ran the package's check with on 2026-10-02 (MCPs board
-#: task ec895824), so a node's check reads the same lint and type rules the
-#: hub's does.
-HOOKS_CHECK_PACKAGES: Final = (
-    "ruff==0.15.1",
-    "mypy==1.19.1",
-    "pytest==9.0.2",
-    "pytest-xdist==3.8.0",
-    "pytest-cov==7.1.0",
-)
-
-#: Tools only some projects need, each the source of a capability tag
-#: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
-#: them every tick like the required tools, but a node without one is refused
-#: nothing: its runners claim without the tag, so the queue hands the jobs
-#: that require it to another node, and the tick logs what is missing, which
-#: projects wait for it and the command that would install it here.
-TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
-    RequiredTool(
-        name="ffmpeg",
-        reason="grandma-api's check converts real audio files through ffmpeg",
-        install={
-            "winget": (
-                "winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco install ffmpeg -y",
-            "apt-get": "sudo apt-get install -y ffmpeg",
-        },
-    ),
-    RequiredTool(
-        name="hooks",
-        reason=(
-            "MCPs packages/claude-hooks's check runs on the system interpreter with its tools "
-            "and reaches the board through ~/.claude/corvis-hooks.json, which only "
-            "install-hooks-node.py writes, with the key the operator chose for the node"
-        ),
-        install={
-            "pip": "python -m pip install --user " + " ".join(HOOKS_CHECK_PACKAGES),
-        },
     ),
 )
 
@@ -564,9 +480,6 @@ def decode_tool_report(value: JSONValue) -> ToolReport:
 
 
 __all__ = [
-    "HOOKS_CHECK_MODULES",
-    "HOOKS_CHECK_PACKAGES",
-    "HOOKS_ROUTE_FILE",
     "PACKAGE_MANAGERS",
     "PINNED_PYTHON",
     "PYTHON_REGISTERED_GUARD",
@@ -574,8 +487,6 @@ __all__ = [
     "REQUIRED_NODE_MAJOR",
     "REQUIRED_PYTHON",
     "REQUIRED_TOOLS",
-    "TAGGED_TOOLS",
-    "RequiredTool",
     "ToolReport",
     "available_managers",
     "decode_tool_report",

@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.detection import TESTDB_CONTAINER
-from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
+from fleet.contracts.tagged_tools import (
+    GO_VERSION_ARGUMENT,
+    HOOKS_CHECK_MODULES,
+    HOOKS_ROUTE_FILE,
+)
 
 #: The toolchain probe's body, verbatim.
 #:
@@ -64,12 +68,18 @@ from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
 #: THE ``hooks`` LINE is the MCPs claude-hooks check's environment (MCPs
 #: board task ec895824): the route file under the account's home and one
 #: ``python3 -c`` importing every module of
-#: :data:`fleet.contracts.toolchain.HOOKS_CHECK_MODULES`, one ``if``
+#: :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_MODULES`, one ``if``
 #: condition for the ``set -e`` reason above.
+#:
+#: ``report``'s THIRD ARGUMENT is what a tool is asked its version with,
+#: ``--version`` unless given: ``go`` has no such flag and answers its usage,
+#: so it is asked :data:`fleet.contracts.tagged_tools.GO_VERSION_ARGUMENT`
+#: (MCPs board task 1da15750).
 TOOLCHAIN_PROBE_BODY = (
     "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
-    '    printf \'%s=yes=%s\\n\' "$1" "$("$2" --version 2>&1 | head -n 1 | tr -d \'\\r\')"\n'
+    "    printf '%s=yes=%s\\n' \"$1\""
+    ' "$("$2" "${3:---version}" 2>&1 | head -n 1 | tr -d \'\\r\')"\n'
     "  else\n"
     "    printf '%s=no=\\n' \"$1\"\n"
     "  fi\n"
@@ -80,6 +90,7 @@ TOOLCHAIN_PROBE_BODY = (
     "report make make\n"
     "report node node\n"
     "report ffmpeg ffmpeg\n"
+    f"report go go {GO_VERSION_ARGUMENT}\n"
     "report tar tar\n"
     "report cargo cargo\n"
     "if command -v g++ > /dev/null 2>&1; then\n"

@@ -12,7 +12,11 @@ a PATH the suite lays out (MCPs board task d69786fa).
 from __future__ import annotations
 
 from fleet.contracts.detection import TESTDB_CONTAINER
-from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
+from fleet.contracts.tagged_tools import (
+    GO_VERSION_ARGUMENT,
+    HOOKS_CHECK_MODULES,
+    HOOKS_ROUTE_FILE,
+)
 
 #: The toolchain probe, verbatim.
 #:
@@ -26,7 +30,9 @@ from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
 #: stand-in vswhere.
 #:
 #: ``--version`` is asked of each tool and the first line kept, because git
-#: and poetry both print several. A tool that is present but declines to
+#: and poetry both print several; ``go``, which has no such flag and answers
+#: its usage, is asked :data:`fleet.contracts.tagged_tools.GO_VERSION_ARGUMENT`
+#: (MCPs board task 1da15750). A tool that is present but declines to
 #: answer yields an empty version rather than a failure: absence and silence
 #: are different states, and only the first stops a dispatch.
 #:
@@ -77,7 +83,7 @@ from fleet.contracts.toolchain import HOOKS_CHECK_MODULES, HOOKS_ROUTE_FILE
 #: ec895824): ``yes=<route file>`` only when the build account carries the
 #: hooks route file (``$HooksRoute``, a parameter so the suite names one) and
 #: the interpreter the tool loop reported imports every module of
-#: :data:`fleet.contracts.toolchain.HOOKS_CHECK_MODULES` in one ``-c``; a
+#: :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_MODULES` in one ``-c``; a
 #: node without the file is never asked to import. Measured 2026-10-02:
 #: sedona carries the file, pendragon and serendipity do not.
 #: ``integrity`` is the ssh session's token (:mod:`fleet.contracts.elevation`):
@@ -130,15 +136,21 @@ if ($python -like '*\Microsoft\WindowsApps\*') {
     $python = ''
 }
 $tools = @(
-    'python', 'poetry', 'git', 'make', 'node', 'ffmpeg', 'tar', 'cargo', 'winget', 'choco'
+    'python', 'poetry', 'git', 'make', 'node', 'ffmpeg', 'go', 'tar', 'cargo', 'winget', 'choco'
 )
 foreach ($tool in $tools) {
     $found = $python
     if ($tool -ne 'python') {
         $found = Find-Tool $tool
     }
+    $asked = '--version'
+    if ($tool -eq 'go') {
+        $asked = '"""
+    + GO_VERSION_ARGUMENT
+    + r"""'
+    }
     if ($found -ne '') {
-        "$tool=yes=" + (Invoke-Answer $Cmd $found '--version').First
+        "$tool=yes=" + (Invoke-Answer $Cmd $found $asked).First
     } else {
         "$tool=no="
     }

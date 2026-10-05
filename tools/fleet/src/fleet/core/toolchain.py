@@ -26,12 +26,12 @@ from fleet.contracts.capability import PROBE_NAME, Capability, measured
 from fleet.contracts.detection import GPU_PROBE, TESTDB_PROBE
 from fleet.contracts.elevation import INTEGRITY_PROBE
 from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.tagged_tools import TAGGED_TOOLS
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
     REQUIRED_NODE_MAJOR,
     REQUIRED_PYTHON,
     REQUIRED_TOOLS,
-    TAGGED_TOOLS,
     ToolReport,
     available_managers,
     install_command,
@@ -294,7 +294,7 @@ def absent_tagged(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
         reports: What the node answered.
 
     Returns:
-        Each :data:`fleet.contracts.toolchain.TAGGED_TOOLS` name the probe
+        Each :data:`fleet.contracts.tagged_tools.TAGGED_TOOLS` name the probe
         reported absent or did not report at all, in the contract's order.
     """
     found = {report["name"] for report in reports if report["present"]}

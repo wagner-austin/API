@@ -74,6 +74,11 @@ route file, pendragon's and serendipity's did not, and none of the three
 interpreters had the check's tools. It is a tool tag like ``ffmpeg``: the
 probe's ``hooks`` line answers present only when the route file exists and
 the interpreter imports every tool the check runs.
+``go`` because MCPs ``rcs-bridge`` is a Go module and no fleet node had go on
+2026-10-05, when the SMS gateway it feeds was found running ahead of the
+server it reads and both host processes had to become fleet projects (MCPs
+board task 1da15750). It is a tool tag like ``ffmpeg``: the probe's ``go``
+line answers present when ``go`` is on the build account's PATH.
 ``elevated`` because MCPs' Task Scheduler
 installers register what only an administrator may register, and every
 build launches as an S4U task at RunLevel Limited (MCPs board task
@@ -110,7 +115,7 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615, 622, 639 and 648) is the same eleven words as these
+    570, 571, 615, 622, 639, 648 and 668) is the same twelve words as these
     members' values, in this order.
     """
 
@@ -125,6 +130,7 @@ class NodeTag(StrEnum):
     STACK = "stack"
     FFMPEG = "ffmpeg"
     HOOKS = "hooks"
+    GO = "go"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -152,6 +158,7 @@ CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
 TOOL_TAG: Final[dict[str, NodeTag]] = {
     "ffmpeg": NodeTag.FFMPEG,
     "hooks": NodeTag.HOOKS,
+    "go": NodeTag.GO,
 }
 
 
