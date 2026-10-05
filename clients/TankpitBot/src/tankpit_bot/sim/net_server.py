@@ -17,7 +17,8 @@ other connection plays on; the handler's ``finally`` takes the tank off
 the field either way.
 
 The accounts are this server's own (:mod:`tankpit_bot.sim.net_accounts`),
-never tankpit.com's.
+never tankpit.com's, kept in a JSON file or in the ``tankpit_sim``
+Postgres database (:mod:`tankpit_bot.sim.net_store`).
 """
 
 from __future__ import annotations
@@ -25,18 +26,20 @@ from __future__ import annotations
 import asyncio
 import base64
 import sys
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 from websockets.asyncio.server import ServerConnection, broadcast, serve
 
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.sim.net_accounts import load_account_book
+from tankpit_bot.sim.net_accounts import AccountBookProtocol, load_account_book
 from tankpit_bot.sim.net_host import NetHost
 from tankpit_bot.sim.net_room import NetError, field_room_info, open_field_room
+from tankpit_bot.sim.net_store import PostgresAccountBook, connect_store, ensure_schema
 
 log = get_logger(__name__)
 
@@ -49,6 +52,7 @@ _SERVE_FLAGS = frozenset(
         "--bind",
         "--port",
         "--accounts",
+        "--database-env",
         "--room",
         "--ticks",
         "--tick-ms",
@@ -132,13 +136,28 @@ class NetServer:
         return played
 
 
+class AccountSource(NamedTuple):
+    """Where the server's accounts are kept.
+
+    Attributes:
+        kind: ``file`` for a JSON account file, ``database`` for the
+            ``tankpit_sim`` Postgres database.
+        location: The file's path, or the name of the environment
+            variable holding the database's connection string (never the
+            string itself, which carries a password, on a command line).
+    """
+
+    kind: Literal["file", "database"]
+    location: str
+
+
 class ServeArgs(NamedTuple):
     """``tankpit-sim-serve``'s flags.
 
     Attributes:
         bind: The address to listen on.
         port: The port to listen on; 0 picks a free one.
-        accounts: The account file.
+        accounts: Where the accounts are kept.
         rooms: Each room as ``ID:FIELD:MODE`` (mode ``p`` practice, ``n`` open).
         ticks: How many ticks to serve; None serves until interrupted.
         tick_ms: The pause after each tick, the wire's 2 s by default; a
@@ -149,7 +168,7 @@ class ServeArgs(NamedTuple):
 
     bind: str
     port: int
-    accounts: Path
+    accounts: AccountSource
     rooms: tuple[str, ...]
     ticks: int | None
     tick_ms: int
@@ -167,8 +186,9 @@ def parse_serve_args(argv: Sequence[str]) -> ServeArgs:
         The flags.
 
     Raises:
-        NetError: If a flag is unknown, lacks its value, or the account
-            file is not named (``SIM_SERVE_USAGE``).
+        NetError: If a flag is unknown or lacks its value, or the flags
+            name both or neither of ``--accounts`` and ``--database-env``
+            (``SIM_SERVE_USAGE``).
         ValueError: If a numeric flag is not a number.
     """
     values: dict[str, str] = {}
@@ -181,13 +201,19 @@ def parse_serve_args(argv: Sequence[str]) -> ServeArgs:
             rooms.append(argv[index + 1])
         else:
             values[flag] = argv[index + 1]
-    if "--accounts" not in values:
-        raise NetError("SIM_SERVE_USAGE: --accounts PATH names this server's account file")
+    path, variable = values.get("--accounts"), values.get("--database-env")
+    if (path is None) == (variable is None):
+        raise NetError(
+            "SIM_SERVE_USAGE: name the accounts once, --accounts PATH for a JSON file"
+            " or --database-env NAME for the tankpit_sim database"
+        )
     ticks, seed = values.get("--ticks"), values.get("--population-seed")
     return ServeArgs(
         bind=values.get("--bind", DEFAULT_BIND),
         port=int(values.get("--port", str(DEFAULT_PORT))),
-        accounts=Path(values["--accounts"]),
+        accounts=AccountSource("file", path)
+        if path is not None
+        else AccountSource("database", values["--database-env"]),
         rooms=tuple(rooms) if rooms else (DEFAULT_ROOM,),
         ticks=None if ticks is None else int(ticks),
         tick_ms=int(values.get("--tick-ms", str(TICK_RATE_MS))),
@@ -196,11 +222,42 @@ def parse_serve_args(argv: Sequence[str]) -> ServeArgs:
     )
 
 
-def build_host(args: ServeArgs) -> NetHost:
-    """Open every room the flags name, over the account file.
+@contextmanager
+def open_account_book(source: AccountSource) -> Generator[AccountBookProtocol, None, None]:
+    """Open the accounts the flags name, for as long as the server runs.
+
+    A database book's connection is closed when the server stops, and its
+    schema is made sure of first, so a fresh ``tankpit_sim`` database
+    serves without a separate step.
+
+    Args:
+        source: Where the accounts are kept.
+
+    Yields:
+        The account book.
+
+    Raises:
+        LobbyError: If the account file holds an invalid record.
+        StoreError: If the database's connection string is not in the
+            named variable (``SIM_STORE_DSN``).
+    """
+    if source.kind == "file":
+        yield load_account_book(Path(source.location))
+        return
+    connection = connect_store(source.location)
+    try:
+        ensure_schema(connection)
+        yield PostgresAccountBook(connection)
+    finally:
+        connection.close()
+
+
+def build_host(args: ServeArgs, accounts: AccountBookProtocol) -> NetHost:
+    """Open every room the flags name, over an account book.
 
     Args:
         args: The flags.
+        accounts: The book the rooms admit from.
 
     Returns:
         The host, no connections open.
@@ -209,7 +266,6 @@ def build_host(args: ServeArgs) -> NetHost:
         NetError: If a room is not ``ID:FIELD:MODE`` with mode ``p`` or
             ``n`` (``SIM_SERVE_ROOM``), or two rooms share an id.
         FieldChoiceError: If a room names no shipped field.
-        LobbyError: If the account file holds an invalid record.
     """
     rooms = []
     for spec in args.rooms:
@@ -222,7 +278,7 @@ def build_host(args: ServeArgs) -> NetHost:
         rooms.append(
             open_field_room(info, layout=args.layout, population_seed=args.population_seed)
         )
-    return NetHost(tuple(rooms), load_account_book(args.accounts))
+    return NetHost(tuple(rooms), accounts)
 
 
 async def serve_rooms(server: NetServer, args: ServeArgs) -> int:
@@ -252,18 +308,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     """CLI entrypoint for ``tankpit-sim-serve``.
 
     Args:
-        argv: ``--accounts PATH`` and optionally ``--bind ADDR``,
-            ``--port N``, ``--room ID:FIELD:MODE`` (repeatable),
-            ``--ticks N``, ``--tick-ms N``, ``--layout NAME``,
-            ``--population-seed N``.
-            Uses ``sys.argv[1:]`` when None.
+        argv: ``--accounts PATH`` or ``--database-env NAME``, and
+            optionally ``--bind ADDR``, ``--port N``, ``--room
+            ID:FIELD:MODE`` (repeatable), ``--ticks N``, ``--tick-ms N``,
+            ``--layout NAME``, ``--population-seed N``. Uses
+            ``sys.argv[1:]`` when None.
 
     Returns:
         0 once the tick count is served.
     """
     args = parse_serve_args(list(argv) if argv is not None else sys.argv[1:])
     setup_rich_logging(level=LogLevel.INFO)
-    played = asyncio.run(serve_rooms(NetServer(build_host(args)), args))
+    with open_account_book(args.accounts) as accounts:
+        played = asyncio.run(serve_rooms(NetServer(build_host(args, accounts)), args))
     sys.stdout.write(f"sim server: {played} ticks served\n")
     return 0
 
@@ -272,10 +329,12 @@ __all__ = [
     "DEFAULT_BIND",
     "DEFAULT_PORT",
     "DEFAULT_ROOM",
+    "AccountSource",
     "NetServer",
     "ServeArgs",
     "build_host",
     "main",
+    "open_account_book",
     "parse_serve_args",
     "serve_rooms",
 ]

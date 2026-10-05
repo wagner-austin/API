@@ -24,7 +24,7 @@ from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.field_choice import resolve_field
 from tankpit_bot.sim.field_run import make_field_world
-from tankpit_bot.sim.lobby import SimAccountDict
+from tankpit_bot.sim.net_accounts import AdmittedAccount, SeatResult
 from tankpit_bot.sim.practice_room import PracticeRoomDriver
 from tankpit_bot.sim.run_boot import _queue_round_opponents, _seed_world, resolve_named_world
 from tankpit_bot.sim.scenarios import SIM_CLIENT_ID, SIM_ENEMY_ID
@@ -97,12 +97,16 @@ class NetRoom:
         self.server = server
         self._driver = driver
         self._admitted = 0
+        self._seated_at: dict[int, int] = {}
 
-    def seat(self, account: SimAccountDict, troop: int) -> int:
+    def seat(self, player: AdmittedAccount, troop: int) -> int:
         """Place a player's tank on the field and connect it.
 
+        The tank carries the account's rank and decoration levels, so a
+        player rejoins as what it left as.
+
         Args:
-            account: The player's account.
+            player: The player's account, as the book admitted it.
             troop: The team the player entered with, 0 to 3.
 
         Returns:
@@ -128,24 +132,40 @@ class NetRoom:
             raise NetError(f"SIM_NET_ROOM_FULL: room {self.info['room_id']} has no open tile")
         tank_id = NET_PLAYER_ID_BASE + self._admitted
         self._admitted += 1
-        rank = account["rank"]
+        name, rank = player.account["name"], player.account["rank"]
         world["tanks"][tank_id] = make_sim_tank(
-            tank_id, troop, rank, landing[0], landing[1], fuel_capacity(rank), name=account["name"]
+            tank_id, troop, rank, landing[0], landing[1], fuel_capacity(rank), name=name
         )
-        self.server.connect(tank_id)
-        log.info("room %s: %s seated as tank %d", self.info["room_id"], account["name"], tank_id)
+        self.server.connect(tank_id).awards.levels = list(player.decorations)
+        self._seated_at[tank_id] = world["tick"]
+        log.info("room %s: %s seated as tank %d", self.info["room_id"], name, tank_id)
         return tank_id
 
-    def leave(self, tank_id: int) -> None:
-        """Take a player's tank off the field and close its connection.
+    def leave(self, tank_id: int) -> SeatResult:
+        """Take a player's tank off the field, closing its connection.
 
         Args:
             tank_id: The player's tank.
 
+        Returns:
+            What the seat came to, read before the tank leaves.
+
         Raises:
             SimError: If nothing is connected for the tank.
         """
+        session = self.server.require_session(tank_id)
+        world = self.server.world
+        result = SeatResult(
+            room_id=self.info["room_id"],
+            field=world["field"],
+            ticks=world["tick"] - self._seated_at.pop(tank_id),
+            rank=world["tanks"][tank_id]["rank"],
+            kills=self.server.combat.destroyed_by(tank_id),
+            deaths=self.server.combat.deactivations_of(tank_id),
+            decorations=tuple(session.awards.levels),
+        )
         self.server.disconnect(tank_id)
+        return result
 
     def advance(self) -> dict[int, list[BinaryMessage]]:
         """Play one tick: the roster decides, the field advances.

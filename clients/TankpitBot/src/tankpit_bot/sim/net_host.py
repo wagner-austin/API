@@ -19,7 +19,9 @@ A connection's life, in the archive's own order
    the room on the troop the client chose (:meth:`NetRoom.seat`).
 3. From then its ``!`` frames are commands for that tank, and each tick
    it is sent its batch, enveloped and XOR'd as the real wire is.
-4. A quit frame, or the socket closing, takes the tank off the field.
+4. A quit frame, or the socket closing, takes the tank off the field,
+   and the account book records what the seat came to: the rank and
+   decoration levels the account rejoins with, and the session itself.
 
 Anything else is a protocol error, raised with a ``SIM_NET_*``,
 ``SIM_LOBBY_*`` or decode code for the socket layer to end that one
@@ -28,9 +30,11 @@ connection with.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sim.lobby import SimLobby, parse_auth_frame
-from tankpit_bot.sim.net_accounts import AccountBookProtocol
+from tankpit_bot.sim.net_accounts import AccountBookProtocol, AdmittedAccount
 from tankpit_bot.sim.net_room import NetError, NetRoom
 from tankpit_bot.sim.transport import (
     encode_plaintext_payload,
@@ -39,16 +43,41 @@ from tankpit_bot.sim.transport import (
 )
 
 
+class _Seat(NamedTuple):
+    """Where a connection's tank plays.
+
+    Attributes:
+        room: The room it sits in.
+        tank_id: Its tank.
+    """
+
+    room: NetRoom
+    tank_id: int
+
+
+class _Player(NamedTuple):
+    """Who a connection's AUTH admitted, and the cipher it named.
+
+    Attributes:
+        account_id: The account.
+        admitted: The account as a room seats it.
+        lobby: The connection's half of the pre-play protocol.
+        table: The connection's XOR table.
+    """
+
+    account_id: str
+    admitted: AdmittedAccount
+    lobby: SimLobby
+    table: bytes
+
+
 class _Connection:
-    """One client's place in the host: its lobby, cipher and seat."""
+    """One client's place in the host: who it is, and where it sits."""
 
     def __init__(self) -> None:
-        """Start before AUTH: no account, no table, no seat."""
-        self.account_id: str | None = None
-        self.lobby: SimLobby | None = None
-        self.table: bytes | None = None
-        self.room: NetRoom | None = None
-        self.tank_id: int | None = None
+        """Start before AUTH: no player, no seat."""
+        self.player: _Player | None = None
+        self.seat: _Seat | None = None
 
 
 class NetHost:
@@ -124,12 +153,14 @@ class NetHost:
             SimError: For a command the sim cannot decode.
         """
         connection = self._require(connection_id)
-        routed = route_client_frames(payload, connection.table)
+        table = None if connection.player is None else connection.player.table
+        routed = route_client_frames(payload, table)
         replies = [reply for body in routed.lobby for reply in self._lobby_frame(connection, body)]
         for command in routed.commands:
-            if connection.room is None or connection.tank_id is None:
+            seat = connection.seat
+            if seat is None:
                 raise NetError(f"SIM_NET_NOT_SEATED: connection {connection_id} has no tank")
-            connection.room.server.queue_command(connection.tank_id, command)
+            seat.room.server.queue_command(seat.tank_id, command)
         return [encode_plaintext_payload([reply]) for reply in replies]
 
     def _lobby_frame(self, connection: _Connection, body: bytes) -> list[bytes]:
@@ -148,34 +179,55 @@ class NetHost:
             NetError: If the account is connected already
                 (``SIM_NET_IN_USE``), or the room refuses the seat.
         """
-        if connection.lobby is None:
-            auth = parse_auth_frame(body)
-            account = self._accounts.verify(auth["account_id"], auth["token"])
-            if any(other.account_id == auth["account_id"] for other in self._connections.values()):
-                raise NetError(f"SIM_NET_IN_USE: account {auth['account_id']!r} is connected")
-            connection.account_id = auth["account_id"]
-            connection.lobby = SimLobby(account, tuple(room.info for room in self._rooms))
-            connection.table = build_session_xor_table(auth["magic"])
-        lobby = connection.lobby
-        replies = lobby.handle_frame(body)
-        if lobby.quit:
+        player = connection.player
+        if player is None:
+            player = self._admit(body)
+            connection.player = player
+        replies = player.lobby.handle_frame(body)
+        entry = player.lobby.entry
+        if player.lobby.quit:
             self._unseat(connection)
-        elif connection.tank_id is None and lobby.entry is not None:
-            room = next(r for r in self._rooms if r.info["room_id"] == lobby.entry.room_id)
-            connection.tank_id = room.seat(lobby.account, lobby.entry.troop)
-            connection.room = room
+        elif connection.seat is None and entry is not None:
+            room = next(r for r in self._rooms if r.info["room_id"] == entry.room_id)
+            connection.seat = _Seat(room=room, tank_id=room.seat(player.admitted, entry.troop))
         return replies
 
+    def _admit(self, body: bytes) -> _Player:
+        """Read a connection's first frame as its AUTH, and admit it.
+
+        Args:
+            body: The frame body.
+
+        Returns:
+            The admitted player, its lobby and its cipher table.
+
+        Raises:
+            LobbyError: If the frame is not an AUTH, or the book does not
+                admit the account.
+            NetError: If the account is connected already (``SIM_NET_IN_USE``).
+        """
+        auth = parse_auth_frame(body)
+        admitted = self._accounts.verify(auth["account_id"], auth["token"])
+        playing = {c.player.account_id for c in self._connections.values() if c.player is not None}
+        if auth["account_id"] in playing:
+            raise NetError(f"SIM_NET_IN_USE: account {auth['account_id']!r} is connected")
+        return _Player(
+            account_id=auth["account_id"],
+            admitted=admitted,
+            lobby=SimLobby(admitted.account, tuple(room.info for room in self._rooms)),
+            table=build_session_xor_table(auth["magic"]),
+        )
+
     def _unseat(self, connection: _Connection) -> None:
-        """Take a connection's tank off the field, if it has one.
+        """Take a connection's tank off the field and record its seat, if it has one.
 
         Args:
             connection: The connection leaving play.
         """
-        if connection.room is not None and connection.tank_id is not None:
-            connection.room.leave(connection.tank_id)
-        connection.room = None
-        connection.tank_id = None
+        seat, player = connection.seat, connection.player
+        if seat is not None and player is not None:
+            self._accounts.record(player.account_id, seat.room.leave(seat.tank_id))
+        connection.seat = None
 
     def tick(self) -> dict[int, str]:
         """Advance every room one tick and encode each player's batch.
@@ -191,12 +243,11 @@ class NetHost:
         batches = {room.info["room_id"]: room.advance() for room in self._rooms}
         payloads: dict[int, str] = {}
         for connection_id, connection in self._connections.items():
-            room, tank_id, table = connection.room, connection.tank_id, connection.table
-            if room is None or tank_id is None or table is None:
+            seat, player = connection.seat, connection.player
+            if seat is None or player is None:
                 continue
-            payloads[connection_id] = encode_tick_payload(
-                batches[room.info["room_id"]][tank_id], table
-            )
+            batch = batches[seat.room.info["room_id"]][seat.tank_id]
+            payloads[connection_id] = encode_tick_payload(batch, player.table)
         return payloads
 
     def close(self, connection_id: int) -> None:
