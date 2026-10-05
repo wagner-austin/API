@@ -80,6 +80,7 @@ one condition it exists to keep reporting.
 
 from __future__ import annotations
 
+import functools
 import sys
 import uuid
 from collections.abc import Callable, Sequence
@@ -409,11 +410,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     credentials = queue.load_credentials()
 
-    def settle(run_id: str) -> str:
-        return node_watch.collect_ended(
-            loaded, credentials, board, identity, agent=agent, run_id=run_id
-        )
-
+    settle = functools.partial(
+        node_watch.collect_ended, loaded, credentials, board, identity, agent=agent
+    )
     watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
 
     def collect() -> None:

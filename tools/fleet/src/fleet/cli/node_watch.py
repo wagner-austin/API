@@ -70,7 +70,7 @@ THREAD_PREFIX: Final = "fleet-watch"
 class Settle(Protocol):
     """Close out one held run whose node has written its result."""
 
-    def __call__(self, run_id: str) -> str:
+    def __call__(self, *, run_id: str) -> str:
         """Settle the run.
 
         Args:
@@ -331,7 +331,7 @@ class RunWatch:
                     return
                 _log.info("%s: %s has ended; collecting it now", self._alias, run_id)
                 try:
-                    line = self._settle(run_id)
+                    line = self._settle(run_id=run_id)
                 finally:
                     self._end_settle()
                 _log.info("%s", line)
