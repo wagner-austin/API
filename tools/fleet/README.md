@@ -1101,6 +1101,25 @@ holding that id is still running this dispatch's own `build.ps1`, read off
 its command line, because ids are reused. A Linux unit needs none of this:
 stopping it stops its control group.
 
+**`taskkill /T` walks parent links, so the build also contains itself**
+(MCPs board task e40bca34). A process whose parent has already exited is not
+in the tree `/T` walks. On sedona, run `MCPs-mcp-proxy-sedona-1791080670`
+hung in its test-database install step; the runner stopped it past its lease
+at 2026-10-04T02:57Z, and two `bash.exe` of `ci-bootstrap-testdb.sh` (pids
+8728 and 14792, parent 19568 gone) lived on holding the transcript cmd.exe's
+`>>` had handed them. Every retire after that stopped on `Move-Item`'s
+"being used by another process", and every tick of sedona's runner exited 1
+until the pair was ended by hand at 2026-10-05T04:44Z. So `build.ps1`, right
+after recording its `$PID`, puts itself in a kill-on-close job object
+(`fleet.core.windows_job`): every process the build starts is in the job
+whatever becomes of its parent, and when the build ends, by finishing or by
+the stop's `taskkill`, the kernel ends every process still in it. And the
+retire, before it moves the transcript, asks Restart Manager which processes
+hold it (`fleet.core.windows_holders`), logs each as
+`FLEET_RETIRE_HOLDER_ENDED: pid <n> <image> (<command line>)`, and ends it by
+pid after reading its start time again; a service or critical process is
+refused as `FLEET_RETIRE_HOLDER_PROTECTED`, by name, and never killed.
+
 **The node runner stops two kinds of run by itself**, through the same
 `fleet.core.stop` path (MCPs board task fd5cabfa):
 
