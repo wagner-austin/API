@@ -55,6 +55,68 @@ class RunResult(TypedDict):
     finished_unix: int
 
 
+class Polled(TypedDict):
+    """One read of a dispatch's result, which a node may not have answered.
+
+    Attributes:
+        result: How it ended; None while it is still going, or when the
+            node did not answer.
+        unreachable: Why the node did not answer, when ssh could not reach
+            it or timed out; None when it answered.
+    """
+
+    result: RunResult | None
+    unreachable: str | None
+
+
+def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
+    """Ask a node how one dispatch ended, reporting a node that did not answer as a value.
+
+    For the serve's watch (:mod:`fleet.cli.node_watch`, MCPs board task
+    8993c306), which reads every held run every few seconds: a node that
+    misses one read, as lavender-wsl did at 09:26:24Z on 2026-10-05 with its
+    host down to 2.6 GB free, is read again at the next poll, as the claim's
+    gate treats a probe it did not answer (:func:`fleet.core.probe.attempt_probe`),
+    rather than ending the serve and leaving the node unwatched until the
+    next fire.
+
+    Args:
+        node: The node it was dispatched to.
+        run_id: The dispatch.
+
+    Returns:
+        Its status and finish time, None while it is still going, or why
+        the node did not answer.
+
+    Raises:
+        AppError: ``DISPATCH_FAILED`` when the node answered and the read
+            failed there, or ``RUN_RESULT_UNREADABLE`` when it answered with
+            something that is not a status and a timestamp. The last is
+            fatal rather than treated as unfinished: an unreadable result
+            would otherwise make a finished run look like a running one
+            forever, holding a node's budget against work that stopped.
+    """
+    target = names.dispatch_directory(node["stage_root"], run_id)
+    spoken = dialect.for_platform(node["platform"])
+    # A distinct script name from the build's own, so that reading a result
+    # cannot overwrite the thing that produced it -- collection runs
+    # repeatedly against a directory a build is still writing to.
+    outcome = remote.attempt_script(
+        node["host"],
+        spoken.script_path(target, names.COLLECT_STEM),
+        spoken.result_script(target),
+        platform=node["platform"],
+    )
+    failure = outcome["failure"]
+    if failure is not None and failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
+        return Polled(result=None, unreachable=failure["message"])
+    if failure is not None:
+        raise AppError(failure["code"], failure["message"])
+    return Polled(
+        result=_read_result(node, run_id=run_id, answer=outcome["output"]), unreachable=None
+    )
+
+
 def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
     """Ask a node how one dispatch ended, if it has.
 
@@ -68,24 +130,30 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
         of every dispatch for as long as it runs.
 
     Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
-            transport, or ``RUN_RESULT_UNREADABLE`` when the node answered
-            with something that is not a status and a timestamp. The last is
-            fatal rather than treated as unfinished: an unreadable result
-            would otherwise make a finished run look like a running one
-            forever, holding a node's budget against work that stopped.
+        AppError: With ``NODE_UNREACHABLE`` when the node did not answer, or
+            as :func:`attempt_poll_result` raises.
     """
-    target = names.dispatch_directory(node["stage_root"], run_id)
-    spoken = dialect.for_platform(node["platform"])
-    # A distinct script name from the build's own, so that reading a result
-    # cannot overwrite the thing that produced it -- collection runs
-    # repeatedly against a directory a build is still writing to.
-    answer = remote.run_script(
-        node["host"],
-        spoken.script_path(target, names.COLLECT_STEM),
-        spoken.result_script(target),
-        platform=node["platform"],
-    ).strip()
+    polled = attempt_poll_result(node, run_id=run_id)
+    if polled["unreachable"] is not None:
+        raise AppError(FleetErrorCode.NODE_UNREACHABLE, polled["unreachable"])
+    return polled["result"]
+
+
+def _read_result(node: NodeConfig, *, run_id: str, answer: str) -> RunResult | None:
+    """Read a node's answer to the result script.
+
+    Args:
+        node: The node, for the message.
+        run_id: The dispatch.
+        answer: What the script printed.
+
+    Returns:
+        The status and finish time, or None when it printed nothing.
+
+    Raises:
+        AppError: ``RUN_RESULT_UNREADABLE`` for anything else.
+    """
+    answer = answer.strip()
     if not answer:
         return None
     fields = answer.split()
@@ -201,7 +269,9 @@ def outlived_its_lease(row: LedgerEntry, plan: ProjectConfig, *, finished_unix: 
 
 __all__ = [
     "PASSING_EXIT_CODE",
+    "Polled",
     "RunResult",
+    "attempt_poll_result",
     "describe",
     "lease_deadline",
     "outcome_for",
