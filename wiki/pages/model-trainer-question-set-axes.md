@@ -17,25 +17,34 @@ source_paths:
   - tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-stage.json
   - tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-digests.txt
   - tools/hpc3/runs/qa-full-wiki-gpt2-v52.json
+  - tools/hpc3/runs/qa-full-wiki-v56.json
+  - tools/hpc3/runs/qa-full-wiki-pythia-6.9b-a30-v56.json
+  - tools/hpc3/runs/hpc3-cartridge-qa.json
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_axes.py": 6ccec43e387e9517f763ac1499337c4a8565f1fa
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_axes.py": 377f81f34295d45103954ec18b33764e530332a9
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_plans.py": 56c017ec9582b3271d6a05c164ad3c5f72b07c20
   "services/Model-Trainer/src/model_trainer/core/contracts/qa_plan.py": 11072ccc6494a0db30b6b4ab52e2989cdd446f76
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_power.py": 7a1566221a09ea1e36da9ff45c64c865323b059b
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_question_set.py": 0bfe2ff9a9e2e2bd310898af8e5a980d0514bb01
   "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 0789465e4cc23a2ee2cc2ca735e0ee7e0697c096
   "services/Model-Trainer/src/model_trainer/cli/cartridge_solo_seeds.py": f77d37acd17b88451fc0264ec29417931035ebcc
-  "tools/hpc3/specs/abl-image.json": a3688867391c9afd87c34f102d25bf9f00e390f9
+  "tools/hpc3/specs/abl-image.json": 8d82403dbdd8e7c2051ee2521e93d0efa1aacd52
   "tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-stage.json": fb3cb4a487382c897508c8b1b1f4890c22babd4a
   "tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-digests.txt": 27c0615da115d3c684e8d6e6ad96a0965589f03a
   "tools/hpc3/runs/qa-full-wiki-gpt2-v52.json": fa3fa9a9a37c9530a9b5e7648c0ba329f1feb913
+  "tools/hpc3/runs/qa-full-wiki-v56.json": 2fe0e5e562b2da10a719a27f223b854fe61d80b0
+  "tools/hpc3/runs/qa-full-wiki-pythia-6.9b-a30-v56.json": 56724d50894f22738093e4560e1e7221cc37aad0
+  "tools/hpc3/runs/hpc3-cartridge-qa.json": 86660ee5bed1f6ec195f74c846b55fa8b8c5d0cb
 provenance:
   - "item counts measured 2026-10-04 on austinpc by running cartridge_question_set.build_question_set over ~/PROJECTS/wiki/pages at wiki commit ee6e6d12 (885 pages, `git status --porcelain -- pages` empty): gpt2 tokenizer, 1,634,715 tokens, 3,753 items at window 128, 3,827 at 256, 3,278 at 512; EleutherAI/pythia-6.9b tokenizer, 1,589,449 tokens, 3,793 items at window 256; corpus digest a756664dbb4e"
   - "the same builder over ~/PROJECTS/API/wiki/pages (38 pages, 104,524 gpt2 tokens) yields 275 items at window 256, against plans whose max_items was 240"
   - "HPC3 ledger rows for the earlier full-wiki submissions: 55898551 FAILED in 332s (image v50 lacked gpt2-full-wiki-qa, KeyError in the job's .err), 55901956 FAILED in 1454s (torch.OutOfMemoryError in the dense embedder's BERT forward, 22.86 GiB requested), 55914185 PREEMPTED at 1341s on hpc3-gpu-l54-04 while still building items"
   - "/pub/wagnera3/hf/hub on 2026-10-04 holds gpt2, gpt2-medium, gpt2-large, gpt2-xl, EleutherAI/pythia-6.9b and thenlper/gte-base, so every rung runs with HF_HUB_OFFLINE=1"
-  - "image v55: build job 57747902 on free, from commit 04d46ff9 (spec commit c9b25ef0); the five first-party wheels' sha256 matched on both sides of the upload"
-fact_checked: "2026-10-04"
+  - "image v55: build job 57747902 on free, from commit 04d46ff9 (spec commit c9b25ef0); the five first-party wheels' sha256 matched on both sides of the upload; its run documents were cancelled with no output"
+  - "image v56: build job 57748479 COMPLETED on free in 48m15s, 54 of 54 smoke checks, /pub/wagnera3/images/v56/abl sha256 890e444560d4c5caa43860bfd3235849471eadc01acbe77b968ae30e6aa7d5be; its GIT_COMMIT file read 0e9f177f56d5e6895b6a148f6ae86901d18d4e89 over ssh on 2026-10-05"
+  - "hpc3-preflight on 2026-10-05 against the A100 default: GPU_MODEL_EXHAUSTED, free-gpu A100 0/2 free, A30 10/28, V100 5/12; on A30 the array was admitted at 156.00 projected GPU-hours and the 7B run at 36.00, against the project's 200.00"
+  - "submitted 2026-10-05 by hpc3-sweep and hpc3-submit: job array 57783112_[0-12] (qa-full-wiki-v56) and job 57783131 (qa-full-wiki-pythia-6.9b-a30-v56), both on free-gpu"
+fact_checked: "2026-10-05"
 confidence: medium
 hubs: [services]
 ---
@@ -115,9 +124,18 @@ change.
 The corpus is staged with `hpc3-stage` to
 `/pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12`. Each file's sha256 is
 checked on both sides and against a digest listing read from the wiki tree
-itself, not from the snapshot that was staged.[^stage] Image v55 is built from
-the commit that carries the family. Its smoke check 49 asserts the cells and
-the bf16 resolution inside the image and fails against v54.[^image]
+itself, not from the snapshot that was staged.[^stage] Image v56 is built from
+`0e9f177f`, the published commit that declares every cell by a literal name.
+Its fiftieth smoke check asserts the cells and the bf16 resolution inside the
+image.[^image] v55, built from an unpublished worktree commit whose cell names
+were assembled by an f-string, was cancelled before it produced anything.
+
+The family runs as two documents, because a sweep's members share one GPU
+profile. The 13 gpt2-family cells are one job array and the 7B rung is its own
+2,160-minute run, all on A30s.[^runs] The project's default card is the A100,
+but `free-gpu` carried two and neither was free on 2026-10-05, against 10 of
+28 A30s, so `hpc3-preflight` refused the array. The 7B rung needs an A30 for
+its weights anyway, so the whole ladder now times on one card model.
 
 Three earlier full-wiki submissions never produced a number. The first image
 predated the plan, the dense embedder ran out of memory on an unbatched
@@ -130,7 +148,8 @@ behind it.[^v52]
 [^items]: `services/Model-Trainer/src/model_trainer/core/services/model/cartridge_question_set.py` § `build_question_set`, which reads `plan["window"]` to find each held-out window.
 [^prec]: `services/Model-Trainer/src/model_trainer/core/contracts/qa_plan.py` § `QaPlan.precision_selector`; `services/Model-Trainer/src/model_trainer/cli/cartridge_solo_seeds.py` § `resolve_precision`.
 [^stage]: `tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-stage.json` (destination, 885 files, provenance block) and `tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-digests.txt` (the record `--expect-from` holds it to).
-[^image]: `tools/hpc3/specs/abl-image.json`, `git_commit` and the forty-ninth `smoke_commands` entry.
+[^image]: `tools/hpc3/specs/abl-image.json`, `git_commit` and the fiftieth `smoke_commands` entry.
+[^runs]: `tools/hpc3/runs/qa-full-wiki-v56.json` (13 members, `gpu` A30, `throttle` 6) and `tools/hpc3/runs/qa-full-wiki-pythia-6.9b-a30-v56.json` (`minutes` 2160, `gpu_pinned_because`); the project defaults they override are in `tools/hpc3/runs/hpc3-cartridge-qa.json`. The preflight reading and the job ids are under `provenance:`.
 [^why]: `services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_axes.py`, the module docstring's "WHY THE FULL WIKI AND NOT THE API-CODEBASE WIKI" paragraph, which records the 237- and 275-item yields against the 240 cap; the item counts themselves are under `provenance:`.
-[^budget]: `services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_axes.py` § `SLOT_AXIS_MAX_SEQ_LEN`, 768, which is 1024 less the largest of `SLOT_COUNTS`.
+[^budget]: `services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_axes.py` § `SLOT_AXIS_MAX_SEQ_LEN`, 768, which is 1024 less the largest of `SLOT_CELLS`.
 [^v52]: `tools/hpc3/runs/qa-full-wiki-gpt2-v52.json`, whose `--corpus` is `/pub/wagnera3/mi/cartridge/corpus-me-wiki-full`; no `*-stage.json` under `tools/hpc3/runs/` names that destination. The three job ids and their outcomes are under `provenance:`.

@@ -6,7 +6,7 @@
 
 ## Hubs
 
-[Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (14 pages)
+[Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (13 pages)
 [Clients](hubs/clients.md) -- DiscordBot, TankpitBot and RustedWarfareBot, plus NavProbe, which is a simulator-determinism instrument rather than a user-facing client (1 page, cross-listed from infrastructure; TankpitBot, RustedWarfareBot and NavProbe each maintain their own dedicated wiki under `clients/<name>/wiki/`, which is why this hub stays thin by design)
 [Libs](hubs/libs.md) -- shared platform_* libraries (core, workers, ml, discord, music, email, calendar, codebase, devpost, kaggle, stt, langid, translate) + domain libs (covenant_domain/ml/nn/persistence, cleargbm, cleargbm_rs, procart) + instrument_io + monorepo_guards (24 pages)
 [Infrastructure](hubs/infrastructure.md) -- docker-compose, Traefik, Redis/RQ, PostgreSQL, monorepo build + test + lint conventions, run-comparability env (3 pages; cluster submission is NOT here — `tools/hpc3` keeps its own wiki, see below)
