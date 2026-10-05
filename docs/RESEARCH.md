@@ -1137,7 +1137,13 @@ entry point that builds a `RunRecord` and is named nowhere here.
   its own document (`qa-full-wiki-pythia-6.9b-a30-v56.json`, 2,160 minutes),
   because a sweep's members share one GPU profile. Artifacts land under
   `/pub/wagnera3/mi/cartridge/results/qa-full-wiki-v56-<plan>.json`, with
-  each plan's checkpoint in `results/checkpoints/`.
+  each plan's checkpoint in `results/checkpoints/`, and are committed beside
+  the sibling cartridge records as
+  `services/Model-Trainer/results/cartridge/qa-full-wiki-v56-<plan>.json`.
+  **Submitted 2026-10-05:** job array `57783112_[0-12]` (the 13 cells, in
+  the member order of `qa-full-wiki-v56.json`) and job `57783131` (the 7B
+  rung), both by the hpc3 CLI with the submitter recorded in the ledger. No
+  cell has produced a record yet; the result belongs here when one does.
 
   **Every cell runs on an A30, not the project's default A100.**
   `hpc3-preflight` on 2026-10-05 refused the array with
