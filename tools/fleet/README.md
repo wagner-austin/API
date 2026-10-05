@@ -481,7 +481,14 @@ reach the board through that route file; measured 2026-10-02, sedona carried
 the file and pendragon and serendipity did not. A node with pip but without
 the tools is offered `python -m pip install --user` at the versions the hub
 ran that check with; the route file only `install-hooks-node.py` writes.
-Installing a tool therefore makes a
+`go` is found the same way, asked `go version` because go has no `--version`
+flag (MCPs board task 1da15750). It routes MCPs `rcs-bridge`, the Go half of
+the SMS gateway, which became a fleet project with `MCPs/sms-gateway` once an
+outage on 2026-10-05 showed a host process needed a check a closure could
+cite; no fleet node had go that day, and a node without it is offered
+`winget install --id GoLang.Go`, `choco install golang` or
+`sudo apt-get install -y golang-go` (any go from 1.21 fetches the 1.27.1
+toolchain the module names). Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
 disappears takes its tag with it. Each difference from `fleet.json` is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its
