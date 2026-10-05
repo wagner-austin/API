@@ -230,6 +230,32 @@ class TestAWatchHoldingNothing:
         assert watch.close_if_idle() is True
 
 
+class TestARunTheLedgerNoLongerCallsRunning:
+    def test_is_not_read_off_the_node(self, sourced_config: pathlib.Path) -> None:
+        """A run the collect pass settled or stopped while the watch held
+        it: the read would send its script into the directory the retire
+        removes, as at 07:00Z on 2026-10-05 on lavender-wsl, so it is not
+        made (MCPs board task 8993c306)."""
+        loaded = _poll_every_second(sourced_config)
+        node = FakeRun([])
+        _test_hooks.run = node
+        watch = _watch(loaded, _never_settles)
+
+        assert watch.ended("a-run-the-ledger-closed") is False
+        assert node.calls == []
+
+    def test_is_read_while_it_is_live(self, sourced_config: pathlib.Path) -> None:
+        launch(sourced_config)
+        loaded = _poll_every_second(sourced_config)
+        node = FakeRun([*STILL_RUNNING, *ENDED])
+        _test_hooks.run = node
+        watch = _watch(loaded, _never_settles)
+
+        assert watch.ended(DEMO_RUN_ID) is False
+        assert watch.ended(DEMO_RUN_ID) is True
+        assert len(node.calls) == len(STILL_RUNNING) + len(ENDED)
+
+
 class TestASettleThatRaises:
     def test_leaves_the_watch_closable_and_the_error_goes_on(
         self, sourced_config: pathlib.Path
