@@ -62,6 +62,18 @@ VITEST_THRESHOLD: Final[re.Pattern[str]] = re.compile(
     r"Coverage for (statements|branches|functions|lines) \((\d+(?:\.\d+)?)%\) does not meet"
 )
 
+#: maketools' check budget verdict for a check that stayed within it:
+#: ``CHECK BUDGET: <package> took 37s of 300s (<split>).`` (MCPs board task
+#: 1b152218), printed by check-lock in MCPs and by check-budget here.
+BUDGET_WITHIN: Final[re.Pattern[str]] = re.compile(r"CHECK BUDGET: \S+ took (\d+)s of (\d+)s")
+
+#: The same rule's verdict for a check past it, which exits non-zero after
+#: every suite passed: ``CHECK OVER BUDGET: <package> took 1261s, over the
+#: 300s budget by 961s.``
+BUDGET_OVER: Final[re.Pattern[str]] = re.compile(
+    r"CHECK OVER BUDGET: \S+ took (\d+)s, over the (\d+)s budget"
+)
+
 
 class Verdict(TypedDict):
     """One check's outcome, as the thread line carries it.
@@ -76,6 +88,7 @@ class Verdict(TypedDict):
         banner: Whether :data:`CHECK_BANNER` was read in the tail.
         tests: ``<passed>p/<failed>f`` read off the tail, or ``unread``.
         coverage: The coverage figures read off the tail, or ``unread``.
+        budget: The check budget verdict read off the tail, or ``unread``.
         log_path: The transcript's absolute path on the node.
         run_id: The fleet ledger's run id.
     """
@@ -88,6 +101,7 @@ class Verdict(TypedDict):
     banner: bool
     tests: str
     coverage: str
+    budget: str
     log_path: str
     run_id: str
 
@@ -153,6 +167,31 @@ def read_coverage(tail: str) -> str:
     return "unread"
 
 
+def read_budget(tail: str) -> str:
+    """Read the check budget verdict off a transcript tail.
+
+    A check over its budget exits non-zero with every suite green, so its
+    row reads like any other red one unless the line says which failure it
+    was; this field is how a fleet row reads as the budget's loud failure.
+
+    Args:
+        tail: The transcript's last lines.
+
+    Returns:
+        ``over:<took>s/<budget>s`` from the over-budget verdict,
+        ``within:<took>s/<budget>s`` from the within-budget one, else
+        ``unread`` (a package whose check predates the budget, or a run
+        that stopped before the verdict printed).
+    """
+    over = BUDGET_OVER.search(tail)
+    if over is not None:
+        return f"over:{over.group(1)}s/{over.group(2)}s"
+    within = BUDGET_WITHIN.search(tail)
+    if within is not None:
+        return f"within:{within.group(1)}s/{within.group(2)}s"
+    return "unread"
+
+
 def judge(
     *,
     job_id: str,
@@ -188,6 +227,7 @@ def judge(
         banner=CHECK_BANNER in tail,
         tests=read_tests(tail),
         coverage=read_coverage(tail),
+        budget=read_budget(tail),
         log_path=log_path,
         run_id=run_id,
     )
@@ -201,20 +241,23 @@ def render_verdict(verdict: Verdict) -> str:
 
     Returns:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
-        banner=<yes|no> tests=<...> coverage=<...> log=<node>:<path>
-        run=<run id>``, one line, so a closure can quote it and a reader can
-        grep a thread for the prefix.
+        banner=<yes|no> tests=<...> coverage=<...> budget=<...>
+        log=<node>:<path> run=<run id>``, one line, so a closure can quote it
+        and a reader can grep a thread for the prefix.
     """
     return (
         f"{VERDICT_PREFIX} {verdict['job_id'][:8]} {verdict['project']} "
         f"sha={verdict['sha']} node={verdict['node']} exit={verdict['exit_code']} "
         f"banner={'yes' if verdict['banner'] else 'no'} tests={verdict['tests']} "
-        f"coverage={verdict['coverage']} log={verdict['node']}:{verdict['log_path']} "
+        f"coverage={verdict['coverage']} budget={verdict['budget']} "
+        f"log={verdict['node']}:{verdict['log_path']} "
         f"run={verdict['run_id']}"
     )
 
 
 __all__ = [
+    "BUDGET_OVER",
+    "BUDGET_WITHIN",
     "CHECK_BANNER",
     "FAILED",
     "LOG_TAIL_LINES",
@@ -225,6 +268,7 @@ __all__ = [
     "VITEST_THRESHOLD",
     "Verdict",
     "judge",
+    "read_budget",
     "read_coverage",
     "read_tests",
     "render_verdict",
