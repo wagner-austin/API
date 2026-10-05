@@ -428,7 +428,7 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "clients/TankpitBot",
-        "install": [],
+        "install": [{"phase": "install", "argv": ["make", "-s", "-C", "clients/TankpitBot", "install"]}],
         "companions": []
       }
     },
