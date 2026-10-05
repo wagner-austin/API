@@ -99,6 +99,7 @@ def settle(
     row: LedgerEntry,
     node: NodeConfig,
     exit_code: int,
+    ended_unix: int,
     detail: str,
     stopped: str | None,
 ) -> str:
@@ -113,6 +114,7 @@ def settle(
         row: The run's live ledger row.
         node: The node it ran on.
         exit_code: The status to record.
+        ended_unix: When the check ended: its result's time, or the stop's.
         detail: What the ledger and the feed say about it.
         stopped: Why the runner stopped the build, appended to the verdict
             line, or None when the build finished on its own.
@@ -144,6 +146,7 @@ def settle(
         node=row["node"],
         exit_code=exit_code,
         tail=tail,
+        ended_unix=ended_unix,
         log_path=retained,
         run_id=row["run_id"],
     )
@@ -239,6 +242,7 @@ def collect_one_job(
                     row=row,
                     node=node,
                     exit_code=TIMED_OUT_EXIT_CODE,
+                    ended_unix=now,
                     detail=reason,
                     stopped=reason,
                 )
@@ -265,6 +269,7 @@ def collect_one_job(
             row=row,
             node=node,
             exit_code=exit_code,
+            ended_unix=finished,
             detail=collect.describe(node, run_id=row["run_id"], exit_code=exit_code),
             stopped=None,
         )
