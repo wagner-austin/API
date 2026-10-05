@@ -969,8 +969,8 @@ spreads and the perturbation hierarchy the card term comes from:
 project registered with `hpc3-register`). Until then this was a subsection of
 `mi`: its one committed run document named `mi`, ran on `mi`'s image line and
 drew on `mi`'s GPU-hour cap. It was split out because what a workspace entry
-records genuinely differs. Its v56 plan is 13 A100 cells of up to 12 hours
-plus one 36-hour A30 rung, about 190 GPU-hours, which now count against a cap
+records genuinely differs. Its v56 plan is 13 cells of up to 12 hours plus
+one 36-hour rung, all on A30, 192 GPU-hours, which now count against a cap
 of 200 that is its own rather than a slice of `mi`'s 500; and its cells resume
 from per-cell checkpoints, where `mi`'s probes do not. Its image is
 `/pub/wagnera3/images/v56/abl`, built from published `0e9f177f` by job
@@ -1126,32 +1126,37 @@ entry point that builds a `RunRecord` and is named nowhere here.
   SHA-256 verified on both sides and held against
   `tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-digests.txt`, a listing read
   from the wiki tree rather than from the snapshot staged (manifest:
-  `qa-corpus-wiki-full-ee6e6d12-stage.json`). Image v55
-  (`/pub/wagnera3/images/v55/abl`, sha256 `12d7be25…`) built from
-  `04d46ff9` by job 57747902 on `free`, 49 min, 54 of 54 smoke checks
-  passing; spec `c9b25ef0` rewrote the QA-family check to assert the cells
-  and the bf16 resolution, which v54 cannot pass. The 13 gpt2-family cells
-  go up as ONE job array (`tools/hpc3/runs/qa-full-wiki-v55.json`, A100,
-  throttle 6) and the 7B rung as its own A30 document
-  (`qa-full-wiki-pythia-6.9b-a30-v55.json`), because a sweep's members share
-  one GPU profile. Artifacts land under
-  `/pub/wagnera3/mi/cartridge/results/qa-v55/<plan>.json`.
+  `qa-corpus-wiki-full-ee6e6d12-stage.json`). Image v56
+  (`/pub/wagnera3/images/v56/abl`, sha256 `890e4445…`) built from
+  published `0e9f177f` by job 57748479 on `free`, 48 min, 54 of 54 smoke
+  checks passing; the image's own `GIT_COMMIT` file reads `0e9f177f56d5…`,
+  checked on the cluster on 2026-10-05, and `services/Model-Trainer/src` is
+  unchanged between that commit and the commit the run documents landed in.
+  The 13 gpt2-family cells go up as ONE job array
+  (`tools/hpc3/runs/qa-full-wiki-v56.json`, throttle 6) and the 7B rung as
+  its own document (`qa-full-wiki-pythia-6.9b-a30-v56.json`, 2,160 minutes),
+  because a sweep's members share one GPU profile. Artifacts land under
+  `/pub/wagnera3/mi/cartridge/results/qa-full-wiki-v56-<plan>.json`, with
+  each plan's checkpoint in `results/checkpoints/`.
 
-  **The image's commit was rebased before it was published, and that is
-  checked rather than waved through.** The image, its spec and both run
-  documents name `04d46ff9`, the worktree commit the wheels were built from.
-  Publishing rebased it onto 20 newer commits as `31893e45`, so `04d46ff9`
-  is reachable from no published branch. `git diff 04d46ff9 31893e45` over
-  the five wheel sources (`services/Model-Trainer`, `libs/platform_core`,
-  `libs/platform_ml`, `libs/platform_workers`, `clients/OrderedKernels`) is
-  empty, so `31893e45` holds byte-for-byte the code inside v55. Board task
-  `2cca4a98` is about exactly this class of declaration.
+  **Every cell runs on an A30, not the project's default A100.**
+  `hpc3-preflight` on 2026-10-05 refused the array with
+  `GPU_MODEL_EXHAUSTED`: `free-gpu` carries two A100s and neither was free,
+  against 10 of 28 A30s. The 7B rung is pinned to an A30 by its weights, so
+  moving the gpt2 cells there too puts the whole ladder on one card model,
+  and the latency columns compare across cells instead of across cards.
+
+  **v55 never ran.** Its image was built from `04d46ff9`, a worktree commit
+  reachable from no published branch, and its run documents named plans
+  assembled by an f-string that `test_committed_run_images.py` could not
+  find; they were cancelled before producing output. `0e9f177f` declares
+  every cell as a literal `(name, value)` pair and is on `main`.
 
   **The earlier full-wiki submissions never produced a number.** Ledger:
   55898551 failed (image v50 predated the plan), 55901956 failed (dense
   embedder OOM, fixed in `a9d1ba1b`), 55914185 was preempted at 1341s. Their
   corpus, `corpus-me-wiki-full`, was copied by hand with no stage manifest;
-  `qa-full-wiki-gpt2-v52.json` names it and is superseded by the v55 array's
+  `qa-full-wiki-gpt2-v52.json` names it and is superseded by the v56 array's
   base member on the staged snapshot.
 
 ### `mi-cu128` — the Blackwell determinism baseline
