@@ -450,9 +450,9 @@ clients/TankpitBot/mine_place.json
 clients/TankpitBot/.pytest_tmp*/
 # TankpitBot credentials (real passwords, never commit)
 clients/TankpitBot/accounts.json
-# Rust
+# Rust (Cargo.lock is tracked: a fresh resolution once drew syn 3 beside
+# pyo3's syn 2, which clippy::multiple_crate_versions refuses)
 target/
-Cargo.lock
 *.lcov
 coverage.lcov
 # LLVM coverage output (cargo llvm-cov)
