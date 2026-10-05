@@ -285,7 +285,7 @@ def launched_by_claim(
 
     The queue row carries no run id until the start lands, so the run is
     found from what the ledger row does carry: the submitter and session the
-    lease was taken for (:func:`fleet.cli.node_agent.launch_claimed` takes
+    lease was taken for (:func:`fleet.cli.node_launch.launch_claimed` takes
     both from the job), the project, and a start within the claim's lease of
     the claim, since the claiming tick launches seconds after it claims.
 
@@ -515,6 +515,7 @@ def collect_pass(
     agent: str,
     alias: str,
     hold: Callable[[frozenset[str]], None],
+    launching: frozenset[str],
 ) -> None:
     """Settle every running job this runner holds, reconcile every claim an
     earlier tick left without a start, then stop what was cancelled.
@@ -530,6 +531,9 @@ def collect_pass(
             soon as the queue has said, before any is settled, so the
             serve's watch (:mod:`fleet.cli.node_watch`) reads them while
             this pass goes on.
+        launching: The jobs this serve's launches still carry
+            (:mod:`fleet.cli.node_launch`), claimed with no start yet by
+            design, which are left to them rather than reconciled.
 
     Raises:
         AppError: As :func:`collect_one_job`, :func:`reconcile_claim` and
@@ -539,9 +543,11 @@ def collect_pass(
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     hold(running)
     for job in held:
-        # Live is claimed or running; a claimed one is an earlier tick's.
+        # Live is claimed or running; a claimed one no launch carries is an earlier tick's.
         if job["status"] is DispatchStatus.RUNNING:
             _log.info("%s", collect_one_job(loaded, credentials, board, job, identity))
+        elif job["job_id"] in launching:
+            _log.info("%s: its launch is under way", encode_job_line(job))
         else:
             line = reconcile_claim(loaded, credentials, job, identity, alias=alias, running=running)
             _log.info("%s", line)

@@ -59,6 +59,54 @@ def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
     )
 
 
+class Admitted(TypedDict):
+    """What the claim decides for a job before its launch is handed off.
+
+    Attributes:
+        plan: The project's declaration.
+        workers: Test workers the capacity check granted on this node, which
+            the room gate charges to the node from the claim on
+            (:mod:`fleet.cli.node_launch`).
+    """
+
+    plan: ProjectConfig
+    workers: int
+
+
+def admit(
+    loaded: _config.LoadedWorkspace, job: DispatchJob, *, node: NodeConfig, ready: Ready
+) -> Admitted | str:
+    """Read a claimed job's registry line, its tags against it, and its grant.
+
+    Only what reads the registry and the probe already taken, so a claim
+    decides it in no time and hands the launch off (MCPs board task
+    8993c306): the commit's fetch, the companions and the fleet-wide
+    resources are the launch's, in :func:`prepare`.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        job: The claimed job.
+        node: This node's declaration.
+        ready: What it reported when probed this pass, and the tags its
+            runner claimed with, the project's fit judged against both.
+
+    Returns:
+        The plan and the grant, or the ``PROJECT_TAGS_MISMATCH`` refusal
+        (:func:`tags_refusal`) as its ``CODE: message`` line.
+
+    Raises:
+        AppError: ``WORKSPACE_PROJECT_UNKNOWN``, or the capacity codes
+            :func:`fleet.core.capacity.plan_dispatch` raises; each a local
+            refusal the caller reports to the queue verbatim.
+    """
+    plan = require_project(loaded.workspace, job["project"])
+    mismatch = tags_refusal(job, plan["required_tags"])
+    if mismatch is not None:
+        return mismatch
+    workers = capacity.plan_dispatch(node, ready["state"], plan, ready["tags"])
+    return Admitted(plan=plan, workers=workers)
+
+
 class Prepared(TypedDict):
     """Everything a claimed job needs before its lease is taken.
 
@@ -84,30 +132,21 @@ class Prepared(TypedDict):
 
 
 def prepare(
-    loaded: _config.LoadedWorkspace,
-    job: DispatchJob,
-    *,
-    node: NodeConfig,
-    ready: Ready,
-    sha: str,
-) -> Prepared | str:
-    """Resolve, check and fetch everything a job needs before its lease.
+    loaded: _config.LoadedWorkspace, job: DispatchJob, *, admitted: Admitted, sha: str
+) -> Prepared:
+    """Resolve, check and fetch everything an admitted job needs before its lease.
 
     In this order because each step is cheaper than the next and each
-    refusal is more the submitter's than the last: the registry line, the
-    tags against it, the remote, the commit on the remote, the companions
-    the project's check reads beside it, and only then the project's fit on
-    this node, judged on the probe the claim pass already took, so no second
-    ssh is paid. The companions are fetched and bundled HERE, with the
-    commit, so a declared ref the remote does not serve refuses with no
-    lease held and nothing copied to a node.
+    refusal is more the submitter's than the last: the remote, the commit
+    on the remote, the companions the project's check reads beside it, and
+    the fleet-wide resources it holds. The companions are fetched and
+    bundled HERE, with the commit, so a declared ref the remote does not
+    serve refuses with no lease held and nothing copied to a node.
 
     Args:
         loaded: The workspace and its resolved record paths.
         job: The claimed job.
-        node: This node's declaration.
-        ready: What it reported when probed this pass, and the tags its
-            runner claimed with, the project's fit judged against both.
+        admitted: Its plan and grant, from :func:`admit`.
         sha: The job's commit.
 
     The archive's scope is resolved here too, with the rest of what the
@@ -117,22 +156,16 @@ def prepare(
     never reaches a node.
 
     Returns:
-        What the dispatch needs, or the ``PROJECT_TAGS_MISMATCH`` refusal
-        (:func:`tags_refusal`) as its ``CODE: message`` line.
+        What the dispatch needs.
 
     Raises:
-        AppError: ``WORKSPACE_PROJECT_UNKNOWN``, ``PROJECT_REMOTE_MISSING``,
-            ``SHA_NOT_ON_REMOTE``, ``INSTALL_PATH_NOT_IN_COMMIT``,
-            ``COMPANION_REF_NOT_ON_REMOTE``,
-            ``EXPORT_FAILED``, ``RESOURCE_HELD`` from
-            :func:`fleet.cli.run.require_resources_free`, or the capacity
-            codes :func:`fleet.core.capacity.plan_dispatch` raises; every
-            one a local refusal the caller reports to the queue verbatim.
+        AppError: ``PROJECT_REMOTE_MISSING``, ``SHA_NOT_ON_REMOTE``,
+            ``INSTALL_PATH_NOT_IN_COMMIT``, ``COMPANION_REF_NOT_ON_REMOTE``,
+            ``EXPORT_FAILED``, or ``RESOURCE_HELD`` from
+            :func:`fleet.cli.run.require_resources_free`; every one a local
+            refusal the caller reports to the queue verbatim.
     """
-    plan = require_project(loaded.workspace, job["project"])
-    mismatch = tags_refusal(job, plan["required_tags"])
-    if mismatch is not None:
-        return mismatch
+    plan = admitted["plan"]
     source = export.require_source(job["project"], plan["source"])
     mirror = export.prepare_mirror(
         loaded.mirrors, project=job["project"], remote=source["remote"], sha=sha
@@ -140,7 +173,7 @@ def prepare(
     export.require_install_paths(mirror, sha, source["install"])
     companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
     run_cli.require_resources_free(loaded, plan)
-    workers = capacity.plan_dispatch(node, ready["state"], plan, ready["tags"])
+    workers = admitted["workers"]
     return Prepared(
         plan=plan,
         source=source,
@@ -153,4 +186,4 @@ def prepare(
     )
 
 
-__all__ = ["Prepared", "prepare", "tags_refusal"]
+__all__ = ["Admitted", "Prepared", "admit", "prepare", "tags_refusal"]

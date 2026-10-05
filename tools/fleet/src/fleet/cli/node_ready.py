@@ -31,7 +31,7 @@ from typing_extensions import TypedDict
 from fleet.cli import _config
 from fleet.contracts.detection import detected_tags, tag_drift
 from fleet.contracts.elevation import elevation_gap
-from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.runner_tick import RunnerTick, TickLoad
 from fleet.contracts.tags import NodeTag, runner_tags
 from fleet.contracts.toolchain import ToolReport
@@ -76,7 +76,13 @@ class Gate(TypedDict):
 
 
 def ready_state(
-    loaded: _config.LoadedWorkspace, *, alias: str, node: NodeConfig, elevated: bool
+    loaded: _config.LoadedWorkspace,
+    *,
+    alias: str,
+    node: NodeConfig,
+    elevated: bool,
+    launching: LiveLoad,
+    launching_projects: frozenset[str],
 ) -> Gate:
     """Ask the node, in order, whether it may claim at all this tick.
 
@@ -86,6 +92,10 @@ def ready_state(
         node: Its declaration.
         elevated: Whether this is the node's elevated runner, which also
             needs the probe to read an administrator's token.
+        launching: What this runner's launches under way were granted, which
+            the room is charged with beside the ledger's live runs, since no
+            ledger row names them yet (:mod:`fleet.cli.node_launch`).
+        launching_projects: Their projects, left out as a lease's are.
 
     Returns:
         The gate. ``ready`` carries the node's measured state and claim tags
@@ -100,7 +110,12 @@ def ready_state(
     """
     if not node["enabled"]:
         return closed(alias, elevated, None, "is disabled in fleet.json; claiming nothing")
-    live = records.live_load(loaded.ledger, node=alias, projects=loaded.workspace["projects"])
+    recorded = records.live_load(loaded.ledger, node=alias, projects=loaded.workspace["projects"])
+    live = LiveLoad(
+        runs=recorded["runs"] + launching["runs"],
+        workers=recorded["workers"] + launching["workers"],
+        ram_gb=recorded["ram_gb"] + launching["ram_gb"],
+    )
     # The probes' scripts are named for this runner, never for the node: a
     # node's ordinary and elevated runners tick on the same minute, and one
     # shared path collided on serendipity every tick (MCPs board task
@@ -134,7 +149,13 @@ def ready_state(
             alias, elevated, load, f"cannot build; claiming nothing: {gap.code}: {gap.message}"
         )
     return _claimable(
-        loaded, alias=alias, node=node, state=state, answered=answered, elevated=elevated
+        loaded,
+        alias=alias,
+        node=node,
+        state=state,
+        answered=answered,
+        elevated=elevated,
+        launching_projects=launching_projects,
     )
 
 
@@ -201,6 +222,7 @@ def _claimable(
     state: NodeState,
     answered: tuple[ToolReport, ...],
     elevated: bool,
+    launching_projects: frozenset[str],
 ) -> Gate:
     """Read a ready node's claim tags and the projects it fits, or say why none.
 
@@ -211,11 +233,14 @@ def _claimable(
         state: What it reported when probed this tick.
         answered: What its toolchain probe answered, already judged ready.
         elevated: Whether this is the node's elevated runner.
+        launching_projects: The projects this runner's launches under way
+            will lease.
 
     Returns:
         The gate: the node's state, claim tags and fitting projects, less
         every one a lease on the node holds now
-        (:func:`fleet.core.run_lease.held_on_node`), so a claim never takes a
+        (:func:`fleet.core.run_lease.held_on_node`) or a launch under way
+        will, so a claim never takes a
         job its lease would refuse; or no ready node when it has room for
         nothing, fits no project, fits only projects a lease holds, or
         (elevated) does not hold an administrator's token, with the reason
@@ -251,7 +276,14 @@ def _claimable(
             alias,
             ", ".join(held),
         )
-    fits = tuple(name for name in roomy if name not in held)
+    launched_here = tuple(name for name in roomy if name in launching_projects)
+    if launched_here:
+        _log.info(
+            "%s leaves out what it is launching now, whose lease is not yet taken: %s",
+            alias,
+            ", ".join(launched_here),
+        )
+    fits = tuple(name for name in roomy if name not in held and name not in launching_projects)
     if roomy and not fits:
         return closed(
             alias,

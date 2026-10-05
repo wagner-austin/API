@@ -37,14 +37,16 @@ bad56f65), and a node missing a tool or on the wrong Python claims nothing
 either, naming the tool and the command that would install it there.
 
 WHAT A CLAIMED JOB BECOMES. The job names a project and a commit. The runner
-re-checks the job's tags against the registry's declaration for the project,
-fetches the commit from the project's declared remote into a bare mirror
-(:mod:`fleet.core.export`) BEFORE any lease is taken, so a sha the remote has
-never seen is refused with nothing held, judges the project's fit on the
-probe already taken, then takes the project's lease on this node, stages
-``git archive`` of the commit through the same verified transport every
-dispatch uses, sends the build script with the project's install steps and
-the node's caches, launches it detached, and reports the run started. The
+re-checks the job's tags against the registry's declaration for the project
+and judges the project's fit on the probe already taken, and hands the rest
+to a launch thread beside the next claim (:mod:`fleet.cli.node_launch`, MCPs
+board task 8993c306): it fetches the commit from the project's declared
+remote into a bare mirror (:mod:`fleet.core.export`) BEFORE any lease is
+taken, so a sha the remote has never seen is refused with nothing held, then
+takes the project's lease on this node, stages ``git archive`` of the commit
+through the same verified transport every dispatch uses, sends the build
+script with the project's install steps and the node's caches, launches it
+detached, and reports the run started. The
 serve's watch, or a later serve's collect pass, collects it
 (:mod:`fleet.cli.node_watch`, :mod:`fleet.cli.node_collect`): reads the result,
 reads the tail of the transcript, composes the verdict
@@ -83,7 +85,7 @@ from __future__ import annotations
 import functools
 import sys
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 from board_watch import config as board_config
 from platform_core import cli_args
@@ -95,24 +97,13 @@ from platform_core.mcp_client import McpCredentials
 from fleet.cli import _config, node_serve, node_watch
 from fleet.cli.node_claim import ask_queue, refuse
 from fleet.cli.node_collect import collect_pass, require_sha
-from fleet.cli.node_prepare import Prepared, prepare
+from fleet.cli.node_launch import Launcher
+from fleet.cli.node_prepare import admit
 from fleet.cli.node_ready import ready_state
-from fleet.cli.node_start import report_started
-from fleet.contracts.dispatch import DispatchJob
-from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.tags import runner_tags
 from fleet.contracts.workspace import require_node
-from fleet.core import (
-    _test_hooks,
-    dispatch,
-    export,
-    names,
-    queue,
-    rolled,
-    run_lease,
-    tick_report,
-)
+from fleet.core import _test_hooks, names, queue, rolled, tick_report
 
 _log = get_logger(__name__)
 
@@ -154,8 +145,9 @@ def claim_pass(
     alias: str,
     node: NodeConfig,
     elevated: bool,
+    launcher: Launcher,
 ) -> str | None:
-    """Take one job for this node and launch it, or report why it could not.
+    """Take one job for this node and hand its launch off, or report why it could not.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -166,6 +158,9 @@ def claim_pass(
         elevated: Whether this is the node's elevated runner, which claims
             with the ``elevated`` tag and only once the probe has read an
             administrator's token for its ssh session.
+        launcher: The serve's launches, whose grants and projects the gate
+            charges to the node and which the claimed job's launch joins
+            (:mod:`fleet.cli.node_launch`, MCPs board task 8993c306).
 
     THE NODE IS ASKED BEFORE THE QUEUE IS. A runner that claimed first and
     probed second took the oldest job off the lane and refused it while a
@@ -184,20 +179,30 @@ def claim_pass(
     the jobs that need it for another node (MCPs board task 939ec5c7).
 
     Returns:
-        The run id of the job claimed and launched; None when this node
-        could take nothing, nothing in the lane matched it, or the job it
-        claimed was refused, which :func:`fill_pass` reads as the end of
-        the pass.
+        The job id of the job claimed and handed to its launch; None when
+        this node could take nothing, nothing in the lane matched it, or
+        the job it claimed was refused, here or by a launch that has
+        already finished, which :func:`fill_pass` reads as the end of the
+        pass.
 
     Raises:
-        AppError: Only from the queue calls themselves. A LOCAL refusal (an
-            unknown project, tags that disagree, a project with no remote,
-            a sha the remote lacks, too little capacity for the project, a
-            held lease) is reported to the queue as ``refused`` with its
-            code and message verbatim and does not propagate: transport,
-            not recovery.
+        AppError: Only from the queue calls themselves, or a launch that has
+            already finished raising one. A LOCAL refusal (an unknown
+            project, tags that disagree, a project with no remote, a sha the
+            remote lacks, too little capacity for the project, a held
+            lease) is reported to the queue as ``refused`` with its code and
+            message verbatim and does not propagate: transport, not
+            recovery.
     """
-    gate = ready_state(loaded, alias=alias, node=node, elevated=elevated)
+    launching = launcher.launching()
+    gate = ready_state(
+        loaded,
+        alias=alias,
+        node=node,
+        elevated=elevated,
+        launching=launching["load"],
+        launching_projects=launching["projects"],
+    )
     ready = gate["ready"]
     if ready is None:
         tick_report.record_tick(credentials, gate["tick"], identity=identity)
@@ -210,28 +215,17 @@ def claim_pass(
         return None
     sha = require_sha(job)
     try:
-        prepared = prepare(loaded, job, node=node, ready=ready, sha=sha)
+        admitted = admit(loaded, job, node=node, ready=ready)
     except AppError as refusal:
         refuse(credentials, job, identity, detail=f"{refusal.code}: {refusal.message}")
         return None
-    if isinstance(prepared, str):
-        refuse(credentials, job, identity, detail=prepared)
+    if isinstance(admitted, str):
+        refuse(credentials, job, identity, detail=admitted)
         return None
-
-    def build(run_id: str) -> dispatch.Payload:
-        path = loaded.archives / f"{run_id}.tgz"
-        data = export.archive_commit(prepared["mirror"], sha, path, prepared["scope"])
-        return dispatch.Payload(path=path, data=data, description=f"git archive of {sha}")
-
-    row = launch_claimed(loaded, job, alias=alias, node=node, prepared=prepared, build=build)
-    if isinstance(row, str):
-        refuse(credentials, job, identity, detail=row)
+    launch = launcher.start(job, admitted=admitted, sha=sha)
+    if launch.done() and launch.result() is None:
         return None
-    agent = node_identity(alias, elevated=elevated)[0]
-    report_started(
-        loaded, credentials, identity, job=job, row=row, alias=alias, node=node, agent=agent
-    )
-    return row["run_id"]
+    return job["job_id"]
 
 
 def fill_pass(
@@ -242,7 +236,7 @@ def fill_pass(
     alias: str,
     node: NodeConfig,
     elevated: bool,
-    hold: Callable[[frozenset[str]], None],
+    launcher: Launcher,
 ) -> tuple[str, ...]:
     """Claim and launch until this node has no room or the lane nothing it fits.
 
@@ -252,15 +246,17 @@ def fill_pass(
     runner launched at most one job per three-minute tick. With 14 checks
     queued on 2026-10-03, each node took exactly one per tick, each finished
     within about a tick, and lavender-wsl ran one job at a time with 18.6 GB
-    free. So after every launch the runner claims again, and every pass
+    free. So after every claim the runner claims again, and every pass
     re-runs the whole gate: :func:`fleet.cli.node_ready.ready_state` re-reads
-    the ledger, which already charges the run just launched, re-probes the
-    node, and leaves out the projects whose lease it now holds.
+    the ledger, which already charges every run launched, adds what the
+    launches still under way were granted (:mod:`fleet.cli.node_launch`),
+    re-probes the node, and leaves out the projects a lease or a launch
+    holds. The claim does not wait for its launch (MCPs board task 8993c306).
 
-    A CLAIM THAT LAUNCHES NOTHING ENDS THE PASS, a refusal included. A node
-    that stopped answering while one job was being staged would refuse the
-    next and the next, closing the whole lane in one pass; stopping at the
-    first refusal leaves the rest for the next pass or another node.
+    A CLAIM THAT LAUNCHES NOTHING ENDS THE PASS, a refusal included, once
+    the claim knows it: a refusal the claim reports, or one its launch has
+    already reported. A node that stops answering while one job is being
+    staged fails the next claim's probe, which closes the gate.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -269,97 +265,32 @@ def fill_pass(
         alias: This node's workspace name.
         node: Its declaration.
         elevated: Whether this is the node's elevated runner.
-        hold: Given each run the moment it is launched, so the serve's watch
-            (:mod:`fleet.cli.node_watch`) reads it while the pass goes on.
+        launcher: The serve's launches, which hand each run to the serve's
+            watch once its start is reported.
 
     Returns:
-        The run ids this pass launched, in launch order.
+        The job ids this pass claimed and handed to a launch, in order.
 
     Raises:
-        AppError: From :func:`claim_pass`.
+        AppError: From :func:`claim_pass`, or from a launch of an earlier
+            pass that raised (:meth:`fleet.cli.node_launch.Launcher.raise_failed`).
     """
+    launcher.raise_failed()
     launched: list[str] = []
     while (
-        run_id := claim_pass(
-            loaded, credentials, identity, alias=alias, node=node, elevated=elevated
+        job_id := claim_pass(
+            loaded,
+            credentials,
+            identity,
+            alias=alias,
+            node=node,
+            elevated=elevated,
+            launcher=launcher,
         )
     ) is not None:
-        hold(frozenset({run_id}))
-        launched.append(run_id)
+        launched.append(job_id)
     _log.info("%s launched %d job(s) this pass", alias, len(launched))
     return tuple(launched)
-
-
-def launch_claimed(
-    loaded: _config.LoadedWorkspace,
-    job: DispatchJob,
-    *,
-    alias: str,
-    node: NodeConfig,
-    prepared: Prepared,
-    build: dispatch.PayloadBuilder,
-) -> LedgerEntry | str:
-    """Take the project's lease on this node and launch the job under it.
-
-    GUARDED LIKE ``prepare``, because a fault here is otherwise reported
-    NOWHERE: there is no failed feed row on this path, so an AppError out of
-    staging ended the tick and left the queue row in status claimed until its
-    lease ran out, an hour later, with no reason recorded anywhere a waiting
-    session could read. Measured 2026-09-24 (board task 1e57ebe5): two jobs
-    sat exactly that way for 32 and 14 minutes.
-
-    A FAILURE AFTER THE LEASE GIVES THE LEASE BACK before the refusal, or the
-    resubmission the refusal invites bounces off it: MCPs board task
-    e12affc5, where job 7143a25e was refused ``LEASE_HELD`` by the dead run
-    of job 4d8b28a9 with 793 s of its lease left. A ``LEASE_HELD`` out of the
-    lease itself gives nothing back, because that lease is another run's
-    (:mod:`fleet.core.run_lease`).
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        job: The claimed job.
-        alias: This node's workspace name.
-        node: Its declaration.
-        prepared: What :func:`prepare` resolved for the job.
-        build: Builds the job's export once the lease is held.
-
-    Returns:
-        The running ledger row, or the ``CODE: message`` refusal to report.
-    """
-    try:
-        lease = run_lease.take(
-            loaded.leases,
-            loaded.feed,
-            node_name=alias,
-            project=job["project"],
-            plan=prepared["plan"],
-            workers=prepared["workers"],
-            agent=job["submitted_by"],
-            session_id=job["session_id"],
-            node_local=loaded.workspace["node_local_resources"],
-        )
-    except AppError as refusal:
-        return f"{refusal.code}: {refusal.message}"
-    try:
-        return dispatch.launch(
-            loaded.ledger,
-            loaded.feed,
-            lease=lease,
-            node=node,
-            workers=prepared["workers"],
-            build_payload=build,
-            companions=prepared["companions"],
-            recipe=dispatch.recipe_for(
-                prepared["plan"],
-                path=prepared["source"]["path"],
-                install=prepared["source"]["install"],
-            ),
-        )
-    except AppError as refusal:
-        detail = f"{refusal.code}: {refusal.message}"
-        given_back = run_lease.abandon(loaded.leases, loaded.feed, lease=lease, detail=detail)
-        _log.info("%s never launched; %s", lease["run_id"], given_back)
-        return detail
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -414,10 +345,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         node_watch.collect_ended, loaded, credentials, board, identity, agent=agent
     )
     watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
+    launcher = Launcher(
+        loaded, credentials, identity, alias=alias, node=node, agent=agent, hold=watch.hold
+    )
 
     def collect() -> None:
         collect_pass(
-            loaded, credentials, board, identity, agent=agent, alias=alias, hold=watch.hold
+            loaded,
+            credentials,
+            board,
+            identity,
+            agent=agent,
+            alias=alias,
+            hold=watch.hold,
+            launching=launcher.launching()["jobs"],
         )
 
     def fill() -> None:
@@ -428,7 +369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             alias=alias,
             node=node,
             elevated=elevated,
-            hold=watch.hold,
+            launcher=launcher,
         )
 
     def queued() -> frozenset[str]:
@@ -437,14 +378,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     def rolled_now() -> str:
         return rolled.rolled_state(loaded.directory)
 
-    node_serve.serve(
-        watch,
-        alias=alias,
-        started=_test_hooks.now(),
-        serve_seconds=loaded.workspace["node_serve_seconds"],
-        poll_seconds=loaded.workspace["node_poll_seconds"],
-        steps=node_serve.ServeSteps(collect=collect, fill=fill, queued=queued, rolled=rolled_now),
-    )
+    with launcher:
+        node_serve.serve(
+            watch,
+            alias=alias,
+            started=_test_hooks.now(),
+            serve_seconds=loaded.workspace["node_serve_seconds"],
+            poll_seconds=loaded.workspace["node_poll_seconds"],
+            steps=node_serve.ServeSteps(
+                collect=collect, fill=fill, queued=queued, rolled=rolled_now
+            ),
+        )
     return 0
 
 
