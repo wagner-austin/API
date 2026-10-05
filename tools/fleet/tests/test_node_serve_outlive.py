@@ -9,18 +9,21 @@ clock and the scripted watch of ``test_node_serve.py``: it closes the watch
 is under way, at once inside those last 10 s, and stops waiting the moment
 the watch thread has ended. The end-to-end case runs
 :func:`fleet.cli.node_serve.serve` with the real watch on a launched run
-whose loop's first queue listing is refused: the run that ends afterwards
-is settled, and only then does the refusal end the serve.
+whose loop's first queue listing fails: the run that ends afterwards is
+settled, and only then does the failure end the serve. A listing the queue
+did not answer at all no longer fails the loop
+(``test_node_serve_claim.py``), so the failure here is an answer the
+runner cannot read.
 """
 
 from __future__ import annotations
 
 import pathlib
 import threading
-import urllib.error
 from concurrent.futures import Future
 
 import pytest
+from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str
 
 from fleet.cli import _config, node_serve, node_watch
@@ -42,9 +45,8 @@ __all__ = ["_credentials_in_env", "_sourced_config"]
 #: failure at DEMO_NOW, 20 s past a fire boundary.
 HANDOVER = FIRST_FIRE - node_serve.HANDOVER_SECONDS
 
-#: The refusal the endpoint answered every serving runner with at
-#: 07:24:56Z on 2026-10-05.
-REFUSED = "No connection could be made because the target machine actively refused it"
+#: What the scripted listing's answer fails with.
+MALFORMED = "dispatch_list answered a job with no id"
 
 
 def _still_watching() -> Future[None]:
@@ -167,13 +169,17 @@ class SleepAfterTheSettle:
         self._clock.seconds += seconds
 
 
-def _refused() -> frozenset[str]:
-    """A queue listing the endpoint refused.
+def _malformed() -> frozenset[str] | None:
+    """A queue listing the endpoint answered with something no job decodes from.
+
+    A refusal no longer ends the loop (``QUEUE_UNANSWERED``,
+    :mod:`fleet.cli.node_serve_claim`); an answer the runner cannot read
+    still does, and is what this case fails the loop with.
 
     Raises:
-        URLError: Always, as ``urllib`` raised it at 07:24:56Z.
+        AppError: ``QUEUE_ANSWER_MALFORMED``, always.
     """
-    raise urllib.error.URLError(ConnectionRefusedError(10061, REFUSED))
+    raise AppError(code=FleetErrorCode.QUEUE_ANSWER_MALFORMED, message=MALFORMED)
 
 
 def _fills_nothing() -> None:
@@ -198,8 +204,17 @@ def _none_launching() -> int:
     return 0
 
 
-class TestAServeWhoseQueueListingIsRefused:
-    def test_settles_the_run_that_ends_afterwards_then_raises_the_refusal(
+def _none_unreported() -> bool:
+    """Whether a start report went unanswered, which none here does.
+
+    Returns:
+        False.
+    """
+    return False
+
+
+class TestAServeWhoseQueueListingFails:
+    def test_settles_the_run_that_ends_afterwards_then_raises_the_failure(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         launch(sourced_config)
@@ -225,12 +240,13 @@ class TestAServeWhoseQueueListingIsRefused:
         steps = node_serve.ServeSteps(
             collect=collect,
             fill=_fills_nothing,
-            queued=_refused,
+            queued=_malformed,
             rolled=_rolled,
             launching=_none_launching,
+            start_unreported=_none_unreported,
         )
 
-        with caplog.at_level("INFO"), pytest.raises(urllib.error.URLError, match="10061"):
+        with caplog.at_level("INFO"), pytest.raises(AppError, match=MALFORMED):
             node_serve.serve(
                 watch,
                 alias="lavender",
@@ -244,8 +260,8 @@ class TestAServeWhoseQueueListingIsRefused:
         assert watch.closed() == 1
         assert clock.seconds == HANDOVER
         assert caplog.records[-1].getMessage() == (
-            "lavender: its serving loop failed at 2025-09-04T15:33:21+00:00 (URLError: "
-            f"<urlopen error [Errno 10061] {REFUSED}>); its watch served on to "
+            "lavender: its serving loop failed at 2025-09-04T15:33:21+00:00 (AppError: "
+            f"{MALFORMED}); its watch served on to "
             "2025-09-04T15:35:50+00:00 with 1 run(s) closed, 0 still watched, and the "
             "failure ends this start"
         )

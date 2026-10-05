@@ -24,13 +24,14 @@ from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 from platform_core.mcp_client import McpHttpResponse
 
-from fleet.cli import _config, node_agent, node_collect
+from fleet.cli import _config, node_agent, node_collect, node_watch
 from fleet.cli.node_launch import Launcher, Launching
 from fleet.cli.node_prepare import Admitted
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.workspace import require_project
 from fleet.core import _test_hooks, queue, records, staging
+from fleet.core.queue_transport import answering
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -39,7 +40,14 @@ from tests._node_agent_fixtures import (
     launch_steps,
     prebuilt_export,
 )
-from tests._queue_fakes import DEFAULT_JOB_ID, DEFAULT_SHA, FakeQueue, ToolRefusal, queue_job
+from tests._queue_fakes import (
+    DEFAULT_JOB_ID,
+    DEFAULT_SHA,
+    FakeQueue,
+    ToolRefusal,
+    Unanswered,
+    queue_job,
+)
 from tests._thread_fakes import await_event
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed
 
@@ -307,6 +315,42 @@ class TestALaunchThatRaises:
         with pytest.raises(LookupError, match="the serve's own"), launcher:
             launcher.start(job, admitted=_admitted(loaded), sha=DEFAULT_SHA)
             raise LookupError("the serve's own")
+
+
+class TestALaunchWhoseStartReportTheQueueDidNotAnswer:
+    def test_leaves_the_run_launched_and_unheld_for_the_collect_pass_and_says_so_once(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Both the start report and the read that would find a cancel go
+        unanswered, as every call did while a deploy recreated mcp-fleet
+        on 2026-10-05; the run stays launched for
+        :func:`fleet.cli.node_collect.reconcile_claim` to adopt, and the
+        launcher raises nothing (MCPs board task 8993c306)."""
+        digest = staging.digest(prebuilt_export(sourced_config))
+        _test_hooks.run = FakeRun(launch_steps(digest, commit_present=True))
+        endpoint = FakeQueue([Unanswered(), Unanswered()])
+        _test_hooks.http_post = answering(endpoint)
+        held: list[frozenset[str]] = []
+        loaded, launcher = _launcher(sourced_config, held)
+        job = decode_job(queue_job(status="claimed"), answer="dispatch_claim")
+
+        with caplog.at_level("INFO"), launcher:
+            launch = launcher.start(job, admitted=_admitted(loaded), sha=DEFAULT_SHA)
+        unreported = [launcher.take_unreported(), launcher.take_unreported()]
+
+        assert launch.result() == DEMO_RUN_ID
+        assert endpoint.tools == ["dispatch_report", "dispatch_get"]
+        assert held == []
+        assert unreported == [True, False]
+        assert node_watch.live_among(loaded, frozenset({DEMO_RUN_ID})) == {DEMO_RUN_ID}
+        assert any(
+            record.getMessage().startswith(
+                f"{DEFAULT_JOB_ID}: the queue did not answer the start report of "
+                f"{DEMO_RUN_ID}; the next collect pass adopts it: "
+            )
+            for record in caplog.records
+        )
+        assert launcher.launching() == NOTHING_LAUNCHING
 
 
 class TestTheCollectPass:

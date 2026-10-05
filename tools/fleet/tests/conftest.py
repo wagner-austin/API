@@ -27,7 +27,6 @@ import pytest
 from board_watch import _test_hooks as board_watch_hooks
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, dump_json_str
-from platform_core.mcp_client import urllib_mcp_post
 
 from fleet.cli import _config
 from fleet.cli import agent as agent_cli
@@ -555,9 +554,9 @@ def _restore() -> None:
     _test_hooks.write_text = _test_hooks._default_write_text
     _test_hooks.hostname = _test_hooks._default_hostname
     _test_hooks.executor = _test_hooks._default_executor
-    # The queue seams. The poster's default lives in platform_core: the SEAM
-    # is this package's, the transport behind it is shared with board-watch.
-    _test_hooks.http_post = urllib_mcp_post
+    # The queue seams. The poster's transport lives in platform_core, shared
+    # with board-watch; the SEAM and its unanswered-call code are this package's.
+    _test_hooks.http_post = _test_hooks._default_http_post
     _test_hooks.env = _test_hooks._default_env
     # The board's credential reader is board-watch's, reached by the tick's
     # observe pass; its env seam is rebound by the same tests and must not

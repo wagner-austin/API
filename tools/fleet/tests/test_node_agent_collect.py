@@ -69,7 +69,7 @@ class TestCollecting:
             "budget=unread ended=2025-09-04T15:34:20Z "
             f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
         )
-        # Retired after the tail was read and before the job was closed:
+        # Retired after the tail was read and the job closed (fleet.cli.node_settle):
         # the fifth and sixth calls send the retire to the stage root and run it.
         retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
         assert [retire_path in " ".join(call) for call in node.calls[:6]] == [

@@ -24,7 +24,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 
-from fleet.cli import node_agent, node_serve
+from fleet.cli import node_agent, node_serve, node_serve_claim
 from fleet.contracts.workspace import (
     NODE_POLL_CEILING_SECONDS,
     NODE_SERVE_CEILING_SECONDS,
@@ -170,6 +170,14 @@ class Steps:
         """
         return 0
 
+    def start_unreported(self) -> bool:
+        """Whether a start report went unanswered, which no case here varies.
+
+        Returns:
+            False; not recorded.
+        """
+        return False
+
     def bound(self) -> node_serve.ServeSteps:
         """The steps as the loop takes them.
 
@@ -182,6 +190,7 @@ class Steps:
             queued=self.queued,
             rolled=self.rolled,
             launching=self.launching,
+            start_unreported=self.start_unreported,
         )
 
 
@@ -254,6 +263,7 @@ def _serve(
     return node_serve.serve_loop(
         watch,
         Future() if watching is None else watching,
+        alias="lavender",
         started=DEMO_NOW,
         serve_seconds=serve_seconds,
         poll_seconds=5,
@@ -405,7 +415,7 @@ class TestTheQueuedJobsAServeWatches:
         )
         _test_hooks.http_post = endpoint
 
-        ids = node_serve.queued_here(queue.load_credentials(), alias="lavender")
+        ids = node_serve_claim.queued_here(queue.load_credentials(), alias="lavender")
 
         assert ids == frozenset(
             {"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"}

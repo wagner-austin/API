@@ -296,6 +296,47 @@ class TestANodeThatMissesARead:
         )
 
 
+class TestASettleTheQueueDidNotAnswer:
+    def test_keeps_the_run_held_and_settles_it_at_the_next_poll(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """At 11:55:31Z on 2026-10-05 the settle of diphtheria's run met the
+        refusal a deploy's recreate of mcp-fleet answered every call with,
+        and its error ended the watch; now the run is settled again at the
+        next poll (MCPs board task 8993c306)."""
+        launch(sourced_config)
+        loaded = _poll_every_second(sourced_config)
+        node = FakeRun([*ENDED, *ENDED])
+        _test_hooks.run = node
+        attempts: list[str] = []
+        settling = threading.Event()
+        refused = "http://127.0.0.1:8035/mcp did not answer: URLError: refused"
+
+        def settle(*, run_id: str) -> str:
+            attempts.append(run_id)
+            if len(attempts) == 1:
+                raise AppError(code=FleetErrorCode.QUEUE_UNANSWERED, message=refused)
+            settling.set()
+            return f"{run_id}: settled"
+
+        watch = _watch(loaded, settle)
+        with caplog.at_level("INFO"), ThreadPoolExecutor(max_workers=1) as pool:
+            watching = pool.submit(watch.watch)
+            with watch:
+                watch.hold(frozenset({DEMO_RUN_ID}))
+                await_event(settling, what="the run to be settled")
+            watching.result()
+
+        assert attempts == [DEMO_RUN_ID, DEMO_RUN_ID]
+        assert watch.closed() == 1
+        assert watch.polls == 2
+        assert len(node.calls) == 2 * len(ENDED)
+        assert (
+            f"lavender: the queue did not answer the settle of {DEMO_RUN_ID}; it is settled "
+            f"again at the next poll: {refused}"
+        ) in [record.getMessage() for record in caplog.records]
+
+
 class TestASettleThatRaises:
     def test_leaves_the_watch_closable_and_the_error_goes_on(
         self, sourced_config: pathlib.Path

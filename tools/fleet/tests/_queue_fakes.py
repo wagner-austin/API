@@ -14,6 +14,7 @@ a patching library's call-recording API.
 
 from __future__ import annotations
 
+import urllib.error
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
@@ -55,6 +56,30 @@ class ToolRefusal:
         self.message = message
 
 
+class Unanswered:
+    """A scripted :class:`FakeQueue` reply that nothing answered at all.
+
+    The call raises what ``urllib`` raised at 11:54:58Z on 2026-10-05 while a
+    deploy recreated mcp-fleet, so a test that binds the queue through
+    :func:`fleet.core.queue_transport.answering` sees the production
+    ``QUEUE_UNANSWERED`` for that one call and answers for the rest (MCPs
+    board task 8993c306).
+
+    Attributes:
+        error: What the transport raises.
+    """
+
+    error: OSError
+
+    def __init__(self) -> None:
+        """Hold the refusal."""
+        self.error = urllib.error.URLError(
+            ConnectionRefusedError(
+                10061, "No connection could be made because the target machine actively refused it"
+            )
+        )
+
+
 class FakeQueue:
     """A dispatch-queue endpoint that answers from a script and records calls.
 
@@ -79,14 +104,15 @@ class FakeQueue:
     tools: list[str]
     arguments: list[JSONObject]
     ticks: list[JSONObject]
-    _replies: list[str | ToolRefusal]
+    _replies: list[str | ToolRefusal | Unanswered]
 
-    def __init__(self, replies: Sequence[str | ToolRefusal]) -> None:
+    def __init__(self, replies: Sequence[str | ToolRefusal | Unanswered]) -> None:
         """Build a queue that will answer with these tool texts in order.
 
         Args:
-            replies: One rendered tool answer, or a :class:`ToolRefusal`, per
-                expected call. Running out is an error rather than a default:
+            replies: One rendered tool answer, a :class:`ToolRefusal`, or an
+                :class:`Unanswered`, per expected call; an unanswered call is
+                still recorded. Running out is an error rather than a default:
                 a test that made more calls than it declared has changed
                 behaviour it did not mean to assert on.
         """
@@ -116,6 +142,7 @@ class FakeQueue:
 
         Raises:
             AssertionError: If more calls are made than replies were given.
+            OSError: The transport's own error, for an :class:`Unanswered` reply.
         """
         envelope = narrow_json_to_dict(load_json_str(body.decode("utf-8")))
         params = narrow_json_to_dict(envelope["params"])
@@ -128,6 +155,8 @@ class FakeQueue:
         self.arguments.append(arguments)
         assert self._replies, f"unscripted queue call: {tool}"
         reply = self._replies.pop(0)
+        if isinstance(reply, Unanswered):
+            raise reply.error
         result: JSONObject = (
             {"isError": True, "content": [{"text": reply.message}]}
             if isinstance(reply, ToolRefusal)
