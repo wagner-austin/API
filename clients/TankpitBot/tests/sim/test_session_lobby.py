@@ -7,7 +7,7 @@ import pytest
 from tankpit_bot.browser._test_hooks import ensure_autoscroll_off
 from tankpit_bot.browser.room_join import join_room
 from tankpit_bot.capture.frames import split_payload_frames
-from tankpit_bot.sim.lobby import SIM_ACCOUNT, SimLobby
+from tankpit_bot.sim.lobby import SIM_ACCOUNT, SIM_ROOMS, LobbyEntry, SimLobby
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
@@ -99,7 +99,7 @@ def test_the_production_join_flow_reaches_a_room_over_the_seam() -> None:
     lobby = link.lobby
     if lobby is None:
         raise AssertionError("the link was built with a lobby")
-    assert lobby.entered_room_id == "1"
+    assert lobby.entry == LobbyEntry(room_id="1", troop=SIM_ROOMS[0]["default_troop"])
     assert ws.selected_room == "1"
 
 

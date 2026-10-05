@@ -23,7 +23,7 @@ from tankpit_bot.protocol.command_builders import build_move_command
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 from tankpit_bot.sim.server import SimServer
-from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
+from tankpit_bot.sim.transport import encode_tick_payload, route_client_frames
 from tankpit_bot.sim.world import SimContainerDict, make_sim_tank, make_sim_world
 from tankpit_bot.sniffer.decoders import process_received_message
 from tankpit_bot.sniffer.world_service import WorldService
@@ -140,9 +140,10 @@ def test_production_command_bytes_drive_the_sim_and_beliefs_track_truth() -> Non
     wire = framed[:3] + bytes(
         byte ^ (table[i] if i < len(table) else 0) for i, byte in enumerate(framed[3:])
     )
-    commands = decode_client_payload(base64.b64encode(wire).decode("ascii"), table)
-    assert [command["kind"] for command in commands] == ["move"]
-    server.queue_command(_CLIENT, commands[0])
+    routed = route_client_frames(base64.b64encode(wire).decode("ascii"), table)
+    assert [command["kind"] for command in routed.commands] == ["move"]
+    assert routed.lobby == []
+    server.queue_command(_CLIENT, routed.commands[0])
     _deliver(ws, server.advance_tick()[_CLIENT], table)
 
     truth = server.world["tanks"][_CLIENT]

@@ -11,9 +11,13 @@ from tankpit_bot.sim.lobby import (
     QUIT_BODY,
     SIM_ACCOUNT,
     SIM_ROOMS,
+    AuthFrameDict,
+    LobbyEntry,
+    LobbyError,
     SimAccountDict,
     SimLobby,
     build_auth_frame,
+    parse_auth_frame,
 )
 
 _MAGIC = "simmagic5uk3et4epiexu"
@@ -70,20 +74,48 @@ def test_entering_a_room_answers_the_response_and_records_the_room() -> None:
     All 286 archived enter responses are ``$1|0``.
     """
     lobby = _lobby()
-    assert lobby.entered_room_id is None
+    assert lobby.entry is None
 
     frames = lobby.handle_frame(b"+1|2|128|128|metadata-tail")
 
     assert [frame.decode("utf-8") for frame in frames] == ["$1|0"]
-    assert lobby.entered_room_id == "1"
+    assert lobby.entry == LobbyEntry(room_id="1", troop=2)
 
 
-def test_entering_an_unadvertised_room_answers_nothing_and_enters_nothing() -> None:
-    """A room the lobby never listed cannot be entered."""
+@pytest.mark.parametrize("body", [b"+99|2|128|128|metadata", b"+1|blue|128|128|x", b"+1"])
+def test_an_entry_naming_no_room_or_no_troop_answers_nothing_and_enters_nothing(
+    body: bytes,
+) -> None:
+    """A room the lobby never listed, or a troop that is not a number, enters nothing."""
     lobby = _lobby()
 
-    assert lobby.handle_frame(b"+99|2|128|128|metadata") == []
-    assert lobby.entered_room_id is None
+    assert lobby.handle_frame(body) == []
+    assert lobby.entry is None
+
+
+def test_an_auth_frame_reads_back_as_the_account_token_and_magic_it_was_built_from() -> None:
+    """The server reads exactly what the page client writes."""
+    assert parse_auth_frame(_AUTH) == AuthFrameDict(
+        account_id="62913", token="0" * 32, magic=_MAGIC
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"*1",
+        b"%AUTH !be 62913|tok|0",
+        b"%AUTH !xx 62913|tok|0 magic",
+        b"%AUTH !be 62913|tok magic",
+        b"%AUTH !be 62913||0 magic",
+        b"%AUTH !be 62913|tok|0 magic extra",
+        b"%AUTH !be 62913|tok|0 ",
+    ],
+)
+def test_a_frame_not_shaped_as_auth_is_refused(body: bytes) -> None:
+    """Every field present and in place, or no account is read at all."""
+    with pytest.raises(LobbyError, match="SIM_LOBBY_AUTH: not an AUTH frame"):
+        parse_auth_frame(body)
 
 
 def test_the_autoscroll_toggle_is_echoed_back_verbatim() -> None:
@@ -185,4 +217,4 @@ def test_every_advertised_room_is_selectable_and_enterable(room: RoomInfo) -> No
 
     assert lobby.handle_frame(f"*{room_id}".encode()) != []
     assert lobby.handle_frame(f"+{room_id}|2|128|128|x".encode()) != []
-    assert lobby.entered_room_id == room_id
+    assert lobby.entry == LobbyEntry(room_id=room_id, troop=2)

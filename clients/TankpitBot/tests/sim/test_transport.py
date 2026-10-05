@@ -10,7 +10,11 @@ from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.commands import CMD_MOVE, COMMAND_PREFIX, TYPE_MOVEMENT
 from tankpit_bot.protocol.types import SyncDict
 from tankpit_bot.sim.commands import SimError
-from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
+from tankpit_bot.sim.transport import (
+    RoutedFrames,
+    encode_tick_payload,
+    route_client_frames,
+)
 from tankpit_bot.wire.helpers import DecodeError, pack16
 
 _TINY_TABLE = bytes([0x07])
@@ -65,26 +69,39 @@ def test_tick_payload_encodes_a_body_the_table_covers() -> None:
 def test_client_round_trip() -> None:
     """A framed move command decodes through the transport."""
     frame = _client_frame(bytes([TYPE_MOVEMENT, CMD_MOVE, 42, 161]), _TABLE)
-    commands = decode_client_payload(frame, _TABLE)
-    assert [(c["kind"], c["x"], c["y"]) for c in commands] == [("move", 42, 161)]
+    routed = route_client_frames(frame, _TABLE)
+    assert [(c["kind"], c["x"], c["y"]) for c in routed.commands] == [("move", 42, 161)]
+    assert routed.lobby == []
 
 
 def test_invalid_base64_raises() -> None:
     """Garbage payloads fail loudly, never best-effort."""
-    with pytest.raises(DecodeError):
-        decode_client_payload("not-base64!!!", _TINY_TABLE)
+    with pytest.raises(DecodeError, match="undecodable client payload"):
+        route_client_frames("not-base64!!!", _TINY_TABLE)
 
 
 def test_torn_frame_raises() -> None:
     """A length prefix pointing past the payload is a decode failure."""
     torn = base64.b64encode(pack16(50) + bytes([COMMAND_PREFIX, 1, 2])).decode("ascii")
-    with pytest.raises(DecodeError):
-        decode_client_payload(torn, _TINY_TABLE)
+    with pytest.raises(DecodeError, match="undecodable client payload"):
+        route_client_frames(torn, _TINY_TABLE)
 
 
-def test_missing_command_prefix_raises() -> None:
-    """Frames without the ``!`` prefix are rejected."""
-    body = bytes([0x2E, 1, 2, 3])
-    payload = base64.b64encode(pack16(len(body)) + body).decode("ascii")
-    with pytest.raises(DecodeError):
-        decode_client_payload(payload, _TINY_TABLE)
+def test_one_payload_routes_its_commands_and_lobby_frames_apart() -> None:
+    """``!`` frames decode as commands; every other frame goes to the lobby, in order."""
+    move = base64.b64decode(_client_frame(bytes([TYPE_MOVEMENT, CMD_MOVE, 42, 161]), _TABLE))
+    select, enter = b"*1", b"+1|2|128|128|x"
+    mixed = pack16(len(select)) + select + move + pack16(len(enter)) + enter
+    routed = route_client_frames(base64.b64encode(mixed).decode("ascii"), _TABLE)
+    assert [(c["kind"], c["x"], c["y"]) for c in routed.commands] == [("move", 42, 161)]
+    assert routed.lobby == [select, enter]
+
+
+def test_lobby_frames_route_before_auth_but_a_command_does_not() -> None:
+    """With no table yet, a lobby frame passes and a command is refused by name."""
+    select = b"*1"
+    plain = base64.b64encode(pack16(len(select)) + select).decode("ascii")
+    assert route_client_frames(plain, None) == RoutedFrames(commands=[], lobby=[select])
+    command = _client_frame(bytes([TYPE_MOVEMENT, CMD_MOVE, 42, 161]), _TABLE)
+    with pytest.raises(DecodeError, match="SIM_COMMAND_BEFORE_AUTH"):
+        route_client_frames(command, None)
