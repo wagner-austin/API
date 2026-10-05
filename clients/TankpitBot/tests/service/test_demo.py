@@ -149,7 +149,7 @@ async def test_spawn_starts_one_bounded_practice_bot_in_the_first_slot(
 
 
 @pytest.mark.asyncio
-async def test_a_demo_row_carries_nothing_but_slot_liveness_and_uptime(
+async def test_a_demo_row_carries_nothing_but_slot_liveness_uptime_and_captions(
     demo_client: TestClient[web.Request, web.Application],
 ) -> None:
     """The public projection is a whitelist, asserted as its whole shape.
@@ -157,18 +157,21 @@ async def test_a_demo_row_carries_nothing_but_slot_liveness_and_uptime(
     Instance names on the operator surface are derived from account
     usernames, so a row that leaked one would publish the login. The
     key set is asserted rather than a handful of absences, so a field
-    added to the report row later cannot arrive here unnoticed.
+    added to the report row later cannot arrive here unnoticed. A bot
+    that has not decided anything yet has no captions.
     """
     spawned = await demo_client.post("/demo/spawn")
     assert spawned.status == 201
     row = narrow_json_to_dict(load_json_str(await spawned.text()))
 
-    assert sorted(row) == ["alive", "slot", "uptime_seconds"]
+    assert sorted(row) == ["alive", "captions", "slot", "uptime_seconds"]
+    assert require_list(row, "captions") == []
 
     body = await _fleet_body(demo_client)
     listed = narrow_json_to_dict(require_list(body, "bots")[0])
-    assert sorted(listed) == ["alive", "slot", "uptime_seconds"]
+    assert sorted(listed) == ["alive", "captions", "slot", "uptime_seconds"]
     assert require_str(listed, "slot") == "demo-1"
+    assert require_list(listed, "captions") == []
 
 
 @pytest.mark.asyncio
