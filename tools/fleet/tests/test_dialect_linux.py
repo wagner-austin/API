@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
+import re
 import socket
 import subprocess
 import sys
@@ -501,7 +502,10 @@ class TestForRealUnderSh:
         assert set(fields) == reported | (
             {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
         )
-        assert float(fields["free_ram_gb"]) > 0.0
+        # Any sign: on the stack host it is MemAvailable net of what capped
+        # containers may still grow into (fleet.core.linux_capacity_probe),
+        # which diphtheria read as -1.513 at 10:24Z on 2026-10-05.
+        assert re.fullmatch(r"-?\d+\.\d{3}", fields["free_ram_gb"])
         assert float(fields["free_disk_gb"]) > 0.0
         assert int(fields["logical_cores"]) >= 1
 
