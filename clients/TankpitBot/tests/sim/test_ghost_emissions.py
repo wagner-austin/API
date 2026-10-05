@@ -132,7 +132,7 @@ def test_seed_ghost_world_relocates_or_skips_blocked_spawns() -> None:
     """A ghost sighted on impassable ground spawns at the nearest open
     tile; one with no open ground nearby is skipped."""
     from tankpit_bot.sim.ghost import GhostSpecDict, GhostTankDict
-    from tankpit_bot.sim.run_boot import _seed_ghost_world
+    from tankpit_bot.sim.run_boot import seed_ghost_world
 
     spec = GhostSpecDict(
         client_team=0,
@@ -156,7 +156,7 @@ def test_seed_ghost_world_relocates_or_skips_blocked_spawns() -> None:
     rocks = {(40, 40): "#"}
     rocks.update({(80 + dx, 80 + dy): "#" for dx in range(-5, 6) for dy in range(-5, 6)})
     world = make_sim_world("field01_r.gif")
-    _seed_ghost_world(world, InMemoryTerrainMap(terrain_data=rocks), spec, None)
+    seed_ghost_world(world, InMemoryTerrainMap(terrain_data=rocks), spec, None)
     assert 500 in world["tanks"]
     spawned = world["tanks"][500]
     assert (spawned["x"], spawned["y"]) != (40, 40)
