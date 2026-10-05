@@ -308,11 +308,16 @@ class TestAnnouncement:
             _event(ts="2026-10-05T02:59:15.0000000Z", kind="released", label="deploy"),
         )
 
-        post = announcement(events, "diphtheria")
-
-        assert post is not None
-        lines = post["body"].splitlines()
-        assert lines[0] == "FLEET-LOCK on diphtheria: 1 hold(s) transitioned"
-        assert lines[-1] == (
-            "@opus-mosh-reboot-0909 your fleet-lock operation on diphtheria transitioned"
-        )
+        assert announcement(events, "diphtheria") == {
+            "body": "\n".join(
+                [
+                    "FLEET-LOCK on diphtheria: 1 hold(s) transitioned",
+                    "deploy (service-up, pid 2688): acquired 02:41:10Z RELEASED after 1085s "
+                    "by @opus-mosh-reboot-0909",
+                    "@opus-mosh-reboot-0909 your fleet-lock operation on diphtheria transitioned",
+                ]
+            ),
+            "agents": ("opus-mosh-reboot-0909",),
+            "holds": 1,
+            "checks": 0,
+        }
