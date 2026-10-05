@@ -9,7 +9,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check _check-unbudgeted install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow larder-probe mine-landing-probe corpus-audit release
 
 help:
 	@echo ""
@@ -62,6 +62,7 @@ help:
 	@echo "  make decode                      replay a capture through real decoders"
 	@echo "  make analyze-viewport            analyze viewport bounds in captures"
 	@echo "  make sim-baseline                fresh one-generation sim corpus + fidelity diff"
+	@echo "  make sim-control ARGS=...        N=1 control: record MANIFEST, or compare BEFORE AFTER"
 	@echo "  make analyze-command-coverage    does the sim survive every command a REAL client sends?"
 	@echo ""
 
@@ -366,6 +367,10 @@ analyze-response-shapes:
 sim-baseline:
 	@echo "=== sim-baseline (fresh one-generation sim corpus + fidelity diff)"
 	poetry run python -m scripts.build_sim_baseline $(ARGS)
+
+sim-control:
+	@echo "=== sim-control (record or compare the N=1 byte-identity control)"
+	poetry run python -m scripts.sim_control $(ARGS)
 
 analyze-command-coverage:
 	@echo "=== analyze command coverage (does the sim survive what a REAL client sends?)"
