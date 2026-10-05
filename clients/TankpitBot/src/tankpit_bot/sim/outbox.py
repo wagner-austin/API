@@ -70,6 +70,21 @@ class TickOutbox:
             raise SimError(f"tank {recipient} already has a batch in this tick's outbox")
         self._batches[recipient] = []
 
+    def dismiss(self, recipient: int) -> None:
+        """Close the batch of a connection that left since this opened.
+
+        Whatever it already held is discarded with it: the socket is
+        gone, so nothing owed to it can be delivered.
+
+        Args:
+            recipient: The departed tank's id.
+
+        Raises:
+            SimError: If the tank has no batch to close.
+        """
+        if self._batches.pop(recipient, None) is None:
+            raise SimError(f"tank {recipient} has no batch in this tick's outbox to close")
+
     def to(self, recipient: int, message: BinaryMessage) -> None:
         """Deliver a receipt to one tank's connection, if it has one.
 

@@ -214,6 +214,18 @@ class ViewportTracker:
             msg_type=0x5A, viewport_left=left, viewport_top=top, entities=entities
         )
 
+    def forget(self, tank_id: int) -> None:
+        """Drop a tank that left the field from this window's memory.
+
+        Its 0x29 already told the client the player is gone, so it is
+        neither visible nor departed-and-rerouting any more.
+
+        Args:
+            tank_id: The departed tank.
+        """
+        self.visible.discard(tank_id)
+        self.removed_at.pop(tank_id, None)
+
     def emit_transitions(self, messages: list[BinaryMessage]) -> None:
         """Diff viewport membership after this tick's relocations.
 

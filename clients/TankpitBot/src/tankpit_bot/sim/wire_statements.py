@@ -14,6 +14,7 @@ from tankpit_bot.protocol.types import (
     MovementResponseDict,
     StatisticsDict,
     TankEntryDict,
+    TankExitDict,
     TankInfoDict,
     TankStatusDict,
     TankStatusSyncDict,
@@ -181,6 +182,31 @@ def entry_statement(world: SimWorldDict, tank_id: int) -> TankEntryDict:
     )
 
 
+def exit_statement(team: int, tank_id: int) -> TankExitDict:
+    """Build the 0x29 a room's connections receive when a player leaves it.
+
+    One builder for both departures the sim models — a churn visitor
+    going home and a connection quitting a running field. Every archived
+    exit with a matching entry is ``was_silent=False,
+    was_eliminated=False``: the player LEFT, and the client is told
+    plainly ([[session-state-deglobalisation]]).
+
+    Args:
+        team: The departing tank's team.
+        tank_id: The departing tank.
+
+    Returns:
+        The exit message.
+    """
+    return TankExitDict(
+        msg_type=0x29,
+        team=team,
+        tank_id=tank_id,
+        was_silent=False,
+        was_eliminated=False,
+    )
+
+
 def statistics_statement(tick: int, destroyed: int, deactivated: int) -> StatisticsDict:
     """Build the 0x56 answer to a client statistics request.
 
@@ -283,6 +309,7 @@ __all__ = [
     "ENTRY_X",
     "ENTRY_Y",
     "entry_statement",
+    "exit_statement",
     "full_status_statement",
     "identity_statement",
     "movement_echo",

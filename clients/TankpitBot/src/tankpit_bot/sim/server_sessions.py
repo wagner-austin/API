@@ -12,15 +12,19 @@ admits one into a field that may already be running — joining a room
 mid-play is the normal case on the real server, not the exception — and
 the connections already there are told with the same 0x28 TankEntry a
 churn visitor's arrival draws ([[session-state-deglobalisation]]).
+:meth:`SimServerSessionsMixin.disconnect` is its inverse: the player
+quits, the tank leaves, and the room is told with a churn departure's
+0x29.
 """
 
 from __future__ import annotations
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.sim.client_session import ClientSession
-from tankpit_bot.sim.commands import SimError
+from tankpit_bot.sim.combat_clock import CombatClock
+from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.outbox import TickOutbox
-from tankpit_bot.sim.wire_statements import entry_statement
+from tankpit_bot.sim.wire_statements import entry_statement, exit_statement
 from tankpit_bot.sim.world import SimWorldDict
 
 
@@ -33,16 +37,24 @@ class SimServerSessionsMixin:
 
     world: SimWorldDict
     terrain: TerrainMapProtocol
+    combat: CombatClock
     _sessions: dict[int, ClientSession]
+    _queue: list[tuple[int, ClientCommandDict]]
     _outbox: TickOutbox
 
     def connect(self, tank_id: int) -> ClientSession:
         """Admit a connection for a tank already on the field.
 
-        The connections already present learn of the arrival through
-        this tick's outbox; the joiner learns the room from its own
-        join burst (:meth:`handshake`), which a real client asks for
-        with CMD_ENTER_GAME.
+        The connections already IN the room — sent their join burst —
+        learn of the arrival through this tick's outbox. The 0x28 they
+        get carries no position (an entry reports ``(0, 0)``), so each
+        of them also forgets the tank from its view: if the tank stands
+        in its window, the end-of-tick membership pass states where with
+        a 0x3D, the way a churn visitor landing in view is placed. A
+        connection still joining is told nothing separately, because its
+        own burst lists the room as it stands. The joiner learns the
+        room from its join burst (:meth:`handshake`), which a real
+        client asks for with CMD_ENTER_GAME.
 
         Args:
             tank_id: The tank the connection speaks for.
@@ -59,11 +71,41 @@ class SimServerSessionsMixin:
             raise SimError(f"no living tank {tank_id} to connect")
         if tank_id in self._sessions:
             raise SimError(f"tank {tank_id} is already connected")
-        self._outbox.broadcast([entry_statement(self.world, tank_id)])
+        for present in self._sessions.values():
+            if present.joined:
+                self._outbox.to(present.client_id, entry_statement(self.world, tank_id))
+                present.viewport.forget(tank_id)
         session = ClientSession(self.world, self.terrain, tank_id)
         self._sessions[tank_id] = session
         self._outbox.admit(tank_id)
         return session
+
+    def disconnect(self, tank_id: int) -> None:
+        """Close a connection, and take its tank off the field.
+
+        A player who quits leaves the room: the tank is removed, the
+        connections still present are told with the 0x29 a departing
+        churn visitor draws, and every trace the field kept of it is
+        dropped — its queued commands, its batch in the open outbox,
+        its unbilled firing costs and corpse window, and its place in
+        every other connection's viewport memory. Its kills and deaths
+        stay on the room's record.
+
+        Args:
+            tank_id: The tank whose connection is closing.
+
+        Raises:
+            SimError: If nothing is connected for the tank.
+        """
+        if self._sessions.pop(tank_id, None) is None:
+            raise SimError(f"tank {tank_id} has no connection to close")
+        self._queue = [entry for entry in self._queue if entry[0] != tank_id]
+        self._outbox.dismiss(tank_id)
+        self.combat.forget(tank_id)
+        tank = self.world["tanks"].pop(tank_id)
+        for session in self._sessions.values():
+            session.viewport.forget(tank_id)
+        self._outbox.broadcast([exit_statement(tank["team"], tank_id)])
 
     @property
     def sessions(self) -> tuple[ClientSession, ...]:

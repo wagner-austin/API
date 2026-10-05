@@ -19,6 +19,9 @@ the whole field, not a scripted clearing.
 
 from __future__ import annotations
 
+from collections import Counter
+from collections.abc import Sequence
+
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.types import BinaryMessage
@@ -128,6 +131,46 @@ class PracticeRoomDriver:
                 if state is not None:
                     note_hit_on_bot(state, shooter["x"], shooter["y"])
                 note_hit_for_team_aggro(world, self.states, tank_id, message["shooter_id"])
+
+    def note_field_batches(
+        self, world: SimWorldDict, batches: Sequence[list[BinaryMessage]]
+    ) -> None:
+        """Note every hit any connection's batch reveals, each once.
+
+        With several connections one shot is narrated to every observer
+        that sees it, so the union of the batches would count it once
+        per observer. Each distinct shot is kept as many times as the
+        batch showing it MOST often shows it — a dual's two identical
+        0x53s stay two — which with one connection is exactly that
+        connection's batch.
+
+        Args:
+            world: Simulated world.
+            batches: Every connection's batch this tick.
+        """
+        merged: list[BinaryMessage] = []
+        kept: Counter[tuple[int, int, int, int, int, int, int, int, int]] = Counter()
+        for batch in batches:
+            seen: Counter[tuple[int, int, int, int, int, int, int, int, int]] = Counter()
+            for message in batch:
+                if message["msg_type"] != 0x53:
+                    continue
+                key = (
+                    message["team"],
+                    message["shooter_id"],
+                    message["source_x"],
+                    message["source_y"],
+                    message["target_x"],
+                    message["target_y"],
+                    message["aim_x"],
+                    message["aim_y"],
+                    message["weapon"],
+                )
+                seen[key] += 1
+                if seen[key] > kept[key]:
+                    kept[key] += 1
+                    merged.append(message)
+        self.note_batch(world, merged)
 
     def decide_all(
         self,

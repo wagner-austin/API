@@ -100,6 +100,21 @@ class CombatClock:
                 expired.append(tank_id)
         return expired
 
+    def forget(self, tank_id: int) -> None:
+        """Drop a departed tank's open clocks.
+
+        A player who leaves the field takes its unbilled firing costs
+        and its corpse window with it: there is no tank left to bill or
+        to remove, and its 0x29 already told the room it is gone. Its
+        kill and death counts stay, because they are the room's record
+        of what happened while it was there.
+
+        Args:
+            tank_id: The departed tank.
+        """
+        self._pending_debits = [entry for entry in self._pending_debits if entry[0] != tank_id]
+        self._died_at.pop(tank_id, None)
+
     def destroyed_by(self, tank_id: int) -> int:
         """Tanks this one has deactivated this session (0x56 ``destroyed``).
 

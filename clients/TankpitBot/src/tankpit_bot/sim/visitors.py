@@ -30,9 +30,9 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import fuel_capacity
-from tankpit_bot.protocol.types import BinaryMessage, TankExitDict
+from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.spawn import find_open_tile
-from tankpit_bot.sim.wire_statements import entry_statement
+from tankpit_bot.sim.wire_statements import entry_statement, exit_statement
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 
 VISITOR_ARRIVAL_PERIOD_TICKS = 1692
@@ -130,16 +130,7 @@ class RoomChurn:
         """
         tank = world["tanks"].pop(tank_id)
         self.visitor_id = None
-        messages.append(
-            TankExitDict(
-                msg_type=0x29,
-                team=tank["team"],
-                tank_id=tank_id,
-                # Every archived exit is a plain departure, announced.
-                was_silent=False,
-                was_eliminated=False,
-            )
-        )
+        messages.append(exit_statement(tank["team"], tank_id))
 
 
 __all__ = [

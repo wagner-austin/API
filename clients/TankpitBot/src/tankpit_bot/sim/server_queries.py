@@ -104,6 +104,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
             SimError: If nothing is connected for the tank.
         """
         session = self.require_session(tank_id)
+        session.joined = True
         client = self.world["tanks"][tank_id]
         inventory = InventoryDict(
             msg_type=0x49,

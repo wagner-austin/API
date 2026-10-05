@@ -32,9 +32,10 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
-from tankpit_bot.sim.cli_args import _parse_cli, require_named_world
+from tankpit_bot.sim.cli_args import _CliArgsDict, _parse_cli, require_named_world
+from tankpit_bot.sim.field_clients import FieldSeatError
+from tankpit_bot.sim.field_run import run_field_session
 from tankpit_bot.sim.ghost import (
     GhostTracker,
 )
@@ -42,6 +43,7 @@ from tankpit_bot.sim.run_boot import (
     TickPacedClock,
     _boot,
     _queue_round_opponents,
+    resolve_named_world,
 )
 from tankpit_bot.sim.scenarios import (
     SIM_CLIENT_ID,
@@ -51,11 +53,6 @@ from tankpit_bot.sim.scenarios import (
 )
 from tankpit_bot.sim.session import build_capture_session, deliver_batch
 from tankpit_bot.sim.world import encode_sim_world
-from tankpit_bot.sim.world_seed import (
-    layout_by_provenance,
-    population_seed_for_stamp,
-    select_practice_layout,
-)
 from tankpit_bot.types import encode_capture_session
 
 log = get_logger(__name__)
@@ -162,24 +159,7 @@ def run_sim_session(
     Raises:
         RuntimeError: If the static key or terrain is unavailable.
     """
-    run_stamp = stamp if stamp is not None else make_run_stamp()
-    # The stamp -> world derivation lives HERE, in the open, rather than
-    # inside _boot where it used to hide. An explicit value wins; absent
-    # one the stamp still implies the world, which keeps interactive
-    # soaks varying and is exactly what a sweep member must override.
-    run_layout = (
-        layout_by_provenance(layout) if layout is not None else select_practice_layout(run_stamp)
-    )
-    run_population_seed = (
-        population_seed if population_seed is not None else population_seed_for_stamp(run_stamp)
-    )
-    log.info(
-        "sim world: layout %s (%s), population seed %d (%s)",
-        run_layout["provenance"],
-        "named" if layout is not None else "derived from stamp",
-        run_population_seed,
-        "named" if population_seed is not None else "derived from stamp",
-    )
+    run_stamp, run_layout, run_population_seed = resolve_named_world(stamp, layout, population_seed)
     artifacts = configure_probe_runtime_logging("sim", run_stamp, runs_root=runs_root)
     world, opponent, practice, ghost_spec, atlas_path, ferry_mode = _resolve_session_mode(
         opponent=opponent,
@@ -281,6 +261,63 @@ def run_sim_session(
     )
 
 
+def _main_field(parsed: _CliArgsDict) -> int:
+    """Run ``--clients N``: several production bots on one field.
+
+    Args:
+        parsed: The parsed flags, ``clients`` other than one.
+
+    Returns:
+        0 once the field session is archived.
+
+    Raises:
+        FieldSeatError: If a one-client scenario flag was also given —
+            the ghost, ferry, larder and atlas-forage worlds, and the
+            human-named scripted opponent, are each written around one
+            client — or the seat count is out of range.
+    """
+    one_client_flags = [
+        flag
+        for flag, given in (
+            ("--ghost", parsed["ghost"] is not None),
+            ("--ferry", parsed["ferry"]),
+            ("--larder", parsed["larder"]),
+            ("--from-atlas", parsed["atlas"] is not None),
+            ("--human-opponent", parsed["opponent_name"] != ""),
+        )
+        if given
+    ]
+    if one_client_flags:
+        raise FieldSeatError(
+            f"SIM_FIELD_SCENARIO: {', '.join(one_client_flags)} play one client; "
+            f"a field of {parsed['clients']} bots plays the arena or --practice"
+        )
+    result = run_field_session(
+        parsed["rounds"],
+        clients=parsed["clients"],
+        archive_dir=Path(parsed["out"]),
+        practice=parsed["practice"],
+        stamp=parsed["stamp"],
+        layout=parsed["layout"],
+        population_seed=parsed["population_seed"],
+        runs_root=parsed["runs_root"],
+    )
+    sys.stdout.write(
+        f"sim field {result['stamp']}: {result['rounds_played']}/{parsed['rounds']} rounds, "
+        f"{len(result['clients'])} bots\n"
+    )
+    for client in result["clients"]:
+        sys.stdout.write(
+            f"  tank {client['tank_id']} {client['name']} team {client['team']}: "
+            f"{client['rounds_played']} rounds, {client['kills']} kills, "
+            f"{client['deaths']} deaths, exit={client['exit_reason']}\n"
+            f"    capture: {client['capture_path']}\n"
+            f"    events:  {client['events_path']}\n"
+        )
+    sys.stdout.write(f"  world:   {result['world_path']}\n")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entrypoint for ``make sim-run``.
 
@@ -288,7 +325,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Command-line arguments (``--rounds N``,
             ``--no-opponent``, ``--stamp S``, ``--human-opponent
             NAME``, ``--ferry``, ``--larder``, ``--from-atlas [PATH]``, ``--out
-            DIR``). Uses ``sys.argv[1:]`` when None.
+            DIR``, ``--clients N`` for N production bots on one field).
+            Uses ``sys.argv[1:]`` when None.
 
     Returns:
         Process exit code (0 — a session that ends via the production
@@ -296,6 +334,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parsed = _parse_cli(list(argv) if argv is not None else list(sys.argv[1:]))
     require_named_world(parsed, _test_hooks.get_env)
+    if parsed["clients"] != 1:
+        return _main_field(parsed)
     result = run_sim_session(
         parsed["rounds"],
         archive_dir=Path(parsed["out"]),

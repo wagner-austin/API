@@ -57,6 +57,10 @@ class _CliArgsDict(TypedDict):
     ``runs_root`` relocates the probe log and event artifacts, which are
     otherwise fixed under ``runs/probe``. N array tasks sharing a node
     share that path and clobber each other's ``latest.*``.
+
+    ``clients`` is how many production bots play the field. One is the
+    ordinary session; two or more seat rival bots, each over its own
+    connection ([[physics-module-roadmap]], the multiplayer track).
     """
 
     rounds: int
@@ -73,6 +77,7 @@ class _CliArgsDict(TypedDict):
     population_seed: int | None
     runs_root: str | None
     sweep: bool
+    clients: int
 
 
 def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
@@ -89,9 +94,10 @@ def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
         :func:`_apply_bare_flag`.
 
     Raises:
-        ValueError: If ``--rounds`` or ``--population-seed`` names a
-            non-integer. Neither a tick count nor a determinism seed is
-            something to guess at when the caller mistyped it.
+        ValueError: If ``--rounds``, ``--population-seed`` or
+            ``--clients`` names a non-integer. None of a tick count, a
+            determinism seed or a seat count is something to guess at
+            when the caller mistyped it.
     """
     if token == "--rounds":
         parsed["rounds"] = int(value)
@@ -109,6 +115,8 @@ def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
         parsed["population_seed"] = int(value)
     elif token == "--runs-root":
         parsed["runs_root"] = value
+    elif token == "--clients":
+        parsed["clients"] = int(value)
     else:
         return False
     return True
@@ -179,6 +187,7 @@ def _parse_cli(args: list[str]) -> _CliArgsDict:
         population_seed=None,
         runs_root=None,
         sweep=False,
+        clients=1,
     )
     index = 0
     while index < len(args):

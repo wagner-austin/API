@@ -39,6 +39,7 @@ class ClientSession:
             exits and 0x3D entries.
         progression: The rank recovery window opened by a deactivation.
         awards: The decoration ledger and its grant thresholds.
+        joined: Whether the connection has been sent its join burst.
     """
 
     def __init__(
@@ -58,6 +59,11 @@ class ClientSession:
         self.viewport = ViewportTracker(world, terrain, client_id)
         self.progression = RankProgression(client_id)
         self.awards = AwardLedger(client_id)
+        self.joined = False
+        """Whether this connection has been sent its join burst.
+
+        A connection still joining learns the room from that burst, so
+        an arrival before it is not announced to it separately."""
 
 
 __all__ = ["ClientSession"]

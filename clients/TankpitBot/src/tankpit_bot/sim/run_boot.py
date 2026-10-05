@@ -19,14 +19,16 @@ from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.commands import CMD_MINE
 from tankpit_bot.protocol.naming import is_practice_bot_name
 from tankpit_bot.resources import require_asset
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.sim.atlas_seed import seed_atlas_population
 from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
+from tankpit_bot.sim.field_clients import seed_field_rivals
 from tankpit_bot.sim.ghost import (
     GhostSpecDict,
     ghost_events_for_tick,
     seed_ghost_world_population,
 )
-from tankpit_bot.sim.lobby import SIM_ACCOUNT, SimLobby
+from tankpit_bot.sim.lobby import SIM_ACCOUNT, SimAccountDict, SimLobby
 from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
 from tankpit_bot.sim.practice_room import PracticeRoomDriver, seed_practice_roster
 from tankpit_bot.sim.scenarios import (
@@ -41,8 +43,11 @@ from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 from tankpit_bot.sim.world_seed import (
     PracticeLayout,
+    layout_by_provenance,
+    population_seed_for_stamp,
     seed_field_population,
     seed_practice_client,
+    select_practice_layout,
 )
 from tankpit_bot.sim.world_seed_mines import (
     MINE_DENSITY,
@@ -77,6 +82,45 @@ class TickPacedClock:
     def advance(self, delta_ms: int) -> None:
         """Advance the session by one round's worth of time."""
         self._now_ms += delta_ms
+
+
+def resolve_named_world(
+    stamp: str | None, layout: str | None, population_seed: int | None
+) -> tuple[str, PracticeLayout, int]:
+    """Settle a run's stamp, practice layout and container seed, and log them.
+
+    The stamp -> world derivation lives HERE, in the open, rather than
+    inside the boot where it used to hide. An explicit value wins;
+    absent one the stamp still implies the world, which keeps
+    interactive soaks varying and is exactly what a sweep member must
+    override ([[sim-world-parameterization]]).
+
+    Args:
+        stamp: The run stamp, or None for a fresh one.
+        layout: A practice layout's provenance, or None to derive it.
+        population_seed: The container seed, or None to derive it.
+
+    Returns:
+        The stamp, the layout and the seed the run plays.
+
+    Raises:
+        UnknownPracticeLayoutError: If ``layout`` names no layout.
+    """
+    run_stamp = stamp if stamp is not None else make_run_stamp()
+    run_layout = (
+        layout_by_provenance(layout) if layout is not None else select_practice_layout(run_stamp)
+    )
+    run_population_seed = (
+        population_seed if population_seed is not None else population_seed_for_stamp(run_stamp)
+    )
+    log.info(
+        "sim world: layout %s (%s), population seed %d (%s)",
+        run_layout["provenance"],
+        "named" if layout is not None else "derived from stamp",
+        run_population_seed,
+        "named" if population_seed is not None else "derived from stamp",
+    )
+    return run_stamp, run_layout, run_population_seed
 
 
 def _seed_ghost_world(
@@ -150,42 +194,38 @@ def _seed_ghost_world(
     )
 
 
-def _boot(
+def _seed_world(
     world: SimWorldDict,
     *,
-    practice: bool = False,
-    stamp: str = "",
+    practice: bool,
     layout: PracticeLayout,
     population_seed: int,
-    atlas_path: Path | None = None,
-    ghost_spec: GhostSpecDict | None = None,
-) -> tuple[Bot, SimServer, SimCDPSession, PracticeRoomDriver | None]:
-    """Wire a real Bot to the sim over the CDP seam.
+    atlas_path: Path | None,
+    ghost_spec: GhostSpecDict | None,
+    rivals: int,
+) -> tuple[_test_hooks.TerrainMapProtocol, frozenset[int], PracticeRoomDriver | None]:
+    """Seed a session's field: its scenario, its rival bots, its furniture.
 
     THE WORLD IS PASSED IN, NOT DERIVED HERE. ``layout`` and
-    ``population_seed`` used to be computed from ``stamp`` inside this
-    function, which made a run's NAME an input to what it played: an array
-    whose tasks stamp themselves varied the room and the container field
-    along with whatever the sweep meant to vary. Both are now the caller's
-    to state, so a sweep member names its world and the stamp goes back to
+    ``population_seed`` used to be computed from the run stamp, which
+    made a run's NAME an input to what it played: an array whose tasks
+    stamp themselves varied the room and the container field along with
+    whatever the sweep meant to vary. Both are now the caller's to
+    state, so a sweep member names its world and the stamp goes back to
     being a label ([[sim-world-parameterization]]).
 
     Args:
-        world: The world the server will own. In practice mode this
-            arrives EMPTY of tanks and containers — ``layout`` seeds the
-            client spawn and the full 36-bot roster, and
-            ``seed_field_population`` lays down the static container field
-            ([[game-economy]] 2026-07-25: the world never spawns at
-            runtime).
-        practice: When True, build the practice-room world before the
-            handshake so the join roster dump includes the bots, and
-            hand the server their ids for the corpse-window
-            reactivation hook.
-        stamp: The run stamp. A LABEL — it names artifacts and nothing
-            else. It no longer reaches the world.
+        world: The world the server will own (mutated). In practice
+            mode this arrives EMPTY of tanks and containers — ``layout``
+            seeds the client spawn and the full 36-bot roster, and
+            ``seed_field_population`` lays down the static container
+            field ([[game-economy]] 2026-07-25: the world never spawns
+            at runtime).
+        practice: Build the practice-room world, so the join roster
+            dump includes the bots and the server learns their ids for
+            the corpse-window reactivation hook.
         layout: The practice layout to seed, for practice and
-            atlas-forage worlds. Required rather than defaulted: a
-            default here is what let the stamp-derived value hide.
+            atlas-forage worlds.
         population_seed: Determinism seed for the static container
             field. Decides where every container lies, and nothing logs
             it, so it is stated rather than derived.
@@ -195,23 +235,24 @@ def _boot(
             the ground truth is the REAL room; standalone it is a
             pure-forage world on the real field.
         ghost_spec: When set, seed a recorded session's world: the
-            client at its recorded spawn state, every sighted
-            opponent as a replayable ghost (at its first PASSABLE
-            sighting; ferry riders and other water sightings spawn at
-            their first dry tile), and the capture's first-observed
-            containers.
+            client at its recorded spawn state, every sighted opponent
+            as a replayable ghost (at its first PASSABLE sighting; ferry
+            riders and other water sightings spawn at their first dry
+            tile), and the capture's first-observed containers.
+        rivals: How many rival production bots to seat beside the
+            primary client (:func:`seed_field_rivals`), before the
+            minefield is laid so mines may share their neighbourhood as
+            they share every other tank's. Zero for a one-bot session.
 
     Returns:
-        The bot, the server, the seam link, and the practice-room
-        driver (None outside practice mode), with the join handshake
-        already delivered.
+        The field's terrain, the roster ids that reactivate in place,
+        and the roster-policy driver (None when no roster plays).
 
     Raises:
-        XorStaticKeyUnavailableError: If the XOR static key cannot be
-            read — the sim's binary seam needs the real cipher.
         RuntimeError: If the field terrain GIF is unavailable, or a
             scenario seed sits on impassable ground — a sim run needs
             both right, loudly.
+        FieldSeatError: If the rivals cannot all be seated.
     """
     terrain = _test_hooks.load_terrain_map(require_asset(world["field"]))
     driver: PracticeRoomDriver | None = None
@@ -255,6 +296,9 @@ def _boot(
         world["tanks"][SIM_CLIENT_ID]["fuel"] = _FERRY_CLIENT_FUEL
         tally = seed_atlas_population(world, terrain, atlas_path)
         log.info("atlas forage world %s: %s", atlas_path, tally)
+    if rivals:
+        seated = seed_field_rivals(world, terrain, SIM_CLIENT_ID, rivals)
+        log.info("field rivals: %d bots seated beside the client, ids %s", len(seated), seated)
     # The room's standing minefield, laid LAST so it can share tiles
     # with the containers already seeded — which the game does, and
     # which is exactly where the bot's clearance and landing-
@@ -269,8 +313,30 @@ def _boot(
     # placed its own keeps them ([[ferry-mechanics]]).
     log.info("ferries: %d afloat", seed_ferries(world, terrain))
     _require_seeds_passable(world, terrain)
-    server = SimServer(world, terrain, roster_ids=roster_ids)
-    server.connect(SIM_CLIENT_ID)
+    return terrain, roster_ids, driver
+
+
+def _attach_bot(
+    server: SimServer, tank_id: int, account: SimAccountDict
+) -> tuple[Bot, SimCDPSession]:
+    """Wire a real Bot to one connected tank over the CDP seam.
+
+    The bot joins through the PRODUCTION lobby flow and receives its
+    tank's join burst, exactly as a live client does.
+
+    Args:
+        server: The sim server; ``tank_id`` is already connected to it.
+        tank_id: The tank the bot plays.
+        account: What the bot's lobby join confirms report.
+
+    Returns:
+        The bot and its seam link, with the join handshake delivered.
+
+    Raises:
+        XorStaticKeyUnavailableError: If the XOR static key cannot be
+            read — the sim's binary seam needs the real cipher.
+        RuntimeError: If the production join flow does not reach a room.
+    """
     bot = Bot("https://sim.tankpit.local/", headless=True)
     # The bot lifts the magic off the page client's AUTH frame live, via
     # a CDP event stream the sim has no counterpart for; the link sends
@@ -279,7 +345,7 @@ def _boot(
     # the wire ([[session-state-deglobalisation]]).
     bot._magic = SIM_MAGIC
     bot._on_magic_captured(SIM_MAGIC)
-    link = SimCDPSession(server, SIM_CLIENT_ID, SIM_MAGIC, SimLobby(SIM_ACCOUNT))
+    link = SimCDPSession(server, tank_id, SIM_MAGIC, SimLobby(account))
     bot._cdp = link
     # The link is the page too: it satisfies the narrow page protocols
     # the poll-and-read flows take, so the PRODUCTION autoscroll
@@ -299,7 +365,57 @@ def _boot(
     # archived lobby frames per session finally have a sim counterpart.
     if not join_room(link, link, bot.world):
         raise RuntimeError("sim lobby: the production join flow did not reach a room")
-    deliver_batch(bot._cdp_message_buffer, server.handshake(SIM_CLIENT_ID), link)
+    deliver_batch(bot._cdp_message_buffer, server.handshake(tank_id), link)
+    return bot, link
+
+
+def _boot(
+    world: SimWorldDict,
+    *,
+    practice: bool = False,
+    stamp: str = "",
+    layout: PracticeLayout,
+    population_seed: int,
+    atlas_path: Path | None = None,
+    ghost_spec: GhostSpecDict | None = None,
+) -> tuple[Bot, SimServer, SimCDPSession, PracticeRoomDriver | None]:
+    """Seed a one-bot session and wire the real Bot to it.
+
+    Args:
+        world: The world the server will own (see :func:`_seed_world`).
+        practice: Build the practice-room world.
+        stamp: The run stamp. A LABEL — it names artifacts and nothing
+            else. It no longer reaches the world.
+        layout: The practice layout to seed. Required rather than
+            defaulted: a default here is what let the stamp-derived
+            value hide.
+        population_seed: Determinism seed for the static container field.
+        atlas_path: The mined longitudinal atlas, when it seeds the field.
+        ghost_spec: A recorded session to seed, when replaying one.
+
+    Returns:
+        The bot, the server, the seam link, and the practice-room
+        driver (None outside practice mode), with the join handshake
+        already delivered.
+
+    Raises:
+        XorStaticKeyUnavailableError: If the XOR static key cannot be
+            read.
+        RuntimeError: If the field terrain GIF is unavailable, or a
+            scenario seed sits on impassable ground.
+    """
+    terrain, roster_ids, driver = _seed_world(
+        world,
+        practice=practice,
+        layout=layout,
+        population_seed=population_seed,
+        atlas_path=atlas_path,
+        ghost_spec=ghost_spec,
+        rivals=0,
+    )
+    server = SimServer(world, terrain, roster_ids=roster_ids)
+    server.connect(SIM_CLIENT_ID)
+    bot, link = _attach_bot(server, SIM_CLIENT_ID, SIM_ACCOUNT)
     return bot, server, link, driver
 
 
@@ -421,4 +537,5 @@ def _queue_round_opponents(
 __all__ = [
     "TickPacedClock",
     "log",
+    "resolve_named_world",
 ]
