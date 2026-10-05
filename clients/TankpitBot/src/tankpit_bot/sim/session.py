@@ -40,13 +40,13 @@ from tankpit_bot.browser.page_client_snapshot import (
 from tankpit_bot.capture.xor import build_session_xor_table, require_static_key, xor_decode_body
 from tankpit_bot.protocol.commands import CMD_STATISTICS, COMMAND_PREFIX, TYPE_QUERY
 from tankpit_bot.protocol.types import BinaryMessage
-from tankpit_bot.sim.commands import ClientCommandKind, decode_client_command
+from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.sim.lobby import SimLobby, build_auth_frame
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import (
     encode_plaintext_payload,
     encode_tick_payload,
-    split_client_frames,
+    route_client_frames,
 )
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tankpit_bot.types.literals import MessageDirection
@@ -302,12 +302,9 @@ class SimCDPSession:
         Args:
             payload: Base64 wire payload of framed client bytes.
         """
-        lobby_replies: list[bytes] = []
-        for body in split_client_frames(payload):
-            if body[0] != COMMAND_PREFIX:
-                lobby_replies.extend(self._handle_lobby_frame(body))
-                continue
-            command = decode_client_command(xor_decode_body(body, self.table, offset=1))
+        routed = route_client_frames(payload, self.table)
+        lobby_replies = [reply for body in routed.lobby for reply in self._handle_lobby_frame(body)]
+        for command in routed.commands:
             self.sent_commands.append(command["kind"])
             if command["kind"] is ClientCommandKind.MAP_OPEN:
                 self.map_visible = True

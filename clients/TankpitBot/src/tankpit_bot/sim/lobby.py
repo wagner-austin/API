@@ -47,7 +47,7 @@ live: off the wire.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import NamedTuple, TypedDict
 
 from tankpit_bot.parser import RoomInfo
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
@@ -169,6 +169,18 @@ def _join_confirm_frame(room_id: str, account: SimAccountDict) -> bytes:
     ).encode()
 
 
+class LobbyEntry(NamedTuple):
+    """Where a client entered play.
+
+    Attributes:
+        room_id: The room it entered.
+        troop: The troop (team id) it entered with.
+    """
+
+    room_id: str
+    troop: int
+
+
 class SimLobby:
     """The pre-play protocol: room list, select, enter, toggles, quit.
 
@@ -188,10 +200,11 @@ class SimLobby:
             account: The account the join confirms report.
             rooms: The advertised rooms, in ROOM_LIST order.
         """
-        self._account = account
+        self.account = account
+        """The account the join confirms report."""
         self._rooms = rooms
-        self.entered_room_id: str | None = None
-        """The room the client entered, or ``None`` before entry."""
+        self.entry: LobbyEntry | None = None
+        """The room and troop the client entered, or ``None`` before entry."""
         self.quit = False
         """Whether the client sent the plaintext quit frame."""
 
@@ -255,25 +268,30 @@ class SimLobby:
         """
         if self._room(room_id) is None:
             return []
-        return [_join_confirm_frame(room_id, self._account)]
+        return [_join_confirm_frame(room_id, self.account)]
 
     def _enter(self, fields: str) -> list[bytes]:
         """Answer a room-entry request and mark the client entered.
 
         The request is ``room|troop|preview_x|preview_y|metadata``; the
         metadata tail is XOR-encoded by the client and the server does
-        not echo it, so only the room id is read here.
+        not echo it, so only the room id and the troop are read here.
+        The troop is the team the client chose, which a server seating a
+        new tank needs.
 
         Args:
             fields: The request body after the ``+`` prefix.
 
         Returns:
-            The enter-response frame, or nothing for an unknown room.
+            The enter-response frame, or nothing for an unknown room or a
+            troop that is not a number.
         """
-        room_id = fields.split("|", 1)[0]
-        if self._room(room_id) is None:
+        parts = fields.split("|", 2)
+        room_id = parts[0]
+        troop = parts[1] if len(parts) > 1 else ""
+        if self._room(room_id) is None or not troop.isdigit():
             return []
-        self.entered_room_id = room_id
+        self.entry = LobbyEntry(room_id=room_id, troop=int(troop))
         return [f"{ENTER_RESPONSE_PREFIX}{room_id}|{ENTER_RESPONSE_CODE}".encode()]
 
 
@@ -297,6 +315,48 @@ def build_auth_frame(account_id: str, token: str, stamp: str, magic: str) -> byt
     return f"{AUTH_PREFIX} !be {account_id}|{token}|{stamp} {magic}".encode()
 
 
+class AuthFrameDict(TypedDict):
+    """What a server reads from a client's AUTH frame.
+
+    Attributes:
+        account_id: The account the client claims.
+        token: The session hash it presents.
+        magic: The session magic its cipher is built from.
+    """
+
+    account_id: str
+    token: str
+    magic: str
+
+
+class LobbyError(ValueError):
+    """A lobby frame a server cannot accept (``SIM_LOBBY_*`` codes)."""
+
+
+def parse_auth_frame(body: bytes) -> AuthFrameDict:
+    """Read an AUTH frame, the inverse of :func:`build_auth_frame`.
+
+    A server speaking to its own clients has to read the frame the page
+    client writes, where the bot's code only lifts the magic off it.
+    The shape is exact: ``%AUTH !be <account>|<hash>|<stamp> <magic>``.
+
+    Args:
+        body: The plaintext frame body.
+
+    Returns:
+        The account, token and magic.
+
+    Raises:
+        LobbyError: If the frame is not in that shape, or any field is
+            empty (``SIM_LOBBY_AUTH``).
+    """
+    words = body.decode("utf-8", errors="replace").split(" ")
+    fields = words[2].split("|") if len(words) == 4 else []
+    if words[:2] != [AUTH_PREFIX, "!be"] or len(fields) != 3 or not all(fields) or not words[-1]:
+        raise LobbyError(f"SIM_LOBBY_AUTH: not an AUTH frame: {body[:40]!r}")
+    return AuthFrameDict(account_id=fields[0], token=fields[1], magic=words[3])
+
+
 __all__ = [
     "AUTH_PREFIX",
     "ENTER_PREFIX",
@@ -308,7 +368,11 @@ __all__ = [
     "SELECT_PREFIX",
     "SIM_ACCOUNT",
     "SIM_ROOMS",
+    "AuthFrameDict",
+    "LobbyEntry",
+    "LobbyError",
     "SimAccountDict",
     "SimLobby",
     "build_auth_frame",
+    "parse_auth_frame",
 ]

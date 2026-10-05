@@ -6,9 +6,11 @@ container), XOR'd exactly the way ``capture.xor.xor_decode_body``
 inverts it — the production ingestion path consumes the output
 unchanged.
 
-Client -> server: the bot's ``!``-prefixed command frames (as built
-by ``protocol.commands``) decode back into typed
-:class:`~tankpit_bot.sim.commands.ClientCommandDict` values.
+Client -> server: :func:`route_client_frames` splits a payload between
+its two protocols. The ``!``-prefixed command frames (as built by
+``protocol.commands``) decode back into typed
+:class:`~tankpit_bot.sim.commands.ClientCommandDict` values, and every
+other frame is plaintext for the lobby.
 
 Both directions use the production cipher with no local copy, and
 :func:`_require_wire_sized` holds the sim to a frame size the real
@@ -20,6 +22,7 @@ than asserted ([[session-state-deglobalisation]]).
 from __future__ import annotations
 
 import base64
+from typing import NamedTuple
 
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.capture.xor import xor_decode_body
@@ -125,7 +128,7 @@ def split_client_frames(payload: str) -> list[bytes]:
     told apart by the leading byte — ``!`` is a command, anything else
     is lobby. Splitting has to happen before that question can be
     asked, so it is its own step here rather than a branch inside
-    :func:`decode_client_payload`.
+    :func:`route_client_frames`.
 
     Args:
         payload: Base64 payload as sent by the bot.
@@ -143,32 +146,54 @@ def split_client_frames(payload: str) -> list[bytes]:
         raise DecodeError(f"undecodable client payload: {error}") from error
 
 
-def decode_client_payload(payload: str, table: bytes) -> list[ClientCommandDict]:
-    """Decode a client frame payload into typed commands.
+class RoutedFrames(NamedTuple):
+    """One client payload, split between its two protocols.
+
+    Attributes:
+        commands: The in-game commands (``!`` frames), decoded, in order.
+        lobby: The plaintext lobby frames, in order, for the lobby to answer.
+    """
+
+    commands: list[ClientCommandDict]
+    lobby: list[bytes]
+
+
+def route_client_frames(payload: str, table: bytes | None) -> RoutedFrames:
+    """Split one client payload into commands and lobby frames.
+
+    One socket carries two protocols, told apart by each frame's lead
+    byte: ``!`` is an in-game command, XOR'd after the prefix; anything
+    else is a plaintext lobby frame. This is the one place that split is
+    made, for the in-process link and the network server alike.
 
     Args:
-        payload: Base64 payload as sent by the bot's command sender
-            (length-prefixed ``!`` frames, XOR after the prefix).
-        table: Session XOR table.
+        payload: Base64 payload of the client's framed bytes.
+        table: The connection's XOR table, or None before the AUTH frame
+            has named the session magic.
 
     Returns:
-        The decoded commands, in frame order.
+        The decoded commands and the lobby frames.
 
     Raises:
-        DecodeError: If the payload is not valid base64, a frame is
-            torn, or a frame does not carry the ``!`` command prefix.
+        DecodeError: If the payload is torn, a command frame arrives
+            before the connection has a table, or a command does not
+            decode.
     """
-    commands: list[ClientCommandDict] = []
+    routed = RoutedFrames(commands=[], lobby=[])
     for body in split_client_frames(payload):
         if body[0] != COMMAND_PREFIX:
-            raise DecodeError(f"client frame missing '!' prefix: 0x{body[0]:02X}")
-        commands.append(decode_client_command(xor_decode_body(body, table, offset=1)))
-    return commands
+            routed.lobby.append(body)
+            continue
+        if table is None:
+            raise DecodeError("SIM_COMMAND_BEFORE_AUTH: a command frame before the AUTH frame")
+        routed.commands.append(decode_client_command(xor_decode_body(body, table, offset=1)))
+    return routed
 
 
 __all__ = [
-    "decode_client_payload",
+    "RoutedFrames",
     "encode_plaintext_payload",
     "encode_tick_payload",
+    "route_client_frames",
     "split_client_frames",
 ]
