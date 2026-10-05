@@ -6466,3 +6466,30 @@ those four items as open.
   were already stale before this change (the auditor's
   `git-blob-pin-stale-uncited` on both), and they are left as they
   were, because the rest of the page was not re-audited.
+
+---
+
+## [2026-10-05] update | The N=1 control becomes `make sim-control`, rerun on the real recording
+
+Board task b008ab91, answering its review's ask that the N=1 control be
+committed so a reviewer can rerun it. [[physics-module-roadmap]]'s
+registry section gains the paragraph on it.
+- The capture archive the previous entry could not find is on
+  diphtheria's archive drive, `/mnt/archive-a/austinpc/tankpitbot-runs/runs`
+  (20 GB): 586 `capture_session.json` files (298 at the top of
+  `runs/bot`, 46 in `runs/sniff`, the rest in per-instance and sim
+  directories) and `runs/analysis` with the container atlas. Copying
+  the captures and `runs/analysis` back into a checkout's `runs/` takes
+  228 MB.
+- `scripts/sim_control.py` records the six baseline scenarios and a
+  ghost self-replay of `bot-20260802-205105` on layout
+  `bot-20260706-223721`, population seed 7, 150 rounds, as 21
+  clock-stripped SHA-256 digests, and compares two such manifests.
+- Pre-Phase-1 (`8674f4c65^`, reconstructed from `git diff` and played
+  through `PYTHONPATH`) against the Phase 1 tree: IDENTICAL on all 21.
+  The ghost tracked 7/150 on both, first divergence round 2.
+- Negative control: `WEAPON_STACK_ROLL` (5, 9) to (5, 11) in a scratch
+  copy DIVERGED on 9 artifacts.
+- The terrain stand-in both baseline script tests need moved to
+  `tests/_baseline_field.py` rather than being copied into the new
+  test.

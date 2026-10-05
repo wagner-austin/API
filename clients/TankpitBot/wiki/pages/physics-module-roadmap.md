@@ -1423,6 +1423,29 @@ matched each other first, which is what makes the comparison a
 control. The two-connection receipt and broadcast rules are pinned in
 `tests/sim/test_server_connections.py`.
 
+**The control is now a committed instrument, and it was rerun with
+the real recording.** `make sim-control` (`scripts/sim_control.py`)
+plays every `build_sim_baseline` scenario (duel, solo, practice,
+ferry, human, larder) on that named layout and seed, plus a ghost
+self-replay of `runs/bot/bot-20260802-205105.capture_session.json` —
+the capture the 2026-08-03 refusal-law lift was controlled against —
+for 150 rounds each, and writes one SHA-256 per capture, world and
+event stream into a manifest; `compare BEFORE AFTER` prints IDENTICAL
+or names each differing artifact. Only the wall clock is stripped
+(`start_timestamp_ms`, `end_timestamp_ms`, each frame's
+`timestamp_ms`, each event's `timestamp`, and the `timestamp_ms`
+inside the survey's `survey_json` text): two runs of one tree minutes
+apart differ in exactly those and nothing else. The older tree is
+played by putting its `src` first on `PYTHONPATH`. On 2026-10-05 the
+pre-Phase-1 tree (`8674f4c65^`) and the Phase 1 tree compared
+IDENTICAL on all 21 artifacts, the ghost tracking 7 of 150 rounds
+with its first divergence at round 2 on both. The 10/150 of
+2026-08-03 is not this baseline: two months of bot changes lie between
+them, which is why the control is always two trees recorded the same
+day. Negative control: the same recording with `WEAPON_STACK_ROLL`
+widened from (5, 9) to (5, 11) DIVERGED on 9 artifacts (the ghost,
+larder and practice sessions), so a one-constant change cannot pass.
+
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
 The "healing ladder" gap died to a user correction ("tanks dont heal…
