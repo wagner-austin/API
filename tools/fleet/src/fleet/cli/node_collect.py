@@ -45,6 +45,8 @@ fails leaves the row live, matching the node.
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from typing import Final
 
 from platform_core.error_codes_fleet import FleetErrorCode
@@ -81,6 +83,10 @@ _log = get_logger(__name__)
 #: ``timeout`` gives a command it ended for running too long, which is what
 #: happened, rather than a number a reader would have to look up.
 TIMED_OUT_EXIT_CODE: Final = 124
+
+#: Held while a held job's run is read and settled, by the collect pass and
+#: by the tick's watch thread alike (:func:`collect_one_job`).
+SETTLING: Final = threading.Lock()
 
 
 def settle(
@@ -199,63 +205,70 @@ def collect_one_job(
             ``QUEUE_ANSWER_MALFORMED`` when a node-lane job carries no sha,
             which the queue's pin makes impossible. Not caught: those mean
             this machine's own records and the fleet disagree.
-    """
-    row: LedgerEntry | None = None
-    for candidate in collect_cli.live_rows(loaded, run_id=job["run_id"]):
-        row = candidate
-    if row is None:
-        return f"{encode_job_line(job)}: no live run on this machine, leaving it"
-    node = require_node(loaded.workspace, row["node"])
-    plan = require_project(loaded.workspace, row["project"])
-    result = collect.poll_result(node, run_id=row["run_id"])
-    if result is None:
-        deadline = collect.lease_deadline(row, plan)
-        now = _test_hooks.now()
-        if now > deadline:
-            reason = (
-                f"{FleetErrorCode.LEASE_NOT_HELD.value}: still running {now - deadline}s past "
-                f"its lease deadline {deadline}, so the runner ended its process tree; raise "
-                f"{row['project']}'s expected_minutes if the suite needs longer"
-            )
-            stop.stop_on_node(node, run_id=row["run_id"])
-            line = settle(
-                loaded,
-                credentials,
-                board,
-                job,
-                identity,
-                row=row,
-                node=node,
-                exit_code=TIMED_OUT_EXIT_CODE,
-                detail=reason,
-                stopped=reason,
-            )
-            return f"{encode_job_line(job)}: {line}"
-        queue.report_progress(
-            credentials,
-            job_id=job["job_id"],
-            note=f"still running on {row['node']} as {row['run_id']}",
-            lease_seconds=CLAIM_LEASE_SECONDS,
-            identity=identity,
-        )
-        return f"{encode_job_line(job)}: still running, lease renewed"
 
-    if collect.outlived_its_lease(row, plan, finished_unix=result["finished_unix"]):
-        raise collect_cli.lapsed_lease_refusal(row, plan, finished_unix=result["finished_unix"])
-    exit_code = result["exit_code"]
-    line = settle(
-        loaded,
-        credentials,
-        board,
-        job,
-        identity,
-        row=row,
-        node=node,
-        exit_code=exit_code,
-        detail=collect.describe(node, run_id=row["run_id"], exit_code=exit_code),
-        stopped=None,
-    )
-    return f"{encode_job_line(job)}: {line}"
+    ONE AT A TIME, under :data:`SETTLING`: the tick's watch settles a run
+    that ends while the collect pass is still going
+    (:mod:`fleet.cli.node_watch`), and the run each finds live is read
+    under the same lock, so the second to reach one finds it closed.
+    """
+    with SETTLING:
+        row: LedgerEntry | None = None
+        for candidate in collect_cli.live_rows(loaded, run_id=job["run_id"]):
+            row = candidate
+        if row is None:
+            return f"{encode_job_line(job)}: no live run on this machine, leaving it"
+        node = require_node(loaded.workspace, row["node"])
+        plan = require_project(loaded.workspace, row["project"])
+        result = collect.poll_result(node, run_id=row["run_id"])
+        if result is None:
+            deadline = collect.lease_deadline(row, plan)
+            now = _test_hooks.now()
+            if now > deadline:
+                reason = (
+                    f"{FleetErrorCode.LEASE_NOT_HELD.value}: still running {now - deadline}s "
+                    f"past its lease deadline {deadline}, so the runner ended its process "
+                    f"tree; raise {row['project']}'s expected_minutes if the suite needs longer"
+                )
+                stop.stop_on_node(node, run_id=row["run_id"])
+                line = settle(
+                    loaded,
+                    credentials,
+                    board,
+                    job,
+                    identity,
+                    row=row,
+                    node=node,
+                    exit_code=TIMED_OUT_EXIT_CODE,
+                    detail=reason,
+                    stopped=reason,
+                )
+                return f"{encode_job_line(job)}: {line}"
+            queue.report_progress(
+                credentials,
+                job_id=job["job_id"],
+                note=f"still running on {row['node']} as {row['run_id']}",
+                lease_seconds=CLAIM_LEASE_SECONDS,
+                identity=identity,
+            )
+            return f"{encode_job_line(job)}: still running, lease renewed"
+
+        finished = result["finished_unix"]
+        if collect.outlived_its_lease(row, plan, finished_unix=finished):
+            raise collect_cli.lapsed_lease_refusal(row, plan, finished_unix=finished)
+        exit_code = result["exit_code"]
+        line = settle(
+            loaded,
+            credentials,
+            board,
+            job,
+            identity,
+            row=row,
+            node=node,
+            exit_code=exit_code,
+            detail=collect.describe(node, run_id=row["run_id"], exit_code=exit_code),
+            stopped=None,
+        )
+        return f"{encode_job_line(job)}: {line}"
 
 
 def launched_by_claim(
@@ -486,7 +499,8 @@ def collect_pass(
     *,
     agent: str,
     alias: str,
-) -> frozenset[str]:
+    hold: Callable[[frozenset[str]], None],
+) -> None:
     """Settle every running job this runner holds, reconcile every claim an
     earlier tick left without a start, then stop what was cancelled.
 
@@ -497,11 +511,10 @@ def collect_pass(
         identity: This runner's identity arguments.
         agent: This runner's label.
         alias: This node's workspace name.
-
-    Returns:
-        The run ids of the running jobs this runner held when the pass
-        began, which the tick's watch (:mod:`fleet.cli.node_watch`) narrows
-        to those this machine's ledger still calls running.
+        hold: Given the run ids of the running jobs this runner holds as
+            soon as the queue has said, before any is settled, so the
+            tick's watch (:mod:`fleet.cli.node_watch`) reads them while
+            this pass goes on.
 
     Raises:
         AppError: As :func:`collect_one_job`, :func:`reconcile_claim` and
@@ -509,6 +522,7 @@ def collect_pass(
     """
     held = queue.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
+    hold(running)
     for job in held:
         # Live is claimed or running; a claimed one is an earlier tick's.
         if job["status"] is DispatchStatus.RUNNING:
@@ -523,7 +537,6 @@ def collect_pass(
         alias=alias,
         held=frozenset(job["run_id"] for job in held),
     )
-    return running
 
 
 def require_sha(job: DispatchJob) -> str:
@@ -551,6 +564,7 @@ def require_sha(job: DispatchJob) -> str:
 
 __all__ = [
     "CLAIM_LEASE_SECONDS",
+    "SETTLING",
     "TIMED_OUT_EXIT_CODE",
     "collect_one_job",
     "collect_pass",

@@ -77,7 +77,7 @@ from __future__ import annotations
 import pathlib
 import sys
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from board_watch import config as board_config
 from platform_core import cli_args
@@ -275,6 +275,7 @@ def fill_pass(
     alias: str,
     node: NodeConfig,
     elevated: bool,
+    hold: Callable[[frozenset[str]], None],
 ) -> tuple[str, ...]:
     """Claim and launch until this node has no room or the lane nothing it fits.
 
@@ -301,6 +302,8 @@ def fill_pass(
         alias: This node's workspace name.
         node: Its declaration.
         elevated: Whether this is the node's elevated runner.
+        hold: Given each run the moment it is launched, so the tick's watch
+            (:mod:`fleet.cli.node_watch`) reads it while the pass goes on.
 
     Returns:
         The run ids this pass launched, in launch order.
@@ -314,6 +317,7 @@ def fill_pass(
             loaded, credentials, identity, alias=alias, node=node, elevated=elevated
         )
     ) is not None:
+        hold(frozenset({run_id}))
         launched.append(run_id)
     _log.info("%s launched %d job(s) this tick", alias, len(launched))
     return tuple(launched)
@@ -532,14 +536,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     credentials = queue.load_credentials()
 
-    def passes() -> frozenset[str]:
-        running = collect_pass(loaded, credentials, board, identity, agent=agent, alias=alias)
-        launched = fill_pass(
-            loaded, credentials, identity, alias=alias, node=node, elevated=elevated
+    def settle(run_id: str) -> str:
+        return node_watch.collect_ended(
+            loaded, credentials, board, identity, agent=agent, run_id=run_id
         )
-        return running | frozenset(launched)
 
-    node_watch.run_tick(loaded, alias=alias, node=node, passes=passes)
+    watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
+
+    def passes() -> None:
+        collect_pass(
+            loaded, credentials, board, identity, agent=agent, alias=alias, hold=watch.hold
+        )
+        fill_pass(
+            loaded,
+            credentials,
+            identity,
+            alias=alias,
+            node=node,
+            elevated=elevated,
+            hold=watch.hold,
+        )
+
+    node_watch.run_tick(watch, alias=alias, passes=passes)
     return 0
 
 
