@@ -124,6 +124,7 @@ def isolated_build_lines(
         f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}' "
         'PLAYWRIGHT_BROWSERS_PATH="$exec_cache/ms-playwright" '
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
+        f"CORVIS_TEST_MAX_WORKERS='{workers}' "
         f"{AGENT_LABEL_VARIABLE}='{agent}' "
         f'{CACHE_VARIABLE}="$exec_cache" '
         f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')} "

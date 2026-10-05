@@ -158,6 +158,7 @@ def build_script(
         '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"',
         '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',
+        '$env:CORVIS_TEST_MAX_WORKERS = "$Workers"',
         f"$env:CORVIS_FLEET_ELEVATED = '{1 if elevated else 0}'",
         f"$env:{AGENT_LABEL_VARIABLE} = '{label}'",
         f"$env:{CACHE_VARIABLE} = $CacheRoot",

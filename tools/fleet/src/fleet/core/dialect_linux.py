@@ -367,11 +367,13 @@ class LinuxDialect:
             f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}'",
             f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
+            f"CORVIS_TEST_MAX_WORKERS='{workers}'",
             f"{AGENT_LABEL_VARIABLE}='{label}'",
             f"{CACHE_VARIABLE}='{cache_root}'",
             f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')}",
             f"export npm_config_cache POETRY_CACHE_DIR {POETRY_KEYRING_OFF[0]} "
-            f"PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS {AGENT_LABEL_VARIABLE} "
+            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
+            f"{AGENT_LABEL_VARIABLE} "
             f"{CACHE_VARIABLE} {WORKSPACE_VARIABLE}",
             f"cd '{target}'",
         ]
