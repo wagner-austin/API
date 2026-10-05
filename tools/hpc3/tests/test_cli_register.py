@@ -112,17 +112,20 @@ class TestRegisteringANewProject:
         """
         root = _tree(tmp_path, section=True)
         _script_image(fake_run, installed="newcomer==0.1.0\n")
+        before = set(declared_projects(runs_of(root)))
 
         assert main(_args(root)) == 0
 
         runs = runs_of(root)
         document = runs / workspace_filename(NEWCOMER)
         registry = declared_projects(runs)
+        assert set(registry) == before | {NEWCOMER}
         assert emitted == [
             f"registered {NEWCOMER} in {document}",
             f"  image {NEWCOMER_IMAGE} sha256 {NEWCOMER_DIGEST}",
             "  /opt/env verified inside it, 1 pin(s) held",
-            f"  table in {index_of(root)} regenerated from the registry: 9 projects",
+            f"  table in {index_of(root)} regenerated from the registry:"
+            f" {len(before) + 1} projects",
             f"next: hpc3-preflight --config {document} --run <run document>",
         ]
         declared = registry[NEWCOMER]

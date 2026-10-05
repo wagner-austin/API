@@ -1,8 +1,10 @@
 """The registration steps: what is refused, what is read, what is written.
 
 Driven against a copy of the real registry and index (``tests._registry_tree``)
-so every check here runs beside the eight projects already registered rather
-than beside a fixture's invention.
+so every check here runs beside every project already registered rather than
+beside a fixture's invention. No count of them is written here: a test that
+pinned one went red the day a real project was registered, which is the
+surprise this command exists to remove.
 """
 
 from __future__ import annotations
@@ -175,6 +177,7 @@ class TestWritingTheDocument:
         """
         root = copy_tree(tmp_path)
         write_section(root, NEWCOMER)
+        before = set(declared_projects(runs_of(root)))
         payload = register.workspace_payload(shared_connection(runs_of(root)), NEWCOMER, _config())
 
         registry = register.write_registration(
@@ -184,7 +187,8 @@ class TestWritingTheDocument:
         document = runs_of(root) / "hpc3-newcomer.json"
         assert document.read_bytes() == (dump_json_str(payload, indent=2) + "\n").encode("utf-8")
         assert registry == declared_projects(runs_of(root))
-        assert len(registry) == 9
+        assert set(registry) == before | {NEWCOMER}
+        assert NEWCOMER not in before
         assert registry[NEWCOMER]["image"]["sha256"] == NEWCOMER_DIGEST
         text = index_of(root).read_text(encoding="utf-8")
         assert extract_projects_block(text) == render_projects_block(registry)

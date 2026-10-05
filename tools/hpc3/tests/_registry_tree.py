@@ -3,7 +3,7 @@
 ``hpc3-register`` WRITES a workspace document and the index, so a test that
 drove it against the real tree would race every test reading them. Copying the
 real documents rather than inventing small ones keeps the point of the test:
-the command lands a project beside the eight already registered, through the
+the command lands a project beside every one already registered, through the
 same index the next session reads, and the table it writes is checked against
 what that whole registry declares.
 """
