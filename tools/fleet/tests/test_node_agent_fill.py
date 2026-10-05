@@ -160,7 +160,7 @@ class TestARoomyNode:
         # left for the next tick without a poll (MCPs board task c1d48330).
         assert messages[-2:] == [
             "lavender launched 2 job(s) this tick",
-            "lavender watch until 2025-09-04T15:33:20+00:00: 0 poll(s), 0 pass(es) rerun, "
+            "lavender watch until 2025-09-04T15:33:20+00:00: 0 poll(s), 0 run(s) closed, "
             "2 run(s) still watched",
         ]
 
