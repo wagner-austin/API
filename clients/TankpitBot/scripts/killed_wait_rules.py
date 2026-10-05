@@ -23,7 +23,7 @@ The rule reads each function in ``tests/`` and flags a ``R.wait(...)`` that
 passes a timeout, positionally or by keyword, on a line after ``R.kill()``
 in the same function, where ``R`` is the same receiver expression. A wait on
 a process nothing killed is not this rule's business, and production code is
-out of scope: ``stream/capture.py`` bounds its post-kill wait on purpose, so
+out of scope: ``stream/helper_process.py`` bounds its post-kill wait on purpose, so
 a helper stuck in uninterruptible sleep fails the stop loudly.
 
 Runs as part of ``make check`` through
