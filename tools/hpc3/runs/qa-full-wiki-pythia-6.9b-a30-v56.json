@@ -1,0 +1,30 @@
+{
+  "project": "cartridge-qa",
+  "name": "qa-full-wiki-pythia-6.9b-a30-v56",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "minutes": 2160,
+  "gpu_pinned_because": "bf16-7b-weights-13.8GB-plus-training-need-24GB-and-the-certified-pair-ran-on-a30",
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan pythia-6.9b-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-wiki-full-ee6e6d12 --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-full-wiki-v56-pythia-6.9b-full-wiki-qa.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/qa-full-wiki-v56-pythia-6.9b-full-wiki-qa.json",
+  "experiment": {
+    "measurement": "cartridge-question-set",
+    "corpus": "wiki-full-885-pages",
+    "corpus_digest": "a756664dbb4e",
+    "wiki_commit": "ee6e6d12ec1e2690958bea9359dd49234aeec1e1",
+    "stage_manifest": "qa-corpus-wiki-full-ee6e6d12-stage.json",
+    "image_commit": "0e9f177f56d5e6895b6a148f6ae86901d18d4e89",
+    "declared_effect": "0.02",
+    "items": "3278-to-3827-per-cell-measured-2026-10-04",
+    "power_gate": "require_resolvable_question_set-refuses-before-the-model-loads-under-250-items",
+    "arms": "base-cartridge-oracle-bm25-dense-fused-expanded-reranked-longcontext",
+    "seeds": "7.8.9",
+    "protection": "per-arm-and-per-seed-checkpoint-resume",
+    "plan": "pythia-6.9b-full-wiki-qa",
+    "base_model": "EleutherAI/pythia-6.9b",
+    "precision": "stored-bf16-declared-in-the-plan-row-resolved-before-the-corpus-read",
+    "why": "the-scale-rung-past-the-reported-774m-crossing-on-an-instrument-that-can-resolve-it"
+  }
+}
