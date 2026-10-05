@@ -69,7 +69,7 @@ from pathlib import Path
 from typing import ClassVar, Final
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 #: The subprocess helpers that run a child to completion in one call. Each
 #: accepts ``timeout``, so each can be bounded and each must be.
@@ -138,7 +138,7 @@ class SubprocessTimeoutRule:
             :data:`AWAITING_CALLS`.
         """
         names: set[str] = set()
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if not isinstance(node, ast.ImportFrom) or node.module != "subprocess":
                 continue
             for alias in node.names:
@@ -220,7 +220,7 @@ class SubprocessTimeoutRule:
                 continue
             tree = parse_source(path)
             imported = self._imported_names(tree)
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 if not isinstance(node, ast.Call):
                     continue
                 callee = self._awaiting_callee(node, imported)

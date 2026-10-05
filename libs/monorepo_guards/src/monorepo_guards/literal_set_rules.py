@@ -48,7 +48,7 @@ from typing import Final
 
 from monorepo_guards import Violation
 from monorepo_guards.config import GuardConfig
-from monorepo_guards.util import parse_source, read_source
+from monorepo_guards.util import module_nodes, parse_source, read_source
 
 
 class LiteralSet:
@@ -212,7 +212,7 @@ def _declared_members(tree: ast.Module, tuple_name: str) -> frozenset[str] | Non
         The declared members, or None when the tuple is absent or is not a
         tuple of string constants.
     """
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if not isinstance(node, ast.AnnAssign):
             continue
         target = node.target
@@ -245,7 +245,7 @@ def _annotation_sites(tree: ast.Module, field_names: frozenset[str]) -> list[tup
         Pairs of (line number, annotation expression).
     """
     sites: list[tuple[int, ast.expr]] = []
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if isinstance(node, ast.AnnAssign):
             target = node.target
             if isinstance(target, ast.Name):

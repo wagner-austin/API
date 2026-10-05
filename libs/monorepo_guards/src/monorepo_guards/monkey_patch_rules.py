@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source, read_source
+from monorepo_guards.util import module_nodes, parse_source, read_source
 
 
 class IsolationContext(TypedDict):
@@ -96,7 +96,7 @@ class MonkeyPatchBanRule:
                 return True
         return name in ("action_hooks", "core_hooks", "script_hooks", "bot_hooks")
 
-    def _collect_module_aliases(self, tree: ast.AST) -> set[str]:
+    def _collect_module_aliases(self, tree: ast.Module) -> set[str]:
         """Collect names bound by 'import ... as ...' statements.
 
         Args:
@@ -106,7 +106,7 @@ class MonkeyPatchBanRule:
             Set of alias names that refer to imported modules.
         """
         aliases: set[str] = set()
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, ast.Import) or (
                 isinstance(node, ast.ImportFrom) and node.module is not None
             ):
@@ -243,7 +243,7 @@ class MonkeyPatchBanRule:
 
         return restored
 
-    def _collect_restored_attrs(self, tree: ast.AST) -> set[tuple[str, str]]:
+    def _collect_restored_attrs(self, tree: ast.Module) -> set[tuple[str, str]]:
         """Collect all (module, attr_key) pairs with save-restore in any function.
 
         Args:
@@ -253,7 +253,7 @@ class MonkeyPatchBanRule:
             Set of (module_name, attr_key) pairs that are properly restored.
         """
         restored: set[tuple[str, str]] = set()
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 restored.update(self._find_restored_attrs_in_scope(node.body))
         return restored
@@ -405,7 +405,7 @@ class MonkeyPatchBanRule:
                     return True
         return False
 
-    def _collect_reset_containers(self, tree: ast.AST) -> set[str]:
+    def _collect_reset_containers(self, tree: ast.Module) -> set[str]:
         """Collect names reset by an autouse fixture in this file.
 
         Args:
@@ -416,7 +416,7 @@ class MonkeyPatchBanRule:
             fixture, so every attribute of that name is restored per test.
         """
         containers: set[str] = set()
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             if not self._is_autouse_fixture(node):
@@ -431,7 +431,7 @@ class MonkeyPatchBanRule:
                     containers.add(inner.func.value.id)
         return containers
 
-    def _isolation_for(self, path: Path, tree: ast.AST) -> IsolationContext:
+    def _isolation_for(self, path: Path, tree: ast.Module) -> IsolationContext:
         """Build the isolation guarantees covering one test file.
 
         pytest applies a conftest fixture to every test module at or below its
@@ -493,7 +493,7 @@ class MonkeyPatchBanRule:
             lines = source.splitlines()
             module_aliases = self._collect_module_aliases(tree)
             isolation = self._isolation_for(path, tree)
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 if isinstance(node, ast.Assign):
                     out.extend(
                         self._check_assignment(

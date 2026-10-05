@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
 class WorkerImportsRule:
@@ -82,7 +82,7 @@ class WorkerImportsRule:
                 tree = parse_source(path)
             except SyntaxError as exc:
                 raise RuntimeError(f"failed to parse {path}: {exc}") from exc
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 if isinstance(node, ast.Import):
                     out.extend(self._check_import_node(path, node))
                 elif isinstance(node, ast.ImportFrom):

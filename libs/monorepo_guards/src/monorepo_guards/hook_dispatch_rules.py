@@ -38,10 +38,10 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
-def _declares_hook_api(tree: ast.AST) -> bool:
+def _declares_hook_api(tree: ast.Module) -> bool:
     """Report whether a module advertises itself as holding hooks.
 
     A module that defines ``set_<name>_hook`` or ``use_real_<name>`` is a
@@ -55,7 +55,7 @@ def _declares_hook_api(tree: ast.AST) -> bool:
     Returns:
         True when the module defines a hook setter or a use-real function.
     """
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         if node.name.startswith("set_") and node.name.endswith("_hook"):
@@ -65,7 +65,7 @@ def _declares_hook_api(tree: ast.AST) -> bool:
     return False
 
 
-def _is_hooks_module(path: Path, tree: ast.AST) -> bool:
+def _is_hooks_module(path: Path, tree: ast.Module) -> bool:
     """Report whether a module is a dependency-injection hooks module.
 
     Args:
@@ -81,7 +81,7 @@ def _is_hooks_module(path: Path, tree: ast.AST) -> bool:
     return _declares_hook_api(tree)
 
 
-def _local_protocol_names(tree: ast.AST) -> frozenset[str]:
+def _local_protocol_names(tree: ast.Module) -> frozenset[str]:
     """Collect names of Protocol classes defined in a module.
 
     Hook protocols are not always named with a ``Proto`` suffix -- a container
@@ -96,7 +96,7 @@ def _local_protocol_names(tree: ast.AST) -> frozenset[str]:
         Names of classes declared with a Protocol base.
     """
     names: set[str] = set()
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if not isinstance(node, ast.ClassDef):
             continue
         for base in node.bases:
@@ -202,7 +202,7 @@ class NullableHookRule:
 
     name = "nullable-hook"
 
-    def _scan(self, path: Path, tree: ast.AST) -> list[Violation]:
+    def _scan(self, path: Path, tree: ast.Module) -> list[Violation]:
         """Collect nullable hook declarations in one module.
 
         Args:
@@ -214,7 +214,7 @@ class NullableHookRule:
         """
         out: list[Violation] = []
         local_protocols = _local_protocol_names(tree)
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if not isinstance(node, ast.AnnAssign):
                 continue
             value = node.value
@@ -347,7 +347,7 @@ class HookDispatchRule:
         out: list[Violation] = []
         for path in files:
             tree = parse_source(path)
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 if isinstance(node, ast.If):
                     hook = self._dispatch_target(node)
                     if hook is not None:

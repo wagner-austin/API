@@ -49,7 +49,7 @@ from pathlib import Path
 from typing import Final
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 #: The summary emitter. Mean and spread; the range discards the replicates.
 _SUMMARY_SYMBOL: Final[str] = "gain_observations"
@@ -75,7 +75,7 @@ def _called_names(tree: ast.Module) -> set[str]:
         The set of names appearing as a direct call target.
     """
     names: set[str] = set()
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             names.add(node.func.id)
     return names

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
 class _MLPatternVisitor(ast.NodeVisitor):
@@ -174,10 +174,10 @@ class MLTestQualityRule:
 
         return out
 
-    def _check_ml_patterns(self, path: Path, tree: ast.AST) -> list[Violation]:
+    def _check_ml_patterns(self, path: Path, tree: ast.Module) -> list[Violation]:
         violations: list[Violation] = []
 
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 continue
             if not node.name.startswith("test_"):

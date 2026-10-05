@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source, read_lines
+from monorepo_guards.util import module_nodes, parse_source, read_lines
 
 
 def _parse_module(path: Path) -> ast.Module:
@@ -61,7 +61,7 @@ def _bare_print_lines(tree: ast.Module) -> set[int]:
     """
     return {
         node.lineno
-        for node in ast.walk(tree)
+        for node in module_nodes(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "print"
@@ -115,7 +115,7 @@ class LoggingRule:
         func_aliases: set[str] = set()
         violations: list[Violation] = []
 
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name != "logging":
@@ -171,7 +171,7 @@ class LoggingRule:
         candidates.add("logging")
         violations: list[Violation] = []
 
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if not isinstance(node, ast.Call):
                 continue
             func = node.func

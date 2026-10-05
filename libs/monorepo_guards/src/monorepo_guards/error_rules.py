@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source, read_lines
+from monorepo_guards.util import module_nodes, parse_source, read_lines
 
 CENTRAL_ERROR_MODULES = frozenset({"errors.py", "error_codes.py"})
 """The files inside ``platform_core`` that ARE the central error vocabulary.
@@ -59,10 +59,10 @@ class ErrorsRule:
         self,
         path: Path,
         lines: list[str],
-        tree: ast.AST,
+        tree: ast.Module,
     ) -> list[Violation]:
         violations: list[Violation] = []
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, ast.ClassDef):
                 if node.name == "AppError" and not self._is_platform_core_errors_module(path):
                     line = lines[node.lineno - 1] if 0 <= node.lineno - 1 < len(lines) else ""

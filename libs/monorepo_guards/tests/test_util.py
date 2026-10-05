@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from monorepo_guards.config import GuardConfig
-from monorepo_guards.util import iter_py_files
+from monorepo_guards.util import iter_py_files, module_nodes, parse_source
 
 
 def _write(path: Path, text: str) -> None:
@@ -31,3 +32,17 @@ def test_iter_py_files_excludes_cache_and_handles_missing_dirs(tmp_path: Path) -
     files = iter_py_files(cfg)
     # Only 'keep.py' should be included
     assert [p.name for p in files] == ["keep.py"]
+
+
+def test_module_nodes_walks_a_parsed_file_once_in_ast_walk_order(tmp_path: Path) -> None:
+    """The first call walks and the second hands back the same tuple, in
+    exactly the order ``ast.walk`` yields, so a rule switched to it sees
+    the nodes it saw before and the module is walked once."""
+    path = tmp_path / "mod.py"
+    _write(path, "import os\n\ndef f(x: int) -> int:\n    return x + 1\n")
+    tree = parse_source(path)
+    first = module_nodes(tree)
+    walked = list(ast.walk(tree))
+    assert len(first) == len(walked) == 16
+    assert all(mine is theirs for mine, theirs in zip(first, walked, strict=True))
+    assert module_nodes(tree) is first

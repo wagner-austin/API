@@ -115,6 +115,37 @@ def parse_source(path: Path) -> ast.Module:
     return tree
 
 
+#: Each module's nodes in ``ast.walk`` order, keyed by the module's id. The
+#: entry holds the module itself, so its id cannot be reused by another object
+#: while the entry lives, and an id found here always names the same tree.
+_NODES_CACHE: dict[int, tuple[ast.Module, tuple[ast.AST, ...]]] = {}
+
+
+def module_nodes(tree: ast.Module) -> tuple[ast.AST, ...]:
+    """Walk a parsed module once, however many rules walk it.
+
+    Measured on clients/TankpitBot (1,293 files) on 2026-10-05: with every
+    file parsed once, the rules still walked each whole module about 22 times,
+    29.8 million ``ast.walk`` generator resumes that were 61 percent of a guard
+    run. Under coverage, which charges every Python-level call, the package's
+    guard-shim test took 308 s; with this cache it took 130 s, and the bare
+    guard went from 52 s to between 31 and 45 s.
+
+    Args:
+        tree: A parsed module, normally :func:`parse_source`'s. Callers must
+            not mutate it, for the reason ``parse_source`` gives.
+
+    Returns:
+        Every node of the module, in the order ``ast.walk`` yields them.
+    """
+    cached = _NODES_CACHE.get(id(tree))
+    if cached is not None:
+        return cached[1]
+    nodes = tuple(ast.walk(tree))
+    _NODES_CACHE[id(tree)] = (tree, nodes)
+    return nodes
+
+
 def read_lines(path: Path) -> list[str]:
     """Read a file's lines, once per version of that file.
 
@@ -196,7 +227,7 @@ def imported_names(tree: ast.Module) -> set[str]:
         component of a dotted plain import.
     """
     names: set[str] = set()
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if isinstance(node, ast.ImportFrom):
             names.update(alias.asname or alias.name for alias in node.names)
         elif isinstance(node, ast.Import):
@@ -217,7 +248,7 @@ def imported_module_names(tree: ast.Module) -> set[str]:
     """
     return {
         node.module.rsplit(".", maxsplit=1)[-1]
-        for node in ast.walk(tree)
+        for node in module_nodes(tree)
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
@@ -228,6 +259,7 @@ __all__ = [
     "imported_module_names",
     "imported_names",
     "iter_py_files",
+    "module_nodes",
     "package_of",
     "parse_source",
     "read_lines",

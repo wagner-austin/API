@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 RESTRICTED_SYMBOLS: dict[str, tuple[str, ...]] = {
     "clear_resource_target": ("bot/ai/intent.py",),
@@ -94,7 +94,7 @@ class RestrictedSymbolRule:
         for path in files:
             posix_path = path.as_posix()
             tree = parse_source(path)
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 for symbol, line_no in self._node_references(node):
                     if self._allowed_here(posix_path, symbol):
                         continue

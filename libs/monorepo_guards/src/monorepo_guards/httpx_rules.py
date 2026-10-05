@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
 class HttpxRule:
@@ -85,7 +85,7 @@ class HttpxRule:
             if not self._should_check(path):
                 continue
             tree = parse_source(path)
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 if isinstance(node, ast.Import):
                     out.extend(self._check_import_node(path, node))
                 elif isinstance(node, ast.ImportFrom):

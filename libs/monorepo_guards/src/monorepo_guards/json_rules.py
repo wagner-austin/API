@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
 class JsonRule:
@@ -57,7 +57,7 @@ class JsonRule:
             if self._is_allowed(path):
                 continue
             tree = parse_source(path)
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 out.extend(self._scan_node(path, node))
         return out
 

@@ -7,7 +7,7 @@ from io import StringIO
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source, read_lines
+from monorepo_guards.util import module_nodes, parse_source, read_lines
 
 
 class TypingRule:
@@ -164,7 +164,7 @@ class TypingRule:
         for stmt in tree.body:
             module_level_nodes.add(id(stmt))
 
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, ast.ImportFrom) and node.module == "typing":
                 for alias in node.names:
                     if alias.name in forbidden_imports:

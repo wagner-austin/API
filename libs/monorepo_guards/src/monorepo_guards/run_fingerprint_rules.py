@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Final
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 #: Keys that together identify a dict literal as an encoded run fingerprint.
 #:
@@ -74,7 +74,7 @@ def _comparison_operands(tree: ast.Module) -> frozenset[int]:
         The ``id()`` of every dict literal used as a comparison operand.
     """
     operands: set[int] = set()
-    for node in ast.walk(tree):
+    for node in module_nodes(tree):
         if not isinstance(node, ast.Compare):
             continue
         for side in (node.left, *node.comparators):

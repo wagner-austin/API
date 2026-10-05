@@ -6,7 +6,7 @@ from io import StringIO
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source, read_lines
+from monorepo_guards.util import module_nodes, parse_source, read_lines
 
 
 class SuppressRule:
@@ -27,7 +27,7 @@ class SuppressRule:
             out.extend(self._scan_pragma_comments(path, source))
         return out
 
-    def _scan_tree(self, path: Path, tree: ast.AST, lines: list[str]) -> list[Violation]:
+    def _scan_tree(self, path: Path, tree: ast.Module, lines: list[str]) -> list[Violation]:
         def is_suppress(expr: ast.AST) -> bool:
             func = expr.func if isinstance(expr, ast.Call) else expr
             if isinstance(func, ast.Attribute):
@@ -37,7 +37,7 @@ class SuppressRule:
 
         out: list[Violation] = []
         seen: set[int] = set()
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, (ast.With, ast.AsyncWith)):
                 for item in node.items:
                     if is_suppress(item.context_expr):

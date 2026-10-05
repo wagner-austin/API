@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source, read_lines
+from monorepo_guards.util import module_nodes, parse_source, read_lines
 
 
 class RequestContextRule:
@@ -27,7 +27,7 @@ class RequestContextRule:
                 tree = parse_source(path)
             except SyntaxError as exc:
                 raise RuntimeError(f"failed to parse {path}: {exc}") from exc
-            for node in ast.walk(tree):
+            for node in module_nodes(tree):
                 if isinstance(node, ast.ClassDef) and self._is_request_id_middleware(node):
                     idx = node.lineno - 1
                     line = lines[idx].rstrip("\n") if 0 <= idx < len(lines) else ""

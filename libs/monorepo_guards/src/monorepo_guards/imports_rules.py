@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
 class ImportsRule:
@@ -124,10 +124,10 @@ class ImportsRule:
 
         return violations
 
-    def _check_ast(self, path: Path, tree: ast.AST) -> list[Violation]:
+    def _check_ast(self, path: Path, tree: ast.Module) -> list[Violation]:
         violations: list[Violation] = []
 
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, ast.Import):
                 violations.extend(self._check_import_node(path, node))
             elif isinstance(node, ast.ImportFrom):

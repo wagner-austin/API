@@ -48,7 +48,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import module_nodes, parse_source
 
 
 def _is_type_spelled(name: str) -> bool:
@@ -91,7 +91,7 @@ class PassthroughRule:
             The names an alias could point at.
         """
         names: set[str] = set()
-        for node in ast.walk(tree):
+        for node in module_nodes(tree):
             if isinstance(node, ast.ClassDef):
                 names.add(node.name)
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
