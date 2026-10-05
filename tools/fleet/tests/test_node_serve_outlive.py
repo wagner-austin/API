@@ -97,23 +97,61 @@ class TestServingOnAfterTheLoopFailed:
         assert clock.seconds == DEMO_NOW
 
 
+class CountingWatch(node_watch.RunWatch):
+    """The real watch, which also says when it has counted a settled run.
+
+    The settle's own callable returns before the watch marks the settle over
+    and counts the run, so an event set inside it would let the main thread
+    ask for the handover in between, refused or granted by the scheduler's
+    whim (fleet job ed284162 on loki read 0 runs closed). The count is the
+    watch's last step for a settled run, so the event set after it marks the
+    watch idle with the run counted.
+
+    Attributes:
+        counted: Set once a settled run is counted.
+    """
+
+    counted: threading.Event
+
+    def __init__(self, loaded: _config.LoadedWorkspace, settle: node_watch.Settle) -> None:
+        """Bind lavender's watch.
+
+        Args:
+            loaded: The workspace.
+            settle: What it settles an ended run with.
+        """
+        node = loaded.workspace["nodes"]["lavender"]
+        super().__init__(loaded, alias="lavender", node=node, settle=settle)
+        self.counted = threading.Event()
+
+    def _settled(self, run_id: str) -> None:
+        """Count the run as the watch does, then say so.
+
+        Args:
+            run_id: The run.
+        """
+        super()._settled(run_id)
+        self.counted.set()
+
+
 class SleepAfterTheSettle:
-    """A sleep that moves the clock, the main thread's only once a run is settled.
+    """A sleep that moves the clock, the main thread's only once a run is counted.
 
     Satisfies :class:`~fleet.core._test_hooks.SleepProtocol`. The serving
     loop sleeps on its own thread and moves the clock at once; the main
     thread's sleeps are :func:`fleet.cli.node_serve.serve_on`'s, and the
-    first of them waits for the watch thread's settle, standing for the
-    seconds a real sleep lets the watch poll, so the case fixes the order a
-    real serve takes rather than racing the watch to the handover.
+    first of them waits for the watch thread to settle and count the run,
+    standing for the seconds a real sleep lets the watch poll, so the case
+    fixes the order a real serve takes rather than racing the watch to the
+    handover.
     """
 
     def __init__(self, clock: FakeClock, settled: threading.Event) -> None:
-        """Bind the clock and the settle's event.
+        """Bind the clock and the count's event.
 
         Args:
             clock: The clock each sleep advances.
-            settled: Set once the watch has settled the run.
+            settled: Set once the watch has settled and counted the run.
         """
         self._clock = clock
         self._settled = settled
@@ -161,19 +199,16 @@ class TestAServeWhoseQueueListingIsRefused:
         sourced_config.write_text(dump_json_str(document), encoding="utf-8")
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         clock = pin_clock(DEMO_NOW)
-        settled = threading.Event()
-        _test_hooks.sleep = SleepAfterTheSettle(clock, settled)
         # Read once still going, then once with its result written.
         _test_hooks.run = FakeRun([ok(""), ok(""), ok(""), ok(f"0 {DEMO_NOW + 72}")])
         closed: list[str] = []
 
         def settle(*, run_id: str) -> str:
             closed.append(run_id)
-            settled.set()
             return f"{run_id}: settled"
 
-        node = loaded.workspace["nodes"]["lavender"]
-        watch = node_watch.RunWatch(loaded, alias="lavender", node=node, settle=settle)
+        watch = CountingWatch(loaded, settle)
+        _test_hooks.sleep = SleepAfterTheSettle(clock, watch.counted)
 
         def collect() -> None:
             watch.hold(frozenset({DEMO_RUN_ID}))
