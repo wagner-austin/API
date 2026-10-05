@@ -1,6 +1,6 @@
-"""Per-instance telemetry for the fleet surface: stats and live activity.
+"""Per-instance telemetry for the fleet surface: stats, activity, captions.
 
-Two read-only summaries, both folded from the instance's events
+Three read-only summaries, all folded from the instance's events
 artifact (``runs/bot/<instance>/latest.events.jsonl``) by
 :class:`~tankpit_bot.service.fleet_stream.InstanceStream`:
 
@@ -9,6 +9,8 @@ artifact (``runs/bot/<instance>/latest.events.jsonl``) by
 * **activity** — the live tail: current bot state, current fuel, and
   the last few AI/WORLD/STATE lines, so the page can show what the
   bot is DOING right now, not just its totals.
+* **captions** — the public demo's timed plain-word captions
+  (:mod:`tankpit_bot.service.demo_caption`).
 
 Two layers of work-avoidance, and they are not the same thing:
 
@@ -20,7 +22,7 @@ Two layers of work-avoidance, and they are not the same thing:
   (:data:`TELEMETRY_CACHE_TTL_MS`), so the page's poll rate stays a UI
   choice rather than an IO multiplier.
 
-Both summaries share one cursor: the page asks for stats and activity
+Every summary shares one cursor: the page asks for stats and activity
 together, so whichever lands second finds nothing new to fold.
 """
 
@@ -30,6 +32,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.service.demo_caption import CaptionDict
 from tankpit_bot.service.fleet_stream import InstanceStream
 
 TELEMETRY_CACHE_TTL_MS = 2000
@@ -47,6 +50,7 @@ class FleetTelemetry:
         """Start with no streams and an empty cache."""
         self._streams: dict[str, InstanceStream] = {}
         self._cache: dict[tuple[str, str], tuple[int, JSONObject]] = {}
+        self._captions_read_ms: dict[str, int] = {}
 
     def _fresh(self, kind: str, instance: str) -> JSONObject | None:
         """Return the cached summary when it is still young enough.
@@ -184,6 +188,29 @@ class FleetTelemetry:
             return self._store("activity", instance, dict(_UNAVAILABLE))
         return self._store("activity", instance, stream.activity())
 
+    def captions(self, instance: str) -> list[CaptionDict]:
+        """Return the public demo's caption window for an instance.
+
+        Not cached as a payload, because the window is measured from
+        the moment of the call; the artifact READ is bounded by the
+        same :data:`TELEMETRY_CACHE_TTL_MS` as the other summaries.
+
+        Args:
+            instance: Instance name (registry membership is the
+                caller's concern).
+
+        Returns:
+            The captions a viewer may still be watching, oldest first;
+            empty when the instance has no readable events yet.
+        """
+        now_ms = top_hooks.get_current_time_ms()
+        refreshed_ms = self._captions_read_ms.get(instance)
+        if refreshed_ms is None or now_ms - refreshed_ms > TELEMETRY_CACHE_TTL_MS:
+            self._captions_read_ms[instance] = now_ms
+            if self._refreshed_stream(instance) is None:
+                return []
+        return self._streams[instance].captions(now_ms)
+
     def forget(self, instance: str) -> None:
         """Drop an instance's stream and cached summaries.
 
@@ -198,6 +225,7 @@ class FleetTelemetry:
             None.
         """
         self._streams.pop(instance, None)
+        self._captions_read_ms.pop(instance, None)
         for kind in ("stats", "activity"):
             self._cache.pop((kind, instance), None)
 

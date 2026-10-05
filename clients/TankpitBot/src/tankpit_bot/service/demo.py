@@ -15,7 +15,9 @@ same way: every demo route resolves its id through
 public video relay cannot be pointed at a private bot by guessing.
 
 What a demo row SAYS is likewise the whole list: a slot name, whether
-it is alive, and how long it has been up. Operator instance names are
+it is alive, how long it has been up, and its captions — what the bot
+is doing and why in plain words, with its fuel
+(:mod:`tankpit_bot.service.demo_caption`). Operator instance names are
 derived from account usernames
 (:func:`~tankpit_bot.service.fleet_config.derive_instance`), so
 reporting one publicly would publish the username; a demo slot is a
@@ -34,6 +36,7 @@ from platform_core.json_utils import JSONObject, JSONValue
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.service.demo_caption import CaptionDict, encode_caption
 from tankpit_bot.service.fleet_bot import FleetBotDict
 from tankpit_bot.service.fleet_config import configured_accounts
 from tankpit_bot.service.fleet_error import FleetError
@@ -75,11 +78,16 @@ class DemoBotDict(TypedDict):
             account-derived instance name the operator surface uses.
         alive: Whether the bot is still playing.
         uptime_seconds: Whole seconds since it was spawned.
+        captions: The bot's recent captions, oldest first, each from
+            the wall-clock moment it became true; empty until its first
+            decision. The page shows the one in force at the frame it
+            is playing.
     """
 
     slot: str
     alive: bool
     uptime_seconds: int
+    captions: list[CaptionDict]
 
 
 class DemoFleetDict(TypedDict):
@@ -155,10 +163,11 @@ def demo_slot_or_refuse(candidate: str) -> str:
     )
 
 
-def _public_row(row: FleetBotDict) -> DemoBotDict:
+def _public_row(manager: FleetManager, row: FleetBotDict) -> DemoBotDict:
     """Reduce one report row to what the public may read.
 
     Args:
+        manager: The fleet registry, read for the bot's captions.
         row: The manager's full report row.
 
     Returns:
@@ -166,12 +175,15 @@ def _public_row(row: FleetBotDict) -> DemoBotDict:
         and this one does not — account, room, troop, doctrine, role,
         pid, service port, exit code, bounds — is dropped by being
         absent from the construction, not by being blanked afterwards.
+        The captions carry no names either: they are the bot's reasons
+        in fixed words, not its log lines.
     """
     elapsed_ms = top_hooks.get_current_time_ms() - row["started_ms"]
     return DemoBotDict(
         slot=row["instance"],
         alive=row["alive"],
         uptime_seconds=elapsed_ms // 1000,
+        captions=manager.captions(row["instance"]),
     )
 
 
@@ -189,7 +201,7 @@ def demo_fleet(manager: FleetManager) -> DemoFleetDict:
         The public snapshot.
     """
     rows = [
-        _public_row(row)
+        _public_row(manager, row)
         for row in manager.report()
         if row["alive"] and row["instance"].startswith(DEMO_SLOT_PREFIX)
     ]
@@ -236,6 +248,7 @@ def demo_spawn(manager: FleetManager) -> DemoBotDict:
     if not slot:
         raise FleetError(f"the demo is full ({demo_capacity()} bots); wait for one to finish")
     return _public_row(
+        manager,
         manager.spawn(
             instance=slot,
             account=account,
@@ -245,7 +258,7 @@ def demo_spawn(manager: FleetManager) -> DemoBotDict:
             room=DEFAULT_LOBBY_ROOM,
             troop="",
             doctrine="",
-        )
+        ),
     )
 
 
@@ -258,10 +271,12 @@ def encode_demo_bot(bot: DemoBotDict) -> JSONObject:
     Returns:
         JSON-serializable object.
     """
+    captions: list[JSONValue] = [encode_caption(caption) for caption in bot["captions"]]
     return {
         "slot": bot["slot"],
         "alive": bot["alive"],
         "uptime_seconds": bot["uptime_seconds"],
+        "captions": captions,
     }
 
 

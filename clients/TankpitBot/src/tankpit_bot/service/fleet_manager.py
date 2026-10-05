@@ -21,6 +21,7 @@ from tankpit_bot.bot.control import ControlCommandDict, ControlVerb, control_pen
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir, bot_stop_file
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.constants import FLEET_CHILD_PORT_BASE, FLEET_CHILD_PORT_COUNT
+from tankpit_bot.service.demo_caption import CaptionDict
 from tankpit_bot.service.fleet_adoption import adopt_recorded_bots
 from tankpit_bot.service.fleet_bot import (
     FleetBotDict,
@@ -543,6 +544,23 @@ class FleetManager:
         if instance not in self._bots:
             raise FleetError(f"unknown instance {instance!r}")
         return self._telemetry.activity(instance)
+
+    def captions(self, instance: str) -> list[CaptionDict]:
+        """Return a registered instance's public demo captions.
+
+        Args:
+            instance: Registered instance name.
+
+        Returns:
+            The timed captions a viewer may still be watching, oldest
+            first (:mod:`tankpit_bot.service.demo_caption`).
+
+        Raises:
+            FleetError: If the instance is not registered.
+        """
+        if instance not in self._bots:
+            raise FleetError(f"unknown instance {instance!r}")
+        return self._telemetry.captions(instance)
 
     def remove(self, instance: str) -> FleetBotDict:
         """Drop a finished instance from the registry.
