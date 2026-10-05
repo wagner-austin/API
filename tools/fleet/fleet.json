@@ -420,6 +420,18 @@
         "companions": []
       }
     },
+    "clients/TankpitBot": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 25,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "clients/TankpitBot",
+        "install": [],
+        "companions": []
+      }
+    },
     "slime": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,
