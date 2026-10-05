@@ -23,6 +23,7 @@ at most the virtualenvs of the runs still on the node.
 from __future__ import annotations
 
 import shlex
+import threading
 from typing import Final
 
 from platform_core.logging import get_logger
@@ -38,9 +39,15 @@ _log = get_logger(__name__)
 #: Where poetry keeps its virtualenvs inside the node's cache root.
 VIRTUALENVS: Final = "pypoetry/virtualenvs"
 
-#: The sweep script's name under the stage root. One name for every run: a
-#: node's runner settles one run at a time, so no two sweeps share it at once.
+#: The sweep script's name under the stage root. One name for every run, so
+#: no two sweeps of one process run at once (:data:`SWEEPING`).
 SWEEP_STEM: Final = "fleet-venv-sweep"
+
+#: Held across each sweep. A serving node runner settles several runs at once
+#: (:mod:`fleet.cli.run_locks`, MCPs board task 8993c306), and two sweeps of
+#: one node would write the one script path above together and remove the
+#: same orphaned virtualenvs twice.
+SWEEPING: Final = threading.Lock()
 
 
 def virtualenvs_directory(stage_root: str) -> str:
@@ -180,17 +187,19 @@ def sweep_on_node(node: NodeConfig) -> str:
             virtualenv could not be read or removed.
     """
     stage_root = node["stage_root"]
-    report = remote.run_script(
-        node["host"],
-        dialect.for_platform(node["platform"]).script_path(stage_root, SWEEP_STEM),
-        script_for(node["platform"], stage_root=stage_root),
-        platform=node["platform"],
-    ).strip()
+    with SWEEPING:
+        report = remote.run_script(
+            node["host"],
+            dialect.for_platform(node["platform"]).script_path(stage_root, SWEEP_STEM),
+            script_for(node["platform"], stage_root=stage_root),
+            platform=node["platform"],
+        ).strip()
     _log.info("%s on %s", report, node["host"])
     return report
 
 
 __all__ = [
+    "SWEEPING",
     "SWEEP_STEM",
     "VIRTUALENVS",
     "linux_script",
