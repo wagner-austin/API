@@ -1583,7 +1583,8 @@
     "https://github.com/wagner-austin/MCPs.git": [],
     "https://github.com/wagner-austin/slime.git": []
   },
-  "node_watch_seconds": 100,
+  "node_serve_seconds": 1200,
+  "node_poll_seconds": 5,
   "ledger": "runs/ledger.jsonl",
   "feed": "runs/feed.jsonl",
   "leases": "runs/leases.json"

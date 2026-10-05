@@ -292,35 +292,50 @@ refuses one job, not the lane. Each pass leaves out of its claim what a lease
 on the node holds now (`fleet.core.run_lease.held_on_node`, below), so the
 pass after a launch never claims a second job of the project still running
 and refuses it `LEASE_HELD`; that job waits in the lane instead. Each
-pass logs `<alias> launched N job(s) this tick`.
+pass logs `<alias> launched N job(s) this pass`.
 
-**A tick closes a run when it ends, not on the next tick** (MCPs board task
-c1d48330, `fleet.cli.node_watch`). Measured 2026-10-04, a finished row was
-closed only by the tick after it ended, so every session waiting on a fleet
-verdict waited up to three minutes after its check had ended. The watch
-runs on a thread of its own from the tick's start, beside the passes: the
-collect pass hands it the runs the queue says this runner holds running as
-soon as it has asked, the fill pass each run the moment it launches, and
-every 5 s it reads each held run's result off the node and settles one that
-has ended (one `dispatch_list`, then the same `collect_one_job` the collect
-pass uses, under one lock so a run is settled once), while the passes go on.
-So a run ending during a launch, which takes about 15 s on diphtheria, 42 s
-on serendipity and up to 155 s on loki, is closed within about one poll and
-one settle, not when the pass ends. The watch reruns no pass: the first
-watch (fcf2aa507) ran both again when a run ended, and loki's 22:30:04Z tick
-on 2026-10-04 reran its fill pass, launched two jobs, exited at 401 s and
-skipped the next two ticks; the room a settled run frees is filled by the
-next tick. The window is `fleet.json`'s `node_watch_seconds`, 100 s from the
-tick's start, declared there rather than passed by `fleet.cli.tick` because
-the registry rolls with the agent while `tick.py` runs from the checkout; no
-poll starts whose wait would end past it, so only one settle under way can
-outlast it, and its decoder refuses more than 110 s, which stays inside the
-3-minute repetition `IgnoreNew` would otherwise skip. A poll that finds
-nothing writes nothing to the queue, and a runner holding no running job
-makes no call at all past its passes, its watch thread waiting on a
-condition without a sleep: its log ends `<alias> holds no running job; no
-watch this tick`, and a watching tick's ends `<alias> watch until <time>: N
-poll(s), M run(s) closed, K run(s) still watched`.
+**A node runner serves across its starts: a run is closed when it ends, a
+job claimed when it arrives** (MCPs board tasks c1d48330 and 8993c306,
+`fleet.cli.node_serve`, `fleet.cli.node_watch`). Measured 2026-10-04, a
+finished row was closed only by the start after it ended and a queued job
+claimed only by a start, so every session waiting on a fleet verdict waited
+up to two 3-minute ticks beside its work. The 100-second watch that followed
+covered 100 s of each 180 s, and a fill running past the next fire skipped
+it: loki's 77fee544 ended 05:53:35Z on 2026-10-05 and closed at 05:57:44Z.
+Now a start runs its collect and fill passes and keeps serving. Its watch,
+on a thread of its own, is handed the runs the queue says this runner holds
+running and each run the fill pass launches, reads each held run's result
+off the node every `node_poll_seconds` (5 in `fleet.json`) and settles one
+that has ended through the same `collect_one_job` the collect pass uses,
+under one lock so a run is settled once. At the same pace the main thread
+lists the queued jobs (one `dispatch_list`) and runs the fill pass again
+when a job naming this node or no node has arrived since its last fill, or
+the watch has settled a run since then: the same fill pass, so a claim still
+goes through the probe, the tags, the leases, the owner reservation and the
+elevated yield. At each fire boundary, a multiple of 180 s since the epoch
+because `FleetSchedule.ps1` registers each task at local midnight repeating
+every 3 minutes, it runs the collect pass again, which renews every running
+job's queue lease as each start did. It hands over only 10 s before a
+boundary and only while no settle is under way, once it has served
+`node_serve_seconds` (1200 in `fleet.json`, at most 1800 so a drain ends
+inside the launcher's 39-minute wall) or `refs/fleet/rolled`, read through
+git from its records directory, has moved, so a roll still takes effect at
+the next boundary; a serve past its time claims nothing more. The fires that
+arrive while it serves are skipped by `IgnoreNew` on purpose, and the node
+goes unwatched only for those 10 s and the next start's few, once a serve. A
+serve of zero seconds is one start's shape: its opening passes, no listing,
+no read of the roll, and a handover at the first boundary. A poll that finds
+a run still going writes nothing to the queue, and a watch holding no run
+waits on its condition with no call. A serve's log ends `<alias> served N s
+from <time>: F fire(s), P fill pass(es), Q poll(s), C run(s) closed, K still
+watched; handed over at <time> before the <time> fire: <reason>`.
+
+**A settle closes the queue job before it sweeps.** The node's orphaned
+virtualenvs (`fleet.core.venv_sweep`) are removed after the row and the
+queue job are closed, not inside the retire, since the sweep's script round
+trip stood between a finished check and its close (11 to 24 s per settle on
+loki and sedona); a sweep that fails after the close leaves nothing a later
+sweep does not remove.
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
