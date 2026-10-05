@@ -51,6 +51,7 @@ from platform_core.config import _optional_env_str, config_test_hooks
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
 from fleet.core._command import CHILD_IO_ENCODING, TIMED_OUT_RETURNCODE, CommandResult, _awaited
+from fleet.core.queue_transport import answering
 
 
 class EnvProtocol(Protocol):
@@ -541,8 +542,10 @@ sleep: SleepProtocol = _default_sleep
 # the SEAM belongs to this package (production binds the real thing, a test
 # binds a fake) while the JSON-RPC-over-SSE transport behind it is one
 # implementation everywhere, down to the error processor that hands back a
-# 401 instead of raising.
-http_post: McpPostProtocol = urllib_mcp_post
+# 401 instead of raising. :func:`fleet.core.queue_transport.answering` gives
+# a call nothing answered its code (MCPs board task 8993c306).
+_default_http_post: McpPostProtocol = answering(urllib_mcp_post)
+http_post: McpPostProtocol = _default_http_post
 env: EnvProtocol = _default_env
 read_text: ReadTextProtocol = _default_read_text
 read_bytes: ReadBytesProtocol = _default_read_bytes
