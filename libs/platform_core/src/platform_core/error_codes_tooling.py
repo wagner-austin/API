@@ -135,6 +135,14 @@ class Hpc3ErrorCode(ErrorCodeBase):
     # Raised by bootstrap, preflight and image capture alike, because the
     # borrowed interpreter breaks all three the day its owner is deleted.
     ENV_INTERPRETER_BORROWED = "ENV_INTERPRETER_BORROWED"
+    # A run that names the commit its payload runs, where the cluster checkout
+    # it runs from is at another commit. Measured on cleargbm P6 rung 5: its
+    # document declared the submitter's HEAD 20d9159, a commit the cluster
+    # clone had never fetched, while the sweep ran 80221ea. The second code is
+    # the checkout's answer arriving in a shape the check cannot read, which
+    # must never be mistaken for either verdict.
+    REPO_COMMIT_NOT_HEAD = "REPO_COMMIT_NOT_HEAD"
+    REPO_COMMIT_PROBE_UNREADABLE = "REPO_COMMIT_PROBE_UNREADABLE"
 
     # Workspace configuration -- the one document every command reads.
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
