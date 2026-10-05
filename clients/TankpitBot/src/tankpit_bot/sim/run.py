@@ -34,6 +34,7 @@ from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 from tankpit_bot.sim.cli_args import _CliArgsDict, _parse_cli, require_named_world
+from tankpit_bot.sim.field_choice import require_field_scenario, resolve_field
 from tankpit_bot.sim.field_clients import FieldSeatError
 from tankpit_bot.sim.field_run import run_field_session
 from tankpit_bot.sim.ghost import (
@@ -48,6 +49,7 @@ from tankpit_bot.sim.run_boot import (
 from tankpit_bot.sim.scenarios import (
     SIM_CLIENT_ID,
     SIM_ENEMY_ID,
+    SIM_FIELD,
     SIM_MAGIC,
     _resolve_session_mode,
 )
@@ -94,6 +96,7 @@ def run_sim_session(
     layout: str | None = None,
     population_seed: int | None = None,
     runs_root: str | None = None,
+    field: str | None = None,
 ) -> SimRunResultDict:
     """Play one production-bot session against the sim and archive it.
 
@@ -152,13 +155,23 @@ def run_sim_session(
             under the human-consent gate and the fair-fight contracts
             (2026-07-31) — the opponent shoots first, which consents
             it into acquisition. Ignored in practice mode.
+        field: The shipped field to play (``field05``); None plays
+            field01. Another field's seeds are settled onto its open
+            ground ([[container-census]] for what is known of its
+            containers).
 
     Returns:
         The session summary (also written to the artifacts).
 
     Raises:
         RuntimeError: If the static key or terrain is unavailable.
+        FieldChoiceError: If ``field`` names no shipped minimap, or a
+            field01-bound scenario is asked to play another field.
     """
+    played_field = SIM_FIELD if field is None else resolve_field(field)
+    require_field_scenario(
+        played_field, ferry=ferry, larder=larder, atlas=atlas is not None, ghost=ghost is not None
+    )
     run_stamp, run_layout, run_population_seed = resolve_named_world(stamp, layout, population_seed)
     artifacts = configure_probe_runtime_logging("sim", run_stamp, runs_root=runs_root)
     world, opponent, practice, ghost_spec, atlas_path, ferry_mode = _resolve_session_mode(
@@ -170,6 +183,7 @@ def run_sim_session(
         ghost=ghost,
         opponent_name=opponent_name,
     )
+    world["field"] = played_field
     bot, server, link, driver = _boot(
         world,
         practice=practice,
@@ -301,6 +315,7 @@ def _main_field(parsed: _CliArgsDict) -> int:
         layout=parsed["layout"],
         population_seed=parsed["population_seed"],
         runs_root=parsed["runs_root"],
+        field=parsed["field"],
     )
     sys.stdout.write(
         f"sim field {result['stamp']}: {result['rounds_played']}/{parsed['rounds']} rounds, "
@@ -325,7 +340,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Command-line arguments (``--rounds N``,
             ``--no-opponent``, ``--stamp S``, ``--human-opponent
             NAME``, ``--ferry``, ``--larder``, ``--from-atlas [PATH]``, ``--out
-            DIR``, ``--clients N`` for N production bots on one field).
+            DIR``, ``--clients N`` for N production bots on one field,
+            ``--field NAME`` to play a shipped field other than field01).
             Uses ``sys.argv[1:]`` when None.
 
     Returns:
@@ -350,6 +366,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         layout=parsed["layout"],
         population_seed=parsed["population_seed"],
         runs_root=parsed["runs_root"],
+        field=parsed["field"],
     )
     rounds = parsed["rounds"]
     sys.stdout.write(

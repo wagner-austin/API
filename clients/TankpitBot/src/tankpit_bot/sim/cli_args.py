@@ -61,6 +61,10 @@ class _CliArgsDict(TypedDict):
     ``clients`` is how many production bots play the field. One is the
     ordinary session; two or more seat rival bots, each over its own
     connection ([[physics-module-roadmap]], the multiplayer track).
+
+    ``field`` names the shipped field to play (``field05``), None for
+    field01, the field every scenario was written on
+    (:mod:`tankpit_bot.sim.field_choice`).
     """
 
     rounds: int
@@ -78,6 +82,35 @@ class _CliArgsDict(TypedDict):
     runs_root: str | None
     sweep: bool
     clients: int
+    field: str | None
+
+
+def _apply_count_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
+    """Apply one flag whose next token is an integer.
+
+    Args:
+        parsed: The bundle being filled (mutated on a match).
+        token: The flag token.
+        value: The token following it.
+
+    Returns:
+        True when ``token`` is one of these flags; False otherwise.
+
+    Raises:
+        ValueError: If ``--rounds``, ``--population-seed`` or
+            ``--clients`` names a non-integer. None of a tick count, a
+            determinism seed or a seat count is something to guess at
+            when the caller mistyped it.
+    """
+    if token == "--rounds":
+        parsed["rounds"] = int(value)
+    elif token == "--population-seed":
+        parsed["population_seed"] = int(value)
+    elif token == "--clients":
+        parsed["clients"] = int(value)
+    else:
+        return False
+    return True
 
 
 def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
@@ -94,14 +127,10 @@ def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
         :func:`_apply_bare_flag`.
 
     Raises:
-        ValueError: If ``--rounds``, ``--population-seed`` or
-            ``--clients`` names a non-integer. None of a tick count, a
-            determinism seed or a seat count is something to guess at
-            when the caller mistyped it.
+        ValueError: If an integer flag names a non-integer
+            (:func:`_apply_count_flag`).
     """
-    if token == "--rounds":
-        parsed["rounds"] = int(value)
-    elif token == "--ghost":
+    if token == "--ghost":
         parsed["ghost"] = value
     elif token == "--stamp":
         parsed["stamp"] = value
@@ -111,14 +140,12 @@ def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
         parsed["out"] = value
     elif token == "--layout":
         parsed["layout"] = value
-    elif token == "--population-seed":
-        parsed["population_seed"] = int(value)
     elif token == "--runs-root":
         parsed["runs_root"] = value
-    elif token == "--clients":
-        parsed["clients"] = int(value)
+    elif token == "--field":
+        parsed["field"] = value
     else:
-        return False
+        return _apply_count_flag(parsed, token, value)
     return True
 
 
@@ -188,6 +215,7 @@ def _parse_cli(args: list[str]) -> _CliArgsDict:
         runs_root=None,
         sweep=False,
         clients=1,
+        field=None,
     )
     index = 0
     while index < len(args):

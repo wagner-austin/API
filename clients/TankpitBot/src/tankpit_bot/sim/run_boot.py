@@ -22,6 +22,7 @@ from tankpit_bot.resources import require_asset
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.sim.atlas_seed import seed_atlas_population
 from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
+from tankpit_bot.sim.field_choice import settle_on_field
 from tankpit_bot.sim.field_clients import seed_field_rivals
 from tankpit_bot.sim.ghost import (
     GhostSpecDict,
@@ -34,6 +35,7 @@ from tankpit_bot.sim.practice_room import PracticeRoomDriver, seed_practice_rost
 from tankpit_bot.sim.scenarios import (
     _FERRY_CLIENT_FUEL,
     SIM_CLIENT_ID,
+    SIM_FIELD,
     SIM_MAGIC,
     _require_seeds_passable,
 )
@@ -296,6 +298,12 @@ def _seed_world(
         world["tanks"][SIM_CLIENT_ID]["fuel"] = _FERRY_CLIENT_FUEL
         tally = seed_atlas_population(world, terrain, atlas_path)
         log.info("atlas forage world %s: %s", atlas_path, tally)
+    if world["field"] != SIM_FIELD:
+        log.info(
+            "field %s: %d seeds settled onto open ground",
+            world["field"],
+            settle_on_field(world, terrain),
+        )
     if rivals:
         seated = seed_field_rivals(world, terrain, SIM_CLIENT_ID, rivals)
         log.info("field rivals: %d bots seated beside the client, ids %s", len(seated), seated)

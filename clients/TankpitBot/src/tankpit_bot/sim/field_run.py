@@ -44,6 +44,7 @@ from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_artifacts import ProbeRunArtifactsDict
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
+from tankpit_bot.sim.field_choice import resolve_field
 from tankpit_bot.sim.field_clients import FieldSeatError, field_account
 from tankpit_bot.sim.lobby import SIM_ACCOUNT
 from tankpit_bot.sim.practice_room import PracticeRoomDriver
@@ -304,6 +305,7 @@ def run_field_session(
     layout: str | None = None,
     population_seed: int | None = None,
     runs_root: str | None = None,
+    field: str | None = None,
 ) -> FieldRunResultDict:
     """Play ``clients`` production bots against each other on one field.
 
@@ -320,6 +322,7 @@ def run_field_session(
         population_seed: The container seed; None derives it.
         runs_root: The root each bot's own ``tank-<id>`` run directory
             sits under; None is :data:`DEFAULT_FIELD_RUNS_ROOT`.
+        field: The shipped field to play (``field05``); None plays field01.
 
     Returns:
         The session's result.
@@ -327,6 +330,7 @@ def run_field_session(
     Raises:
         FieldSeatError: If fewer than two bots, or more than a field
             seats, are asked for.
+        FieldChoiceError: If ``field`` names no shipped minimap.
         RuntimeError: If the static key or the terrain is unavailable.
     """
     if clients < 2:
@@ -335,6 +339,7 @@ def run_field_session(
         )
     run_stamp, run_layout, run_population_seed = resolve_named_world(stamp, layout, population_seed)
     world = make_field_world(practice)
+    world["field"] = SIM_FIELD if field is None else resolve_field(field)
     terrain, roster_ids, driver = _seed_world(
         world,
         practice=practice,
