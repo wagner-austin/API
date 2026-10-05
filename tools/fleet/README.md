@@ -566,12 +566,16 @@ task gets this runner's own post, in the `fleet` room addressed
 `@<submitter>`:
 
 ```
-FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% log=lavender:C:/fleet/stage/<run>/result.txt.log run=<run>
+FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% budget=within:41s/300s log=lavender:C:/fleet/stage/<run>/result.txt.log run=<run>
 ```
 
 `banner` is whether `=== ALL CHECKS PASSED ===` appeared; `tests` and
 `coverage` are read from vitest's or pytest-cov's own lines and say `unread`
-when neither printed them. The same line is the job's close `detail` on the
+when neither printed them. `budget` is maketools' five-minute check budget
+verdict (MCPs board task 1b152218): `over:<took>s/<budget>s` from its
+`CHECK OVER BUDGET` line, which fails a check whose every suite passed,
+`within:<took>s/<budget>s` from its `CHECK BUDGET` line, and `unread` when
+the run printed neither. The same line is the job's close `detail` on the
 queue, so a closure may quote it as its check evidence and the manager audit
 resolves it against the `fleet_dispatch_jobs` row it names.
 
