@@ -128,19 +128,20 @@ def test_relocate_tank_announces_in_window_placements_only() -> None:
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 100, 100, 1000)
     world["tanks"][500] = make_sim_tank(500, 1, 1, 200, 200, 600)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.relocate_tank(500, 104, 100)
-    entered = server.advance_tick()
+    entered = server.advance_tick()[9]
     positions = [m for m in entered if m["msg_type"] == 0x3D]
     # Entering the window: exactly ONE 0x3D (the membership diff's).
     assert [(m["tank_id"], m["x"], m["y"]) for m in positions] == [(500, 104, 100)]
     server.relocate_tank(500, 105, 100)
-    moved = server.advance_tick()
+    moved = server.advance_tick()[9]
     moved_positions = [m for m in moved if m["msg_type"] == 0x3D]
     # In-window movement of a visible tank: the explicit re-statement.
     assert [(m["tank_id"], m["x"], m["y"]) for m in moved_positions] == [(500, 105, 100)]
     server.relocate_tank(500, 220, 220)
-    away = server.advance_tick()
+    away = server.advance_tick()[9]
     announced = [m for m in away if m["msg_type"] == 0x3D and m.get("tank_id") == 500]
     assert announced == []
     world["tanks"][500]["alive"] = False

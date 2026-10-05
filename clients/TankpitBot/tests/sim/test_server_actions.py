@@ -38,7 +38,7 @@ def test_teleport_tick_emits_landing_position_and_sync() -> None:
     server = _server()
     server.world["containers"].append(SimContainerDict(x=30, y=30, volume=40, dotted=True))
     server.queue_command(9, _command(("teleport", 116), 30, 30))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     # Wire order law (archive-measured 2026-08-01, 7,176 live
     # teleports): the recentered 0x5A LEADS the landing batch, then
     # the position statement, then the landed confirm, then the
@@ -62,7 +62,7 @@ def test_enemy_teleport_emits_no_client_viewport_update() -> None:
     """0x5A is the CLIENT's window — another tank's hop never moves it."""
     server = _server()
     server.queue_command(11, _command(("teleport", 116), 18, 12))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert 0x5A not in _kinds(messages)
     assert (server.world["tanks"][11]["x"], server.world["tanks"][11]["y"]) == (18, 12)
 
@@ -72,7 +72,7 @@ def test_teleport_rejections_emit_supervisor_with_map_close() -> None:
     server = _server()
     server.world["tanks"][9]["fuel"] = 3
     server.queue_command(9, _command(("teleport", 116), 30, 30))
-    poor = _supervisors(server.advance_tick())
+    poor = _supervisors(server.advance_tick()[9])
     assert [(r["error_code"], r["close_map"]) for r in poor] == [
         (SUPERVISOR_ERROR_INSUFFICIENT_FUEL, 1)
     ]
@@ -93,9 +93,10 @@ def test_teleport_onto_sealed_tile_confirms_at_origin() -> None:
     world: SimWorldDict = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     walls = {(30, 30): "#", (31, 30): "#", (30, 29): "#", (29, 30): "#", (30, 31): "#"}
-    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls))
+    server.connect(9)
     server.queue_command(9, _command(("teleport", 116), 30, 30))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _supervisors(messages) == []
     kinds = _kinds(messages)
     assert 0x3D in kinds
@@ -116,9 +117,10 @@ def test_enemy_refused_teleport_emits_nothing_to_the_client() -> None:
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][11] = make_sim_tank(11, 1, 8, 15, 10, 1800)
     walls = {(30, 30): "#", (31, 30): "#", (30, 29): "#", (29, 30): "#", (30, 31): "#"}
-    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls))
+    server.connect(9)
     server.queue_command(11, _command(("teleport", 116), 30, 30))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _supervisors(messages) == []
     assert "teleport_landed" not in _kinds(messages)
     enemy = server.world["tanks"][11]
@@ -129,7 +131,7 @@ def test_teleport_to_empty_ground_has_no_pickup_message() -> None:
     """A landing on bare ground emits no container message."""
     server = _server()
     server.queue_command(9, _command(("teleport", 116), 30, 30))
-    assert _kinds(server.advance_tick()) == [0x5A, 0x3D, "teleport_landed", 0x58, 0x2E, 0x2E]
+    assert _kinds(server.advance_tick()[9]) == [0x5A, 0x3D, "teleport_landed", 0x58, 0x2E, 0x2E]
 
 
 def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
@@ -147,7 +149,7 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
         amount=0,
     )
     server.queue_command(9, toggle)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x74, 0x2E, 0x2E]
     toggled = messages[0]
     assert toggled["msg_type"] == 0x74
@@ -165,7 +167,7 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
         amount=0,
     )
     server.queue_command(9, out_of_range)
-    ignored = server.advance_tick()
+    ignored = server.advance_tick()[9]
     assert _kinds(ignored) == [0x74, 0x2E, 0x2E]
     assert server.world["tanks"][9]["enabled"] == [True, False, True, True, True]
 
@@ -174,7 +176,7 @@ def test_map_open_tick_emits_map_data() -> None:
     """A map open costs nothing and returns the 0x4C snapshot."""
     server = _server()
     server.queue_command(9, _command(("map_open", 108)))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x4C, 0x2E, 0x2E]
     assert server.world["tanks"][9]["fuel"] == 1000
 
@@ -190,7 +192,7 @@ def test_pickup_click_routes_through_the_move_law() -> None:
     server = _server()
     server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30, dotted=True))
     server.queue_command(9, _command(("pickup_fuel", 100), 12, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [
         0x47,
         "container_pickup",
@@ -225,7 +227,7 @@ def test_chat_tick_echoes_the_0x4d_broadcast() -> None:
         amount=0,
     )
     server.queue_command(9, chat)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x4D, 0x2E, 0x2E]
     echo = messages[0]
     assert echo["msg_type"] == 0x4D
@@ -261,7 +263,7 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
             amount=0,
         ),
     )
-    own = _supervisors(server.advance_tick())
+    own = _supervisors(server.advance_tick()[9])
     assert [record["error_code"] for record in own] == [SUPERVISOR_ERROR_EMPTY_CONTAINER]
     server.queue_command(
         11,
@@ -277,7 +279,7 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
             amount=0,
         ),
     )
-    assert _supervisors(server.advance_tick()) == []
+    assert _supervisors(server.advance_tick()[9]) == []
 
 
 def test_the_statistics_key_is_answered_with_the_session_counters() -> None:
@@ -290,7 +292,7 @@ def test_the_statistics_key_is_answered_with_the_session_counters() -> None:
     """
     server = _server()
     server.queue_command(9, _statistics_key())
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
 
     reports = [m for m in batch if m["msg_type"] == 0x56]
     assert reports == [
@@ -312,7 +314,7 @@ def test_statistics_playtime_counts_the_session_from_tick_zero() -> None:
     server.world["tick"] = 1849  # 3700 s -> 1 h 01 m 40 s on the next tick
     server.queue_command(9, _statistics_key())
 
-    reports = [m for m in server.advance_tick() if m["msg_type"] == 0x56]
+    reports = [m for m in server.advance_tick()[9] if m["msg_type"] == 0x56]
     assert [
         (r["playtime_hours"], r["playtime_minutes"], r["playtime_seconds"]) for r in reports
     ] == [(1, 1, 40)]
@@ -322,7 +324,7 @@ def test_another_tanks_statistics_key_is_not_answered_to_the_client() -> None:
     """Every server answer is per-connection, this one included."""
     server = _server()
     server.queue_command(11, _statistics_key())
-    assert [m for m in server.advance_tick() if m["msg_type"] == 0x56] == []
+    assert [m for m in server.advance_tick()[9] if m["msg_type"] == 0x56] == []
 
 
 def test_a_rejected_teleport_emits_no_landing_confirm() -> None:
@@ -345,7 +347,7 @@ def test_a_rejected_teleport_emits_no_landing_confirm() -> None:
     origin = (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"])
     server.queue_command(9, _command(("teleport", 116), 30, 30))
 
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert _kinds(messages) == [0x52, 0x2E, 0x2E]
     assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == origin
@@ -367,7 +369,7 @@ def test_a_pickup_outside_the_client_window_does_nothing_but_refuse() -> None:
     origin = (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"])
     server.queue_command(9, _command(("pickup_fuel", 112), 200, 200))
 
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert _kinds(messages) == [0x52, 0x2E, 0x2E]
     assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == origin
@@ -420,7 +422,7 @@ def test_only_map_open_is_answered_with_a_map_dump() -> None:
         server = _server()
         server.queue_command(9, command)
 
-        kinds = _kinds(server.advance_tick())
+        kinds = _kinds(server.advance_tick()[9])
 
         assert kinds == expected, label
         assert 0x4C not in kinds, label

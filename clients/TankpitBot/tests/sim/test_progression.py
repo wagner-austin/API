@@ -111,7 +111,8 @@ def test_the_server_demotes_on_the_clients_own_deactivation() -> None:
     world["tanks"][9]["fuel"] = 40
     world["tanks"][11] = make_sim_tank(11, 1, 8, 12, 10, 1800)
     world["tanks"][11]["counts"][SLOT_DUAL] = 3
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.queue_command(
         11,
         ClientCommandDict(
@@ -127,7 +128,7 @@ def test_the_server_demotes_on_the_clients_own_deactivation() -> None:
         ),
     )
 
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
 
     kinds = [message["msg_type"] for message in batch]
     assert 0x41 in kinds
@@ -144,7 +145,8 @@ def test_another_tanks_deactivation_leaves_the_clients_rank_alone() -> None:
     world = _world()
     world["tanks"][9]["counts"][SLOT_DUAL] = 3
     world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 40)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.queue_command(
         9,
         ClientCommandDict(
@@ -160,7 +162,7 @@ def test_another_tanks_deactivation_leaves_the_clients_rank_alone() -> None:
         ),
     )
 
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
 
     assert 0x41 in [message["msg_type"] for message in batch]
     assert 0x2B not in [message["msg_type"] for message in batch]
@@ -172,9 +174,10 @@ def test_the_sync_cadence_carries_the_resting_bar() -> None:
     from tankpit_bot.sim.server import SimServer
 
     world = _world()
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
 
-    syncs = [message for message in server.advance_tick() if message["msg_type"] == 0x2E]
+    syncs = [message for message in server.advance_tick()[9] if message["msg_type"] == 0x2E]
 
     assert syncs != []
     assert {sync["promo_state"] for sync in syncs} == {STEADY_PROMO_STATE}

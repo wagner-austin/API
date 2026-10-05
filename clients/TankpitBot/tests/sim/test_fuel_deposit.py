@@ -73,7 +73,9 @@ def _server(fuel: int) -> SimServer:
     """
     world: SimWorldDict = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, fuel)
-    return SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
+    return server
 
 
 def _kinds(messages: list[BinaryMessage]) -> list[int | str]:
@@ -248,7 +250,7 @@ def test_an_own_tile_deposit_answers_with_the_three_messages_alone() -> None:
     server = _server(fuel=1100)
     server.queue_command(9, _deposit(10, 10, 400))
 
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert _kinds(messages) == [0x2E, 0x64, "container_pickup", 0x2E]
     assert server.world["tanks"][9]["fuel"] == 700
@@ -264,7 +266,7 @@ def test_a_walked_deposit_echoes_the_walk_and_still_draws_no_sync() -> None:
     server = _server(fuel=1100)
     server.queue_command(9, _deposit(13, 10, 400))
 
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert _kinds(messages) == [0x47, 0x2E, 0x64, "container_pickup", 0x2E]
     assert 0x3F not in _kinds(messages)
@@ -282,7 +284,7 @@ def test_a_deposit_outside_the_stored_window_is_refused_like_any_click() -> None
     server = _server(fuel=1100)
     server.queue_command(9, _deposit(200, 200, 400))
 
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert 0x52 in _kinds(messages)
     assert 0x64 not in _kinds(messages)

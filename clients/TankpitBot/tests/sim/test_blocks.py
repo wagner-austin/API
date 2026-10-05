@@ -154,7 +154,8 @@ def test_server_emits_0x42_0x4a_and_refreshed_viewport() -> None:
     world = _world()
     world["blocks"] = []
     world["tanks"][9]["carrying"] = True
-    server = SimServer(world, _map_with_pond(), client_id=9)
+    server = SimServer(world, _map_with_pond())
+    server.connect(9)
     press = ClientCommandDict(
         kind=ClientCommandKind.BLOCK,
         command=98,
@@ -167,7 +168,7 @@ def test_server_emits_0x42_0x4a_and_refreshed_viewport() -> None:
         amount=0,
     )
     server.queue_command(9, press)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     kinds = [m["msg_type"] for m in messages]
     assert kinds[:3] == [0x42, 0x4A, 0x5A]
     build = messages[0]
@@ -193,7 +194,8 @@ def test_out_of_reach_press_answers_code_1_for_the_client_only() -> None:
     """The measured 0x52 code 1 for a far press; enemies stay silent."""
     world = _world()
     world["tanks"][11] = make_sim_tank(11, 1, 1, 20, 20, 500)
-    server = SimServer(world, _map_with_pond(), client_id=9)
+    server = SimServer(world, _map_with_pond())
+    server.connect(9)
     far = ClientCommandDict(
         kind=ClientCommandKind.BLOCK,
         command=98,
@@ -206,10 +208,10 @@ def test_out_of_reach_press_answers_code_1_for_the_client_only() -> None:
         amount=0,
     )
     server.queue_command(9, far)
-    own = server.advance_tick()
+    own = server.advance_tick()[9]
     assert [m["error_code"] for m in own if m["msg_type"] == 0x52] == [1]
     server.queue_command(11, far)
-    other = server.advance_tick()
+    other = server.advance_tick()[9]
     assert [m for m in other if m["msg_type"] == 0x52] == []
 
 
@@ -217,7 +219,8 @@ def test_towing_refuses_teleport_with_code_0() -> None:
     """The measured three-for-three towing teleport refusal."""
     world = _world()
     world["tanks"][9]["carrying"] = True
-    server = SimServer(world, _map_with_pond(), client_id=9)
+    server = SimServer(world, _map_with_pond())
+    server.connect(9)
     hop = ClientCommandDict(
         kind=ClientCommandKind.TELEPORT,
         command=116,
@@ -230,7 +233,7 @@ def test_towing_refuses_teleport_with_code_0() -> None:
         amount=0,
     )
     server.queue_command(9, hop)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m["error_code"] for m in messages if m["msg_type"] == 0x52] == [0]
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (10, 10)
 
@@ -249,7 +252,8 @@ def test_enemy_block_actions_stay_per_recipient() -> None:
     world = _world()
     world["tanks"][11] = make_sim_tank(11, 1, 1, 20, 20, 500)
     world["tanks"][11]["carrying"] = True
-    server = SimServer(world, _map_with_pond(), client_id=9)
+    server = SimServer(world, _map_with_pond())
+    server.connect(9)
     hop = ClientCommandDict(
         kind=ClientCommandKind.TELEPORT,
         command=116,
@@ -262,7 +266,7 @@ def test_enemy_block_actions_stay_per_recipient() -> None:
         amount=0,
     )
     server.queue_command(11, hop)
-    towed = server.advance_tick()
+    towed = server.advance_tick()[9]
     assert [m for m in towed if m["msg_type"] == 0x52] == []
     drop = ClientCommandDict(
         kind=ClientCommandKind.BLOCK,
@@ -276,7 +280,7 @@ def test_enemy_block_actions_stay_per_recipient() -> None:
         amount=0,
     )
     server.queue_command(11, drop)
-    dropped = server.advance_tick()
+    dropped = server.advance_tick()[9]
     kinds = [m["msg_type"] for m in dropped]
     assert 0x42 in kinds
     assert 0x4A in kinds
@@ -343,7 +347,8 @@ def test_a_refused_press_builds_nothing_and_says_nothing_was_built() -> None:
     """
     world = _world()
     world["blocks"] = []
-    server = SimServer(world, _map_with_pond(), client_id=9)
+    server = SimServer(world, _map_with_pond())
+    server.connect(9)
     far = ClientCommandDict(
         kind=ClientCommandKind.BLOCK,
         command=98,
@@ -357,7 +362,7 @@ def test_a_refused_press_builds_nothing_and_says_nothing_was_built() -> None:
     )
     server.queue_command(9, far)
 
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert [m["msg_type"] for m in messages] == [0x52, 0x2E]
     assert world["blocks"] == []

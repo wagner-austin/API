@@ -27,9 +27,10 @@ def _world() -> SimWorldDict:
 
 def _link(*, with_lobby: bool = True) -> SimCDPSession:
     """A seam link, with or without its lobby half."""
-    server = SimServer(_world(), InMemoryTerrainMap(), client_id=9)
+    server = SimServer(_world(), InMemoryTerrainMap())
+    server.connect(9)
     lobby = SimLobby(SIM_ACCOUNT) if with_lobby else None
-    return SimCDPSession(server, _MAGIC, lobby)
+    return SimCDPSession(server, 9, _MAGIC, lobby)
 
 
 def _received_bodies(link: SimCDPSession) -> list[bytes]:
@@ -195,7 +196,7 @@ def test_the_production_enforcer_verifies_autoscroll_off_over_the_seam() -> None
     """
     link = _link()
     link.open_lobby()
-    deliver_batch([], link.server.handshake(), link)
+    deliver_batch([], link.server.handshake(link.tank_id), link)
     ws = _drain(link)
 
     ensure_autoscroll_off(link, link, link.wire_log, ws)
@@ -240,7 +241,7 @@ def test_the_statistics_key_press_puts_the_command_on_the_wire() -> None:
         link.send("Input.dispatchKeyEvent", {"type": event_type, "key": "c"})
 
     assert link.sent_commands == ["statistics"]
-    assert [m["msg_type"] for m in link.server.advance_tick()].count(0x56) == 1
+    assert [m["msg_type"] for m in link.server.advance_tick()[link.tank_id]].count(0x56) == 1
 
 
 def test_an_unmodeled_dispatched_key_is_refused() -> None:

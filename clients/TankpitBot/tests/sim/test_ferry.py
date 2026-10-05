@@ -167,8 +167,9 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
     from tankpit_bot.sim.server import SimServer
 
     world = _world(10, 10)
-    server = SimServer(world, _channel_map(), client_id=9)
-    burst = server.handshake()
+    server = SimServer(world, _channel_map())
+    server.connect(9)
+    burst = server.handshake(9)
     patches = [m for m in burst if m["msg_type"] == 0x5A]
     assert len(patches) == 1
     left = patches[0]["viewport_left"]
@@ -189,7 +190,7 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
             amount=0,
         ),
     )
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     patch = next(m for m in batch if m["msg_type"] == 0x5A)
     coded = sorted(
         (
@@ -225,9 +226,10 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     from tankpit_bot.sim.server import SimServer
 
     world = _world(10, 10)
-    server = SimServer(world, _channel_map(), client_id=9)
-    server.handshake()
-    assert (13, 10) in server.session.viewport._patched_dynamic_tiles
+    server = SimServer(world, _channel_map())
+    server.connect(9)
+    server.handshake(9)
+    assert (13, 10) in server.require_session(9).viewport._patched_dynamic_tiles
     world["ferries"][0] = SimFerryDict(x=13, y=12)
     server.queue_command(
         9,
@@ -243,10 +245,10 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
             amount=0,
         ),
     )
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     patch = next(m for m in batch if m["msg_type"] == 0x5A)
     assert patch["entities"] == []
-    assert (13, 10) in server.session.viewport._patched_dynamic_tiles
+    assert (13, 10) in server.require_session(9).viewport._patched_dynamic_tiles
 
 
 def test_production_world_learns_the_ferry_over_the_seam() -> None:

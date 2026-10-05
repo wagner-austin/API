@@ -74,8 +74,9 @@ def _boot(ws: WorldService) -> tuple[SimServer, bytes]:
     world["tanks"][_CLIENT]["counts"] = [25, 25, 25, 25, 25]
     world["tanks"][_ENEMY] = make_sim_tank(_ENEMY, 1, 1, 107, 100, 500)
     world["containers"].append(SimContainerDict(x=103, y=100, volume=300, dotted=True))
-    server = SimServer(world, InMemoryTerrainMap(), client_id=_CLIENT)
-    _deliver(ws, server.handshake(), table)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(_CLIENT)
+    _deliver(ws, server.handshake(_CLIENT), table)
     return server, table
 
 
@@ -142,7 +143,7 @@ def test_production_command_bytes_drive_the_sim_and_beliefs_track_truth() -> Non
     commands = decode_client_payload(base64.b64encode(wire).decode("ascii"), table)
     assert [command["kind"] for command in commands] == ["move"]
     server.queue_command(_CLIENT, commands[0])
-    _deliver(ws, server.advance_tick(), table)
+    _deliver(ws, server.advance_tick()[_CLIENT], table)
 
     truth = server.world["tanks"][_CLIENT]
     assert (truth["x"], truth["y"]) == (103, 100)
@@ -175,7 +176,7 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
             amount=0,
         ),
     )
-    _deliver(ws, server.advance_tick(), table)
+    _deliver(ws, server.advance_tick()[_CLIENT], table)
     assert server.world["tanks"][_ENEMY]["fuel"] == 500 - 90
     world = ws.world_state
     assert _established_self(ws)["fuel"] == 800

@@ -42,9 +42,8 @@ def _arena() -> tuple[SimWorldDict, SimServer]:
     world = make_sim_world("field01_r.gif")
     world["tanks"][_CLIENT] = make_sim_tank(_CLIENT, 2, 1, 100, 100, 1100)
     world["tanks"][_GHOST] = make_sim_tank(_GHOST, 1, 1, 103, 100, 1100, name="orange-2")
-    server = SimServer(
-        world, InMemoryTerrainMap(), client_id=_CLIENT, roster_ids=frozenset({_GHOST})
-    )
+    server = SimServer(world, InMemoryTerrainMap(), roster_ids=frozenset({_GHOST}))
+    server.connect(_CLIENT)
     return world, server
 
 
@@ -84,12 +83,12 @@ def test_hit_ghost_returns_fire_by_the_certified_policy() -> None:
     driver = PracticeRoomDriver(frozenset({_GHOST}))
 
     server.queue_command(_CLIENT, _shoot(103, 100))
-    batch = server.advance_tick()
+    batch = server.advance_tick()[_CLIENT]
     driver.note_batch(world, batch)
     assert _ghost_shots(batch) == []
 
     _queue_round_opponents(server, driver, False, _spec([]), 11, 0)
-    batch = server.advance_tick()
+    batch = server.advance_tick()[_CLIENT]
     returns = _ghost_shots(batch)
     assert len(returns) == 1
     assert (returns[0]["target_x"], returns[0]["target_y"]) == (100, 100)
@@ -102,11 +101,11 @@ def test_recorded_event_takes_the_tick_over_the_policy() -> None:
     driver = PracticeRoomDriver(frozenset({_GHOST}))
 
     server.queue_command(_CLIENT, _shoot(103, 100))
-    driver.note_batch(world, server.advance_tick())
+    driver.note_batch(world, server.advance_tick()[_CLIENT])
 
     recorded = GhostEventDict(tick=0, tank_id=_GHOST, kind="shoot", x=90, y=90, message_id=0)
     _queue_round_opponents(server, driver, False, _spec([recorded]), 11, 0)
-    batch = server.advance_tick()
+    batch = server.advance_tick()[_CLIENT]
     shots = _ghost_shots(batch)
     assert len(shots) == 1
     assert (shots[0]["target_x"], shots[0]["target_y"]) == (90, 90)
@@ -114,7 +113,7 @@ def test_recorded_event_takes_the_tick_over_the_policy() -> None:
     # The queued return was withheld, not lost: the next quiet tick
     # still answers it (the policy state kept the pending return).
     _queue_round_opponents(server, driver, False, _spec([]), 11, 1)
-    batch = server.advance_tick()
+    batch = server.advance_tick()[_CLIENT]
     late = _ghost_shots(batch)
     assert len(late) == 1
     assert (late[0]["target_x"], late[0]["target_y"]) == (100, 100)

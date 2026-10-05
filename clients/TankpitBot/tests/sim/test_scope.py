@@ -124,7 +124,9 @@ def _server() -> SimServer:
     world: SimWorldDict = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 100, 100, 1000)
     world["tanks"][11] = make_sim_tank(11, 1, 1, 113, 100, 500)
-    return SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
+    return server
 
 
 def test_client_scope_command_answers_with_the_shifted_0x5a() -> None:
@@ -135,7 +137,7 @@ def test_client_scope_command_answers_with_the_shifted_0x5a() -> None:
     """
     server = _server()
     server.queue_command(9, decode_client_command(_scope_payload(SCOPE_EAST)))
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     updates = [m for m in batch if m["msg_type"] == 0x5A]
     assert len(updates) == 1
     assert (updates[0]["viewport_left"], updates[0]["viewport_top"]) == (100, 92)
@@ -145,7 +147,7 @@ def test_scope_shift_reveals_tanks_entering_the_window() -> None:
     """The pan's membership diff announces newly visible tanks (0x3D)."""
     server = _server()
     server.queue_command(9, decode_client_command(_scope_payload(SCOPE_EAST)))
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     positions = [m for m in batch if m["msg_type"] == 0x3D and m.get("tank_id") == 11]
     assert len(positions) == 1
 
@@ -153,8 +155,8 @@ def test_scope_shift_reveals_tanks_entering_the_window() -> None:
 def test_non_client_scope_command_moves_no_window() -> None:
     """Another tank's scope press never touches the client's window."""
     server = _server()
-    before = server.session.viewport.window
+    before = server.require_session(9).viewport.window
     server.queue_command(11, decode_client_command(_scope_payload(SCOPE_EAST)))
-    batch = server.advance_tick()
-    assert server.session.viewport.window == before
+    batch = server.advance_tick()[9]
+    assert server.require_session(9).viewport.window == before
     assert [m for m in batch if m["msg_type"] == 0x5A] == []

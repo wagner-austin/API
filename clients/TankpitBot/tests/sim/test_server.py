@@ -70,7 +70,7 @@ def test_dead_client_commands_drop_silently() -> None:
     server = _server()
     server.world["tanks"][9]["alive"] = False
     server.queue_command(9, _move(12, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m["msg_type"] for m in messages if m["msg_type"] == 0x47] == []
     assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == (10, 10)
 
@@ -83,7 +83,7 @@ def test_move_tick_emits_echo_then_fuel_sync() -> None:
     """
     server = _server()
     server.queue_command(9, _move(13, 12))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert server.world["tick"] == 1
     echo = messages[0]
     assert echo["msg_type"] == 0x47
@@ -103,10 +103,10 @@ def test_rejected_moves_emit_supervisor_errors() -> None:
     """
     server = _server()
     server.queue_command(9, _move(18, 10))
-    outside = _supervisors(server.advance_tick())
+    outside = _supervisors(server.advance_tick()[9])
     assert [record["error_code"] for record in outside] == [SUPERVISOR_ERROR_CANT_DO]
     server.queue_command(9, _move(15, 10))
-    occupied = _supervisors(server.advance_tick())
+    occupied = _supervisors(server.advance_tick()[9])
     assert [record["error_code"] for record in occupied] == [SUPERVISOR_ERROR_CANT_GO]
 
 
@@ -124,7 +124,7 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     server = _server()
     server.world["tanks"][12] = make_sim_tank(12, 3, 1, 20, 20, 100)
     server.world["tanks"][12]["alive"] = False
-    burst = server.handshake()
+    burst = server.handshake(9)
     kinds = _kinds(burst)
     assert kinds == [0x21, 0x3E, 0x5A, 0x3D, 0x2E, 0x21, 0x49, 0x49, 0x74, 0x3F]
     own = burst[0]
@@ -150,7 +150,7 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     # 0x21 in 340 of 340 archived sessions ([[recipient-policy]]).
     assert burst[5]["msg_type"] == 0x21
     assert burst[5]["tank_id"] == 11
-    assert 11 in server.session.viewport.visible
+    assert 11 in server.require_session(9).viewport.visible
 
 
 def test_handshake_tail_is_the_measured_inventory_pair_toggle_sync() -> None:
@@ -167,7 +167,7 @@ def test_handshake_tail_is_the_measured_inventory_pair_toggle_sync() -> None:
     client = server.world["tanks"][9]
     client["counts"] = [1, 2, 3, 4, 5]
     client["enabled"] = [False, True, False, True, True]
-    burst = server.handshake()
+    burst = server.handshake(9)
 
     assert _kinds(burst)[-4:] == [0x49, 0x49, 0x74, 0x3F]
     first, second = burst[-4], burst[-3]
@@ -195,13 +195,13 @@ def test_a_walk_draws_a_sync_and_a_standstill_does_not() -> None:
     """
     server = _server()
     server.queue_command(9, _move(12, 10))
-    assert 0x3F in _kinds(server.advance_tick())
+    assert 0x3F in _kinds(server.advance_tick()[9])
 
     server.queue_command(9, _move(12, 10))  # already there: empty path
-    assert 0x3F not in _kinds(server.advance_tick())
+    assert 0x3F not in _kinds(server.advance_tick()[9])
 
     server.queue_command(9, _shoot(15, 10))
-    assert 0x3F not in _kinds(server.advance_tick())
+    assert 0x3F not in _kinds(server.advance_tick()[9])
 
 
 def test_a_client_heartbeat_is_answered_with_silence_not_a_crash() -> None:
@@ -223,10 +223,10 @@ def test_a_client_heartbeat_is_answered_with_silence_not_a_crash() -> None:
     dict cannot catch the decoder naming the frame something else.
     """
     server = _server()
-    quiet = server.advance_tick()
+    quiet = server.advance_tick()[9]
 
     server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_KEEPALIVE])))
-    beating = server.advance_tick()
+    beating = server.advance_tick()[9]
 
     assert _kinds(beating) == _kinds(quiet)
 
@@ -240,12 +240,12 @@ def test_a_heartbeat_never_disturbs_the_command_it_rides_beside() -> None:
     """
     server = _server()
     server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_RADAR])))
-    without = server.advance_tick()
+    without = server.advance_tick()[9]
 
     server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_KEEPALIVE])))
     server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_RADAR])))
     server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_KEEPALIVE])))
-    with_beats = server.advance_tick()
+    with_beats = server.advance_tick()[9]
 
     assert _kinds(with_beats) == _kinds(without)
 
@@ -265,10 +265,10 @@ def test_another_tanks_join_and_inventory_questions_are_not_this_client_s_answer
     of a tank that is not the client.
     """
     server = _server()
-    quiet = server.advance_tick()
+    quiet = server.advance_tick()[9]
 
     server.queue_command(11, decode_client_command(bytes([_TYPE, CMD_ENTER_GAME])))
     server.queue_command(11, decode_client_command(bytes([_TYPE, CMD_INVENTORY])))
-    foreign = server.advance_tick()
+    foreign = server.advance_tick()[9]
 
     assert _kinds(foreign) == _kinds(quiet)

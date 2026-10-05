@@ -144,7 +144,8 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
     world["tanks"][9] = make_sim_tank(9, 0, 1, 100, 100, 1000)
     world["tanks"][BOT_ID] = make_sim_tank(BOT_ID, 1, 0, 101, 100, 45)
     world["tanks"][BOT_ID]["counts"] = [0, 0, 0, 0, 0]
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9, roster_ids=frozenset({BOT_ID}))
+    server = SimServer(world, InMemoryTerrainMap(), roster_ids=frozenset({BOT_ID}))
+    server.connect(9)
     server.queue_command(
         9,
         ClientCommandDict(
@@ -159,13 +160,13 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
             amount=0,
         ),
     )
-    first = server.advance_tick()
+    first = server.advance_tick()[9]
     assert [m["msg_type"] for m in first if m["msg_type"] == 0x41] == [0x41]
     assert world["tanks"][BOT_ID]["alive"] is False
     for _ in range(CORPSE_WINDOW_TICKS - 1):
-        batch = server.advance_tick()
+        batch = server.advance_tick()[9]
         assert [m for m in batch if m["msg_type"] == 0x58] == []
-    boundary = server.advance_tick()
+    boundary = server.advance_tick()[9]
     removes = [m for m in boundary if m["msg_type"] == 0x58]
     assert [m["tank_id"] for m in removes] == [BOT_ID]
     bot = world["tanks"][BOT_ID]
@@ -279,7 +280,8 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 900)
     world["tanks"][510] = make_sim_tank(510, 1, 0, 101, 100, 800)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.queue_command(
         9,
         ClientCommandDict(
@@ -308,7 +310,7 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
             amount=0,
         ),
     )
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     shooters = [m["shooter_id"] for m in batch if m["msg_type"] == 0x53]
     assert shooters == [9, 510] or shooters == sorted(shooters)
     assert shooters == sorted(shooters)

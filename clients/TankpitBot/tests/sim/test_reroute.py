@@ -37,7 +37,9 @@ def _arena() -> SimWorldDict:
 
 def _server(world: SimWorldDict) -> SimServer:
     """A sim server for the arena with tank 9 as the client."""
-    return SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
+    return server
 
 
 def _teleport(x: int, y: int) -> ClientCommandDict:
@@ -74,20 +76,20 @@ def test_viewport_exit_emits_tank_remove_and_reentry_restates_position() -> None
     """Leaving the viewport draws 0x58 once; re-entering draws 0x3D."""
     world = _arena()
     server = _server(world)
-    assert server.session.viewport.visible == {11}
+    assert server.require_session(9).viewport.visible == {11}
     server.queue_command(9, _teleport(40, 40))
-    away = server.advance_tick()
+    away = server.advance_tick()[9]
     removes = [m for m in away if m["msg_type"] == 0x58]
     assert [m["tank_id"] for m in removes] == [11]
-    assert server.session.viewport.removed_at == {11: 1}
-    quiet = server.advance_tick()
+    assert server.require_session(9).viewport.removed_at == {11: 1}
+    quiet = server.advance_tick()[9]
     assert [m for m in quiet if m["msg_type"] == 0x58] == []
     server.queue_command(9, _teleport(15, 12))
-    back = server.advance_tick()
+    back = server.advance_tick()[9]
     positions = [m for m in back if m["msg_type"] == 0x3D and m["tank_id"] == 11]
     assert len(positions) == 1
-    assert server.session.viewport.visible == {11}
-    assert server.session.viewport.removed_at == {}
+    assert server.require_session(9).viewport.visible == {11}
+    assert server.require_session(9).viewport.removed_at == {}
 
 
 def test_handshake_positions_are_self_only_even_inside_the_viewport() -> None:
@@ -108,12 +110,12 @@ def test_handshake_positions_are_self_only_even_inside_the_viewport() -> None:
     world = _arena()
     world["tanks"][12] = make_sim_tank(12, 1, 1, 40, 40, 500)
     server = _server(world)
-    burst = server.handshake()
+    burst = server.handshake(9)
     identities = [m["tank_id"] for m in burst if m["msg_type"] == 0x21]
     positions = [m["tank_id"] for m in burst if m["msg_type"] == 0x3D]
     assert identities == [9, 11, 12]
     assert positions == [9]
-    assert server.session.viewport.visible == {11}
+    assert server.require_session(9).viewport.visible == {11}
 
 
 def test_deactivated_tank_drops_from_the_viewport_without_0x58() -> None:
@@ -123,9 +125,9 @@ def test_deactivated_tank_drops_from_the_viewport_without_0x58() -> None:
     world["tanks"][11]["fuel"] = 45
     world["tanks"][11]["counts"][0] = 0
     server.queue_command(9, _id_shot(15, 10, 11))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m["msg_type"] for m in messages if m["msg_type"] in (0x41, 0x58)] == [0x41]
-    assert server.session.viewport.visible == set()
+    assert server.require_session(9).viewport.visible == set()
 
 
 def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:
@@ -155,7 +157,7 @@ def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:
     )
     server.queue_command(7, enemy_move)
     server.queue_command(9, _id_shot(15, 10, 7))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     shots = [m for m in messages if m["msg_type"] == 0x53]
     assert [s["weapon"] for s in shots] == [WEAPON_HOMING]
     assert world["tanks"][9]["counts"][SLOT_HOMING] == 1
@@ -253,11 +255,11 @@ def test_server_ticks_price_the_departure_age_for_the_shot() -> None:
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
     server = _server(world)
     server.queue_command(9, _teleport(40, 40))
-    away = server.advance_tick()
+    away = server.advance_tick()[9]
     assert [m["tank_id"] for m in away if m["msg_type"] == 0x58] == [11]
     landed = world["tanks"][9]
     server.queue_command(9, _id_shot(landed["x"], landed["y"], 11))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     shots = [m for m in messages if m["msg_type"] == 0x53]
     assert [s["weapon"] for s in shots] == [WEAPON_HOMING]
     assert [m for m in messages if m["msg_type"] == 0x49] == []
@@ -279,10 +281,10 @@ def test_an_aim_outside_the_window_is_refused_rather_than_rerouted() -> None:
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
     server = _server(world)
     server.queue_command(9, _teleport(40, 40))
-    server.advance_tick()
+    server.advance_tick()[9]
 
     server.queue_command(9, _id_shot(15, 10, 11))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert [m for m in messages if m["msg_type"] == 0x53] == []
     refusals = [m for m in messages if m["msg_type"] == 0x52]

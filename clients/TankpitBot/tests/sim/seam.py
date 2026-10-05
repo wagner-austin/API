@@ -154,13 +154,14 @@ def boot_seam(
         world["ferries"].append(SimFerryDict(x=x, y=y))
     for x, y in blocks:
         world["blocks"].append(SimBlockDict(x=x, y=y))
-    server = SimServer(world, InMemoryTerrainMap(), client_id=SEAM_CLIENT_ID)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(SEAM_CLIENT_ID)
     bot = Bot("https://sim.tankpit.local/", headless=True)
     bot._magic = SEAM_MAGIC
     bot._on_magic_captured(SEAM_MAGIC)
-    link = SimCDPSession(server, SEAM_MAGIC)
+    link = SimCDPSession(server, SEAM_CLIENT_ID, SEAM_MAGIC)
     bot._cdp = link
-    deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
+    deliver_batch(bot._cdp_message_buffer, server.handshake(SEAM_CLIENT_ID), link)
     return bot, server, link, table
 
 

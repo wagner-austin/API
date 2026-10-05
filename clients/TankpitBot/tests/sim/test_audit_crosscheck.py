@@ -53,13 +53,13 @@ def test_sim_wire_survives_the_archive_audit(tmp_path: Path) -> None:
         bot, server, link, _table = boot_seam(enemy_fuel=4000, containers=RICH_CONTAINERS)
         for _ in range(40):
             _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
             clock.advance(1000)
         truth = server.world["tanks"][SEAM_CLIENT_ID]
         walk = build_move_command(truth["x"] - 3, truth["y"])
         assert bot._send_bytes(walk, "audit_walk") is True
         for _ in range(4):
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
             clock.advance(1000)
         _tick_once(bot)
     finally:
@@ -82,6 +82,6 @@ def test_sim_wire_survives_the_archive_audit(tmp_path: Path) -> None:
 def test_capture_assembly_refuses_an_empty_session() -> None:
     """A link that never carried traffic cannot become a capture."""
     _bot, server, _link, _table = boot_seam()
-    fresh = SimCDPSession(server, SEAM_MAGIC)
+    fresh = SimCDPSession(server, SEAM_CLIENT_ID, SEAM_MAGIC)
     with pytest.raises(EncodeError):
         build_capture_session(fresh, SEAM_MAGIC, "empty")

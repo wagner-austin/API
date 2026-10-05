@@ -78,7 +78,7 @@ def test_ringed_hop_is_refused_once_and_never_re_certified() -> None:
             for _ in range(14):
                 rounds += 1
                 _tick_once(bot)
-                deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+                deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
                 clock.advance(1000)
         except SessionExitError as error:
             # An exhausted world ends the session the production way once

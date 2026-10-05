@@ -57,7 +57,9 @@ def _server() -> SimServer:
     world: SimWorldDict = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][11] = make_sim_tank(11, 1, 1, 15, 10, 500)
-    return SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
+    return server
 
 
 def _kinds(messages: list[BinaryMessage]) -> list[int | str]:

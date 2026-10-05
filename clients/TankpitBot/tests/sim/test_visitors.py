@@ -5,12 +5,11 @@ from __future__ import annotations
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.visitors import (
     VISITOR_ARRIVAL_PERIOD_TICKS,
-    VISITOR_ENTRY_X,
-    VISITOR_ENTRY_Y,
     VISITOR_ID_BASE,
     VISITOR_STAY_TICKS,
     RoomChurn,
 )
+from tankpit_bot.sim.wire_statements import ENTRY_X, ENTRY_Y
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -70,8 +69,8 @@ def test_the_entry_reports_no_position() -> None:
             "rank": 1,
             "damage_state": 3,
             "score": 0,
-            "x": VISITOR_ENTRY_X,
-            "y": VISITOR_ENTRY_Y,
+            "x": ENTRY_X,
+            "y": ENTRY_Y,
         }
     ]
 
@@ -85,7 +84,7 @@ def test_the_visitor_really_joins_the_world() -> None:
 
     visitor = world["tanks"][VISITOR_ID_BASE]
     assert visitor["alive"] is True
-    assert (visitor["x"], visitor["y"]) != (VISITOR_ENTRY_X, VISITOR_ENTRY_Y)
+    assert (visitor["x"], visitor["y"]) != (ENTRY_X, ENTRY_Y)
 
 
 def test_the_visitor_leaves_after_the_measured_stay() -> None:
@@ -146,8 +145,8 @@ def test_successive_visitors_take_fresh_ids() -> None:
             "rank": 0,
             "damage_state": 3,
             "score": 0,
-            "x": VISITOR_ENTRY_X,
-            "y": VISITOR_ENTRY_Y,
+            "x": ENTRY_X,
+            "y": ENTRY_Y,
         }
     ]
 
@@ -171,9 +170,10 @@ def test_the_server_churns_its_room() -> None:
     from tankpit_bot.sim.server import SimServer
 
     world = _world()
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     world["tick"] = VISITOR_ARRIVAL_PERIOD_TICKS - 1
 
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
 
     assert 0x28 in [message["msg_type"] for message in batch]

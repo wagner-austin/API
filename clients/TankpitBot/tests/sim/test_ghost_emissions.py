@@ -173,7 +173,8 @@ def test_dead_ghosts_skip_their_remaining_timeline() -> None:
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][500] = make_sim_tank(500, 1, 1, 20, 20, 600)
     world["tanks"][500]["alive"] = False
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     spec = GhostSpecDict(
         client_team=0,
         client_rank=1,
@@ -195,7 +196,7 @@ def test_dead_ghosts_skip_their_remaining_timeline() -> None:
     )
     _queue_ghost_round(server, spec, 0)
     assert (world["tanks"][500]["x"], world["tanks"][500]["y"]) == (20, 20)
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     # nothing was queued: the tick carries only the client's sync
     assert [m["msg_type"] for m in batch] == [0x2E]
 
@@ -254,7 +255,8 @@ def test_replayed_mine_press_relocates_then_lays_by_sim_law() -> None:
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][500] = make_sim_tank(500, 1, 1, 20, 20, 600)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     spec = GhostSpecDict(
         client_team=0,
         client_rank=1,
@@ -276,7 +278,7 @@ def test_replayed_mine_press_relocates_then_lays_by_sim_law() -> None:
 
     assert acted == frozenset({500})
     assert (world["tanks"][500]["x"], world["tanks"][500]["y"]) == (40, 41)
-    server.advance_tick()
+    server.advance_tick()[9]
     laid = {(mine["x"], mine["y"]) for mine in world["mines"].values()}
     assert (40, 41) in laid
     assert len(laid) == 9

@@ -120,9 +120,10 @@ def test_pickup_walk_emits_gain_snapshot_and_pickup_record() -> None:
     """
     world = _arena([25, 12, 25, 20, 15])
     world["equipment"][0] = SimEquipmentDict(x=12, y=10)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.queue_command(9, _pickup_equipment(12, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     kinds = [m["msg_type"] for m in messages]
     assert kinds == [0x47, 0x67, 0x49, "container_pickup", 0x3F, 0x2E]
     gain = messages[1]
@@ -140,9 +141,10 @@ def test_full_inventory_click_draws_the_measured_error_7() -> None:
     """An explicit pickup at full inventory answers 0x52 error 7."""
     world = _arena([25, 25, 25, 25, 25])
     world["equipment"][0] = SimEquipmentDict(x=12, y=10)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.queue_command(9, _pickup_equipment(12, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     errors = [m for m in messages if m["msg_type"] == 0x52]
     assert [e["error_code"] for e in errors] == [SUPERVISOR_ERROR_INVENTORY_FULL]
     assert len(server.world["equipment"]) == 1
@@ -152,7 +154,8 @@ def test_incidental_arrival_at_full_inventory_is_silent() -> None:
     """A plain move onto equipment at full inventory: no error, no grant."""
     world = _arena([25, 25, 25, 25, 25])
     world["equipment"][0] = SimEquipmentDict(x=12, y=10)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     move = ClientCommandDict(
         kind=ClientCommandKind.MOVE,
         command=112,
@@ -165,7 +168,7 @@ def test_incidental_arrival_at_full_inventory_is_silent() -> None:
         amount=0,
     )
     server.queue_command(9, move)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m["msg_type"] for m in messages if m["msg_type"] in (0x52, 0x67)] == []
     assert len(server.world["equipment"]) == 1
 
@@ -188,7 +191,8 @@ def test_teleport_landing_takes_fuel_but_never_equipment() -> None:
     world["equipment"][0] = SimEquipmentDict(x=30, y=30)
     world["containers"].append(SimContainerDict(x=30, y=30, volume=400, dotted=True))
     world["tanks"][9]["fuel"] = 900
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     hop = ClientCommandDict(
         kind=ClientCommandKind.TELEPORT,
         command=116,
@@ -201,7 +205,7 @@ def test_teleport_landing_takes_fuel_but_never_equipment() -> None:
         amount=0,
     )
     server.queue_command(9, hop)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert [m for m in messages if m["msg_type"] == 0x67] == []
     assert server.world["equipment"] == [SimEquipmentDict(x=30, y=30)]
@@ -215,7 +219,8 @@ def test_radar_reveals_equipment_with_the_wire_marker() -> None:
     """0x4F carries equipment as the 0xFFFF -> -1 cache value."""
     world = _arena([25, 25, 25, 25, 15])
     world["equipment"][0] = SimEquipmentDict(x=14, y=12)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     scan = ClientCommandDict(
         kind=ClientCommandKind.RADAR,
         command=102,
@@ -228,7 +233,7 @@ def test_radar_reveals_equipment_with_the_wire_marker() -> None:
         amount=0,
     )
     server.queue_command(9, scan)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     scans = [m for m in messages if m["msg_type"] == 0x4F]
     assert len(scans) == 1
     assert [(c["x"], c["y"], c["volume"]) for c in scans[0]["containers"]] == [(14, 12, -1)]
@@ -245,7 +250,8 @@ def test_radar_zero_kill_grants_the_mercy_bundle() -> None:
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][9]["counts"] = [25, 25, 25, 25, 0]
     world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 45)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     shot = ClientCommandDict(
         kind=ClientCommandKind.SHOOT,
         command=115,
@@ -258,7 +264,7 @@ def test_radar_zero_kill_grants_the_mercy_bundle() -> None:
         amount=0,
     )
     server.queue_command(9, shot)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     bundles = [m for m in messages if m["msg_type"] == 0x67]
     assert len(bundles) == 1
     assert bundles[0]["show_message"] is False
@@ -274,7 +280,8 @@ def test_kills_with_radar_stock_grant_nothing() -> None:
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][9]["counts"] = [25, 25, 25, 25, 1]
     world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 45)
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     shot = ClientCommandDict(
         kind=ClientCommandKind.SHOOT,
         command=115,
@@ -287,7 +294,7 @@ def test_kills_with_radar_stock_grant_nothing() -> None:
         amount=0,
     )
     server.queue_command(9, shot)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m for m in messages if m["msg_type"] == 0x67] == []
 
 
@@ -299,7 +306,8 @@ def test_enemy_killers_take_their_bundle_silently() -> None:
     world["tanks"][9]["enabled"][0] = False
     world["tanks"][11] = make_sim_tank(11, 1, 1, 32, 30, 1000)
     world["tanks"][11]["counts"] = [25, 25, 25, 25, 0]
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     shot = ClientCommandDict(
         kind=ClientCommandKind.SHOOT,
         command=115,
@@ -312,7 +320,7 @@ def test_enemy_killers_take_their_bundle_silently() -> None:
         amount=0,
     )
     server.queue_command(11, shot)
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m for m in messages if m["msg_type"] == 0x67] == []
     assert world["tanks"][11]["counts"][4] == 1
 
@@ -334,7 +342,7 @@ def test_production_bot_restocks_ammo_over_the_seam() -> None:
     start_extras = 8
     for _ in range(14):
         _tick_once(bot)
-        deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+        deliver_batch(bot._cdp_message_buffer, server.advance_tick()[9], link)
     _tick_once(bot)
     truth = server.world["tanks"][9]["counts"]
     assert truth[SLOT_RADAR] > start_extras - 3

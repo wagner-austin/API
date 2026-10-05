@@ -69,11 +69,12 @@ def test_an_unattended_ferry_never_moves_and_never_says_anything() -> None:
     produced thirty 0x4A pairs here.
     """
     world = _world_with_ferry(100, 100)
-    server = SimServer(world, _lake(), client_id=9)
+    server = SimServer(world, _lake())
+    server.connect(9)
 
     emitted: list[BinaryMessage] = []
     for _ in range(30):
-        emitted.extend(server.advance_tick())
+        emitted.extend(server.advance_tick()[9])
 
     assert _terrain_updates(emitted) == []
     assert (world["ferries"][0]["x"], world["ferries"][0]["y"]) == (100, 100)
@@ -90,11 +91,12 @@ def test_a_ferry_under_a_standing_tank_still_does_not_move() -> None:
     world = _world_with_ferry(100, 100)
     world["tanks"][9]["x"] = 100
     world["tanks"][9]["y"] = 100
-    server = SimServer(world, _lake(), client_id=9)
+    server = SimServer(world, _lake())
+    server.connect(9)
 
     emitted: list[BinaryMessage] = []
     for _ in range(10):
-        emitted.extend(server.advance_tick())
+        emitted.extend(server.advance_tick()[9])
 
     assert _terrain_updates(emitted) == []
     assert (world["ferries"][0]["x"], world["ferries"][0]["y"]) == (100, 100)

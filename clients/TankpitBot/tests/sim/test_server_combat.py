@@ -40,7 +40,7 @@ def test_arrival_pickup_and_mine_walk_emit_container_messages() -> None:
     server.world["containers"].append(SimContainerDict(x=11, y=10, volume=50, dotted=True))
     place_mine(server.world, 11, 10, 1)
     server.queue_command(9, _move(11, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [
         0x47,
         0x45,
@@ -61,10 +61,10 @@ def test_shot_bills_the_shooter_on_the_next_tick() -> None:
     """Charge latency: the firing cost lands one tick later."""
     server = _server()
     server.queue_command(9, _shoot(12, 12))
-    first = server.advance_tick()
+    first = server.advance_tick()[9]
     assert [shot["weapon"] for shot in _shots(first)] == [0]
     assert server.world["tanks"][9]["fuel"] == 1000
-    second = server.advance_tick()
+    second = server.advance_tick()[9]
     assert server.world["tanks"][9]["fuel"] == 994
     assert [(sync["tank_id"], sync["fuel"]) for sync in _syncs(second)] == [(9, 994), (11, None)]
 
@@ -80,7 +80,7 @@ def test_hit_victim_syncs_and_no_shot_snapshot() -> None:
     server = _server()
     server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
     server.queue_command(9, _shoot(15, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [shot["weapon"] for shot in _shots(messages)] == [1]
     syncs = _syncs(messages)
     assert [(sync["tank_id"], sync["fuel"]) for sync in syncs] == [(9, 1000), (11, None)]
@@ -99,7 +99,7 @@ def test_same_tick_move_then_shot_selects_homing() -> None:
     server.world["tanks"][11]["counts"][SLOT_HOMING] = 1
     server.queue_command(11, _shoot(11, 10))
     server.queue_command(9, _move(11, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [shot["weapon"] for shot in _shots(messages)] == [3]
 
 
@@ -108,7 +108,7 @@ def test_armored_victim_marks_ammo_not_fuel() -> None:
     server = _server()
     server.world["tanks"][11]["counts"][0] = 5
     server.queue_command(9, _shoot(15, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     syncs = _syncs(messages)
     assert [(sync["tank_id"], sync["fuel"]) for sync in syncs] == [(9, 1000), (11, None)]
     assert server.world["tanks"][11]["counts"][0] == 4
@@ -120,7 +120,7 @@ def test_shot_mine_cascade_rides_the_batch() -> None:
     server = _server()
     place_mine(server.world, 12, 12, 1)
     server.queue_command(9, _shoot(12, 12))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x53, 0x45, 0x2E, 0x2E]
     assert server.world["mines"] == {}
 
@@ -137,15 +137,15 @@ def test_corpse_window_closes_with_0x58_after_exactly_22_seconds() -> None:
     server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
     server.world["tanks"][11]["fuel"] = 45
     server.queue_command(9, _shoot(15, 10))
-    first = server.advance_tick()
+    first = server.advance_tick()[9]
     assert 0x41 in _kinds(first)
     assert 0x58 not in _kinds(first)
     for _ in range(CORPSE_WINDOW_TICKS - 1):
-        assert 0x58 not in _kinds(server.advance_tick())
-    closing = server.advance_tick()
+        assert 0x58 not in _kinds(server.advance_tick()[9])
+    closing = server.advance_tick()[9]
     removes = [m for m in closing if m["msg_type"] == 0x58]
     assert [m["tank_id"] for m in removes] == [11]
-    assert server.session.viewport.removed_at == {}
+    assert server.require_session(9).viewport.removed_at == {}
 
 
 def test_kill_emits_deactivation_and_skips_the_deads_commands() -> None:
@@ -154,7 +154,7 @@ def test_kill_emits_deactivation_and_skips_the_deads_commands() -> None:
     server.world["tanks"][11]["fuel"] = 45
     server.queue_command(9, _shoot(15, 10))
     server.queue_command(11, _move(15, 12))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     kinds = _kinds(messages)
     assert 0x41 in kinds
     assert 0x47 not in kinds
@@ -170,7 +170,7 @@ def test_radar_tick_emits_snapshot_then_scan_and_sync() -> None:
     server = _server()
     server.world["tanks"][9]["counts"][4] = 3
     server.queue_command(9, _command(("radar", 102)))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x49, 0x4F, 0x46, 0x2E, 0x2E]
     assert server.world["tanks"][9]["fuel"] == 990
     assert server.world["tanks"][9]["counts"][4] == 2
@@ -181,7 +181,7 @@ def test_mine_press_tick_emits_placement_and_trades() -> None:
     server = _server()
     place_mine(server.world, 11, 11, 1)
     server.queue_command(9, _command(("mine", 107)))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x4B, 0x45, 0x2E, 0x2E]
     assert server.world["tanks"][9]["fuel"] == 990
 
@@ -190,7 +190,7 @@ def test_radar_without_extras_has_no_snapshot() -> None:
     """A built-in scan changes no counts, so no 0x49 follows."""
     server = _server()
     server.queue_command(9, _command(("radar", 102)))
-    assert _kinds(server.advance_tick()) == [0x4F, 0x46, 0x2E, 0x2E]
+    assert _kinds(server.advance_tick()[9]) == [0x4F, 0x46, 0x2E, 0x2E]
 
 
 def test_mine_press_on_sealed_ground_places_nothing() -> None:
@@ -200,9 +200,10 @@ def test_mine_press_on_sealed_ground_places_nothing() -> None:
     ring = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx, dy) != (0, 0)]
     rocks = {(10 + dx, 10 + dy): "#" for dx, dy in ring}
     place_mine(world, 10, 10, 0)
-    server = SimServer(world, InMemoryTerrainMap(terrain_data=rocks), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=rocks))
+    server.connect(9)
     server.queue_command(9, _command(("mine", 107)))
-    assert _kinds(server.advance_tick()) == [0x2E]
+    assert _kinds(server.advance_tick()[9]) == [0x2E]
     assert server.world["tanks"][9]["fuel"] == 990
 
 
@@ -212,10 +213,10 @@ def test_statistics_counts_the_clients_kills_not_the_rooms() -> None:
     server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
     server.world["tanks"][11]["fuel"] = 45
     server.queue_command(9, _shoot(15, 10))
-    assert 0x41 in _kinds(server.advance_tick())
+    assert 0x41 in _kinds(server.advance_tick()[9])
 
     server.queue_command(9, _statistics_key())
-    reports = [m for m in server.advance_tick() if m["msg_type"] == 0x56]
+    reports = [m for m in server.advance_tick()[9] if m["msg_type"] == 0x56]
     assert [(r["destroyed"], r["deactivated"]) for r in reports] == [(1, 0)]
 
 
@@ -258,7 +259,7 @@ def test_a_shot_at_a_teammate_is_refused_with_friendly_fire() -> None:
     server.world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 10, 500)
 
     server.queue_command(9, _id_shot(12, 10, 12))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert _shots(messages) == []
     assert [m for m in messages if m["msg_type"] == 0x52] == [
@@ -279,7 +280,7 @@ def test_a_positional_shot_over_a_teammate_still_fires() -> None:
     server.world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 10, 500)
 
     server.queue_command(9, _shoot(12, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert len(_shots(messages)) == 1
     assert [m for m in messages if m["msg_type"] == 0x52] == []
@@ -297,9 +298,9 @@ def test_a_stale_id_is_not_treated_as_an_ally() -> None:
     server.world["tanks"][12]["alive"] = False
 
     server.queue_command(9, _id_shot(12, 10, 12))
-    dead_target = server.advance_tick()
+    dead_target = server.advance_tick()[9]
     server.queue_command(9, _id_shot(11, 10, 404))
-    unknown_target = server.advance_tick()
+    unknown_target = server.advance_tick()[9]
 
     assert len(_shots(dead_target)) == 1
     assert len(_shots(unknown_target)) == 1
@@ -321,7 +322,7 @@ def test_an_npcs_refused_shot_emits_no_supervisor_receipt() -> None:
     server.world["tanks"][13] = make_sim_tank(13, 0, 1, 14, 10, 500)
 
     server.queue_command(12, _id_shot(14, 10, 13))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
 
     assert _shots(messages) == []
     assert [m for m in messages if m["msg_type"] == 0x52] == []

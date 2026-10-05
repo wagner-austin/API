@@ -33,7 +33,7 @@ def test_adjacent_engage_presses_the_pin_once_over_the_wire() -> None:
     try:
         for _ in range(14):
             _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
     except SessionExitError as error:
         # Killing the seeded enemy empties the room and the session
         # ends the production way; any other exit is a scenario bug.

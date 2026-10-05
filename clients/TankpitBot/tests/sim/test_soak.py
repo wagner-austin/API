@@ -81,7 +81,7 @@ def test_seam_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
         bot, server, link, _table = boot_seam(enemy_fuel=4000, containers=RICH_CONTAINERS)
         for _ in range(30):
             _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
             clock.advance(1000)
         _tick_once(bot)
     finally:
@@ -132,7 +132,7 @@ def test_fighting_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
             opponent_command = decide_opponent(server.world, SEAM_ENEMY_ID, SEAM_CLIENT_ID)
             if opponent_command is not None:
                 server.queue_command(SEAM_ENEMY_ID, opponent_command)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
             clock.advance(1000)
         _tick_once(bot)
     finally:
@@ -168,7 +168,7 @@ def test_detector_fires_on_corrupted_fuel_sync(fake_fs: FakeFileSystem) -> None:
         bot, server, link, _table = boot_seam()
         for _ in range(4):
             _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
             clock.advance(1000)
         truth = server.world["tanks"][SEAM_CLIENT_ID]
         corrupted = TankStatusSyncDict(

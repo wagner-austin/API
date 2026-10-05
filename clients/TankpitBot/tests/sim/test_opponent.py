@@ -67,7 +67,8 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     """
     world = _arena()
     walls = {(16, 10): "#"}
-    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls))
+    server.connect(9)
     from tankpit_bot.sim.commands import ClientCommandDict, ClientCommandKind
 
     server.queue_command(
@@ -84,7 +85,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
             amount=0,
         ),
     )
-    blocked = server.advance_tick()
+    blocked = server.advance_tick()[9]
     assert [m for m in blocked if m["msg_type"] == 0x52] == []
     world["tanks"][11]["fuel"] = 2
     server.queue_command(
@@ -101,7 +102,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
             amount=0,
         ),
     )
-    poor = server.advance_tick()
+    poor = server.advance_tick()[9]
     assert [m for m in poor if m["msg_type"] == 0x52] == []
     server.queue_command(
         11,
@@ -117,7 +118,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
             amount=0,
         ),
     )
-    broke = server.advance_tick()
+    broke = server.advance_tick()[9]
     assert [m for m in broke if m["msg_type"] == 0x52] == []
     server.queue_command(
         11,
@@ -133,7 +134,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
             amount=0,
         ),
     )
-    ghost = server.advance_tick()
+    ghost = server.advance_tick()[9]
     assert [m for m in ghost if m["msg_type"] == 0x52] == []
 
 
@@ -145,7 +146,8 @@ def test_revival_activates_a_new_tank_near_the_client() -> None:
     the replacement activates within the reachable ring band.
     """
     world = _arena()
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     world["tanks"][11]["alive"] = False
     world["tick"] = 2
     new_id = maybe_revive_opponent(server, 11, 9)
@@ -156,7 +158,7 @@ def test_revival_activates_a_new_tank_near_the_client() -> None:
     assert world["tanks"][11]["alive"] is False
     reach = max(abs(fresh["x"] - 10), abs(fresh["y"] - 10))
     assert 6 <= reach <= 24
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
     announcement = batch[0]
     assert announcement["msg_type"] == 0x21
     assert announcement["tank_id"] == 12
@@ -165,7 +167,8 @@ def test_revival_activates_a_new_tank_near_the_client() -> None:
 def test_revival_derives_a_fresh_practice_name_for_the_new_id() -> None:
     """A red-named opponent respawns as red-<new id>, not a stale alias."""
     world = _arena()
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     world["tanks"][11]["alive"] = False
     world["tick"] = 2
 
@@ -185,7 +188,8 @@ def test_revival_keeps_a_human_persona_across_respawns() -> None:
     """
     world = _arena()
     world["tanks"][11]["name"] = "guest"
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     world["tanks"][11]["alive"] = False
     world["tick"] = 2
 
@@ -198,14 +202,16 @@ def test_revival_keeps_a_human_persona_across_respawns() -> None:
 def test_revival_holds_while_alive_off_beat_or_sealed() -> None:
     """No revival for the living, off the beat, or on a closed map."""
     world = _arena()
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     world["tick"] = 2
     assert maybe_revive_opponent(server, 11, 9) == 11
     world["tanks"][11]["alive"] = False
     world["tick"] = 3
     assert maybe_revive_opponent(server, 11, 9) == 11
     sealed = InMemoryTerrainMap(terrain_data={(x, y): "#" for x in range(256) for y in range(256)})
-    walled = SimServer(world, sealed, client_id=9)
+    walled = SimServer(world, sealed)
+    walled.connect(9)
     world["tick"] = 4
     assert maybe_revive_opponent(walled, 11, 9) == 11
     assert 12 not in world["tanks"]
@@ -219,7 +225,8 @@ def test_enemy_equipment_grant_resolves_silently() -> None:
     world = _arena()
     world["tanks"][11]["counts"] = [0, 0, 0, 0, 0]
     world["equipment"].append(SimEquipmentDict(x=16, y=10))
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     server.queue_command(
         11,
         ClientCommandDict(
@@ -234,7 +241,7 @@ def test_enemy_equipment_grant_resolves_silently() -> None:
             amount=0,
         ),
     )
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert [m for m in messages if m["msg_type"] in (0x67, 0x49)] == []
     assert any(count > 0 for count in world["tanks"][11]["counts"])
     assert world["equipment"] == []

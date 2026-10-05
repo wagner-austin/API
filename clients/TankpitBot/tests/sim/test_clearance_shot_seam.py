@@ -70,7 +70,7 @@ def test_clearance_shot_resolves_fired_over_the_seam() -> None:
     try:
         for _ in range(10):
             _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
     except SessionExitError as error:
         # Once the shot clears the way and the container is consumed
         # (or released), the session ends the production way — either

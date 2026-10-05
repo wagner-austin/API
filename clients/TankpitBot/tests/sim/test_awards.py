@@ -146,12 +146,13 @@ def test_the_join_burst_carries_the_clients_awards() -> None:
     """0x21 and 0x3E both report what the client has earned."""
     from tankpit_bot.sim.server import SimServer
 
-    server = SimServer(_world(), InMemoryTerrainMap(), client_id=9)
-    server.session.awards.levels[SLOT_TANK] = 3
+    server = SimServer(_world(), InMemoryTerrainMap())
+    server.connect(9)
+    server.require_session(9).awards.levels[SLOT_TANK] = 3
 
-    burst = server.handshake()
+    burst = server.handshake(9)
 
-    expected = server.session.awards.decoration_state
+    expected = server.require_session(9).awards.decoration_state
     assert expected != bytes(4)
     match burst[0], burst[1]:
         case (
@@ -175,11 +176,12 @@ def test_the_server_grants_on_the_tick() -> None:
     from tankpit_bot.sim.server import SimServer
 
     world = _world()
-    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
     for victim_id in range(1000, 1000 + TANK_KILLS[0]):
         server.combat.record_deactivation(9, victim_id)
 
-    batch = server.advance_tick()
+    batch = server.advance_tick()[9]
 
     grants = [message for message in batch if message["msg_type"] == 0x4E]
     assert grants == [{"msg_type": 0x4E, "tank_id": 9, "slot": SLOT_TANK, "level": 1}]

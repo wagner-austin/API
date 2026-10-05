@@ -38,7 +38,9 @@ def _server(fuel: int = 1000) -> SimServer:
     world: SimWorldDict = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, fuel)
     world["tanks"][11] = make_sim_tank(11, 1, 1, 20, 20, 500)
-    return SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server = SimServer(world, InMemoryTerrainMap())
+    server.connect(9)
+    return server
 
 
 def _kinds(messages: list[BinaryMessage]) -> list[int | str]:
@@ -88,7 +90,7 @@ def test_clamped_pickup_emits_the_five_message_gain_shape() -> None:
     server = _server(fuel=1000)  # rank 1: capacity 1100, headroom 100
     server.world["containers"].append(SimContainerDict(x=12, y=10, volume=500, dotted=True))
     server.queue_command(9, _pickup(12, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [
         0x47,
         "container_pickup",
@@ -123,7 +125,7 @@ def test_full_tank_own_tile_click_uses_the_no_gain_0x44_form() -> None:
     server = _server(fuel=1100)
     server.world["containers"].append(SimContainerDict(x=10, y=10, volume=300, dotted=True))
     server.queue_command(9, _pickup(10, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x44, "container_pickup", 0x52, 0x2E, 0x2E]
     assert _gains(messages) == [
         FuelGainDict(msg_type=0x44, fuel_total=1100, is_free=False, flag=43)
@@ -140,7 +142,7 @@ def test_empty_own_tile_click_closes_code_4_without_reset() -> None:
     server = _server(fuel=1000)
     server.world["containers"].append(SimContainerDict(x=10, y=10, volume=0, dotted=True))
     server.queue_command(9, _pickup(10, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [0x44, "container_pickup", 0x52, 0x2E, 0x2E]
     assert _remainings(messages) == [0]
     assert _closes(messages) == [(4, 0)]
@@ -157,7 +159,7 @@ def test_walk_to_a_drained_container_still_executes_and_closes_code_4() -> None:
     server = _server(fuel=1000)
     server.world["containers"].append(SimContainerDict(x=13, y=10, volume=0, dotted=True))
     server.queue_command(9, _pickup(13, 10))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _kinds(messages) == [
         0x47,
         "container_pickup",
@@ -184,7 +186,7 @@ def test_other_tanks_pickups_broadcast_records_without_closes() -> None:
     server = _server()
     server.world["containers"].append(SimContainerDict(x=22, y=20, volume=200, dotted=True))
     server.queue_command(11, _pickup(22, 20))
-    messages = server.advance_tick()
+    messages = server.advance_tick()[9]
     assert _remainings(messages) == [0, 0]
     assert _gains(messages) == []
     assert _closes(messages) == []
@@ -193,7 +195,7 @@ def test_other_tanks_pickups_broadcast_records_without_closes() -> None:
     # still silent.
     server.world["containers"].append(SimContainerDict(x=24, y=20, volume=900, dotted=True))
     server.queue_command(11, _pickup(24, 20))
-    clamp = server.advance_tick()
+    clamp = server.advance_tick()[9]
     clamp_remainings = _remainings(clamp)
     assert len(clamp_remainings) == 3
     assert clamp_remainings[0] > 0
@@ -206,7 +208,7 @@ def test_other_tanks_pickups_broadcast_records_without_closes() -> None:
         SimContainerDict(x=tank["x"], y=tank["y"], volume=50, dotted=True)
     )
     server.queue_command(11, _pickup(tank["x"], tank["y"]))
-    nowalk = server.advance_tick()
+    nowalk = server.advance_tick()[9]
     assert len(_remainings(nowalk)) == 1
     assert _gains(nowalk) == []
     assert _closes(nowalk) == []
@@ -218,11 +220,11 @@ def test_bare_ground_pickup_still_pre_refuses_without_moving() -> None:
     tank's identical click stays silent on our wire."""
     server = _server()
     server.queue_command(9, _pickup(12, 10))
-    own = server.advance_tick()
+    own = server.advance_tick()[9]
     assert _closes(own) == [(4, 1)]
     assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == (10, 10)
     server.queue_command(11, _pickup(25, 20))
-    other = server.advance_tick()
+    other = server.advance_tick()[9]
     assert _closes(other) == []
 
 

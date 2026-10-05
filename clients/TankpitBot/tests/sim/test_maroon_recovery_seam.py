@@ -56,7 +56,7 @@ def test_marooned_tank_pans_and_walks_to_fuel_beyond_the_window() -> None:
         try:
             for _ in range(_ROUNDS):
                 _tick_once(bot)
-                deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+                deliver_batch(bot._cdp_message_buffer, server.advance_tick()[link.tank_id], link)
                 clock.advance(1000)
         except SessionExitError as error:
             # After the refuel the world holds no more containers, no

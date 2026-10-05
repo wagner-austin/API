@@ -110,7 +110,7 @@ def test_own_deactivation_ends_the_session_through_the_production_exit() -> None
     ws = bot.world
     for _ in range(2):
         _tick_once(bot)
-        deliver_batch(bot._cdp_message_buffer, _server.advance_tick(), link)
+        deliver_batch(bot._cdp_message_buffer, _server.advance_tick()[_CLIENT], link)
     death = DeactivationDict(
         msg_type=0x41,
         status=1,
@@ -168,7 +168,7 @@ def test_real_tick_loop_plays_a_session_against_the_sim() -> None:
     del table
     for _ in range(12):
         _tick_once(bot)
-        deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+        deliver_batch(bot._cdp_message_buffer, server.advance_tick()[_CLIENT], link)
     _tick_once(bot)
     assert link.sent_commands != []
     truth = server.world["tanks"][_CLIENT]
@@ -219,7 +219,7 @@ def test_a_page_client_heartbeat_does_not_kill_the_session() -> None:
     link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
 
     assert link.sent_commands[-1] == "keepalive"
-    assert server.advance_tick() == server.advance_tick()
+    assert server.advance_tick()[_CLIENT] == server.advance_tick()[_CLIENT]
 
 
 def test_a_heartbeat_leaves_the_next_real_command_untouched() -> None:
@@ -231,14 +231,14 @@ def test_a_heartbeat_leaves_the_next_real_command_untouched() -> None:
     """
     _control_bot, control, control_link, control_table = boot_seam()
     control_link.send_page_frame(_query_frame(control_table, CMD_MAP_OPEN))
-    expected = [message["msg_type"] for message in control.advance_tick()]
+    expected = [message["msg_type"] for message in control.advance_tick()[_CLIENT]]
 
     _bot, server, link, table = boot_seam()
     link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
     link.send_page_frame(_query_frame(table, CMD_MAP_OPEN))
     link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
 
-    assert [message["msg_type"] for message in server.advance_tick()] == expected
+    assert [message["msg_type"] for message in server.advance_tick()[_CLIENT]] == expected
 
 
 def test_enter_game_is_answered_with_the_join_burst() -> None:
@@ -258,7 +258,7 @@ def test_enter_game_is_answered_with_the_join_burst() -> None:
     _bot, server, link, table = boot_seam()
 
     link.send_page_frame(_query_frame(table, CMD_ENTER_GAME))
-    burst = server.advance_tick()
+    burst = server.advance_tick()[_CLIENT]
 
     assert link.sent_commands[-1] == "enter_game"
     kinds = [message["msg_type"] for message in burst]
@@ -276,7 +276,7 @@ def test_an_inventory_request_is_answered_with_a_snapshot() -> None:
     _bot, server, link, table = boot_seam()
 
     link.send_page_frame(_query_frame(table, CMD_INVENTORY))
-    answered = server.advance_tick()
+    answered = server.advance_tick()[_CLIENT]
 
     assert link.sent_commands[-1] == "inventory"
     snapshots = [m for m in answered if m["msg_type"] == 0x49]
