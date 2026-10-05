@@ -17,16 +17,21 @@ closes a row (a cancel, by ``fleet-cancel`` or under a runner), and the hub's
 tick settles the run again; every step of the script tolerates what an
 earlier attempt already did.
 
-AND THE RUN'S VIRTUALENV GOES WITH IT (MCPs board task 7b07c5d2). Poetry
-named it after the tree just removed, so right after the retire the node is
-sent :mod:`fleet.core.venv_sweep`, which removes every virtualenv in the
-node's fleet cache whose recorded source paths are all gone.
+THE RUN'S VIRTUALENV GOES TOO, BUT AFTER THE CLOSE, NOT HERE (MCPs board
+tasks 7b07c5d2 and 8993c306). Poetry named it after the tree just removed,
+so each caller sends the node :mod:`fleet.core.venv_sweep`, which removes
+every virtualenv in the node's fleet cache whose recorded source paths are
+all gone, once the row is closed. The sweep was part of this retire until
+2026-10-05, so it stood between a finished check and its queue close: one
+more script round trip, which on loki and sedona made a settle take 11 to
+24 s. A sweep that fails after the close leaves nothing a later sweep does
+not remove, since it removes every orphan it finds, not the run's alone.
 """
 
 from __future__ import annotations
 
 from fleet.contracts.node import NodeConfig, NodePlatform
-from fleet.core import dialect, names, remote, venv_sweep
+from fleet.core import dialect, names, remote
 
 
 def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
@@ -77,7 +82,6 @@ def retire_on_node(node: NodeConfig, *, run_id: str) -> str:
         script_for(node["platform"], stage_root=stage_root, run_id=run_id),
         platform=node["platform"],
     )
-    venv_sweep.sweep_on_node(node)
     return names.retained_log_path(stage_root, run_id)
 
 

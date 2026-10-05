@@ -343,24 +343,30 @@ def held_by(credentials: McpCredentials, *, agent: str) -> tuple[DispatchJob, ..
     )
 
 
-def queued_for(credentials: McpCredentials, *, project: str) -> tuple[DispatchJob, ...]:
-    """List the first page of one project's jobs still waiting for a runner.
+def queued_for(credentials: McpCredentials, *, project: str | None) -> tuple[DispatchJob, ...]:
+    """List the first page of the jobs still waiting for a runner.
 
-    One page is enough for the question this answers, whether ANY job of the
-    project waits: the first page holds up to :data:`LISTING_PAGE_LIMIT`
-    jobs, and a project with more queued than that has one on it.
+    One page is enough for both questions this answers: whether ANY job of a
+    project waits, since the first page holds up to
+    :data:`LISTING_PAGE_LIMIT` jobs and a project with more queued than that
+    has one on it; and, for a serving node runner, whether a job has arrived
+    since it last looked (:mod:`fleet.cli.node_serve`), since the page is
+    newest first and an arrival is always on it.
 
     Args:
         credentials: Endpoint and headers.
-        project: The project's key in the registry.
+        project: The project's key in the registry, or None for every
+            project's.
 
     Returns:
-        Its queued jobs, newest first.
+        The queued jobs, newest first.
 
     Raises:
         AppError: Any transport or contract failure from the underlying call.
     """
-    arguments: JSONObject = {"project": project, "status": "queued", "limit": LISTING_PAGE_LIMIT}
+    arguments: JSONObject = {"status": "queued", "limit": LISTING_PAGE_LIMIT}
+    if project is not None:
+        arguments["project"] = project
     return decode_listing(
         call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
     )

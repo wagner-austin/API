@@ -23,7 +23,7 @@ import pathlib
 
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.core import dialect, dispatch, names, remote, retire
+from fleet.core import dialect, dispatch, names, remote, retire, venv_sweep
 
 
 def stop_on_node(node: NodeConfig, *, run_id: str) -> None:
@@ -64,7 +64,8 @@ def stop_and_finish(
     exit_code: int,
     detail: str,
 ) -> LedgerEntry:
-    """Stop a dispatch on its node, retire its directory, then close its row.
+    """Stop a dispatch on its node, retire its directory, close its row, then
+    sweep the node's orphaned virtualenvs.
 
     Closing the row emits it and frees its lease.
 
@@ -91,7 +92,7 @@ def stop_and_finish(
     # After the stop, so nothing the build started still holds a file in
     # the directory; before the row closes, for the same reason the stop is.
     retire.retire_on_node(node, run_id=row["run_id"])
-    return dispatch.finish(
+    closing = dispatch.finish(
         loaded_leases,
         loaded_ledger,
         loaded_feed,
@@ -100,6 +101,10 @@ def stop_and_finish(
         exit_code=exit_code,
         detail=detail,
     )
+    # After the row closes: housekeeping no reader of the row waits on
+    # (fleet.core.retire).
+    venv_sweep.sweep_on_node(node)
+    return closing
 
 
 __all__ = ["stop_and_finish", "stop_on_node"]

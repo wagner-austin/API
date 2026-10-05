@@ -189,6 +189,33 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
     )
 
 
+def rolled_state(checkout: pathlib.Path) -> str:
+    """What :data:`ROLLED_REF` names now, as a serving agent compares it.
+
+    A node runner serves across its scheduled starts (:mod:`fleet.cli.node_serve`,
+    MCPs board task 8993c306), so it reads this when it starts and again at
+    each fire boundary, and hands over once the two differ
+    (:func:`fleet.cli.node_serve.handover_policy`). It is read by the agent
+    rather than handed down by the launcher because the launcher runs from
+    the checkout, which no roll updates, and a flag it does not yet pass
+    would refuse every start.
+
+    Args:
+        checkout: A directory inside the checkout whose ref the launcher
+            read: the agent's records directory, ``tools/fleet`` there.
+
+    Returns:
+        The commit the ref names, or the :data:`REF_UNRESOLVED_CODE`
+        refusal saying why it names none; either compares unequal to a
+        different answer, so a ref that stops resolving hands over too, and
+        the next start reports the refusal as its own.
+    """
+    resolved = commit_tree.resolve_commit(checkout, ROLLED_REF, REF_UNRESOLVED_CODE)
+    if isinstance(resolved, str):
+        return resolved
+    return resolved["commit"]
+
+
 __all__ = [
     "ARCHIVED_PATHS",
     "ARCHIVE_FAILED_CODE",
@@ -209,4 +236,5 @@ __all__ = [
     "discard_rolled_tree",
     "extract_rolled_tree",
     "launch_directory",
+    "rolled_state",
 ]
