@@ -6596,3 +6596,16 @@ gains "Accounts are this server's own, and they keep what they earn".
   `tankpit-sim-accounts` makes the tables and issues accounts.
 - Live: account 1001 joined field05 over a WebSocket for 5 ticks; one
   `sim_sessions` row was written and the account kept rank 2.
+
+---
+
+## [2026-10-06] update | Sim server behind Traefik, graceful stop
+
+Board task b008ab91, Phase 5. [[sim-network-server]] gains "Behind the
+platform's Traefik" and "Stopping keeps every seat".
+- `sim-server.compose.json` routes `/tankpit-sim` through the root
+  compose's Traefik v3 to the server on `platform-network`; a test holds
+  its command, port and network to the CLI.
+- Live on the hub: a client joined through Traefik and its quit was
+  recorded; `docker stop` with a player seated closed the socket with
+  1001, the server exited 0 and the seat was recorded.

@@ -20,7 +20,11 @@ source_paths:
   - "tests/sim/test_net_server.py"
   - "tests/sim/test_net_host.py"
   - "tests/sim/test_net_room.py"
+  - "sim-server.compose.json"
+  - "tests/sim/test_sim_compose.py"
 source_git_blobs:
+  "sim-server.compose.json": "9df71d498fd5d1721173097bd8588a981172df8b"
+  "tests/sim/test_sim_compose.py": "1d93db9967cfc4c1d4f0a6383cace9dbf77f43ea"
   "src/tankpit_bot/sim/net_server.py": "00c9ed1231acb3bcf761357abf9d5844fe5d9897"
   "src/tankpit_bot/sim/net_host.py": "faaa8be06944b58216788115e4cbc7192a83ad83"
   "src/tankpit_bot/sim/net_room.py": "f242a4ba888b471670e9f58f92847b12fe18c27e"
@@ -36,7 +40,8 @@ source_git_blobs:
 provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 5, 2026-10-05: the scripts/sim_control.py comparison and the tankpit-sim-serve run quoted below, both from the committed tree"
   - "2026-10-05 live persistence check: tankpit_sim created on the local platform-postgres container (host port 55432); tankpit-sim-accounts init/add/list, then a scratch WebSocket client joining field05 room 1 as account 1001 for 5 ticks; rows read back with psql from sim_sessions and sim_accounts"
-fact_checked: "2026-10-05"
+  - "2026-10-06 live Traefik check on the hub: tankpit-bot:local built from clients/TankpitBot/Dockerfile, sim-server.compose.json up beside the root compose's traefik and platform-postgres, a scratch client joining as account 1003 through ws://127.0.0.1/tankpit-sim, then docker stop with the account seated; sim_sessions rows 2 and 3 read back with psql"
+fact_checked: "2026-10-06"
 confidence: high
 hubs: [architecture]
 ---
@@ -177,10 +182,33 @@ The server also creates any missing tables when it starts.
   `sim_sessions` row was written (`1001|1|field05_r.gif|5|2|0|0`), and
   the account kept rank 2.
 
+## Behind the platform's Traefik
+
+`sim-server.compose.json` runs `tankpit-sim-serve` from the package
+image on the root compose's `platform-network`. Traefik v3 routes
+`/tankpit-sim` to it, strips the prefix, and balances to port 8765. The
+accounts come from `tankpit_sim` on `platform-postgres`. The file is
+JSON, which compose reads as it reads YAML, so the package's own JSON
+decoders test it against the CLI. Its command must parse as the
+server's flags, the label's port must be the port bound, and the network
+must be the external one the service joins.[^9]
+
+```
+docker build -f clients/TankpitBot/Dockerfile -t tankpit-bot:local .   # from the repo root
+docker compose -f clients/TankpitBot/sim-server.compose.json up -d --no-build
+```
+
+Checked live on the hub on 2026-10-06:
+- A client joined account 1003 through `ws://127.0.0.1/tankpit-sim`. It
+  was shown both rooms and drew the join burst with the practice
+  roster's identities, and its quit wrote a `sim_sessions` row.
+- `docker stop`, with the account still seated, closed its socket with
+  1001 (going away). The server printed `32 ticks served` and exited 0,
+  and the seat was written as a row of its own.
+
 ## Not done here
 
-Traefik labels for a public route and the TypeScript renderer are the
-rest of Phase 5. The production bot still reaches a server through a
+The TypeScript renderer is the rest of Phase 5. The production bot still reaches a server through a
 browser page. A bot or renderer speaking this socket directly is the
 next client.
 
@@ -192,3 +220,4 @@ next client.
 [^6]: `tests/sim/test_net_server.py`, `test_a_client_joins_and_plays_over_a_real_socket`.
 [^7]: `src/tankpit_bot/sim/net_store.py`, `PostgresAccountBook`, `SCHEMA` and `connect_store`; `src/tankpit_bot/sim/net_room.py`, `NetRoom.leave`; `src/tankpit_bot/sim/net_host.py`, `NetHost._unseat`; `tests/sim/test_net_host.py`, `test_a_seat_that_leaves_is_recorded_and_the_account_rejoins_as_it_left`; `tests/sim/test_net_store.py`, `test_a_seat_updates_the_account_and_adds_a_session_in_one_commit`.
 [^8]: `src/tankpit_bot/sim/net_server.py`, `serve_rooms` and `NetServer.tick_for`; `tests/sim/test_net_server.py`, `test_a_signal_stops_the_server_after_the_tick_in_play` and `test_closing_the_listener_records_every_seat_still_in_play`.
+[^9]: `sim-server.compose.json`, the `sim` service's `command` and `labels`; `tests/sim/test_sim_compose.py`, `test_traefik_balances_to_the_port_the_server_binds` and `test_the_command_serves_from_the_database_its_environment_names`.
