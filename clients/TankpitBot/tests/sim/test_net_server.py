@@ -70,6 +70,7 @@ def _args(
         tick_ms=0,
         layout="bot-20260706-223721",
         population_seed=7,
+        web_root=None,
     )
 
 
@@ -208,6 +209,7 @@ def test_flags_default_to_one_practice_room_on_localhost(accounts: Path) -> None
         tick_ms=TICK_RATE_MS,
         layout=None,
         population_seed=None,
+        web_root=None,
     )
 
 
@@ -215,7 +217,7 @@ def test_every_flag_is_read() -> None:
     """Rooms repeat; the rest name one value each."""
     argv = ["--bind", "0.0.0.0", "--port", "9000", "--database-env", DSN_VARIABLE]
     argv += ["--room", "1:field01:p", "--room", "5:field05:n", "--ticks", "4", "--tick-ms", "50"]
-    argv += ["--layout", "bot-20260706-223721", "--population-seed", "3"]
+    argv += ["--layout", "bot-20260706-223721", "--population-seed", "3", "--web-root", "/app/web"]
     assert parse_serve_args(argv) == ServeArgs(
         bind="0.0.0.0",
         port=9000,
@@ -225,6 +227,7 @@ def test_every_flag_is_read() -> None:
         tick_ms=50,
         layout="bot-20260706-223721",
         population_seed=3,
+        web_root="/app/web",
     )
 
 

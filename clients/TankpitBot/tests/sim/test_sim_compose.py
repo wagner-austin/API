@@ -68,13 +68,32 @@ def test_traefik_balances_to_the_port_the_server_binds() -> None:
     )
 
 
-def test_the_route_strips_the_prefix_it_matches() -> None:
-    """The server sees the socket at its root, as it serves it."""
+def test_the_route_sends_the_bare_prefix_to_the_page_then_strips_it() -> None:
+    """``/tankpit-sim`` redirects to ``/tankpit-sim/``; the server then sees its root.
+
+    The play page loads ``./dist/...`` and opens its socket on its own
+    directory, both relative, which resolve under the prefix only when the
+    page's URL ends in a slash. Compose reads ``$$`` as one ``$``.
+    """
     labels = _labels()
     assert labels["traefik.enable"] == "true"
     assert labels[f"{_ROUTER}.rule"] == "PathPrefix(`/tankpit-sim`)"
-    middleware = labels[f"{_ROUTER}.middlewares"]
-    assert labels[f"traefik.http.middlewares.{middleware}.stripprefix.prefixes"] == "/tankpit-sim"
+    slash, strip = labels[f"{_ROUTER}.middlewares"].split(",")
+    redirect = f"traefik.http.middlewares.{slash}.redirectregex"
+    assert (labels[f"{redirect}.regex"], labels[f"{redirect}.replacement"]) == (
+        "^(.*)/tankpit-sim$$",
+        "$${1}/tankpit-sim/",
+    )
+    assert labels[f"{redirect}.permanent"] == "true"
+    assert labels[f"traefik.http.middlewares.{strip}.stripprefix.prefixes"] == "/tankpit-sim"
+
+
+def test_the_web_root_is_where_the_image_puts_the_client() -> None:
+    """--web-root names the directory the Dockerfile copies play.html and dist/ into."""
+    web_root = _args().web_root
+    dockerfile = (_COMPOSE.parent / "Dockerfile").read_text(encoding="utf-8")
+    assert f"COPY ${{APP_DIR}}/web/play.html {web_root}/play.html" in dockerfile
+    assert f"COPY --from=web /web/dist {web_root}/dist" in dockerfile
 
 
 def test_traefik_routes_on_the_external_network_the_service_joins() -> None:
