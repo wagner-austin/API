@@ -15,8 +15,9 @@ This rule closes the mechanically-checkable half of that gap:
 * **Provenance** -- every ``source_paths`` entry still exists on disk
   (a trailing ``:line`` or ``:start-end`` locator is stripped first,
   and ``http(s)://`` sources are skipped), and every
-  ``source_git_blobs`` key is one of them with a well-formed 40-hex
-  object id (catching typo'd or invented anchors).
+  ``source_git_blobs`` key is one of them, names a file rather than a
+  directory, and carries a well-formed 40-hex object id (catching
+  typo'd or invented anchors).
 * **Navigation** -- every hub inclusion link resolves, and every page
   is reachable from at least one hub (SCHEMA's orphan ban).
 * **Counts** -- ``index.md``'s per-hub page counts equal each hub's
@@ -365,8 +366,19 @@ def _provenance_violations(
     # citing several lines of one file.
     cited_files = {_LINE_LOCATOR.sub("", source) for source in source_paths}
     for anchored, blob in blob_pins.items():
-        if _LINE_LOCATOR.sub("", anchored) not in cited_files:
+        pinned_file = _LINE_LOCATOR.sub("", anchored)
+        if pinned_file not in cited_files:
             violations.append(f"{page}: source_git_blobs key '{anchored}' is not in source_paths")
+        # Only a FILE is pinned, as wiki-check's ``git-blob-hash-pin``
+        # requires (board task a6b2c4c9): a directory's tree hash moves
+        # with every commit beneath it -- ``src/tankpit_bot`` took 122 in
+        # 14 days -- so its pin says a commit happened and never which file
+        # moved. The directory stays citable in source_paths.
+        if (project_root / pinned_file).is_dir():
+            violations.append(
+                f"{page}: source_git_blobs key '{anchored}' pins a directory - "
+                "pin the files the page's claims rest on instead"
+            )
         if _BLOB_HASH.match(blob) is None:
             violations.append(f"{page}: source_git_blobs['{anchored}'] is not a 40-hex object id")
     return violations

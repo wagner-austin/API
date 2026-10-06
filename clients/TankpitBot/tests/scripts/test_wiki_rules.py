@@ -446,6 +446,22 @@ class TestProvenance:
         assert count == 1
         assert "is not a 40-hex object id" in out
 
+    def test_directory_pin_is_a_violation(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A directory may be cited but not pinned: its tree hash names no file."""
+        _green_tree(tmp_path)
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "src/fixture.py"\n  - "src"')
+        page = page.replace(
+            '"src/fixture.py": "0123456789abcdef0123456789abcdef01234567"',
+            '"src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n'
+            '  "src": "89abcdef0123456789abcdef0123456789abcdef"',
+        )
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        count, out = _capture(tmp_path, capsys)
+        assert count == 1
+        assert "source_git_blobs key 'src' pins a directory" in out
+
 
 class TestNavigation:
     """Hub links must resolve and no page may be orphaned."""

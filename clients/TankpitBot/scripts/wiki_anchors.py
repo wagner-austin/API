@@ -1,8 +1,9 @@
 """Report which wiki pages have drifted from the trees they were audited against.
 
-``source_git_blobs`` records the git tree or blob a page was last
-audited against. A lagging anchor is NOT a defect -- it means "nobody
-has re-read this page since that tree" -- so the ``wiki-structure``
+``source_git_blobs`` records the git blob of each cited file a page was
+last audited against (``wiki-structure`` refuses a directory pin, board
+task a6b2c4c9). A lagging anchor is NOT a defect -- it means "nobody
+has re-read this page since that blob" -- so the ``wiki-structure``
 guard rule deliberately does not gate on it (see
 ``wiki/SCHEMA.md`` and ``scripts/wiki_rules.py``). Gating would redden
 the build on every source commit and would reward bumping anchors
