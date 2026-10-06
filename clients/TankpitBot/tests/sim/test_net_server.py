@@ -9,7 +9,9 @@ by the time the test reads the host.
 
 from __future__ import annotations
 
+import asyncio
 import base64
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,7 @@ from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close, CloseCode
 
+from tankpit_bot import _test_hooks
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.sim.lobby import LobbyError
 from tankpit_bot.sim.net_accounts import encode_account_book
@@ -110,10 +113,11 @@ async def test_a_client_joins_and_plays_over_a_real_socket(accounts: Path) -> No
                 "=1|Oct. 05, 2026|austin|3|9|9|9|9",
                 "$1|0",
             ]
-            await socket.send(wire(enter_game()))
-            # The pong comes back after the server has read everything sent
-            # before the ping, so the command is queued when the tick runs.
-            await (await socket.ping())
+            # A select rides behind the command in the same message: its
+            # confirm is sent only after the handler has queued the command,
+            # so the command is in the queue when the tick runs.
+            await socket.send(wire(enter_game(), SELECT))
+            assert plaintext([await _received(socket)]) == ["=1|Oct. 05, 2026|austin|3|9|9|9|9"]
             assert server.tick() == 1
             burst = received_kinds([await _received(socket)])
             assert burst[:2] == [0x21, 0x3E]
@@ -138,10 +142,50 @@ async def test_a_text_message_ends_only_that_connection(accounts: Path) -> None:
 async def test_the_server_ticks_for_its_count_then_returns(accounts: Path) -> None:
     """A tick count is how a smoke run ends; nobody seated is still a tick."""
     server = NetServer(_host(_args(accounts)))
-    assert await server.tick_for(3, 0) == 3
+    assert await server.tick_for(3, 0, asyncio.Event()) == 3
     assert server.host.rooms[0].server.world["tick"] == 3
     assert await serve_rooms(server, _args(accounts, ticks=2)) == 2
     assert server.host.rooms[0].server.world["tick"] == 5
+
+
+async def test_a_signal_stops_the_server_after_the_tick_in_play(accounts: Path) -> None:
+    """SIGINT or SIGTERM sets the stop; the endless loop returns instead of the process dying."""
+    server = NetServer(_host(_args(accounts)))
+    handlers: list[Callable[[], None]] = []
+
+    def record(on_interrupt: Callable[[], None]) -> None:
+        """Keep the handler instead of binding it to the process's signals."""
+        handlers.append(on_interrupt)
+
+    real = _test_hooks.install_signal_handlers
+    _test_hooks.install_signal_handlers = record
+    serving = asyncio.ensure_future(serve_rooms(server, _args(accounts, ticks=None)))
+    while not handlers or server.host.rooms[0].server.world["tick"] < 2:
+        await asyncio.sleep(0)
+    handlers[0]()
+    played = await serving
+    _test_hooks.install_signal_handlers = real
+    assert played == server.host.rooms[0].server.world["tick"]
+
+
+async def test_closing_the_listener_records_every_seat_still_in_play(accounts: Path) -> None:
+    """The way out of serve closes each socket and waits for its handler to record the seat."""
+    book = account_book()
+    server = NetServer(build_host(_args(accounts), book))
+    async with serve(server.handle, "127.0.0.1", 0) as listening:
+        bound: tuple[str, int] = next(iter(listening.sockets)).getsockname()
+        async with connect(f"ws://127.0.0.1:{bound[1]}") as socket:
+            await socket.send(wire(auth(), SELECT, ENTER))
+            # Three replies (room list, confirm, enter response): the seat is taken.
+            for _ in range(3):
+                await _received(socket)
+            assert sorted(server.host.rooms[0].server.world["tanks"]) == [NET_PLAYER_ID_BASE]
+            stop = asyncio.Event()
+            stop.set()
+            assert await server.tick_for(None, 0, stop) == 0
+            listening.close()
+            await listening.wait_closed()
+    assert [account for account, _ in book.results] == ["1001"]
 
 
 def test_the_command_line_serves_its_rooms_for_its_ticks(
