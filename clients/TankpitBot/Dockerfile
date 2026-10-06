@@ -81,6 +81,24 @@ WORKDIR /workspace/clients/TankpitBot
 
 RUN poetry build -f wheel
 
+# ---------- Web: the browser client tankpit-sim-serve hands out ----------
+# `tankpit-sim-serve --web-root /app/web` answers a browser's plain GETs on
+# its WebSocket port with play.html and the built modules under dist/
+# (tankpit_bot.sim.net_web). The package's engines want npm 11, which
+# Node 24 ships; tsc's output is plain ES modules, so the runtime stage
+# copies files and needs no Node of its own.
+FROM node:24-bookworm-slim AS web
+
+ARG APP_DIR=clients/TankpitBot
+
+WORKDIR /web
+
+COPY ${APP_DIR}/web/package.json ${APP_DIR}/web/package-lock.json ./
+RUN npm ci
+COPY ${APP_DIR}/web/tsconfig.json ${APP_DIR}/web/tsconfig.build.json ./
+COPY ${APP_DIR}/web/src ./src
+RUN npm run build
+
 # ---------- Runtime ----------
 FROM python:${PYTHON_VERSION} AS runtime
 
@@ -146,6 +164,13 @@ WORKDIR /app
 # artifact a session exists to produce.
 RUN mkdir -p /app/runs && chown -R app:app /app
 VOLUME ["/app/runs"]
+
+# The sim server's browser client (the `web` stage above), read-only: the
+# page and the modules it imports. sim-server.compose.json names this
+# directory with --web-root.
+ARG APP_DIR=clients/TankpitBot
+COPY ${APP_DIR}/web/play.html /app/web/play.html
+COPY --from=web /web/dist /app/web/dist
 
 USER app
 

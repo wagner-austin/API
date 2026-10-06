@@ -18,7 +18,9 @@
         "--room",
         "1:field01:p",
         "--room",
-        "5:field05:n"
+        "5:field05:n",
+        "--web-root",
+        "/app/web"
       ],
       "environment": {
         "TANKPIT_SIM_DATABASE_URL": "${TANKPIT_SIM_DATABASE_URL:-postgresql://covenant:covenant@platform-postgres:5432/tankpit_sim}"
@@ -27,7 +29,10 @@
         "traefik.enable=true",
         "traefik.http.routers.tankpit-sim.rule=PathPrefix(`/tankpit-sim`)",
         "traefik.http.routers.tankpit-sim.entrypoints=web",
-        "traefik.http.routers.tankpit-sim.middlewares=tankpit-sim-strip",
+        "traefik.http.routers.tankpit-sim.middlewares=tankpit-sim-slash,tankpit-sim-strip",
+        "traefik.http.middlewares.tankpit-sim-slash.redirectregex.regex=^(.*)/tankpit-sim$$",
+        "traefik.http.middlewares.tankpit-sim-slash.redirectregex.replacement=$${1}/tankpit-sim/",
+        "traefik.http.middlewares.tankpit-sim-slash.redirectregex.permanent=true",
         "traefik.http.middlewares.tankpit-sim-strip.stripprefix.prefixes=/tankpit-sim",
         "traefik.http.services.tankpit-sim.loadbalancer.server.port=8765",
         "traefik.docker.network=platform-network"
