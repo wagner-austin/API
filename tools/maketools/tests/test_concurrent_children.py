@@ -96,4 +96,8 @@ def test_a_real_make_runs_each_target_and_reports_it(
     assert "left ran" in left_block.splitlines()
     assert "right ran" in right_block.splitlines()
     assert "left ran" not in right_block
-    assert printed.rstrip("\n").splitlines()[-1].startswith("concurrent: 2 of 2 passed (_left ")
+    assert (
+        printed.rstrip("\n")
+        .splitlines()[-1]
+        .startswith("concurrent: every target succeeded (_left ")
+    )

@@ -10,6 +10,7 @@ the whole path.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TypedDict
@@ -122,9 +123,15 @@ def test_every_target_runs_as_one_make_in_one_batch(world: World, tmp_path: Path
         "=== concurrent: _suite passed after 190s",
         "7290 passed",
         "",
-        "concurrent: 3 of 3 passed (_guard 41s, _mypy 55s, _suite 190s)",
+        "concurrent: every target succeeded (_guard 41s, _mypy 55s, _suite 190s)",
     ]
     assert world.errors == []
+    # tools/fleet's verdict reads the LAST "N passed" in a transcript as the
+    # suite's total, so the command's own lines must carry none: the
+    # suite's "7290 passed" is the last one the fleet may find.
+    own_prefixes = ("=== concurrent:", "concurrent:")
+    own_lines = [line for line in world.lines if line.startswith(own_prefixes)]
+    assert [line for line in own_lines if re.search(r"\d+ (passed|failed)", line)] == []
 
 
 def test_a_failure_returns_the_first_named_code_and_every_failure_is_named(

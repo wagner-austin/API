@@ -21,6 +21,14 @@ THE TARGETS MUST BE INDEPENDENT. Each child is a separate make with no
 memory of its siblings, so a target listed here must not need another to
 have run first; a package runs whatever they share (``poetry sync``, a
 formatter that rewrites files) before this command, in its own recipe.
+
+ITS OWN LINES NEVER READ AS A SUITE'S COUNTS. tools/fleet's verdict
+(``fleet.core.verdict``) takes the LAST ``N passed`` and ``N failed`` in a
+check's transcript as the suite's totals, and this command's lines are the
+last a check prints before the budget verdict. So they spell no number
+before either word: on 2026-10-05 the summary read ``3 of 3 passed`` and
+loki's verdict for TankpitBot at dec6ae3f2 reported ``tests=3p`` for a suite
+of over seven thousand.
 """
 
 from __future__ import annotations
@@ -76,7 +84,7 @@ def run_targets_concurrently(package_directory: Path, targets: Sequence[str]) ->
         )
         return failed[0][1]
     _test_hooks.write_line("")
-    _test_hooks.write_line(f"concurrent: {len(targets)} of {len(targets)} passed ({summary})")
+    _test_hooks.write_line(f"concurrent: every target succeeded ({summary})")
     return 0
 
 
