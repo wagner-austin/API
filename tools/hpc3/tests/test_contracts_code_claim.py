@@ -56,9 +56,10 @@ class TestReadingTheClaim:
 
     def test_a_full_forty_character_sha_is_accepted(self) -> None:
         sha = "80221ea1056e08aacd3f5ee01e6c599e166970be"
-        claim = code_claim({REPO_COMMIT_KEY: sha, REPO_TREE_KEY: _TREE})
-        assert claim is not None
-        assert claim["commit"] == sha
+        assert code_claim({REPO_COMMIT_KEY: sha, REPO_TREE_KEY: _TREE}) == {
+            "tree": _TREE,
+            "commit": sha,
+        }
 
     def test_a_commit_without_its_tree_is_refused_naming_the_tree(self) -> None:
         """Rung 5's shape: a commit, and nothing saying which checkout it describes."""
