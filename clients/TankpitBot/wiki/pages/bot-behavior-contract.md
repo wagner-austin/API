@@ -9,9 +9,6 @@ related:
 source_paths:
   - "src/tankpit_bot/bot"
   - "src/tankpit_bot/sniffer"
-source_git_blobs:
-  "src/tankpit_bot/bot": "2c1f9aee03ec2ec1c1cdc77fade29c5beb82ef8e"
-  "src/tankpit_bot/sniffer": "3838aaabbb5dc3a9783af371cfd6afaebef7a21e"
 provenance:
   - "runs/bot/latest.events.jsonl -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-29"

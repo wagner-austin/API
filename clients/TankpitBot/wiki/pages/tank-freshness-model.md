@@ -8,8 +8,6 @@ related:
   - "[[server-push-gating]]"
 source_paths:
   - "src/tankpit_bot/state"
-source_git_blobs:
-  "src/tankpit_bot/state": "3d5819f5304e97e195d8f0fa44ae930ced2ce573"
 provenance:
   - "runs/bot/bot-20260619-050303.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
   - "runs/bot/bot-20260620-191622.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"

@@ -6,8 +6,6 @@ related:
   - "[[inheritance-chain]]"
 source_paths:
   - "src/tankpit_bot"
-source_git_blobs:
-  "src/tankpit_bot": "500aa9a71a62f8fafa8d0428d595562935a5b8bb"
 fact_checked: "2026-09-05"
 confidence: high
 hubs: [codebase]

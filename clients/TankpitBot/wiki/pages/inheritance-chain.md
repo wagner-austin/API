@@ -5,8 +5,6 @@ related:
   - "[[coding-standards]]"
 source_paths:
   - "src/tankpit_bot"
-source_git_blobs:
-  "src/tankpit_bot": "0c8b596c7022a130d131f51e210c6945bbb59cd8"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture]

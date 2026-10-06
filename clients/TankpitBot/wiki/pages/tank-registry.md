@@ -6,8 +6,6 @@ related:
   - "[[shot-range]]"
 source_paths:
   - "src/tankpit_bot/state"
-source_git_blobs:
-  "src/tankpit_bot/state": "ee69b98f73b49ec8fe8473fc38c53cbd330d0f86"
 provenance:
   - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
   - "runs/probe -- gitignored probe capture artifacts (the page snapshots behind the bookkeeping-field table)"

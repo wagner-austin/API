@@ -8,8 +8,6 @@ related:
   - "[[mine-mechanics]]"
 source_paths:
   - "src/tankpit_bot/bot"
-source_git_blobs:
-  "src/tankpit_bot/bot": "6816b2568371fabe3982cf4adddba153e1ad44b9"
 provenance:
   - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"

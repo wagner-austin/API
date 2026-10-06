@@ -75,9 +75,9 @@ related:
   - "[[other-slug]]"
 source_paths:                       # repo-relative paths this page rests on
   - "src/tankpit_bot/bot/ai"
-  - "runs/bot/bot-20260619-053210.capture_session.json"
-source_git_blobs:                   # tree/blob the page was last audited against
-  "src/tankpit_bot/bot/ai": "15e99c69d071cba99f5214df9f14de712355dba3"
+  - "src/tankpit_bot/bot/ai/combat_target.py"
+source_git_blobs:                   # FILE blobs the page was last audited against
+  "src/tankpit_bot/bot/ai/combat_target.py": "15e99c69d071cba99f5214df9f14de712355dba3"
 fact_checked: "2026-07-31"          # when claims were last confirmed
 confidence: high                    # high | medium | low
 hubs: [architecture]                # hub(s) linking this page
@@ -108,9 +108,9 @@ tick_n 49-778)" is footnote material, per the citation rules above. The legacy
 free-text `sources:` field was retired 2026-07-31; its one remaining user
 migrated to `source_paths` plus footnotes.
 
-`source_git_blobs` maps a `source_paths` entry to the git tree/blob hash the
-page was **last audited against**. It is a staleness marker, not a version pin:
-a lagging anchor means "nobody has re-read this page since that tree," and the
+`source_git_blobs` maps a `source_paths` FILE to the git blob hash the page
+was **last audited against**. It is a staleness marker, not a version pin:
+a lagging anchor means "nobody has re-read this page since that blob," and the
 honest response is to audit the page and then move the anchor. **Never bump an
 anchor without re-reading the page** — that launders unverified prose as
 verified. The guard checks that anchored paths exist and hashes are well-formed
@@ -118,12 +118,17 @@ verified. The guard checks that anchored paths exist and hashes are well-formed
 that would redden the gate on every source commit and reward exactly the
 bump-without-audit it is meant to prevent.
 
+A directory may be cited in `source_paths` but never pinned (board task
+a6b2c4c9, 2026-10-06). Its tree hash changes with every commit beneath it —
+`src/tankpit_bot` took 122 in 14 days — so a directory pin said a commit
+happened and never which file moved, while `module-map` carried three false
+file citations it never pointed at. `wiki-structure` and wiki-check's
+`git-blob-hash-pin` both refuse one; pin the files the page's claims rest on.
+
 Drift is surfaced by a report instead: **`make wiki-anchors`**
 (`scripts/wiki_anchors.py`) resolves every anchor against HEAD and lists the
 pages owed an audit, with each page's `fact_checked` date for triage order.
-It always exits 0 unless you pass `--exit-code`. Note that a whole-package
-anchor (`src/tankpit_bot`) goes stale on ANY change inside that package, so
-expect churn there; a file-level anchor is narrower and quieter.
+It always exits 0 unless you pass `--exit-code`.
 
 ## Cross-references
 

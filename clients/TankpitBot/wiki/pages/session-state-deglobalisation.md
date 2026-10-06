@@ -16,8 +16,6 @@ source_paths:
   - "src/tankpit_bot/runtime_logging_handlers.py"
   - "tests/conftest.py"
 source_git_blobs:
-  "src/tankpit_bot/sniffer": "3838aaabbb5dc3a9783af371cfd6afaebef7a21e"
-  "src/tankpit_bot/ledger": "cd0c48b58ce3f3e46a991b8d3efc9b0985d9a42f"
   "src/tankpit_bot/capture/xor.py": "01a8945e660c744bce89bdc4956a5586c8c10517"
   "src/tankpit_bot/protocol/codec.py": "b69f89bd1bf4e550a56f48a7761f91acbf35f9e1"
   "src/tankpit_bot/runtime_context.py": "a2f16cdc52ac9a0e707cc6d0a3a72e59982bcb9f"

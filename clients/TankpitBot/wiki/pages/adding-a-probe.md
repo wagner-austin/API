@@ -8,8 +8,6 @@ related:
   - "[[make-targets]]"
 source_paths:
   - "src/tankpit_bot/action_lab"
-source_git_blobs:
-  "src/tankpit_bot/action_lab": "0629f1ba13d0067cec09a6bb70b249d83b2b6bc8"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]

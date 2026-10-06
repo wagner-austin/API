@@ -11,9 +11,7 @@ source_paths:
   - "edge/nginx.conf"
   - "docker-compose.yml"
 source_git_blobs:
-  "src/tankpit_bot/service": "bebfcf846003f6619ea2a44fd08bcdd1b2cfe407"
   "src/tankpit_bot/bot/config.py": "4d54f7e356112888c83a5788b923dfa1130b6ec8"
-  "src/tankpit_bot/stream": "b24edbdd53f315d07737060e1b11fa8dfe003bbd"
   "edge/nginx.conf": "c333d658863ec86f1ab76a585fe887b3d29169dc"
   "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
 fact_checked: "2026-09-28"
