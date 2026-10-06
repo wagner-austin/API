@@ -5,13 +5,17 @@ related:
   - "[[cleargbm-decorative-knob-class]]"
   - "[[cleargbm-leaf-normalized-benchmarking]]"
   - "[[cleargbm-perf-leaf-wise-growth]]"
+  - "[[cleargbm-hpc3-farm-and-rw-value]]"
 source_paths:
   - libs/cleargbm_rs/src/training/train.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md
+  - tools/hpc3/runs/sweep-cleargbm-p6-rung5.json
 source_git_blobs:
   "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": f544b40fa8e4619fbe29c525bd1ef8d694c4ecd9
+  "tools/hpc3/runs/sweep-cleargbm-p6-rung5.json": 046840c974fd8fc473e316173e8985f8eaaa6dda
 provenance:
+  - "rung 5's attribution added 2026-10-06 (board task 2cca4a98): the sweep document now declares repo_commit 80221ea with repo_tree /pub/wagnera3/api, read at blob 046840c9; the measurement behind it (checkout reflog, sacct submit times, null image digests in the ledger) is recorded once, on [[cleargbm-hpc3-farm-and-rw-value]], and is not restated here."
   - "repinned 2026-09-11 on a mechanical argument rather than a re-reading: the knob-closure document's diff from the pinned blob to HEAD is +42/-0, a Power section appended by the power audit (board 1e4ab572). Nothing was removed or altered, so every line this page could have cited is still present byte-identical. Check with: git diff eeac3932d433742870ccadf0286d691348b3cc11 f544b40fa8e4619fbe29c525bd1ef8d694c4ecd9"
   - "THE APPENDED SECTION IS ADVERSE TO THE DOCUMENT IT SITS IN, which is worth a reader's attention even though it cannot stale a citation: it argues that the document's 'statistical wash on the mean' is a null reported without the effect its instrument could have resolved."
 fact_checked: "2026-08-22"
@@ -172,8 +176,12 @@ The primary operator of this library is an AI session. Therefore:
   polish by 0.0012 and us by 4 points — the us gap measured to be a
   TUNING-SURFACE asymmetry (ClearGBM's space never samples
   max_features/colsample/reg_lambda, knobs the engine has), the named
-  successor: search-space parity. Distributed/GPU training only when
-  single-node ceilings measurably bind.
+  successor: search-space parity. Rung 5's figures were produced by
+  commit `80221ea` in the cluster checkout, not by the `20d9159` its
+  sweep document declared until 2026-10-05 (board task `2cca4a98`); the
+  figures stand and only their attribution moved, with the evidence on
+  [[cleargbm-hpc3-farm-and-rw-value]][^rung5-commit]. Distributed/GPU
+  training only when single-node ceilings measurably bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).
@@ -193,3 +201,5 @@ the us binary head-to-head; financial_distress is a near-tie nominally
 led by xgboost; ~1.31x wall clock, 0.86x per leaf. The program wins when
 the quality column leads everywhere it matters and nobody has to squint
 at an asterisk.
+
+[^rung5-commit]: `tools/hpc3/runs/sweep-cleargbm-p6-rung5.json:10`, `repo_commit`.
