@@ -103,6 +103,19 @@ describe("the lobby half", () => {
     expect(client.phase).toBe(Phase.Playing);
   });
 
+  it("keeps the rows listed after its own room without selecting again, and refuses one after the confirm", async () => {
+    const { client, sink, handlers } = await rig();
+    handlers.open();
+    handlers.message(lobby("+5|World (field05)|5|1,1,1,0,1,0,0|2|n|field05.gif|2026"));
+    handlers.message(lobby("+7|World (field07)|7|1,1,1,0,1,0,0|2|n|field07.gif|2026"));
+    expect([client.phase, client.rooms.map((room) => room.roomId)]).toEqual([Phase.Selected, ["5", "7"]]);
+    expect(sink.frames()).toEqual(["%AUTH !be 1001|token-of-austin|0 magic5uk3et4", "*5"]);
+    handlers.message(lobby("=5|Oct. 05, 2026|austin|3|9|9|9|9"));
+    expect(() => handlers.message(lobby("+9|World (field09)|9|1,1,1,0,1,0,0|2|n|field09.gif|2026"))).toThrow(
+      "LOBBY_ORDER: room 9's listing arrived in phase entering, not lobby",
+    );
+  });
+
   it("refuses a lobby reply out of turn", async () => {
     const { handlers } = await rig();
     expect(() => handlers.message(lobby("+5|World (field05)|5|1,1,1,0,1,0,0|2|n|field05.gif|2026"))).toThrow(
