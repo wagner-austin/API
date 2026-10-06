@@ -24,10 +24,15 @@ from fleet.contracts.runners import (
     encode_host_runner_spec,
     encode_runner_spec,
 )
+from fleet.contracts.tagged_tools import TAGGED_TOOLS
+from fleet.contracts.workspace import decode_fleet_workspace
 from tests._runner_fixtures import base_json, ci_slice_json
 
 #: The shipped roster, resolved from this file so the test runs from any cwd.
 SHIPPED_ROSTER = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
+
+#: The shipped fleet registry beside it, which names the nodes runners claim as.
+SHIPPED_WORKSPACE = pathlib.Path(__file__).resolve().parent.parent / "fleet.json"
 
 
 def _install(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -374,3 +379,30 @@ class TestRunnerSpec:
         }
         assert lavender["base"]["execution_policy"] == "RemoteSigned"
         assert lavender["base"]["disk"]["baseline_gb"] < lavender["base"]["disk"]["ceiling_gb"]
+
+    def test_a_distro_that_is_a_fleet_node_installs_every_tagged_tool_apt_supplies(self) -> None:
+        """A rebuild never takes a capability tag away from a fleet node.
+
+        lavender's distro is both a CI runner host here and the fleet node
+        lavender-wsl in fleet.json, whose runner claims with the tags its
+        probe finds each tick. A tagged tool installed by hand there would be
+        lost on the next ``--rebuild``, and every job needing its tag would
+        silently wait for another node: on 2026-10-05 no node had go, and MCPs
+        rcs-bridge's check had nowhere to run (MCPs board task 1da15750). So
+        the roster's base installs each tagged tool's apt-get package.
+        """
+        spec = decode_runner_spec(load_json_str(SHIPPED_ROSTER.read_text(encoding="utf-8")))
+        workspace = decode_fleet_workspace(
+            load_json_str(SHIPPED_WORKSPACE.read_text(encoding="utf-8"))
+        )
+        wsl_hosts = {node["wsl_host"] for node in workspace["nodes"].values()}
+        apt_supplied = {
+            tool["install"]["apt-get"].split()[-1]
+            for tool in TAGGED_TOOLS
+            if "apt-get" in tool["install"]
+        }
+        assert apt_supplied == {"ffmpeg", "golang-go"}
+        node_hosts = [host for host in spec["hosts"] if host["name"] in wsl_hosts]
+        assert [host["name"] for host in node_hosts] == ["lavender"]
+        for host in node_hosts:
+            assert apt_supplied <= set(host["base"]["apt_packages"]), host["name"]
