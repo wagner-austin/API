@@ -224,11 +224,13 @@ citation checkable at all.
 
 - **Every page declares `source_paths:`** — repo paths relative to that
   wiki's `workspaceRoot`, which must resolve at audit time.
-- **Every `source_paths:` entry gets a `source_git_blobs:` pin.**
+- **Every `source_paths:` FILE gets a `source_git_blobs:` pin.**
   `source-path-exists` only proves the path still resolves, which stays true
   across a total rewrite of the file. `git-blob-hash-pin` is the only rule
   that catches drift, and it fires ONLY on pinned paths. An unpinned citation
-  is a claim nothing will ever re-check.
+  is a claim nothing will ever re-check. A DIRECTORY is cited but never
+  pinned: its tree hash moves with every commit beneath it, so the rule
+  refuses the pin (board task a6b2c4c9); pin the files the claims rest on.
 - **Evidence that is not a repo path goes in `provenance:`**, not in
   `source_paths:` — probe job ids, `sshare` readings, cluster paths under
   `/pub`, and citations that genuinely point outside the wiki's
