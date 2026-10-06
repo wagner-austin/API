@@ -35,6 +35,7 @@ from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
 from websockets.asyncio.server import ServerConnection, broadcast, serve
 
+from tankpit_bot import _test_hooks
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.sim.net_accounts import AccountBookProtocol, load_account_book
 from tankpit_bot.sim.net_host import NetHost
@@ -118,21 +119,29 @@ class NetServer:
             broadcast([self._sockets[connection_id]], base64.b64decode(payload))
         return len(payloads)
 
-    async def tick_for(self, ticks: int | None, interval_seconds: float) -> int:
-        """Tick at the wire's cadence, for a number of ticks or forever.
+    async def tick_for(
+        self, ticks: int | None, interval_seconds: float, stop: asyncio.Event
+    ) -> int:
+        """Tick at the wire's cadence until the count is played or a stop is asked for.
+
+        The pause after each tick ends early when ``stop`` is set, so a
+        shutdown does not wait out a two-second tick.
 
         Args:
-            ticks: How many ticks to play; None never stops.
+            ticks: How many ticks to play; None plays until stopped.
             interval_seconds: The pause after each tick.
+            stop: Set to end the loop after the current tick.
 
         Returns:
             How many ticks were played.
         """
+        stopped = asyncio.ensure_future(stop.wait())
         played = 0
-        while ticks is None or played < ticks:
+        while (ticks is None or played < ticks) and not stop.is_set():
             self.tick()
             played += 1
-            await asyncio.sleep(interval_seconds)
+            await asyncio.wait({stopped}, timeout=interval_seconds)
+        stopped.cancel()
         return played
 
 
@@ -282,7 +291,12 @@ def build_host(args: ServeArgs, accounts: AccountBookProtocol) -> NetHost:
 
 
 async def serve_rooms(server: NetServer, args: ServeArgs) -> int:
-    """Listen on the flags' port and tick until the tick count is played.
+    """Listen on the flags' port and tick until the count is played or a signal stops it.
+
+    SIGINT and SIGTERM (``docker stop``) stop the tick loop rather than
+    the process. Leaving the listener then closes every socket and waits
+    for each handler, so every seat still in play is recorded before the
+    server returns.
 
     Args:
         server: The server to put behind the port.
@@ -291,6 +305,14 @@ async def serve_rooms(server: NetServer, args: ServeArgs) -> int:
     Returns:
         How many ticks were played.
     """
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    def request_stop() -> None:
+        """Ask the tick loop to stop; a signal handler may run outside the loop."""
+        loop.call_soon_threadsafe(stop.set)
+
+    _test_hooks.install_signal_handlers(request_stop)
     async with serve(server.handle, args.bind, args.port) as listening:
         # getsockname() is Any in typeshed, the address shape varying by
         # family; this listener is TCP, so it is a (host, port) pair.
@@ -301,7 +323,7 @@ async def serve_rooms(server: NetServer, args: ServeArgs) -> int:
             bound[1],
             ", ".join(room.info["room_id"] for room in server.host.rooms),
         )
-        return await server.tick_for(args.ticks, args.tick_ms / 1000)
+        return await server.tick_for(args.ticks, args.tick_ms / 1000, stop)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
