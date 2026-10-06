@@ -1,6 +1,6 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (28 pages)
+Codebase design decisions, patterns, and coding standards. (29 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
@@ -32,6 +32,7 @@ Codebase design decisions, patterns, and coding standards. (28 pages)
 [Packaged Data Assets](../pages/packaged-data-assets.md) -- the wheel shipped neither the XOR key nor the 45 minimaps, so two consumers each rebuilt the data environment by hand; the two assets failed by DIFFERENT mechanisms, and the env override was what let the defect survive
 [Multiplayer Field](../pages/multiplayer-field.md) -- several production bots on one sim server: `tankpit-sim-run --clients N`, rival seating, a contextvars context and a connection per bot, a bot that exits leaving through `disconnect` and its 0x29, the join-gated 0x28, and the finding that the bot's risk model refuses a mirror duel
 [Sim Network Server](../pages/sim-network-server.md) -- the sim's rooms over WebSockets: `tankpit-sim-serve`, the page client's own bytes, AUTH against this server's accounts (token digests only), seating on the entered troop, the one command/lobby split, and the archived join burst read back through the production decoder
+[Sim Renderer](../pages/sim-renderer.md) -- the TypeScript client's drawing in `web/`: the client's six layers, scaled context, 18x18 dirty-tile grid, per-tank dirty rects and toolbar hit regions, drawing whatever a decoded sprite manifest names; the default pack is our own art painted at start-up, and the pack preview page
 [Sim World Parameterization](../pages/sim-world-parameterization.md) -- the run stamp silently chose the practice layout AND the container-population seed; why the two cluster blockers are one defect, and the --layout / --population-seed / --runs-root shape a sweep member must use
 [Feature Corpus Provenance](../pages/feature-corpus-provenance.md) -- the tick table shipped with no digest, fingerprint or run record; the two configurations and why only the derivation is recorded; digests over decoded text so a Windows export and its Linux copy are one input
 [Project History](../pages/project-history.md) -- the eight-month arc: which package arrived when, what superseded what, and the three lessons learned more than once

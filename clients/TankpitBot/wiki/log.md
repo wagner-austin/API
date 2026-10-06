@@ -6609,3 +6609,16 @@ platform's Traefik" and "Stopping keeps every seat".
 - Live on the hub: a client joined through Traefik and its quit was
   recorded; `docker stop` with a player seated closed the socket with
   1001, the server exited 0 and the seat was recorded.
+
+---
+
+## [2026-10-06] create | Sim renderer
+
+Board task b008ab91, Phase 5. New page [[sim-renderer]] (architecture
+hub, now 29 pages; index 88).
+- `clients/TankpitBot/web` is the TypeScript renderer: the client's six
+  layers, scaled context, dirty-tile grid, per-tank dirty rects and
+  toolbar regions, drawing only what a decoded sprite manifest names.
+- The default pack is our own art painted at start-up; the preview page
+  rendered every frame in real Chromium at scale 2 with no page error.
+- Registered as its own fleet project, `clients/TankpitBot/web`.
