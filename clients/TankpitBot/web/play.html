@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sim field</title>
+    <style>
+      body { margin: 16px; background: #15171a; color: #d8dce2; font: 14px system-ui, sans-serif; }
+      form { display: grid; grid-template-columns: max-content 16rem; gap: 6px 10px; margin-bottom: 12px; }
+      form[hidden] { display: none; }
+      input, button { font: inherit; }
+      #game { image-rendering: pixelated; cursor: crosshair; }
+      #status { margin: 8px 0; color: #a8b0bc; }
+    </style>
+  </head>
+  <body>
+    <form id="join">
+      <label for="account">Account</label><input id="account" autocomplete="username" required />
+      <label for="token">Token</label><input id="token" type="password" autocomplete="current-password" required />
+      <label for="room">Room</label><input id="room" value="1" required />
+      <label for="troop">Troop (0 to 3)</label><input id="troop" type="number" min="0" max="3" value="2" required />
+      <span></span><button type="submit">Join</button>
+    </form>
+    <p id="status">not joined</p>
+    <div id="game"></div>
+    <script type="module">
+      import { startPlay } from "./dist/play.js";
+      await startPlay(window);
+    </script>
+  </body>
+</html>
