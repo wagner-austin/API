@@ -488,7 +488,10 @@ outage on 2026-10-05 showed a host process needed a check a closure could
 cite; no fleet node had go that day, and a node without it is offered
 `winget install --id GoLang.Go`, `choco install golang` or
 `sudo apt-get install -y golang-go` (any go from 1.21 fetches the 1.27.1
-toolchain the module names). Installing a tool therefore makes a
+toolchain the module names). lavender's distro, which is the node
+lavender-wsl, gets go and ffmpeg from `runners.json`'s base `apt_packages`, so
+a `--rebuild` keeps both tags, and `test_runner_contracts.py` fails if a tagged
+tool apt can supply is missing from that list. Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
 disappears takes its tag with it. Each difference from `fleet.json` is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its

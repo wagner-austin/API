@@ -181,6 +181,7 @@
           "pkg-config",
           "postgresql-client",
           "ffmpeg",
+          "golang-go",
           "curl",
           "pipx",
           "git",
