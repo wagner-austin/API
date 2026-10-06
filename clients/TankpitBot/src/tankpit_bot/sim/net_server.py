@@ -16,6 +16,9 @@ handler, which the WebSocket library ends with a 1011 close while every
 other connection plays on; the handler's ``finally`` takes the tank off
 the field either way.
 
+The same port answers a browser's plain HTTP requests with the play page,
+the built client and what that client fetches (:mod:`tankpit_bot.sim.net_web`).
+
 The accounts are this server's own (:mod:`tankpit_bot.sim.net_accounts`),
 never tankpit.com's, kept in a JSON file or in the ``tankpit_sim``
 Postgres database (:mod:`tankpit_bot.sim.net_store`).
@@ -41,6 +44,7 @@ from tankpit_bot.sim.net_accounts import AccountBookProtocol, load_account_book
 from tankpit_bot.sim.net_host import NetHost
 from tankpit_bot.sim.net_room import NetError, field_room_info, open_field_room
 from tankpit_bot.sim.net_store import PostgresAccountBook, connect_store, ensure_schema
+from tankpit_bot.sim.net_web import WebPages
 
 log = get_logger(__name__)
 
@@ -59,6 +63,7 @@ _SERVE_FLAGS = frozenset(
         "--tick-ms",
         "--layout",
         "--population-seed",
+        "--web-root",
     }
 )
 """Every flag ``tankpit-sim-serve`` reads; each takes one value."""
@@ -173,6 +178,9 @@ class ServeArgs(NamedTuple):
             smoke run may fast-forward.
         layout: The practice layout's provenance; None derives it per room.
         population_seed: The container seed; None derives it per room.
+        web_root: The built web package (``play.html`` and ``dist/``) the
+            port serves to browsers; None serves no page
+            (:mod:`tankpit_bot.sim.net_web`).
     """
 
     bind: str
@@ -183,6 +191,7 @@ class ServeArgs(NamedTuple):
     tick_ms: int
     layout: str | None
     population_seed: int | None
+    web_root: str | None
 
 
 def parse_serve_args(argv: Sequence[str]) -> ServeArgs:
@@ -228,6 +237,7 @@ def parse_serve_args(argv: Sequence[str]) -> ServeArgs:
         tick_ms=int(values.get("--tick-ms", str(TICK_RATE_MS))),
         layout=values.get("--layout"),
         population_seed=None if seed is None else int(seed),
+        web_root=values.get("--web-root"),
     )
 
 
@@ -313,7 +323,10 @@ async def serve_rooms(server: NetServer, args: ServeArgs) -> int:
         loop.call_soon_threadsafe(stop.set)
 
     _test_hooks.install_signal_handlers(request_stop)
-    async with serve(server.handle, args.bind, args.port) as listening:
+    pages = WebPages(None if args.web_root is None else Path(args.web_root), server.host.rooms)
+    async with serve(
+        server.handle, args.bind, args.port, process_request=pages.answer
+    ) as listening:
         # getsockname() is Any in typeshed, the address shape varying by
         # family; this listener is TCP, so it is a (host, port) pair.
         bound: tuple[str, int] = next(iter(listening.sockets)).getsockname()
@@ -333,7 +346,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: ``--accounts PATH`` or ``--database-env NAME``, and
             optionally ``--bind ADDR``, ``--port N``, ``--room
             ID:FIELD:MODE`` (repeatable), ``--ticks N``, ``--tick-ms N``,
-            ``--layout NAME``, ``--population-seed N``. Uses
+            ``--layout NAME``, ``--population-seed N``, ``--web-root DIR``. Uses
             ``sys.argv[1:]`` when None.
 
     Returns:
