@@ -1,0 +1,47 @@
+{
+  "name": "tankpit-sim",
+  "services": {
+    "sim": {
+      "build": {
+        "context": "../..",
+        "dockerfile": "clients/TankpitBot/Dockerfile"
+      },
+      "image": "${SIM_IMAGE:-tankpit-bot:local}",
+      "command": [
+        "tankpit-sim-serve",
+        "--database-env",
+        "TANKPIT_SIM_DATABASE_URL",
+        "--bind",
+        "0.0.0.0",
+        "--port",
+        "8765",
+        "--room",
+        "1:field01:p",
+        "--room",
+        "5:field05:n"
+      ],
+      "environment": {
+        "TANKPIT_SIM_DATABASE_URL": "${TANKPIT_SIM_DATABASE_URL:-postgresql://covenant:covenant@platform-postgres:5432/tankpit_sim}"
+      },
+      "labels": [
+        "traefik.enable=true",
+        "traefik.http.routers.tankpit-sim.rule=PathPrefix(`/tankpit-sim`)",
+        "traefik.http.routers.tankpit-sim.entrypoints=web",
+        "traefik.http.routers.tankpit-sim.middlewares=tankpit-sim-strip",
+        "traefik.http.middlewares.tankpit-sim-strip.stripprefix.prefixes=/tankpit-sim",
+        "traefik.http.services.tankpit-sim.loadbalancer.server.port=8765",
+        "traefik.docker.network=platform-network"
+      ],
+      "networks": [
+        "platform-network"
+      ],
+      "stop_grace_period": "15s",
+      "restart": "unless-stopped"
+    }
+  },
+  "networks": {
+    "platform-network": {
+      "external": true
+    }
+  }
+}
