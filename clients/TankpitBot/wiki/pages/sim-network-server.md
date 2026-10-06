@@ -21,7 +21,7 @@ source_paths:
   - "tests/sim/test_net_host.py"
   - "tests/sim/test_net_room.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/net_server.py": "b999e30c2c1666f3270a8ba48a09cdf071541a0d"
+  "src/tankpit_bot/sim/net_server.py": "00c9ed1231acb3bcf761357abf9d5844fe5d9897"
   "src/tankpit_bot/sim/net_host.py": "faaa8be06944b58216788115e4cbc7192a83ad83"
   "src/tankpit_bot/sim/net_room.py": "f242a4ba888b471670e9f58f92847b12fe18c27e"
   "src/tankpit_bot/sim/net_accounts.py": "1b08e40f5533385aad8e9c5cca88514fbdb9328d"
@@ -30,7 +30,7 @@ source_git_blobs:
   "tests/sim/test_net_store.py": "37e21282a3bceb279091f9d161eaaf74f479bced"
   "src/tankpit_bot/sim/lobby.py": "a3c4eedb0230aca2f075c0434c8caeb54656674e"
   "src/tankpit_bot/sim/transport.py": "b84317e74e3aca75c007b1e26bff8d8b633e4b03"
-  "tests/sim/test_net_server.py": "6c940a431b0db9ff30f85d3cb480d8c9be1ba08c"
+  "tests/sim/test_net_server.py": "0630745d5e5c52469cd810ee9b60732704a62ab3"
   "tests/sim/test_net_host.py": "c16b92cc112c7a223e18231b00b9373440d8c7b0"
   "tests/sim/test_net_room.py": "dd1d028f8c670d461558eaaa28310e2047fe2d49"
 provenance:
@@ -111,6 +111,12 @@ that only tests still called.[^2]
   1011, every other connection plays on, and the handler's `finally`
   unseats the tank.[^3]
 
+**Stopping keeps every seat.** SIGINT and SIGTERM (what `docker stop`
+sends) stop the tick loop, not the process. Leaving the listener then
+closes each socket and waits for its handler, so every seat still in
+play is recorded before the server returns. Python's default SIGTERM
+would have ended the process with those seats unrecorded.[^8]
+
 ## Accounts are this server's own, and they keep what they earn
 
 An account record holds the SHA-256 of its token, never the token, and
@@ -185,3 +191,4 @@ next client.
 [^5]: `tests/sim/test_net_host.py`, `test_enter_game_is_answered_with_the_join_burst_on_the_next_tick` and `test_a_second_player_is_announced_to_the_first_and_its_quit_too`.
 [^6]: `tests/sim/test_net_server.py`, `test_a_client_joins_and_plays_over_a_real_socket`.
 [^7]: `src/tankpit_bot/sim/net_store.py`, `PostgresAccountBook`, `SCHEMA` and `connect_store`; `src/tankpit_bot/sim/net_room.py`, `NetRoom.leave`; `src/tankpit_bot/sim/net_host.py`, `NetHost._unseat`; `tests/sim/test_net_host.py`, `test_a_seat_that_leaves_is_recorded_and_the_account_rejoins_as_it_left`; `tests/sim/test_net_store.py`, `test_a_seat_updates_the_account_and_adds_a_session_in_one_commit`.
+[^8]: `src/tankpit_bot/sim/net_server.py`, `serve_rooms` and `NetServer.tick_for`; `tests/sim/test_net_server.py`, `test_a_signal_stops_the_server_after_the_tick_in_play` and `test_closing_the_listener_records_every_seat_still_in_play`.
