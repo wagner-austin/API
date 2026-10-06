@@ -7,7 +7,7 @@
  * back a distinct canvas per URL; resetHooks undoes it.
  */
 
-import { setHooks } from "../src/_test_hooks.js";
+import { realHooks, setHooks } from "../src/_test_hooks.js";
 import type { Surface } from "../src/scaled_context.js";
 
 /** One recorded drawing call. */
@@ -51,7 +51,7 @@ export interface Fakes {
 }
 
 /**
- * Bind every hook to a recording fake.
+ * Bind the renderer's hooks to recording fakes, the rest to the real ones.
  *
  * @param options - noContext makes every canvas report no 2D context; failUrl makes that URL fail to load.
  * @returns The surfaces handed out, in order, and the images by URL.
@@ -59,6 +59,7 @@ export interface Fakes {
 export function installFakes(options: { readonly noContext?: boolean; readonly failUrl?: string } = {}): Fakes {
   const fakes: Fakes = { surfaces: [], images: new Map(), loaded: [] };
   setHooks({
+    ...realHooks,
     canvasContext: () => {
       if (options.noContext === true) {
         return null;
