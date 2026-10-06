@@ -164,10 +164,22 @@ export class WireClient implements LobbyHandler, SocketHandlers {
     this.listener.changed(this);
   }
 
+  /**
+   * One row of the room list.
+   *
+   * The server sends one row per room in answer to AUTH, and the client
+   * selects its room as soon as that row arrives, so the rows after it
+   * arrive once the client has selected; they are still the list.
+   *
+   * @param room - The row.
+   * @throws LobbyError LOBBY_ORDER for a row before AUTH or after the join confirm.
+   */
   public room(room: LobbyRoom): void {
-    this.expect(Phase.Lobby, `room ${room.roomId}'s listing`);
+    if (this.current !== Phase.Selected) {
+      this.expect(Phase.Lobby, `room ${room.roomId}'s listing`);
+    }
     this.listed.push(room);
-    if (room.roomId === this.options.roomId) {
+    if (this.current === Phase.Lobby && room.roomId === this.options.roomId) {
       this.current = Phase.Selected;
       this.send(selectFrame(room.roomId));
     }
