@@ -69,7 +69,9 @@ The field is `source_paths:`, **not** `sources:`. This wiki runs the `code-paths
 
 ### Blob pinning
 
-`source_git_blobs:` maps a `source_paths:` entry to the `git ls-tree HEAD` blob-hash it was verified against. It is opt-in per page, but **all-or-nothing once opted in**: a page that declares the field must pin every git-tracked entry in its `source_paths:` (untracked artifacts are exempt — they are unpinnable by nature). When the file changes, `git-blob-hash-pin` fails; the fix is to re-verify the page's claims against the new content and *then* repin, never to repin alone.
+`source_git_blobs:` maps a `source_paths:` entry to the `git ls-tree HEAD` blob-hash it was verified against. It is **not opt-in**: every git-tracked FILE in a page's `source_paths:` must be pinned, whether or not the page declares the field (untracked artifacts are exempt — they are unpinnable by nature). When the file changes, the pin is stale and the audit fails; the fix is to re-verify the page's claims against the new content and *then* repin, never to repin alone.
+
+**Only files are pinned** (board task a6b2c4c9, 2026-10-06). A directory in `source_paths:` needs no pin, and a pin on one is a `git-blob-hash-pin` finding, fresh or stale: a tree's hash changes with every commit beneath it, so it says a commit happened and never which file moved. `source-path-exists` still checks that a cited directory resolves; a page that wants a staleness signal pins the files its claims rest on.
 
 ### Verifying a page
 
