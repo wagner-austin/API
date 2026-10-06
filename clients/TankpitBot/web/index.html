@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sim pack preview</title>
+    <style>
+      body { margin: 16px; background: #15171a; color: #d8dce2; font: 14px system-ui, sans-serif; }
+      #game { image-rendering: pixelated; }
+    </style>
+  </head>
+  <body>
+    <p>Every frame of a sprite pack. Add <code>?pack=&lt;manifest URL&gt;</code> to preview another pack.</p>
+    <div id="game"></div>
+    <script type="module">
+      import { startPreview } from "./dist/preview.js";
+      await startPreview(window);
+    </script>
+  </body>
+</html>
