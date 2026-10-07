@@ -37,6 +37,7 @@ from platform_core.json_utils import (
     dump_json_str,
     load_json_bytes,
     narrow_json_to_dict,
+    require_bool,
     require_list,
     require_str,
 )
@@ -60,10 +61,15 @@ class AskSpec(TypedDict):
     """One ask, as the audit states it and the board's writer takes it.
 
     Attributes:
-        kind: The ask's kind; the audit states ``critical``.
+        kind: The ask's kind, which decides whether the operator is texted
+            or a board task is filed (MCPs board task db98562b); the audit
+            states ``decision``, filed in its room.
         key: The producer's stable name for it.
         subjectTaskId: The task it is about, or None.
         subjectNode: The fleet node it is about, or None.
+        urgent: Whether a texted kind is texted at once; False for a filed one.
+        cause: The failure it stems from, shared by every ask it causes, or None.
+        room: The room a filed kind naming no task is filed in, or None.
         what: What happened, with no reading in it.
         why: Why it needs the operator.
         action: The one thing to do.
@@ -73,6 +79,9 @@ class AskSpec(TypedDict):
     key: str
     subjectTaskId: str | None
     subjectNode: str | None
+    urgent: bool
+    cause: str | None
+    room: str | None
     what: str
     why: str
     action: str
@@ -133,6 +142,9 @@ def decode_ask_spec(value: JSONValue) -> AskSpec:
         key=require_str(obj, "key"),
         subjectTaskId=_nullable_str(obj, "subjectTaskId"),
         subjectNode=_nullable_str(obj, "subjectNode"),
+        urgent=require_bool(obj, "urgent"),
+        cause=_nullable_str(obj, "cause"),
+        room=_nullable_str(obj, "room"),
         what=require_str(obj, "what"),
         why=require_str(obj, "why"),
         action=require_str(obj, "action"),
@@ -173,6 +185,9 @@ def encode_ask_spec(ask: AskSpec) -> JSONObject:
         "key": ask["key"],
         "subjectTaskId": ask["subjectTaskId"],
         "subjectNode": ask["subjectNode"],
+        "urgent": ask["urgent"],
+        "cause": ask["cause"],
+        "room": ask["room"],
         "what": ask["what"],
         "why": ask["why"],
         "action": ask["action"],

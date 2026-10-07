@@ -58,14 +58,17 @@ session to tag, so it reaches the sessions subscribed to the standing task
 
 After the journal, each cycle reads `operator-asks.json`, which the audit
 writes beside the journal on every run (MCPs `fleet-mcp/src/operator-asks.ts`,
-board task 1acbf53e): the whole set of `fleet:disk` asks, one critical ask per
-node whose disk is below its floor. When the producer and asks differ from
-what this bridge last stated (recorded in
+board task 1acbf53e): the whole set of `fleet:disk` asks, one decision ask
+per node whose disk is below its floor, filed in room coordination (MCPs
+board task db98562b). Each ask carries the `urgent`, `cause` and `room` its
+kind is routed by, and the bridge refuses a file whose asks lack them. When
+the producer and asks differ from what this bridge last stated (recorded in
 `operator-asks.json.fleet-health-wake-stated.json`, written only after the
 board answers), it checks in and states them with `task_ask_sync`; the board's
 writer opens new asks, keeps unchanged ones and resolves the ones no longer
-stated, and the SMS gateway texts the operator each new one. An unchanged set
-and an absent file are each said in the cycle's report line.
+stated, and the miss audit files each new decision as a task in its room,
+never a text to the operator. An unchanged set and an absent file are each
+said in the cycle's report line.
 
 ## Running
 

@@ -32,18 +32,21 @@ COUNTS: Final = '{"opened":1,"changed":0,"kept":0,"resolved":0}'
 
 #: sedona's ask, as fleet-mcp's ``diskAsk`` words it.
 SEDONA_SPEC: Final[JSONObject] = {
-    "kind": "critical",
+    "kind": "decision",
     "key": "disk-floor:sedona",
     "subjectTaskId": None,
     "subjectNode": "sedona",
+    "urgent": False,
+    "cause": None,
+    "room": "coordination",
     "what": "sedona's free disk is below its floor of 20GB",
     "why": (
-        "a full disk stops every build, container and backup on it, and freeing space "
-        "deletes somebody's data, which only a person decides"
+        "a full disk stops every build, container and backup on it, and what to delete is a "
+        "ruling the room's supervisor or a session makes from the survey"
     ),
     "action": (
-        "see what fills sedona's disk (fleet_status, the fleet disk survey) and decide what "
-        "is deleted or moved"
+        "see what fills sedona's disk (fleet_status, the fleet disk survey), decide what is "
+        "deleted or moved, and free it"
     ),
 }
 
@@ -188,6 +191,21 @@ class TestDecodeStatement:
         assert [(ask["key"], ask["subjectTaskId"]) for ask in statement["asks"]] == [
             ("disk-floor:sedona", None)
         ]
+        (ask,) = statement["asks"]
+        assert (ask["kind"], ask["urgent"], ask["cause"], ask["room"]) == (
+            "decision",
+            False,
+            None,
+            "coordination",
+        )
+
+    def test_refuses_an_ask_written_before_its_route_was_stated(self) -> None:
+        """An ask with no ``urgent`` is the pre-db98562b audit's: refused, never read as false."""
+        ask: JSONObject = {**SEDONA_SPEC}
+        del ask["urgent"]
+        value = load_json_str(dump_json_str({"source": "s", "at": "a", "asks": [ask]}))
+        with pytest.raises(JSONTypeError, match="urgent"):
+            decode_statement(value)
 
     def test_refuses_an_ask_missing_a_nullable_field(self) -> None:
         ask: JSONObject = {"kind": "critical", "key": "k", "subjectTaskId": None}
