@@ -122,6 +122,14 @@ compressed into a line format:
   mid-flight, which ran something before it died. With `jobs=0`, a run
   **evicted from the concurrency queue**, which never created a job at all.
   This bridge never prints the word alone.
+- **A cancelled run is NOT RUN, in those words** (MCPs board task
+  `c04519f9`). MCPs main shares one pending slot, so every push of a burst
+  but the newest gets a run cancelled before any job starts, and the post
+  used to close with "your push has its CI verdict" over it. Now the outcome
+  reads `cancelled -- no job ever ran, NOT RUN` (or `N of M jobs completed,
+  K NOT RUN`), the push gets a `NOT RUN:` line naming its full sha as having
+  no complete verdict, and the mention to the pushing session says how many
+  of its shas were not run, never that it has a verdict.
 - A repository can be green on one workflow and red on another for one sha,
   so a post that named no workflow would be a verdict about no workflow.
 

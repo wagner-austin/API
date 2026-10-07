@@ -72,10 +72,21 @@ group a superseding push stops only the jobs of packages it touches; the
 measured loss was 3 of 42, not 42 of 42.
 
 The phrase still says "may" rather than "are", because whether an unchecked
-window results depends on the repository's ``cancel-in-progress`` setting --
-``wagner-austin/MCPs`` cancels nothing, so it is immune -- and the Actions runs
-API does not expose it. Asserting the stronger form would invent a fact about
-a file this package never reads.
+window results depends on the repository's concurrency settings, which the
+Actions runs API does not expose. Asserting the stronger form would invent a
+fact about a file this package never reads.
+
+A CANCELLED RUN IS NOT RUN, AND THE POST SAYS SO IN THOSE WORDS (MCPs board
+task c04519f9). Since 2026-09-24 ``wagner-austin/MCPs`` gives every push to
+main one shared pending slot (its ``check.yml``), so each push of a burst but
+the newest gets a run that is cancelled before any job starts. That run's
+verdict is no verdict, and the post used to close with "your push has its CI
+verdict" regardless; 49b8cb6a1's never-run tests reached main through that
+silence. So every cancelled run's outcome carries :data:`NOT_RUN`, the push
+gets a line naming its FULL sha as having no complete verdict, and the mention
+tells the pusher how many of their pushes were not run instead of that they
+have a verdict. Still no cause: the count and the words are facts, the reason
+is not in the payload.
 
 FAILURES ARE NOT SOFTENED AND ARE NAMED. A post that said "failure" without
 saying which jobs would send its reader to the run page to learn the thing
@@ -105,6 +116,14 @@ FAILED_CAP: Final = 8
 
 #: How short a sha is rendered. Seven is what git and GitHub both show.
 _SHORT_SHA: Final = 7
+
+#: The words every cancelled run carries, so a cancellation reads as what it
+#: is to anyone scanning a post: work CI never did, not a verdict. MCPs board
+#: task c04519f9: main's shared concurrency slot keeps one pending run and
+#: cancels the rest before any job starts, so an intermediate push of a burst
+#: gets a run that reads ``cancelled`` with nothing executed, and 49b8cb6a1's
+#: wrong tests reached main through exactly that silence.
+NOT_RUN: Final = "NOT RUN"
 
 
 class RunReport(TypedDict):
@@ -167,9 +186,28 @@ def _outcome_phrase(report: RunReport) -> str:
         return run["conclusion"]
     tally = report["tally"]
     if tally["total"] == 0:
-        return "cancelled -- no job ever ran"
+        return f"cancelled -- no job ever ran, {NOT_RUN}"
     survived = tally["total"] - len(tally["cancelled"])
-    return f"cancelled -- {survived} of {tally['total']} jobs completed"
+    return (
+        f"cancelled -- {survived} of {tally['total']} jobs completed, "
+        f"{len(tally['cancelled'])} {NOT_RUN}"
+    )
+
+
+def _is_not_run(report: PushReport) -> bool:
+    """Did CI leave any of this push's runs unfinished by cancelling it?
+
+    Args:
+        report: The decided push and its runs.
+
+    Returns:
+        True when one of its runs ended ``cancelled``: some or all of the
+        push was never checked, whatever the rest of its runs said.
+    """
+    return any(
+        is_terminal(entry["run"]) and entry["run"]["conclusion"] == "cancelled"
+        for entry in report["reports"]
+    )
 
 
 def _jobs_phrase(tally: JobTally) -> str:
@@ -262,6 +300,15 @@ def _push_lines(report: PushReport) -> list[str]:
         outcome = _outcome_phrase(entry)
         lines.append(f"  {run['workflow']} {outcome} -- {_jobs_phrase(entry['tally'])}")
         lines.append(f"  {run['html_url']}")
+    if _is_not_run(report):
+        # The FULL sha, because this is the line a reader acts on: it is what
+        # make check-fleet and every board closure cite, and seven characters
+        # are what gh run list --commit silently matched nothing with.
+        lines.append(
+            f"  {NOT_RUN}: CI cancelled work for {attempt['sha']}, so this sha has no "
+            "complete CI verdict and a cancelled run is not a pass; check it with "
+            "make check-fleet."
+        )
     return lines
 
 
@@ -289,20 +336,28 @@ def _tally_phrase(reports: Sequence[PushReport]) -> str:
     return ", ".join(f"{outcome} x{count}" for outcome, count in sorted(counts.items()))
 
 
-def _mention_line(agent: str) -> str:
+def _mention_line(agent: str, not_run: int) -> str:
     """Address the post, or say plainly that it cannot be addressed.
 
     Args:
         agent: The pushing session's board label, or the empty string.
+        not_run: How many of the post's pushes CI cancelled work for.
 
     Returns:
-        The final line of the body.
+        The final line of the body. A push CI did not run in full is never
+        told it "has its CI verdict": that sentence is how a cancelled run
+        came to read as green.
     """
     if agent == "":
         return (
             "This push exported no BOARD_AGENT_LABEL and its shell had no session "
             "the board has bound, so there is nobody to tag. A session that has "
             "posted a checkin is addressed automatically; a terminal exports it."
+        )
+    if not_run > 0:
+        return (
+            f"@{agent} {not_run} of your pushed sha(s) were not run by CI in full "
+            f"({NOT_RUN}), so they have no CI verdict"
         )
     return f"@{agent} your push has its CI verdict"
 
@@ -326,7 +381,7 @@ def _body(repo: str, agent: str, reports: Sequence[PushReport]) -> str:
         lines.extend(_push_lines(report))
     if len(reports) > LINE_CAP:
         lines.append(f"+{len(reports) - LINE_CAP} more, all in the enrolment record")
-    lines.append(_mention_line(agent))
+    lines.append(_mention_line(agent, sum(_is_not_run(report) for report in reports)))
     return "\n".join(lines)
 
 
@@ -356,6 +411,7 @@ __all__ = [
     "FAILED_CAP",
     "LINE_CAP",
     "MARKER",
+    "NOT_RUN",
     "Announcement",
     "PushReport",
     "RunReport",
