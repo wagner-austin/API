@@ -24,8 +24,9 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/queue/rq_adapter.py": 09a397ac1ad9036bde1c5889f8d1214c6d7b0957
   "services/Model-Trainer/src/model_trainer/core/services/container.py": e3165ede22b989b0679c5b8b3122a95785e107fc
   "services/Model-Trainer/src/model_trainer/cluster/entry.py": 67c8783d843179348bfdcd6b59641fa4cbab6a27
-  "docs/RESEARCH.md": fa186d5df657233450dfac204982ad9eff07173d
+  "docs/RESEARCH.md": 501940c688722b74b5b1a49b1825b2a22e2322e4
 provenance:
+  - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the mi section and its Runs bullet that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "read from code at API commit 2e0511ee7 on 2026-10-05; the CLI module count is a listing of src/model_trainer/cli/ (42 .py files besides __init__, including report and hook modules that are not entry points)"
 fact_checked: "2026-10-05"
 confidence: high

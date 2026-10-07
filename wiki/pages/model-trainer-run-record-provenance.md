@@ -16,8 +16,9 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/run_fingerprint.py": 29b5d9b803fcb6b3cec894100d60d67a0a336bc6
   "libs/platform_core/src/platform_core/comparability.py": eec82a133f44877523c06c45a182bb6cf7a21741
   "libs/platform_core/src/platform_core/run_record.py": 7d3ca55d81674311342b179cbf476a3d61b14dd6
-  "docs/RESEARCH.md": fa186d5df657233450dfac204982ad9eff07173d
+  "docs/RESEARCH.md": 501940c688722b74b5b1a49b1825b2a22e2322e4
 provenance:
+  - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the mi and floor sections and the bullets this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "read from code at API commit 2e0511ee7 on 2026-10-05"
 fact_checked: "2026-10-05"
 confidence: high
