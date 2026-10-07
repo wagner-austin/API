@@ -11,9 +11,11 @@ companion_repository_commands). idle's check reads nothing beside it, and its
 browser project draws with WebGL in Chromium, so it takes slime's tags.
 tree-bot's and Dashboards/rabbit's checks read nothing beside them and run
 their recipes in PowerShell, so each takes a Windows node and installs
-through its own make check (MCPs board task ddd25310). The Dashboards root is
-deliberately absent: its check ends in a provenance gate whose validator
-lives only in a workstation's ``~/.claude/skills``, so no node could run it.
+through its own make check (MCPs board task ddd25310). The Dashboards root's
+check ends in a provenance gate that runs the deliverable-write validator
+against the wikis its articles cite, all found beside the repository as a
+workstation keeps them in ``~/PROJECTS``, so the root carries those five
+repositories as companions under the directory names they have there.
 """
 
 from __future__ import annotations
@@ -21,7 +23,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import load_json_str
 
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
@@ -85,6 +86,34 @@ def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
         install=(),
         companions=(),
     )
-    with pytest.raises(AppError) as excinfo:
-        require_project(workspace, "Dashboards")
-    assert excinfo.value.code is FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN
+
+
+def test_the_dashboards_root_carries_the_validator_and_the_wikis_it_reads() -> None:
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    project = require_project(workspace, "Dashboards")
+    assert project["required_tags"] == (NodeTag.WINDOWS,)
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/Dashboards.git",
+        path="",
+        install=(),
+        companions=(
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/deliverable-write.git",
+                ref="master",
+                directory="deliverable-write",
+            ),
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/wiki.git", ref="main", directory="wiki"
+            ),
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/me-wiki.git",
+                ref="main",
+                directory="me-wiki",
+            ),
+            MCPS_COMPANION,
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/API.git", ref="main", directory="API"
+            ),
+        ),
+    )

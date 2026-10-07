@@ -579,6 +579,24 @@
         "companions": []
       }
     },
+    "Dashboards": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 4,
+      "expected_minutes": 15,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/Dashboards.git",
+        "path": "",
+        "install": [],
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/deliverable-write.git", "ref": "master", "directory": "deliverable-write"},
+          {"remote": "https://github.com/wagner-austin/wiki.git", "ref": "main", "directory": "wiki"},
+          {"remote": "https://github.com/wagner-austin/me-wiki.git", "ref": "main", "directory": "me-wiki"},
+          {"remote": "https://github.com/wagner-austin/MCPs.git", "ref": "main", "directory": "MCPs"},
+          {"remote": "https://github.com/wagner-austin/API.git", "ref": "main", "directory": "API"}
+        ]
+      }
+    },
     "Dashboards/rabbit": {
       "worker_ram_gb": 1.0,
       "minimum_workers": 4,
