@@ -30,13 +30,13 @@ from tests.backends.random_forest._rf_fixtures import (
     _make_synthetic_dataset,
 )
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def test_rf_backend_train_returns_outcome(tmp_path: Path) -> None:
     """RandomForestBackend trains and returns TrainOutcome with all required fields."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10, max_depth=5)
@@ -93,7 +93,7 @@ def test_rf_backend_config_type_validation(tmp_path: Path) -> None:
 def test_rf_backend_predict_proba_after_train(tmp_path: Path) -> None:
     """RandomForestBackend trained model can predict probabilities."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=15)
@@ -111,7 +111,7 @@ def test_rf_backend_predict_proba_after_train(tmp_path: Path) -> None:
 def test_rf_backend_evaluate_computes_metrics(tmp_path: Path) -> None:
     """RandomForestBackend.evaluate computes metrics using loaded model."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=15)
@@ -140,7 +140,7 @@ def test_rf_backend_prepare_raises() -> None:
 def test_rf_backend_save_raises(tmp_path: Path) -> None:
     """RandomForestBackend.save raises RuntimeError."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=5)
@@ -156,7 +156,7 @@ def test_rf_backend_save_raises(tmp_path: Path) -> None:
 def test_rf_backend_load_and_predict(tmp_path: Path) -> None:
     """RandomForestBackend.load loads a trained model that can predict probabilities."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10)
@@ -186,7 +186,7 @@ def test_rf_backend_load_and_predict(tmp_path: Path) -> None:
 def test_rf_backend_feature_importances_returns_none(tmp_path: Path) -> None:
     """RandomForestBackend.get_feature_importances returns None (provided via TrainOutcome)."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=5)
@@ -203,7 +203,7 @@ def test_rf_backend_feature_importances_returns_none(tmp_path: Path) -> None:
 def test_rf_backend_train_without_feature_names(tmp_path: Path) -> None:
     """RandomForestBackend generates feature names if not provided."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y = dataset["x"], dataset["y"]
 
     config = _make_rf_config(n_estimators=10)
@@ -245,7 +245,7 @@ def test_rf_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
 def test_rf_backend_with_progress_callback(tmp_path: Path) -> None:
     """RandomForestBackend calls progress callback with training metrics."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10)

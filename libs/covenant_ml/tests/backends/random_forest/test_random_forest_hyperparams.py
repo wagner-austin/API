@@ -12,13 +12,13 @@ from covenant_ml.backends.random_forest import create_random_forest_backend
 from covenant_ml.explainers.adapters import try_extract_native_tree_model
 from tests.backends.random_forest._rf_fixtures import _invoke_rf_train, _make_rf_config
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def test_rf_backend_with_oob_score(tmp_path: Path) -> None:
     """RandomForestBackend works with OOB score enabled."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=100, bootstrap=True, oob_score=True)
@@ -32,7 +32,7 @@ def test_rf_backend_with_oob_score(tmp_path: Path) -> None:
 def test_rf_backend_without_bootstrap(tmp_path: Path) -> None:
     """RandomForestBackend works without bootstrap (full dataset)."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10, bootstrap=False, oob_score=False)
@@ -45,7 +45,7 @@ def test_rf_backend_without_bootstrap(tmp_path: Path) -> None:
 def test_rf_backend_with_no_max_depth(tmp_path: Path) -> None:
     """RandomForestBackend works with unlimited depth."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10, max_depth=None)
@@ -58,7 +58,7 @@ def test_rf_backend_with_no_max_depth(tmp_path: Path) -> None:
 def test_rf_backend_with_log2_features(tmp_path: Path) -> None:
     """RandomForestBackend works with log2 max_features."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10, max_features="log2")
@@ -71,7 +71,7 @@ def test_rf_backend_with_log2_features(tmp_path: Path) -> None:
 def test_rf_backend_with_high_min_samples(tmp_path: Path) -> None:
     """RandomForestBackend works with high min_samples parameters."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(
@@ -90,7 +90,7 @@ def test_rf_backend_with_high_min_samples(tmp_path: Path) -> None:
 def test_rf_backend_without_class_weight_balance(tmp_path: Path) -> None:
     """RandomForestBackend works without class weight balancing."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=10)
@@ -104,7 +104,7 @@ def test_rf_backend_without_class_weight_balance(tmp_path: Path) -> None:
 def test_rf_backend_feature_importance_ranking(tmp_path: Path) -> None:
     """RandomForestBackend produces correctly ranked feature importances."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=20)
@@ -124,7 +124,7 @@ def test_rf_backend_feature_importance_ranking(tmp_path: Path) -> None:
 def test_rf_backend_config_stored_in_outcome(tmp_path: Path) -> None:
     """RandomForestBackend stores config in TrainOutcome."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=15, max_depth=7)
@@ -138,7 +138,7 @@ def test_rf_backend_config_stored_in_outcome(tmp_path: Path) -> None:
 def test_rf_backend_scale_pos_weight_computed(tmp_path: Path) -> None:
     """RandomForestBackend computes and stores scale_pos_weight."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config()
@@ -151,7 +151,7 @@ def test_rf_backend_scale_pos_weight_computed(tmp_path: Path) -> None:
 def test_rf_backend_single_round_training(tmp_path: Path) -> None:
     """RandomForestBackend always reports single round training."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config()
@@ -166,7 +166,7 @@ def test_rf_backend_single_round_training(tmp_path: Path) -> None:
 def test_rf_backend_different_tree_counts(tmp_path: Path) -> None:
     """RandomForestBackend works with various n_estimators values."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     for n_trees in [5, 10, 25]:
@@ -178,7 +178,7 @@ def test_rf_backend_different_tree_counts(tmp_path: Path) -> None:
 def test_rf_backend_different_depths(tmp_path: Path) -> None:
     """RandomForestBackend works with various max_depth values."""
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     for max_depth in [2, 5, 10]:
@@ -195,7 +195,7 @@ def test_rf_prepared_exposes_the_native_sklearn_model(tmp_path: Path) -> None:
     native handle has to be reachable or shap_tree cannot work here.
     """
     backend = create_random_forest_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_rf_config(n_estimators=5)
