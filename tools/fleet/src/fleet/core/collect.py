@@ -101,20 +101,16 @@ def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
     # A distinct script name from the build's own, so that reading a result
     # cannot overwrite the thing that produced it -- collection runs
     # repeatedly against a directory a build is still writing to.
-    outcome = remote.attempt_script(
+    read = remote.read_script(
         node["host"],
         spoken.script_path(target, names.COLLECT_STEM),
         spoken.result_script(target),
         platform=node["platform"],
     )
-    failure = outcome["failure"]
-    if failure is not None and failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
-        return Polled(result=None, unreachable=failure["message"])
-    if failure is not None:
-        raise AppError(failure["code"], failure["message"])
-    return Polled(
-        result=_read_result(node, run_id=run_id, answer=outcome["output"]), unreachable=None
-    )
+    output = read["output"]
+    if output is None:
+        return Polled(result=None, unreachable=read["unreachable"])
+    return Polled(result=_read_result(node, run_id=run_id, answer=output), unreachable=None)
 
 
 def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:

@@ -377,6 +377,51 @@ def attempt_script(
     return attempt_ssh(host, (*dialect.for_platform(platform).invocation(), remote_path))
 
 
+class Answered(TypedDict):
+    """A script's output from a node that may not have answered.
+
+    Attributes:
+        output: The script's standard output, or None when the node did not
+            answer.
+        unreachable: Why it did not, when ssh could not reach it or timed
+            out; None when it answered.
+    """
+
+    output: str | None
+    unreachable: str | None
+
+
+def read_script(host: str, remote_path: str, body: str, *, platform: NodePlatform) -> Answered:
+    """Run a read on a node, reporting a node that did not answer as a value.
+
+    For a serving runner's reads of the runs it holds (:mod:`fleet.cli.node_watch`):
+    a node that misses one read, lavender-wsl on 2026-10-07 between 02:53Z
+    and 02:55Z say, is read again at the next poll, while a node that
+    answered and failed the read is a fault, raised as :func:`run_script`
+    raises it.
+
+    Args:
+        host: SSH destination.
+        remote_path: Absolute path on the node to write and then execute.
+        body: The script's complete text.
+        platform: The node's declared platform.
+
+    Returns:
+        The output, or why the node did not answer.
+
+    Raises:
+        AppError: With ``DISPATCH_FAILED`` when the node answered and the
+            script failed there.
+    """
+    outcome = attempt_script(host, remote_path, body, platform=platform)
+    failure = outcome["failure"]
+    if failure is None:
+        return Answered(output=outcome["output"], unreachable=None)
+    if failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
+        return Answered(output=None, unreachable=failure["message"])
+    raise AppError(failure["code"], failure["message"])
+
+
 def run_script(host: str, remote_path: str, body: str, *, platform: NodePlatform) -> str:
     """Send a script to a node and run it by path.
 
@@ -439,11 +484,13 @@ __all__ = [
     "SSH_FAILURE",
     "SSH_OPTIONS",
     "SSH_TIMEOUT_SECONDS",
+    "Answered",
     "RemoteFailure",
     "RemoteOutcome",
     "attempt_script",
     "attempt_send",
     "attempt_ssh",
+    "read_script",
     "run_script",
     "run_script_within",
     "run_ssh",
