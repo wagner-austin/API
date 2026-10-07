@@ -35,15 +35,6 @@ BeforeAll {
         return $null -ne (Get-CimInstance Win32_Process -Filter "ProcessId=$Id")
     }
 
-    function Invoke-TaskCleanup {
-        param([string]$Name)
-        if ($null -ne (Get-TaskDefinition $Name)) {
-            $scheduler = New-Object -ComObject Schedule.Service
-            $scheduler.Connect()
-            $scheduler.GetFolder('\').DeleteTask($Name, 0)
-        }
-    }
-
     # A build blocked on a child, as sedona measured it: build.ps1 records its
     # id as a real build does, then waits on a PowerShell child that records
     # its own and sleeps. Both ids go on the case's list for AfterEach.

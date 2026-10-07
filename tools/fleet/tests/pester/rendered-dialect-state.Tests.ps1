@@ -3,7 +3,9 @@ $ErrorActionPreference = 'Stop'
 
 # The Windows dialect's probes and the scripts that make, empty and read a
 # dispatch's directory, executed from their committed copies under rendered/
-# (fleet.core.rendered_powershell, MCPs board task d69786fa, A2). Every
+# (fleet.core.rendered_powershell, MCPs board task d69786fa, A2); the result
+# render, which reads a build's scheduled task, is rendered-dialect-result's
+# (MCPs board task 4e3afe4f). Every
 # location is a parameter defaulting to the example dispatch's, so each case
 # points it at a directory under $TestDrive; the probes read this machine and
 # run as rendered.
@@ -267,18 +269,5 @@ Describe 'What the node reports back' {
         [System.IO.File]::WriteAllText((Join-Path $target 'tree.tgz'), 'abc')
         Invoke-Rendered 'dialect-digest' @{ Target = $target } |
             Should -BeExactly 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
-    }
-    It 'prints nothing while the build has written no result' {
-        $target = Join-Path $TestDrive 'running'
-        [void][System.IO.Directory]::CreateDirectory($target)
-        @(Invoke-Rendered 'dialect-result' @{ Target = $target }).Count | Should -Be 0
-    }
-    It 'prints the status and the UTC epoch second the build wrote it' {
-        $target = Join-Path $TestDrive 'finished'
-        [void][System.IO.Directory]::CreateDirectory($target)
-        $result = Join-Path $target 'result.txt'
-        [System.IO.File]::WriteAllText($result, "3`r`n")
-        [System.IO.File]::SetLastWriteTimeUtc($result, [datetime]::new(2026, 9, 27, 17, 0, 0, [System.DateTimeKind]::Utc))
-        Invoke-Rendered 'dialect-result' @{ Target = $target } | Should -BeExactly '3 1790528400'
     }
 }
