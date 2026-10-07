@@ -26,7 +26,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def _invoke_lightgbm_train(
@@ -93,7 +93,7 @@ def _make_lightgbm_config(
 def test_lightgbm_backend_train_returns_outcome(tmp_path: Path) -> None:
     """LightGBMBackend trains and returns TrainOutcome with all required fields."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LightGBMConfig = {
@@ -140,7 +140,7 @@ def test_lightgbm_backend_train_returns_outcome(tmp_path: Path) -> None:
 def test_lightgbm_backend_train_with_early_stopping(tmp_path: Path) -> None:
     """LightGBMBackend triggers early stopping when validation AUC plateaus."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     # High n_estimators with short early stopping rounds to trigger early stop
@@ -186,7 +186,7 @@ def test_lightgbm_backend_config_type_validation(tmp_path: Path) -> None:
 def test_lightgbm_backend_predict_proba_after_train(tmp_path: Path) -> None:
     """LightGBMBackend trained model can predict probabilities."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=10)
@@ -204,7 +204,7 @@ def test_lightgbm_backend_predict_proba_after_train(tmp_path: Path) -> None:
 def test_lightgbm_backend_evaluate_computes_metrics(tmp_path: Path) -> None:
     """LightGBMBackend.evaluate computes metrics using loaded model."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=15)
@@ -234,7 +234,7 @@ def test_lightgbm_backend_prepare_raises() -> None:
 def test_lightgbm_backend_save_raises(tmp_path: Path) -> None:
     """LightGBMBackend.save raises RuntimeError."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=5)
@@ -250,7 +250,7 @@ def test_lightgbm_backend_save_raises(tmp_path: Path) -> None:
 def test_lightgbm_backend_load_and_predict(tmp_path: Path) -> None:
     """LightGBMBackend.load loads a trained model that can predict probabilities."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=10)
@@ -280,7 +280,7 @@ def test_lightgbm_backend_load_and_predict(tmp_path: Path) -> None:
 def test_lightgbm_backend_feature_importances_returns_none(tmp_path: Path) -> None:
     """LightGBMBackend.get_feature_importances returns None (provided via TrainOutcome)."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=5)
@@ -297,7 +297,7 @@ def test_lightgbm_backend_feature_importances_returns_none(tmp_path: Path) -> No
 def test_lightgbm_backend_with_device_auto(tmp_path: Path) -> None:
     """LightGBMBackend works with device='auto' (resolves to cpu)."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=10)
@@ -314,7 +314,7 @@ def test_lightgbm_backend_with_device_auto(tmp_path: Path) -> None:
 def test_lightgbm_backend_with_regularization(tmp_path: Path) -> None:
     """LightGBMBackend works with L1/L2 regularization."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=15)
@@ -329,7 +329,7 @@ def test_lightgbm_backend_with_regularization(tmp_path: Path) -> None:
 def test_lightgbm_backend_with_subsampling(tmp_path: Path) -> None:
     """LightGBMBackend works with row and column subsampling."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=15)
@@ -344,7 +344,7 @@ def test_lightgbm_backend_with_subsampling(tmp_path: Path) -> None:
 def test_lightgbm_backend_train_without_feature_names(tmp_path: Path) -> None:
     """LightGBMBackend generates feature names if not provided."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y = dataset["x"], dataset["y"]
 
     config = _make_lightgbm_config(n_estimators=10)
@@ -387,7 +387,7 @@ def test_lightgbm_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
 def test_lightgbm_backend_with_progress_callback(tmp_path: Path) -> None:
     """LightGBMBackend calls progress callback with training metrics."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=10)
@@ -448,7 +448,7 @@ def test_lightgbm_backend_capabilities() -> None:
 def test_lightgbm_backend_different_depths(tmp_path: Path) -> None:
     """LightGBMBackend works with various max_depth values."""
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     for max_depth in [2, 4, 6]:
@@ -501,7 +501,7 @@ def test_lightgbm_prepared_exposes_the_native_booster(tmp_path: Path) -> None:
     compatible.
     """
     backend = create_lightgbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_lightgbm_config(n_estimators=5)
