@@ -9,6 +9,11 @@ carries MCPs as a companion at ``main``: the fleet clones it beside the export
 with ``origin/main`` at its real commit (fleet.core.dialect,
 companion_repository_commands). idle's check reads nothing beside it, and its
 browser project draws with WebGL in Chromium, so it takes slime's tags.
+tree-bot's and Dashboards/rabbit's checks read nothing beside them and run
+their recipes in PowerShell, so each takes a Windows node and installs
+through its own make check (MCPs board task ddd25310). The Dashboards root is
+deliberately absent: its check ends in a provenance gate whose validator
+lives only in a workstation's ``~/.claude/skills``, so no node could run it.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import load_json_str
 
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
@@ -47,6 +53,7 @@ MCPS_COMPANION = ProjectCompanion(
         ("hardware-wiki", (), (), (MCPS_COMPANION,)),
         ("metabolomics-dashboard", (NodeTag.WINDOWS,), (), (MCPS_COMPANION,)),
         ("corvis-stick", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
+        ("tree-bot", (NodeTag.WINDOWS,), (), ()),
     ],
 )
 def test_each_repository_s_root_check_is_declared_with_what_it_reads(
@@ -65,3 +72,19 @@ def test_each_repository_s_root_check_is_declared_with_what_it_reads(
         install=install,
         companions=companions,
     )
+
+
+def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    project = require_project(workspace, "Dashboards/rabbit")
+    assert project["required_tags"] == (NodeTag.WINDOWS,)
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/Dashboards.git",
+        path="rabbit",
+        install=(),
+        companions=(),
+    )
+    with pytest.raises(AppError) as excinfo:
+        require_project(workspace, "Dashboards")
+    assert excinfo.value.code is FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN

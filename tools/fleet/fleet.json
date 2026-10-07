@@ -566,6 +566,30 @@
         ]
       }
     },
+    "tree-bot": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 4,
+      "expected_minutes": 15,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/tree-bot.git",
+        "path": "",
+        "install": [],
+        "companions": []
+      }
+    },
+    "Dashboards/rabbit": {
+      "worker_ram_gb": 1.0,
+      "minimum_workers": 4,
+      "expected_minutes": 15,
+      "required_tags": ["windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/Dashboards.git",
+        "path": "rabbit",
+        "install": [],
+        "companions": []
+      }
+    },
     "corvis-stick/execution": {
       "worker_ram_gb": 1.0,
       "minimum_workers": 1,
