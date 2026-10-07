@@ -23,16 +23,19 @@ carry ``None`` into a state machine.
 
 from __future__ import annotations
 
-import re
-from datetime import datetime
 from enum import StrEnum
 
-from platform_core.error_codes_fleet import FleetErrorCode
-from platform_core.errors import AppError
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.json_utils import JSONValue
 from platform_core.members import find_member
 from typing_extensions import TypedDict
 
+from fleet.contracts.queue_answer import (
+    envelope,
+    malformed,
+    require_optional_instant,
+    require_optional_str,
+    require_str,
+)
 from fleet.contracts.tags import NodeTag
 
 
@@ -147,6 +150,12 @@ class DispatchJob(TypedDict):
             decoded, because the collect pass decides from it (MCPs board
             task 5a4f9b3e): a claim whose start never reached the queue is
             matched to the run its tick launched by when that run began.
+        lease_expires_unix: When the holder's lease runs out, whole seconds
+            since the epoch, or None while no lease is set. Decoded because
+            the collect pass renews a running job only once its lease was
+            last set long enough ago (MCPs board task c1d48330,
+            :func:`fleet.cli.node_collected.lease_age`), so a second pass
+            seconds after the first writes nothing to the queue.
     """
 
     job_id: str
@@ -164,105 +173,7 @@ class DispatchJob(TypedDict):
     required_tags: tuple[NodeTag, ...]
     task_id: str | None
     claimed_unix: int | None
-
-
-#: How the tool renders an instant: JavaScript's ``toISOString``, always UTC.
-_INSTANT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z")
-
-
-def _malformed(detail: str, *, answer: str) -> AppError[FleetErrorCode]:
-    """Build the refusal for an answer that is not the documented shape.
-
-    Args:
-        detail: What was wrong, specifically.
-        answer: The whole answer, echoed so the reader sees what arrived.
-
-    Returns:
-        The error to raise.
-    """
-    return AppError(
-        code=FleetErrorCode.QUEUE_ANSWER_MALFORMED,
-        message=(
-            f"the dispatch queue answered a shape this runner cannot read: "
-            f"{detail}. The tool's contract is JSON with named keys, so this "
-            f"means the contract moved and the fix is in the MCPs repo, not "
-            f"here. Received: {answer[:400]}"
-        ),
-    )
-
-
-def _require_str(row: dict[str, JSONValue], key: str, *, answer: str) -> str:
-    """Read one string field.
-
-    Args:
-        row: The decoded object.
-        key: The field name.
-        answer: The whole answer, for the error message.
-
-    Returns:
-        The value.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when absent or not a string.
-    """
-    value = row.get(key)
-    if not isinstance(value, str):
-        raise _malformed(f"field {key!r} is {type(value).__name__}, not a string", answer=answer)
-    return value
-
-
-def _require_optional_str(row: dict[str, JSONValue], key: str, *, answer: str) -> str | None:
-    """Read one nullable string field.
-
-    ``null`` and a missing key are NOT the same here, and the difference is
-    checked: the tool renders every absent value as an explicit ``null``
-    precisely so a consumer can tell "no node yet" from "the field is gone".
-
-    Args:
-        row: The decoded object.
-        key: The field name.
-        answer: The whole answer, for the error message.
-
-    Returns:
-        The value, or None when the field is present and null.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when absent, or present and
-            neither a string nor null.
-    """
-    if key not in row:
-        raise _malformed(f"field {key!r} is missing", answer=answer)
-    value = row[key]
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise _malformed(
-            f"field {key!r} is {type(value).__name__}, not a string or null", answer=answer
-        )
-    return value
-
-
-def _require_optional_instant(row: dict[str, JSONValue], key: str, *, answer: str) -> int | None:
-    """Read one nullable instant field as whole seconds since the epoch.
-
-    Args:
-        row: The decoded object.
-        key: The field name.
-        answer: The whole answer, for the error message.
-
-    Returns:
-        The instant, or None when the field is present and null.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when absent, neither a string nor
-            null, or a string that is not a UTC instant as the tool renders one.
-    """
-    text = _require_optional_str(row, key, answer=answer)
-    if text is None:
-        return None
-    if _INSTANT.fullmatch(text) is None:
-        raise _malformed(f"field {key!r} is {text!r}, not a UTC instant", answer=answer)
-    return int(datetime.fromisoformat(text).timestamp())
+    lease_expires_unix: int | None
 
 
 def _require_status(row: dict[str, JSONValue], *, answer: str) -> DispatchStatus:
@@ -278,11 +189,11 @@ def _require_status(row: dict[str, JSONValue], *, answer: str) -> DispatchStatus
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` when it is not one of them.
     """
-    value = _require_str(row, "status", answer=answer)
+    value = require_str(row, "status", answer=answer)
     status = find_member(value, DispatchStatus)
     if status is not None:
         return status
-    raise _malformed(f"status {value!r} is not one of {', '.join(DispatchStatus)}", answer=answer)
+    raise malformed(f"status {value!r} is not one of {', '.join(DispatchStatus)}", answer=answer)
 
 
 def _require_command(row: dict[str, JSONValue], *, answer: str) -> DispatchCommand:
@@ -298,11 +209,11 @@ def _require_command(row: dict[str, JSONValue], *, answer: str) -> DispatchComma
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` when it is not one of them.
     """
-    value = _require_str(row, "command", answer=answer)
+    value = require_str(row, "command", answer=answer)
     command = find_member(value, DispatchCommand)
     if command is not None:
         return command
-    raise _malformed(f"command {value!r} is not one of {', '.join(DispatchCommand)}", answer=answer)
+    raise malformed(f"command {value!r} is not one of {', '.join(DispatchCommand)}", answer=answer)
 
 
 def _require_tags(row: dict[str, JSONValue], *, answer: str) -> tuple[NodeTag, ...]:
@@ -323,14 +234,14 @@ def _require_tags(row: dict[str, JSONValue], *, answer: str) -> tuple[NodeTag, .
     """
     value = row.get("requiredTags")
     if not isinstance(value, list):
-        raise _malformed(
+        raise malformed(
             f"field 'requiredTags' is {type(value).__name__}, not an array", answer=answer
         )
     tags: list[NodeTag] = []
     for index, entry in enumerate(value):
         matched = find_member(entry, NodeTag) if isinstance(entry, str) else None
         if matched is None:
-            raise _malformed(
+            raise malformed(
                 f"requiredTags[{index}] {entry!r} is not one of {', '.join(NodeTag)}",
                 answer=answer,
             )
@@ -353,49 +264,25 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
             wrong type.
     """
     if not isinstance(value, dict):
-        raise _malformed(f"a job is {type(value).__name__}, not an object", answer=answer)
+        raise malformed(f"a job is {type(value).__name__}, not an object", answer=answer)
     return DispatchJob(
-        job_id=_require_str(value, "id", answer=answer),
-        project=_require_str(value, "project", answer=answer),
+        job_id=require_str(value, "id", answer=answer),
+        project=require_str(value, "project", answer=answer),
         command=_require_command(value, answer=answer),
         status=_require_status(value, answer=answer),
-        requested_node=_require_optional_str(value, "requestedNode", answer=answer),
-        node=_require_optional_str(value, "node", answer=answer),
-        run_id=_require_str(value, "runId", answer=answer),
-        claimed_by=_require_optional_str(value, "claimedBy", answer=answer),
-        submitted_by=_require_str(value, "submittedBy", answer=answer),
-        session_id=_require_str(value, "sessionId", answer=answer),
-        session_target=_require_optional_str(value, "sessionTarget", answer=answer),
-        sha=_require_optional_str(value, "sha", answer=answer),
+        requested_node=require_optional_str(value, "requestedNode", answer=answer),
+        node=require_optional_str(value, "node", answer=answer),
+        run_id=require_str(value, "runId", answer=answer),
+        claimed_by=require_optional_str(value, "claimedBy", answer=answer),
+        submitted_by=require_str(value, "submittedBy", answer=answer),
+        session_id=require_str(value, "sessionId", answer=answer),
+        session_target=require_optional_str(value, "sessionTarget", answer=answer),
+        sha=require_optional_str(value, "sha", answer=answer),
         required_tags=_require_tags(value, answer=answer),
-        task_id=_require_optional_str(value, "taskId", answer=answer),
-        claimed_unix=_require_optional_instant(value, "claimedAt", answer=answer),
+        task_id=require_optional_str(value, "taskId", answer=answer),
+        claimed_unix=require_optional_instant(value, "claimedAt", answer=answer),
+        lease_expires_unix=require_optional_instant(value, "leaseExpiresAt", answer=answer),
     )
-
-
-def _envelope(answer: str, key: str) -> JSONValue:
-    """Pull one named member out of a tool answer.
-
-    Args:
-        answer: The tool's whole text.
-        key: The member to read.
-
-    Returns:
-        Its value.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when the answer is not a JSON
-            object or does not carry the member. Not an ``InvalidJsonError``:
-            a caller here cannot act on "the JSON was bad" any differently
-            than on "the JSON was fine and had the wrong keys", and both mean
-            the same thing -- the tool changed.
-    """
-    body = load_json_str(answer)
-    if not isinstance(body, dict):
-        raise _malformed(f"the answer is {type(body).__name__}, not an object", answer=answer)
-    if key not in body:
-        raise _malformed(f"the answer has no {key!r} member", answer=answer)
-    return body[key]
 
 
 def decode_claim(answer: str) -> DispatchJob | None:
@@ -413,7 +300,7 @@ def decode_claim(answer: str) -> DispatchJob | None:
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` on a shape this cannot read.
     """
-    claimed = _envelope(answer, "claimed")
+    claimed = envelope(answer, "claimed")
     if claimed is None:
         return None
     return decode_job(claimed, answer=answer)
@@ -434,7 +321,7 @@ def decode_reported(answer: str) -> DispatchJob:
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` on a shape this cannot read.
     """
-    return decode_job(_envelope(answer, "job"), answer=answer)
+    return decode_job(envelope(answer, "job"), answer=answer)
 
 
 def decode_listing(answer: str) -> tuple[DispatchJob, ...]:
@@ -454,9 +341,9 @@ def decode_listing(answer: str) -> tuple[DispatchJob, ...]:
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` on a shape this cannot read.
     """
-    jobs = _envelope(answer, "jobs")
+    jobs = envelope(answer, "jobs")
     if not isinstance(jobs, list):
-        raise _malformed(f"'jobs' is {type(jobs).__name__}, not an array", answer=answer)
+        raise malformed(f"'jobs' is {type(jobs).__name__}, not an array", answer=answer)
     return tuple(decode_job(row, answer=answer) for row in jobs)
 
 
@@ -493,16 +380,16 @@ def decode_listing_page(answer: str) -> ListingPage:
             including a ``nextOffset`` that is neither a whole number nor
             null.
     """
-    pagination = _envelope(answer, "pagination")
+    pagination = envelope(answer, "pagination")
     if not isinstance(pagination, dict):
-        raise _malformed(
+        raise malformed(
             f"'pagination' is {type(pagination).__name__}, not an object", answer=answer
         )
     next_offset = pagination.get("nextOffset", False)
     if next_offset is None:
         return ListingPage(jobs=decode_listing(answer), next_offset=None)
     if isinstance(next_offset, bool) or not isinstance(next_offset, int):
-        raise _malformed(
+        raise malformed(
             f"'nextOffset' is {type(next_offset).__name__}, not a whole number or null",
             answer=answer,
         )
@@ -539,20 +426,20 @@ def decode_trail_claims(answer: str) -> tuple[TrailClaim, ...]:
         AppError: ``QUEUE_ANSWER_MALFORMED`` when the trail is not an array, an
             entry is not an object, or a claim lacks its actor or instant.
     """
-    trail = _envelope(answer, "trail")
+    trail = envelope(answer, "trail")
     if not isinstance(trail, list):
-        raise _malformed(f"'trail' is {type(trail).__name__}, not an array", answer=answer)
+        raise malformed(f"'trail' is {type(trail).__name__}, not an array", answer=answer)
     claims: list[TrailClaim] = []
     for entry in trail:
         if not isinstance(entry, dict):
-            raise _malformed(f"a trail entry is {type(entry).__name__}", answer=answer)
-        if _require_str(entry, "kind", answer=answer) != "claimed":
+            raise malformed(f"a trail entry is {type(entry).__name__}", answer=answer)
+        if require_str(entry, "kind", answer=answer) != "claimed":
             continue
-        instant = _require_optional_instant(entry, "createdAt", answer=answer)
+        instant = require_optional_instant(entry, "createdAt", answer=answer)
         if instant is None:
-            raise _malformed("a claim on the trail has a null 'createdAt'", answer=answer)
+            raise malformed("a claim on the trail has a null 'createdAt'", answer=answer)
         claims.append(
-            TrailClaim(actor=_require_str(entry, "actor", answer=answer), claimed_unix=instant)
+            TrailClaim(actor=require_str(entry, "actor", answer=answer), claimed_unix=instant)
         )
     return tuple(claims)
 
