@@ -123,9 +123,10 @@ def settle(
         run_id=row["run_id"],
     )
     rendered = verdict.render_verdict(judged)
-    # How the unit ended, when the build did not write its own status: an
-    # oom-kill reads as one rather than as a failing suite (MCPs board task
-    # c8585623, fleet.core.linux_unit_end).
+    # How the unit or task ended, when the build did not write its own
+    # status: an oom-kill or a killed powershell.exe reads as one rather than
+    # as a failing suite (MCPs board tasks c8585623 and 4e3afe4f,
+    # fleet.core.linux_unit_end and fleet.core.windows_result).
     unit_end = verdict.read_unit_end(tail)
     ended = rendered if unit_end is None else f"{rendered} {unit_end}"
     line = ended if stopped is None else f"{ended} stopped: {stopped}"
