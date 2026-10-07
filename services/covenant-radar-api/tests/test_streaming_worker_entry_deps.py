@@ -159,7 +159,6 @@ class TestLoadModel:
             random_state=42,
             class_weight=None,
             l1_ratio=None,
-            n_jobs=-1,
         )
         lr.fit(x, y)
         model_path = tmp_path / "model.joblib"

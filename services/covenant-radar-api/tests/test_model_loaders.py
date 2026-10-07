@@ -449,7 +449,6 @@ class TestLoadLogregModelFull:
             random_state=42,
             class_weight=None,
             l1_ratio=None,
-            n_jobs=-1,
         )
         model.fit(x_data, y_data)
 
