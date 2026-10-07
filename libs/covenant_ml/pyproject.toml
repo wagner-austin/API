@@ -103,4 +103,8 @@ fail_under = 100
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-v -n auto --dist loadscope"
+addopts = "-v -n auto --dist loadscope --durations=25"
+# ``--durations=25`` prints the 25 slowest setups, calls and teardowns at the
+# end of every run, so a check that drifts toward its 300 s budget (board
+# task 2e880b79) names the tests that moved it in its own output, rather than
+# needing a profiling run of its own to find them.
