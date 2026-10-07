@@ -13,12 +13,13 @@ import pathlib
 import subprocess
 
 import pytest
+from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import _test_hooks, venv_sweep
 from fleet.core.dialect_linux import SH_INVOCATION
-from tests.conftest import FakeRun, ok
+from tests.conftest import FakeRun, failed, ok
 
 
 def _node(platform: NodePlatform, stage_root: str) -> NodeConfig:
@@ -98,6 +99,32 @@ def test_a_node_is_sent_the_sweep_under_its_stage_root_and_its_report_returned(
     assert report == "venv-sweep: removed 7 of 7 (24110 MB)"
     assert script_path in " ".join(runner.calls[0])
     assert runner.stdin[0] == venv_sweep.script_for(platform, stage_root=stage_root).encode("utf-8")
+
+
+def test_a_node_that_does_not_answer_is_left_to_the_next_sweep() -> None:
+    """lavender-wsl at 04:05Z on 2026-10-07: the sweep after a closed row
+    met a timed-out banner exchange, and raising it ended the serve (MCPs
+    board task c1d48330)."""
+    runner = FakeRun([failed(255, "Connection timed out during banner exchange")])
+    _test_hooks.run = runner
+
+    report = venv_sweep.sweep_on_node(_node(NodePlatform.LINUX, "/home/corvis/fleet/stage"))
+
+    assert report == (
+        "venv-sweep: lavender-wsl did not answer; the next sweep removes its orphans: ssh to "
+        "lavender-wsl failed while sending /home/corvis/fleet/stage/fleet-venv-sweep.sh: "
+        "Connection timed out during banner exchange"
+    )
+    assert len(runner.calls) == 1
+
+
+def test_a_node_that_answers_with_a_failed_sweep_raises_it() -> None:
+    _test_hooks.run = FakeRun([ok(""), failed(1, "rm: cannot remove: Permission denied")])
+
+    with pytest.raises(AppError) as raised:
+        venv_sweep.sweep_on_node(_node(NodePlatform.LINUX, "/home/corvis/fleet/stage"))
+
+    assert raised.value.code is FleetErrorCode.DISPATCH_FAILED
 
 
 def _virtualenv(venvs: pathlib.Path, name: str, lines: list[str] | None) -> pathlib.Path:
