@@ -330,6 +330,29 @@ waits on its condition with no call. A serve's log ends `<alias> served N s
 from <time>: F fire(s), P fill pass(es), Q poll(s), C run(s) closed, K still
 watched; handed over at <time> before the <time> fire: <reason>`.
 
+**A node that misses a read costs a poll, never the serve, and a renewal is
+written once a fire** (MCPs board task c1d48330, `fleet.cli.node_collected`).
+Between 2026-10-06T20:16Z and 2026-10-07T03:48Z, 3 of 265 node rows closed
+more than 30 s after their checks through the runner's own doing, besides an
+outage of the shared ledger (board task 9fcc78a3) and mcp-fleet's deploys:
+lavender-wsl stopped answering ssh at 02:53Z, a settle's tail read raised
+and ended the serve, and the watch had counted an unanswered collect as a
+closed run (1d5d0a1a and 24c4e934, 192 s); serendipity adopted run 220c2a9e
+and never handed it to the watch (47.5 s); and twice a start report landing
+during the collect pass made a just-started run look lost to two jobs, so
+DISPATCH_CLAIM_AMBIGUOUS ended the serve. Nine lease renewals came under
+60 s after the one before, from collect passes rerun while the queue
+recovered. Now every collect says what it did (settled, renewed, still
+running, unreachable, not live, not held) and only a settle counts as
+closed; the settle reads the transcript's tail first, with a read the node
+may miss, so an unreachable node changes nothing and is read again at the
+next poll; a run the collect pass adopts goes to the watch and is the
+pass's own; a job that names a run is the one that launched it; a run still
+going has its lease renewed only once it was last set 60 s or more ago
+(`leaseExpiresAt`), so the boundary's pass renews and a pass seconds later
+writes nothing; and a run whose node missed the boundary's read is owed a
+renewal, which the watch makes at its first read that reaches the node.
+
 **A settle closes the queue job before it sweeps.** The node's orphaned
 virtualenvs (`fleet.core.venv_sweep`) are removed after the row and the
 queue job are closed, not inside the retire, since the sweep's script round
