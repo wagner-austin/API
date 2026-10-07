@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_dict
 
 from tankpit_bot.analysis.scan import decode_session_frames
@@ -10,6 +11,7 @@ from tankpit_bot.protocol.commands import CMD_KEEPALIVE, CMD_RADAR, COMMAND_PREF
 from tankpit_bot.sim.commands import ClientCommandKind
 from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.conformance_wire import BURST_GAP_MS, ReplayCapture, read_replay
+from tankpit_bot.wire.helpers import DecodeError
 from tests.analysis._capture_fixtures import (
     OWN_TANK,
     _ciphered,
@@ -83,15 +85,26 @@ def test_a_command_closes_the_open_batch() -> None:
 
 
 def test_frames_that_are_not_commands_are_passed_over() -> None:
-    """A non-``!`` sent frame and an undecodable command open nothing."""
+    """A non-``!`` sent frame is lobby traffic and opens nothing."""
     capture = _replay(
         [
             _sent(_payload(_ciphered(bytes([0x2B, 0x01, 0x02]))), timestamp_ms=1000),
-            _sent(_payload(_ciphered(bytes([COMMAND_PREFIX, 0x02]))), timestamp_ms=1001),
             _received(_payload(_radar_result()), timestamp_ms=1500),
         ]
     )
     assert _kinds(capture) == [(1500, [], [0x46])]
+
+
+def test_an_undecodable_command_stops_the_read() -> None:
+    """A ``!`` frame too short to be a command raises instead of vanishing."""
+    with pytest.raises(DecodeError, match=r"^ClientCommand: expected >= 2 bytes, got 1$"):
+        _replay(
+            [
+                _sent(_payload(_command(build_query_command(CMD_RADAR))), timestamp_ms=1000),
+                _sent(_payload(_ciphered(bytes([COMMAND_PREFIX, 0x02]))), timestamp_ms=1001),
+                _received(_payload(_radar_result()), timestamp_ms=1500),
+            ]
+        )
 
 
 def test_the_last_confirmed_join_of_a_listed_room_names_the_field() -> None:
