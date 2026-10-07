@@ -42,10 +42,15 @@ _lint-mypy:
 # inline recipe and the incident behind it. --durations names the suite's 25
 # slowest steps in every check's log, so the next run that nears the
 # five-minute budget says on the fleet node itself which tests cost it.
+# -p no:ddtrace keeps out the pytest plugin that the ddtrace runtime
+# dependency registers: it is Datadog CI Visibility, which no run of this
+# suite turns on, and importing it cost 1 to 3 s in the controller and again
+# in every xdist worker (tests/integrations/datadog imports ddtrace itself and
+# passes without the plugin).
 test: _deps _test-suite
 
 _test-suite:
-	$(MAKETOOLS) test --durations=25
+	$(MAKETOOLS) test -p no:ddtrace --durations=25
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
