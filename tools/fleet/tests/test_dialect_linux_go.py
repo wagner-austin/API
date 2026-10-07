@@ -25,6 +25,27 @@ DIALECT = LinuxDialect()
 #: What the fake answers ``go version`` with, as go1.27.1 does on Linux.
 GO_ANSWER = "go version go1.27.1 linux/amd64"
 
+#: The system directories whose programs the case's tools directory links.
+SYSTEM_BINARIES = (pathlib.Path("/usr/bin"), pathlib.Path("/bin"))
+
+
+def _link_system_tools_except_go(tools: pathlib.Path) -> None:
+    """Link every program in :data:`SYSTEM_BINARIES` but ``go`` into ``tools``.
+
+    The node's own ``go`` never reaches the probe this way, whatever the node
+    has installed: lavender-wsl gained apt's go1.22.2 at ``/usr/bin/go``, and
+    with ``/usr/bin`` on ``PATH`` the no-go case read it (fleet job 986d128c,
+    2026-10-07). A name in both directories is linked once, from the first.
+
+    Args:
+        tools: The empty directory the links go in.
+    """
+    for directory in SYSTEM_BINARIES:
+        for program in sorted(directory.iterdir()):
+            link = tools / program.name
+            if program.name != "go" and not program.is_dir() and not link.is_symlink():
+                link.symlink_to(program)
+
 
 def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
     """Run the toolchain probe with ``PATH`` holding only the case's tools.
@@ -38,6 +59,7 @@ def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
     """
     tools = tmp_path / "tools"
     tools.mkdir()
+    _link_system_tools_except_go(tools)
     if with_go:
         fake = tools / "go"
         fake.write_bytes(
@@ -51,7 +73,7 @@ def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
     script = tmp_path / "probe.sh"
     script.write_text(
         DIALECT.toolchain_probe_script().replace(
-            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':/usr/bin:/bin\n", 1
+            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}'\n", 1
         ),
         encoding="utf-8",
     )
@@ -86,5 +108,5 @@ class TestTheGoLineUnderSh:
         assert fields["tar"].startswith("yes=tar (GNU tar)")
 
     def test_no_go_on_the_path_answers_no(self, tmp_path: pathlib.Path) -> None:
-        """diphtheria and lavender-wsl, 2026-10-05."""
+        """diphtheria, and lavender-wsl until it gained apt's go1.22.2."""
         assert _probe_fields(tmp_path, with_go=False)["go"] == "no="
