@@ -67,13 +67,26 @@ def launching_job(
         agent: This runner's label.
 
     Returns:
-        The job, or None when no job of the row's submitter carries a claim by
-        this runner inside the window the run began in.
+        The job that names the run, which launched it; otherwise the one of
+        the row's submitter that carries a claim by this runner inside the
+        window the run began in; or, among several such, one this runner
+        still holds whose start it has not reported yet, since the run may
+        be that job's, so it is not shown lost. None when no job matches.
 
     Raises:
         AppError: ``DISPATCH_CLAIM_AMBIGUOUS`` when more than one job could
-            have launched it, which is refused rather than guessed at; or a
-            queue failure.
+            have launched it and none is still held unstarted, which is
+            refused rather than guessed at; or a queue failure.
+
+    THE QUEUE'S OWN RECORD COMES FIRST (MCPs board task c1d48330). A job
+    names the run it launched once its start is reported, and the collect
+    pass lists what it holds before it reads the ledger's candidates, so a
+    start reported in between left a run nothing named: lavender-wsl's
+    collect pass listed job 641605e5 claimed at 03:47:50Z on 2026-10-07, its
+    launch reported the start at 03:47:53Z, and the pass took the run for a
+    lost one that two of the same session's jobs could have launched, raised
+    DISPATCH_CLAIM_AMBIGUOUS and ended the serve. A job of this runner that
+    names another run launched that one, so it is no candidate here.
     """
     matches: list[DispatchJob] = []
     offset: int | None = 0
@@ -83,6 +96,10 @@ def launching_job(
         )
         for job in page["jobs"]:
             if job["session_id"] != row["session_id"]:
+                continue
+            if job["run_id"] == row["run_id"]:
+                return job
+            if still_held(job, agent=agent) and job["run_id"] != "":
                 continue
             claims = queue.trail_claims(credentials, job_id=job["job_id"])
             if any(
@@ -94,6 +111,9 @@ def launching_job(
             ):
                 matches.append(job)
         offset = page["next_offset"]
+    unstarted = [job for job in matches if still_held(job, agent=agent)]
+    if len(matches) > 1 and unstarted:
+        return unstarted[0]
     if len(matches) > 1:
         raise AppError(
             FleetErrorCode.DISPATCH_CLAIM_AMBIGUOUS,

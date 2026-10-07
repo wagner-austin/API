@@ -358,7 +358,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             identity,
             agent=agent,
             alias=alias,
-            hold=watch.hold,
+            holder=watch,
             launching=launcher.launching()["jobs"],
         )
 

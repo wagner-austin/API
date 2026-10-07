@@ -27,6 +27,16 @@ directory retired (the node). A retire that fails there leaves the run's
 directory on the node and the verdict naming a transcript not yet moved;
 it raises, so the serve's log says so, but the row and the queue job are
 both already closed and nothing else waits on it.
+
+THE TAIL IS READ FIRST, AS A READ THE NODE MAY MISS (MCPs board task
+c1d48330). The settle read the transcript's tail with a raising read, and
+on 2026-10-07 at 02:54:10Z lavender-wsl stopped answering ssh as row
+1d5d0a1a's run ended: the collect pass's tail read raised NODE_UNREACHABLE,
+the serve ended with it, and the row closed at the next start, 192 s after
+its check. It is now read first, with :func:`read_tail`, a read the node
+may miss, and a node that did not answer changes nothing and leaves the run
+to be read again at the next poll, as the result read already did
+(:func:`fleet.core.collect.attempt_poll_result`).
 """
 
 from __future__ import annotations
@@ -37,7 +47,8 @@ from platform_core.json_utils import JSONObject
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
-from fleet.contracts.dispatch import ClosingStatus, DispatchJob
+from fleet.cli.node_collected import Collected, CollectOutcome
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
 from fleet.core import collect, dialect, dispatch, names, queue, remote, retire, venv_sweep, verdict
@@ -56,9 +67,10 @@ def settle(
     ended_unix: int,
     detail: str,
     stopped: str | None,
-) -> str:
-    """Judge a run, post a task-less run's verdict, close its queue job, then
-    finish its row, retire its directory and sweep the node's orphaned virtualenvs.
+) -> Collected:
+    """Read a run's tail and judge it, post a task-less run's verdict, close its
+    queue job, then finish its row, retire its directory and sweep the node's
+    orphaned virtualenvs.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -75,7 +87,10 @@ def settle(
             line, or None when the build finished on its own.
 
     Returns:
-        The verdict line, as posted and as the queue job's detail.
+        :attr:`~fleet.cli.node_collected.CollectOutcome.SETTLED` with the
+        job's line and the verdict, as posted and as the queue job's detail;
+        or :attr:`~fleet.cli.node_collected.CollectOutcome.UNREACHABLE`, with
+        nothing anywhere changed, when the node did not answer the tail's read.
 
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries no sha;
@@ -84,14 +99,16 @@ def settle(
             board or queue failure. Not caught.
     """
     sha = require_sha(job)
-    target = names.dispatch_directory(node["stage_root"], row["run_id"])
-    spoken = dialect.for_platform(node["platform"])
-    tail = remote.run_script(
-        node["host"],
-        spoken.script_path(target, names.LOG_TAIL_STEM),
-        spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
-        platform=node["platform"],
-    )
+    read = read_tail(node, run_id=row["run_id"])
+    tail = read["output"]
+    if tail is None:
+        return Collected(
+            outcome=CollectOutcome.UNREACHABLE,
+            line=(
+                f"{encode_job_line(job)}: did not answer the read of its transcript's tail: "
+                f"{read['unreachable']}"
+            ),
+        )
     judged = verdict.judge(
         job_id=job["job_id"],
         project=row["project"],
@@ -136,7 +153,32 @@ def settle(
     # After the queue close, so the session waiting on this row is not kept
     # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
     venv_sweep.sweep_on_node(node)
-    return line
+    return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {line}")
+
+
+def read_tail(node: NodeConfig, *, run_id: str) -> remote.Answered:
+    """Read the tail of a run's transcript, the lines its verdict is judged from.
+
+    Args:
+        node: The node it ran on.
+        run_id: The run.
+
+    Returns:
+        The last :data:`fleet.core.verdict.LOG_TAIL_LINES` lines, or why the
+        node did not answer.
+
+    Raises:
+        AppError: ``DISPATCH_FAILED`` when the node answered and the read
+            failed there.
+    """
+    target = names.dispatch_directory(node["stage_root"], run_id)
+    spoken = dialect.for_platform(node["platform"])
+    return remote.read_script(
+        node["host"],
+        spoken.script_path(target, names.LOG_TAIL_STEM),
+        spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),
+        platform=node["platform"],
+    )
 
 
 def require_sha(job: DispatchJob) -> str:
@@ -162,4 +204,4 @@ def require_sha(job: DispatchJob) -> str:
     return sha
 
 
-__all__ = ["require_sha", "settle"]
+__all__ = ["read_tail", "require_sha", "settle"]

@@ -9,7 +9,8 @@ runner holds and settles every run it launched in one of four ways:
   the job names no task, and close the job on both sides, the queue's side
   first (:mod:`fleet.cli.node_settle`); the queue's close posts a
   task-naming job's outcome to its thread (MCPs board task 2fecad69).
-* STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim and leave it.
+* STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim, once it was last
+  set a minute or more ago (:mod:`fleet.cli.node_collected`), and leave it.
 * STILL RUNNING, PAST ITS LEASE (MCPs board task fd5cabfa). Stop it. Until
   this, a renewal had no deadline, so a suite that hung kept its claim and
   its node for as long as it stayed hung: measured 2026-09-22, slime job
@@ -46,8 +47,7 @@ fails leaves the row live, matching the node.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Final
+from typing import Final, Protocol, TypedDict
 
 from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.errors import AppError
@@ -57,6 +57,7 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config, node_lost
 from fleet.cli import collect as collect_cli
+from fleet.cli.node_collected import RENEW_AFTER_SECONDS, Collected, CollectOutcome, lease_age
 from fleet.cli.node_settle import settle
 from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus, encode_job_line
@@ -76,14 +77,46 @@ _log = get_logger(__name__)
 TIMED_OUT_EXIT_CODE: Final = 124
 
 
+class RunHolder(Protocol):
+    """What the collect pass hands runs to: the serve's watch
+    (:class:`fleet.cli.node_watch.RunWatch`)."""
+
+    def hold(self, run_ids: frozenset[str]) -> None:
+        """Watch these runs.
+
+        Args:
+            run_ids: Runs this runner holds running.
+        """
+
+    def owe(self, run_ids: frozenset[str]) -> None:
+        """Watch these runs and renew each at its first read that reaches its node.
+
+        Args:
+            run_ids: Running runs whose node did not answer this pass's read.
+        """
+
+
+class Reconciled(TypedDict):
+    """What reconciling a claim an earlier tick left without a start did.
+
+    Attributes:
+        line: One line saying so, for the log.
+        adopted: The run adopted, which the collect pass hands to the serve's
+            watch, or None when the claim was refused.
+    """
+
+    line: str
+    adopted: str | None
+
+
 def collect_one_job(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
     board: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
-) -> str:
-    """Close one running job out, stop it past its lease, or renew it.
+) -> Collected:
+    """Close one running job out, stop it past its lease, or renew it when due.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -93,7 +126,13 @@ def collect_one_job(
         identity: This runner's identity arguments.
 
     Returns:
-        One line saying what happened, for the log.
+        What it did (:class:`fleet.cli.node_collected.CollectOutcome`) and
+        the line for the log. A node that did not answer a read before
+        anything changed is :attr:`~fleet.cli.node_collected.CollectOutcome.UNREACHABLE`,
+        its lease left as it is (MCPs board task 8993c306: lavender-wsl,
+        10:30Z); a run still going whose lease was set under
+        :data:`fleet.cli.node_collected.RENEW_AFTER_SECONDS` ago writes
+        nothing (MCPs board task c1d48330).
 
     Raises:
         AppError: With a node or workspace code when the node failed a read
@@ -113,14 +152,18 @@ def collect_one_job(
         for candidate in collect_cli.live_rows(loaded, run_id=job["run_id"]):
             row = candidate
         if row is None:
-            return f"{encode_job_line(job)}: no live run on this machine, leaving it"
+            return Collected(
+                outcome=CollectOutcome.NOT_LIVE,
+                line=f"{encode_job_line(job)}: no live run on this machine, leaving it",
+            )
         node = require_node(loaded.workspace, row["node"])
         plan = require_project(loaded.workspace, row["project"])
-        # A node that does not answer is read again at the next pass, its
-        # lease left as it is (MCPs board task 8993c306: lavender-wsl, 10:30Z).
         polled = collect.attempt_poll_result(node, run_id=row["run_id"])
         if polled["unreachable"] is not None:
-            return f"{encode_job_line(job)}: did not answer the read: {polled['unreachable']}"
+            return Collected(
+                outcome=CollectOutcome.UNREACHABLE,
+                line=f"{encode_job_line(job)}: did not answer the read: {polled['unreachable']}",
+            )
         result = polled["result"]
         if result is None:
             deadline = collect.lease_deadline(row, plan)
@@ -132,7 +175,7 @@ def collect_one_job(
                     f"tree; raise {row['project']}'s expected_minutes if the suite needs longer"
                 )
                 stop.stop_on_node(node, run_id=row["run_id"])
-                line = settle(
+                return settle(
                     loaded,
                     credentials,
                     board,
@@ -145,7 +188,12 @@ def collect_one_job(
                     detail=reason,
                     stopped=reason,
                 )
-                return f"{encode_job_line(job)}: {line}"
+            age = lease_age(job, now=now)
+            if age is not None and age < RENEW_AFTER_SECONDS:
+                return Collected(
+                    outcome=CollectOutcome.RUNNING,
+                    line=f"{encode_job_line(job)}: still running, lease set {age} s ago",
+                )
             queue.report_progress(
                 credentials,
                 job_id=job["job_id"],
@@ -153,13 +201,16 @@ def collect_one_job(
                 lease_seconds=CLAIM_LEASE_SECONDS,
                 identity=identity,
             )
-            return f"{encode_job_line(job)}: still running, lease renewed"
+            return Collected(
+                outcome=CollectOutcome.RENEWED,
+                line=f"{encode_job_line(job)}: still running, lease renewed",
+            )
 
         finished = result["finished_unix"]
         if collect.outlived_its_lease(row, plan, finished_unix=finished):
             raise collect_cli.lapsed_lease_refusal(row, plan, finished_unix=finished)
         exit_code = result["exit_code"]
-        line = settle(
+        return settle(
             loaded,
             credentials,
             board,
@@ -172,7 +223,6 @@ def collect_one_job(
             detail=collect.describe(node, run_id=row["run_id"], exit_code=exit_code),
             stopped=None,
         )
-        return f"{encode_job_line(job)}: {line}"
 
 
 def launched_by_claim(
@@ -226,7 +276,7 @@ def reconcile_claim(
     *,
     alias: str,
     running: frozenset[str],
-) -> str:
+) -> Reconciled:
     """Adopt the run a claim launched, or refuse a claim that launched nothing.
 
     Args:
@@ -239,7 +289,8 @@ def reconcile_claim(
             rows are theirs and not this claim's.
 
     Returns:
-        One line saying what happened, for the log.
+        One line saying what happened, for the log, and the run adopted, if
+        one was.
 
     Raises:
         AppError: ``DISPATCH_CLAIM_AMBIGUOUS`` from :func:`launched_by_claim`,
@@ -263,7 +314,7 @@ def reconcile_claim(
             detail=detail,
             identity=identity,
         )
-        return f"{encode_job_line(job)}: refused, {detail}"
+        return Reconciled(line=f"{encode_job_line(job)}: refused, {detail}", adopted=None)
     queue.report_start(
         credentials,
         job_id=job["job_id"],
@@ -285,7 +336,7 @@ def reconcile_claim(
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
-    return f"{encode_job_line(job)}: {adopted}"
+    return Reconciled(line=f"{encode_job_line(job)}: {adopted}", adopted=row["run_id"])
 
 
 def stop_cancelled(
@@ -411,7 +462,7 @@ def collect_pass(
     *,
     agent: str,
     alias: str,
-    hold: Callable[[frozenset[str]], None],
+    holder: RunHolder,
     launching: frozenset[str],
 ) -> None:
     """Settle every running job this runner holds, reconcile every claim an
@@ -424,10 +475,11 @@ def collect_pass(
         identity: This runner's identity arguments.
         agent: This runner's label.
         alias: This node's workspace name.
-        hold: Given the run ids of the running jobs this runner holds as
-            soon as the queue has said, before any is settled, so the
-            serve's watch (:mod:`fleet.cli.node_watch`) reads them while
-            this pass goes on.
+        holder: The serve's watch (:mod:`fleet.cli.node_watch`), given the
+            run ids of the running jobs this runner holds as soon as the
+            queue has said, before any is settled, so it reads them while
+            this pass goes on; each run this pass adopts; and each run whose
+            node did not answer this pass's read, whose renewal it then owes.
         launching: The jobs this serve's launches still carry
             (:mod:`fleet.cli.node_launch`), claimed with no start yet by
             design, which are left to them rather than reconciled.
@@ -438,29 +490,38 @@ def collect_pass(
     """
     held = queue.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
-    hold(running)
+    holder.hold(running)
+    accounted = {job["run_id"] for job in held}
     for job in held:
         # Live is claimed or running; a claimed one no launch carries is an earlier tick's.
         if job["status"] is DispatchStatus.RUNNING:
-            _log.info("%s", collect_one_job(loaded, credentials, board, job, identity))
+            collected = collect_one_job(loaded, credentials, board, job, identity)
+            _log.info("%s", collected["line"])
+            if collected["outcome"] is CollectOutcome.UNREACHABLE:
+                holder.owe(frozenset({job["run_id"]}))
         elif job["job_id"] in launching:
             _log.info("%s: its launch is under way", encode_job_line(job))
         else:
-            line = reconcile_claim(loaded, credentials, job, identity, alias=alias, running=running)
-            _log.info("%s", line)
-    stop_cancelled(
-        loaded,
-        credentials,
-        agent=agent,
-        alias=alias,
-        held=frozenset(job["run_id"] for job in held),
-    )
+            reconciled = reconcile_claim(
+                loaded, credentials, job, identity, alias=alias, running=running
+            )
+            _log.info("%s", reconciled["line"])
+            adopted = reconciled["adopted"]
+            if adopted is not None:
+                # Watched from now, as a run launched by this serve is
+                # (row 220c2a9e on serendipity, 2026-10-07, MCPs board
+                # task c1d48330), and its own, not a lost one, below.
+                holder.hold(frozenset({adopted}))
+                accounted.add(adopted)
+    stop_cancelled(loaded, credentials, agent=agent, alias=alias, held=frozenset(accounted))
 
 
 __all__ = [
     "CLAIM_LEASE_SECONDS",
     "SETTLING",
     "TIMED_OUT_EXIT_CODE",
+    "Reconciled",
+    "RunHolder",
     "collect_one_job",
     "collect_pass",
     "stop_cancelled",
