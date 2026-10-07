@@ -347,11 +347,15 @@ running, unreachable, not live, not held) and only a settle counts as
 closed; the settle reads the transcript's tail first, with a read the node
 may miss, so an unreachable node changes nothing and is read again at the
 next poll; a run the collect pass adopts goes to the watch and is the
-pass's own; a job that names a run is the one that launched it; a run still
-going has its lease renewed only once it was last set 60 s or more ago
-(`leaseExpiresAt`), so the boundary's pass renews and a pass seconds later
-writes nothing; and a run whose node missed the boundary's read is owed a
-renewal, which the watch makes at its first read that reaches the node.
+pass's own; a job that names a run is the one that launched it when this
+runner holds it, and another runner's run when that runner does
+(serendipity's two runners share one node); a run still going has its
+lease renewed only once it was last set 70 s or more ago (`leaseExpiresAt`,
+decoded to whole seconds, so 60 s let a pair land 59.2 s apart), so the
+boundary's pass renews and a pass seconds later writes nothing; a sweep of
+virtualenvs the node does not answer is left to the next sweep; and a run
+whose node missed the boundary's read is owed a renewal, which the watch
+makes at its first read that reaches the node.
 
 **A settle closes the queue job before it sweeps.** The node's orphaned
 virtualenvs (`fleet.core.venv_sweep`) are removed after the row and the
