@@ -30,7 +30,7 @@ from tests.backends.cleargbm._cleargbm_fixtures import (
     _require_importances,
 )
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def test_cleargbm_backend_evaluate_computes_metrics(tmp_path: Path) -> None:
@@ -203,7 +203,7 @@ def test_cleargbm_backend_get_feature_importances_returns_none_for_wrong_type(
 def test_cleargbm_backend_us_bankruptcy_full_pipeline(tmp_path: Path) -> None:
     """Full pipeline test with US bankruptcy dataset."""
     backend = create_cleargbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: ClearGBMConfig = {

@@ -39,13 +39,13 @@ from tests.backends.cleargbm._cleargbm_fixtures import (
     _make_synthetic_dataset,
 )
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def test_cleargbm_backend_train_returns_outcome(tmp_path: Path) -> None:
     """ClearGBMBackend trains and returns TrainOutcome with all required fields."""
     backend = create_cleargbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config = _make_cleargbm_config(n_estimators=10, max_depth=4)
@@ -337,7 +337,7 @@ def test_cleargbm_backend_train_leaf_wise(tmp_path: Path) -> None:
 def test_cleargbm_backend_train_early_stopping(tmp_path: Path) -> None:
     """ClearGBMBackend tracks early stopping progress."""
     backend = create_cleargbm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     # Use more estimators to potentially trigger early stopping
