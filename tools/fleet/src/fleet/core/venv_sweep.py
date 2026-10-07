@@ -175,25 +175,41 @@ def script_for(platform: NodePlatform, *, stage_root: str) -> str:
 def sweep_on_node(node: NodeConfig) -> str:
     """Remove the orphaned virtualenvs in one node's fleet cache.
 
+    A NODE THAT DOES NOT ANSWER IS LEFT TO THE NEXT SWEEP (MCPs board task
+    c1d48330). Every caller sweeps after its row is closed, and a sweep
+    removes every orphan it finds, not one run's, so a sweep the node missed
+    leaves nothing the next one does not remove. Raising there ended
+    lavender-wsl's serve at 04:05Z on 2026-10-07, after the row it swept
+    for had closed, and every other run it held waited for the next start.
+
     Args:
         node: The node.
 
     Returns:
-        The node's one-line report, which is also logged.
+        The node's one-line report, or the line saying it did not answer;
+        either is also logged.
 
     Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
-            transport, the latter carrying the node's own error when a
-            virtualenv could not be read or removed.
+        AppError: With ``DISPATCH_FAILED`` carrying the node's own error
+            when it answered and a virtualenv could not be read or removed.
     """
     stage_root = node["stage_root"]
     with SWEEPING:
-        report = remote.run_script(
+        read = remote.read_script(
             node["host"],
             dialect.for_platform(node["platform"]).script_path(stage_root, SWEEP_STEM),
             script_for(node["platform"], stage_root=stage_root),
             platform=node["platform"],
-        ).strip()
+        )
+    output = read["output"]
+    if output is None:
+        missed = (
+            f"venv-sweep: {node['host']} did not answer; the next sweep removes its "
+            f"orphans: {read['unreachable']}"
+        )
+        _log.info("%s", missed)
+        return missed
+    report = output.strip()
     _log.info("%s on %s", report, node["host"])
     return report
 
