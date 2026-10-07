@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+from platform_langid import _test_hooks as langid_hooks
 from platform_langid._test_hooks import SpokenLanguageDetectorProtocol
+from platform_langid.testing import (
+    FakeAudioLoader,
+    make_fake_model_factory,
+    make_fake_processor_factory,
+    reset_hooks,
+)
 from platform_langid.types import DetectorConfig, SpokenLanguageResult
 from platform_stt import _test_hooks as stt_hooks
 from platform_stt._test_hooks import OpenAIClientProtocol
@@ -96,14 +103,36 @@ def test_default_stt_client_factory_creates_client() -> None:
 
 
 def test_default_langid_detector_factory_creates_detector() -> None:
-    """Test _default_langid_detector_factory creates a detector."""
+    """Test _default_langid_detector_factory creates a working detector.
+
+    Rebinds platform_langid's model, processor and audio seams so the real
+    factory still builds the real SpokenLanguageDetector without loading the
+    facebook/mms-lid-4017 checkpoint through transformers, which held one
+    xdist worker for the whole suite (MCPs board task bb2cad07). Detecting
+    through the result proves the detector was built from the injected model.
+    """
+    langid_hooks.model_factory = make_fake_model_factory(
+        predicted_id=2,
+        confidence=0.9,
+        id2label={0: "en", 1: "vi", 2: "es"},
+    )
+    langid_hooks.processor_factory = make_fake_processor_factory()
+    audio_loader = FakeAudioLoader()
+    langid_hooks.audio_loader = audio_loader
     config = DetectorConfig(
         model_id="facebook/mms-lid-4017",
         device="cpu",
         confidence_threshold=0.0,
     )
-    detector = _default_langid_detector_factory(config)
-    assert callable(detector.detect)
+    try:
+        detector = _default_langid_detector_factory(config)
+        result = detector.detect(b"\x00\x01", 16000)
+    finally:
+        reset_hooks()
+    assert result["language"] == "es"
+    assert round(result["confidence"], 6) == 0.9
+    assert result["model_id"] == "facebook/mms-lid-4017"
+    assert audio_loader.calls == [(b"\x00\x01", 16000)]
 
 
 def test_default_translator_factory_creates_translator() -> None:
