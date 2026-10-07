@@ -19,18 +19,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import dump_json_str
 
-from fleet.cli import _config, node_watch
+from fleet.cli import _config
+from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.core import _test_hooks, records
-from tests._node_agent_fixtures import (
-    NPM_CI,
-    _credentials_in_env,
-    _sourced_config,
-    launch,
-    sourced_document,
-)
+from tests._node_agent_fixtures import _credentials_in_env, _sourced_config, launch
 from tests._thread_fakes import WAIT_SECONDS, await_event
+from tests._watch_fixtures import collected, lavender_watch, poll_every_second
 from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -56,29 +51,12 @@ def _two_ended_runs(config_path: pathlib.Path) -> _config.LoadedWorkspace:
         The workspace, loaded.
     """
     launch(config_path)
-    document = sourced_document((NPM_CI,))
-    document["node_poll_seconds"] = 1
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
-    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
+    loaded = poll_every_second(config_path)
     second = records.read_ledger(loaded.ledger)[-1].copy()
     second["run_id"] = SECOND_RUN
     records.append_ledger(loaded.ledger, second)
     _test_hooks.run = FakeRun([ok(f"0 {DEMO_NOW + 72}")] * 4)
     return loaded
-
-
-def _watch(loaded: _config.LoadedWorkspace, settle: node_watch.Settle) -> node_watch.RunWatch:
-    """Lavender's watch.
-
-    Args:
-        loaded: The workspace.
-        settle: What it settles an ended run with.
-
-    Returns:
-        The watch, holding nothing.
-    """
-    node = loaded.workspace["nodes"]["lavender"]
-    return node_watch.RunWatch(loaded, alias="lavender", node=node, settle=settle)
 
 
 class TestTwoRunsThatEndTogether:
@@ -90,13 +68,13 @@ class TestTwoRunsThatEndTogether:
         release = threading.Event()
         settled: list[str] = []
 
-        def settle(*, run_id: str) -> str:
+        def settle(*, run_id: str) -> Collected:
             begun[run_id].set()
             await_event(release, what="the case's go-ahead to finish the settles")
             settled.append(run_id)
-            return f"{run_id}: settled"
+            return collected(run_id, CollectOutcome.SETTLED)
 
-        watch = _watch(loaded, settle)
+        watch = lavender_watch(loaded, settle)
         with ThreadPoolExecutor(max_workers=1) as pool:
             watching = pool.submit(watch.watch)
             with watch:
@@ -120,11 +98,11 @@ class TestTwoSettlesThatRaise:
         loaded = _two_ended_runs(sourced_config)
         both_begun = threading.Barrier(2, timeout=WAIT_SECONDS)
 
-        def settle(*, run_id: str) -> str:
+        def settle(*, run_id: str) -> Collected:
             both_begun.wait()
             raise AppError(FleetErrorCode.QUEUE_ANSWER_MALFORMED, f"{run_id}: nonsense")
 
-        watch = _watch(loaded, settle)
+        watch = lavender_watch(loaded, settle)
         with ThreadPoolExecutor(max_workers=1) as pool:
             watching = pool.submit(watch.watch)
             watch.hold(BOTH)

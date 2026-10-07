@@ -63,28 +63,6 @@ ADOPTED = queue_job(
 #: The queue's answer to the adopting start report.
 STARTED = dump_json_str({"job": ADOPTED})
 
-#: An empty page of the cancelled listing.
-NO_CANCELS = listing_page([], None)
-
-
-def _adopted_and_asked_about(claimed_unix: int) -> list[str]:
-    """What the lost-run pass hears about an adopted run (board task fd402617).
-
-    The held set was read before the adoption, so the adopted row is still a
-    candidate; the queue lists its job running under this runner, which the
-    pass leaves alone.
-
-    Args:
-        claimed_unix: When the job's trail says lavender claimed it.
-
-    Returns:
-        The submitter's page and the job's trail.
-    """
-    return [
-        listing_page([ADOPTED], None),
-        trail_answer(ADOPTED, [("fleet-node-lavender", claimed_unix)]),
-    ]
-
 
 class RefusedAt:
     """A queue endpoint that answers from a script until one call, which the
@@ -177,8 +155,6 @@ class TestTheNextTick:
                 dump_json_str({"jobs": [ORPHANED]}),
                 STARTED,
                 STARTED,
-                NO_CANCELS,
-                *_adopted_and_asked_about(DEMO_NOW),
             ]
         )
         _test_hooks.http_post = endpoint
@@ -187,14 +163,10 @@ class TestTheNextTick:
 
         # No dispatch_claim: the adopted run holds the one project's lease on
         # lavender, so the claim pass leaves it out (MCPs board task 939ec5c7).
-        assert endpoint.tools == [
-            "dispatch_list",
-            "dispatch_report",
-            "dispatch_report",
-            "dispatch_list",
-            "dispatch_list",
-            "dispatch_get",
-        ]
+        # No cancelled listing and no trail either: the adopted run is the
+        # pass's own, so no other live run is left to account for (MCPs
+        # board task c1d48330).
+        assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_report"]
         # The trail says why the start came a tick late (55f2cb0b, A2).
         assert endpoint.arguments[2]["action"] == "progress"
         assert endpoint.arguments[2]["note"] == (
@@ -230,8 +202,6 @@ class TestTheNextTick:
                 dump_json_str({"jobs": [stamped_late]}),
                 STARTED,
                 STARTED,
-                NO_CANCELS,
-                *_adopted_and_asked_about(late),
             ]
         )
         _test_hooks.http_post = endpoint

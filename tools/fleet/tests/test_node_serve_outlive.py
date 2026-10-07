@@ -27,6 +27,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str
 
 from fleet.cli import _config, node_serve, node_watch
+from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
     NPM_CI,
@@ -126,13 +127,14 @@ class CountingWatch(node_watch.RunWatch):
         super().__init__(loaded, alias="lavender", node=node, settle=settle)
         self.counted = threading.Event()
 
-    def _settled(self, run_id: str) -> None:
+    def _collected(self, run_id: str, outcome: CollectOutcome) -> None:
         """Count the run as the watch does, then say so.
 
         Args:
             run_id: The run.
+            outcome: What its collect did.
         """
-        super()._settled(run_id)
+        super()._collected(run_id, outcome)
         self.counted.set()
 
 
@@ -227,9 +229,9 @@ class TestAServeWhoseQueueListingFails:
         _test_hooks.run = FakeRun([ok(""), ok(""), ok(""), ok(f"0 {DEMO_NOW + 72}")])
         closed: list[str] = []
 
-        def settle(*, run_id: str) -> str:
+        def settle(*, run_id: str) -> Collected:
             closed.append(run_id)
-            return f"{run_id}: settled"
+            return Collected(outcome=CollectOutcome.SETTLED, line=f"{run_id}: settled")
 
         watch = CountingWatch(loaded, settle)
         _test_hooks.sleep = SleepAfterTheSettle(clock, watch.counted)

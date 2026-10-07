@@ -32,6 +32,7 @@ from fleet.contracts.node import LiveLoad
 from fleet.contracts.workspace import require_project
 from fleet.core import _test_hooks, queue, records, staging
 from fleet.core.queue_transport import answering
+from tests._holder_fakes import RecordingHolder
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -363,7 +364,7 @@ class TestTheCollectPass:
         endpoint = FakeQueue([dump_json_str({"jobs": [claimed]})])
         _test_hooks.http_post = endpoint
         _test_hooks.run = FakeRun([])
-        held: list[frozenset[str]] = []
+        holder = RecordingHolder()
 
         with caplog.at_level("INFO"):
             node_collect.collect_pass(
@@ -373,10 +374,11 @@ class TestTheCollectPass:
                 {},
                 agent=LAVENDER,
                 alias="lavender",
-                hold=held.append,
+                holder=holder,
                 launching=frozenset({DEFAULT_JOB_ID}),
             )
 
         assert endpoint.tools == ["dispatch_list"]
-        assert held == [frozenset()]
+        assert holder.held == [frozenset()]
+        assert holder.owed == []
         assert caplog.records[-1].getMessage().endswith(": its launch is under way")

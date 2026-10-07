@@ -261,6 +261,7 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         "requiredTags": [],
         "taskId": None,
         "claimedAt": None,
+        "leaseExpiresAt": None,
     }
     row.update(overrides)
     return row
