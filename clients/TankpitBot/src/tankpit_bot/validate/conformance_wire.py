@@ -32,7 +32,6 @@ from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import ClientCommandDict, decode_client_command
 from tankpit_bot.types.literals import MessageDirection
-from tankpit_bot.wire.helpers import DecodeError
 
 BURST_GAP_MS = 500
 """Received messages closer than this, with no command between, are one batch.
@@ -90,22 +89,26 @@ def _sent_command(frame: DecodedFrameDict) -> ClientCommandDict | None:
     """Decode a sent frame's command, if it carries one.
 
     The lobby shares the socket, so only ``!``-prefixed frames are
-    commands; a command body that will not decode is not a command the
-    sim could be given, and is passed over exactly as the response-shape
-    differ passes it over.
+    commands. A ``!`` frame whose body will not decode is not passed
+    over: the tick it was sent into would then be replayed without it
+    and compared as if the client had sent less than it did. Every one
+    of the 163,688 commands in the 451 captures of ``runs/bot`` and
+    ``runs/probe`` decodes (2026-10-07), so such a frame is a fault in
+    the capture or in :func:`~tankpit_bot.sim.commands.decode_client_command`,
+    and it stops the read.
 
     Args:
         frame: One sent frame.
 
     Returns:
-        The command, or None.
+        The command, or None when the frame is not a command.
+
+    Raises:
+        DecodeError: If a ``!`` frame's body is not a decodable command.
     """
     if frame["msg_type"] != COMMAND_PREFIX:
         return None
-    try:
-        return decode_client_command(frame["body"])
-    except DecodeError:
-        return None
+    return decode_client_command(frame["body"])
 
 
 class _RoomLedger:
@@ -197,6 +200,10 @@ def read_replay(frames: list[DecodedFrameDict]) -> ReplayCapture:
 
     Returns:
         The capture as ticks, with its field image.
+
+    Raises:
+        DecodeError: If a sent ``!`` frame's body is not a decodable
+            command.
     """
     rooms = _RoomLedger()
     builder = _TickBuilder()

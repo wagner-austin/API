@@ -334,6 +334,10 @@ def run_census(paths: list[Path]) -> CensusReportDict:
     Returns:
         The census: fields by name, then every ordered pair of fields
         whose train side saw a site on ground.
+
+    Raises:
+        DecodeError: If a capture holds a sent command that will not
+            decode (:func:`~tankpit_bot.validate.conformance_wire.read_replay`).
     """
     tallies: dict[str, tuple[Path, FieldTally]] = {}
     for path in paths:

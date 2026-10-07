@@ -337,6 +337,10 @@ def run_conformance(paths: list[Path]) -> ConformanceReportDict:
 
     Returns:
         The run.
+
+    Raises:
+        DecodeError: If a capture holds a sent command that will not
+            decode (:func:`~tankpit_bot.validate.conformance_wire.read_replay`).
     """
     archive = _Archive()
     for path in paths:
