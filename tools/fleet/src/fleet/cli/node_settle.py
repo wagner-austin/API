@@ -84,7 +84,9 @@ def settle(
         ended_unix: When the check ended: its result's time, or the stop's.
         detail: What the ledger and the feed say about it.
         stopped: Why the runner stopped the build, appended to the verdict
-            line, or None when the build finished on its own.
+            line, or None when the build finished on its own. A unit-end
+            line in the tail (:func:`fleet.core.verdict.read_unit_end`) is
+            appended before it.
 
     Returns:
         :attr:`~fleet.cli.node_collected.CollectOutcome.SETTLED` with the
@@ -121,7 +123,12 @@ def settle(
         run_id=row["run_id"],
     )
     rendered = verdict.render_verdict(judged)
-    line = rendered if stopped is None else f"{rendered} stopped: {stopped}"
+    # How the unit ended, when the build did not write its own status: an
+    # oom-kill reads as one rather than as a failing suite (MCPs board task
+    # c8585623, fleet.core.linux_unit_end).
+    unit_end = verdict.read_unit_end(tail)
+    ended = rendered if unit_end is None else f"{rendered} {unit_end}"
+    line = ended if stopped is None else f"{ended} stopped: {stopped}"
     # A job naming a task gets its row from the queue's close below, on the
     # task's thread and addressed to the submitter (MCPs board task
     # 2fecad69); only a task-less job's verdict is this runner's to post.
