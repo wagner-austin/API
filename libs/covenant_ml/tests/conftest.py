@@ -13,6 +13,11 @@ from numpy.typing import NDArray
 # Path to test data directory
 DATA_DIR = Path(__file__).parent / "data"
 
+# Rows in the bankruptcy sample the integration tests train on, and the seed
+# that picks them; see load_us_bankruptcy_sample.
+SAMPLE_ROWS = 6000
+SAMPLE_SEED = 42
+
 
 class USBankruptcyDataset(TypedDict):
     """US bankruptcy dataset loaded from CSV."""
@@ -24,6 +29,10 @@ class USBankruptcyDataset(TypedDict):
     n_features: int
     n_bankrupt: int
     n_healthy: int
+
+
+# The one parsed sample of this test process; see load_us_bankruptcy_sample.
+_SAMPLE_CACHE: list[USBankruptcyDataset] = []
 
 
 def _safe_float(value: str, default: float = 0.0) -> float:
@@ -39,11 +48,48 @@ def _safe_float(value: str, default: float = 0.0) -> float:
         return default
 
 
-def load_us_bankruptcy_data() -> USBankruptcyDataset:
-    """Load full US bankruptcy dataset for testing.
+def load_us_bankruptcy_sample() -> USBankruptcyDataset:
+    """Load a fixed, class-stratified sample of the US bankruptcy dataset.
+
+    The backend integration tests train on this. The file holds 78,682
+    rows, 5,220 of them failed companies; every test that fit a model on all
+    of it took 9 to 31 s on serendipity, the fleet node that runs this
+    package's make check, and together they put the check at 545 s against
+    its 300 s budget (board task 2e880b79). SAMPLE_ROWS rows with the file's
+    class balance keep real accounting data with real signal under every
+    backend at a fraction of the fitting time.
+
+    The file is parsed once per test process and kept in _SAMPLE_CACHE; each
+    call returns fresh copies of the arrays and the name list, so a test that
+    mutates what it was given cannot change what the next test reads.
 
     Returns:
-        USBankruptcyDataset with feature matrix, labels, and metadata.
+        USBankruptcyDataset with the sample's feature matrix, labels, and
+        metadata.
+
+    Raises:
+        FileNotFoundError: If dataset file not found.
+    """
+    if not _SAMPLE_CACHE:
+        _SAMPLE_CACHE.append(_read_us_bankruptcy_sample())
+    cached = _SAMPLE_CACHE[0]
+    return {
+        "x": cached["x"].copy(),
+        "y": cached["y"].copy(),
+        "feature_names": list(cached["feature_names"]),
+        "n_samples": cached["n_samples"],
+        "n_features": cached["n_features"],
+        "n_bankrupt": cached["n_bankrupt"],
+        "n_healthy": cached["n_healthy"],
+    }
+
+
+def _read_us_bankruptcy_sample() -> USBankruptcyDataset:
+    """Parse the bankruptcy CSV and draw the stratified sample from it.
+
+    Returns:
+        USBankruptcyDataset with the sample's feature matrix, labels, and
+        metadata.
 
     Raises:
         FileNotFoundError: If dataset file not found.
@@ -91,15 +137,45 @@ def load_us_bankruptcy_data() -> USBankruptcyDataset:
             value = row[col_idx] if col_idx < len(row) else "0"
             x_array[i, j] = _safe_float(value)
 
-    n_bankrupt = int(np.sum(y_array))
-    n_healthy = n_samples - n_bankrupt
+    sample = _stratified_sample_indices(y_array)
+    x_sample = x_array[sample]
+    y_sample = y_array[sample]
+    n_bankrupt = int(np.sum(y_sample))
 
     return {
-        "x": x_array,
-        "y": y_array,
+        "x": x_sample,
+        "y": y_sample,
         "feature_names": feature_cols,
-        "n_samples": n_samples,
+        "n_samples": SAMPLE_ROWS,
         "n_features": n_features,
         "n_bankrupt": n_bankrupt,
-        "n_healthy": n_healthy,
+        "n_healthy": SAMPLE_ROWS - n_bankrupt,
     }
+
+
+def _stratified_sample_indices(y_array: NDArray[np.int64]) -> NDArray[np.int64]:
+    """Pick SAMPLE_ROWS row indices that keep the file's class balance.
+
+    Each class contributes its share of SAMPLE_ROWS, drawn without
+    replacement by a fixed-seed generator, and the indices come back sorted
+    so the sample keeps the file's row order.
+
+    Args:
+        y_array: Labels of every row in the file.
+
+    Returns:
+        Sorted row indices, SAMPLE_ROWS of them.
+    """
+    rng = np.random.default_rng(SAMPLE_SEED)
+    pos_mask: NDArray[np.bool_] = y_array == 1
+    neg_mask: NDArray[np.bool_] = y_array == 0
+    pos_indices: NDArray[np.intp] = np.flatnonzero(pos_mask)
+    neg_indices: NDArray[np.intp] = np.flatnonzero(neg_mask)
+    rng.shuffle(pos_indices)
+    rng.shuffle(neg_indices)
+    n_positive = round(SAMPLE_ROWS * len(pos_indices) / len(y_array))
+    chosen: NDArray[np.intp] = np.concatenate(
+        [pos_indices[:n_positive], neg_indices[: SAMPLE_ROWS - n_positive]]
+    )
+    ordered: NDArray[np.intp] = np.sort(chosen)
+    return ordered.astype(np.int64)
