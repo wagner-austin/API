@@ -106,7 +106,10 @@ def _dialect_scripts() -> list[RenderedScript]:
             name="dialect-reset-directory", text=spoken.reset_directory_script(companion)
         ),
         RenderedScript(name="dialect-digest", text=spoken.digest_script(staged)),
-        RenderedScript(name="dialect-result", text=spoken.result_script(target)),
+        RenderedScript(
+            name="dialect-result",
+            text=spoken.result_script(target=target, run_id=EXAMPLE_RUN_ID),
+        ),
         RenderedScript(
             name="dialect-log-tail",
             text=spoken.log_tail_script(target, verdict.LOG_TAIL_LINES),

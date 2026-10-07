@@ -202,16 +202,19 @@ def read_budget(tail: str) -> str:
 
 
 def read_unit_end(tail: str) -> str | None:
-    """Read how a Linux build's unit ended, when the build itself could not say.
+    """Read how a build's unit or task ended, when the build itself could not say.
 
     Args:
         tail: The transcript's last lines.
 
     Returns:
         The last :data:`fleet.core.linux_unit_end.UNIT_ENDED_MARKER` line,
-        marker included (``FLEET_UNIT_ENDED: unit ... ended with systemd
-        result oom-kill (killed KILL) ...``), or None for a build that wrote
-        its own status, which is every build that was not killed.
+        marker included and line ending excluded (``FLEET_UNIT_ENDED: unit
+        ... ended with systemd result oom-kill (killed KILL) ...`` from a
+        Linux unit, ``FLEET_UNIT_ENDED: task ... ended with Task Scheduler
+        state 3 (Ready) and last result 0x00000001 ...`` from a Windows
+        node, :mod:`fleet.core.windows_result`), or None for a build that
+        wrote its own status, which is every build that was not killed.
     """
     last: str | None = None
     for match in UNIT_ENDED_LINE.finditer(tail):

@@ -20,7 +20,7 @@ registration interpolates one path and no code.
 from __future__ import annotations
 
 from fleet.contracts.source import InstallStep
-from fleet.core import names, windows_build, windows_retire, windows_task
+from fleet.core import names, windows_build, windows_result, windows_retire, windows_task
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
 from fleet.core.windows_log_tail import windows_log_tail_script
@@ -463,40 +463,19 @@ class WindowsDialect:
         """
         return windows_task.launch_script(target=target, run_id=run_id, elevated=elevated)
 
-    def result_script(self, target: str) -> str:
+    def result_script(self, *, target: str, run_id: str) -> str:
         """Print the status and the epoch second it was written, or nothing.
-
-        IT REPORTS *WHEN* AS WELL AS *WHAT*. Whether a run was safe is a
-        question about whether its lease covered the whole of it, answerable
-        only against the moment the build ended -- which the node knows and
-        nobody else does. Measured 2026-09-04, a run that finished three
-        minutes inside its window was refused twenty minutes later for having
-        been collected late.
-
-        The epoch is computed by subtracting the Unix epoch from a UTC
-        timestamp rather than with ``-UFormat %s``, which in PowerShell 5.1
-        converts from LOCAL time and would put every node's answer out by its
-        own offset.
 
         Args:
             target: Absolute remote directory holding the staged tree.
+            run_id: The dispatch, which names the task its build runs as.
 
         Returns:
-            The script's text.
+            :func:`fleet.core.windows_result.result_script`'s text, which
+            says why it reads the build's task before the result file, and
+            what it records for a build that ended without its status.
         """
-        return _located_script(
-            "Target",
-            target,
-            (
-                f'$result = "$Target/{names.RESULT_NAME}"',
-                "if (Test-Path -LiteralPath $result) {",
-                "    $file = Get-Item -LiteralPath $result",
-                "    $code = (Get-Content -Raw -LiteralPath $result).Trim()",
-                "    $epoch = [int]($file.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds",
-                '    "$code $epoch"',
-                "}",
-            ),
-        )
+        return windows_result.result_script(target=target, run_id=run_id)
 
     def stop_script(self, *, target: str, run_id: str) -> str:
         """End the build's process tree, then stop and unregister the task.

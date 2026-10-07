@@ -24,14 +24,16 @@ merely slow and a run that is wedged look identical from here, and the thing
 that tells them apart is the lease expiring, which
 :func:`fleet.cli.watch.lost_runs` already reports.
 
-A BUILD THAT IS KILLED IS NOT STILL GOING, and on Linux its unit says so. A
+A BUILD THAT IS KILLED IS NOT STILL GOING, and its task or unit says so. A
 killed build cannot write its own status, and before MCPs board task
 c8585623 such a build read as running until its lease lapsed. Fleet job
 859e7ab3 was killed by systemd-oomd 2 min 8 s into its install on
 diphtheria and was closed 22 minutes later as ``LEASE_NOT_HELD``. A Linux
 unit's ``ExecStopPost=`` now writes the result for a build that did not
-(:mod:`fleet.core.linux_unit_end`), so absence there means the build's
-processes are still alive. A Windows build still has no such writer.
+(:mod:`fleet.core.linux_unit_end`), and a Windows node's result script
+writes it when the build's scheduled task has ended without one
+(:mod:`fleet.core.windows_result`, MCPs board task 4e3afe4f), so on either
+platform absence means the build's process is still alive.
 """
 
 from __future__ import annotations
@@ -113,7 +115,7 @@ def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
     read = remote.read_script(
         node["host"],
         spoken.script_path(target, names.COLLECT_STEM),
-        spoken.result_script(target),
+        spoken.result_script(target=target, run_id=run_id),
         platform=node["platform"],
     )
     output = read["output"]
@@ -166,9 +168,9 @@ def _read_result(node: NodeConfig, *, run_id: str, answer: str) -> RunResult | N
         raise AppError(
             FleetErrorCode.RUN_RESULT_UNREADABLE,
             f"{run_id} on {node['host']} recorded {answer!r} where an exit status and a "
-            f"timestamp were expected; the build's last act writes {names.RESULT_NAME} and "
-            "nothing else does, so this is a node that was written to by something other than "
-            "the build",
+            f"timestamp were expected; only the build's last act, or its task or unit ending "
+            f"without it, writes {names.RESULT_NAME}, so this is a node that was written to by "
+            "something else",
         )
     return RunResult(exit_code=int(fields[0]), finished_unix=int(fields[1]))
 

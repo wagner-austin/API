@@ -320,16 +320,21 @@ class Dialect(Protocol):
         """
         ...
 
-    def result_script(self, target: str) -> str:
+    def result_script(self, *, target: str, run_id: str) -> str:
         """The script that reports how a dispatch ended, if it has.
 
         Args:
             target: Absolute remote directory holding the staged tree.
+            run_id: The dispatch, which names its own task or unit.
 
         Returns:
             The script's text. It prints the exit status and the epoch
             second the result was written, space-separated, or nothing while
-            the run is still going.
+            the run is still going. A build whose process ended without
+            writing its status is not still going: its task or unit has
+            ended, and the result is written for it, with a
+            :data:`fleet.core.linux_unit_end.UNIT_ENDED_MARKER` line in the
+            transcript saying how it ended.
         """
         ...
 

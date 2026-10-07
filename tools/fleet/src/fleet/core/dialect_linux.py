@@ -464,11 +464,18 @@ class LinuxDialect:
             f"printf 'launched\\n'\n"
         )
 
-    def result_script(self, target: str) -> str:
+    def result_script(self, *, target: str, run_id: str) -> str:
         """Print the status and the epoch second it was written, or nothing.
+
+        A build that ended without writing its status has had it written by
+        its unit's ``ExecStopPost=`` (:mod:`fleet.core.linux_unit_end`) by
+        the time systemd considers the unit stopped, so this reads the
+        result file alone and the unit's name is not read.
 
         Args:
             target: Absolute remote directory holding the staged tree.
+            run_id: The dispatch; unused on this platform, for the reason
+                above.
 
         Returns:
             The script's text. ``stat -c %Y`` is the file's modification time

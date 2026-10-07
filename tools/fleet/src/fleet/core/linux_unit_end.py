@@ -64,9 +64,15 @@ UNIT_END_STEM: Final = "unit-end"
 #: The word that opens the transcript line, so a reader can grep for it.
 UNIT_ENDED_MARKER: Final = "FLEET_UNIT_ENDED"
 
-#: The line, as :func:`unit_end_script` appends it; the verdict reads the
-#: whole line, marker included.
-UNIT_ENDED_LINE: Final[re.Pattern[str]] = re.compile(rf"^{UNIT_ENDED_MARKER}: (.+)$", re.MULTILINE)
+#: The line, as :func:`unit_end_script` and a Windows node's result script
+#: (:mod:`fleet.core.windows_result`) append it; the verdict reads the whole
+#: line, marker included. It ends before a carriage return as well as a line
+#: feed: a Windows tail crosses ssh with CRLF endings and is decoded as it
+#: came (:mod:`fleet.core._command`), so a ``$`` would leave the return in
+#: the verdict line.
+UNIT_ENDED_LINE: Final[re.Pattern[str]] = re.compile(
+    rf"^{UNIT_ENDED_MARKER}: [^\r\n]+", re.MULTILINE
+)
 
 #: The status recorded when the unit ended without a failing status of its
 #: own: its main process exited 0 without writing a result, which the build's
