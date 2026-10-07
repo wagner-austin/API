@@ -111,3 +111,46 @@ class TestACloseTheQueueDidNotAnswer:
             True,
         ]
         assert "passed" in _ledger(sourced_config)
+
+
+#: The tail of a build the unit-end script closed (MCPs board task
+#: c8585623): 859e7ab3's transcript as it stopped, then the line systemd's
+#: ``ExecStopPost=`` appends for an oom-kill.
+KILLED_TAIL = (
+    "fleet-prepare: no stored install for tree key e7fd2baa9e87; running npm ci\n"
+    "npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException\n"
+    "FLEET_UNIT_ENDED: unit fleet-MCPs-mcp-shared-diphtheria-1791171734 ended with systemd "
+    "result oom-kill (killed KILL) before the build wrote its status; recorded exit 137\n"
+)
+
+
+class TestABuildItsUnitClosed:
+    def test_closes_failed_with_the_unit_s_ending_on_the_line(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        launch(sourced_config)
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("137 1757000060"), ok(""), ok(KILLED_TAIL), *retire_replies(), *PROBED]
+        )
+        answering_queue = FakeQueue(
+            [
+                held_answer(taskId=VERDICT_TASK),
+                dump_json_str({"job": queue_job(status="failed", exitCode=137)}),
+                dump_json_str({"claimed": None}),
+            ]
+        )
+        _test_hooks.http_post = answering(answering_queue)
+
+        assert node_agent.main(node_argv(sourced_config)) == 0
+
+        close = answering_queue.arguments[1]
+        assert close["action"] == "close"
+        assert close["status"] == "failed"
+        assert close["exitCode"] == 137
+        assert narrow_json_to_str(close["detail"]).endswith(
+            f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
+            "FLEET_UNIT_ENDED: unit fleet-MCPs-mcp-shared-diphtheria-1791171734 ended with "
+            "systemd result oom-kill (killed KILL) before the build wrote its status; "
+            "recorded exit 137"
+        )
+        assert "failed" in _ledger(sourced_config)
