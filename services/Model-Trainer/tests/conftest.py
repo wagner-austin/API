@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Final, Literal, Protocol
 
 import pytest
+import torch
 from platform_core.config import config_test_hooks
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_ml import sentencepiece as _spm_init
@@ -321,6 +322,34 @@ def _dump_stacks_when_a_test_stops_making_progress() -> Generator[None, None, No
     faulthandler.dump_traceback_later(_HANG_DUMP_SECONDS, repeat=True)
     yield
     faulthandler.cancel_dump_traceback_later()
+
+
+#: Intra-op threads torch may use inside one test process.
+#:
+#: ONE, BECAUSE XDIST IS ALREADY THE PARALLELISM. torch sizes its pool to
+#: every core by default, so the CI pool's 8 workers on lavender's 16 cores
+#: ran 128 compute threads beside a co-tenant job, and the models under test
+#: are tiny: each matmul is too small to divide, so the threads spent the run
+#: waiting on each other. Measured from the job logs (gaps between one
+#: worker's PASSED lines, MCPs board task 2f90d785):
+#: TestMeasureSlotCount::test_a_trained_sweep_point_beats_an_untrained_prefix
+#: took 1118.9 s in job 113056567370 and passed the 900 s timeout, a test that
+#: takes 1.83 s alone on the hub. Eight concurrent copies of that file on the
+#: hub took 6.7 to 7.0 s per run of it at torch's default and 3.1 to 3.4 s
+#: under the fixture below.
+_TORCH_THREADS_PER_TEST: Final[int] = 1
+
+
+@pytest.fixture(autouse=True)
+def _one_torch_thread_per_test() -> None:
+    """Pin torch's intra-op pool to one thread before every test.
+
+    Per test rather than once per worker, because the training jobs pin the
+    pool themselves (``job_utils`` asks for the configured count, every core
+    when none is set), and a pin one test's job made must not carry into the
+    tests that worker runs after it.
+    """
+    torch.set_num_threads(_TORCH_THREADS_PER_TEST)
 
 
 @pytest.fixture(autouse=True)
