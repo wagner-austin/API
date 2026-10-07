@@ -97,7 +97,18 @@ class _TorchModuleProtocol(Protocol):
 
 
 def _default_import_torch() -> _TorchModuleProtocol:
-    """Production implementation - imports real torch."""
+    """Production implementation - imports real torch.
+
+    torch is platform-ml's optional ``torch`` extra, so it is present only
+    when the consumer installs that extra or declares torch itself, as every
+    package that reaches this importer does.
+
+    Returns:
+        The torch module, typed by its protocol.
+
+    Raises:
+        ModuleNotFoundError: If torch is not installed in the environment.
+    """
     return __import__("torch")
 
 
