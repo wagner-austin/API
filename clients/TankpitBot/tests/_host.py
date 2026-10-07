@@ -1,21 +1,23 @@
-"""The case that watches the public demo play, and the run that proves it did.
+"""The cases that watch the public demo play, and the run that proves they did.
 
 Board task 46934cd6, whose review asked for checks that "measure the live
 service rather than file contents". Every other case in this suite drives
 the demo's routes, its captions and its HLS capture against fakes and a
 local server, so the suite proves the code builds the stream it means to
 and never that austinwagner.org/tankpit, with a real bot behind it, is
-serving sound and captions now. ``host_live_demo`` binds a case to the one
-thing that can say so: the live demo service, reached over the internet,
-and ``ffprobe`` to read a segment it served.
+serving sound and captions now. ``host_live_demo`` binds a case to what can
+say so: the live demo service and the published page, reached over the
+internet, ``ffmpeg`` and ``ffprobe`` to read the segments it served, and the
+installed Microsoft Edge to play the page as a visitor does
+(``tests/live/_visitor.py`` says why Playwright's own Chromium cannot).
 
-It is EXECUTION-ONLY (platform_core's :mod:`~platform_core.host_execution`):
-the ordinary ``make check`` skips it on every machine, because that run is
+They are EXECUTION-ONLY (platform_core's :mod:`~platform_core.host_execution`):
+the ordinary ``make check`` skips them on every machine, because that run is
 also API's CI, where pressing the public spawn button on every push would
-start a stranger-visible bot for each one. ``make execution`` runs only this
-case and fails on a skip or on none, and that is the check of the fleet
+start a stranger-visible bot for each one. ``make execution`` runs only these
+cases and fails on a skip or on none, and that is the check of the fleet
 project ``clients/TankpitBot-execution``, which requires the ``windows`` and
-``ffmpeg`` tags.
+``ffmpeg`` tags; every Windows node ships Edge.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from typing import Final
 import pytest
 from platform_core import host_execution
 
-#: The marker binding a case to the live demo service and a node's ffprobe.
+#: The marker binding a case to the live demo, a node's ffmpeg and its Edge.
 LIVE_DEMO_MARKER: Final[str] = "host_live_demo"
 
 #: The fleet project whose check is this package's execution run.
@@ -36,7 +38,7 @@ PROJECT: Final[str] = "clients/TankpitBot-execution"
 PLAN: Final[host_execution.HostExecutionPlan] = host_execution.HostExecutionPlan(
     markers={},
     execution_only={LIVE_DEMO_MARKER: "windows"},
-    needs={LIVE_DEMO_MARKER: "needs the live demo service and a node's ffprobe"},
+    needs={LIVE_DEMO_MARKER: "needs the live demo service, a node's ffmpeg and its Edge"},
     projects={"windows": PROJECT},
     here="windows" if sys.platform == "win32" else "linux",
 )
