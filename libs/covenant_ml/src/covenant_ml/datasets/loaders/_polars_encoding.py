@@ -158,7 +158,7 @@ def apply_encodings(
     for enc in encodings:
         encoding_by_name[enc["column_name"]] = dict(enc["mapping"])
 
-    result_df = df
+    encoded_columns: list[PolarsExprProtocol] = []
 
     for feat_idx in sorted(categorical_columns):
         column_name = feature_columns[feat_idx]
@@ -176,11 +176,9 @@ def apply_encodings(
                 expr = expr.when(val_condition).then(lit_fn(float(code)))
 
         expr = expr.otherwise(lit_fn(float(missing_code)))
-        expr = expr.alias(column_name)
+        encoded_columns.append(expr.alias(column_name))
 
-        result_df = result_df.with_columns(expr)
-
-    return result_df
+    return df.with_columns(*encoded_columns)
 
 
 def convert_to_numeric(
@@ -192,6 +190,10 @@ def convert_to_numeric(
 
     Handles all-missing columns by first replacing missing strings with null,
     then casting to Float64 (which handles null gracefully), then filling nulls.
+    Each of the two passes is one ``with_columns`` over every numeric column:
+    a call per column per pass re-planned and re-materialized the frame 2N
+    times, 5.4 of 6.1 s of loading a 50-row, 190-column fixture (board task
+    dbbb9758).
 
     Args:
         df: Polars DataFrame.
@@ -207,29 +209,28 @@ def convert_to_numeric(
     when_fn: PolarsWhenFnProtocol = polars_mod.when
     float64_dtype: PolarsDataTypeProtocol = polars_mod.Float64
 
-    result_df = df
+    missing_list = list(MISSING_VALUES)
+    nullified_columns: list[PolarsExprProtocol] = []
+    numeric_columns: list[PolarsExprProtocol] = []
 
     for feat_idx, column_name in enumerate(feature_columns):
         if feat_idx in categorical_columns:
             continue
 
         col_expr = col_fn(column_name)
-        missing_list = list(MISSING_VALUES)
         missing_condition = col_expr.is_null() | col_expr.is_in(missing_list)
 
         # Replace missing strings with null first, then cast - handles all-missing columns
         nullify_expr: PolarsExprProtocol = (
             when_fn(missing_condition).then(lit_fn(None)).otherwise(col_expr)
         )
-        nullified_col = nullify_expr.alias(column_name)
-        result_df = result_df.with_columns(nullified_col)
+        nullified_columns.append(nullify_expr.alias(column_name))
 
         # Now cast and fill nulls - works even when all values are null
         cast_expr = col_fn(column_name).cast(float64_dtype).fill_null(0.0)
-        final_expr = cast_expr.alias(column_name)
-        result_df = result_df.with_columns(final_expr)
+        numeric_columns.append(cast_expr.alias(column_name))
 
-    return result_df
+    return df.with_columns(*nullified_columns).with_columns(*numeric_columns)
 
 
 __all__ = [

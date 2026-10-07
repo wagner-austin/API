@@ -211,8 +211,8 @@ class PolarsDataFrameProtocol(Protocol):
         """Convert to numpy array."""
         ...
 
-    def with_columns(self, expr: PolarsExprProtocol) -> PolarsDataFrameProtocol:
-        """Add/replace columns."""
+    def with_columns(self, *exprs: PolarsExprProtocol) -> PolarsDataFrameProtocol:
+        """Add/replace columns, all of them in one pass over the frame."""
         ...
 
 
