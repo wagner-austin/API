@@ -6622,3 +6622,18 @@ hub, now 29 pages; index 88).
 - The default pack is our own art painted at start-up; the preview page
   rendered every frame in real Chromium at scale 2 with no page error.
 - Registered as its own fleet project, `clients/TankpitBot/web`.
+
+---
+
+## [2026-10-06] create | Sim web client
+
+Board task b008ab91, Phase 5. New page [[sim-web-client]] (architecture
+hub, now 30 pages; index 89). [[sim-renderer]] and
+[[sim-network-server]] point to it.
+- `tankpit-sim-serve` serves the play page, its modules, each room's
+  terrain and the static key on its WebSocket port (`--web-root`).
+- The browser client runs the lobby, un-XORs the 0x2E batches, paints
+  through the renderer and moves on a click; a session recorded from a
+  real NetHost holds the client and the server to each other's bytes.
+- Live in Chromium: joined, drew the field and the tank, and a click
+  moved the tank to the clicked tile.

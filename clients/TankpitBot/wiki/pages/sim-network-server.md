@@ -23,9 +23,9 @@ source_paths:
   - "sim-server.compose.json"
   - "tests/sim/test_sim_compose.py"
 source_git_blobs:
-  "sim-server.compose.json": "9df71d498fd5d1721173097bd8588a981172df8b"
-  "tests/sim/test_sim_compose.py": "1d93db9967cfc4c1d4f0a6383cace9dbf77f43ea"
-  "src/tankpit_bot/sim/net_server.py": "00c9ed1231acb3bcf761357abf9d5844fe5d9897"
+  "sim-server.compose.json": "e57835d5e566167d57196cf3e6ca4306ea83ceae"
+  "tests/sim/test_sim_compose.py": "481b3c714187661e4bbad771b2f99a0d85756354"
+  "src/tankpit_bot/sim/net_server.py": "7e6edfe71cfe6e9c06c3bd4cc85c8c17e30383ee"
   "src/tankpit_bot/sim/net_host.py": "faaa8be06944b58216788115e4cbc7192a83ad83"
   "src/tankpit_bot/sim/net_room.py": "f242a4ba888b471670e9f58f92847b12fe18c27e"
   "src/tankpit_bot/sim/net_accounts.py": "1b08e40f5533385aad8e9c5cca88514fbdb9328d"
@@ -34,7 +34,7 @@ source_git_blobs:
   "tests/sim/test_net_store.py": "37e21282a3bceb279091f9d161eaaf74f479bced"
   "src/tankpit_bot/sim/lobby.py": "a3c4eedb0230aca2f075c0434c8caeb54656674e"
   "src/tankpit_bot/sim/transport.py": "b84317e74e3aca75c007b1e26bff8d8b633e4b03"
-  "tests/sim/test_net_server.py": "0630745d5e5c52469cd810ee9b60732704a62ab3"
+  "tests/sim/test_net_server.py": "4ecff1180ba167b7f3193c102e6e3b7062a93c50"
   "tests/sim/test_net_host.py": "c16b92cc112c7a223e18231b00b9373440d8c7b0"
   "tests/sim/test_net_room.py": "dd1d028f8c670d461558eaaa28310e2047fe2d49"
 provenance:
@@ -206,11 +206,17 @@ Checked live on the hub on 2026-10-06:
   1001 (going away). The server printed `32 ticks served` and exited 0,
   and the seat was written as a row of its own.
 
+## The same port serves the browser client
+
+A plain HTTP `GET` on the server's port gets the play page, its
+modules, a room's terrain and the static key; an upgrade gets the game.
+[[sim-web-client]] describes both halves. `--web-root` names the built
+page, and the image passes `/app/web`.
+
 ## Not done here
 
-The TypeScript renderer is the rest of Phase 5. The production bot still reaches a server through a
-browser page. A bot or renderer speaking this socket directly is the
-next client.
+The production bot still reaches a server through a browser page. A
+bot speaking this socket directly is the next client.
 
 [^1]: `src/tankpit_bot/sim/net_server.py`, `parse_serve_args`, `build_host` and `main`; `tests/sim/test_net_server.py`, `test_the_command_line_serves_its_rooms_for_its_ticks` and `test_every_flag_is_read`.
 [^2]: `src/tankpit_bot/sim/lobby.py`, `parse_auth_frame` and `SimLobby._enter`; `src/tankpit_bot/sim/transport.py`, `route_client_frames`.

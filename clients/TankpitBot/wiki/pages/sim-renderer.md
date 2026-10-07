@@ -120,16 +120,12 @@ Checked live on 2026-10-06: the built preview ran in Playwright's
 Chromium at device scale 2. It drew six canvases with no page error, and
 a click 10 px into the strip pressed Radar.
 
-## Not done here
+## Fed from the socket
 
-The renderer is not yet fed from the socket. A browser client that
-speaks [[sim-network-server]]'s wire would need to:
-
-- AUTH and run the lobby;
-- un-XOR the 0x2E batches;
-- turn viewport updates and syncs into `setTile` and `setTank`.
-
-That client is the next piece, and the renderer's API is what it calls.
+[[sim-web-client]] is the browser client that feeds this renderer. It
+AUTHs and runs the lobby, un-XORs the 0x2E batches, and turns them into
+`setTile` and `setTank` through its world view. The play page,
+`play.html`, is served by the sim server itself.
 
 [^1]: `web/src/manifest.ts`, `decodeManifest` and `encodeManifest`; `web/tests/manifest.spec.ts`, `reads back exactly what encodeManifest wrote, through JSON text`.
 [^2]: `web/src/renderer.ts`, `Renderer.renderFrame` and `Renderer.removeTank`; `web/tests/renderer.spec.ts`, `redraws a still tank whose pixels a moving tank's erase cleared, and only that one` and `follows an erase through a chain of overlapping tanks`.
