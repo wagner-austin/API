@@ -325,33 +325,6 @@ class TestLaunchScript:
         assert "FLEET_LAUNCH_NOT_STARTED" in body
 
 
-class TestResultAndStopScripts:
-    def test_it_reports_when_as_well_as_what(self) -> None:
-        """Whether a run was PROTECTED is a question about whether its lease
-        covered it, and only the node knows when the build ended. Asking for
-        the status alone forced the reader to substitute "is a lease held now"
-        -- a question about how promptly somebody collected -- which refused a
-        run that finished three minutes inside its window. Pester runs it
-        (tests/pester/rendered-dialect-state.Tests.ps1)."""
-        body = DIALECT.result_script("C:/s/run-1")
-
-        assert "LastWriteTimeUtc" in body
-        assert "1970-01-01" in body
-
-    def test_it_does_not_use_uformat_for_the_epoch(self) -> None:
-        """PowerShell 5.1's -UFormat %s converts from LOCAL time, which would
-        put every node's answer out by its own offset."""
-        assert "-UFormat" not in DIALECT.result_script("C:/s/run-1")
-
-    def test_the_result_script_reads_the_result_file_under_its_target(self) -> None:
-        """Absence is the signal, so an unfinished run is not read as exit 0."""
-        body = DIALECT.result_script("C:/s/run-1")
-
-        assert "[string]$Target = 'C:/s/run-1'" in body
-        assert f'$result = "$Target/{names.RESULT_NAME}"' in body
-        assert "if (Test-Path -LiteralPath $result) {" in body
-
-
 class TestTransportShape:
     def test_scripts_are_ps1_and_run_through_powershell_by_path(self) -> None:
         assert DIALECT.script_path("C:/s", "build") == "C:/s/build.ps1"

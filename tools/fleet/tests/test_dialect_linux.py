@@ -105,7 +105,7 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         _build(workers=4),
         DIALECT.log_tail_script(TARGET, 200),
         DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False),
-        DIALECT.result_script(TARGET),
+        DIALECT.result_script(target=TARGET, run_id=DEMO_RUN_ID),
         DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID),
         DIALECT.capacity_probe_script(),
         DIALECT.toolchain_probe_script(),
@@ -323,7 +323,7 @@ class TestLaunchScript:
 
 class TestResultAndStopScripts:
     def test_the_result_script_prints_status_and_mtime_or_nothing(self) -> None:
-        body = DIALECT.result_script(TARGET)
+        body = DIALECT.result_script(target=TARGET, run_id=DEMO_RUN_ID)
         result = f"{TARGET}/{names.RESULT_NAME}"
 
         assert f"if [ -f '{result}' ]; then" in body
