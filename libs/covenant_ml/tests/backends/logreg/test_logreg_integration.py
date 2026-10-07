@@ -91,6 +91,37 @@ def _make_synthetic_dataset(
     return x, y, feature_names
 
 
+def _make_learnable_dataset(
+    n_samples: int = 400,
+    n_features: int = 8,
+    seed: int = 42,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], list[str]]:
+    """Create a standardized dataset whose labels follow a linear score.
+
+    The saga solver converges in a few dozen passes over standard-normal
+    features, where on the raw bankruptcy CSV (78,682 rows on unscaled
+    accounting magnitudes) it ran 136 to 167 s per test against a
+    ``max_iter`` of 10000. Labels are the sign of a fixed linear score plus
+    noise, so a trained model has real signal to find and an AUC well above
+    chance is evidence that it found it.
+
+    Args:
+        n_samples: Number of samples.
+        n_features: Number of features.
+        seed: Random seed.
+
+    Returns:
+        Tuple of (features, labels, feature_names).
+    """
+    rng = np.random.default_rng(seed)
+    x = rng.standard_normal((n_samples, n_features)).astype(np.float64)
+    weights = np.linspace(2.0, -1.0, n_features, dtype=np.float64)
+    noise = rng.standard_normal(n_samples).astype(np.float64)
+    y = (x @ weights + noise > 0.0).astype(np.int64)
+    feature_names = [f"f{i}" for i in range(n_features)]
+    return x, y, feature_names
+
+
 def _make_logreg_config(
     penalty: LogRegPenalty = LogRegPenalty.L2,
     c_value: float = 1.0,
@@ -402,14 +433,13 @@ def test_logreg_backend_class_instantiation() -> None:
 def test_logreg_backend_with_l1_penalty(tmp_path: Path) -> None:
     """LogRegBackend works with L1 penalty (saga solver)."""
     backend = create_logreg_backend()
-    dataset = load_us_bankruptcy_data()
-    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+    x, y, names = _make_learnable_dataset()
 
-    config = _make_logreg_config(penalty=LogRegPenalty.L1, solver=LogRegSolver.SAGA, max_iter=10000)
+    config = _make_logreg_config(penalty=LogRegPenalty.L1, solver=LogRegSolver.SAGA, max_iter=1000)
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
-    assert outcome["best_val_auc"] > 0.5
+    assert outcome["best_val_auc"] > 0.8
     assert Path(outcome["model_path"]).exists()
 
 
@@ -429,17 +459,16 @@ def test_logreg_backend_with_no_penalty(tmp_path: Path) -> None:
 def test_logreg_backend_with_elasticnet_penalty(tmp_path: Path) -> None:
     """LogRegBackend works with ElasticNet penalty (saga solver)."""
     backend = create_logreg_backend()
-    dataset = load_us_bankruptcy_data()
-    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+    x, y, names = _make_learnable_dataset()
 
     config = _make_logreg_config(
-        penalty=LogRegPenalty.ELASTICNET, solver=LogRegSolver.SAGA, max_iter=10000
+        penalty=LogRegPenalty.ELASTICNET, solver=LogRegSolver.SAGA, max_iter=1000
     )
     config["l1_ratio"] = 0.5  # Mix of L1 and L2
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
-    assert outcome["best_val_auc"] > 0.5
+    assert outcome["best_val_auc"] > 0.8
 
 
 def test_logreg_backend_with_strong_regularization(tmp_path: Path) -> None:
