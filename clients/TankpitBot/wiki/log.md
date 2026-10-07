@@ -6637,3 +6637,17 @@ hub, now 30 pages; index 89). [[sim-renderer]] and
   real NetHost holds the client and the server to each other's bytes.
 - Live in Chromium: joined, drew the field and the tank, and a click
   moved the tank to the clicked tile.
+
+---
+
+## [2026-10-07] update | Capture conformance: an undecodable command stops the read
+
+Board task b008ab91, Phase 3, after the 2026-10-07 review reopen.
+[[capture-conformance]] gains a bullet under "How a capture is
+replayed" and footnote 6; [[container-census]] re-pins
+`container_census.py`.
+- `conformance_wire._sent_command` no longer turns a `DecodeError` into
+  None; a sent `!` frame that will not decode now raises out of
+  `read_replay`, `run_conformance` and `run_census`.
+- A scan of the 451 captures under `runs/bot` and `runs/probe` decoded
+  all 163,688 commands, so no archived capture stops a run.

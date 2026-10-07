@@ -15,7 +15,7 @@ source_paths:
   - "src/tankpit_bot/sim/field_choice.py"
   - "tests/sim/test_field_choice.py"
 source_git_blobs:
-  "src/tankpit_bot/validate/container_census.py": "08c5a0dbe4bff5690bcfc0159197a5023eb5627d"
+  "src/tankpit_bot/validate/container_census.py": "697c797392eda9336a15f3e17842e62c2d17ff44"
   "src/tankpit_bot/sim/actions.py": "b1df4395545335965eb4a2d7b38290468a0128b4"
   "tests/validate/test_container_census.py": "931c51e109c8278365daf90c93145d975e158fa1"
   "wiki/sources/container_census_2026-10-05.json": "4212f91529ef466b754af6e69769dd5cdea685b2"

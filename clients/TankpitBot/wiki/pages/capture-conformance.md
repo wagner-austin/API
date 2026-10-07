@@ -13,16 +13,19 @@ source_paths:
   - "src/tankpit_bot/validate/conformance_mirror.py"
   - "src/tankpit_bot/validate/conformance_cli.py"
   - "tests/validate/test_conformance.py"
+  - "tests/validate/test_conformance_wire.py"
   - "wiki/sources/conformance_baseline.json"
 source_git_blobs:
-  "src/tankpit_bot/validate/conformance.py": "166d73d8a23d2b85a5aa53afd876af8071ab905f"
-  "src/tankpit_bot/validate/conformance_wire.py": "35de89f8814ca9f571f0abe26bfc438d1cbce285"
+  "src/tankpit_bot/validate/conformance.py": "3c1d434c53914a747076b159f525e8ab7d012778"
+  "src/tankpit_bot/validate/conformance_wire.py": "44a781ce275f7d9a3566b18aecbc4f344ff47102"
   "src/tankpit_bot/validate/conformance_mirror.py": "8df0c339f77f5ee270584194d8071425f2e3a8bf"
   "src/tankpit_bot/validate/conformance_cli.py": "c4a93931a31e8733eb7589a5ee448c8fb86fe05e"
   "tests/validate/test_conformance.py": "e2aab37d4f457c2c7a70844b0e86d253ad5ad6e6"
+  "tests/validate/test_conformance_wire.py": "010d2b3c1cb993da12a24e12e2f2158dce235e42"
   "wiki/sources/conformance_baseline.json": "837d26a995c4aafebdf90f9a668644f709d640dc"
 provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 3, 2026-10-05: tankpit-conformance over runs/bot and runs/sniff, the 586-capture archive copied from diphtheria:/mnt/archive-a/austinpc/tankpitbot-runs/runs"
+  - "Board task b008ab91, 2026-10-07: every sent '!' frame of the 451 capture files under runs/bot and runs/probe in the API-tankpit-w1 worktree passed through sim.commands.decode_client_command by a one-off scan; 163,688 commands, none raised DecodeError"
 fact_checked: "2026-10-05"
 confidence: high
 hubs: [protocol]
@@ -52,6 +55,12 @@ answer gets worse.[^1]
   every container a radar or pickup record showed.[^3] So a tick
   compares the sim's laws from the real tick's starting state, and one
   early miss cannot make every later tick differ.
+- **Every command is read, or the run stops.** A sent `!` frame whose
+  body will not decode raises `DecodeError` out of `read_replay`. It is
+  not dropped, because dropping it would replay its tick without it and
+  compare that tick as if the client had sent less. On 2026-10-07 all
+  163,688 commands in the 451 captures under `runs/bot` and `runs/probe`
+  decoded, so no capture there stops a run.[^6]
 - **Compared in the shape alphabet.** Both batches are reduced with the
   differ's own `shape_token`, so ids, positions and clocks never count.
   A tick is compared when the client sent it a command other than a
@@ -117,3 +126,4 @@ group's rate fails `make audit` with `CONFORMANCE_REGRESSED`.
 [^3]: `src/tankpit_bot/validate/conformance_mirror.py`, `ArchiveMirror.observe` and `ArchiveMirror.anchor`.
 [^4]: `tests/validate/test_conformance.py`, `test_the_sim_replays_its_own_capture_tick_for_tick`: a 20-round sim session's capture, replayed on open field01, has more than ten commanded ticks and every one matches.
 [^5]: the run of `tankpit-conformance --write-baseline wiki/sources/conformance_baseline.json` at this page's commit, over `runs/bot` and `runs/sniff`; per-capture totals and every divergence with an example capture and timestamp are in its `runs/analysis/conformance.json` (gitignored).
+[^6]: `src/tankpit_bot/validate/conformance_wire.py`, `_sent_command`, which has no catch; `tests/validate/test_conformance_wire.py`, `test_an_undecodable_command_stops_the_read`. The count is the 2026-10-07 scan named in this page's provenance.
