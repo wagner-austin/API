@@ -1671,6 +1671,23 @@ scored is that the item set is a staged file rather than a data-bank id.
   intervals imply a difference, overlapping ones imply nothing, and the
   az↔tr asymmetry that the overlap test called lost at v6 survives the
   difference test at `+0.2253 [+0.0629, +0.3918]`.
+
+  **As of 2026-10-06 every run also writes `<results>_listeners.csv` and
+  `<results>_section_scores.json`** (board task bc12f18b). The listener file
+  compares every two foreign listeners on one text with a shared-index paired
+  bootstrap: both read the same sections against the same native baseline, so
+  one index list is applied to both and passage difficulty cancels. Its run
+  record is experiment `turkic-zero-shot-listener-difference`. The LSTM
+  README had told readers that two distances differ only when their intervals
+  do not overlap; re-decided on the published `zero_shot_excess_ce_skip.csv`'s
+  own section scores, which `scripts.compare_listeners` re-pools into that CSV
+  byte for byte before testing, 20 of its 105 listener comparisons change
+  verdict, all from unresolved to differ, none reversed (69 separated by the
+  overlap rule, 89 by the paired test). The README carries it as a dated
+  correction. The published matrix's scores came from the July pipeline
+  (`2fac83a`, `checkpoints_2026-02`), which
+  `analysis/listener-comparisons-2026-10/dump_published_section_scores.py`
+  rebuilds.
 - **Eight languages as of 2026-09-03, seven of them scored.** Russian was
   added as a second non-Turkic control — Finnish is the agglutinative control,
   Russian the contact language the Cyrillic corpora borrow from. It is a base
