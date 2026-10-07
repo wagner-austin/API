@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from shutil import copyfile
 from typing import Protocol
 
 import numpy as np
@@ -21,6 +20,7 @@ from covenant_radar_api.worker.explain_regression_job import (
     run_regression_explanation,
 )
 from covenant_radar_api.worker.job_phases import ExplainJobStatus
+from tests._real_datasets import copy_real_financial_distress
 
 # ---------------------------------------------------------------------------
 # Tests for _optional_int
@@ -271,38 +271,6 @@ class _TrainableRegressorProto(Protocol):
     def save_model(self, fname: str) -> None: ...
 
 
-def _copy_real_financial_distress(
-    external_root: Path,
-) -> tuple[Path, int, list[str]]:
-    """Copy financial distress dataset into external_root.
-
-    Args:
-        external_root: Target external directory.
-
-    Returns:
-        Tuple of (path, n_rows, feature_names).
-    """
-    src = (
-        Path(__file__).parent.parent
-        / "data"
-        / "external"
-        / "kaggle_financial_distress"
-        / "Financial Distress.csv"
-    )
-    if not src.exists():
-        raise FileNotFoundError("Financial Distress dataset not found in repo data")
-    dst_dir = external_root / "kaggle_financial_distress"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "Financial Distress.csv"
-    copyfile(str(src), str(dst))
-    header = dst.read_text(encoding="utf-8").splitlines()[0]
-    cols = [c.strip() for c in header.split(",")]
-    # Exclude: Company, Time, Financial Distress (target)
-    feature_names = [c for c in cols if c not in ("Company", "Time", "Financial Distress")]
-    n_rows = sum(1 for _ in dst.open(encoding="utf-8")) - 1
-    return dst, n_rows, feature_names
-
-
 def _create_xgb_regressor_model(
     model_path: Path,
     n_features: int,
@@ -333,7 +301,7 @@ class TestRunRegressionExplanation:
     def test_permutation_explainer(self, tmp_path: Path) -> None:
         """run_regression_explanation completes with permutation."""
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_financial_distress(external_dir)
+        _, _, feature_names = copy_real_financial_distress(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgb_regressor_model(model_path, len(feature_names))
@@ -366,7 +334,7 @@ class TestRunRegressionExplanation:
         )
 
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_financial_distress(external_dir)
+        _, _, feature_names = copy_real_financial_distress(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgb_regressor_model(model_path, len(feature_names))
@@ -392,7 +360,7 @@ class TestRunRegressionExplanation:
     def test_incompatible_explainer_raises(self, tmp_path: Path) -> None:
         """Raises ValueError for incompatible explainer-backend combo."""
         external_dir = tmp_path / "external"
-        _copy_real_financial_distress(external_dir)
+        copy_real_financial_distress(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgb_regressor_model(model_path, 83)
@@ -413,7 +381,7 @@ class TestRunRegressionExplanation:
     def test_progress_callback(self, tmp_path: Path) -> None:
         """Progress callback receives all status transitions."""
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_financial_distress(external_dir)
+        _, _, feature_names = copy_real_financial_distress(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgb_regressor_model(model_path, len(feature_names))
@@ -450,7 +418,7 @@ class TestRunRegressionExplanation:
     def test_samples_all_when_exceeds_dataset(self, tmp_path: Path) -> None:
         """Uses all samples when n_samples exceeds dataset size."""
         external_dir = tmp_path / "external"
-        _, n_rows, feature_names = _copy_real_financial_distress(external_dir)
+        _, n_rows, feature_names = copy_real_financial_distress(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgb_regressor_model(model_path, len(feature_names))
@@ -499,7 +467,7 @@ class TestProcessRegressionExplainJob:
         external_dir = data_root / "external"
         models_dir = tmp_path / "models"
 
-        _, _, feature_names = _copy_real_financial_distress(external_dir)
+        _, _, feature_names = copy_real_financial_distress(external_dir)
 
         # Create model inside the configured models root:
         # process_regression_explain_job confines model_path to APP__MODELS_ROOT.

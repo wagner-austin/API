@@ -7,7 +7,6 @@ All code paths are tested with strong assertions on actual behavior.
 from __future__ import annotations
 
 from pathlib import Path
-from shutil import copyfile
 
 import pytest
 from covenant_ml.datasets import (
@@ -37,6 +36,7 @@ from tests._optimize_common_fixtures import (
     _make_fake_timeseries_dataset,
     _make_fake_timeseries_registry,
 )
+from tests._real_datasets import copy_real_polish, copy_real_taiwan, copy_real_us
 
 
 class TestGetDatasetType:
@@ -386,72 +386,12 @@ class TestWorkerTimeseriesHooks:
         assert len(dataset["x"]) == len(dataset["y"])
 
 
-def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full Taiwan dataset into external_root and return (path, n_rows, feature_names)."""
-    src = Path(__file__).parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
-    if not src.exists():
-        raise FileNotFoundError("Taiwan dataset not found in repository data")
-    dst_dir = external_root / "taiwan_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "data.csv"
-    copyfile(str(src), str(dst))
-    header = (dst.read_text(encoding="utf-8").splitlines())[0]
-    cols = [c.strip() for c in header.split(",")]
-    feature_names = cols[1:]  # all columns after label
-    n_rows = sum(1 for _ in dst.open(encoding="utf-8")) - 1
-    return dst, n_rows, feature_names
-
-
-def _copy_real_us(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full US dataset into external_root and return (path, n_rows, feature_names)."""
-    src = Path(__file__).parent.parent / "data" / "external" / "us_data" / "american_bankruptcy.csv"
-    if not src.exists():
-        raise FileNotFoundError("US dataset not found in repository data")
-    dst_dir = external_root / "us_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "american_bankruptcy.csv"
-    copyfile(str(src), str(dst))
-    header = (dst.read_text(encoding="utf-8-sig").splitlines())[0]
-    cols = [c.strip() for c in header.split(",")]
-    feature_names = [c for c in cols if c.startswith("X")]
-    n_rows = sum(1 for _ in dst.open(encoding="utf-8-sig")) - 1
-    return dst, n_rows, feature_names
-
-
-def _copy_real_polish(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full Polish dataset into external_root and return (path, n_rows, feature_names)."""
-    src = Path(__file__).parent.parent / "data" / "external" / "polish_data" / "1year.arff"
-    if not src.exists():
-        raise FileNotFoundError("Polish dataset not found in repository data")
-    dst_dir = external_root / "polish_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "1year.arff"
-    copyfile(str(src), str(dst))
-    lines = dst.read_text(encoding="utf-8").splitlines()
-    data_idx = -1
-    for i, line in enumerate(lines):
-        if line.strip().lower() == "@data":
-            data_idx = i
-            break
-    if data_idx < 0:
-        raise RuntimeError("ARFF file missing @data section")
-    n_rows = len(lines) - (data_idx + 1)
-    feature_names: list[str] = []
-    for line in lines[: data_idx + 1]:
-        s = line.strip()
-        if s.lower().startswith("@attribute"):
-            parts = s.split()
-            if len(parts) >= 2 and parts[1].lower() != "class":
-                feature_names.append(parts[1])
-    return dst, n_rows, feature_names
-
-
 class TestLoadDataset:
     """Tests for load_dataset function."""
 
     def test_load_taiwan_dataset(self, tmp_path: Path) -> None:
         """load_dataset loads Taiwan data successfully."""
-        _, n_rows, feature_names = _copy_real_taiwan(tmp_path)
+        _, n_rows, feature_names = copy_real_taiwan(tmp_path)
         dataset = load_dataset("taiwan", tmp_path)
         meta = dataset["meta"]
 
@@ -460,7 +400,7 @@ class TestLoadDataset:
 
     def test_load_us_dataset(self, tmp_path: Path) -> None:
         """load_dataset loads US data successfully."""
-        _, n_rows_us, feature_names_us = _copy_real_us(tmp_path)
+        _, n_rows_us, feature_names_us = copy_real_us(tmp_path)
         dataset = load_dataset("us", tmp_path)
         meta = dataset["meta"]
 
@@ -469,7 +409,7 @@ class TestLoadDataset:
 
     def test_load_polish_dataset(self, tmp_path: Path) -> None:
         """load_dataset loads Polish data successfully."""
-        _, n_rows_pl, feature_names_pl = _copy_real_polish(tmp_path)
+        _, n_rows_pl, feature_names_pl = copy_real_polish(tmp_path)
         dataset = load_dataset("polish", tmp_path)
         meta = dataset["meta"]
 

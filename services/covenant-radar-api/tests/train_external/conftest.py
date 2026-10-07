@@ -1,75 +1,12 @@
-"""Shared fixtures for external training tests."""
+"""Shared fixtures for external training tests.
+
+The copies of the repository's real dataset files live in
+``tests/_real_datasets.py``, shared with the optimize and explain tests.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
-from shutil import copyfile
-
-
-def copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full Taiwan dataset into external_root and return (path, n_rows, feature_names)."""
-    src = Path(__file__).parent.parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
-    if not src.exists():
-        raise FileNotFoundError("Taiwan dataset not found in repository data")
-    dst_dir = external_root / "taiwan_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "data.csv"
-    copyfile(str(src), str(dst))
-    header = (dst.read_text(encoding="utf-8").splitlines())[0]
-    cols = [c.strip() for c in header.split(",")]
-    feature_names = cols[1:]
-    n_rows = sum(1 for _ in dst.open(encoding="utf-8")) - 1
-    return dst, n_rows, feature_names
-
-
-def copy_real_us(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full US dataset into external_root and return (path, n_rows, feature_names)."""
-    src = (
-        Path(__file__).parent.parent.parent
-        / "data"
-        / "external"
-        / "us_data"
-        / "american_bankruptcy.csv"
-    )
-    if not src.exists():
-        raise FileNotFoundError("US dataset not found in repository data")
-    dst_dir = external_root / "us_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "american_bankruptcy.csv"
-    copyfile(str(src), str(dst))
-    header = (dst.read_text(encoding="utf-8-sig").splitlines())[0]
-    cols = [c.strip() for c in header.split(",")]
-    feature_names = [c for c in cols if c.startswith("X")]
-    n_rows = sum(1 for _ in dst.open(encoding="utf-8-sig")) - 1
-    return dst, n_rows, feature_names
-
-
-def copy_real_polish(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full Polish dataset into external_root and return (path, n_rows, feature_names)."""
-    src = Path(__file__).parent.parent.parent / "data" / "external" / "polish_data" / "1year.arff"
-    if not src.exists():
-        raise FileNotFoundError("Polish dataset not found in repository data")
-    dst_dir = external_root / "polish_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "1year.arff"
-    copyfile(str(src), str(dst))
-    lines = dst.read_text(encoding="utf-8").splitlines()
-    data_idx = -1
-    for i, line in enumerate(lines):
-        if line.strip().lower() == "@data":
-            data_idx = i
-            break
-    if data_idx < 0:
-        raise RuntimeError("ARFF file missing @data section")
-    n_rows = len(lines) - (data_idx + 1)
-    feature_names: list[str] = []
-    for line in lines[: data_idx + 1]:
-        s = line.strip()
-        if s.lower().startswith("@attribute"):
-            parts = s.split()
-            if len(parts) >= 2 and parts[1].lower() != "class":
-                feature_names.append(parts[1])
-    return dst, n_rows, feature_names
 
 
 def write_taiwan_dataset(base_dir: Path) -> Path:

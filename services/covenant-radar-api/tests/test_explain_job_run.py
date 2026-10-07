@@ -24,10 +24,8 @@ from covenant_radar_api.worker.explain_job import (
     run_explanation,
 )
 from covenant_radar_api.worker.job_phases import ExplainJobStatus
-from tests._explain_job_fixtures import (
-    _copy_real_taiwan,
-    _create_xgboost_model,
-)
+from tests._explain_job_fixtures import _create_xgboost_model
+from tests._real_datasets import copy_real_taiwan
 
 
 class TestSampleData:
@@ -89,7 +87,7 @@ class TestRunExplanation:
             tmp_path: Pytest temporary directory unique to this test.
         """
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         models_root = tmp_path / "models"
         models_root.mkdir()
@@ -115,7 +113,7 @@ class TestRunExplanation:
         """run_explanation completes with permutation explainer."""
         # Set up data
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         # Create model
         model_path = tmp_path / "model.ubj"
@@ -147,7 +145,7 @@ class TestRunExplanation:
     def test_run_explanation_with_shap_tree_explainer(self, tmp_path: Path) -> None:
         """run_explanation completes with shap_tree explainer."""
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgboost_model(model_path, len(feature_names))
@@ -175,7 +173,7 @@ class TestRunExplanation:
     ) -> None:
         """run_explanation uses all samples when n_samples exceeds dataset size."""
         external_dir = tmp_path / "external"
-        _, n_rows, feature_names = _copy_real_taiwan(external_dir)
+        _, n_rows, feature_names = copy_real_taiwan(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgboost_model(model_path, len(feature_names))
@@ -200,7 +198,7 @@ class TestRunExplanation:
     def test_run_explanation_raises_on_incompatible_explainer(self, tmp_path: Path) -> None:
         """run_explanation raises ValueError for incompatible explainer-backend combo."""
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgboost_model(model_path, len(feature_names))
@@ -223,7 +221,7 @@ class TestRunExplanation:
     def test_run_explanation_with_progress_callback(self, tmp_path: Path) -> None:
         """run_explanation calls progress callback with status updates."""
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgboost_model(model_path, len(feature_names))
@@ -263,7 +261,7 @@ class TestRunExplanation:
     def test_run_explanation_raises_on_missing_model_file(self, tmp_path: Path) -> None:
         """run_explanation raises FileNotFoundError for missing model file."""
         external_dir = tmp_path / "external"
-        _copy_real_taiwan(external_dir)
+        copy_real_taiwan(external_dir)
 
         config_json = dump_json_str(
             {
@@ -284,7 +282,7 @@ class TestRunExplanation:
         from covenant_ml.explainers.registry import default_explainer_registry
 
         external_dir = tmp_path / "external"
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         model_path = tmp_path / "model.ubj"
         _create_xgboost_model(model_path, len(feature_names))
@@ -323,7 +321,7 @@ class TestProcessExplainJob:
         models_dir = tmp_path / "models"
 
         # Copy real Taiwan data
-        _, _, feature_names = _copy_real_taiwan(external_dir)
+        _, _, feature_names = copy_real_taiwan(external_dir)
 
         # Create model inside the configured models root: process_explain_job
         # confines model_path to APP__MODELS_ROOT.

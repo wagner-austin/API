@@ -31,6 +31,7 @@ from scripts._test_hooks import (
 from scripts.optimize._runners import run_single_with_progress
 
 from covenant_radar_api.dataset_names import DatasetName
+from tests._real_datasets import copy_real_taiwan
 
 from .conftest import (
     make_fake_cleargbm_result,
@@ -58,22 +59,15 @@ class TestRealDatasetHooks:
         """Test _real_dataset_loader loads Taiwan dataset."""
         from scripts._test_hooks import _real_dataset_loader, _real_dataset_registry
 
-        # Copy real Taiwan dataset
         external_dir = tmp_path / "external"
-        taiwan_dir = external_dir / "taiwan_data"
-        taiwan_dir.mkdir(parents=True, exist_ok=True)
-        real_src = (
-            Path(__file__).parent.parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
-        )
-        assert real_src.exists(), "Taiwan dataset not found"
-        copyfile(str(real_src), str(taiwan_dir / "data.csv"))
+        _, n_rows, feature_names = copy_real_taiwan(external_dir)
 
         registry = _real_dataset_registry()
         config = registry.get("taiwan")
         dataset = _real_dataset_loader(config, external_dir)
 
-        assert dataset["meta"]["n_samples"] > 0
-        assert dataset["meta"]["n_features"] > 0
+        assert dataset["meta"]["n_samples"] == n_rows
+        assert dataset["meta"]["n_features"] == len(feature_names)
 
 
 class TestRealTimeseriesHooks:

@@ -7,8 +7,7 @@ from pathlib import Path
 import pytest
 
 from covenant_radar_api.worker.train_external_job import _load_dataset
-
-from .conftest import copy_real_polish, copy_real_taiwan, copy_real_us
+from tests._real_datasets import copy_real_polish, copy_real_taiwan, copy_real_us
 
 
 class TestLoadDataset:

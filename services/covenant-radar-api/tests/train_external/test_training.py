@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from shutil import copyfile
 
 from platform_core.json_utils import (
     dump_json_str,
@@ -14,8 +13,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.train_external_job import run_external_training
-
-from .conftest import copy_real_polish, copy_real_taiwan, copy_real_us
+from tests._real_datasets import copy_real_polish, copy_real_taiwan, copy_real_us
 
 
 class TestXGBoostTraining:
@@ -123,17 +121,12 @@ class TestMLPTraining:
     """Tests for MLP model training."""
 
     def test_taiwan_produces_model(self, tmp_path: Path) -> None:
-        """run_external_training trains MLP model on the full Taiwan dataset."""
+        """run_external_training trains MLP model on a sample of the real Taiwan dataset."""
         external_dir = tmp_path / "external"
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        taiwan_dir = external_dir / "taiwan_data"
-        taiwan_dir.mkdir(parents=True, exist_ok=True)
-        data_root = Path(__file__).parent.parent.parent / "data" / "external"
-        real_tw = data_root / "taiwan_data" / "data.csv"
-        assert real_tw.exists(), "Taiwan dataset not found in repository data"
-        copyfile(str(real_tw), str(taiwan_dir / "data.csv"))
+        copy_real_taiwan(external_dir)
 
         config_json = dump_json_str(
             {
@@ -164,19 +157,9 @@ class TestMLPTraining:
         assert model_path.suffix == ".pt"
 
     def test_us_produces_model(self, tmp_path: Path) -> None:
-        """run_external_training trains MLP on the full US dataset."""
+        """run_external_training trains MLP on a sample of the real US dataset."""
         external_dir = tmp_path / "external"
-        us_dir = external_dir / "us_data"
-        us_dir.mkdir(parents=True, exist_ok=True)
-        real_us = (
-            Path(__file__).parent.parent.parent
-            / "data"
-            / "external"
-            / "us_data"
-            / "american_bankruptcy.csv"
-        )
-        assert real_us.exists(), "US dataset not found in repository data"
-        copyfile(str(real_us), str(us_dir / "american_bankruptcy.csv"))
+        copy_real_us(external_dir)
 
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -214,17 +197,12 @@ class TestLSTMTraining:
     """Tests for LSTM model training."""
 
     def test_taiwan_produces_model(self, tmp_path: Path) -> None:
-        """run_external_training trains LSTM model on the full Taiwan dataset."""
+        """run_external_training trains LSTM model on a sample of the real Taiwan dataset."""
         external_dir = tmp_path / "external"
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        taiwan_dir = external_dir / "taiwan_data"
-        taiwan_dir.mkdir(parents=True, exist_ok=True)
-        data_root = Path(__file__).parent.parent.parent / "data" / "external"
-        real_tw = data_root / "taiwan_data" / "data.csv"
-        assert real_tw.exists(), "Taiwan dataset not found in repository data"
-        copyfile(str(real_tw), str(taiwan_dir / "data.csv"))
+        copy_real_taiwan(external_dir)
 
         config_json = dump_json_str(
             {
@@ -388,17 +366,12 @@ class TestLightGBMTraining:
     """Tests for LightGBM model training."""
 
     def test_taiwan_produces_model(self, tmp_path: Path) -> None:
-        """run_external_training trains LightGBM model on the full Taiwan dataset."""
+        """run_external_training trains LightGBM model on a sample of the real Taiwan dataset."""
         external_dir = tmp_path / "external"
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        taiwan_dir = external_dir / "taiwan_data"
-        taiwan_dir.mkdir(parents=True, exist_ok=True)
-        data_root = Path(__file__).parent.parent.parent / "data" / "external"
-        real_tw = data_root / "taiwan_data" / "data.csv"
-        assert real_tw.exists(), "Taiwan dataset not found in repository data"
-        copyfile(str(real_tw), str(taiwan_dir / "data.csv"))
+        copy_real_taiwan(external_dir)
 
         config_json = dump_json_str(
             {
