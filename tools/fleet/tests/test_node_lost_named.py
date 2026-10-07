@@ -90,6 +90,27 @@ class TestAJobThatNamesTheRun:
         assert node_lost.still_held(launcher, agent=LAVENDER) is True
 
 
+class TestAJobAnotherRunnerHoldsThatNamesTheRun:
+    def test_leaves_the_run_to_that_runner_and_reads_no_trail(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """serendipity's elevated runner at 04:27:09Z on 2026-10-07 stopped
+        its sibling runner's live run of job 2042e8ef as lost; the run is
+        the holder's, never this runner's to stop."""
+        row = _launched_row(sourced_config)
+        sibling = queue_job(
+            status="running",
+            node="lavender",
+            runId=DEMO_RUN_ID,
+            claimedBy="fleet-node-lavender-elevated",
+        )
+
+        found, endpoint = _ask(row, [listing_page([sibling, TWIN], None)])
+
+        assert found is None
+        assert endpoint.tools == ["dispatch_list"]
+
+
 class TestAJobThisRunnerHoldsForAnotherRun:
     def test_is_no_candidate_and_its_trail_is_not_read(self, sourced_config: pathlib.Path) -> None:
         row = _launched_row(sourced_config)
