@@ -17,12 +17,21 @@ merely looked would be changing what the next capacity check sees. They stay
 apart and compose in a shell loop, which is the same reason ``fleet-watch``
 has no ``--follow``.
 
-ABSENCE IS THE SIGNAL. The node writes its exit status only when the recipe
+ABSENCE IS THE SIGNAL. The build writes its exit status only when the recipe
 has returned, so a missing result file means the run is still going. There is
 no heartbeat and nothing infers progress from elapsed time: a run that is
 merely slow and a run that is wedged look identical from here, and the thing
 that tells them apart is the lease expiring, which
 :func:`fleet.cli.watch.lost_runs` already reports.
+
+A BUILD THAT IS KILLED IS NOT STILL GOING, and on Linux its unit says so. A
+killed build cannot write its own status, and before MCPs board task
+c8585623 such a build read as running until its lease lapsed. Fleet job
+859e7ab3 was killed by systemd-oomd 2 min 8 s into its install on
+diphtheria and was closed 22 minutes later as ``LEASE_NOT_HELD``. A Linux
+unit's ``ExecStopPost=`` now writes the result for a build that did not
+(:mod:`fleet.core.linux_unit_end`), so absence there means the build's
+processes are still alive. A Windows build still has no such writer.
 """
 
 from __future__ import annotations

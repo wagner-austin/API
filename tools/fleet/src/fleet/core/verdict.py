@@ -27,6 +27,8 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
+from fleet.core.linux_unit_end import UNIT_ENDED_LINE
+
 #: The line every package's ``make check`` prints last when it passed.
 CHECK_BANNER: Final = "=== ALL CHECKS PASSED ==="
 
@@ -199,6 +201,24 @@ def read_budget(tail: str) -> str:
     return "unread"
 
 
+def read_unit_end(tail: str) -> str | None:
+    """Read how a Linux build's unit ended, when the build itself could not say.
+
+    Args:
+        tail: The transcript's last lines.
+
+    Returns:
+        The last :data:`fleet.core.linux_unit_end.UNIT_ENDED_MARKER` line,
+        marker included (``FLEET_UNIT_ENDED: unit ... ended with systemd
+        result oom-kill (killed KILL) ...``), or None for a build that wrote
+        its own status, which is every build that was not killed.
+    """
+    last: str | None = None
+    for match in UNIT_ENDED_LINE.finditer(tail):
+        last = match.group(0)
+    return last
+
+
 def judge(
     *,
     job_id: str,
@@ -282,5 +302,6 @@ __all__ = [
     "read_budget",
     "read_coverage",
     "read_tests",
+    "read_unit_end",
     "render_verdict",
 ]

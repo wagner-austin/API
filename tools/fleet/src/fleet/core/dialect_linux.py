@@ -45,11 +45,16 @@ from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import POETRY_KEYRING_OFF, isolated_build_lines
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
+from fleet.core.linux_unit_end import unit_end_path, unit_end_script
 from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import sh_phase_lines
 
 #: How a script file is run by path.
 SH_INVOCATION = ("/bin/sh",)
+
+#: The quoted heredoc's delimiter that carries the unit-end script inside the
+#: launch script; the unit-end script never holds a line equal to it.
+UNIT_END_DELIMITER = "FLEET_UNIT_END_SCRIPT"
 
 #: How a script's body is written on the far side.
 #:
@@ -413,6 +418,12 @@ class LinuxDialect:
         and names the fix, because a unit started without it dies with the
         ssh session and reports nothing.
 
+        The unit's ``ExecStopPost=`` runs the unit-end script, which records
+        how the unit ended whenever the build did not write its own status
+        (:mod:`fleet.core.linux_unit_end`, MCPs board task c8585623). The
+        script is written by a quoted heredoc, so nothing in it is expanded
+        on the way to the disk.
+
         Args:
             target: Absolute remote directory holding the staged tree.
             run_id: The dispatch, which names its own unit.
@@ -436,6 +447,7 @@ class LinuxDialect:
             )
         unit = names.task_name(run_id)
         build = f"{target}/{names.BUILD_STEM}.sh"
+        ended = unit_end_path(target)
         return (
             f'{PROLOGUE}user="$(id -un)"\n'
             f'if [ "$(loginctl show-user "$user" -p Linger --value)" != yes ]; then\n'
@@ -443,8 +455,12 @@ class LinuxDialect:
             f'ssh session; enable it once with: sudo loginctl enable-linger $user" >&2\n'
             f"  exit 1\n"
             f"fi\n"
+            f"cat > '{ended}' <<'{UNIT_END_DELIMITER}'\n"
+            f"{unit_end_script(target=target, unit=unit, prologue=PROLOGUE)}"
+            f"{UNIT_END_DELIMITER}\n"
             f"systemd-run --user --unit='{unit}' --collect --quiet "
-            f"--property=WorkingDirectory='{target}' /bin/sh '{build}'\n"
+            f"--property=WorkingDirectory='{target}' "
+            f"--property=ExecStopPost='/bin/sh {ended}' /bin/sh '{build}'\n"
             f"printf 'launched\\n'\n"
         )
 
@@ -518,6 +534,7 @@ __all__ = [
     "PROLOGUE",
     "SH_INVOCATION",
     "TOOLCHAIN_PROBE_SCRIPT",
+    "UNIT_END_DELIMITER",
     "WRITE_COMMAND",
     "LinuxDialect",
 ]
