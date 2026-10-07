@@ -154,6 +154,7 @@ class TestClaim:
             "required_tags": (),
             "task_id": None,
             "claimed_unix": None,
+            "lease_expires_unix": None,
         }
         assert endpoint.tools == ["dispatch_claim"]
         assert endpoint.arguments[0] == {
