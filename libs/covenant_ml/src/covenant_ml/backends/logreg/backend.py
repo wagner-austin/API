@@ -169,11 +169,16 @@ def _create_logreg_model(
     random_state: int,
     class_weight: str | None,
     l1_ratio: float | None,
-    n_jobs: int,
 ) -> _LogRegModelProtocol:
     """Create sklearn LogisticRegression with given parameters.
 
-    Maps inverse_reg_strength to sklearn's uppercase C parameter.
+    Maps inverse_reg_strength to sklearn's uppercase C parameter. The model
+    runs with ``n_jobs=1``: sklearn parallelizes LogisticRegression only
+    across classes, and this backend fits one binary problem, so any other
+    value buys no parallelism and starts joblib's loky process pool for every
+    fit. Measured 2026-10-07 on 3,600 rows of the bankruptcy data: 0.60 to
+    1.02 s per fit with ``n_jobs=-1`` against 0.013 s with ``n_jobs=1``
+    (board task 2e880b79).
 
     Args:
         penalty: Regularization type ("l1", "l2", "elasticnet", or None).
@@ -184,7 +189,6 @@ def _create_logreg_model(
         random_state: Random seed.
         class_weight: Class weight strategy ("balanced" or None).
         l1_ratio: ElasticNet mixing (only for elasticnet penalty).
-        n_jobs: Number of parallel jobs.
 
     Returns:
         Fitted LogisticRegression model satisfying _LogRegModelProtocol.
@@ -202,7 +206,7 @@ def _create_logreg_model(
         random_state=random_state,
         class_weight=class_weight,
         l1_ratio=l1_ratio,
-        n_jobs=n_jobs,
+        n_jobs=1,
     )
     return model
 
@@ -392,7 +396,6 @@ class LogRegBackend(ClassifierBackend):
             random_state=cfg["random_state"],
             class_weight=class_weight_arg,
             l1_ratio=l1_ratio_arg,
-            n_jobs=-1,
         )
 
         _log.info(
