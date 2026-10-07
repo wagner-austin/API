@@ -10,7 +10,7 @@ runner holds and settles every run it launched in one of four ways:
   first (:mod:`fleet.cli.node_settle`); the queue's close posts a
   task-naming job's outcome to its thread (MCPs board task 2fecad69).
 * STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim, once it was last
-  set a minute or more ago (:mod:`fleet.cli.node_collected`), and leave it.
+  set 70 s or more ago (:mod:`fleet.cli.node_collected`), and leave it.
 * STILL RUNNING, PAST ITS LEASE (MCPs board task fd5cabfa). Stop it. Until
   this, a renewal had no deadline, so a suite that hung kept its claim and
   its node for as long as it stayed hung: measured 2026-09-22, slime job

@@ -33,10 +33,16 @@ from fleet.contracts.dispatch import DispatchJob
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS
 
 #: How long ago a running job's lease must have been set before a collect
-#: pass renews it: under the 180 s between fire boundaries, so each
-#: boundary's pass renews, and the threshold the duplicate renewals were
-#: counted against.
-RENEW_AFTER_SECONDS: Final = 60
+#: pass renews it. Over 60 s, the spacing the duplicate renewals were counted
+#: against, by more than what reading the lease can be off by: the queue's
+#: instant is decoded to whole seconds, which floors away up to one, and the
+#: hub's clock and the queue's differ by a little more. At exactly 60 s, job
+#: d371c8ec's start report at 04:35:00.935Z on 2026-10-07 read as set 60 s
+#: before the 04:36:00Z boundary's pass, which renewed it 59.2 s after it.
+#: Under 90 s, so the longest gap between two progress entries of a running
+#: job, a start just under this before a boundary and the renewal at the
+#: next, stays under 270 s with the pass's own seconds.
+RENEW_AFTER_SECONDS: Final = 70
 
 
 class CollectOutcome(StrEnum):
