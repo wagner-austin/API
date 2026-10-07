@@ -67,11 +67,13 @@ def launching_job(
         agent: This runner's label.
 
     Returns:
-        The job that names the run, which launched it; otherwise the one of
-        the row's submitter that carries a claim by this runner inside the
-        window the run began in; or, among several such, one this runner
-        still holds whose start it has not reported yet, since the run may
-        be that job's, so it is not shown lost. None when no job matches.
+        The job that names the run when this runner holds it, which
+        launched it; None when another runner holds the job that names it,
+        whose run it is; otherwise the one of the row's submitter that
+        carries a claim by this runner inside the window the run began in;
+        or, among several such, one this runner still holds whose start it
+        has not reported yet, since the run may be that job's, so it is not
+        shown lost. None when no job matches.
 
     Raises:
         AppError: ``DISPATCH_CLAIM_AMBIGUOUS`` when more than one job could
@@ -87,6 +89,15 @@ def launching_job(
     lost one that two of the same session's jobs could have launched, raised
     DISPATCH_CLAIM_AMBIGUOUS and ended the serve. A job of this runner that
     names another run launched that one, so it is no candidate here.
+
+    AND ONLY THE RUNNER HOLDING IT. Two runners serve serendipity, its own
+    and its elevated one, and each sees the other's live runs on the node as
+    candidates. A naming job taken for the launcher whoever held it made
+    the elevated runner stop the other's live run as lost at 04:27:09Z on
+    2026-10-07 (job 2042e8ef, MCPs/packages/session-audit). The trail rule
+    below already required a claim by this runner; the naming rule now
+    requires that this runner holds the job, and leaves the run to the
+    runner that does.
     """
     matches: list[DispatchJob] = []
     offset: int | None = 0
@@ -97,8 +108,8 @@ def launching_job(
         for job in page["jobs"]:
             if job["session_id"] != row["session_id"]:
                 continue
-            if job["run_id"] == row["run_id"]:
-                return job
+            if job["run_id"] == row["run_id"] and job["claimed_by"] is not None:
+                return job if job["claimed_by"] == agent else None
             if still_held(job, agent=agent) and job["run_id"] != "":
                 continue
             claims = queue.trail_claims(credentials, job_id=job["job_id"])
