@@ -1,0 +1,18 @@
+# Published digests of the authored trait-pair corpora (board task 83c25b86).
+#
+# Read by `hpc3-stage --expect-from` against `trait-corpus-stage.json`. Each
+# digest is of the COMMITTED BLOB, read with `git show HEAD:<path> | sha256sum`
+# at a8afd6c9's tree, never of a working-tree file: a Windows checkout with
+# core.autocrlf=true writes these four files with CRLF endings, so the working
+# tree hashes differently from the bytes git publishes and the cluster stages.
+# A corpus staged from such a checkout fails here, which is the refusal this
+# file exists for.
+#
+# Format is a sha256sum listing only by convention -- the reader takes
+# every 64-character lowercase-hex token it finds anywhere in the text.
+
+# services/Model-Trainer/corpus/traits, 32 authored pairs per trait
+213e933fa68a8bfc49b237ba56224144be5b76b071eed8d0acee5f1ec45c92a4  bullets.json
+d3b705d5977fdb52320d4da4b9db911e3a12bf6e9a43474bfb3da2610c6b0309  formal-tone.json
+3a9f2539bb574baf2f3e82cab19625880d4243edf94edfa13a5fd8dacac3704e  rhetorical-questions.json
+8c9682e25bf675c996038f58efa1332115053365261d7c7ee6cc8a102c03673f  step-by-step.json

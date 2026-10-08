@@ -1,0 +1,42 @@
+{
+  "project": "mi",
+  "name": "cartridge-traits-gpt2-pilot-cpu-v56",
+  "partition": "free",
+  "image": {
+    "path": "/pub/wagnera3/images/v56/abl",
+    "sha256": "890e444560d4c5caa43860bfd3235849471eadc01acbe77b968ae30e6aa7d5be",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "cpus": 16,
+  "minutes": 300,
+  "mem_gb": 32,
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_trait_sweep --plan gpt2-traits --corpus /pub/wagnera3/mi/traits/corpus --device cpu --out /pub/wagnera3/mi/traits/results/pilot-cpu-v56/gpt2-traits.json",
+  "artifact": "/pub/wagnera3/mi/traits/results/pilot-cpu-v56/gpt2-traits.json",
+  "experiment": {
+    "measurement": "cartridge-trait-composition",
+    "plan": "gpt2-traits",
+    "base_model": "gpt2",
+    "corpus": "authored-trait-pairs-4x32",
+    "corpus_digest": "53b2249185311be5",
+    "stage_manifest": "trait-corpus-stage.json",
+    "image_commit": "0e9f177f56d5e6895b6a148f6ae86901d18d4e89",
+    "traits": "bullets.step-by-step.formal-tone.rhetorical-questions",
+    "seeds": "7.8.9",
+    "compartment_counts": "2.4",
+    "steering_site": "transformer.h.8.mlp.c_proj",
+    "steering_strength": "1.0",
+    "declared_effect": "0.375",
+    "held_out_pairs": "16",
+    "why": "the-PILOT-the-task's-A6-names-as-part-of-the-criterion:-read-the-solo-precondition-and-the-seed-spread-of-contrastive-logprob-differences-on-the-committed-surface-before-the-smallest-effect-of-interest-is-re-derived",
+    "why_cpu": "a-variance-pilot-on-gpt2-small-needs-minutes-of-compute,-and-free-gpu-projected-a-start-thirteen-hours-out-on-priority-while-the-free-CPU-partition-starts-it-now;-CPU-arithmetic-is-deterministic,-and-every-number-a-plan-later-declares-from-this-pilot-is-a-spread,-not-a-gain-that-would-be-differenced-against-a-GPU-record",
+    "supersedes": "cartridge-traits-gpt2-v54.json,-which-named-image-v54-whose-opt-spec-GIT_COMMIT-a3af3e06-predates-the-trait-surface-(a8afd6c9)-and-whose-model_trainer-cli-holds-no-trait-module,-so-it-would-have-died-at-import",
+    "precondition": "the-solo-cell-runs-FIRST-and-the-run-is-refused-if-its-expression-gain-does-not-clear-its-own-seed-spread",
+    "declared_effect_status": "0.375-is-the-floor-the-32-pair-corpus-resolves,-chosen-so-the-corpus-clears-it;-this-pilot-does-not-claim-it-as-an-SEI",
+    "checkpoint_isolation": "own-results-directory,-because-the-checkpoint-lives-at-out.parent/checkpoints-and-a-twin-sharing-it-would-resume-this-run's-cells-instead-of-measuring-them",
+    "protection": "per-cell-checkpoint-resume-corpus-and-power-gate-re-derived"
+  },
+  "gpu": null
+}

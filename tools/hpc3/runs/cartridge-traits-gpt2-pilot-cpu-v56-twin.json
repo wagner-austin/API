@@ -1,0 +1,32 @@
+{
+  "project": "mi",
+  "name": "cartridge-traits-gpt2-pilot-cpu-v56-twin",
+  "partition": "free",
+  "image": {
+    "path": "/pub/wagnera3/images/v56/abl",
+    "sha256": "890e444560d4c5caa43860bfd3235849471eadc01acbe77b968ae30e6aa7d5be",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "cpus": 16,
+  "minutes": 300,
+  "mem_gb": 32,
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_trait_sweep --plan gpt2-traits --corpus /pub/wagnera3/mi/traits/corpus --device cpu --out /pub/wagnera3/mi/traits/results/pilot-cpu-v56-twin/gpt2-traits.json",
+  "artifact": "/pub/wagnera3/mi/traits/results/pilot-cpu-v56-twin/gpt2-traits.json",
+  "experiment": {
+    "measurement": "cartridge-trait-composition",
+    "plan": "gpt2-traits",
+    "base_model": "gpt2",
+    "corpus": "authored-trait-pairs-4x32",
+    "corpus_digest": "53b2249185311be5",
+    "stage_manifest": "trait-corpus-stage.json",
+    "image_commit": "0e9f177f56d5e6895b6a148f6ae86901d18d4e89",
+    "why": "bit-identity-certificate-for-cartridge-traits-gpt2-pilot-cpu-v56",
+    "what_it_certifies": "A2-requires-that-two-runs-of-the-same-plan-produce-a-bit-identical-record.-This-is-the-second-run.-No-judge-model-enters-the-measurement-path-and-the-steering-arm-draws-nothing,-so-if-the-two-records-differ-a-determinism-pin-has-come-loose-rather-than-the-traits-having-changed.",
+    "checkpoint_isolation": "own-results-directory,-because-the-checkpoint-lives-at-out.parent/checkpoints-and-a-twin-sharing-the-original's-directory-would-resume-its-cells-and-certify-nothing",
+    "protection": "per-cell-checkpoint-resume-corpus-and-power-gate-re-derived"
+  },
+  "gpu": null
+}
