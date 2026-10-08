@@ -200,9 +200,24 @@ class TestTheCommandLine:
 
         assert not _out_path(tmp_path).exists()
 
-    def test_an_absent_out_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="--out"):
-            probe_ladder.main(["--device", "cpu"])
+    def test_an_absent_out_is_refused_before_any_rung_runs(self) -> None:
+        # The refusal used to come after the whole production ladder had been
+        # walked: 42.6 s of this suite's CI job 113153367247, and the full
+        # ladder's time on a cluster job missing the flag.
+        asked: list[None] = []
+
+        def _recording_shapes() -> Mapping[str, ProbeShape]:
+            asked.append(None)
+            return CHEAP
+
+        measurement_hooks.ladder_shapes = _recording_shapes
+        try:
+            with pytest.raises(ValueError, match="--out"):
+                probe_ladder.main(["--device", "cpu"])
+        finally:
+            measurement_hooks.ladder_shapes = measurement_hooks._default_ladder_shapes
+
+        assert asked == []
 
     def test_an_unknown_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--rung"):
