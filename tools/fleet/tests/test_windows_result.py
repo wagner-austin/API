@@ -108,7 +108,8 @@ class TestTheScriptsText:
         converts from LOCAL time, so the epoch is computed from UTC."""
         body = result_script(target=TARGET, run_id=DEMO_RUN_ID)
 
-        assert "LastWriteTimeUtc - [datetime]'1970-01-01'" in body
+        assert "$age = $file.LastWriteTimeUtc - [datetime]'1970-01-01'" in body
+        assert "$epoch = [int][Math]::Floor($age.TotalSeconds)" in body
         assert "-UFormat" not in body
 
     def test_a_target_it_cannot_carry_verbatim_is_refused(self) -> None:

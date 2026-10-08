@@ -29,6 +29,7 @@ if ((-not $going) -and (-not (Test-Path -LiteralPath $result))) {
 if (Test-Path -LiteralPath $result) {
     $file = Get-Item -LiteralPath $result
     $code = (Get-Content -Raw -LiteralPath $result).Trim()
-    $epoch = [int]($file.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds
+    $age = $file.LastWriteTimeUtc - [datetime]'1970-01-01'
+    $epoch = [int][Math]::Floor($age.TotalSeconds)
     "$code $epoch"
 }

@@ -109,7 +109,10 @@ def result_script(*, target: str, run_id: str) -> str:
     late. The epoch is computed by subtracting the Unix epoch from a UTC
     timestamp rather than with ``-UFormat %s``, which in PowerShell 5.1
     converts from LOCAL time and would put every node's answer out by its
-    own offset.
+    own offset. The seconds are floored, as ``date +%s`` truncates on a
+    Linux node: a bare ``[int]`` rounds, so a file written 0.6 s into a
+    second was reported one second in the future, after the collector's own
+    clock read (fleet job 75503f09 failed on exactly that).
 
     Args:
         target: Absolute remote directory holding the staged tree.
@@ -159,7 +162,8 @@ def result_script(*, target: str, run_id: str) -> str:
         "if (Test-Path -LiteralPath $result) {",
         "    $file = Get-Item -LiteralPath $result",
         "    $code = (Get-Content -Raw -LiteralPath $result).Trim()",
-        "    $epoch = [int]($file.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds",
+        "    $age = $file.LastWriteTimeUtc - [datetime]'1970-01-01'",
+        "    $epoch = [int][Math]::Floor($age.TotalSeconds)",
         '    "$code $epoch"',
         "}",
     ]

@@ -70,7 +70,7 @@ BeforeAll {
         #>
         param([object[]]$Said, [string]$Target, [string]$Code)
         $result = Join-Path $Target 'result.txt'
-        $written = [int]((Get-Item -LiteralPath $result).LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds
+        $written = [int][Math]::Floor(((Get-Item -LiteralPath $result).LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds)
         $Said | Should -HaveCount 1
         $Said[0] | Should -BeExactly "$Code $written"
         [System.IO.File]::ReadAllText($result).Trim() | Should -BeExactly $Code
@@ -99,6 +99,13 @@ Describe 'The result render' {
         [System.IO.File]::SetLastWriteTimeUtc($result, [datetime]::new(2026, 9, 27, 17, 0, 0, [System.DateTimeKind]::Utc))
         Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly '3 1790528400'
         Test-Path -LiteralPath (Join-Path $target 'result.txt.log') | Should -BeFalse
+    }
+    It 'floors a write late in its second rather than rounding it into the next' {
+        $target = Initialize-Target 'late'
+        $result = Join-Path $target 'result.txt'
+        [System.IO.File]::WriteAllText($result, "0`r`n")
+        [System.IO.File]::SetLastWriteTimeUtc($result, [datetime]::new(2026, 9, 27, 17, 0, 0, 600, [System.DateTimeKind]::Utc))
+        Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly '0 1790528400'
     }
     It 'records the exit status of a task that ended without the build''s status, with a line saying how' {
         $target = Initialize-Target 'ended'
