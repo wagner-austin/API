@@ -13,9 +13,13 @@ scripts are removed.
 ONE RETIRE, THREE CALLERS, like :mod:`fleet.core.stop`: the node runner's
 settle (a finished run, or one stopped past its lease), every stop that
 closes a row (a cancel, by ``fleet-cancel`` or under a runner), and the hub's
-``fleet-collect``. A failure propagates with the row still live, so the next
+``fleet-collect``. For a stop and the hub's collect, which retire before
+the row closes, a failure propagates with the row still live, so the next
 tick settles the run again; every step of the script tolerates what an
-earlier attempt already did.
+earlier attempt already did. The node runner's settle retires after the
+queue close and the row's, so a node that does not answer it is recorded
+as owing the retire and a later collect pass sends it
+(:mod:`fleet.core.retire_owed`, MCPs board task 8776b828).
 
 THE RUN'S VIRTUALENV GOES TOO, BUT AFTER THE CLOSE, NOT HERE (MCPs board
 tasks 7b07c5d2 and 8993c306). Poetry named it after the tree just removed,
@@ -30,6 +34,7 @@ not remove, since it removes every orphan it finds, not the run's alone.
 
 from __future__ import annotations
 
+from platform_core.errors import AppError
 from platform_core.logging import get_logger
 
 from fleet.contracts.node import NodeConfig, NodePlatform
@@ -64,8 +69,45 @@ def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
     )
 
 
+def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOutcome:
+    """Keep one dispatch's transcript and remove its export and root scripts,
+    reporting a failure as a value.
+
+    For the settle (:mod:`fleet.core.retire_owed`), which runs after the row
+    is closed and so must tell a node that did not answer, whose retire a
+    later pass does, from one that answered and failed (MCPs board task
+    8776b828).
+
+    Args:
+        node: The node it was dispatched to.
+        run_id: The dispatch.
+
+    Returns:
+        The script's output, or the failure: ``NODE_UNREACHABLE`` when ssh
+        could not reach the node or timed out, ``DISPATCH_FAILED`` carrying
+        the node's own error when a file could not be moved or removed.
+    """
+    stage_root = node["stage_root"]
+    outcome = remote.attempt_script(
+        node["host"],
+        dialect.for_platform(node["platform"]).script_path(stage_root, names.retire_stem(run_id)),
+        script_for(node["platform"], stage_root=stage_root, run_id=run_id),
+        platform=node["platform"],
+    )
+    # A Windows retire prints one line per leftover process it ended for
+    # holding the transcript (MCPs board task e40bca34); the tick log is
+    # where a reader looks for what a runner killed.
+    for line in outcome["output"].splitlines():
+        _log.info("retire %s on %s: %s", run_id, node["host"], line)
+    return outcome
+
+
 def retire_on_node(node: NodeConfig, *, run_id: str) -> str:
     """Keep one dispatch's transcript and remove its export and root scripts.
+
+    The raising boundary over :func:`attempt_retire_on_node`, for the stop
+    and the hub's collect, which retire before the row closes, so a failure
+    leaves the row live to be settled again.
 
     Args:
         node: The node it was dispatched to.
@@ -79,19 +121,10 @@ def retire_on_node(node: NodeConfig, *, run_id: str) -> str:
             transport, the latter carrying the node's own error when a file
             could not be moved or removed.
     """
-    stage_root = node["stage_root"]
-    said = remote.run_script(
-        node["host"],
-        dialect.for_platform(node["platform"]).script_path(stage_root, names.retire_stem(run_id)),
-        script_for(node["platform"], stage_root=stage_root, run_id=run_id),
-        platform=node["platform"],
-    )
-    # A Windows retire prints one line per leftover process it ended for
-    # holding the transcript (MCPs board task e40bca34); the tick log is
-    # where a reader looks for what a runner killed.
-    for line in said.splitlines():
-        _log.info("retire %s on %s: %s", run_id, node["host"], line)
-    return names.retained_log_path(stage_root, run_id)
+    failure = attempt_retire_on_node(node, run_id=run_id)["failure"]
+    if failure is not None:
+        raise AppError(failure["code"], failure["message"])
+    return names.retained_log_path(node["stage_root"], run_id)
 
 
-__all__ = ["retire_on_node", "script_for"]
+__all__ = ["attempt_retire_on_node", "retire_on_node", "script_for"]

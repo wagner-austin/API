@@ -1,8 +1,9 @@
-"""Reading and appending the two append-only files.
+"""Reading and appending the three append-only files.
 
-The ledger and the feed share every mechanical property -- one JSON object per
-line, appended and never rewritten, read whole -- and differ only in what a
-line means and who reads it. So the mechanics live here once and the two
+The ledger, the feed and the retire record (:mod:`fleet.contracts.retire_record`,
+MCPs board task 8776b828) share every mechanical property -- one JSON object
+per line, appended and never rewritten, read whole -- and differ only in what
+a line means and who reads it. So the mechanics live here once and the
 contracts stay separate, which is the DRY split: shared plumbing, distinct
 vocabulary.
 
@@ -27,6 +28,7 @@ from fleet.contracts.feed import FeedEvent, decode_feed_event, encode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledger_entry, is_live
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import ProjectConfig
+from fleet.contracts.retire_record import RetireRecord, decode_retire_record, encode_retire_record
 from fleet.core import _test_hooks
 
 
@@ -188,11 +190,40 @@ def append_feed(path: pathlib.Path, event: FeedEvent) -> None:
     _test_hooks.append_text(path, dump_json_str(encode_feed_event(event)))
 
 
+def read_retires(path: pathlib.Path) -> tuple[RetireRecord, ...]:
+    """Read every retire a node runner recorded as owed, done or failed.
+
+    Args:
+        path: The retire record file.
+
+    Returns:
+        Every line, in the order it was appended.
+
+    Raises:
+        JSONTypeError: If a line is not JSON or does not decode, which is
+            fatal for the reason the module docstring gives: a line skipped
+            is a run's directory nothing retires.
+    """
+    return tuple(decode_retire_record(value) for _, value in _read_lines(path))
+
+
+def append_retire(path: pathlib.Path, record: RetireRecord) -> None:
+    """Append one change in a run's retire.
+
+    Args:
+        path: The retire record file.
+        record: The line to record.
+    """
+    _test_hooks.append_text(path, dump_json_str(encode_retire_record(record)))
+
+
 __all__ = [
     "append_feed",
     "append_ledger",
+    "append_retire",
     "latest_rows",
     "live_load",
     "read_feed",
     "read_ledger",
+    "read_retires",
 ]
