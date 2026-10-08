@@ -15,10 +15,19 @@ import pytest
 
 from maketools import _test_hooks
 from maketools.concurrent_run import run_targets_concurrently
+from maketools.makefile_grammar import SHELL_INCLUDE
 
 #: Wall for the children that exit by themselves. Generous so a loaded box
 #: never fails a case that is not about timing.
 PROBE_WALL_SECONDS = 120
+
+#: The repository's shell prologue, which the real-make case's Makefile
+#: includes as every tracked Makefile does, so its recipes run under the
+#: shell the prologue names rather than whichever one the environment hands
+#: make. Without it fleet c68f15c7 on loki failed with ``CreateProcess(NULL,
+#: echo left ran, ...) failed``: Windows make ran ``echo`` as a program
+#: (MCPs board task 90c135ac), which the same make on the hub never did.
+SHELL_PROLOGUE = Path(__file__).resolve().parents[3] / SHELL_INCLUDE
 
 
 def test_every_child_runs_and_answers_in_the_order_named(tmp_path: Path) -> None:
@@ -83,8 +92,12 @@ def test_a_batch_past_its_wall_kills_the_children_still_running(tmp_path: Path) 
 def test_a_real_make_runs_each_target_and_reports_it(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    # The text is quoted so PowerShell's echo prints it as one line, as
+    # /bin/sh's does.
     (tmp_path / "Makefile").write_text(
-        "_left:\n\t@echo left ran\n\n_right:\n\t@echo right ran\n", encoding="utf-8"
+        f"include {SHELL_PROLOGUE.as_posix()}\n\n"
+        "_left:\n\t@echo 'left ran'\n\n_right:\n\t@echo 'right ran'\n",
+        encoding="utf-8",
     )
     assert run_targets_concurrently(tmp_path, ["_left", "_right"]) == 0
     printed = capsys.readouterr().out
