@@ -93,11 +93,13 @@ def test_a_batch_past_its_wall_kills_the_children_still_running(tmp_path: Path) 
 def test_a_real_make_runs_each_target_and_reports_it(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # The text is quoted so PowerShell's echo prints it as one line, as
-    # /bin/sh's does.
+    # The text is double-quoted, as the recipe grammar requires, so
+    # PowerShell's echo prints it as one line as /bin/sh's does, and so GNU
+    # make 3.81 on serendipity hands it to the shell instead of running
+    # ``echo`` as a program (fleet bdaed272 failed on single quotes).
     (tmp_path / "Makefile").write_text(
         f"include {SHELL_PROLOGUE.as_posix()}\n\n"
-        "_left:\n\t@echo 'left ran'\n\n_right:\n\t@echo 'right ran'\n",
+        '_left:\n\t@echo "left ran"\n\n_right:\n\t@echo "right ran"\n',
         encoding="utf-8",
     )
     assert run_targets_concurrently(tmp_path, ["_left", "_right"]) == 0

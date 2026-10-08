@@ -77,11 +77,20 @@ SH_ONLY: Final[Sequence[tuple[str, str]]] = (
 #: on serendipity, PowerShell reads it as several words and the recipe dies
 #: before running anything (tools/fleet-execution, 2026-09-27, MCPs board
 #: task 930f4c0c), while ``/bin/sh`` on a spaceless path never shows it.
+#: ``echo`` takes its text in double quotes because GNU make 3.81, the
+#: GnuWin32 make on serendipity, reads ``powershell.exe`` as a POSIX shell
+#: and hands a recipe line holding none of its shell characters straight to
+#: CreateProcess; ``"`` is one of them and ``'`` is not, so ``@echo 'left
+#: ran'`` and ``@echo left`` exit 2 with ``CreateProcess(NULL, echo ...)
+#: failed`` there while ``@echo "left ran"`` reaches the shell (measured on
+#: serendipity 2026-10-08, fleet job bdaed272, MCPs board task cc7222ca),
+#: and make 4.4.1 on loki and sedona runs all three.
 DIVERGENT: Final[Sequence[tuple[str, str]]] = (
     (r";", "; separator (one command per line)"),
     (r"[<>|]", "redirection or pipe"),
     (r"^cd\s", "cd (use make -C or a script)"),
     (r"\$[({]MAKE[)}]", "$(MAKE) (use plain make -C)"),
+    (r'^echo\b(?!\s+")', "echo without double-quoted text (make 3.81 runs it as a program)"),
 )
 
 #: make functions that run the shell, banned anywhere in the file, and

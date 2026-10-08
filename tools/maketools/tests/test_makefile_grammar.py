@@ -92,6 +92,9 @@ def test_the_recipe_body_drops_make_prefixes() -> None:
         ("cd libs/platform_core", "cd (use make -C or a script)"),
         ("$(MAKE) -C web test", "$(MAKE) (use plain make -C)"),
         ("@${MAKE} -C ../fleet execution", "$(MAKE) (use plain make -C)"),
+        ("@echo 'left ran'", "echo without double-quoted text (make 3.81 runs it as a program)"),
+        ("@echo done", "echo without double-quoted text (make 3.81 runs it as a program)"),
+        ("@echo", "echo without double-quoted text (make 3.81 runs it as a program)"),
     ],
 )
 def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -> None:
@@ -103,6 +106,8 @@ def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -
     [
         "poetry run mypy src tests scripts",
         '@echo "=== ALL CHECKS PASSED ==="',
+        '@echo ""',
+        "@echoes-tool --flag",
         "$(PYTHON) ../../tools/maketools/scripts/run.py test",
         "poetry run pytest -n auto -v --cov-branch --cov=src",
         "make -C libs/platform_core check",
@@ -158,11 +163,11 @@ def test_the_else_arm_of_the_platform_fence_is_checked(repo: Path) -> None:
 
 def test_an_ifneq_fence_exempts_its_else_arm_instead(repo: Path) -> None:
     text = PORTABLE + (
-        "ifneq ($(OS),Windows_NT)\nx:\n\t@echo portable\nelse\nx:\n\t@Write-Host win\nendif\n"
+        'ifneq ($(OS),Windows_NT)\nx:\n\t@echo "portable"\nelse\nx:\n\t@Write-Host win\nendif\n'
     )
     assert check_makefile(repo, repo / "libs" / "Makefile", text) == []
     swapped = PORTABLE + (
-        "ifneq ($(OS),Windows_NT)\nx:\n\t@Write-Host win\nelse\nx:\n\t@echo portable\nendif\n"
+        'ifneq ($(OS),Windows_NT)\nx:\n\t@Write-Host win\nelse\nx:\n\t@echo "portable"\nendif\n'
     )
     rules = [v["rule"] for v in check_makefile(repo, repo / "libs" / "Makefile", swapped)]
     assert rules == ["cmdlet"]

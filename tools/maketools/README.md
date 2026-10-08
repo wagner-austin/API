@@ -37,7 +37,7 @@ three `platform_core` modules used (`errors`, `error_codes_tooling`,
 
 A recipe line is one plain command. Allowed: the command and its arguments,
 `@echo "..."`, make's own `$(VAR)`, a plain `make -C <dir>`, single or double
-quotes. Banned, and refused by `lint-makefiles`:
+quotes around an argument. Banned, and refused by `lint-makefiles`:
 
 | banned | because |
 |---|---|
@@ -45,6 +45,7 @@ quotes. Banned, and refused by `lint-makefiles`:
 | `&&`, `\|\|`, `$$VAR`, `/dev/null`, `[ test ]`, `if`/`for` | sh only |
 | `;`, `>`, `<`, `\|`, `cd` | read differently by the two shells |
 | `$(MAKE)`, `${MAKE}` | an unquoted path that PowerShell splits at a space (`Program Files (x86)`) |
+| `echo` whose text is not in double quotes (`@echo 'x'`, `@echo x`) | GNU Make 3.81 on serendipity runs a line holding no `"` or other shell character as a program, and `echo` is not one |
 | `SHELL :=`, `.SHELLFLAGS`, `$(shell ...)` outside `shell.mk` | the platform shell leaking into a Makefile |
 
 One fence is allowed: inside `ifeq ($(OS),Windows_NT)` ... `else` ... `endif`
