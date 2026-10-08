@@ -181,12 +181,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
-
-    record = ladder_run_record(
-        cli_args.require_flag(parsed, DEVICE_FLAG), _measurement_hooks.ladder_shapes()
-    )
-
+    device = cli_args.require_flag(parsed, DEVICE_FLAG)
+    # RESOLVED BEFORE THE RUN, as every required flag is: an absent --out
+    # used to be found only after the whole ladder had been walked.
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
+    record = ladder_run_record(device, _measurement_hooks.ladder_shapes())
+
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 
