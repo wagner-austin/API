@@ -46,33 +46,22 @@ from platform_core.run_record import (
 )
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
-from model_trainer.cli.cartridge_base_lora_sweep import (
-    LORA_TRAIN_SEED,
-    POOL_SEED_BASE,
-    _require_admissible_corpora,
-)
+from model_trainer.cli.cartridge_base_lora_sweep import _require_admissible_corpora
 from model_trainer.cli.cartridge_composition_sweep import staged_partner_trains
+from model_trainer.cli.cartridge_crowd_adapters import crowd_invariance_adapter
 from model_trainer.cli.cartridge_lora_families import lora_arm_families
-from model_trainer.cli.cartridge_lora_policy import quantization_for, target_modules_for
+from model_trainer.cli.cartridge_lora_policy import quantization_for
 from model_trainer.cli.cartridge_pool_provider import SeededPoolProvider
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
 )
-from model_trainer.core.services.finetuning.strategies import _test_hooks as strategy_hooks
 from model_trainer.core.services.finetuning.strategies.cartridge import (
     require_cache_capable,
 )
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
-from model_trainer.core.services.model.cartridge_base_lora import freeze_adapted
-from model_trainer.core.services.model.cartridge_content_lora import (
-    train_composition_lora_invariant,
-)
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
-from model_trainer.core.services.model.cartridge_measurement import (
-    train_cartridge,
-)
 from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
     digest_parts,
@@ -198,68 +187,12 @@ def measure_grid(
     )
     base.to(device)
 
-    crowding_pool = tuple(
-        train_cartridge(
-            base,
-            pool_train,
-            num_slots=plan["slots"],
-            seed=POOL_SEED_BASE + position * plan["pool_members_per_corpus"] + member,
-            epochs=plan["epochs"],
-            learning_rate=plan["learning_rate"],
-        )
-        for position, pool_train in enumerate(pool_trains)
-        for member in range(plan["pool_members_per_corpus"])
-    )
-    # A SECOND plain instance for the teacher: PEFT injects its adapters
-    # into the wrapped module tree, so after adaptation the one loaded base
-    # cannot also answer as the un-adapted base. Frozen before first use --
-    # the teacher is a fixed reference, and a teacher that could drift under
-    # the student's optimizer would make the objective chase itself.
-    teacher_base = require_cache_capable(
-        hf_hooks.Hooks.load_hf_model(plan["model_id"], quantization_for(plan["model_id"]))
-    )
-    teacher_base.to(device)
-    freeze_adapted(teacher_base)
-
-    adapted = require_cache_capable(
-        strategy_hooks.Hooks.create_peft_model(
-            base,
-            r=plan["lora_rank"],
-            lora_alpha=plan["lora_alpha"],
-            lora_dropout=0.0,
-            target_modules=target_modules_for(plan["model_id"]),
-            bias="none",
-        )
-    )
-    # member_windows[i] is the corpus pool[i] was trained on: the crowding
-    # pool nests (corpus, variant), so members of one corpus share one
-    # window list by reference.
-    member_windows = [
-        pool_trains[position]
-        for position in range(len(pool_trains))
-        for _member in range(plan["pool_members_per_corpus"])
-    ]
-    epoch_kls = train_composition_lora_invariant(
-        adapted,
-        teacher_base,
-        crowding_pool,
-        member_windows,
-        max_drawn=plan["max_drawn"],
-        seed=LORA_TRAIN_SEED,
-        epochs=plan["lora_epochs"],
-        learning_rate=plan["lora_learning_rate"],
-    )
-    freeze_adapted(adapted)
-    for position, loss in enumerate(epoch_kls):
-        _log.info("invariance epoch %d mean kl %.6f", position, loss)
+    adapted, epoch_rows = crowd_invariance_adapter(base, pool_trains, plan, device=device)
 
     observations: list[Observation] = [
         Observation(name="slots_per_cartridge", value=float(plan["slots"])),
         Observation(name="max_drawn", value=float(plan["max_drawn"])),
-        *[
-            Observation(name=f"invariance-train-epoch-{position}_kl", value=loss)
-            for position, loss in enumerate(epoch_kls)
-        ],
+        *epoch_rows,
     ]
 
     provider = SeededPoolProvider(

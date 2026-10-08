@@ -19,11 +19,15 @@ it has its own seam too, and it is where the axis's next seam goes.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
 from model_trainer.core.contracts.trait_corpus import TraitCorpus
+from model_trainer.core.services.model.cartridge_trait_repair_plans import (
+    TRAIT_REPAIR_SWEEP_PLANS,
+    TraitRepairPlan,
+)
 from model_trainer.core.services.model.trait_corpus import load_trait_corpora
 
 
@@ -66,7 +70,35 @@ def _default_read_trait_corpora(
 read_trait_corpora: ReadTraitCorporaProto = _default_read_trait_corpora
 
 
+class TraitRepairPlansProto(Protocol):
+    """Protocol for the trait-repair plan table.
+
+    Behind a hook because every real row trains a crowding pool, an adapter
+    and a companion pool over a real GPT-2 before its first cell, so a suite
+    reaching only the real table would either download a base or leave the
+    entry uncovered. Tests install a one-row table over a model they built.
+    """
+
+    def __call__(self) -> Mapping[str, TraitRepairPlan]:
+        """Return every declared trait-repair plan, in table order."""
+        ...
+
+
+def _default_trait_repair_plans() -> Mapping[str, TraitRepairPlan]:
+    """Production implementation - the committed table.
+
+    Returns:
+        :data:`~model_trainer.core.services.model.cartridge_trait_repair_plans.TRAIT_REPAIR_SWEEP_PLANS`.
+    """
+    return TRAIT_REPAIR_SWEEP_PLANS
+
+
+trait_repair_plans: TraitRepairPlansProto = _default_trait_repair_plans
+
+
 __all__ = [
     "ReadTraitCorporaProto",
+    "TraitRepairPlansProto",
     "read_trait_corpora",
+    "trait_repair_plans",
 ]
