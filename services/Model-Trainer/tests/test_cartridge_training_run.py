@@ -21,7 +21,7 @@ import pytest
 import torch
 from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 
-from model_trainer.core.config.settings import Settings, load_settings
+from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.cartridge import (
     CARTRIDGE_MANIFEST_NAME,
     CARTRIDGE_WEIGHTS_NAME,
@@ -169,11 +169,17 @@ class _Run:
     snapshot: dict[str, torch.Tensor]
     settings: Settings
 
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, settings: Settings) -> None:
         """Adapt a real model and prepare it for the trainer.
 
         Args:
             tmp_path: Directory the corpus is written into.
+            settings: Settings whose artifact, run, log and data roots are
+                under this test's own ``tmp_path``. Every test here trains a
+                run named ``cartridge-integration``, in parallel on xdist
+                workers, so a shared root (``load_settings()``'s ``/data``)
+                let one worker's checkpoint ``os.replace`` take another's
+                ``.tmp`` (API CI run 37732101697, MCPs board task 8bcefa0b).
 
         Raises:
             TypeError: If the strategy returned something else.
@@ -189,7 +195,7 @@ class _Run:
         self.snapshot = {
             name: parameter.detach().clone() for name, parameter in base.named_parameters()
         }
-        self.settings = load_settings()
+        self.settings = settings
 
     def trainer(self, run_id: str) -> BaseTrainer:
         """Build the real trainer over this run's prepared model.
@@ -236,7 +242,7 @@ class _Run:
 
 
 @pytest.fixture(name="completed")
-def _completed(tmp_path: Path) -> tuple[_Run, float, str]:
+def _completed(tmp_path: Path, settings_with_paths: Settings) -> tuple[_Run, float, str]:
     """Run one cartridge training run to completion.
 
     Shared across the assertions below so the loop runs once rather than once
@@ -244,11 +250,12 @@ def _completed(tmp_path: Path) -> tuple[_Run, float, str]:
 
     Args:
         tmp_path: Directory for the corpus.
+        settings_with_paths: Settings rooted under ``tmp_path``.
 
     Returns:
         The run, its final loss, and its output directory.
     """
-    run = _Run(tmp_path)
+    run = _Run(tmp_path, settings_with_paths)
     outcome = run.trainer("cartridge-integration").train()
     return run, outcome["loss"], outcome["out_dir"]
 

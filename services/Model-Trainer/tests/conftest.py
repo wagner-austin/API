@@ -10,6 +10,7 @@ import torch
 from platform_core.config import config_test_hooks
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_ml import sentencepiece as _spm_init
+from platform_ml import testing as platform_ml_testing
 from platform_ml import torch_types as platform_ml_torch_types
 from platform_workers.testing import (
     FakeQueue,
@@ -369,11 +370,20 @@ def _reset_hook_containers() -> Generator[None, None, None]:
     Named on the containers rather than as bare reset_hooks() calls so the
     isolation is attributable: tests below this conftest may assign
     `Hooks.<attr>` knowing each attribute is restored per test.
+
+    ``platform_ml.testing.hooks`` is restored here too. Tests assign its
+    ``load_wandb_module`` (``tests/test_coverage_gaps.py`` raises
+    ``WandbUnavailableError`` through it), and until 2026-10-08 nothing put it
+    back, so a later test on the same xdist worker that loads the real module
+    read 'wandb not installed' (API CI run 37732101697, MCPs board task
+    8bcefa0b).
     """
     Hooks.reset()
     FtHooks.reset()
     HfLmHooks.reset()
+    platform_ml_testing.reset_hooks()
     yield
     Hooks.reset()
     FtHooks.reset()
     HfLmHooks.reset()
+    platform_ml_testing.reset_hooks()
