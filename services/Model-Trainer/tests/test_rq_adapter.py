@@ -21,9 +21,6 @@ from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 # Recursive JSON type matching rq_harness
 _JsonValue = dict[str, "_JsonValue"] | list["_JsonValue"] | str | int | float | bool | None
 
-# Kwargs dict for tracking enqueue calls
-_KwargsDict = dict[str, int | str | None]
-
 
 class _TrackingQueue(RQClientQueue):
     """Queue that tracks enqueue calls for test assertions.
@@ -35,7 +32,7 @@ class _TrackingQueue(RQClientQueue):
     """
 
     def __init__(self) -> None:
-        self.last: tuple[str, _JsonValue, _KwargsDict] | None = None
+        self.last: tuple[str, _JsonValue, dict[str, int | str | None]] | None = None
         self.last_retry: RQRetryLike | None = None
         self.removed: list[str] = []
         self.remove_result = 1
@@ -52,7 +49,7 @@ class _TrackingQueue(RQClientQueue):
     ) -> RQJobLike:
         # args[0] is the payload dict
         payload: _JsonValue = args[0] if args else {}
-        kwargs: _KwargsDict = {
+        kwargs: dict[str, int | str | None] = {
             "job_timeout": job_timeout,
             "result_ttl": result_ttl,
             "failure_ttl": failure_ttl,

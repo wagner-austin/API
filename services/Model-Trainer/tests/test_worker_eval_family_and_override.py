@@ -38,18 +38,14 @@ from model_trainer.worker.eval_job import process_eval_job
 # --- Helper classes extracted from test for C901 complexity reduction ---
 
 
-# Type alias for manifest dict to avoid line length violations
-_ManifestDict = dict[str, str | int | float | bool | dict[str, str | int | float | None] | None]
-
-
 class _FakeStoreForEval:
     """Fake ArtifactStore for eval job tests."""
 
-    _manifest: _ManifestDict
+    _manifest: dict[str, str | int | float | bool | dict[str, str | int | float | None] | None]
 
     def __init__(
         self,
-        manifest: _ManifestDict,
+        manifest: dict[str, str | int | float | bool | dict[str, str | int | float | None] | None],
         base_url: str,
         api_key: str,
         *,
@@ -102,7 +98,9 @@ class _FakeServiceContainerForEval:
         return self._model_registry
 
 
-def _create_eval_manifest(run_id: str) -> _ManifestDict:
+def _create_eval_manifest(
+    run_id: str,
+) -> dict[str, str | int | float | bool | dict[str, str | int | float | None] | None]:
     """Create a manifest dict for eval job tests."""
     return {
         "run_id": run_id,
