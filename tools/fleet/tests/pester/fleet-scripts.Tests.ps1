@@ -6,11 +6,22 @@ $ErrorActionPreference = 'Stop'
 # tested in tests/test_cli_tick.py; the tasks here only run it (MCPs board
 # task 94ac1c4f).
 #
-# NOTHING HERE STARTS A REAL AGENT. poetry is a .cmd stand-in that records
-# its arguments and working directory and exits with a chosen status; every
-# task this suite registers has a disposable name and runs that stand-in,
-# so a scheduler that starts it at once (StartWhenAvailable) starts nothing
+# NOTHING HERE STARTS A REAL AGENT. poetry is a .cmd stand-in that exits
+# with a chosen status; every task this suite registers has a disposable
+# name and runs that stand-in, so a scheduler that starts it starts nothing
 # that touches the queue.
+#
+# THE RECORD HAS ONE WRITER. Register-FleetTick's trigger repeats every
+# three minutes from midnight, so Task Scheduler starts a registered task at
+# the next three-minute boundary: on the hub a task registered at
+# 2026-10-08T05:05:57Z was started at 05:06:01Z (MCPs board task 8e8e8769). A case
+# whose run crosses a boundary would find that call in the record beside the
+# announce the entry under test makes, and on a loaded hub the review of
+# 8e8e8769 read a pre-registered 'stale' task's call where the announce was
+# expected. So the stand-in records only the announce lanes, which only an
+# entry runs, synchronously, from this console; the lanes a schedule runs
+# (hub, node, elevated, and a case's 'stale') exit without writing, and each
+# case compares the whole record.
 
 BeforeAll {
     $scriptsRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'scripts'
@@ -38,9 +49,12 @@ BeforeAll {
         <#
         .SYNOPSIS
             A disposable API root with a tools\fleet directory, a log
-            directory, and a stand-in poetry that appends each call's
-            arguments and working directory to a record and exits with the
-            given status.
+            directory, and a stand-in poetry that exits with the given
+            status, first appending the arguments and working directory of
+            each announce-lane call to a record.
+        .NOTES
+            The lane is read with delayed expansion, so the quotes the tick's
+            paths carry are text in the comparison and never end an operand.
         #>
         param([int]$ExitCode = 0)
         $root = Join-Path $TestDrive ('world-' + [guid]::NewGuid().ToString('N'))
@@ -48,7 +62,9 @@ BeforeAll {
         [void][System.IO.Directory]::CreateDirectory((Join-Path $api 'tools\fleet'))
         $record = Join-Path $root 'poetry-calls.txt'
         $poetry = Join-Path $root 'poetry.cmd'
-        $body = "@echo off`r`necho %*>>`"$record`"`r`necho cwd=%CD%>>`"$record`"`r`nexit /b $ExitCode`r`n"
+        $body = "@echo off`r`nsetlocal EnableDelayedExpansion`r`nset `"said=%*`"`r`n" +
+            "if `"!said:announce=!`"==`"!said!`" exit /b $ExitCode`r`n" +
+            "echo %*>>`"$record`"`r`necho cwd=%CD%>>`"$record`"`r`nexit /b $ExitCode`r`n"
         [System.IO.File]::WriteAllText($poetry, $body, [System.Text.Encoding]::ASCII)
         return [pscustomobject]@{
             Api = $api; Fleet = Join-Path $api 'tools\fleet'; Logs = Join-Path $root 'logs'
@@ -112,9 +128,7 @@ Describe 'The schedules' {
         Invoke-TestEntry $script:registerHub $parameters 6>$null
         # The announce ran for real: the stand-in poetry, from tools\fleet,
         # with the hub-announce lane's arguments (MCPs board task 2fecad69).
-        # A scheduler that started the registered task at once appends a
-        # hub-lane call after it.
-        (Read-PoetryCall $script:world)[0..1] | Should -Be @((Get-TestTickArgument $script:world 'hub-announce'), "cwd=$($script:world.Fleet)")
+        Read-PoetryCall $script:world | Should -Be @((Get-TestTickArgument $script:world 'hub-announce'), "cwd=$($script:world.Fleet)")
         $said = @(Invoke-TestEntry $script:registerHub $parameters 6>&1 | ForEach-Object { "$_" })
         $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
         $said | Should -Be @("Registered $name (every 3 minutes and at boot, $identity, S4U, Limited) and announced it.")
@@ -166,9 +180,8 @@ Describe 'The schedules' {
         $task.Actions.Exec.Arguments | Should -BeExactly (Get-TestTickArgument $script:world 'node' 'alpha')
         $task.Settings.Priority | Should -BeExactly '4'
         # The announce ran for real: the stand-in poetry, from tools\fleet,
-        # with the announce lane's arguments. A scheduler that started the
-        # registered task at once appends a node-lane call after it.
-        (Read-PoetryCall $script:world)[0..1] | Should -Be @((Get-TestTickArgument $script:world 'announce' 'alpha'), "cwd=$($script:world.Fleet)")
+        # with the announce lane's arguments, for alpha alone.
+        Read-PoetryCall $script:world | Should -Be @((Get-TestTickArgument $script:world 'announce' 'alpha'), "cwd=$($script:world.Fleet)")
     }
     # MCPs board task a98d7083: a node declaring elevated has a second runner,
     # and its task name reads as an alias no node carries, so the cleanup
@@ -189,12 +202,11 @@ Describe 'The schedules' {
             Should -Be @("${script:prefix}alpha-3min", "${script:prefix}alpha-elevated-3min")
         (Get-TaskDefinition "${script:prefix}alpha-elevated-3min").Task.Actions.Exec.Arguments |
             Should -BeExactly (Get-TestTickArgument $script:world 'elevated' 'alpha')
-        # Each run announces both runners, the ordinary one first. A task the
-        # scheduler started at once records a node-lane call, so only the
-        # announces are compared.
-        @(Read-PoetryCall $script:world | Where-Object { $_ -like '*announce*' }) | Should -Be @(
-            (Get-TestTickArgument $script:world 'announce' 'alpha'), (Get-TestTickArgument $script:world 'elevated-announce' 'alpha'),
-            (Get-TestTickArgument $script:world 'announce' 'alpha'), (Get-TestTickArgument $script:world 'elevated-announce' 'alpha'))
+        # Each run announces both runners from tools\fleet, the ordinary one
+        # first.
+        $cwd = "cwd=$($script:world.Fleet)"
+        $announces = @((Get-TestTickArgument $script:world 'announce' 'alpha'), $cwd, (Get-TestTickArgument $script:world 'elevated-announce' 'alpha'), $cwd)
+        Read-PoetryCall $script:world | Should -Be @($announces + $announces)
         [System.IO.File]::WriteAllText($workspace, '{"nodes": {"alpha": {"enabled": true, "elevated": false}}}')
         $retired = @(Invoke-TestEntry $script:registerNodes $parameters 6>&1 | ForEach-Object { "$_" })
         $retired[0] | Should -BeExactly "Unregistered ${script:prefix}alpha-elevated-3min: fleet.json asks for no such runner."
