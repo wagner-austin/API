@@ -258,6 +258,19 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # names collide fails in seconds rather than in hours.
     CARTRIDGE_CHECKPOINT_DUPLICATE_CELL = "CARTRIDGE_CHECKPOINT_DUPLICATE_CELL"
 
+    # A merge asked to assemble a sharded sweep whose shards do not cover it:
+    # a shard directory with no completed checkpoint, or cells the sweep needs
+    # that no shard measured. Its own code because the remedy is to run the
+    # named shards, and because assembling from what is there would report
+    # means and spreads over fewer seeds than the record's label claims.
+    CARTRIDGE_SHARD_INCOMPLETE = "CARTRIDGE_SHARD_INCOMPLETE"
+
+    # A plan whose seeds cannot be cut into whole blocks of the minimum
+    # replicate count. A block is the unit a sharded sweep checkpoints and
+    # distributes, so a ragged last block would be a replicate set smaller
+    # than any measurement here accepts.
+    CARTRIDGE_SEED_BLOCKS_UNEVEN = "CARTRIDGE_SEED_BLOCKS_UNEVEN"
+
     # A trait corpus that cannot measure the trait it names: a blank member, a
     # pair whose two continuations are identical, a trait outside the
     # consistently-effective set, a trait with no pairs, or a directory with
@@ -271,19 +284,12 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # to be at the decode.
     TRAIT_CORPUS_UNUSABLE = "TRAIT_CORPUS_UNUSABLE"
 
-    # The solo trait cartridge did not express its trait by more than its own
-    # seed spread, so the composition cells below it cannot be interpreted.
-    # Raised BETWEEN cells rather than at the end, which is the whole point:
-    # the 7B rung of the corpus programme failed at exactly this step and not
-    # at composition -- solo gain +0.068 against a per-seed span of the same
-    # order -- and every retention ratio computed on those records became a
-    # division artefact. A composed arm measured against a solo arm that is
-    # indistinguishable from noise is a ratio with no reading, and the hours
-    # it costs are spent before anybody can see that. Its own code rather
-    # than reuse of CARTRIDGE_MEASUREMENT_UNREPLICATED: that one says an arm
-    # has too few SEEDS, this says the arm ran correctly and the EFFECT is
-    # not there, and the remedies share nothing.
-    TRAIT_SOLO_PRECONDITION_FAILED = "TRAIT_SOLO_PRECONDITION_FAILED"
+    # No strength in a plan's declared steering grid keeps the training
+    # pairs' coherence cost within the plan's bar, so the published tuning
+    # rule -- the most expressive strength that stays coherent -- has nothing
+    # to choose. Its own code because the remedy is the grid or the bar in the
+    # plan, not the corpus and not the site.
+    TRAIT_STEERING_STRENGTH_UNREACHABLE = "TRAIT_STEERING_STRENGTH_UNREACHABLE"
 
     # Knowledge-editing errors
     #
