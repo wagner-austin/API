@@ -31,7 +31,9 @@ The markers are read in the test and its same-file helpers:
 * a ``status`` or ``status_code`` compared to, or stated as a keyword or
   dict entry of, a literal of 400 or more: network;
 * a string literal that exits nonzero (``sys.exit(3)``, ``process.exit(1)``,
-  ``exit 2``), the child script a real process test runs: process.
+  ``exit 2``), the child script a real process test runs, or that reports
+  one (``pg_dump exited 2``, ``exit status 2``) or a spawn that found no
+  executable (``spawn claude.exe ENOENT``): process.
 
 A bare ``pytest.raises`` is not one: ``raises(ValueError)`` on bad input is
 not a timeout, an exit, a refusal or a kill.
@@ -107,7 +109,14 @@ FAILURE_ATTRIBUTES = frozenset({"timed_out", "killed"})
 EXIT_NAMES = frozenset({"exit_code", "returncode", "exitcode", "code"})
 STATUS_NAMES = frozenset({"status", "status_code"})
 NETWORK_PHRASES = ("fetch failed", "connection refused")
-NONZERO_EXIT_TEXT = re.compile(r"(?:sys\.exit|process\.exit)\(\s*[1-9]\d*\s*\)|\bexit\s+[1-9]\d*\b")
+#: Text that says a process failed: a nonzero exit, stated as code or as a
+#: message (``pg_dump exited 2``, ``exit status 2``), or a spawn that found
+#: no executable (``spawn claude.exe ENOENT``, MCPs board task 5895c980).
+#: Verbatim from MCPs' table (board task c96e8791).
+NONZERO_EXIT_TEXT = re.compile(
+    r"\b(?:sys\.exit|process\.exit|SystemExit|exit(?:ed)?)(?:\s+with)?(?:\s+(?:code|status))?"
+    r"\s*\(?\s*[1-9]|\bspawn\b[^\n]*\bENOENT\b"
+)
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 

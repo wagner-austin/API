@@ -94,6 +94,13 @@ class TestProcessMarkers:
         assert _kinds('script = "process.exit(1)"\n') == {PROCESS}
         assert _kinds('script = "exit 2"\n') == {PROCESS}
         assert _kinds('script = "sys.exit(0)"\n') == frozenset()
+        assert _kinds('match = "pg_dump exited 2"\n') == {PROCESS}
+        assert _kinds('match = "installer exited with code 1"\n') == {PROCESS}
+        assert _kinds('match = "exit status 2"\n') == {PROCESS}
+        # ENOENT is also a word of its own, the file-swap name.
+        assert _kinds('match = "spawn claude.exe ENOENT"\n') == {PROCESS, FILE_SWAP}
+        assert _kinds('match = "exit status 0"\n') == frozenset()
+        assert _kinds('match = "exit code 0"\n') == frozenset()
         assert _kinds("make()()\n") == frozenset()
 
     def test_exit_code_comparisons(self) -> None:
