@@ -42,6 +42,7 @@ from monorepo_guards.effect_primitives import (
     import_bindings,
     local_aliases,
     primitive_of,
+    qualified_name,
 )
 from monorepo_guards.util import module_nodes, parse_source
 
@@ -213,6 +214,92 @@ def resolve_function(
     return resolve_function(index, source, attr, seen)
 
 
+def package_function(
+    index: dict[str, PackageModule], module: PackageModule, node: ast.expr
+) -> tuple[PackageModule, ast.FunctionDef | ast.AsyncFunctionDef] | None:
+    """Find the package function an expression names, when it names one.
+
+    Args:
+        index: The package's modules.
+        module: The module the expression appears in.
+        node: A bare name, or ``module.fn`` on an import of a package
+            module.
+
+    Returns:
+        The defining module and function, or None for anything else, an
+        ``obj.method`` included.
+    """
+    if isinstance(node, ast.Name):
+        return resolve_function(index, module, node.id, set())
+    qualified = qualified_name(node, module.bindings)
+    if qualified is None:
+        return None
+    source_name, _, attr = qualified.rpartition(".")
+    source = index.get(source_name)
+    if source is None:
+        return None
+    return resolve_function(index, source, attr, set())
+
+
+def _factory_built(index: dict[str, PackageModule], module: PackageModule, value: ast.expr) -> bool:
+    """Report whether a bound value is a package function's result.
+
+    Args:
+        index: The package's modules.
+        module: The hooks module.
+        value: The bound value, e.g. ``make_run_git(spawn, root)``.
+
+    Returns:
+        True for a call of a package function.
+    """
+    return isinstance(value, ast.Call) and package_function(index, module, value.func) is not None
+
+
+def _reach_bound(
+    index: dict[str, PackageModule],
+    owner: PackageModule,
+    bound: ast.expr,
+    visited: set[tuple[str, str]],
+) -> Reach | None:
+    """Follow a hook bound to a value, not a function, to its effect.
+
+    A value bound straight to a primitive (``subprocess.run``,
+    ``x.bind(...)``) is that primitive. A factory-built one
+    (``make_run_git(spawn_and_collect, root)``) reaches through the
+    factory's own walk first and, failing that, the first argument it is
+    handed that is a primitive or a package function reaching one, since a
+    factory acts through what it is given (corvis-stick, measured for MCPs
+    board task c96e8791).
+
+    Args:
+        index: The package's modules.
+        owner: The hooks module.
+        bound: The bound value.
+        visited: ``(module, function)`` pairs already walked.
+
+    Returns:
+        The chain from the value, the factory or the argument, or None.
+    """
+    handed: list[ast.expr] = [bound]
+    if isinstance(bound, ast.Call):
+        handed.extend([bound.func, *bound.args, *(keyword.value for keyword in bound.keywords)])
+    for argument in handed:
+        primitive = bound_primitive(argument, owner.bindings)
+        if primitive is not None:
+            return Reach(chain=(primitive.called,), primitive=primitive)
+        target = package_function(index, owner, argument)
+        if target is None:
+            continue
+        key = (target[0].name, target[1].name)
+        if key in visited:
+            continue
+        visited.add(key)
+        deeper = reach_primitive(index, target[0], target[1], visited)
+        if deeper is not None:
+            return Reach(chain=(target[1].name, *deeper.chain), primitive=deeper.primitive)
+    return None
+
+
 def reach_primitive(
     index: dict[str, PackageModule],
     owner: PackageModule,
@@ -232,8 +319,7 @@ def reach_primitive(
         implementation reaches none.
     """
     if not isinstance(impl, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
-        bound = bound_primitive(impl, owner.bindings)
-        return None if bound is None else Reach(chain=(bound.called,), primitive=bound)
+        return _reach_bound(index, owner, impl, visited)
     aliases = local_aliases(impl, owner.bindings)
     for call in calls_in_order(impl):
         primitive = primitive_of(call, owner.bindings, aliases)
@@ -318,7 +404,11 @@ def module_seams(index: dict[str, PackageModule], module: PackageModule) -> list
         factory = owners.get(holder, "")
         if isinstance(value, ast.Name) and value.id in functions and factory:
             fields[value.id].add((factory, field))
-        elif isinstance(value, ast.Lambda) or bound_primitive(value, module.bindings):
+        elif (
+            isinstance(value, ast.Lambda)
+            or bound_primitive(value, module.bindings) is not None
+            or _factory_built(index, module, value)
+        ):
             pairs = frozenset({(factory, field)}) if factory else frozenset()
             label = f"{factory}.{field}" if factory else field
             bundled.append(Seam(module, label, value.lineno, frozenset(), pairs, module, value))
@@ -355,7 +445,9 @@ def _bound_seams(
             continue
         if not isinstance(target, ast.Name):
             continue
-        if bound_primitive(value, module.bindings) is not None:
+        if bound_primitive(value, module.bindings) is not None or _factory_built(
+            index, module, value
+        ):
             seams.append(
                 Seam(module, target.id, node.lineno, frozenset(), frozenset(), module, value)
             )

@@ -15,13 +15,21 @@ The markers are read in the test and its same-file helpers:
 
 * a NAME (a bare name, an attribute's last part, or a string key) from
   :data:`FAILURE_NAME_KINDS`, e.g. ``subprocess.TimeoutExpired``,
-  ``pytest.raises(OperationalError)``, ``errno.ENOENT``;
-* a read of ``timed_out`` or ``killed`` (attribute or key), and a call of
-  ``kill``, ``terminate`` or ``killpg``: process;
-* an exit code (``exit_code``, ``returncode``, ``exitcode``, ``code``)
-  compared equal to a nonzero literal, unequal to 0 or above 0: process;
-* a ``status`` or ``status_code`` compared to a literal of 400 or more:
+  ``pytest.raises(OperationalError)``, ``errno.ENOENT``, or any WORD of a
+  string literal that is one (``"connect ECONNREFUSED 127.0.0.1:1"``), and
+  the phrases ``fetch failed`` and ``connection refused`` (any case):
   network;
+* a read of ``timed_out`` (attribute or key): process; a read of
+  ``killed``, ``SIGKILL`` or ``SIGTERM``, and a call whose final name
+  carries ``kill`` or ``terminate`` as a snake or camel word
+  (``terminate_process(pid)``) or is ``killpg``: process and file swap,
+  since a swap killed mid-way is MCPs board task 5895c980 itself;
+* an exit code (``exit_code``, ``returncode``, ``exitcode``, ``code``)
+  compared equal to a nonzero literal, unequal to 0 or above 0, or stated
+  as a nonzero keyword argument or string-keyed dict entry
+  (``returncode=3``, ``{"exit_code": 3}``): process;
+* a ``status`` or ``status_code`` compared to, or stated as a keyword or
+  dict entry of, a literal of 400 or more: network;
 * a string literal that exits nonzero (``sys.exit(3)``, ``process.exit(1)``,
   ``exit 2``), the child script a real process test runs: process.
 
@@ -44,8 +52,10 @@ SERVICE = "service"
 FAILURE_NAME_KINDS: dict[str, frozenset[str]] = {
     "TimeoutExpired": frozenset({PROCESS}),
     "CalledProcessError": frozenset({PROCESS}),
-    "SIGKILL": frozenset({PROCESS}),
-    "SIGTERM": frozenset({PROCESS}),
+    # A kill is also a file-swap failure: a swap killed mid-way is MCPs
+    # board task 5895c980 itself, the launcher left missing.
+    "SIGKILL": frozenset({PROCESS, FILE_SWAP}),
+    "SIGTERM": frozenset({PROCESS, FILE_SWAP}),
     "TimeoutError": frozenset({PROCESS, NETWORK, SERVICE}),
     "URLError": frozenset({NETWORK}),
     "HTTPError": frozenset({NETWORK}),
@@ -86,11 +96,75 @@ SATISFIED_BY: dict[str, frozenset[str]] = {
     SERVICE: frozenset({SERVICE}),
 }
 
-KILL_CALLS = frozenset({"kill", "terminate", "killpg"})
+KILL_WORDS = frozenset({"kill", "terminate"})
+#: What a kill is a failure of: the process, and a swap it interrupts.
+KILL_KINDS = frozenset({PROCESS, FILE_SWAP})
 FAILURE_ATTRIBUTES = frozenset({"timed_out", "killed"})
 EXIT_NAMES = frozenset({"exit_code", "returncode", "exitcode", "code"})
 STATUS_NAMES = frozenset({"status", "status_code"})
+NETWORK_PHRASES = ("fetch failed", "connection refused")
 NONZERO_EXIT_TEXT = re.compile(r"(?:sys\.exit|process\.exit)\(\s*[1-9]\d*\s*\)|\bexit\s+[1-9]\d*\b")
+_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _names_a_kill(name: str | None) -> bool:
+    """Report whether a called name kills or terminates something.
+
+    Args:
+        name: The call's final name.
+
+    Returns:
+        True for ``killpg`` and for a name with ``kill`` or ``terminate``
+        as a snake or camel word (``terminate_process``,
+        ``nodeTerminateProcess``).
+    """
+    if name is None:
+        return False
+    words = set(_CAMEL_BOUNDARY.sub("_", name).lower().split("_"))
+    return name == "killpg" or bool(words & KILL_WORDS)
+
+
+def _stated_kind(name: str | None, value: int | None) -> str | None:
+    """Name the failure a member stated equal to a literal is, if one.
+
+    Args:
+        name: The member, e.g. ``returncode`` or ``status``.
+        value: The integer it is stated or compared equal to.
+
+    Returns:
+        Process for a nonzero exit code, network for a status of 400 or
+        more, None otherwise.
+    """
+    if value is None:
+        return None
+    if name in STATUS_NAMES:
+        return NETWORK if value >= 400 else None
+    if name in EXIT_NAMES:
+        return PROCESS if value != 0 else None
+    return None
+
+
+def _text_kinds(text: str) -> frozenset[str]:
+    """Name the failures a string literal states.
+
+    Args:
+        text: The literal.
+
+    Returns:
+        The kinds of every failure name among its words, network for the
+        two phrases a refused fetch or connect prints, process for an inline
+        script that exits nonzero.
+    """
+    kinds: set[str] = set()
+    spaced = "".join(char if char.isalnum() or char == "_" else " " for char in text)
+    for word in spaced.split():
+        kinds |= FAILURE_NAME_KINDS.get(word, frozenset())
+    lowered = text.lower()
+    if any(phrase in lowered for phrase in NETWORK_PHRASES):
+        kinds.add(NETWORK)
+    if NONZERO_EXIT_TEXT.search(text) is not None:
+        kinds.add(PROCESS)
+    return frozenset(kinds)
 
 
 def _int_literal(node: ast.expr) -> int | None:
@@ -169,6 +243,34 @@ def _compare_kind(node: ast.Compare) -> str | None:
     return PROCESS if failed else None
 
 
+def _only(kind: str | None) -> frozenset[str]:
+    """Wrap one optional kind as a set.
+
+    Args:
+        kind: A kind, or None.
+
+    Returns:
+        The kind alone, or nothing.
+    """
+    return frozenset() if kind is None else frozenset({kind})
+
+
+def _dict_kinds(node: ast.Dict) -> frozenset[str]:
+    """Name the failures a dict literal states by its string keys.
+
+    Args:
+        node: The dict, e.g. ``{"status": 502}``.
+
+    Returns:
+        The kinds its exit and status entries state.
+    """
+    kinds: set[str] = set()
+    for key, value in zip(node.keys, node.values, strict=True):
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            kinds |= _only(_stated_kind(key.value, _int_literal(value)))
+    return frozenset(kinds)
+
+
 def _node_kinds(child: ast.AST) -> frozenset[str]:
     """Name the failure kinds one node is a marker of.
 
@@ -180,18 +282,21 @@ def _node_kinds(child: ast.AST) -> frozenset[str]:
     """
     if isinstance(child, (ast.Name, ast.Attribute, ast.Subscript)):
         name = terminal_name(child) or ""
+        if not isinstance(child, ast.Name) and name == "killed":
+            return KILL_KINDS
         if not isinstance(child, ast.Name) and name in FAILURE_ATTRIBUTES:
             return frozenset({PROCESS})
         return FAILURE_NAME_KINDS.get(name, frozenset())
     if isinstance(child, ast.Call):
-        killed = terminal_name(child.func) in KILL_CALLS
-        return frozenset({PROCESS}) if killed else frozenset()
+        return KILL_KINDS if _names_a_kill(terminal_name(child.func)) else frozenset()
     if isinstance(child, ast.Compare):
-        kind = _compare_kind(child)
-        return frozenset() if kind is None else frozenset({kind})
+        return _only(_compare_kind(child))
+    if isinstance(child, ast.keyword):
+        return _only(_stated_kind(child.arg, _int_literal(child.value)))
+    if isinstance(child, ast.Dict):
+        return _dict_kinds(child)
     if isinstance(child, ast.Constant) and isinstance(child.value, str):
-        exits = NONZERO_EXIT_TEXT.search(child.value) is not None
-        return frozenset({PROCESS}) if exits else frozenset()
+        return _text_kinds(child.value)
     return frozenset()
 
 
@@ -215,8 +320,10 @@ __all__ = [
     "FAILURE_ATTRIBUTES",
     "FAILURE_NAME_KINDS",
     "FILE_SWAP",
-    "KILL_CALLS",
+    "KILL_KINDS",
+    "KILL_WORDS",
     "NETWORK",
+    "NETWORK_PHRASES",
     "NONZERO_EXIT_TEXT",
     "PROCESS",
     "SATISFIED_BY",

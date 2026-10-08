@@ -43,18 +43,13 @@ from pathlib import Path
 
 from monorepo_guards import Violation
 from monorepo_guards.config import GuardConfig
-from monorepo_guards.effect_primitives import (
-    dotted_name,
-    local_aliases,
-    primitive_of,
-    qualified_name,
-)
+from monorepo_guards.effect_primitives import dotted_name, local_aliases, primitive_of
 from monorepo_guards.effect_seams import (
     PackageModule,
     effect_seams,
     exposed_names,
     index_package,
-    resolve_function,
+    package_function,
     top_level_functions,
 )
 
@@ -125,34 +120,6 @@ def _is_hooks_receiver(receiver: ast.expr) -> bool:
     return dotted is not None and "hooks" in dotted.lower()
 
 
-def _first_party_callee(
-    index: dict[str, PackageModule], module: PackageModule, call: ast.Call
-) -> tuple[PackageModule, ast.FunctionDef | ast.AsyncFunctionDef] | None:
-    """Resolve a call to a function of the same package, when it is one.
-
-    Args:
-        index: The package's modules.
-        module: The calling module.
-        call: The call.
-
-    Returns:
-        The defining module and function for a bare name, or for
-        ``module.fn`` where ``module`` is an import of a package module;
-        None for anything else, an ``obj.method`` call included.
-    """
-    func = call.func
-    if isinstance(func, ast.Name):
-        return resolve_function(index, module, func.id, set())
-    qualified = qualified_name(func, module.bindings)
-    if qualified is None:
-        return None
-    source_name, _, attr = qualified.rpartition(".")
-    source = index.get(source_name)
-    if source is None:
-        return None
-    return resolve_function(index, source, attr, set())
-
-
 def performs_effect(
     index: dict[str, PackageModule],
     module: PackageModule,
@@ -191,7 +158,7 @@ def performs_effect(
             and _is_hooks_receiver(func.value)
         ):
             return True
-        target = _first_party_callee(index, module, node)
+        target = package_function(index, module, node.func)
         if target is None:
             continue
         key = (target[0].name, target[1].name)
