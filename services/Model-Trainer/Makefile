@@ -23,10 +23,15 @@ lint:
 # adds a pre-run sweep and, on Windows, a kill-on-close job object so a run
 # that dies cannot strand its xdist workers; its module header carries the
 # 2026-08-19 incident that motivated both.
+#
+# --durations=0 with --durations-min=1.0 names every test step of a second or
+# more in every check's log, as services/covenant-radar-api does, so a run
+# that nears the five-minute budget says on the CI runner or fleet node itself
+# which tests cost it (MCPs board task 2f90d785).
 test:
 	poetry lock
 	poetry sync --with dev
-	$(PYTHON) ../../tools/maketools/scripts/run.py test
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --durations=0 --durations-min=1.0
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget

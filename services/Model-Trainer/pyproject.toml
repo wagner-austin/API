@@ -141,7 +141,15 @@ testpaths = ["tests"]
 # The cap only binds where there are many cores; a box with 8 or fewer gets
 # what `auto` would have given it. Measured on one machine, so the ratio is
 # this machine's -- what generalises is the direction and the ceiling.
-addopts = "-v -n 8 --dist loadscope"
+#
+# loadgroup, not loadscope (MCPs board task 2f90d785). loadscope sends a
+# whole class or module to one worker, so CI job 113082396721 had seven
+# workers done at about 197 s while the eighth ran on to 352 s, three
+# epochs-line walks of one class among what it was given. Under loadgroup a
+# test with no xdist_group mark is scheduled on its own; a module whose
+# fixture outlives one test groups itself under its own path, which
+# tests/test_xdist_grouping.py enforces.
+addopts = "-v -n 8 --dist loadgroup"
 # 900, not 300. Measured 2026-08-19: the slowest test here
 # (test_cancel_during_eval_returns_partial_results, a 3-epoch CPU GPT-2 train)
 # takes 99.18 s ALONE on a fully idle box. Under `-n auto` each of ~31 workers
