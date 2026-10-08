@@ -13,8 +13,6 @@ equal to the recorded plan row, and the base loading ONCE per walk.
 from __future__ import annotations
 
 import pathlib
-import runpy
-import sys
 from collections.abc import Generator
 
 import pytest
@@ -43,6 +41,7 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import LMModelProto
+from tests._module_run import run_module_as_main
 from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 
 _VOCAB = PROBE_SHAPES["tiny"]["vocab_size"]
@@ -316,13 +315,24 @@ class TestDeclaredSets:
 
 
 class TestMain:
-    def test_main_walks_the_selected_set_and_writes_the_record(
+    """The command line, walked once.
+
+    ONE WALK, NOT THREE (MCPs board task 2f90d785). ``main()``, the console
+    ``entrypoint()`` and ``python -m`` each walked the whole epochs-line set,
+    27 trainings, about 30 s alone and 55 to 70 s each in CI. ``python -m``
+    runs the ``__main__`` guard, which calls ``entrypoint()``, which calls
+    ``main()`` on the process arguments, so the one execution below proves
+    all three forms and carries every assertion the separate walks made.
+    """
+
+    def test_running_it_as_a_module_walks_the_selected_set_and_writes_the_record(
         self, tmp_path: pathlib.Path
     ) -> None:
         alpha = _staged(tmp_path, "alpha")
         out = tmp_path / "record" / "line.json"
 
-        code = grid.main(
+        code = run_module_as_main(
+            "model_trainer.cli.cartridge_solo_grid",
             [
                 "--model-id",
                 "gpt2",
@@ -336,7 +346,7 @@ class TestMain:
                 "cpu",
                 "--out",
                 str(out),
-            ]
+            ],
         )
 
         assert code == 0
@@ -348,64 +358,12 @@ class TestMain:
             assert f"grid-gpt2-{cell['token']}_gain_mean" in names
         assert _LOADS == ["gpt2"]
 
-    def test_entrypoint_reads_process_argv_and_exits_with_mains_code(
+    def test_main_refuses_an_absent_out_before_loading_anything(
         self, tmp_path: pathlib.Path
     ) -> None:
         alpha = _staged(tmp_path, "alpha")
-        out = tmp_path / "line.json"
-        saved = sys.argv
-        sys.argv = [
-            "prog",
-            "--model-id",
-            "gpt2",
-            "--precision",
-            "policy",
-            "--cells",
-            "epochs-line",
-            "--corpus",
-            str(alpha),
-            "--device",
-            "cpu",
-            "--out",
-            str(out),
-        ]
-        try:
-            with pytest.raises(SystemExit) as caught:
-                grid.entrypoint()
-        finally:
-            sys.argv = saved
 
-        assert caught.value.code == 0
-        assert out.exists()
+        with pytest.raises(ValueError, match="--out"):
+            grid.main(["--model-id", "gpt2", "--cells", "grid", "--corpus", str(alpha)])
 
-    def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
-        out = tmp_path / "module" / "line.json"
-        module_name = "model_trainer.cli.cartridge_solo_grid"
-        saved_argv = sys.argv
-        saved_module = sys.modules.pop(module_name, None)
-        sys.argv = [
-            "x",
-            "--model-id",
-            "gpt2",
-            "--precision",
-            "policy",
-            "--cells",
-            "epochs-line",
-            "--corpus",
-            str(alpha),
-            "--device",
-            "cpu",
-            "--out",
-            str(out),
-        ]
-        try:
-            with pytest.raises(SystemExit) as raised:
-                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
-        finally:
-            sys.argv = saved_argv
-            if saved_module is not None:
-                sys.modules[module_name] = saved_module
-
-        assert raised.value.code == 0
-        assert out.is_file()
+        assert _LOADS == []
