@@ -33,6 +33,8 @@ from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     compose,
 )
 from model_trainer.core.services.model.cartridge_measurement import (
+    ComposedReplicate,
+    ReplicateConsumerProto,
     fresh_cartridge,
     held_out_gain,
 )
@@ -124,6 +126,99 @@ class CompanionPoolProviderProto(Protocol):
         ...
 
 
+def companioned_replicates(
+    base: CacheCapableLMProto,
+    *,
+    first_train: Sequence[torch.Tensor],
+    other_trains: Sequence[Sequence[torch.Tensor]],
+    num_slots: int,
+    seeds: Sequence[int],
+    seed_stride: int,
+    epochs: int,
+    learning_rate: float,
+    pool_for_seed: CompanionPoolProviderProto,
+    companion_probability: float,
+    consume: ReplicateConsumerProto,
+) -> None:
+    """Build one replicate per seed where EVERY cartridge trained beside a pool.
+
+    THE VARIED-COMPANIONED GEOMETRY, WITH ONE OWNER, for the reason
+    :func:`~model_trainer.core.services.model.cartridge_measurement.composed_replicates`
+    gives for the plain one: the seed offsets, the fold order and the
+    untrained control are what two measurements must share to be subtracted,
+    and the corpus grid and the trait grid both drive this one. It hands each
+    replicate to ``consume`` before building the next, because scoring flips
+    the base to evaluation mode and the geometry probe's RNG consumption
+    depends on that mode -- a caller that collected every replicate first
+    would train the next one from a different RNG state.
+
+    Args:
+        base: The frozen base.
+        first_train: Training items for the cartridge whose retention is the
+            finding.
+        other_trains: One training-item sequence per additional cartridge.
+        num_slots: Prefix positions for EACH cartridge.
+        seeds: Seeds to draw, one replicate each.
+        seed_stride: Spacing between a replicate's cartridge draws: the
+            number of seeds in the whole plan, for the reason
+            :func:`~model_trainer.core.services.model.cartridge_measurement.composed_replicates`
+            gives.
+        epochs: Passes over each training set.
+        learning_rate: Step size for AdamW.
+        pool_for_seed: Builds the replicate's frozen companion pool.
+        companion_probability: Chance per training forward that companions
+            are present, in (0, 1].
+        consume: Scores one replicate. Called once per seed, in seed order,
+            and before the next replicate is built.
+
+    Raises:
+        ValueError: If the probability is outside (0, 1] or a pool holds
+            fewer than two companions.
+        AppError: With ``CARTRIDGE_GEOMETRY_MISMATCH`` if a provider returns a
+            pool cut for another model.
+    """
+    for seed in seeds:
+        pool = pool_for_seed(seed)
+        first = train_cartridge_with_companions(
+            base,
+            first_train,
+            num_slots=num_slots,
+            seed=seed,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            companions=pool,
+            companion_probability=companion_probability,
+        )
+        others = [
+            train_cartridge_with_companions(
+                base,
+                other_train,
+                num_slots=num_slots,
+                seed=seed + (position + 1) * seed_stride,
+                epochs=epochs,
+                learning_rate=learning_rate,
+                companions=pool,
+                companion_probability=companion_probability,
+            )
+            for position, other_train in enumerate(other_trains)
+        ]
+        untrained_others = [
+            fresh_cartridge(
+                base, num_slots=num_slots, seed=seed + (position + 1) * seed_stride
+            ).slots
+            for position in range(len(other_trains))
+        ]
+        consume(
+            ComposedReplicate(
+                seed=seed,
+                alone=first,
+                composed=functools.reduce(compose, others, first),
+                untrained_composed=functools.reduce(compose, untrained_others, first),
+                others=tuple(others),
+            )
+        )
+
+
 def measure_varied_companioned_scaling(
     base: CacheCapableLMProto,
     *,
@@ -179,48 +274,44 @@ def measure_varied_companioned_scaling(
     composed: list[tuple[int, float]] = []
     untrained_composed: list[tuple[int, float]] = []
     cross: list[list[tuple[int, float]]] = [[] for _ in other_trains]
-    for seed in seeds:
-        pool = pool_for_seed(seed)
-        first = train_cartridge_with_companions(
-            base,
-            first_train,
-            num_slots=num_slots,
-            seed=seed,
-            epochs=epochs,
-            learning_rate=learning_rate,
-            companions=pool,
-            companion_probability=companion_probability,
-        )
-        others = [
-            train_cartridge_with_companions(
-                base,
-                other_train,
-                num_slots=num_slots,
-                seed=seed + (position + 1) * len(seeds),
-                epochs=epochs,
-                learning_rate=learning_rate,
-                companions=pool,
-                companion_probability=companion_probability,
-            )
-            for position, other_train in enumerate(other_trains)
-        ]
-        joined = functools.reduce(compose, others, first)
-        untrained_others = [
-            fresh_cartridge(
-                base, num_slots=num_slots, seed=seed + (position + 1) * len(seeds)
-            ).slots
-            for position in range(len(other_trains))
-        ]
-        untrained_joined = functools.reduce(compose, untrained_others, first)
-        alone.append((seed, held_out_gain(CartridgeModel(base=base, slots=first), held_out)))
-        composed.append((seed, held_out_gain(CartridgeModel(base=base, slots=joined), held_out)))
-        untrained_composed.append(
-            (seed, held_out_gain(CartridgeModel(base=base, slots=untrained_joined), held_out))
-        )
-        for position, other in enumerate(others):
-            cross[position].append(
-                (seed, held_out_gain(CartridgeModel(base=base, slots=other), held_out))
-            )
+
+    def _gain(slots: CartridgeSlots) -> float:
+        """Score one slot block on the primary held-out items.
+
+        Args:
+            slots: The block to put in front of the base.
+
+        Returns:
+            The held-out gain.
+        """
+        return held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
+
+    def _score(built: ComposedReplicate, /) -> None:
+        """Score one replicate's arms, in the order the record has always used.
+
+        Args:
+            built: The replicate just constructed.
+        """
+        seed = built["seed"]
+        alone.append((seed, _gain(built["alone"])))
+        composed.append((seed, _gain(built["composed"])))
+        untrained_composed.append((seed, _gain(built["untrained_composed"])))
+        for position, other in enumerate(built["others"]):
+            cross[position].append((seed, _gain(other)))
+
+    companioned_replicates(
+        base,
+        first_train=first_train,
+        other_trains=other_trains,
+        num_slots=num_slots,
+        seeds=seeds,
+        seed_stride=len(seeds),
+        epochs=epochs,
+        learning_rate=learning_rate,
+        pool_for_seed=pool_for_seed,
+        companion_probability=companion_probability,
+        consume=_score,
+    )
     return (
         replicate(f"{arm}-alone", alone),
         replicate(f"{arm}-composed", composed),
@@ -233,6 +324,7 @@ def measure_varied_companioned_scaling(
 
 __all__ = [
     "CompanionPoolProviderProto",
+    "companioned_replicates",
     "measure_varied_companioned_scaling",
     "train_cartridge_with_companions",
 ]

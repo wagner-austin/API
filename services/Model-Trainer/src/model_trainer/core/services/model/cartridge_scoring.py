@@ -277,6 +277,38 @@ def coherence_outcomes(losses: Sequence[TraitPairLosses]) -> list[PairedItemOutc
     ]
 
 
+def style_outcomes(losses: Sequence[TraitPairLosses]) -> list[PairedItemOutcome]:
+    """Reduce measured losses to what each arm did to the TRAIT-EXPRESSING text.
+
+    THE READING THAT WOULD MAKE THIS A CORPUS MEASUREMENT, kept so the record
+    can say whether it is one. Loss on held-out trait-expressing text is the
+    corpus arc's own dependent variable applied to a style corpus -- option
+    (b) on board task ``83c25b86``, rejected as the instrument because a
+    persona scored that way IS a style-corpus cartridge. It is carried, not
+    used, for that reason: the three readings decompose exactly, expression
+    = style - coherence, so a record holding all three shows how much of an
+    arm's expression is the trait member getting easier and how much is the
+    neutral member getting harder. A persona result that tracks this reading
+    alone is a style-corpus result, and has to be named as one.
+
+    Args:
+        losses: Measured losses, in pair order.
+
+    Returns:
+        One outcome per pair, ``baseline`` the base's loss on the expressing
+        continuation and ``treatment`` the cartridge's, so an item counts as
+        improved when the prefix made the trait's own text easier.
+    """
+    return [
+        PairedItemOutcome(
+            index=item["index"],
+            baseline=item["base_expressing"],
+            treatment=item["arm_expressing"],
+        )
+        for item in losses
+    ]
+
+
 class TraitReading(TypedDict):
     """What one arm did to a trait, and what it did to ordinary text.
 
@@ -286,7 +318,10 @@ class TraitReading(TypedDict):
     pushed toward a trait by being made worse at everything, and a record
     holding only the first number cannot tell that apart from trait
     acquisition. Reporting them together, from one set of forward passes,
-    means no arm can appear in a record with one and not the other.
+    means no arm can appear in a record with one and not the other. The style
+    reading rides along for the opposite reason: it is the number that would
+    make this a corpus measurement, and the record has to show how far the
+    expression reading departs from it.
 
     Attributes:
         expression: How much further toward the trait this arm leans than the
@@ -296,12 +331,16 @@ class TraitReading(TypedDict):
         coherence: What this arm did to the loss on the trait-free member of
             each pair.
         coherence_items: The per-item outcomes ``coherence`` was reduced from.
+        style: What this arm did to the loss on the trait-expressing member.
+        style_items: The per-item outcomes ``style`` was reduced from.
     """
 
     expression: PairedComparison
     expression_items: list[PairedItemOutcome]
     coherence: PairedComparison
     coherence_items: list[PairedItemOutcome]
+    style: PairedComparison
+    style_items: list[PairedItemOutcome]
 
 
 def read_trait_pairs(model: CartridgeModel, pairs: Sequence[TraitPair]) -> TraitReading:
@@ -346,16 +385,19 @@ def read_trait_pairs(model: CartridgeModel, pairs: Sequence[TraitPair]) -> Trait
             anything.
 
     Returns:
-        The two readings and the per-item outcomes each was reduced from.
+        The three readings and the per-item outcomes each was reduced from.
     """
     losses = measure_trait_losses(model, pairs)
     expression = expression_outcomes(losses)
     coherence = coherence_outcomes(losses)
+    style = style_outcomes(losses)
     return TraitReading(
         expression=summarise_pairs(expression),
         expression_items=expression,
         coherence=summarise_pairs(coherence),
         coherence_items=coherence,
+        style=summarise_pairs(style),
+        style_items=style,
     )
 
 
@@ -414,5 +456,6 @@ __all__ = [
     "measure_trait_losses",
     "read_trait_pairs",
     "score_held_out",
+    "style_outcomes",
     "train_on",
 ]

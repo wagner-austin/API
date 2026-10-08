@@ -5,11 +5,11 @@ dependent variable. Where that one asks whether held-out text from a corpus
 became easier to predict, this asks whether the prefix carries a DISPOSITION.
 Everything else is deliberately identical -- the seed offsets, the composition
 order, the untrained-composed control, the cross arms -- and it is identical
-because it is the SAME code:
-:func:`~model_trainer.core.services.model.cartridge_measurement.composed_replicates`
-builds the cartridges and this module scores them. Two measurements that
-differ in exactly one thing are comparable; two that were written separately
-and happen to look alike are not.
+because it is the SAME code: the corpus grid's replicate builders, bound in
+:mod:`~model_trainer.core.services.model.trait_families`, build the cartridges
+and this module scores them. Two measurements that differ in exactly one thing
+are comparable; two that were written separately and happen to look alike are
+not.
 
 EVERY ARM CARRIES TWO NUMBERS AND NEITHER IS OPTIONAL. Expression says how far
 toward the trait the arm leans; coherence says what it did to ordinary text. A
@@ -48,7 +48,7 @@ from model_trainer.core.services.finetuning.strategies.cartridge_model import Ca
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots
 from model_trainer.core.services.model.cartridge_measurement import (
     ComposedReplicate,
-    composed_replicates,
+    ReplicateBuilderProto,
     fresh_cartridge,
     train_cartridge,
 )
@@ -57,28 +57,51 @@ from model_trainer.core.services.model.cartridge_scoring import (
     coherence_outcomes,
     expression_outcomes,
     read_trait_pairs,
+    style_outcomes,
 )
 from model_trainer.core.services.model.steering_vectors import (
+    SteeringTuning,
     compose_directions,
     extract_steering_vector,
     steered_trait_losses,
+    tune_steering_strength,
     unit_direction,
 )
 from model_trainer.core.services.model.trait_corpus import training_items
 from model_trainer.core.types import CacheCapableLMProto, SteerableLMProto
 
 
+class TraitGains(TypedDict):
+    """One arm's three readings at one seed, as gains.
+
+    Attributes:
+        expression: How much further toward the trait the arm leans than its
+            base does.
+        coherence: How much easier the arm made the trait-free member.
+        style: How much easier the arm made the trait-expressing member.
+            ``expression == style - coherence`` exactly.
+    """
+
+    expression: float
+    coherence: float
+    style: float
+
+
 class TraitArm(TypedDict):
-    """One arm's two readings, replicated across seeds.
+    """One arm's three readings, replicated across seeds.
 
     Attributes:
         expression: How much further toward the trait this arm leans than the
             plain base, per seed.
         coherence: What this arm did to the loss on trait-free text, per seed.
+        style: What this arm did to the loss on the trait-expressing text,
+            per seed -- the corpus arc's own variable, carried so a persona
+            result that is really a style-corpus result shows as one.
     """
 
     expression: ReplicatedGain
     coherence: ReplicatedGain
+    style: ReplicatedGain
 
 
 class TraitCompositionArms(TypedDict):
@@ -103,35 +126,40 @@ class TraitCompositionArms(TypedDict):
     cross: tuple[TraitArm, ...]
 
 
-def trait_gains(model: CartridgeModel, pairs: Sequence[TraitPair]) -> tuple[float, float]:
-    """Score one model on one trait's pairs, as two gains.
+def trait_gains(model: CartridgeModel, pairs: Sequence[TraitPair]) -> TraitGains:
+    """Score one model on one trait's pairs, as three gains.
 
-    The one place a reading becomes a gain, so both numbers get the SIGN
+    The one place a reading becomes a gain, so every number gets the SIGN
     CONVENTION the whole arc uses: positive is better, meaning more
-    trait-preferring for expression and lower loss on ordinary text for
-    coherence. Two call sites computing ``baseline - treatment`` separately
-    is exactly how a sign flips in one arm and nothing notices.
+    trait-preferring for expression and lower loss for coherence and style.
+    Two call sites computing ``baseline - treatment`` separately is exactly
+    how a sign flips in one arm and nothing notices.
 
     Args:
         model: The cartridge-wrapped model. Its own base is the control.
         pairs: The held-out pairs of the trait being measured.
 
     Returns:
-        ``(expression, coherence)``.
+        The arm's three gains.
     """
     reading = read_trait_pairs(model, pairs)
-    return (
-        reading["expression"]["mean_baseline"] - reading["expression"]["mean_treatment"],
-        reading["coherence"]["mean_baseline"] - reading["coherence"]["mean_treatment"],
+    return TraitGains(
+        expression=reading["expression"]["mean_baseline"] - reading["expression"]["mean_treatment"],
+        coherence=reading["coherence"]["mean_baseline"] - reading["coherence"]["mean_treatment"],
+        style=reading["style"]["mean_baseline"] - reading["style"]["mean_treatment"],
     )
 
 
-def _arm(name: str, results: Sequence[tuple[int, tuple[float, float]]]) -> TraitArm:
-    """Reduce one arm's per-seed pairs of gains to two replicated gains.
+def trait_arm(name: str, results: Sequence[tuple[int, TraitGains]]) -> TraitArm:
+    """Reduce one arm's per-seed gains to three replicated gains.
+
+    Public because every module that scores a trait arm needs the same
+    reduction, and two copies of it would be two places the reading suffixes
+    are spelled.
 
     Args:
         name: The arm's name, without a reading suffix.
-        results: ``(seed, (expression, coherence))`` in the order run.
+        results: ``(seed, gains)`` in the order run.
 
     Returns:
         The arm.
@@ -141,8 +169,13 @@ def _arm(name: str, results: Sequence[tuple[int, tuple[float, float]]]) -> Trait
             were run, propagated from :func:`replicate`.
     """
     return TraitArm(
-        expression=replicate(f"{name}-expression", [(seed, gains[0]) for seed, gains in results]),
-        coherence=replicate(f"{name}-coherence", [(seed, gains[1]) for seed, gains in results]),
+        expression=replicate(
+            f"{name}-expression", [(seed, gains["expression"]) for seed, gains in results]
+        ),
+        coherence=replicate(
+            f"{name}-coherence", [(seed, gains["coherence"]) for seed, gains in results]
+        ),
+        style=replicate(f"{name}-style", [(seed, gains["style"]) for seed, gains in results]),
     )
 
 
@@ -194,8 +227,8 @@ def measure_trait_solo(
             the minimum seeds are given.
     """
     items = training_items(train)
-    trained: list[tuple[int, tuple[float, float]]] = []
-    untrained: list[tuple[int, tuple[float, float]]] = []
+    trained: list[tuple[int, TraitGains]] = []
+    untrained: list[tuple[int, TraitGains]] = []
     for seed in seeds:
         # THE UNTRAINED DRAW FIRST, at the same seed, so the two arms differ
         # in training and in nothing else. Scored before training runs,
@@ -218,66 +251,87 @@ def measure_trait_solo(
             learning_rate=learning_rate,
         )
         trained.append((seed, trait_gains(CartridgeModel(base=base, slots=slots), held_out)))
-    return _arm(arm, trained), _arm(f"{arm}-untrained", untrained)
+    return trait_arm(arm, trained), trait_arm(f"{arm}-untrained", untrained)
+
+
+def solo_precondition_cleared(expression: ReplicatedGain) -> bool:
+    """Decide whether the solo arm cleared its own noise.
+
+    THE BAR IS THE ARM'S OWN SPREAD, and it is deliberately the weakest
+    defensible one. A solo gain smaller than the range its own seeds produced
+    cannot be told from which cartridge happened to be drawn; clearing it is
+    not evidence the effect is large, only that there is an effect for every
+    composed retention to divide by. The 7B rung of the corpus programme
+    failed exactly here -- +0.068 against per-seed spans of the same order --
+    and every retention computed beside it was a division artefact.
+
+    A VERDICT, NOT A REFUSAL. A failed precondition is the result the task
+    names first (a null about the SUBSTRATE), so it has to reach a record the
+    way every other result does; a raise would leave it in a job log.
+
+    TAKES THE EXPRESSION READING RATHER THAN THE ARM because the caller
+    rebuilds it from checkpointed rows, and a resumed run never held the arm.
+
+    Args:
+        expression: The trained solo arm's expression reading.
+
+    Returns:
+        True when the mean expression gain exceeds its own per-seed spread.
+    """
+    return expression["mean"] > expression["spread"]
 
 
 def measure_trait_composition(
     base: CacheCapableLMProto,
     *,
-    first_train: Sequence[TraitPair],
-    other_trains: Sequence[Sequence[TraitPair]],
+    build: ReplicateBuilderProto,
+    partners: int,
     held_out: Sequence[TraitPair],
     arm: str,
-    num_slots: int,
-    seeds: Sequence[int],
-    epochs: int,
-    learning_rate: float,
 ) -> TraitCompositionArms:
     """Measure one trait with other traits' cartridges composed in front of it.
 
     THE COMPOSITION GEOMETRY IS NOT THIS MODULE'S, deliberately. The seed
-    offsets, the fold order and the untrained control come from
-    :func:`~model_trainer.core.services.model.cartridge_measurement.composed_replicates`,
-    the same function the corpus grid uses, so a trait cell and a corpus cell
-    differ in what is trained and scored and in nothing structural. That is
-    the property that makes the two records comparable, and it cannot be
+    offsets, the fold order and the untrained control come from the builder
+    -- :func:`~model_trainer.core.services.model.cartridge_measurement.composed_replicates`
+    for the naive grid, its companioned sibling for the repair families --
+    the same functions the corpus grid uses, so a trait cell and a corpus
+    cell differ in what is trained and scored and in nothing structural. That
+    is the property that makes the two records comparable, and it cannot be
     obtained by writing similar code twice.
 
     Args:
-        base: The frozen base.
-        first_train: Training pairs of the trait whose expression is the
-            finding.
-        other_trains: One training-pair sequence per additional trait, in
-            roster order. Composing N compartments takes ``N - 1`` entries.
+        base: The frozen base every replicate was trained in front of. Its own
+            preference is the control each arm is differenced against.
+        build: The training recipe, bound to the trait's training pairs and
+            schedule, that emits one replicate per seed.
+        partners: How many other traits the builder composes, which is how
+            many cross arms the cell carries.
         held_out: Held-out pairs of the FIRST trait. Every arm here is scored
             on these, including the cross arms -- a cross arm asks what
             another trait's cartridge does to THIS trait's pairs.
         arm: Name for this cell, e.g. ``"bullets-n4"``.
-        num_slots: Prefix positions for EACH cartridge.
-        seeds: Seeds to draw, one replicate each.
-        epochs: Passes over each trait's training pairs.
-        learning_rate: Step size for AdamW.
 
     Returns:
         The cell's arms and its controls.
 
     Raises:
-        AppError: With ``CARTRIDGE_MEASUREMENT_UNREPLICATED`` if fewer than
-            the minimum seeds are given.
+        AppError: With ``CARTRIDGE_MEASUREMENT_UNREPLICATED`` if the builder
+            emitted fewer than the minimum seeds.
     """
-    alone: list[tuple[int, tuple[float, float]]] = []
-    composed: list[tuple[int, tuple[float, float]]] = []
-    untrained_composed: list[tuple[int, tuple[float, float]]] = []
-    cross: list[list[tuple[int, tuple[float, float]]]] = [[] for _ in other_trains]
+    alone: list[tuple[int, TraitGains]] = []
+    composed: list[tuple[int, TraitGains]] = []
+    untrained_composed: list[tuple[int, TraitGains]] = []
+    cross: list[list[tuple[int, TraitGains]]] = [[] for _ in range(partners)]
 
-    def _scored(slots: CartridgeSlots) -> tuple[float, float]:
+    def _scored(slots: CartridgeSlots) -> TraitGains:
         """Score one composed or solo slot block on the primary trait.
 
         Args:
             slots: The block to put in front of the base.
 
         Returns:
-            ``(expression, coherence)``.
+            The block's three gains.
         """
         return trait_gains(CartridgeModel(base=base, slots=slots), held_out)
 
@@ -294,22 +348,13 @@ def measure_trait_composition(
         for position, other in enumerate(built["others"]):
             cross[position].append((seed, _scored(other)))
 
-    composed_replicates(
-        base,
-        first_train=training_items(first_train),
-        other_trains=[training_items(other) for other in other_trains],
-        num_slots=num_slots,
-        seeds=seeds,
-        epochs=epochs,
-        learning_rate=learning_rate,
-        consume=_score,
-    )
+    build(_score)
     return TraitCompositionArms(
-        alone=_arm(f"{arm}-alone", alone),
-        composed=_arm(f"{arm}-composed", composed),
-        untrained_composed=_arm(f"{arm}-untrained-composed", untrained_composed),
+        alone=trait_arm(f"{arm}-alone", alone),
+        composed=trait_arm(f"{arm}-composed", composed),
+        untrained_composed=trait_arm(f"{arm}-untrained-composed", untrained_composed),
         cross=tuple(
-            _arm(f"{arm}-cross-{position}", results) for position, results in enumerate(cross)
+            trait_arm(f"{arm}-cross-{position}", results) for position, results in enumerate(cross)
         ),
     )
 
@@ -321,11 +366,16 @@ class SteeringReading(TypedDict):
         arm: What was measured, e.g. ``"steer-n4"``.
         expression: The paired comparison for trait preference.
         coherence: The paired comparison for the loss on trait-free text.
+        style: The paired comparison for the loss on trait-expressing text.
+        tuning: The strength the arm was applied at, and the training-pair
+            trials it was chosen from.
     """
 
     arm: str
     expression: PairedComparison
     coherence: PairedComparison
+    style: PairedComparison
+    tuning: SteeringTuning
 
 
 def measure_trait_steering(
@@ -335,7 +385,8 @@ def measure_trait_steering(
     held_out: Sequence[TraitPair],
     arm: str,
     module_name: str,
-    strength: float,
+    strengths: Sequence[float],
+    coherence_bar: float,
 ) -> SteeringReading:
     """Measure the published intervention at one trait count.
 
@@ -349,6 +400,12 @@ def measure_trait_steering(
     read off the pairs it is scored on measures memorisation and the two arms
     would no longer be answering the same question.
 
+    THE STRENGTH IS TUNED ON THE SOLO DIRECTION AND CARRIED TO EVERY COUNT,
+    which is how the published measurement composes: each vector's
+    coefficient is tuned alone, and the cost of composing is read at those
+    coefficients. Re-tuning the composed direction would tune the
+    composition's cost away and measure the tuner.
+
     Args:
         base: The plain base, steerable. Never cartridge-wrapped: this is an
             alternative to a prefix, not an addition to one.
@@ -359,41 +416,55 @@ def measure_trait_steering(
             on.
         arm: Name for this configuration.
         module_name: Dotted path of the site to read and perturb.
-        strength: Multiplier applied to the unit direction.
+        strengths: The plan's candidate strengths for the unit direction.
+        coherence_bar: Largest coherence cost, in nats, the tuned strength
+            may incur on the first trait's training pairs.
 
     Returns:
-        The reading.
+        The reading, with the tuning that fixed its strength.
 
     Raises:
         AppError: With ``TRAIT_CORPUS_UNUSABLE`` if a trait supplies no pairs
-            or its direction is degenerate, or ``EDIT_MODULE_NOT_FOUND`` if
-            the site does not exist.
+            or its direction is degenerate, ``EDIT_MODULE_NOT_FOUND`` if the
+            site does not exist, or ``TRAIT_STEERING_STRENGTH_UNREACHABLE``
+            if no strength stays within the bar.
     """
     directions = [
         unit_direction(extract_steering_vector(base, pairs, module_name=module_name))
         for pairs in trait_trains
     ]
+    tuning = tune_steering_strength(
+        base,
+        trait_trains[0],
+        directions[0],
+        module_name=module_name,
+        strengths=strengths,
+        coherence_bar=coherence_bar,
+    )
     losses = steered_trait_losses(
         base,
         held_out,
         compose_directions(directions),
         module_name=module_name,
-        strength=strength,
+        strength=tuning["strength"],
     )
     return SteeringReading(
         arm=arm,
         expression=summarise_pairs(expression_outcomes(losses)),
         coherence=summarise_pairs(coherence_outcomes(losses)),
+        style=summarise_pairs(style_outcomes(losses)),
+        tuning=tuning,
     )
 
 
 def trait_arm_observations(measured: TraitArm) -> tuple[Observation, ...]:
-    """Name one arm's two readings for the record.
+    """Name one arm's three readings for the record.
 
-    BOTH READINGS, ALWAYS. Emitting them from one function is what makes it
+    EVERY READING, ALWAYS. Emitting them from one function is what makes it
     impossible for an arm to reach a record with an expression number and no
     coherence number beside it -- the failure that would let a trait gain
-    bought by wrecked fluency read as a clean result.
+    bought by wrecked fluency read as a clean result -- or without the style
+    number that says whether the gain is just a style corpus learned.
 
     Args:
         measured: The arm.
@@ -402,7 +473,7 @@ def trait_arm_observations(measured: TraitArm) -> tuple[Observation, ...]:
         Each reading's mean, spread and per-seed gains.
     """
     named: list[Observation] = []
-    for reading in (measured["expression"], measured["coherence"]):
+    for reading in (measured["expression"], measured["coherence"], measured["style"]):
         named.extend(gain_observations(reading))
         named.extend(per_seed_observations(reading))
     return tuple(named)
@@ -421,28 +492,32 @@ def trait_cell_observations(arm: str, cell: TraitCompositionArms) -> tuple[Obser
     A ratio against a non-gain would report a number whose sign and size both
     mean nothing.
 
-    RETENTION IS EXPRESSION-ONLY, AND DELIBERATELY. A ratio of coherence gains
+    NO COHERENCE RETENTION, AND DELIBERATELY. A ratio of coherence gains
     would divide one fluency change by another, which is not a retained
     fraction of anything: coherence is a cost, and costs are read as
-    differences against the controls in the same record.
+    differences against the controls in the same record. The STYLE retention
+    is emitted beside the expression one because it is the corpus arc's own
+    retention on a style corpus: where the two agree arm for arm, the persona
+    result is a style-corpus result and has to be named as one.
 
     Args:
         arm: The cell's name.
         cell: The cell's arms.
 
     Returns:
-        Every arm's rows, and the expression retention where it is readable.
+        Every arm's rows, and each retention where its alone arm gained.
     """
     named: list[Observation] = []
     for measured in (cell["alone"], cell["composed"], cell["untrained_composed"], *cell["cross"]):
         named.extend(trait_arm_observations(measured))
-    if cell["alone"]["expression"]["mean"] > 0.0:
-        named.append(
-            Observation(
-                name=f"{arm}_expression_retention",
-                value=retention(cell["alone"]["expression"], cell["composed"]["expression"]),
+    for reading in ("expression", "style"):
+        if cell["alone"][reading]["mean"] > 0.0:
+            named.append(
+                Observation(
+                    name=f"{arm}_{reading}_retention",
+                    value=retention(cell["alone"][reading], cell["composed"][reading]),
+                )
             )
-        )
     return tuple(named)
 
 
@@ -460,12 +535,20 @@ def steering_observations(reading: SteeringReading) -> tuple[Observation, ...]:
         reading: The configuration.
 
     Returns:
-        Both readings' shifts, item counts, directional splits and p-values.
+        The tuned strength and every training trial it was chosen from, then
+        every reading's shift, item count, directional split and p-value.
     """
-    named: list[Observation] = []
+    named: list[Observation] = [
+        Observation(name=f"{reading['arm']}-strength", value=reading["tuning"]["strength"])
+    ]
+    for trial in reading["tuning"]["trials"]:
+        prefix = f"{reading['arm']}-tune-s{trial['strength']:g}"
+        named.append(Observation(name=f"{prefix}-expression_train", value=trial["expression"]))
+        named.append(Observation(name=f"{prefix}-coherence_train", value=trial["coherence"]))
     for label, comparison in (
         ("expression", reading["expression"]),
         ("coherence", reading["coherence"]),
+        ("style", reading["style"]),
     ):
         prefix = f"{reading['arm']}-{label}"
         named.append(
@@ -485,10 +568,13 @@ __all__ = [
     "SteeringReading",
     "TraitArm",
     "TraitCompositionArms",
+    "TraitGains",
     "measure_trait_composition",
     "measure_trait_solo",
     "measure_trait_steering",
+    "solo_precondition_cleared",
     "steering_observations",
+    "trait_arm",
     "trait_arm_observations",
     "trait_cell_observations",
     "trait_gains",

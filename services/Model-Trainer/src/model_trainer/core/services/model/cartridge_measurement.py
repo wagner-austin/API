@@ -336,6 +336,22 @@ class ReplicateConsumerProto(Protocol):
         ...
 
 
+class ReplicateBuilderProto(Protocol):
+    """A training recipe, bound to its inputs, that emits replicates to a scorer.
+
+    What lets one scorer drive several recipes. The plain build
+    (:func:`composed_replicates`) and the companioned one
+    (:func:`~model_trainer.core.services.model.cartridge_varied.companioned_replicates`)
+    differ in how each cartridge trains and in nothing they hand over, so a
+    measurement that scores replicates takes one of these rather than a flag
+    naming which recipe to call.
+    """
+
+    def __call__(self, consume: ReplicateConsumerProto, /) -> None:
+        """Build every replicate, handing each to ``consume`` as it is built."""
+        ...
+
+
 def composed_replicates(
     base: CacheCapableLMProto,
     *,
@@ -343,6 +359,7 @@ def composed_replicates(
     other_trains: Sequence[Sequence[torch.Tensor]],
     num_slots: int,
     seeds: Sequence[int],
+    seed_stride: int,
     epochs: int,
     learning_rate: float,
     consume: ReplicateConsumerProto,
@@ -353,11 +370,19 @@ def composed_replicates(
     order and the untrained control are the parts that must be identical
     between any two measurements that want to be compared, and they are not
     obvious: the k-th other cartridge draws from ``seed + (k + 1) *
-    len(seeds)`` so no two cartridges in one replicate share a draw, and the
+    seed_stride`` so no two cartridges in one replicate share a draw, and the
     untrained draws reuse those SAME offsets so they differ from each other
     exactly the way the trained ones do. A second measurement re-deriving that
     would not fail; it would produce a complete table whose arms cannot be
     subtracted from this one's, which is worse.
+
+    THE STRIDE IS THE PLAN'S SEED COUNT, PASSED, NOT THIS CALL'S. Every
+    recorded sweep measured all its seeds in one call and passed
+    ``len(seeds)``, which is what the offsets have always been. A sweep that
+    measures its seeds in BLOCKS -- to checkpoint or distribute them -- passes
+    the whole plan's count, so a block's cartridges are the ones a straight
+    run would have drawn, and no block's partner draw lands on another
+    block's primary seed.
 
     IT CALLS THE CALLER BACK RATHER THAN RETURNING A LIST, AND THAT IS
     LOAD-BEARING RATHER THAN TIDINESS. Scoring puts the base in evaluation
@@ -382,6 +407,8 @@ def composed_replicates(
             Composing N compartments takes ``N - 1`` entries.
         num_slots: Prefix positions for EACH cartridge.
         seeds: Seeds to draw, one replicate each.
+        seed_stride: Spacing between a replicate's cartridge draws: the
+            number of seeds in the whole plan.
         epochs: Passes over each training set.
         learning_rate: Step size for AdamW.
         consume: Scores one replicate. Called once per seed, in seed order,
@@ -401,7 +428,7 @@ def composed_replicates(
                 base,
                 other_train,
                 num_slots=num_slots,
-                seed=seed + (position + 1) * len(seeds),
+                seed=seed + (position + 1) * seed_stride,
                 epochs=epochs,
                 learning_rate=learning_rate,
             )
@@ -409,7 +436,7 @@ def composed_replicates(
         ]
         untrained_others = [
             fresh_cartridge(
-                base, num_slots=num_slots, seed=seed + (position + 1) * len(seeds)
+                base, num_slots=num_slots, seed=seed + (position + 1) * seed_stride
             ).slots
             for position in range(len(other_trains))
         ]
@@ -525,6 +552,7 @@ def measure_composition_scaling(
         other_trains=other_trains,
         num_slots=num_slots,
         seeds=seeds,
+        seed_stride=len(seeds),
         epochs=epochs,
         learning_rate=learning_rate,
         consume=_score,
@@ -541,6 +569,7 @@ def measure_composition_scaling(
 
 __all__ = [
     "ComposedReplicate",
+    "ReplicateBuilderProto",
     "ReplicateConsumerProto",
     "composed_replicates",
     "fresh_cartridge",

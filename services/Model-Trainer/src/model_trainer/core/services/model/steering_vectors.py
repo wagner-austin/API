@@ -43,11 +43,15 @@ from platform_core.errors import (
     ModelTrainerErrorCode,
     model_trainer_status_for,
 )
+from typing_extensions import TypedDict
 
+from model_trainer.core.contracts.paired_comparison import summarise_pairs
 from model_trainer.core.services.model.cartridge_scoring import (
     TraitPair,
     TraitPairLosses,
     base_loss,
+    coherence_outcomes,
+    expression_outcomes,
 )
 from model_trainer.core.services.model.editing.activations import capture_module_io
 from model_trainer.core.services.model.editing.sites import require_edit_module
@@ -380,11 +384,117 @@ def steered_trait_losses(
     ]
 
 
+class SteeringTrial(TypedDict):
+    """One candidate strength, scored on the training pairs.
+
+    Attributes:
+        strength: The multiplier tried.
+        expression: The expression gain it produced on the training pairs.
+        coherence: The coherence gain it produced there -- negative when the
+            neutral member got harder.
+    """
+
+    strength: float
+    expression: float
+    coherence: float
+
+
+class SteeringTuning(TypedDict):
+    """The strength the published rule chose, and every trial it chose among.
+
+    Attributes:
+        strength: The chosen multiplier.
+        trials: Every candidate, in the plan's grid order.
+    """
+
+    strength: float
+    trials: tuple[SteeringTrial, ...]
+
+
+def tune_steering_strength(
+    model: SteerableLMProto,
+    pairs: Sequence[TraitPair],
+    direction: torch.Tensor,
+    *,
+    module_name: str,
+    strengths: Sequence[float],
+    coherence_bar: float,
+) -> SteeringTuning:
+    """Choose a strength the way the published composition measurement does.
+
+    THE RULE IS THE PUBLISHED ONE. Subbiah et al. tune each vector's
+    coefficient to maximise trait expression subject to coherence staying at
+    or above a bar, because steering harder buys expression with fluency and
+    an untuned arm is a comparison against whatever strength happened to be
+    typed. A strength fixed at 1.0 on a unit direction is exactly that: on
+    gpt2 at two thirds of depth it moves expression by thousandths of a nat.
+
+    THE BAR IS IN THIS INSTRUMENT'S UNITS, not the paper's. Their 75-of-100
+    is a judge score and does not transfer; here a trial is admitted when its
+    coherence gain is no worse than ``-coherence_bar`` nats, and a plan sets
+    the bar to the cartridge's own solo coherence cost so the two substrates
+    are compared at matched fluency.
+
+    ON TRAINING PAIRS ONLY, for the wall every arm is held to: a strength
+    chosen on the pairs it is scored on would be fitted to them.
+
+    Args:
+        model: The plain base, steerable.
+        pairs: The trait's TRAINING pairs.
+        direction: The unit direction being tuned, usually the solo one.
+        module_name: Dotted path of the site to perturb.
+        strengths: The plan's candidate grid, in order.
+        coherence_bar: Largest coherence cost, in nats, a trial may incur.
+
+    Returns:
+        The most expressive admissible strength (the first in grid order on a
+        tie) and every trial.
+
+    Raises:
+        AppError: With ``TRAIT_STEERING_STRENGTH_UNREACHABLE`` when no strength
+            in the grid stays within the bar, and propagated from scoring.
+    """
+    trials: list[SteeringTrial] = []
+    for strength in strengths:
+        losses = steered_trait_losses(
+            model, pairs, direction, module_name=module_name, strength=strength
+        )
+        expression = summarise_pairs(expression_outcomes(losses))
+        coherence = summarise_pairs(coherence_outcomes(losses))
+        trials.append(
+            SteeringTrial(
+                strength=strength,
+                expression=expression["mean_baseline"] - expression["mean_treatment"],
+                coherence=coherence["mean_baseline"] - coherence["mean_treatment"],
+            )
+        )
+    admissible = [trial for trial in trials if trial["coherence"] >= -coherence_bar]
+    if not admissible:
+        raise AppError(
+            ModelTrainerErrorCode.TRAIT_STEERING_STRENGTH_UNREACHABLE,
+            (
+                f"every strength in {tuple(strengths)} costs more than {coherence_bar:.4f} nats "
+                f"of coherence on the training pairs (the mildest costs "
+                f"{-max(trial['coherence'] for trial in trials):.4f}); the grid needs a "
+                f"smaller strength or the plan a different bar"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.TRAIT_STEERING_STRENGTH_UNREACHABLE),
+        )
+    chosen = admissible[0]
+    for trial in admissible[1:]:
+        if trial["expression"] > chosen["expression"]:
+            chosen = trial
+    return SteeringTuning(strength=chosen["strength"], trials=tuple(trials))
+
+
 __all__ = [
+    "SteeringTrial",
+    "SteeringTuning",
     "attach_steering",
     "compose_directions",
     "extract_steering_vector",
     "require_steerable",
     "steered_trait_losses",
+    "tune_steering_strength",
     "unit_direction",
 ]

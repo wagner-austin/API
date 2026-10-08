@@ -3,11 +3,22 @@
 THE SAME CONTRACT AS :mod:`~model_trainer.core.contracts.qa_plan`, one
 substrate over. Every field here is either an input a number cannot be
 reproduced without, or a commitment the run is checked against before a model
-loads. ``smallest_effect_of_interest``, ``alpha`` and ``mcnemar_test`` are the
-second kind: they are read by
-:func:`~model_trainer.core.services.model.cartridge_qa_power.require_resolvable_pairs`
-against the REALISED held-out pair count, and a plan that cannot resolve what
-it declares is refused rather than run and regretted.
+loads. Two commitments are checked, on two different scales:
+
+* ``pair_test_floor``, ``alpha`` and ``mcnemar_test`` are read by
+  :func:`~model_trainer.core.services.model.cartridge_qa_power.require_resolvable_pairs`
+  against the REALISED held-out pair count: a falsifiability check on the
+  per-pair McNemar test the steering arm reports. It is NOT a smallest effect
+  of interest, because this arc has never acted on a net-pair-rate effect
+  and so has nothing to derive one from in that unit.
+* ``acted_on_retention``, ``pilot_alone_gain`` and
+  ``pilot_paired_differences`` are read by
+  :func:`~model_trainer.core.services.model.trait_roster.require_resolvable_seeds`:
+  the SMALLEST EFFECT OF INTEREST, derived from the smallest effect this arc
+  has acted on and carried into the instrument's own unit by the pilot's
+  solo gain, against the seed count the pilot's paired spread says resolves
+  it. That is where composition arms are compared, so that is where the
+  smallest effect of interest lives.
 
 WHY THERE IS NO DECODER HERE, and the asymmetry with every other contract in
 this package is deliberate. A plan is a constant in a committed table; it
@@ -26,6 +37,8 @@ so -- which is what stops two rosters being differenced against each other.
 """
 
 from __future__ import annotations
+
+import itertools
 
 from platform_core.power_distributions import McNemarTest
 from typing_extensions import TypedDict
@@ -60,19 +73,27 @@ class TraitPlan(TypedDict):
         learning_rate: Step size for AdamW.
         compartment_counts: How many trait cartridges are composed, in
             increasing order. ``len(traits)`` must reach the largest.
-        smallest_effect_of_interest: The smallest net rate of items the
-            measurement exists to resolve, in the units
+        pair_test_floor: The net pair rate the per-pair McNemar test is
+            declared to resolve, in the units
             :func:`~model_trainer.core.contracts.paired_comparison.summarise_pairs`
-            reports.
-
-            A DECLARED VALUE MUST SAY WHETHER IT WAS MEASURED OR CHOSEN, and
-            the table's comments do. For this axis it is CHOSEN, because the
-            arc has never measured the variance of a contrastive logprob
-            difference and inheriting the published 15-40 point figures would
-            import a judge scale that does not transfer. Erring small is the
-            safe direction: a too-large value licenses a verdict, a too-small
-            one only refuses a run.
-        alpha: Two-sided significance level the rejection region is fixed at.
+            reports. It is the committed corpus's own floor and says so: a
+            value chosen so the corpus clears it is not a threshold, which is
+            why the smallest effect of interest is the next three fields.
+        acted_on_retention: The smallest composition effect this arc has ever
+            acted on, as a fraction of the alone gain: base-LoRA plus diverse
+            cartridges retaining 0.3326 at eight compartments against diverse
+            alone's 0.2800, the margin the operating point of record was
+            adopted on. Derived, not chosen, the way
+            ``clients/RustedWarfareBot``'s power audit derives its SEI.
+        pilot_alone_gain: The solo arm's mean expression gain in the pilot
+            record, which carries the retention above into nats of
+            expression: a retention difference IS a composed-gain difference
+            divided by the alone gain.
+        pilot_paired_differences: Per-seed differences between two composed
+            arms of the pilot record, the spread every composed comparison
+            this plan makes is resolved against.
+        alpha: Two-sided significance level the rejection region is fixed at,
+            for both the per-pair test and the seed-paired one.
         mcnemar_test: Which McNemar variant the per-arm comparison is reported
             under. Carried rather than assumed because the exact and mid-p
             rejection regions differ, so a power statement computed against
@@ -83,11 +104,16 @@ class TraitPlan(TypedDict):
             is readable at is a property of the model that this programme has
             not measured, and a derived one would put an unchosen number in
             every record.
-        steering_strength: Multiplier applied to a unit steering direction
-            when it is added back. Declared for the same reason the BM25 knobs
-            are declared on the question-set plan: it moves the arm the
-            cartridge is being compared against, so an arm reported without it
-            says nothing a reader can reproduce.
+        steering_strengths: The candidate multipliers for a unit steering
+            direction, in the order tried. The arm is applied at the most
+            expressive one that stays within ``steering_coherence_bar`` on the
+            training pairs -- the published tuning rule -- so the grid is
+            declared and the choice is recorded rather than either being
+            typed in as one number.
+        steering_coherence_bar: Largest coherence cost, in nats, the tuned
+            steering strength may incur. Set to the trait cartridge's own solo
+            coherence cost in the pilot, so the two substrates are compared at
+            matched fluency rather than at whatever strength was typed.
     """
 
     model_id: str
@@ -99,11 +125,15 @@ class TraitPlan(TypedDict):
     epochs: int
     learning_rate: float
     compartment_counts: tuple[int, ...]
-    smallest_effect_of_interest: float
+    pair_test_floor: float
+    acted_on_retention: float
+    pilot_alone_gain: float
+    pilot_paired_differences: tuple[float, ...]
     alpha: float
     mcnemar_test: McNemarTest
     steering_module: str
-    steering_strength: float
+    steering_strengths: tuple[float, ...]
+    steering_coherence_bar: float
 
 
 #: Fixed rather than a flag, and distinct from every other cartridge
@@ -111,6 +141,27 @@ class TraitPlan(TypedDict):
 #: differenced against a corpus-compartment record would be comparing two
 #: different questions that happen to share an arm vocabulary.
 TRAIT_SWEEP_EXPERIMENT = "cartridge-trait-composition"
+
+
+def seed_token(seeds: tuple[int, ...]) -> str:
+    """Spell a plan's seeds for its label, compactly when they are a run.
+
+    A pilot's three seeds read ``7.8.9`` as they always have. A plan sized by
+    its pilot can carry a hundred or more, and listing them would make the
+    label longer than anything that reads it; a contiguous ascending run of
+    four or more is ``first..last`` instead, which names exactly the same set
+    and cannot be mistaken for a dotted list.
+
+    Args:
+        seeds: The plan's seeds, in order.
+
+    Returns:
+        The token.
+    """
+    contiguous = all(later == earlier + 1 for earlier, later in itertools.pairwise(seeds))
+    if contiguous and len(seeds) >= 4:
+        return f"{seeds[0]}..{seeds[-1]}"
+    return ".".join(str(seed) for seed in seeds)
 
 
 def trait_plan_label(name: str, plan: TraitPlan, *, digest: str) -> str:
@@ -133,8 +184,9 @@ def trait_plan_label(name: str, plan: TraitPlan, *, digest: str) -> str:
         The label.
     """
     traits = ".".join(plan["traits"])
-    seeds = ".".join(str(seed) for seed in plan["seeds"])
+    seeds = seed_token(plan["seeds"])
     counts = ".".join(str(count) for count in plan["compartment_counts"])
+    strengths = ".".join(f"{strength:g}" for strength in plan["steering_strengths"])
     return (
         f"{name}"
         f"-{plan['model_id']}"
@@ -145,7 +197,7 @@ def trait_plan_label(name: str, plan: TraitPlan, *, digest: str) -> str:
         f"-slots{plan['slots']}"
         f"-n{counts}"
         f"-seeds{seeds}"
-        f"-steer{plan['steering_module']}x{plan['steering_strength']}"
+        f"-steer{plan['steering_module']}x{strengths}-bar{plan['steering_coherence_bar']}"
         f"-{digest[:12]}"
     )
 
@@ -153,5 +205,6 @@ def trait_plan_label(name: str, plan: TraitPlan, *, digest: str) -> str:
 __all__ = [
     "TRAIT_SWEEP_EXPERIMENT",
     "TraitPlan",
+    "seed_token",
     "trait_plan_label",
 ]

@@ -379,12 +379,9 @@ def checkpointed_cells(
             share a name, or ``CARTRIDGE_CHECKPOINT_FOREIGN`` when the
             checkpoint on disk describes a different measurement.
     """
-    require_distinct_cells(cells)
-    checkpoint = resume_or_start(directory, measurement=measurement, inputs_digest=inputs_digest)
-    produced: dict[str, tuple[Observation, ...]] = {}
-    for name, measure in cells:
-        checkpoint, observations = cell_or_resume(checkpoint, directory, name, measure)
-        produced[name] = observations
+    produced = run_cells(
+        directory, measurement=measurement, inputs_digest=inputs_digest, cells=cells
+    )
 
     # DELETED LAST, once every cell this sweep will run has run. A leftover
     # file is indistinguishable from an interrupted run, so the next
@@ -392,6 +389,43 @@ def checkpointed_cells(
     # it any earlier would leave a window where a failure loses both the run
     # and the record of what it had already done.
     delete_sweep_checkpoint(directory, measurement)
+    return produced
+
+
+def run_cells(
+    directory: Path,
+    *,
+    measurement: str,
+    inputs_digest: str,
+    cells: Sequence[tuple[str, Callable[[], Sequence[Observation]]]],
+) -> Mapping[str, tuple[Observation, ...]]:
+    """Run cells under the resume discipline and LEAVE the checkpoint in place.
+
+    :func:`checkpointed_cells` is this followed by the delete, and a sweep
+    that reduces its own cells calls that. This is the half a SHARD calls:
+    a shard's completed checkpoint is its output, the file a merge adopts, so
+    deleting it would discard the work it exists to hand over.
+
+    Args:
+        directory: Where this checkpoint file lives.
+        measurement: Names the sweep.
+        inputs_digest: Digest of what this run measures over.
+        cells: The units of work, in order, each a ``(name, measure)`` pair.
+
+    Returns:
+        Each cell's observations, keyed by cell name, in the order given.
+
+    Raises:
+        AppError: With ``CARTRIDGE_CHECKPOINT_DUPLICATE_CELL`` when two cells
+            share a name, or ``CARTRIDGE_CHECKPOINT_FOREIGN`` when the
+            checkpoint on disk describes a different measurement.
+    """
+    require_distinct_cells(cells)
+    checkpoint = resume_or_start(directory, measurement=measurement, inputs_digest=inputs_digest)
+    produced: dict[str, tuple[Observation, ...]] = {}
+    for name, measure in cells:
+        checkpoint, observations = cell_or_resume(checkpoint, directory, name, measure)
+        produced[name] = observations
     return produced
 
 
@@ -405,5 +439,6 @@ __all__ = [
     "load_sweep_checkpoint",
     "require_distinct_cells",
     "resume_or_start",
+    "run_cells",
     "save_sweep_checkpoint",
 ]
