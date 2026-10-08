@@ -59,7 +59,7 @@ class _TestHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     """Simple HTTP request handler for testing."""
 
     response_body: bytes = b"test content"
-    response_code: int = 200
+    status_code: int = 200
     upload_response_json: bytes = b'{"file_id": "test-file-id"}'
 
     def log_message(self, format_str: str, *args: str) -> None:
@@ -73,7 +73,7 @@ class _TestHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Handle GET requests."""
-        self.send_response(self.response_code)
+        self.send_response(self.status_code)
         self.send_header("Content-Type", "application/octet-stream")
         self.end_headers()
         self.wfile.write(self.response_body)
@@ -84,7 +84,7 @@ class _TestHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         # Read body but don't use it (just to consume the request)
         _ = self.rfile.read(content_length)
 
-        self.send_response(self.response_code)
+        self.send_response(self.status_code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(self.upload_response_json)
@@ -92,14 +92,14 @@ class _TestHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
 def _start_test_server(
     response_body: bytes = b"test content",
-    response_code: int = 200,
+    status_code: int = 200,
     upload_response_json: bytes = b'{"file_id": "test-file-id"}',
 ) -> tuple[socketserver.TCPServer, threading.Thread, int]:
     """Start a test HTTP server.
 
     Args:
         response_body: Body to return for GET requests.
-        response_code: HTTP status code to return.
+        status_code: HTTP status code to return.
         upload_response_json: JSON bytes for POST response.
 
     Returns:
@@ -110,7 +110,7 @@ def _start_test_server(
         pass
 
     Handler.response_body = response_body
-    Handler.response_code = response_code
+    Handler.status_code = status_code
     Handler.upload_response_json = upload_response_json
 
     # Find an available port
@@ -129,7 +129,7 @@ def test_default_http_get_success() -> None:
     expected_content = b"downloaded file content"
     server, _thread, port = _start_test_server(
         response_body=expected_content,
-        response_code=200,
+        status_code=200,
     )
 
     url = f"http://127.0.0.1:{port}/test-file"
@@ -146,7 +146,7 @@ def test_default_http_get_failure() -> None:
     """Test _default_http_get raises error on non-200 response."""
     server, _thread, port = _start_test_server(
         response_body=b"error",
-        response_code=404,
+        status_code=404,
     )
 
     url = f"http://127.0.0.1:{port}/test-file"
@@ -163,7 +163,7 @@ def test_default_http_get_failure() -> None:
 def test_default_http_upload_success() -> None:
     """Test _default_http_upload uploads content successfully."""
     server, _thread, port = _start_test_server(
-        response_code=200,
+        status_code=200,
         upload_response_json=b'{"file_id": "uploaded-file-123"}',
     )
 
@@ -183,7 +183,7 @@ def test_default_http_upload_success() -> None:
 def test_default_http_upload_success_201() -> None:
     """Test _default_http_upload accepts 201 response."""
     server, _thread, port = _start_test_server(
-        response_code=201,
+        status_code=201,
         upload_response_json=b'{"file_id": "created-file-456"}',
     )
 
@@ -203,7 +203,7 @@ def test_default_http_upload_success_201() -> None:
 def test_default_http_upload_failure() -> None:
     """Test _default_http_upload raises error on non-200/201 response."""
     server, _thread, port = _start_test_server(
-        response_code=500,
+        status_code=500,
         upload_response_json=b'{"error": "server error"}',
     )
 
@@ -255,7 +255,7 @@ def test_default_http_upload_invalid_response_not_dict() -> None:
 def test_default_http_upload_invalid_response_missing_file_id() -> None:
     """Test _default_http_upload raises error when file_id is missing."""
     server, _thread, port = _start_test_server(
-        response_code=200,
+        status_code=200,
         upload_response_json=b'{"other_field": "value"}',
     )
 

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from art_trainer.core.services.training.backends.kohya import _test_hooks
 from art_trainer.core.services.training.backends.kohya.runner import run_subprocess
@@ -86,3 +90,24 @@ def test_run_subprocess_real_subprocess_no_cwd() -> None:
 
     assert result.returncode == 0
     assert result.stdout.strip() == "test_exact_output_67890"
+
+
+def test_real_runner_returns_a_failing_kohya_run_with_its_words(tmp_path: Path) -> None:
+    """A training script that fails comes back as a status, never raised."""
+    result = _test_hooks._real_subprocess_runner(
+        [sys.executable, "-c", "import sys; sys.stderr.write('CUDA out of memory'); sys.exit(3)"],
+        cwd=tmp_path,
+        timeout=30,
+    )
+
+    assert result.returncode == 3
+    assert result.stdout == ""
+    assert result.stderr == "CUDA out of memory"
+
+
+def test_real_runner_raises_when_a_run_outlasts_its_timeout() -> None:
+    with pytest.raises(subprocess.TimeoutExpired):
+        _test_hooks._real_subprocess_runner(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            timeout=1,
+        )
