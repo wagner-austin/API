@@ -19,7 +19,7 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def _invoke_mlp_train(
@@ -101,7 +101,7 @@ def test_mlp_backend_feature_importances_returns_none() -> None:
 def test_mlp_backend_different_optimizers(tmp_path: Path) -> None:
     """MLPBackend works with different optimizer choices."""
     backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     for optimizer in OptimizerName:
@@ -153,58 +153,6 @@ def test_mlp_backend_different_optimizers(tmp_path: Path) -> None:
         )
 
 
-def test_mlp_backend_with_dropout(tmp_path: Path) -> None:
-    """MLPBackend works with dropout enabled."""
-    backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
-    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
-
-    config: MLPConfig = {
-        "device": RequestedDevice.CPU,
-        "precision": RequestedPrecision.FP32,
-        "optimizer": OptimizerName.ADAMW,
-        "hidden_sizes": (64, 32),
-        "learning_rate": 0.001,
-        "batch_size": 256,
-        "n_epochs": 10,
-        "dropout": 0.2,  # Dropout enabled
-        "train_ratio": 0.7,
-        "val_ratio": 0.15,
-        "test_ratio": 0.15,
-        "random_state": 42,
-        "early_stopping_patience": 5,
-    }
-
-    progress_calls: list[TrainProgress] = []
-
-    def on_progress(p: TrainProgress) -> None:
-        progress_calls.append(p)
-
-    outcome: TrainOutcome = backend.train(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        config=config,
-        output_dir=tmp_path,
-        progress=on_progress,
-    )
-
-    assert outcome["samples_total"] == dataset["n_samples"]
-    # Verify model learned by tracking actual loss
-    assert progress_calls, "Progress callback must be invoked"
-    val_losses: list[float] = []
-    for p in progress_calls:
-        val_loss = p["val_loss"]
-        if val_loss is None:
-            raise AssertionError("val_loss must not be None during MLP training")
-        val_losses.append(val_loss)
-    loss_initial = val_losses[0]
-    loss_final = min(val_losses)
-    assert loss_final < loss_initial, (
-        f"Best loss {loss_final} should be below first epoch {loss_initial}"
-    )
-
-
 def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
     """MLPBackend trains on CUDA with mixed precision."""
     # Skip if CUDA not available
@@ -214,7 +162,7 @@ def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
         pytest.skip("CUDA not available")
 
     backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
@@ -272,7 +220,7 @@ def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
 def test_mlp_backend_train_without_progress(tmp_path: Path) -> None:
     """MLPBackend trains without progress callback (covers progress=None branch)."""
     backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {

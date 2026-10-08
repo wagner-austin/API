@@ -16,7 +16,7 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.objectives import MLPRegressorObjective, create_mlp_regressor_objective
 
-from ..conftest import load_us_bankruptcy_data
+from ..conftest import load_us_bankruptcy_sample
 
 
 def _make_regression_targets(x: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -39,7 +39,7 @@ def _make_regression_targets(x: NDArray[np.float64]) -> NDArray[np.float64]:
 
 def test_mlp_regressor_objective_returns_negative_rmse() -> None:
     """MLPRegressorObjective trains MLP and returns negative validation RMSE."""
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x = dataset["x"]
     names = dataset["feature_names"]
     y = _make_regression_targets(x)
@@ -89,13 +89,13 @@ def test_mlp_regressor_objective_returns_negative_rmse() -> None:
 
 
 def test_mlp_regressor_objective_with_feature_engineering() -> None:
-    """MLPRegressorObjective applies feature engineering when preset is not 'none'."""
-    dataset = load_us_bankruptcy_data()
+    """MLPRegressorObjective, built directly with Adam, applies a non-'none' preset."""
+    dataset = load_us_bankruptcy_sample()
     x = dataset["x"]
     names = dataset["feature_names"]
     y = _make_regression_targets(x)
 
-    objective = create_mlp_regressor_objective(
+    objective = MLPRegressorObjective(
         x_features=x,
         y_targets=y,
         feature_names=names,
@@ -104,6 +104,7 @@ def test_mlp_regressor_objective_with_feature_engineering() -> None:
         feature_preset=FeaturePreset.LOG_ONLY,
         n_epochs=3,
         early_stopping_patience=2,
+        optimizer_name=OptimizerName.ADAM,
     )
 
     # Feature count should be increased by log transforms
@@ -131,54 +132,6 @@ def test_mlp_regressor_objective_with_feature_engineering() -> None:
         val_ratio=0.15,
         test_ratio=0.15,
         random_state=42,
-    )
-
-    assert result < 0.0
-
-
-def test_mlp_regressor_objective_class_direct_instantiation() -> None:
-    """MLPRegressorObjective can be instantiated directly with custom optimizer."""
-    dataset = load_us_bankruptcy_data()
-    x = dataset["x"]
-    names = dataset["feature_names"]
-    y = _make_regression_targets(x)
-
-    objective = MLPRegressorObjective(
-        x_features=x,
-        y_targets=y,
-        feature_names=names,
-        device=RequestedDevice.CPU,
-        precision=RequestedPrecision.FP32,
-        feature_preset=FeaturePreset.NONE,
-        n_epochs=2,
-        early_stopping_patience=1,
-        optimizer_name=OptimizerName.ADAM,
-    )
-
-    assert objective.n_features == dataset["n_features"]
-
-    int_params: SampledIntParams = {
-        "n_layers": 1,
-        "hidden_size": 8,
-        "batch_size": 512,
-    }
-    float_params: SampledFloatParams = {
-        "learning_rate": 0.01,
-        "dropout": 0.0,
-    }
-    string_params: SampledStringParams = {}
-
-    result = objective(
-        x_features=x,
-        y_targets=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=123,
     )
 
     assert result < 0.0

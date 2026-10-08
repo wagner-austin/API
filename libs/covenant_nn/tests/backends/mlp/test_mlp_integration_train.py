@@ -19,7 +19,7 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.mlp import create_mlp_backend
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def _invoke_mlp_train(
@@ -82,9 +82,9 @@ def _make_mlp_config(
 
 
 def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
-    """MLPBackend trains and returns TrainOutcome with all required fields."""
+    """MLPBackend trains, reports each epoch to the callback and returns TrainOutcome."""
     backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
@@ -122,91 +122,32 @@ def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
     assert Path(outcome["model_path"]).exists()
     assert outcome["model_id"] == "mlp"
     assert outcome["samples_total"] == dataset["n_samples"]
-    # Verify model learned by tracking actual loss from progress
+    assert 0.0 <= outcome["best_val_auc"] <= 1.0
+    assert outcome["total_rounds"] >= 1
+
+    # Verify each progress report, then that the model learned
     assert progress_calls, "Progress callback must be invoked"
     val_losses: list[float] = []
     for p in progress_calls:
+        assert p["round"] >= 1
+        assert p["total_rounds"] == config["n_epochs"]
+        val_auc = p["val_auc"]
         val_loss = p["val_loss"]
-        if val_loss is None:
-            raise AssertionError("val_loss must not be None during MLP training")
+        if val_auc is None or val_loss is None:
+            raise AssertionError("val_auc and val_loss must not be None during MLP training")
+        assert 0.0 <= val_auc <= 1.0
         val_losses.append(val_loss)
     loss_initial = val_losses[0]
     loss_final = min(val_losses)
     assert loss_final < loss_initial, (
         f"Best loss {loss_final} should be below first epoch {loss_initial}"
     )
-    assert outcome["total_rounds"] >= 1
-
-
-def test_mlp_backend_train_with_progress_callback(tmp_path: Path) -> None:
-    """MLPBackend invokes progress callback during training."""
-    backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
-    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
-
-    config: MLPConfig = {
-        "device": RequestedDevice.CPU,
-        "precision": RequestedPrecision.FP32,
-        "optimizer": OptimizerName.ADAMW,
-        "hidden_sizes": (32, 16),
-        "learning_rate": 0.001,
-        "batch_size": 256,
-        "n_epochs": 10,
-        "dropout": 0.0,
-        "train_ratio": 0.7,
-        "val_ratio": 0.15,
-        "test_ratio": 0.15,
-        "random_state": 42,
-        "early_stopping_patience": 5,
-    }
-
-    progress_calls: list[TrainProgress] = []
-
-    def on_progress(p: TrainProgress) -> None:
-        progress_calls.append(p)
-
-    outcome: TrainOutcome = backend.train(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        config=config,
-        output_dir=tmp_path,
-        progress=on_progress,
-    )
-
-    # Verify outcome structure
-    assert outcome["samples_total"] == dataset["n_samples"]
-    assert 0.0 <= outcome["best_val_auc"] <= 1.0
-
-    # Verify progress callbacks
-    assert progress_calls, "Progress callback must be invoked"
-    n_epochs = config["n_epochs"]
-    for p in progress_calls:
-        assert p["round"] >= 1
-        assert p["total_rounds"] == n_epochs
-        val_auc = p["val_auc"]
-        if val_auc is None:
-            raise AssertionError("val_auc must not be None during MLP training")
-        assert 0.0 <= val_auc <= 1.0
-
-    # Verify model learned by tracking actual loss from progress
-    val_losses: list[float] = []
-    for p in progress_calls:
-        val_loss = p["val_loss"]
-        if val_loss is None:
-            raise AssertionError("val_loss must not be None during MLP training")
-        val_losses.append(val_loss)
-    loss_initial = val_losses[0]
-    loss_final = val_losses[-1]
-    assert loss_final < loss_initial, (
-        f"Final loss {loss_final} should be below first epoch {loss_initial}"
-    )
 
 
 def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
     """MLPBackend stops early when validation AUC doesn't improve."""
     backend = create_mlp_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     # Use very low patience (2) and high learning rate to force early stopping

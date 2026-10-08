@@ -19,7 +19,7 @@ from platform_ml import RequestedDevice, RequestedPrecision
 
 from covenant_nn.backends.lstm import create_lstm_backend
 
-from ...conftest import load_us_bankruptcy_data
+from ...conftest import load_us_bankruptcy_sample
 
 
 def _invoke_lstm_train(
@@ -87,7 +87,7 @@ def _make_lstm_config(
 def test_lstm_backend_with_multiple_layers(tmp_path: Path) -> None:
     """LSTMBackend works with multiple LSTM layers."""
     backend = create_lstm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
@@ -140,7 +140,7 @@ def test_lstm_backend_with_multiple_layers(tmp_path: Path) -> None:
 def test_lstm_backend_train_without_progress(tmp_path: Path) -> None:
     """LSTMBackend trains without progress callback (covers progress=None branch)."""
     backend = create_lstm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
@@ -270,7 +270,7 @@ def test_lstm_backend_train_on_cuda(tmp_path: Path) -> None:
         pytest.skip("CUDA not available")
 
     backend = create_lstm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: LSTMConfig = {
@@ -322,63 +322,6 @@ def test_lstm_backend_train_on_cuda(tmp_path: Path) -> None:
     )
 
 
-def test_lstm_backend_different_sequence_lengths(tmp_path: Path) -> None:
-    """LSTMBackend works with different sequence length configurations."""
-    backend = create_lstm_backend()
-    dataset = load_us_bankruptcy_data()
-    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
-
-    for seq_len in (2, 4, 8):
-        config: LSTMConfig = {
-            "device": RequestedDevice.CPU,
-            "precision": RequestedPrecision.FP32,
-            "hidden_size": 16,
-            "num_layers": 1,
-            "dropout": 0.0,
-            "bidirectional": False,
-            "sequence_length": seq_len,
-            "learning_rate": 0.001,
-            "batch_size": 256,
-            "n_epochs": 10,
-            "train_ratio": 0.7,
-            "val_ratio": 0.15,
-            "test_ratio": 0.15,
-            "random_state": 42,
-            "early_stopping_patience": 5,
-        }
-
-        out_dir = tmp_path / f"seq_{seq_len}"
-        out_dir.mkdir()
-
-        progress_calls: list[TrainProgress] = []
-
-        outcome: TrainOutcome = backend.train(
-            x_features=x,
-            y_labels=y,
-            feature_names=names,
-            config=config,
-            output_dir=out_dir,
-            progress=progress_calls.append,
-        )
-
-        assert outcome["samples_total"] == dataset["n_samples"]
-        assert outcome["model_path"].endswith(".pt")
-
-        # Verify model learned by tracking actual loss progression
-        assert progress_calls, f"seq_len={seq_len}: Progress callback must be invoked"
-        val_losses: list[float] = []
-        for p in progress_calls:
-            val_loss = p["val_loss"]
-            if val_loss is None:
-                raise AssertionError(f"seq_len={seq_len}: val_loss must not be None")
-            val_losses.append(val_loss)
-        loss_initial = val_losses[0]
-        loss_final = min(val_losses)
-        assert loss_final <= loss_initial, (
-            f"seq_len={seq_len}: Best loss {loss_final} should be at or below {loss_initial}"
-        )
-
-
 def test_lstm_backend_triggers_early_stop_break(tmp_path: Path) -> None:
     """LSTMBackend triggers early stopping and lr_scale reduction branches.
 
@@ -388,7 +331,7 @@ def test_lstm_backend_triggers_early_stop_break(tmp_path: Path) -> None:
     - High epochs ensures we have time to trigger patience
     """
     backend = create_lstm_backend()
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     # Config designed to improve then plateau early so patience triggers

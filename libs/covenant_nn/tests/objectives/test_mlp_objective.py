@@ -11,12 +11,12 @@ from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision
 
 from covenant_nn.objectives import MLPObjective, create_mlp_objective
 
-from ..conftest import load_us_bankruptcy_data
+from ..conftest import load_us_bankruptcy_sample
 
 
 def test_mlp_objective_returns_validation_auc() -> None:
     """MLPObjective trains MLP and returns validation AUC."""
-    dataset = load_us_bankruptcy_data()
+    dataset = load_us_bankruptcy_sample()
     x = dataset["x"]
     y = dataset["y"]
     names = dataset["feature_names"]
@@ -69,14 +69,13 @@ def test_mlp_objective_returns_validation_auc() -> None:
 
 
 def test_mlp_objective_with_feature_engineering() -> None:
-    """MLPObjective applies feature engineering when preset is not 'none'."""
-    dataset = load_us_bankruptcy_data()
+    """MLPObjective, built directly with Adam, applies a non-'none' preset."""
+    dataset = load_us_bankruptcy_sample()
     x = dataset["x"]
     y = dataset["y"]
     names = dataset["feature_names"]
 
-    # Create objective with feature engineering
-    objective = create_mlp_objective(
+    objective = MLPObjective(
         x_features=x,
         y_labels=y,
         feature_names=names,
@@ -85,6 +84,7 @@ def test_mlp_objective_with_feature_engineering() -> None:
         feature_preset=FeaturePreset.LOG_ONLY,  # Apply log transforms
         n_epochs=3,
         early_stopping_patience=2,
+        optimizer_name=OptimizerName.ADAM,  # Use adam instead of default adamw
     )
 
     # Feature count should be increased by log transforms
@@ -119,56 +119,4 @@ def test_mlp_objective_with_feature_engineering() -> None:
     )
 
     # AUC should be valid
-    assert 0.0 <= val_auc <= 1.0
-
-
-def test_mlp_objective_class_direct_instantiation() -> None:
-    """MLPObjective can be instantiated directly."""
-    dataset = load_us_bankruptcy_data()
-    x = dataset["x"]
-    y = dataset["y"]
-    names = dataset["feature_names"]
-
-    # Direct instantiation
-    objective = MLPObjective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        device=RequestedDevice.CPU,
-        precision=RequestedPrecision.FP32,
-        feature_preset=FeaturePreset.NONE,
-        n_epochs=2,
-        early_stopping_patience=1,
-        optimizer_name=OptimizerName.ADAM,  # Use adam instead of default adamw
-    )
-
-    assert objective.n_features == dataset["n_features"]
-
-    # Run with minimal config
-    int_params: SampledIntParams = {
-        "n_layers": 1,
-        "hidden_size": 8,
-        "batch_size": 512,
-    }
-    float_params: SampledFloatParams = {
-        "learning_rate": 0.01,
-        "dropout": 0.0,
-    }
-
-    # MLP has no string params
-    string_params: SampledStringParams = {}
-
-    val_auc = objective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=123,
-    )
-
     assert 0.0 <= val_auc <= 1.0
