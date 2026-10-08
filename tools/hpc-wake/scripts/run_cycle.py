@@ -199,6 +199,14 @@ def package_root_from(tokens: Sequence[str]) -> pathlib.Path:
 
 _LOG_LIMIT_BYTES = 1_000_000
 
+#: Wall-clock bound on one publisher. Twenty minutes: twice the longest
+#: deadline any publisher holds inside itself (hpc3's ten-minute cluster
+#: command, which the hpc-wake publisher's ssh rides), so no honest run is
+#: cut short, and still FINITE. Before it the pump had none, and a
+#: publisher that never returned would have held every later tick forever,
+#: the shape that drained the fleet queue for three days in September 2026.
+PUBLISHER_WALL_SECONDS: Final[int] = 1200
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one bridge cycle and append its output to the cycle log.
@@ -225,6 +233,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             a broken pump, not a publisher outcome, and the header already
             written puts the evidence in the log before the scheduler
             records the crash.
+        subprocess.TimeoutExpired: When a publisher outlasts
+            :data:`PUBLISHER_WALL_SECONDS`; it is killed and the tick ends
+            there, as a crash the scheduler records, with the health record
+            left unwritten so its age says the pump stopped.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     package_root = package_root_from(tokens)
@@ -249,8 +261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 list(publisher["args"]),
                 cwd=(package_root / publisher["cwd"]).resolve(),
                 env={**os.environ, **environment},
-                capture_output=True,
-                text=True,
+                timeout=PUBLISHER_WALL_SECONDS,
             )
             handle.write(completed.stdout)
             handle.write(completed.stderr)
