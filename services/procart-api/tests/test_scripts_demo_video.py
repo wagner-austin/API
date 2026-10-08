@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import socket
 import sys
 from collections.abc import Generator
 from pathlib import Path
 from types import TracebackType
 
+import httpx
 import pytest
 from scripts import _test_hooks, demo_video
 from scripts._test_hooks import HttpClientProtocol, RenderRequest, ResponseProtocol
@@ -216,6 +218,22 @@ def test_real_http_client_builds_a_client_for_the_base_url() -> None:
 
     with client as entered:
         assert entered is client
+
+
+def test_real_http_client_raises_when_the_service_is_not_running() -> None:
+    """The demo against a stopped service fails at its first request, loudly.
+
+    The port is one a listener held and released, so nothing is bound to it.
+    """
+    released = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    released.bind(("127.0.0.1", 0))
+    bound: tuple[str, int] = released.getsockname()
+    released.close()
+    client = _test_hooks._real_http_client(
+        base_url=f"http://127.0.0.1:{bound[1]}", timeout_seconds=10.0
+    )
+    with client, pytest.raises(httpx.ConnectError):
+        client.get("/healthz")
 
 
 def test_reset_hooks_restores_the_real_factory() -> None:
