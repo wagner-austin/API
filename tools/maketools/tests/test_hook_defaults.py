@@ -136,8 +136,8 @@ def test_the_real_process_table_lists_this_process() -> None:
 def test_kill_ends_a_real_child_and_refuses_a_gone_one() -> None:
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
     _test_hooks._default_kill(child.pid)
-    child.wait(timeout=10)
-    assert child.returncode != 0
+    returncode = child.wait(timeout=10)
+    assert returncode != 0
     with pytest.raises(OSError):
         _test_hooks._default_kill(child.pid)
 
