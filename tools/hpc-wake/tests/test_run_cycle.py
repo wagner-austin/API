@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import datetime
 import pathlib
-import subprocess
 from collections.abc import Generator, Mapping, Sequence
 
 import pytest
@@ -40,11 +39,9 @@ class _RecordingRunner:
         *,
         cwd: pathlib.Path,
         env: Mapping[str, str],
-        capture_output: bool,
-        text: bool,
+        timeout: int,
     ) -> _Completed:
-        assert capture_output is True
-        assert text is True
+        assert timeout == run_cycle.PUBLISHER_WALL_SECONDS
         self.calls.append((args, cwd, dict(env)))
         return self.results[len(self.calls) - 1]
 
@@ -68,7 +65,7 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
     )
     _test_hooks.run_process = fake
     yield fake
-    _test_hooks.run_process = subprocess.run
+    _test_hooks.run_process = _test_hooks._default_run_process
 
 
 class _FrozenClock:
@@ -513,5 +510,4 @@ class TestMainBlock:
 
 class TestHookDefault:
     def test_the_production_runner_is_the_real_one(self) -> None:
-        expected: _test_hooks.RunProcess = subprocess.run
-        assert _test_hooks.run_process is expected
+        assert _test_hooks.run_process is _test_hooks._default_run_process
