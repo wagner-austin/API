@@ -250,6 +250,21 @@ class TestTheInstrumentComputesWhatItClaims:
             base_loss(model.base, pair["neutral"])
         )
 
+    def test_style_baseline_is_the_bases_loss_on_the_expressing_member(self) -> None:
+        """The corpus-style reading must be the base's own loss on the trait text.
+
+        Checked against ``base_loss`` directly, as the other two are: a style
+        reading that read the neutral member would equal coherence and the
+        decomposition it exists for would say nothing.
+        """
+        model = _adapt(num_slots=4)
+        pair = _pair(3)
+        reading = read_trait_pairs(model, [pair])
+        assert reading["style_items"][0]["baseline"] == pytest.approx(
+            base_loss(model.base, pair["expressing"])
+        )
+        assert reading["style"]["items"] == reading["expression"]["items"]
+
     def test_expression_and_coherence_are_read_from_one_set_of_losses(self) -> None:
         """Both readings must describe the same items in the same order.
 

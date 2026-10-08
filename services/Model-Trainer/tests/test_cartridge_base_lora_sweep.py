@@ -23,6 +23,7 @@ from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_base_lora_sweep as sweep
 from model_trainer.cli import cartridge_lora_policy as policy
+from model_trainer.cli.cartridge_crowd_adapters import LORA_TRAIN_SEED, POOL_SEED_BASE
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
@@ -364,7 +365,7 @@ class TestArchitecturePolicy:
         largest_measurement_seed = max(plan["seeds"]) + (
             COMPANION_SEED_STRIDE + plan["max_companions"] - 1
         ) * len(plan["seeds"])
-        assert largest_measurement_seed < sweep.LORA_TRAIN_SEED < sweep.POOL_SEED_BASE
+        assert largest_measurement_seed < LORA_TRAIN_SEED < POOL_SEED_BASE
         pool_size = plan["max_companions"] * plan["pool_members_per_corpus"]
         assert plan["max_drawn"] <= pool_size
 

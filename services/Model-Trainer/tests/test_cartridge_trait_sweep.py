@@ -7,12 +7,11 @@ are the hub loaders, the trait reader and the plan table, because the
 production plan is GPU-minutes of cartridges over a base this suite must not
 download.
 
-THE TWO PROPERTIES ASSERTED HERE THAT NOTHING ELSE CAN CHECK are both about
-ORDER. The power gate has to refuse before a model loads, because its whole
-value is being cheaper than the run it prevents; and the solo precondition has
-to refuse before the composed cells run, because a composed arm measured
-against a solo arm indistinguishable from noise is a ratio with no reading and
-the composed cells are where the hours are.
+THE PROPERTY ASSERTED HERE THAT NOTHING ELSE CAN CHECK is about ORDER: the
+power gate has to refuse before a model loads, because its whole value is
+being cheaper than the run it prevents. The solo precondition's own ordering
+-- composed cells only after it clears -- is asserted in
+`test_cartridge_trait_precondition.py`.
 """
 
 from __future__ import annotations
@@ -20,136 +19,37 @@ from __future__ import annotations
 import pathlib
 import runpy
 import sys
-from collections.abc import Generator, Mapping, Sequence
+from collections.abc import Generator
 
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from platform_core.power_distributions import McNemarTest
 from platform_core.run_record import decode_run_record
 
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _trait_hooks as trait_hooks
 from model_trainer.cli import cartridge_trait_sweep as sweep
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
-from model_trainer.core.contracts.replicated_measurement import replicate
 from model_trainer.core.contracts.sweep_checkpoint import decode_sweep_checkpoint
-from model_trainer.core.contracts.trait_corpus import TraitCorpus, TraitPairSpec
 from model_trainer.core.contracts.trait_plan import TRAIT_SWEEP_EXPERIMENT, TraitPlan
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
-from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
 from model_trainer.core.services.model.cartridge_sweep_checkpoint import checkpoint_path
 from model_trainer.core.services.model.cartridge_trait_plans import TRAIT_SWEEP_PLANS
-from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
-from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
-from model_trainer.core.services.model.trait_arms import TraitArm
+from model_trainer.core.services.model.trait_roster import prepare_traits
 from model_trainer.core.types import LMModelProto
-from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
-
-#: The site the tiny probe model actually has, tensor-valued so a direction
-#: can be both read and applied there.
-_SITE = "transformer.h.0.mlp.c_proj"
+from tests._trait_sweep_support import (
+    TINY_TRAIT_PLAN,
+    fake_trait_reader,
+    install_fakes,
+    restore_fakes,
+)
 
 #: A block, whose output is a tuple. Used only to make the steering cell fail
 #: on purpose, so the checkpoint's contents can be asserted.
 _TUPLE_SITE = "transformer.h.0"
 
-#: Three traits so an n3 cell exists, two counts so the step verdicts have a
-#: pair to compare, and three seeds because fewer is refused. Twelve pairs at
-#: stride two hold out six, which is exactly the fewest that can ever reject
-#: at alpha 0.05 under the exact test -- so the declared effect is 1.0 and the
-#: gate passes by the narrowest margin it can.
-TINY_TRAIT_PLAN: TraitPlan = {
-    "model_id": "gpt2",  # a real policy id (the fakes return a tiny GPT-2 anyway)
-    "traits": ("bullets", "formal-tone", "step-by-step"),
-    "held_out_stride": 2,
-    "max_seq_len": 32,
-    "slots": 2,
-    "seeds": (7, 8, 9),
-    "epochs": 1,
-    "learning_rate": 0.05,
-    "compartment_counts": (2, 3),
-    "smallest_effect_of_interest": 1.0,
-    "alpha": 0.05,
-    "mcnemar_test": McNemarTest.EXACT,
-    "steering_module": _SITE,
-    "steering_strength": 10.0,
-}
-
-_VOCAB = PROBE_SHAPES["tiny"]["vocab_size"]
-
 #: The committed trait corpus, for the one test that reads the real reader.
 _CORPUS_ROOT = pathlib.Path(__file__).resolve().parent.parent / "corpus" / "traits"
-
-
-def _corpus(trait: str, marker: str) -> TraitCorpus:
-    """Author one trait's pairs, short enough for the declared budget.
-
-    Args:
-        trait: The trait to declare.
-        marker: A character making this trait's text unlike the others'.
-
-    Returns:
-        The corpus: twelve pairs, so the stride holds out six.
-    """
-    return TraitCorpus(
-        trait=trait,
-        pairs=[
-            TraitPairSpec(
-                prompt=f"p{marker}{index} ",
-                expressing=f"{marker * 4}{index}",
-                neutral=f"{chr(ord(marker) + 9) * 4}{index}",
-            )
-            for index in range(12)
-        ],
-    )
-
-
-def _fake_trait_reader(
-    corpus_dir: pathlib.Path, traits: Sequence[str], /
-) -> tuple[TraitCorpus, ...]:
-    """Stand in for the trait reader, returning the roster in order.
-
-    Args:
-        corpus_dir: Unused; the corpora are authored here.
-        traits: The roster requested.
-
-    Returns:
-        One corpus per requested trait, in roster order.
-    """
-    markers = {"bullets": "a", "formal-tone": "b", "step-by-step": "c"}
-    return tuple(_corpus(trait, markers[trait]) for trait in traits)
-
-
-def _fake_tokenizer(model_id_or_path: str) -> HFTokenizerProto:
-    """Stand in for the hub tokenizer loader.
-
-    Args:
-        model_id_or_path: The id the plan declares.
-
-    Returns:
-        The fake tokenizer.
-    """
-    assert model_id_or_path == TINY_TRAIT_PLAN["model_id"]
-    return FakeHFTokenizer(vocab_size=_VOCAB)
-
-
-def _fake_model(
-    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
-) -> LMModelProto:
-    """Stand in for the hub model loader, returning a real tiny GPT-2.
-
-    Args:
-        model_id_or_path: The id the plan declares.
-        quantization: Must be None for a gpt2-class id.
-
-    Returns:
-        The model.
-    """
-    assert model_id_or_path == TINY_TRAIT_PLAN["model_id"]
-    assert quantization is None
-    model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
-    return model
 
 
 def _refusing_model(
@@ -167,15 +67,6 @@ def _refusing_model(
     raise AssertionError("the power gate must refuse before a model is loaded")
 
 
-def _fake_plans() -> Mapping[str, TraitPlan]:
-    """Stand in for the production plan table.
-
-    Returns:
-        One runnable plan.
-    """
-    return {"tiny": TINY_TRAIT_PLAN}
-
-
 @pytest.fixture(name="wired", autouse=True)
 def _wired() -> Generator[None, None, None]:
     """Install the fakes, and put the real hooks back afterwards.
@@ -183,31 +74,9 @@ def _wired() -> Generator[None, None, None]:
     Yields:
         None, once the fakes are installed.
     """
-    measurement_hooks.trait_sweep_plans = _fake_plans
-    trait_hooks.read_trait_corpora = _fake_trait_reader
-    hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
-    hf_hooks.Hooks.load_hf_model = _fake_model
+    install_fakes()
     yield None
-    measurement_hooks.trait_sweep_plans = measurement_hooks._default_trait_sweep_plans
-    trait_hooks.read_trait_corpora = trait_hooks._default_read_trait_corpora
-    hf_hooks.Hooks.reset()
-
-
-def _arm(name: str, gains: tuple[float, float, float]) -> TraitArm:
-    """Build one arm from chosen numbers.
-
-    Args:
-        name: The arm's name, without a reading suffix.
-        gains: Per-seed expression gains; coherence is held at zero.
-
-    Returns:
-        The arm.
-    """
-    seeds = TINY_TRAIT_PLAN["seeds"]
-    return TraitArm(
-        expression=replicate(f"{name}-expression", list(zip(seeds, gains, strict=True))),
-        coherence=replicate(f"{name}-coherence", [(seed, 0.0) for seed in seeds]),
-    )
+    restore_fakes()
 
 
 def _argv(tmp_path: pathlib.Path) -> list[str]:
@@ -231,44 +100,6 @@ def _argv(tmp_path: pathlib.Path) -> list[str]:
     ]
 
 
-class TestTheSoloPrecondition:
-    """The arc stops here, and it stops BEFORE the composed cells."""
-
-    def test_a_gain_larger_than_its_own_spread_passes(self) -> None:
-        """Clearing the bar is not evidence of a large effect.
-
-        Only that there is an effect to divide by, which is what every
-        retention below it needs.
-        """
-        sweep.require_solo_precondition(
-            _arm("solo", (0.90, 0.95, 1.00)), _arm("solo-untrained", (0.0, 0.0, 0.0))
-        )
-
-    def test_a_gain_inside_its_own_spread_is_refused(self) -> None:
-        """The 7B failure's exact shape: a mean the seeds could have produced.
-
-        Every composed cell divides by this gain, so the refusal has to come
-        before them rather than after -- the composed cells are the hours.
-        """
-        with pytest.raises(AppError) as excinfo:
-            sweep.require_solo_precondition(
-                _arm("solo", (0.05, 0.50, 0.95)), _arm("solo-untrained", (0.0, 0.0, 0.0))
-            )
-        assert excinfo.value.code is ModelTrainerErrorCode.TRAIT_SOLO_PRECONDITION_FAILED
-
-    def test_the_refusal_names_the_untrained_control_too(self) -> None:
-        """A solo gain that merely matches an untrained prefix is the other failure.
-
-        A reader needs both numbers to tell the two apart, so the message
-        carries the control's mean as well as the arm's.
-        """
-        with pytest.raises(AppError) as excinfo:
-            sweep.require_solo_precondition(
-                _arm("solo", (0.05, 0.50, 0.95)), _arm("solo-untrained", (0.44, 0.44, 0.44))
-            )
-        assert "+0.4400" in excinfo.value.message
-
-
 class TestThePowerGateRunsFirst:
     """Its whole value is being cheaper than the run it prevents."""
 
@@ -281,7 +112,7 @@ class TestThePowerGateRunsFirst:
             tmp_path: The test's temporary directory.
         """
         hf_hooks.Hooks.load_hf_model = _refusing_model
-        plan: TraitPlan = {**TINY_TRAIT_PLAN, "smallest_effect_of_interest": 0.01}
+        plan: TraitPlan = {**TINY_TRAIT_PLAN, "pair_test_floor": 0.01}
         with pytest.raises(AppError) as excinfo:
             sweep.measure_grid(
                 plan,
@@ -289,8 +120,31 @@ class TestThePowerGateRunsFirst:
                 corpus=tmp_path,
                 device="cpu",
                 checkpoints=tmp_path / "checkpoints",
+                merge=None,
             )
         assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_QA_UNDERPOWERED
+
+    def test_too_few_seeds_for_the_sei_is_refused_before_a_model_loads(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The seed gate is the second refusal, and it is cheap for the same reason.
+
+        Args:
+            tmp_path: The test's temporary directory.
+        """
+        hf_hooks.Hooks.load_hf_model = _refusing_model
+        plan: TraitPlan = {**TINY_TRAIT_PLAN, "pilot_paired_differences": (0.0, 0.1, 0.2)}
+        with pytest.raises(AppError) as excinfo:
+            sweep.measure_grid(
+                plan,
+                plan_name="tiny",
+                corpus=tmp_path,
+                device="cpu",
+                checkpoints=tmp_path / "checkpoints",
+                merge=None,
+            )
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_QA_UNDERPOWERED
+        assert "composes over 3 seed(s)" in excinfo.value.message
 
     def test_the_refusal_names_the_pairs_it_would_take(self, tmp_path: pathlib.Path) -> None:
         """A refusal that names a target is a next action.
@@ -302,7 +156,7 @@ class TestThePowerGateRunsFirst:
             tmp_path: The test's temporary directory.
         """
         hf_hooks.Hooks.load_hf_model = _refusing_model
-        plan: TraitPlan = {**TINY_TRAIT_PLAN, "smallest_effect_of_interest": 0.01}
+        plan: TraitPlan = {**TINY_TRAIT_PLAN, "pair_test_floor": 0.01}
         with pytest.raises(AppError) as excinfo:
             sweep.measure_grid(
                 plan,
@@ -310,6 +164,7 @@ class TestThePowerGateRunsFirst:
                 corpus=tmp_path,
                 device="cpu",
                 checkpoints=tmp_path / "checkpoints",
+                merge=None,
             )
         assert "pair(s)" in excinfo.value.message
         assert "600 pair(s)" in excinfo.value.message
@@ -326,8 +181,8 @@ class TestPreparingTheRoster:
         Args:
             tmp_path: The test's temporary directory.
         """
-        corpora = _fake_trait_reader(tmp_path, TINY_TRAIT_PLAN["traits"])
-        prepared = sweep.prepare_traits(corpora, TINY_TRAIT_PLAN, device="cpu")
+        corpora = fake_trait_reader(tmp_path, TINY_TRAIT_PLAN["traits"])
+        prepared = prepare_traits(corpora, TINY_TRAIT_PLAN, device="cpu")
         assert [split.trait for split in prepared] == list(TINY_TRAIT_PLAN["traits"])
         assert all(len(split.train) == 6 for split in prepared)
         assert all(len(split.held_out) == 6 for split in prepared)
@@ -351,10 +206,18 @@ class TestTheWholeGrid:
             corpus=tmp_path,
             device="cpu",
             checkpoints=tmp_path / "checkpoints",
+            merge=None,
         )
         names = {row["name"] for row in observations}
         assert digest
-        assert {"held_out_pairs", "training_pairs", "resolvable_floor", "declared_effect"} <= names
+        assert {
+            "held_out_pairs",
+            "training_pairs",
+            "resolvable_floor",
+            "pair_test_floor",
+            "smallest_effect_of_interest",
+            "solo_precondition_cleared",
+        } <= names
         assert "bullets-solo-expression_mean" in names
         assert "bullets-solo-untrained-expression_mean" in names
         assert "bullets-solo-coherence_mean" in names
@@ -380,6 +243,7 @@ class TestTheWholeGrid:
             corpus=tmp_path,
             device="cpu",
             checkpoints=tmp_path / "checkpoints",
+            merge=None,
         )
         values = {row["name"]: row["value"] for row in observations}
         assert values["held_out_pairs"] == 6.0
@@ -401,16 +265,18 @@ class TestTheWholeGrid:
             corpus=tmp_path,
             device="cpu",
             checkpoints=checkpoints,
+            merge=None,
         )
-        assert not checkpoint_path(checkpoints, "trait-tiny").exists()
+        assert not checkpoint_path(checkpoints, "trait-tiny-anchor").exists()
+        assert not checkpoint_path(checkpoints, "trait-tiny-composed").exists()
 
     def test_an_interrupted_run_keeps_the_cells_it_finished(self, tmp_path: pathlib.Path) -> None:
         """The hours an eviction cannot take are the ones already written.
 
         The steering site is pointed at a block here, whose output is a tuple
-        and cannot be perturbed, so the cells before it complete and the run
-        dies in the last family. That is a real failure of this measurement,
-        not a simulated one.
+        and cannot be perturbed, so the solo cell completes and the run dies
+        in the anchor phase's steering family. That is a real failure of this
+        measurement, not a simulated one.
 
         Args:
             tmp_path: The test's temporary directory.
@@ -424,16 +290,17 @@ class TestTheWholeGrid:
                 corpus=tmp_path,
                 device="cpu",
                 checkpoints=checkpoints,
+                merge=None,
             )
         assert excinfo.value.code is ModelTrainerErrorCode.EDIT_ACTIVATION_NOT_CAPTURED
         saved = decode_sweep_checkpoint(
             narrow_json_to_dict(
                 load_json_str(
-                    checkpoint_path(checkpoints, "trait-tiny").read_text(encoding="utf-8")
+                    checkpoint_path(checkpoints, "trait-tiny-anchor").read_text(encoding="utf-8")
                 )
             )
         )
-        assert [cell["cell"] for cell in saved["cells"]] == ["solo", "n2", "n3"]
+        assert [cell["cell"] for cell in saved["cells"]] == ["solo@b0"]
 
 
 class TestHookDefaults:
@@ -488,6 +355,7 @@ class TestInvocationForms:
                 corpus=tmp_path,
                 device="cpu",
                 checkpoints=tmp_path / "checkpoints",
+                merge=None,
             )
 
     def test_the_console_entry_point_runs_and_exits_zero(self, tmp_path: pathlib.Path) -> None:

@@ -31,6 +31,7 @@ from model_trainer.core.services.model.steering_vectors import (
     extract_steering_vector,
     require_steerable,
     steered_trait_losses,
+    tune_steering_strength,
     unit_direction,
 )
 from model_trainer.core.types import SteerableLMProto
@@ -325,3 +326,65 @@ class TestScoringASteeredArm:
         direction = unit_direction(extract_steering_vector(model, pairs, module_name=_SITE))
         losses = steered_trait_losses(model, pairs, direction, module_name=_SITE, strength=10.0)
         assert [item["index"] for item in losses] == [0, 1, 2, 3]
+
+
+class TestTuningTheStrength:
+    """The published rule: the most expressive strength that stays coherent."""
+
+    def test_every_trial_is_scored_and_the_best_admissible_is_chosen(self) -> None:
+        """With a bar nothing exceeds, the choice is the expression argmax."""
+        model = _model()
+        pairs = _pairs(4)
+        direction = unit_direction(extract_steering_vector(model, pairs, module_name=_SITE))
+        tuning = tune_steering_strength(
+            model,
+            pairs,
+            direction,
+            module_name=_SITE,
+            strengths=(1.0, 10.0, 100.0),
+            coherence_bar=1e9,
+        )
+        assert [trial["strength"] for trial in tuning["trials"]] == [1.0, 10.0, 100.0]
+        expressions = [trial["expression"] for trial in tuning["trials"]]
+        best = tuning["trials"][expressions.index(max(expressions))]
+        assert tuning["strength"] == best["strength"]
+
+    def test_a_trial_over_the_bar_cannot_be_chosen(self) -> None:
+        """A bar just above the mildest trial's cost admits that trial alone.
+
+        The mildest trial is whichever cost least, so the bar is set from the
+        trials themselves rather than from a guess about this tiny model.
+        """
+        model = _model()
+        pairs = _pairs(4)
+        direction = unit_direction(extract_steering_vector(model, pairs, module_name=_SITE))
+        strengths = (1.0, 10.0, 100.0)
+        trials = tune_steering_strength(
+            model, pairs, direction, module_name=_SITE, strengths=strengths, coherence_bar=1e9
+        )["trials"]
+        coherences = [trial["coherence"] for trial in trials]
+        mildest = trials[coherences.index(max(coherences))]
+        others = [trial for trial in trials if trial is not mildest]
+        assert all(trial["coherence"] < mildest["coherence"] for trial in others)
+        bar = -mildest["coherence"] + 1e-12
+        tuning = tune_steering_strength(
+            model, pairs, direction, module_name=_SITE, strengths=strengths, coherence_bar=bar
+        )
+        assert tuning["strength"] == mildest["strength"]
+
+    def test_a_grid_that_cannot_meet_the_bar_is_refused(self) -> None:
+        """A negative bar admits nothing: the plan's grid or bar is wrong."""
+        model = _model()
+        pairs = _pairs(4)
+        direction = unit_direction(extract_steering_vector(model, pairs, module_name=_SITE))
+        with pytest.raises(AppError) as excinfo:
+            tune_steering_strength(
+                model,
+                pairs,
+                direction,
+                module_name=_SITE,
+                strengths=(100.0,),
+                coherence_bar=-1e9,
+            )
+        assert excinfo.value.code is ModelTrainerErrorCode.TRAIT_STEERING_STRENGTH_UNREACHABLE
+        assert "every strength in (100.0,)" in excinfo.value.message

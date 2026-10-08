@@ -33,6 +33,7 @@ from model_trainer.core.services.model.trait_arms import (
     trait_arm_observations,
     trait_cell_observations,
 )
+from model_trainer.core.services.model.trait_families import plain_trait_build
 from model_trainer.core.types import CacheCapableLMProto, SteerableLMProto
 
 _SITE = "transformer.h.0.mlp.c_proj"
@@ -40,6 +41,10 @@ _SITE = "transformer.h.0.mlp.c_proj"
 #: Three is the fewest replicates a gain may be built from, and the arms
 #: refuse below it, so every measurement here runs exactly three.
 _SEEDS = (7, 8, 9)
+
+#: A coherence bar no tiny-model trial can exceed, so the tuning admits every
+#: strength and the tests below read the arm at the strength they name.
+_WIDE_BAR = 1000.0
 
 
 def _model() -> SteerableLMProto:
@@ -88,11 +93,14 @@ def _arm(name: str, expression: tuple[float, ...], coherence: tuple[float, ...])
         coherence: Per-seed coherence gains.
 
     Returns:
-        The arm.
+        The arm, its style reading derived as ``expression + coherence`` --
+        the identity the three readings satisfy on real losses.
     """
+    style = tuple(left + right for left, right in zip(expression, coherence, strict=True))
     return TraitArm(
         expression=replicate(f"{name}-expression", list(zip(_SEEDS, expression, strict=True))),
         coherence=replicate(f"{name}-coherence", list(zip(_SEEDS, coherence, strict=True))),
+        style=replicate(f"{name}-style", list(zip(_SEEDS, style, strict=True))),
     )
 
 
@@ -145,14 +153,19 @@ def _cell() -> TraitCompositionArms:
     other = _pairs(3, count=6)
     return measure_trait_composition(
         base,
-        first_train=primary[:4],
-        other_trains=[other[:4]],
+        build=plain_trait_build(
+            base,
+            first_train=primary[:4],
+            other_trains=[other[:4]],
+            num_slots=4,
+            seeds=_SEEDS,
+            seed_stride=len(_SEEDS),
+            epochs=2,
+            learning_rate=0.05,
+        ),
+        partners=1,
         held_out=primary[4:],
         arm="bullets-n2",
-        num_slots=4,
-        seeds=_SEEDS,
-        epochs=2,
-        learning_rate=0.05,
     )
 
 
@@ -171,6 +184,29 @@ class TestTheSoloArmAndItsControl:
         for arm in (trained, untrained):
             assert arm["expression"]["seeds"] == _SEEDS
             assert arm["coherence"]["seeds"] == _SEEDS
+
+    def test_the_three_readings_decompose_exactly(
+        self, measured: tuple[TraitArm, TraitArm]
+    ) -> None:
+        """Expression is style minus coherence, seed by seed, on real losses.
+
+        The identity is what makes the style reading a DECOMPOSITION of the
+        expression gain rather than a fourth opinion: it splits an arm's lean
+        into the trait member getting easier and the neutral member getting
+        harder.
+
+        Args:
+            measured: The solo cell.
+        """
+        trained, untrained = measured
+        for arm in (trained, untrained):
+            for expression, coherence, style in zip(
+                arm["expression"]["gains"],
+                arm["coherence"]["gains"],
+                arm["style"]["gains"],
+                strict=True,
+            ):
+                assert expression == pytest.approx(style - coherence, abs=1e-9)
 
     def test_the_arms_are_named_apart(self, measured: tuple[TraitArm, TraitArm]) -> None:
         """The control's rows must not land under the trained arm's name.
@@ -278,7 +314,8 @@ class TestTheSteeringArm:
             held_out=primary[4:],
             arm="bullets-steer-n1",
             module_name=_SITE,
-            strength=10.0,
+            strengths=(10.0,),
+            coherence_bar=_WIDE_BAR,
         )
         assert reading["arm"] == "bullets-steer-n1"
         assert reading["expression"]["items"] == 2
@@ -299,7 +336,8 @@ class TestTheSteeringArm:
             held_out=primary[4:],
             arm="bullets-steer-n1",
             module_name=_SITE,
-            strength=10.0,
+            strengths=(10.0,),
+            coherence_bar=_WIDE_BAR,
         )
         composed = measure_trait_steering(
             model,
@@ -307,7 +345,8 @@ class TestTheSteeringArm:
             held_out=primary[4:],
             arm="bullets-steer-n2",
             module_name=_SITE,
-            strength=10.0,
+            strengths=(10.0,),
+            coherence_bar=_WIDE_BAR,
         )
         assert composed["expression"]["mean_treatment"] != solo["expression"]["mean_treatment"]
 
@@ -325,7 +364,8 @@ class TestTheSteeringArm:
             held_out=primary[4:],
             arm="a",
             module_name=_SITE,
-            strength=10.0,
+            strengths=(10.0,),
+            coherence_bar=_WIDE_BAR,
         )
         second = measure_trait_steering(
             model,
@@ -333,7 +373,8 @@ class TestTheSteeringArm:
             held_out=primary[4:],
             arm="a",
             module_name=_SITE,
-            strength=10.0,
+            strengths=(10.0,),
+            coherence_bar=_WIDE_BAR,
         )
         assert first == second
 
@@ -347,6 +388,7 @@ class TestTheRowsAnArmPutsInTheRecord:
         names = _names(rows)
         assert {"x-expression_mean", "x-expression_spread"} <= names
         assert {"x-coherence_mean", "x-coherence_spread"} <= names
+        assert {"x-style_mean", "x-style_spread"} <= names
         assert {f"x-expression_seed{seed}_gain" for seed in _SEEDS} <= names
 
     def test_a_cell_reports_retention_when_the_solo_arm_improved(self) -> None:
@@ -361,6 +403,22 @@ class TestTheRowsAnArmPutsInTheRecord:
         retention = [row for row in rows if row["name"] == "c_expression_retention"]
         assert len(retention) == 1
         assert retention[0]["value"] == pytest.approx(0.5)
+
+    def test_a_cell_reports_the_style_retention_beside_it(self) -> None:
+        """The corpus arc's retention on the style text, to be held against expression.
+
+        Coherence 0.4 on the alone arm makes its style 1.4 against an
+        expression of 1.0, so the two retentions differ and each is checked.
+        """
+        cell = TraitCompositionArms(
+            alone=_arm("c-alone", (1.0, 1.0, 1.0), (0.4, 0.4, 0.4)),
+            composed=_arm("c-composed", (0.5, 0.5, 0.5), (0.2, 0.2, 0.2)),
+            untrained_composed=_arm("c-untrained", (0.2, 0.2, 0.2), (0.0, 0.0, 0.0)),
+            cross=(),
+        )
+        values = {row["name"]: row["value"] for row in trait_cell_observations("c", cell)}
+        assert values["c_expression_retention"] == pytest.approx(0.5)
+        assert values["c_style_retention"] == pytest.approx(0.7 / 1.4)
 
     def test_a_cell_omits_retention_when_the_solo_arm_did_not_improve(self) -> None:
         """A ratio against a non-gain has a sign and a size that mean nothing.
@@ -378,6 +436,7 @@ class TestTheRowsAnArmPutsInTheRecord:
         )
         names = _names(trait_cell_observations("c", cell))
         assert "c_expression_retention" not in names
+        assert "c_style_retention" not in names
         assert "c-alone-expression_mean" in names
 
     def test_a_cells_cross_arms_are_named_and_present(self) -> None:
@@ -406,11 +465,18 @@ class TestTheRowsAnArmPutsInTheRecord:
                 held_out=primary[4:],
                 arm="s",
                 module_name=_SITE,
-                strength=10.0,
+                strengths=(1.0, 10.0),
+                coherence_bar=_WIDE_BAR,
             )
         )
         names = _names(rows)
         assert "s-expression_once" in names
         assert "s-expression_mean" not in names
         assert {"s-expression_items", "s-expression_improved", "s-expression_p_value"} <= names
-        assert "s-coherence_once" in names
+        values = {row["name"]: row["value"] for row in rows}
+        strengths = (1.0, 10.0)
+        trained = [values[f"s-tune-s{strength:g}-expression_train"] for strength in strengths]
+        assert values["s-strength"] == strengths[trained.index(max(trained))]
+        assert values["s-style_once"] == pytest.approx(
+            values["s-expression_once"] + values["s-coherence_once"], abs=1e-9
+        )

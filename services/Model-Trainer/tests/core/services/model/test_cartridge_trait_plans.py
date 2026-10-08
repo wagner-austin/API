@@ -18,10 +18,11 @@ import pathlib
 import pytest
 
 from model_trainer.core.contracts.trait_corpus import CONSISTENTLY_EFFECTIVE_TRAITS
-from model_trainer.core.contracts.trait_plan import TraitPlan, trait_plan_label
+from model_trainer.core.contracts.trait_plan import TraitPlan, seed_token, trait_plan_label
 from model_trainer.core.services.model.cartridge_qa_power import resolvable_floor
 from model_trainer.core.services.model.cartridge_trait_plans import TRAIT_SWEEP_PLANS
 from model_trainer.core.services.model.trait_corpus import load_trait_corpora, split_trait_pairs
+from model_trainer.core.services.model.trait_roster import require_resolvable_seeds
 
 #: The committed corpus, read rather than assumed.
 #:
@@ -73,8 +74,8 @@ class TestEveryPlanIsInternallyConsistent:
         plan = TRAIT_SWEEP_PLANS[name]
         assert len(set(plan["traits"])) == len(plan["traits"])
 
-    def test_the_declared_effect_is_resolvable_by_the_committed_corpus(self, name: str) -> None:
-        """The gate would refuse this plan on the cluster otherwise.
+    def test_the_pair_floor_is_resolvable_by_the_committed_corpus(self, name: str) -> None:
+        """The per-pair gate would refuse this plan on the cluster otherwise.
 
         Computed with the same function the gate calls, against the pair count
         the COMMITTED corpus actually yields -- so this fails here, in
@@ -89,7 +90,21 @@ class TestEveryPlanIsInternallyConsistent:
             corpora[0]["pairs"], held_out_stride=plan["held_out_stride"]
         )
         floor = resolvable_floor(len(held_out), plan["alpha"], plan["mcnemar_test"])
-        assert floor <= plan["smallest_effect_of_interest"]
+        assert floor <= plan["pair_test_floor"]
+
+    def test_the_seeds_resolve_the_derived_sei(self, name: str) -> None:
+        """The seed gate would refuse this plan on the cluster otherwise.
+
+        The same function the run calls, on the plan as committed, so a plan
+        whose seeds fall short of its pilot's spread fails here in seconds.
+
+        Args:
+            name: The plan under test.
+        """
+        rows = {
+            row["name"]: row["value"] for row in require_resolvable_seeds(TRAIT_SWEEP_PLANS[name])
+        }
+        assert rows["seed_paired_mde"] <= rows["smallest_effect_of_interest"]
 
     def test_every_trait_in_the_roster_is_committed_and_the_same_size(self, name: str) -> None:
         """A roster whose traits differ in size makes the cross arms uneven.
@@ -127,9 +142,29 @@ class TestEveryPlanIsInternallyConsistent:
         label = trait_plan_label(name, plan, digest="0123456789abcdef")
         assert plan["model_id"] in label
         assert all(trait in label for trait in plan["traits"])
-        assert all(str(seed) in label for seed in plan["seeds"])
+        assert f"-seeds{seed_token(plan['seeds'])}-" in label
         assert plan["steering_module"] in label
         assert label.endswith("0123456789ab")
+
+
+class TestTheSeedToken:
+    """Every seed named, compactly only where the compact form is exact."""
+
+    def test_a_pilots_three_seeds_read_as_they_always_have(self) -> None:
+        """The pilot records' labels must still match."""
+        assert seed_token((7, 8, 9)) == "7.8.9"
+
+    def test_a_long_contiguous_run_is_its_endpoints(self) -> None:
+        """138 seeds would otherwise be a label nothing can read."""
+        assert seed_token(tuple(range(7, 145))) == "7..144"
+
+    def test_a_gap_keeps_the_full_list(self) -> None:
+        """``7..13`` would claim seeds this set does not have."""
+        assert seed_token((7, 9, 11, 13)) == "7.9.11.13"
+
+    def test_every_plan_declares_whole_blocks(self) -> None:
+        """A sharded run cuts the seeds into blocks of three, so the count must divide."""
+        assert all(len(plan["seeds"]) % 3 == 0 for plan in TRAIT_SWEEP_PLANS.values())
 
 
 class TestTheRosterControl:
