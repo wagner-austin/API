@@ -39,9 +39,11 @@ _lint-mypy:
 
 # Test running lives in the shared launcher, tools/maketools (the ``test``
 # command); see any sibling package's Makefile for what it adds over the
-# inline recipe and the incident behind it. --durations names the suite's 25
-# slowest steps in every check's log, so the next run that nears the
-# five-minute budget says on the fleet node itself which tests cost it.
+# inline recipe and the incident behind it. --durations=0 with
+# --durations-min=1.0 names every test step that took a second or more in
+# every check's log, so the next run that nears the five-minute budget says on
+# the fleet node itself which tests cost it; the 25 slowest it named before
+# left the rest of the suite's time unaccounted for.
 # -p no:ddtrace keeps out the pytest plugin that the ddtrace runtime
 # dependency registers: it is Datadog CI Visibility, which no run of this
 # suite turns on, and importing it cost 1 to 3 s in the controller and again
@@ -50,7 +52,7 @@ _lint-mypy:
 test: _deps _test-suite
 
 _test-suite:
-	$(MAKETOOLS) test -p no:ddtrace --durations=25
+	$(MAKETOOLS) test -p no:ddtrace --durations=0 --durations-min=1.0
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
