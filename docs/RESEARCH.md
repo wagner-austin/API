@@ -97,7 +97,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   cartridge_companion_sweep, cartridge_composition_sweep,
   cartridge_content_lora_sweep, cartridge_diverse_companion_sweep,
   cartridge_headroom, cartridge_solo_grid,
-  cartridge_solo_seeds, cartridge_trait_sweep,
+  cartridge_solo_seeds, cartridge_trait_repair_sweep, cartridge_trait_sweep,
   cartridge_varied_companion_sweep, continuations,
   forward_benchmark, gemm_benchmark, gemm_probe, known_answer_probe,
   known_answer_registry, legacy_gemm_probe, probe_ladder, probe_trace,
@@ -870,9 +870,22 @@ and that every common composition scheme degrades as vectors are added.
   each, staged by `tools/hpc3/runs/trait-corpus-stage.json` with a sha256 per
   file. 32 is the POWER GATE's number, not a round one: the stride holds out
   half, and 6 of 16 is the smallest net rate any outcome could ever report as
-  significant at alpha 0.05 under the exact McNemar test. Every plan declares
-  exactly that 0.375, and halving it means doubling the authored pairs. The
-  gate runs on the REALISED held-out count before a model loads.
+  significant at alpha 0.05 under the exact McNemar test. That 0.375 is now
+  `pair_test_floor` and says only that the per-pair test is falsifiable on
+  this corpus; it was once the plans' "smallest effect of interest", which is
+  the move `cartridge_qa_plans` forbids (a threshold chosen so the corpus
+  clears it is not a threshold). The gate runs on the REALISED held-out count
+  before a model loads.
+- **The smallest effect of interest is derived, and a seed gate enforces
+  it.** 0.0526 retention -- base-LoRA plus diverse cartridges over diverse
+  alone at n8 (0.3326 vs 0.2800), the margin the corpus arc's operating point
+  of record was adopted on -- times the variance pilot's solo gain, 2.6144
+  nats: 0.1375 nats. The pilot's paired spread (n2 minus n4 composed, per
+  seed: 2.0248, 0.5953, 0.6317, sd 0.815) needs 138 seeds at that SEI under
+  `platform_core.minimum_detectable_effect.required_replicates`, so every plan
+  declares seeds 7..144 and `trait_roster.require_resolvable_seeds` refuses a
+  plan whose seeds fall short, before a model loads. The derivation follows
+  `clients/RustedWarfareBot/wiki/pages/power-audit-mde-ledger.md`.
 - **The traits are not free choice.** The roster is drawn from the six the
   published work found consistently effective; the four it excluded are
   positionally concentrated (rhyme matters at line ends), so a composition
@@ -883,34 +896,58 @@ and that every common composition scheme degrades as vectors are added.
 - **The solo cell runs first and the arc stops if it fails.** The 7B rung of
   the corpus programme failed at exactly that step and not at composition —
   solo gain +0.068 against a per-seed span of the same order — and every
-  retention ratio computed on those records became a division artefact.
-  `require_solo_precondition` raises `TRAIT_SOLO_PRECONDITION_FAILED` between
-  cells when the solo arm's mean does not exceed its own spread, naming the
-  untrained-prefix control beside it because a gain that merely matches an
-  untrained prefix is the other way this fails.
-- **The steering arm has no seeds, and the record says so in its names.** A
-  contrastive activation vector is a mean over a fixed pair set; nothing is
-  drawn. Wrapping that in a replicated gain would report a spread of exactly
-  zero and invite comparison against the cartridge arms' spreads, which are
-  estimates of a different thing. Its rows are named `_once` rather than
-  `_mean`.
-- **The grid is the recorded one with a STATED deviation.** Solo, n2 and n4
-  with the untrained-composed and per-partner cross controls; the
-  diverse-companion, base-LoRA and crowd-invariance families are not run here.
-  Those three are interventions that REPAIR composition, and the question they
-  answer is only askable once a naive interference number exists to repair —
-  which is the order the corpus arc was built in, each sweep importing the one
-  before it.
-- **Two run documents are committed:**
-  `tools/hpc3/runs/cartridge-traits-gpt2-v54.json` and its `-twin`, against
-  image `c66460f05275` (v54). The twin is the bit-identity certificate A2
-  requires: no judge model and no draw in the steering arm, so if the two
-  records differ, a determinism pin has come loose rather than the traits
-  having changed.
-- **No results yet.** The command, its corpus, its gate and its controls
-  exist and are green; nothing has been run on the cluster. This entry
-  records a registered surface, not a finding, and the distinction is the one
-  `cartridge_qa_benchmark` below exists to keep visible.
+  retention ratio computed on those records became a division artefact. The
+  verdict (solo mean above its own per-seed spread) is a RECORD row,
+  `solo_precondition_cleared`; a failed one still writes the solo and steering
+  rows and stops before the composed cells.
+- **Three readings, and they decompose exactly.** Expression (the difference
+  of differences), coherence (loss gain on the neutral member) and style (loss
+  gain on the expressing member), with expression = style - coherence pair by
+  pair. Style is the corpus arc's own variable on a style corpus -- option (b)
+  of the task -- so a `_style_retention` row sits beside every
+  `_expression_retention`, and where the two agree the persona result is a
+  style-corpus result.
+- **The steering arm has no seeds, and its strength is tuned by the published
+  rule.** A contrastive vector is a mean over a fixed pair set, so its rows are
+  `_once`, not `_mean`. The strength is the most expressive one in the plan's
+  grid whose training-pair coherence cost stays within
+  `steering_coherence_bar` -- the cartridge's own solo coherence cost, 1.8611
+  nats, so the substrates are compared at matched fluency -- chosen on the
+  solo direction and carried to every count. At strength 1.0 on a unit
+  direction (the old plan) it moved expression by +0.004.
+- **The repairs are `cartridge_trait_repair_sweep`**, one plan per lever:
+  `gpt2-traits-diverse` (diverse companions on the plain base),
+  `gpt2-traits-base-lora` (LM adapter behind the crowd, both families),
+  `gpt2-traits-content-lora` (crowd-invariance adapter, both families). Each
+  reads the naive plan's trait row by identity and the corpus arc's crowd row
+  by identity, builds the adapter through the lifted
+  `cli/cartridge_crowd_adapters.py` (row-for-row identical corpus records
+  before and after the lift), and records a companion-cross arm per pool
+  member. Stated deviations: counts (2, 4), not (4, 8), because six traits are
+  admissible; no plain family on the plain base, because the naive grid is
+  it; the pool is the recorded corpus pool, not traits.
+- **Seed blocks and shards.** At 138 seeds one job is a day of CPU with whole
+  cells at risk on each `free` preemption, and `free-gpu` would not start for
+  about two days (`sbatch --test-only`, 2026-10-07). Every cell is one block
+  of three seeds; `seed_stride` passes the PLAN's seed count to the partner
+  draws, so a block trains exactly the cartridges a straight run would;
+  `--shards DIR --shard-count N --shard K` measures one share, and
+  `--shards DIR --shard-count N` adopts every share and resumes through the
+  straight run's own path (`cartridge_sweep_shards.py`). A merged record
+  equals the straight record bit for bit (`tests/test_cartridge_trait_shards.py`),
+  and a repair merge refuses shards whose adapters' epoch rows differ.
+- **The pilot.** `tools/hpc3/runs/cartridge-traits-gpt2-pilot-cpu-v56.json`
+  and `-twin`, image v56 (`0e9f177f`; v54 holds no trait code, so the old v54
+  documents could never have run), CPU `free`, seeds 7, 8, 9, each twin in
+  its own result directory so a twin cannot resume the original's cells. The
+  twin (job 57928006) completed, record sha256 `db357c23…`; the original
+  logged the identical solo, n2 and n4 lines and was preempted twice before
+  its last steering cells. Bullets: solo expression +2.6144 (spread 0.3550,
+  A1 cleared), coherence -1.8611, untrained -0.6072; n2 retention 0.390, n4
+  -0.025; untrained-composed +1.23 (n2) and +0.47 (n4).
+- **No full-grid results yet.** The 138-seed runs need an image built from
+  the commit that carries the blocks, the style reading and the tuned
+  steering arm.
 
 #### the extraction ablation's marker contrast across four scales
 
