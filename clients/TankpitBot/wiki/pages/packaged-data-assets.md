@@ -17,12 +17,12 @@ source_paths:
 source_git_blobs:
   "src/tankpit_bot/resources.py": "97a6416f44ecfdc88f72294ae34e1828d3e4ae2b"
   "src/tankpit_bot/protocol/codec.py": "b69f89bd1bf4e550a56f48a7761f91acbf35f9e1"
-  "src/tankpit_bot/sniffer/world_service.py": "48c3ff79c77bfea915869be662621d6f4b0ee492"
-  "src/tankpit_bot/sim/run_boot.py": "d28a3b5cc5f86b77fb04f4095696b389e86bb713"
+  "src/tankpit_bot/sniffer/world_service.py": "526062c0977cb85f6154caefca9866e9faed47a8"
+  "src/tankpit_bot/sim/run_boot.py": "5b53afaf54c67be123391762dd756a746e8ddea4"
   "tests/test_resources.py": "01f6d2dbedc0608bac6752ec2427554e88a9b4fa"
-  "scripts/download_fields.py": "267d3f5ddb0c22e4a2987aff1edbd5f87644f013"
-  "pyproject.toml": "e366ce3f8cdcda1fcbcaa53a4f72fde26e8fc051"
-  "Dockerfile": "e41a1035df86e034f28ae521db5a2124908861ae"
+  "scripts/download_fields.py": "9e317cc66e9bb538104a3fd8bd1aa4ef7214dd9d"
+  "pyproject.toml": "498c0e7d90f7bac2d22d278045b632055973a864"
+  "Dockerfile": "f9e9ecda1175f74b5bc83f0c9120569a8b397ffc"
 provenance:
   - "HPC3 job 55715554 failed on field01_r.gif not found, 2026-09-03"
   - "HPC3 job 55715564 failed on xor_static_key.txt missing despite the file being staged beside the GIF, 2026-09-03"
@@ -31,6 +31,7 @@ provenance:
   - "Both halves of the spelling assertion exercised against a reintroduced duplicate and against a rename, 2026-09-03: the count catches an added file, the suffix check catches a renamed one"
   - "git notes on 12717125 and bccf5afa recorded this split until 2026-09-03, when all five notes in the repository were deleted and their contents migrated into the wikis; refs/notes/commits had never been pushed"
 fact_checked: "2026-09-03"
+verified: 2026-10-08 (the five pinned files re-read against API HEAD for MCPs board task 3d71a8e1; the package now ships hls.min.js as a fourth asset, the sim boot still loads its terrain through require_asset, and the Dockerfile still copies neither the key nor the GIFs)
 confidence: high
 hubs: [architecture]
 ---
@@ -181,8 +182,8 @@ layer.[^12]
 [^4]: Verified 2026-09-03 by breaking the tree twice. Copying `field42_r.gif` back to `field42-r.gif` fails at `tests/test_resources.py:88` on `assert 45 == 44`; *renaming* it — which leaves the count at 44 — passes line 88 and falls through to `tests/test_resources.py:92`, `AssertionError: field42-r.gif ships but no lookup can reach it`. The second case is the one the old `continue` silently permitted.
 [^5]: `scripts/download_fields.py`, `download_field_gifs`: `out_path = resolved_dir / f"{field_name}_r.gif"`, the only GIF filename the module constructs.
 
-[^6]: The two lookups as they stood before commit `bccf5afa`: the key was read from `Path(__file__).parent.parent.parent.parent`, four levels above `protocol/codec.py`, which is the repository root from a checkout and `site-packages` from an install; the GIFs were resolved from a bare relative filename in `sniffer/world_service.py::_find_field_gif`. `pyproject.toml:14-18` now ships `src/tankpit_bot/data/*.gif` and `src/tankpit_bot/data/xor_static_key.txt` beside `py.typed`, which previously stood alone.
-[^7]: The container workaround is visible in `Dockerfile:121-128`, which now records the two `COPY` lines and the `ENV TANKPIT_XOR_KEY_FILE` it used to carry and no longer does. The cluster workaround is jobs `55715554`/`55715564`/`55715577`, whose submissions staged 46 files into the working directory and passed the variable per run.
+[^6]: The two lookups as they stood before commit `bccf5afa`: the key was read from `Path(__file__).parent.parent.parent.parent`, four levels above `protocol/codec.py`, which is the repository root from a checkout and `site-packages` from an install; the GIFs were resolved from a bare relative filename in `sniffer/world_service.py::_find_field_gif`. `pyproject.toml:14-19` now ships `src/tankpit_bot/data/*.gif` and `src/tankpit_bot/data/xor_static_key.txt` beside `py.typed`, which previously stood alone, and since `3f79c7c30` (2026-09-04, repo API) a fourth asset, `src/tankpit_bot/data/hls.min.js`, which `service/http_server.py:271` serves through the same `require_asset`. The three-line include this footnote quoted until 2026-10-08 is lines 14-18 of blob `e366ce3f`.
+[^7]: The container workaround is visible in `Dockerfile:150-157` (`:121-128` until the web stage and the capture layers were added above it), which now records the two `COPY` lines and the `ENV TANKPIT_XOR_KEY_FILE` it used to carry and no longer does. The cluster workaround is jobs `55715554`/`55715564`/`55715577`, whose submissions staged 46 files into the working directory and passed the variable per run.
 [^8]: `src/tankpit_bot/resources.py:63`, `data_directory`, returns `Path(str(files(DATA_PACKAGE)))` with `DATA_PACKAGE = "tankpit_bot.data"` at line 33 — one anchor on the installed package rather than on the caller's working directory or the module's parents.
 [^9]: All five deletions are in commit `bccf5afa`, which removes `_CHECKOUT_STATIC_KEY_PATH` and the `TANKPIT_XOR_KEY_FILE` branch from `protocol/codec.py` (-27 lines), the CWD candidate list from `sniffer/world_service.py`, both `COPY`/`ENV` pairs from the `Dockerfile` (-23 lines), and 45 lines from `tests/test_codec.py` — the three tests that pinned the override's behaviour.
 [^10]: Commit `bccf5afa` touches 37 files; the import repoint accounts for most of them, and `protocol/codec.py` retains no re-export of the moved function.

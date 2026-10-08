@@ -18,20 +18,25 @@ source_paths:
   - "scripts/fleet_host.py"
   - "docker-compose.yml"
   - "Makefile"
+  - "scripts/fleet_gate.py"
+  - "scripts/fleet_remote.py"
 source_git_blobs:
-  "src/tankpit_bot/service/fleet.py": "c2aee830aeefa47e937cc0b92609112c308a4291"
+  "src/tankpit_bot/service/fleet.py": "bfb7fb5e4d92ae57525d14406b672bf33b6c3452"
   "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
   "src/tankpit_bot/service/fleet_record.py": "ca5367073005c0cd30227d51253762ae2e9a9705"
   "src/tankpit_bot/service/fleet_adoption.py": "32d4aaea0a2968db120498eef69b8c8c6d090883"
-  "src/tankpit_bot/service/fleet_manager.py": "45689875f78d5b31d62fae0824403a23cd8a8add"
+  "src/tankpit_bot/service/fleet_manager.py": "0fca9c8a1742f866f88ed607d7eb78dd37db7427"
   "src/tankpit_bot/service/fleet_slot.py": "36057f6a8419373350e307feebcab0e49356a486"
   "src/tankpit_bot/service/service_main.py": "9d85d62a5a1af8a39fd5d4064fd3f674e0cc0789"
   "src/tankpit_bot/runtime_artifacts.py": "062e2e5984680df96a1d2e17e8897bd9899c6238"
   "src/tankpit_bot/service/serving.py": "02f70d54653b438e885bf88e1aa1bd52209fd596"
-  "scripts/fleet_host.py": "d6b33832c471344d9677134f98334f7acf09f891"
+  "scripts/fleet_host.py": "86ff7450c3473940c899a0c26d9f1e3d4a943faf"
   "docker-compose.yml": "663ccb504d2bc7d42e84a5183f4259e44eb412b3"
-  "Makefile": "bf8521b096bdca7b59861fb762513f11765295ac"
+  "scripts/fleet_gate.py": "d1a74605621980e9c0662e33f67c142572944ed1"
+  "scripts/fleet_remote.py": "0e10eacf7fb66e0b53e7e783ea538d9e68dfb1bd"
+  "Makefile": "d645040986ceba38930aefbab34f836ae5f31475"
 fact_checked: "2026-09-29"
+verified: 2026-10-08 (fleet.py, fleet_manager.py, fleet_host.py and the Makefile re-read against API HEAD for MCPs board task 3d71a8e1; the up gate and the fleet_remote split added, the manager's demo captions and main's logging setup leave the lifecycle unchanged)
 confidence: high
 hubs: [architecture]
 ---
@@ -132,7 +137,7 @@ this work.
 
 | Command | Effect |
 |---|---|
-| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era), run on the hub against SEDONA, the game host, since 2026-09-28: resolve the newest release, stage the committed compose file, `edge/nginx.conf` and the release's `.env` and `accounts.json` into `C:/fleet/tankpit` on sedona, build the image there if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, compose the fleet CONTAINER up with its public edge (the `/demo/`-only filter and tankpit's own tunnel), and wait for `https://tankpit.austinwagner.org` to serve.[^10] |
+| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era), run on the hub against SEDONA, the game host, since 2026-09-28: resolve the newest release, stage the committed compose file, `edge/nginx.conf` and the release's `.env` and `accounts.json` into `C:/fleet/tankpit` on sedona, build the image there if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, compose the fleet CONTAINER up with its public edge (the `/demo/`-only filter and tankpit's own tunnel), and wait for `https://tankpit.austinwagner.org` to serve; since 2026-09-28 it ends with the bring-up gate, `scripts/fleet_gate.py`'s `gate`, which spawns one bounded Practice bot and waits for its first tick, so an `up` that exits 0 has been seen playing the game as well as serving.[^10] |
 | `make down` | Drain on sedona: `docker stop`'s SIGTERM enters `drain_on_interrupt`, every bot quits to the lobby, the container exits after the last one (grace 10 m). The edge stays up and the demo reads offline.[^10] |
 | `make dev` | The only other manager: hot tree, foreground, development only — Ctrl+C drains. |
 
@@ -222,7 +227,11 @@ child console to a file. The path constant died with the launcher on
       in `scripts/fleet_host.py`, whose module docstring lists what is
       staged and from where; the `public` and `tunnel` services under
       profile `edge` in `docker-compose.yml`. The move is MCPs board task
-      `077204e8`.
+      `077204e8`. The bring-up gate is `gate` in `scripts/fleet_gate.py`
+      (`free_account`, `spawn`, `_still_alive`), called last by `up`
+      since `72c76d556` (2026-09-28, repo API); the ssh and command
+      helpers moved out of `fleet_host.py` into `scripts/fleet_remote.py`
+      (`SEDONA_SSH`, `FleetHostError`, `on_sedona`, `run_checked`).
 [^11]: The `doctrine` and `service_port` fields of the spawn record and
       its encoder and decoder in `src/tankpit_bot/service/fleet_record.py`;
       `_allocate_service_port` in `service/fleet_manager.py` reserves the

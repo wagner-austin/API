@@ -13,8 +13,12 @@ source_paths:
   - "src/tankpit_bot/sim/server_sessions.py"
   - "tests/sim/test_field_run.py"
   - "scripts/sim_control.py"
+  - "src/tankpit_bot/sim/field_choice.py"
+  - "src/tankpit_bot/sim/cli_args.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/field_run.py": "9f053094e851b8da2da35d3c2eb5f2dd0b71a5e1"
+  "src/tankpit_bot/sim/field_run.py": "1bdf096f5e4c32ea8ba64535178a6e5caea06340"
+  "src/tankpit_bot/sim/field_choice.py": "cbfcc15d038057798795875d393e6149a0d23f2a"
+  "src/tankpit_bot/sim/cli_args.py": "179ec5e69c3d9ea92b2623f5cac78b2f1ea9565b"
   "src/tankpit_bot/sim/field_clients.py": "73987f5fc24a998c7bd9abbfd42fea0b1358b3be"
   "src/tankpit_bot/sim/server_sessions.py": "b75b71414d6ff7422c934739e230f56522c37fe2"
   "tests/sim/test_field_run.py": "f44c7d8967963ee52160ea711f8f9d919916f282"
@@ -22,6 +26,7 @@ source_git_blobs:
 provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 2, 2026-10-05: the live field runs on field01 quoted below, played from the committed tree into a scratch archive"
 fact_checked: "2026-10-05"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; field_run.py gained only the field parameter)
 confidence: high
 hubs: [architecture]
 ---
@@ -54,6 +59,13 @@ its events under `<runs-root>/tank-<id>/probe/`, and the field's final
 world once at `<out>/sim-<stamp>.world.json`. The ghost, ferry, larder
 and atlas-forage scenarios, and `--human-opponent`, are written around
 one client and are refused with `SIM_FIELD_SCENARIO`.[^1]
+
+Since `b54cefd67` (2026-10-05, Phase 4 of the same track, repo API) a
+field can also be played on any of the shipped field minimaps:
+`--field NAME` reaches `run_field_session`'s `field` parameter, which
+sets the world's terrain through `field_choice.resolve_field` and
+otherwise keeps field01 (`SIM_FIELD`). An unknown name is refused with
+`SIM_FIELD_UNKNOWN`.[^8]
 
 ## Who sits at the field
 
@@ -145,3 +157,4 @@ and the field ends at round 10.[^7]
 [^5]: `src/tankpit_bot/sim/practice_room.py` `note_field_batches`; `tests/sim/test_field_run.py` `test_one_shot_seen_by_two_connections_is_one_hit`.
 [^6]: `scripts/sim_control.py`, run 2026-10-05: `IDENTICAL: all 21 artifacts` comparing the Phase 1 recording with this tree's.
 [^7]: `tests/sim/test_field_run.py` `test_the_two_bots_fight_each_other` and `test_a_bot_that_exits_leaves_the_field_and_its_rival_is_told`.
+[^8]: `src/tankpit_bot/sim/field_run.py:298-342`, `run_field_session(..., field: str | None = None)` and its `world["field"] = SIM_FIELD if field is None else resolve_field(field)` at `:342`; `src/tankpit_bot/sim/field_choice.py:41-59`, `resolve_field`, raising `FieldChoiceError` with `SIM_FIELD_UNKNOWN`; `src/tankpit_bot/sim/cli_args.py:145`, the `--field` token.

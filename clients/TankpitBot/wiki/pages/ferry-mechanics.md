@@ -9,11 +9,12 @@ source_paths:
   - "src/tankpit_bot/sim/movement.py"
   - "src/tankpit_bot/analysis/scan.py"
 source_git_blobs:
-  "src/tankpit_bot/analysis/scan.py": "507dcc1e35be2504b4973af43d98c7c2fd0b84a4"
-  "src/tankpit_bot/sim/movement.py": "d3486ee8310ce26c9c5bc6939fe7a7007fe27bd3"
+  "src/tankpit_bot/analysis/scan.py": "808b553d59c0a4e80e0907c8fef7c28bf8843cbc"
+  "src/tankpit_bot/sim/movement.py": "9f11eee9d993b2af18be536a125fdd567693d036"
 provenance:
   - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; scan.py and sim/movement.py changed only to make SessionSkipReason, Surface and StopReason string enums, and every cited range is unchanged)
 confidence: high
 hubs: [game-mechanics]
 ---

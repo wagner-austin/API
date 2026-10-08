@@ -12,8 +12,9 @@ source_paths:
   - "src/tankpit_bot/action_lab/enemy_teleport.py"
 source_git_blobs:
   "bot_watch_probe.capture_session.json": "694fa343cbc2c92ad1fb30b4c7fb30d2bcbf58f6"
-  "src/tankpit_bot/action_lab/enemy_teleport.py": "f5134f56b6615d1e6dbe76c6fd97049508190a24"
+  "src/tankpit_bot/action_lab/enemy_teleport.py": "eb5ceeac341d327ff25be07c5fe16dec4479202c"
 fact_checked: "2026-08-07"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; enemy_teleport.py changed only to name its phase and timeout status through ActionPhaseName and TeleportAttemptStatus, and the cited lines are unchanged)
 confidence: high
 hubs: [protocol]
 ---

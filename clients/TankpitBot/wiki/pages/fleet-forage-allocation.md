@@ -13,15 +13,18 @@ source_paths:
   - "src/tankpit_bot/bot/ai/context.py"
   - "src/tankpit_bot/bot/ai/tactics.py"
   - "src/tankpit_bot/fleetshare/types.py"
+  - "src/tankpit_bot/fleetshare/replace_window.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/tick_body.py": "45addc1e7e7a2e82116c7bd4f4d177941a394f3d"
-  "src/tankpit_bot/bot/tick_claims.py": "d29caeef6f472f7b45dcdc9658057aae94e54764"
-  "src/tankpit_bot/fleetshare/claims.py": "167c63cd04e3e799177cdbe6c9d29386002dbbff"
-  "src/tankpit_bot/fleetshare/merge.py": "bce1c259f0e79d5709f3634d30ec3686344d565d"
+  "src/tankpit_bot/bot/tick_body.py": "69d1b2a658e53a95a11477a2c73dad7e246901f3"
+  "src/tankpit_bot/bot/tick_claims.py": "0b3c48bac041f7ae2edf9d6a1eaccee4b62c1881"
+  "src/tankpit_bot/fleetshare/claims.py": "fbe7d8ff474e185b0d871ffc7f4ad9ff3d8e8e9a"
+  "src/tankpit_bot/fleetshare/merge.py": "aef2586f2f1e8745010754cf1bb1bbf7345e698a"
   "src/tankpit_bot/bot/ai/context.py": "7ab60480ed3b3d5e1faf2f0f8a1438b80edb4702"
   "src/tankpit_bot/bot/ai/tactics.py": "3e2e7bc64815c7687469a8afe3eaaadecf87a429"
-  "src/tankpit_bot/fleetshare/types.py": "7bc23b7b1177ba508258d777be91da1cc93704de"
+  "src/tankpit_bot/fleetshare/types.py": "c64e2927eb240c56f69bdf929ea0a5bfdc010f4b"
+  "src/tankpit_bot/fleetshare/replace_window.py": "56bb265f15d0b2fc18759f79b95ce8c1828f7fe9"
 fact_checked: "2026-09-02"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; since 2026-09-29 claims._read_claim reads through replace_window.read_once and treats any of its four replace-window forms as the unreadable claim this page describes, and the other changes are string enums)
 confidence: high
 hubs: [architecture]
 ---

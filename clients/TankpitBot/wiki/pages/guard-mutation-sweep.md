@@ -12,10 +12,10 @@ source_paths:
 source_git_blobs:
   "tests/sniffer/test_dispatch_exclusivity.py": "bbc986e8939abe32cc17f6c8c3c2b952b124e3db"
   "src/tankpit_bot/sniffer/constants.py": "fe859e16ecdc3670bdc9e150e290dc607d1bac72"
-  "src/tankpit_bot/validate/roundtrip.py": "b57592a4a886e62d202674421642d65ac38ddb49"
+  "src/tankpit_bot/validate/roundtrip.py": "c5a36b36689409586cf9e5e4d8abd97a68d464b2"
 fact_checked: "2026-08-12"
 confidence: high
-verified: "every claimed kill re-mutated against the final tree (31/31); structural cases re-mutated and confirmed still surviving"
+verified: "every claimed kill re-mutated against the final tree (31/31); structural cases re-mutated and confirmed still surviving; 2026-10-08, for MCPs board task 3d71a8e1, roundtrip.py re-read at API HEAD: it changed only to compare a frame's direction with MessageDirection.RECEIVED, and the sweep was not re-run"
 hubs: [codebase, architecture]
 ---
 

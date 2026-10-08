@@ -9,10 +9,17 @@ related:
 source_paths:
   - "src/tankpit_bot/bot/ai/intent.py"
   - "src/tankpit_bot/bot/ai/collect_mode.py"
+  - "src/tankpit_bot/bot/ai/collect_mode_outcomes.py"
+  - "src/tankpit_bot/bot/ai/collect_hops.py"
+  - "src/tankpit_bot/bot/ai/types.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/intent.py": "0f14f54dd2aab07743ac77de600f7968aab5ceb8"
-  "src/tankpit_bot/bot/ai/collect_mode.py": "51dea1db9862ee894e5458a3409d50c296cf150c"
+  "src/tankpit_bot/bot/ai/intent.py": "2f2f1aff5b7b8ab7ddf7a421fa9f1a22f906848c"
+  "src/tankpit_bot/bot/ai/collect_mode.py": "fce9a51df3f7165c76933a4ecc04e64613e47b9b"
+  "src/tankpit_bot/bot/ai/collect_mode_outcomes.py": "430d03baca12c61123c8138c1bbca38076349576"
+  "src/tankpit_bot/bot/ai/collect_hops.py": "854b07cd406df844615f84a542987305fd417153"
+  "src/tankpit_bot/bot/ai/types.py": "8f3c883185f8ea6b24dda03b8f93961bf0208c07"
 fact_checked: "2026-08-07"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; no live run re-observed)
 confidence: high
 hubs: [architecture]
 ---
@@ -48,17 +55,21 @@ with a specific reason so churn is measurable in the events stream
 instead of silent.
 
 The plan's persistent representation is state that already exists —
-no new fields, no migration[^3]:
+no new fields, no migration[^3] when phase 1 shipped; the progress
+invariant of 2026-09-02 later added one counter,
+`resource_target_held_ticks`, to the lock:
 
 | Plan | Persistent fields | Owner module |
 |---|---|---|
-| Collect (harvest a container) | `resource_target_kind/x/y` + `suppress_landing_scan` | `bot/ai/intent.py` (phase 1, SHIPPED) |
+| Collect (harvest a container) | `resource_target_kind/x/y` + `resource_target_held_ticks` + `suppress_landing_scan` | `bot/ai/intent.py` (phase 1, SHIPPED) |
 | Hunt (close on / pursue a target) | `combat_target_id/x/y` + break latch | phase 2, open |
 | Clearance (shoot mine, then collect) | `mine_clearance_aim_key/_shot_ms` | phase 2, open |
 
-`bot/ai/intent.py` is the single owner of collect-plan SEMANTICS;
-raw field mutation stays in `context.py` (`set_resource_target` /
-`clear_resource_target`)[^3]. The API:
+`bot/ai/intent.py` is the single owner of collect-plan SEMANTICS and,
+since 2026-08-28, of the raw field mutation too (`set_resource_target`,
+`clear_resource_target` and the newer `hold_resource_target`), which
+moved in from `context.py` to break a context, intent, context import
+cycle[^3]. The API:
 
 - `current_collect_plan(ai_state)` — the held plan as a typed
   `CollectPlanDict` (kind, target_x, target_y), or `None`.
@@ -77,8 +88,9 @@ raw field mutation stays in `context.py` (`set_resource_target` /
 `tank_at_capacity` (completion — the fuel plan's purpose is served),
 `superior_candidate`, `not_executable`, `landing_scan_reset`,
 `walk_for_fuel_override`, `target_gone`, `target_not_pursuable`,
-`kind_invalid`, `unservable`[^4]. A new release site means a new
-documented reason in `intent.PLAN_RELEASE_REASONS`, not an invented
+`kind_invalid`, `unservable`, `claim_lost`, `relocated`,
+`progress_stalled`[^4]. A new release site means a new documented
+member of the `intent.PlanReleaseReason` string enum, not an invented
 string[^4].
 
 **`unservable` (added 2026-08-05)** is the *structural* release, and the
@@ -105,8 +117,9 @@ transient holds measure 2-3 ticks, so the bound never fires on them.
 
 **Lock integrity (2026-09-02, after the livelock).** Only the intent
 module may touch the raw lock fields: `clear_resource_target` is
-guard-restricted to `intent.py` (`restricted-symbols` rule,
-`monorepo_guards`), every other drop flows through
+guard-restricted to `intent.py` (the `RESTRICTED_SYMBOLS` table of the
+monorepo's `libs/monorepo_guards/src/monorepo_guards/restricted_symbol_rules.py:28-30`,
+outside this wiki's workspace), every other drop flows through
 `release_collect_plan`, and the quad sweep — whose raw clear re-armed
 the harvest latch 136 times — now declines outright while a lock is
 held. Forage coverage decisions preserve a held lock (the s11-5 law:
@@ -120,7 +133,7 @@ all = a hold-forever shape worth a triage page.
 
 ## Wired-in continuity (phase 1)
 
-- **Under-fire escape** (`_escape_under_fire_decision`)[^6]: before any
+- **Under-fire escape** (`escape_under_fire_decision`)[^6]: before any
   hop selection, a held plan that completes here is finished — the
   pickup IS the escape continuation (one action, no added exposure).
   This is the s8-2 fix at the root: the landing tick now serves the
@@ -152,8 +165,8 @@ all = a hold-forever shape worth a triage page.
   through intent so plan HANDOFFS are also visible.
 
 [^1]: [synthesis] — the motivating behaviour, recorded from live runs rather than measured in a test. The specific receipt is the s8-2 flag on run `bot-20260730-025337` (03:00:00) described in [[flag-triage-20260729]]: an escape hop landed on its own locked equipment and the next derivation selected a fresh teleport to it. `src/tankpit_bot/bot/ai/intent.py:23-26` records the same rationale in the module doc — every release emits a `plan_released` diagnostic "so plan churn is measurable in the events stream instead of silent".
-[^2]: `src/tankpit_bot/bot/ai/intent.py` — the four-function API that implements the question: `current_collect_plan(ai_state)` at `:180`, `plan_completes_here(plan, self_x, self_y)` at `:204`, `release_collect_plan(...)` at `:221`, and `validate_collect_plan(...)` at `:257`, the last "run at ``DecideCtx`` construction" per the module doc at `:20-21`.
-[^3]: `src/tankpit_bot/bot/ai/intent.py:28-30` — module doc, verbatim: "Raw field mutation stays in :mod:`tankpit_bot.bot.ai.context` (``set_resource_target`` / ``clear_resource_target``); this layer adds meaning, not a parallel mechanism." Both mutators exist at `src/tankpit_bot/bot/ai/context.py:201` and `:182` respectively (was `:185` / `:166`; re-located 2026-08-12), and carry the plan's persistent fields, so no new state was introduced.
-[^4]: `src/tankpit_bot/bot/ai/intent.py:73-83` — `PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...]` is the closed tuple `("tank_at_capacity", "superior_candidate", "not_executable", "landing_scan_reset", "walk_for_fuel_override", "target_gone", "target_not_pursuable", "kind_invalid", "unservable")`, matching this section's list exactly and in order; the same nine are the `PlanReleaseReason` Literal at `:61-71`, so the type and the tuple cannot drift apart silently. Its docstring at `:84` names it a "Closed vocabulary of plan-release reason codes" and describes `unservable` and the 11-minute `bot-20260804-234008` lock at `:86-92`. **Corrected 2026-08-06:** this page's "closed" list omitted `unservable`, which was added to the code 2026-08-05 — caught by the `intent.py` pin, and exactly the failure the code comment warns about ("a new release site means a new documented reason here, not an invented string").
-[^5]: `src/tankpit_bot/bot/ai/intent.py:23-26,94` — every release "emits a ``plan_released`` diagnostic with a specific reason code, so plan churn is measurable in the events stream instead of silent", and `plan_released` events are grouped "by this field". The churn interpretations below (lock thrash, the F6 passability family, re-planning under fire) are this page's reading of that data, not a recorded measurement.
-[^6]: `src/tankpit_bot/bot/ai/collect_mode_outcomes.py:174` — `def _escape_under_fire_decision(...)`, called from `src/tankpit_bot/bot/ai/collect_mode.py:244` before the hop-selection path (was `:158` / `:246`; both re-located 2026-08-12). **Corrected 2026-08-07:** both this function and `hop_toward_equipment` were cited on `collect_mode.py`, which has since been split — `collect_mode.py` keeps the arbiter and its sense/safety gates (255 lines, module doc `:1-6`) while the outcomes it selects between moved to `collect_mode_outcomes.py` and the hop selectors to `collect_hops.py`. `hop_toward_equipment` is `src/tankpit_bot/bot/ai/collect_hops.py:109`, and is public now, not `_hop_toward_equipment`; it tallies `own_ground` at `:174,191` and reports it through `emit_hop_declined` at `:203-208`.
+[^2]: `src/tankpit_bot/bot/ai/intent.py`, the four-function API that implements the question: `current_collect_plan(ai_state)` at `:269`, `plan_completes_here(plan, self_x, self_y)` at `:292`, `release_collect_plan(...)` at `:309`, and `validate_collect_plan(...)` at `:345`, the last "run at ``DecideCtx`` construction" per the module doc at `:19-21`.
+[^3]: `src/tankpit_bot/bot/ai/intent.py:28-33`, module doc, verbatim: "Raw field mutation lives here too (``set_resource_target`` / ``clear_resource_target``) — one owner for the lock mechanism and its meaning. They moved in from ``context`` 2026-08-28: keeping mechanism there forced ``context`` to late-import this module's validity pass (the context->intent->context cycle)." The mutators are `clear_resource_target` at `:137`, `set_resource_target` at `:164` and `hold_resource_target` at `:196`; the lock's fields are declared on `AIStateDict` in `src/tankpit_bot/bot/ai/types.py:372-378`. Until 2026-10-08 this footnote quoted the module doc before the move, "Raw field mutation stays in :mod:`tankpit_bot.bot.ai.context` (``set_resource_target`` / ``clear_resource_target``); this layer adds meaning, not a parallel mechanism", which is line 28 of blob `d74b42c5` (the file at `d45fc42f1^`, repo API) and left the file in `d45fc42f1` on 2026-08-28.
+[^4]: `src/tankpit_bot/bot/ai/intent.py:64-103`: `class PlanReleaseReason(StrEnum)`, whose docstring at `:65-90` names it a "Closed vocabulary of plan-release reason codes", describes `unservable` and the 11-minute `bot-20260804-234008` lock, and gives `claim_lost`, `relocated` and `progress_stalled` their dates; its twelve members at `:92-103` are this section's list in order. Since `88015a10d` (2026-09-26, repo API) the enum is the vocabulary: the `PlanReleaseReason` Literal and the `PLAN_RELEASE_REASONS` tuple it replaced are gone. The nine-reason tuple this footnote quoted until 2026-10-08 is lines 73-83 of blob `d74b42c5`. **Corrected 2026-08-06:** this page's "closed" list omitted `unservable`, which was added to the code 2026-08-05, caught by the `intent.py` pin, and exactly the failure the code comment warns about ("a new release site means a new documented reason here, not an invented string"). **Corrected 2026-10-08:** the list still stopped at nine though the code had carried twelve since 2026-09-02, and the pin had been moved past that change without the list being re-read.
+[^5]: `src/tankpit_bot/bot/ai/intent.py:23-26,75` — every release "emits a ``plan_released`` diagnostic with a specific reason code, so plan churn is measurable in the events stream instead of silent", and `plan_released` events are grouped "by this field". The churn interpretations below (lock thrash, the F6 passability family, re-planning under fire) are this page's reading of that data, not a recorded measurement.
+[^6]: `src/tankpit_bot/bot/ai/collect_mode_outcomes.py:237` — `def escape_under_fire_decision(...)`, public now and no longer `_escape_under_fire_decision`, called from `src/tankpit_bot/bot/ai/collect_mode.py:277` before the hop-selection path (was `:174` / `:244` until 2026-10-08, and `:158` / `:246` before 2026-08-12). In HEAD `collect_mode.py` is 290 lines with the module doc at `:1-6`; `hop_toward_equipment` is `src/tankpit_bot/bot/ai/collect_hops.py:141`, tallies `own_ground` at `:210,252` and reports it through `emit_hop_declined` at `:264-270`. **Corrected 2026-08-07:** both this function and `hop_toward_equipment` were cited on `collect_mode.py`, which has since been split — `collect_mode.py` keeps the arbiter and its sense/safety gates while the outcomes it selects between moved to `collect_mode_outcomes.py` and the hop selectors to `collect_hops.py`, where `hop_toward_equipment` became public rather than `_hop_toward_equipment`.

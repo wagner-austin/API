@@ -10,16 +10,19 @@ source_paths:
   - "src/tankpit_bot/diagnostics/feature_rows.py"
   - "src/tankpit_bot/diagnostics/feature_row_types.py"
   - "src/tankpit_bot/_test_hooks/runtime.py"
+  - "src/tankpit_bot/runtime_logging.py"
 source_git_blobs:
-  "src/tankpit_bot/diagnostics/feature_provenance.py": "e80cee8cd49b694c59f7b7d41199e5416b72d494"
+  "src/tankpit_bot/diagnostics/feature_provenance.py": "55ff2d7b4e47926fe23822e5766d43099a2f5ade"
   "src/tankpit_bot/diagnostics/feature_rows.py": "450c70275e522cd78c9ae0dd2d86330594b77d3d"
-  "src/tankpit_bot/diagnostics/feature_row_types.py": "a24390e153d46ddfda06b53ce76a9f9f042a9bd4"
-  "src/tankpit_bot/_test_hooks/runtime.py": "b26bbaf2f336c3eae585c9372130461019d53ed6"
+  "src/tankpit_bot/diagnostics/feature_row_types.py": "ebc45b0078a5bb7fcc4d20cfd1d5dbcda72ecd5c"
+  "src/tankpit_bot/_test_hooks/runtime.py": "2ae399a0b1bfb320bfde72fe64d69361f1c93711"
+  "src/tankpit_bot/runtime_logging.py": "3f8cb38655c4ac7fa16ea7211701284907b14cad"
 provenance:
   - "docs/RESEARCH.md — the monorepo research index, and the four-step registration procedure this page is measured against"
   - "clients/RustedWarfareBot/src/rw_bot/provenance.py — the `rusted` precedent, adopted 2026-08-29"
   - "runs/bot/artax/bot-20260806-210413.events.jsonl — the archived artifact the first record was produced from"
 fact_checked: "2026-09-02"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; the build stamp this page called undone shipped 2026-09-03)
 confidence: high
 hubs: [architecture]
 ---
@@ -54,10 +57,11 @@ The whole design turns on a distinction that is easy to blur:
 | What produced the EVENTS (a live bot run — build, doctrine, account, rank) | **No** | only as a digest of the artifact |
 | What produced the FEATURE ROWS (the derivation) | Yes | fully, as a `RunFingerprint` |
 
-An events record carries `timestamp`, `level`, `logger`, `mode`,
-`channel` and `message` — and no build stamp, commit or version
-anywhere.[^3] For the runs already in `runs/bot/` that cannot be
-recovered, so no fingerprint written today can honestly claim it. The
+An events record written before 2026-09-04 carries `timestamp`,
+`level`, `logger`, `mode`, `channel` and `message`, and no build stamp,
+commit or version anywhere.[^3] For the runs already in `runs/bot/` when
+this was written that cannot be recovered, so no fingerprint written
+today can honestly claim it. The
 record therefore describes the derivation and identifies the events
 only by `tankpit-events`, a digest of what was read.
 
@@ -67,8 +71,14 @@ plainly for `turkic-lstm`: results already on disk have no sidecar and
 cannot be given an honest one retroactively.
 
 **Stamping the build at emission time is the fix for FUTURE runs.** It
-belongs in the runtime logging path, not in the derivation, and is not
-done.
+belongs in the runtime logging path, not in the derivation, and it
+shipped the next day: since `3c631fa93` (2026-09-03, repo API, board
+task 7e766d65) `configure_bot_runtime_logging` opens every bot events
+artifact with a `session_build` diagnostic carrying the distribution
+version, the build ref (HEAD's sha, or empty in a tree with no
+repository), the instance, the doctrine and the room, and deliberately
+not the account name.[^6] The derivation itself still identifies its
+input by digest only; the stamp is there for a later one to join on.
 
 ## The shape
 
@@ -124,12 +134,14 @@ better served by the already-registered `cleargbm` than by a project of
 its own.
 
 **The record's own limit is unchanged by any of that.** It still
-describes the derivation and identifies the live run only by a digest,
-because an events artifact carries no build stamp. Registration did not
-make the 539 archived runs attributable, and nothing will.
+describes the derivation and identifies the live run only by a digest:
+the 539 archived runs carry no build stamp, registration did not make
+them attributable, and nothing will. Runs since 2026-09-04 carry the
+`session_build` stamp, which no derivation reads yet.
 
 [^1]: `src/tankpit_bot/diagnostics/feature_rows.py`, `write_feature_rows` before 2026-09-02 — the body was joined and written with no sidecar. Shipped in commit `3c961bef`.
 [^2]: `docs/RESEARCH.md`, the `cleargbm` entry: "The 3,068 rows written before that state `"fingerprint": null` explicitly."
 [^3]: `runs/bot/artax/bot-20260806-210413.events.jsonl` line 1, read 2026-09-02: keys are `timestamp`, `level`, `logger`, `mode`, `channel`, `message`, `diagnostic_kind`, `room_id`, `field_image`.
 [^4]: `clients/RustedWarfareBot/src/rw_bot/provenance.py`, `arm_run_record` / `sweep_fingerprint`.
+[^6]: `src/tankpit_bot/runtime_logging.py:98-142`, `configure_bot_runtime_logging`, whose `emit_diagnostic(diagnostic_kind="session_build", ...)` call is at `:136-142` beside the comment "The account name is DELIBERATELY absent"; the build ref comes from `_real_resolve_build_ref` at `src/tankpit_bot/_test_hooks/runtime.py:271`, which asks `git rev-parse HEAD` under the 60-second `GIT_HEAD_WALL_SECONDS` bound. `src/tankpit_bot/diagnostics/feature_provenance.py:17-27` states the same split in its module doc.
 [^5]: `docs/RESEARCH.md`, "Adding a research project" — register in `tools/hpc3/runs/`, add a section, emit `RunRecord`s, submit through the CLI.

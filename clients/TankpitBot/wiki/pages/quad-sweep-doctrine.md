@@ -9,8 +9,9 @@ related:
 source_paths:
   - "src/tankpit_bot/bot/ai/forage.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/forage.py": "3b435823e9116c9628c65b15fc762a3cee24bca4"
+  "src/tankpit_bot/bot/ai/forage.py": "a0705c6a5ffa705b6250960534824bba0c087ce9"
 fact_checked: "2026-08-07"
+verified: 2026-10-08 (forage.py re-read against API HEAD for MCPs board task 3d71a8e1; the free-radar frontier's walk-then-pan added)
 confidence: high
 hubs: [architecture]
 ---
@@ -109,8 +110,14 @@ harvest loop can be built on it.** Miner: scratchpad
 Replaces the extras-stocked branch of forage (the branch whose
 veto-then-walk deadlock produced the 2026-08-06 one-tile crawl,
 fixed same day to yield nothing). Quad sweep becomes what
-extras-stocked foraging IS; the free-radar reposition walk remains
-the extras-empty strategy.[^4]
+extras-stocked foraging IS; the free-radar frontier remains the
+extras-empty strategy.[^4] That frontier is no longer a plain walk:
+since `74b4c42b2` (2026-09-05, repo API) the bot walks to the window
+edge facing the least-scanned band and then spends a free `Rb` scope
+pan toward it, because with autoscroll pinned OFF the window never
+slides on a walk. The walk-only version, once the tank stood on the
+facing edge, re-sent a zero-length move every tick (395 rejected
+`move -> (239,48)` from (239,48) on demo-1, 2026-09-05).[^7]
 
 ## As built (2026-08-07, `bot/ai/quad_sweep.py`)
 
@@ -178,5 +185,6 @@ the scout remains the extras-empty fallback.[^6]
 [^2]: [synthesis] — the grid-disciplined vs opportunistic trade is a tuning choice stated for the operator, not a measured law. The anchor arithmetic it rests on (± 31) is the ANCHOR law established from the human session cited in [^3]; nothing in `src/tankpit_bot/bot/ai/quad_sweep.py` fixes the choice, which is why it is written as "user's call to tune" rather than as behaviour.
 [^3]: Archive-mined 2026-08-06 from two captures on disk: `runs/sniff/sniff-20260710-202821.capture_session.json` (the 421.8 s human session behind the ANCHOR law; five shift→pickup windows) and `runs/sniff/ghost_observe.capture_session.json` (equipment pickups at (149,207) and (155,200), plus a 438-volume fuel container by move-onto at (152,204)). **The miner was a scratchpad script (`mine_shift_pickup.py`) and is not committed** — the captures are the durable artifact; re-derive rather than trust the counts.
 [^4]: `src/tankpit_bot/bot/ai/forage.py` — the module quad sweep replaces the extras-stocked branch of, blob-pinned in this page's frontmatter. Verified present 2026-08-07.
+[^7]: `src/tankpit_bot/bot/ai/forage.py:70` `_frontier_walk_target`, which now returns the edge tile, the band's first tile past it and the pan's compass byte, and `:175` `_frontier_pan`, called at `:431` when the walk target is the tank's own tile; its docstring records the demo-1 loop. Re-read 2026-10-08.
 [^5]: `src/tankpit_bot/bot/ai/mode_controller.py:153` — `latch_scope_shift_landing`, the pre-latch that distinguishes a deliberate pan from a teleport landing so the scan-on-landing gate does not fire on it. Verified present 2026-08-07.
 [^6]: `tests/sim/seam.py` — the shared seam boot the doctrine soak runs under, whose docstring at `:1-4` names the shared "seam" the step-(c) smoke and step-(e) divergence soak both boot from. Verified present 2026-08-07.

@@ -12,10 +12,11 @@ source_paths:
   - "src/tankpit_bot/service/fleet_telemetry.py"
 source_git_blobs:
   "src/tankpit_bot/diagnostics/event_tail.py": "4d97cda6957481cd5fd578002f9b20923c2ce2e0"
-  "src/tankpit_bot/diagnostics/run_digest_fold.py": "c1fbddbe7c7ff432760e9f58dbd06b1dc3fc3983"
-  "src/tankpit_bot/service/fleet_stream.py": "9a1fcdcaba2c7edb98cb97a73765118c44c3214c"
-  "src/tankpit_bot/service/fleet_telemetry.py": "6b59d1826c8f34a554f8ce6566e271b556f4b449"
+  "src/tankpit_bot/diagnostics/run_digest_fold.py": "e07513e31b7f8627cc5cc250d4e71c3970087cb3"
+  "src/tankpit_bot/service/fleet_stream.py": "78a46fa480589aa3c912fe92447697bcd7241be3"
+  "src/tankpit_bot/service/fleet_telemetry.py": "200890db7e371470d184a2d16839725ee4e6df2a"
 fact_checked: "2026-09-01"
+verified: 2026-10-08 (the three files re-read against API HEAD for MCPs board task 3d71a8e1; the stream now feeds a third fold, the demo captions, and the digest's radar-yield window closes only on the bot's own pickup)
 confidence: high
 hubs: [architecture]
 ---
@@ -85,7 +86,7 @@ than merely fast:
 - **Run identity.** A new session re-creates the same path, which would
   otherwise leave the cursor pointing into the middle of a different
   run. The file's own filesystem index is compared on every read, so a
-  replaced artifact is REPORTED as a restart and both folds reset.
+  replaced artifact is REPORTED as a restart and every fold resets.
 
 **Reads are transactional.** The cursor is committed only after the
 decode succeeds, and a fold that fails part-way **spoils** that run's
@@ -94,8 +95,12 @@ same reason: advancing past a line the strict decoder rejected would
 serve a digest with a hole in it — numbers that look plausible and are
 wrong — while claiming nothing was amiss.
 
-One cursor feeds both summaries, so whichever of stats/activity is
-asked for second finds nothing new to fold.[^8] The page also polls its
+One cursor feeds every summary, so whichever of stats/activity is
+asked for second finds nothing new to fold.[^8] Since `3fb0838f1`
+(2026-10-05, repo API) the same stream feeds a third fold, the public
+demo page's timed captions (`InstanceStream.captions`,
+`service/demo_caption.py`), whose read is bounded by the same cache TTL
+but whose window is measured at each call rather than cached.[^11] The page also polls its
 bots **concurrently** now, so first paint costs the slowest bot rather
 than the sum.[^9]
 
@@ -125,6 +130,7 @@ entirely.[^10]
       `src/tankpit_bot/service/fleet_stream.py`.
 [^8]: `FleetTelemetry._refreshed_stream`
       (`service/fleet_telemetry.py`).
+[^11]: `src/tankpit_bot/service/fleet_stream.py:101` `InstanceStream`, whose docstring calls it "read forward and folded three ways", with `refresh` at `:136` and `captions(now_ms)` at `:199`; `FleetTelemetry.captions` in `src/tankpit_bot/service/fleet_telemetry.py`, "Not cached as a payload, because the window is measured from the moment of the call".
 [^9]: `poll` fans out with `Promise.all(names.map(pollBot))`
       (`service/fleet_page.py`); it previously awaited each bot in a
       `for` loop.

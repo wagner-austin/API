@@ -18,7 +18,7 @@ source_paths:
 source_git_blobs:
   "src/tankpit_bot/validate/conformance.py": "3c1d434c53914a747076b159f525e8ab7d012778"
   "src/tankpit_bot/validate/conformance_wire.py": "44a781ce275f7d9a3566b18aecbc4f344ff47102"
-  "src/tankpit_bot/validate/conformance_mirror.py": "8df0c339f77f5ee270584194d8071425f2e3a8bf"
+  "src/tankpit_bot/validate/conformance_mirror.py": "0ad7427600482dab13ea81f856fc48b5f2174d60"
   "src/tankpit_bot/validate/conformance_cli.py": "c4a93931a31e8733eb7589a5ee448c8fb86fe05e"
   "tests/validate/test_conformance.py": "e2aab37d4f457c2c7a70844b0e86d253ad5ad6e6"
   "tests/validate/test_conformance_wire.py": "010d2b3c1cb993da12a24e12e2f2158dce235e42"
@@ -27,6 +27,7 @@ provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 3, 2026-10-05: tankpit-conformance over runs/bot and runs/sniff, the 586-capture archive copied from diphtheria:/mnt/archive-a/austinpc/tankpitbot-runs/runs"
   - "Board task b008ab91, 2026-10-07: every sent '!' frame of the 451 capture files under runs/bot and runs/probe in the API-tankpit-w1 worktree passed through sim.commands.decode_client_command by a one-off scan; 163,688 commands, none raised DecodeError"
 fact_checked: "2026-10-05"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; conformance_mirror.py only gained the tile and rank properties, so ArchiveMirror.observe and anchor read as cited)
 confidence: high
 hubs: [protocol]
 ---

@@ -21,8 +21,9 @@ source_git_blobs:
   "src/tankpit_bot/runtime_context.py": "a2f16cdc52ac9a0e707cc6d0a3a72e59982bcb9f"
   "src/tankpit_bot/runtime_logging.py": "3f8cb38655c4ac7fa16ea7211701284907b14cad"
   "src/tankpit_bot/runtime_logging_handlers.py": "f40da6f9ff2dbda34964e40d5488584319995d05"
-  "tests/conftest.py": "19772ccea6aabe6a4f7ede939afad66ada400a4c"
+  "tests/conftest.py": "a1e1b2af37106addc492e40267f3b9496552a829"
 fact_checked: "2026-09-29"
+verified: 2026-10-08 (tests/conftest.py re-read against API HEAD for MCPs board task 3d71a8e1; since the 2026-09-29 sweep it gained the connect_database reset in _restore_hooks and the tests._host plugin and lost the live_cdp fixture, and _isolate_protocol_singletons is still the one reset_static_key_cache pair around its yield)
 confidence: high
 hubs: [architecture]
 ---

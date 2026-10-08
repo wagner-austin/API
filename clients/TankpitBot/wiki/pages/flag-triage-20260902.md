@@ -17,14 +17,15 @@ source_paths:
   - "src/tankpit_bot/state/scan_coverage.py"
   - "src/tankpit_bot/sniffer/world_service.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/block_harvest.py": "36583d8cfa1c9ebfa43a3ebe48b44ddd3f0caad0"
-  "src/tankpit_bot/bot/ai/quad_sweep.py": "99f6254cb5dc91fa22c561996e420b4be1528373"
+  "src/tankpit_bot/bot/ai/block_harvest.py": "6838030a618014bb4f49868e845fe61337dd00cc"
+  "src/tankpit_bot/bot/ai/quad_sweep.py": "f81de2289de7a1b77b6b654a4ddf2a520afbcf54"
   "src/tankpit_bot/bot/ai/combat_break.py": "295d58704a009d1f30fa2f09f1f6d0984c2bb6a7"
-  "src/tankpit_bot/bot/ai/mine_pin.py": "fd87a23c17de213fd7b7a9782dfd374226b8833b"
-  "src/tankpit_bot/bot/ai/scope_scout.py": "7f8bf25f88e840e9491e9d829f2eb3dd621ba326"
+  "src/tankpit_bot/bot/ai/mine_pin.py": "c3c1dff648386ec2b28a2ec83743bf6ae728d1f5"
+  "src/tankpit_bot/bot/ai/scope_scout.py": "b240f73c0f38f8d320844746200f11aad1bd348c"
   "src/tankpit_bot/state/scan_coverage.py": "143210fd78dd06544d635b734ca459b6b4de348f"
-  "src/tankpit_bot/sniffer/world_service.py": "48c3ff79c77bfea915869be662621d6f4b0ee492"
+  "src/tankpit_bot/sniffer/world_service.py": "526062c0977cb85f6154caefca9866e9faed47a8"
 fact_checked: "2026-09-02"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; the five pinned files changed only to name modes, reasons, item types and fact sources through string enums carrying the same strings, and world_service.py dropped its ITEM_TYPES list)
 confidence: high
 hubs: [architecture, combat]
 ---

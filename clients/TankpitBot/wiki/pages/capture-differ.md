@@ -10,12 +10,13 @@ source_paths:
   - "scripts/build_sim_baseline.py"
   - "scripts/analyze_response_shapes.py"
 source_git_blobs:
-  "scripts/build_sim_baseline.py": "dab6c6baf9bf97e811c6da40e7c33032326b092d"
-  "scripts/analyze_response_shapes.py": "9977e89500553254584f34e00651bd921b337364"
+  "scripts/build_sim_baseline.py": "392c1fd1380234dda7778dfade8ab6738df1ad8f"
+  "scripts/analyze_response_shapes.py": "e52dd5f19d295644ab457020ab2704d8df867192"
 provenance:
   - "analysis_scripts/mine_container_atlas.py and analysis_scripts/diff_server_laws.py -- cited here until 2026-09-03, then removed rather than repinned: the whole analysis_scripts/ tree was DELIBERATELY retired in 48cda6bd ('Retire the 44 ungated one-shot scripts', board task f0c3a532). No prose on this page depended on either; they were frontmatter-only citations. Recoverable at git show 48cda6bd^:clients/TankpitBot/analysis_scripts/"
   - "runs/analysis -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-02"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; both scripts changed only to pass LogLevel.INFO)
 confidence: high
 hubs: [protocol]
 ---
@@ -588,5 +589,5 @@ coverage, harvest memory, and belief freshness exactly like a
 [^6]: **Point-in-time measurement, no committed artifact.** The 10/150-round / first-divergence-2 / drift-53 baseline was read from a ghost replay of `runs/bot/bot-20260802-205105` on 2026-08-02. The capture is on disk; the replay summary is not, so re-run rather than carry the numbers forward.
 [^7]: `src/tankpit_bot/sim/bot_policy.py` — the archive-mined roster policy. The reactive-ghost driver is `PracticeRoomDriver` at `src/tankpit_bot/sim/practice_room.py:84`, pinned by `tests/sim/test_ghost_reactive.py`. Verified present 2026-08-07.
 [^8]: `analysis_scripts/mine_container_atlas.py:41-45` — the migration note recording that both mining scripts now read through `scan_session` (`src/tankpit_bot/analysis/scan.py:121`) and that results reproduce exactly.
-[^10]: `scripts/build_sim_baseline.py` — the one-generation baseline builder behind `make sim-baseline`; its scenario matrix is `SCENARIOS` and the per-run archive directory reaches `run_sim_session` through the `--out` flag (`src/tankpit_bot/sim/run.py:80`). The determinism measurement compared `runs/sim/sim-20260902-155056`, `-155100` and `-155104` payload-by-payload. Verified present 2026-09-02.
+[^10]: `scripts/build_sim_baseline.py` — the one-generation baseline builder behind `make sim-baseline`; its scenario matrix is `SCENARIOS` and the per-run archive directory is passed to `run_sim_session` as its `archive_dir` parameter (`src/tankpit_bot/sim/run.py:87`) from `scripts/build_sim_baseline.py:165-178`, the same parameter the CLI's `--out` flag fills (`src/tankpit_bot/sim/cli_args.py:139-140`, read at `run.py:312`). Until 2026-10-08 this footnote said the directory went through the `--out` flag at `run.py:80`, a line that now declares a result field. The determinism measurement compared `runs/sim/sim-20260902-155056`, `-155100` and `-155104` payload-by-payload. Verified present 2026-09-02.
 [^9]: `run_sim_session` at `src/tankpit_bot/sim/run.py:80`, paced by `TickPacedClock` at `src/tankpit_bot/sim/run_boot.py:57`. Verified present 2026-08-07.

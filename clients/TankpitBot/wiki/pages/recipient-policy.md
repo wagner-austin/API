@@ -16,12 +16,12 @@ source_paths:
   - "src/tankpit_bot/sim/server.py"
   - "src/tankpit_bot/sim/server_queries.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/narrate/movement.py": "7d6be21f2147defcb6e773f553960fc1015eef7c"
+  "src/tankpit_bot/sim/narrate/movement.py": "1180c50f7a004a00ad6cec8d5a2baba730b3dfb4"
   "src/tankpit_bot/sim/narrate/combat.py": "cc68c7a022eeeca830d2038489b6c4962c9c97ff"
-  "src/tankpit_bot/sim/narrate/resources.py": "26e4d5de387a107521864ed5283ef69a655919e9"
+  "src/tankpit_bot/sim/narrate/resources.py": "aa2d2df20a4aaa1a8a7adbba9f634063e2d210c4"
   "src/tankpit_bot/sim/narrate/world.py": "5915877643b9d6be3906eb827d718db469b9ce9a"
-  "src/tankpit_bot/sim/server.py": "244ffe04228c59c63fa7bcd6083dd48c77db8b84"
-  "src/tankpit_bot/sim/server_queries.py": "29c39c2a53aeafb6d45974dd4a5a4f4962dc4473"
+  "src/tankpit_bot/sim/server.py": "8ab59cf72cf0df14f6ce3440f584dcfeb525e32e"
+  "src/tankpit_bot/sim/server_queries.py": "9b1e55b994e865db0f0b9b99572ac879978bfd50"
 provenance:
   - "src/tankpit_bot/sim/emissions.py and sim/combat_emissions.py -- cited here until 2026-09-03. Both were split into the sim/narrate/ package this page already lists (combat, movement, resources, world); the four successors are now pinned in their place rather than the two dead paths being repinned"
   - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
@@ -29,7 +29,7 @@ provenance:
   - "runs/bot/bot-20260826-003928.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-01"
 confidence: high
-verified: 2026-09-01 (341-session archive sweep, zero-trigger test)
+verified: 2026-09-01 (341-session archive sweep, zero-trigger test); 2026-10-08 code re-read against API HEAD for MCPs board task 3d71a8e1 (footnotes moved off the deleted sim/emissions.py onto sim/narrate/, the statistics answer onto server_queries.py, the 0x64 deposit row added from narrate_fuel_deposit)
 hubs: [protocol]
 ---
 
@@ -82,6 +82,7 @@ commands ([[movable-blocks]]).[^2]
 | 0x4B | MinePlacement | 23 placements, every one naming the capturing client[^3] |
 | 0x67 | EquipmentGain | any 0x67 is a SELF gain in production[^7] |
 | 0x44 | FuelGain | per-connection with the 0x52 close[^5] |
+| 0x64 | FuelDeposit | the depositor only, with its 0x2E sync and its single refill record: zero cross-tank 0x64s in the atlas[^12] |
 | 0x56 | Statistics | the asking tank's own counters[^8] |
 | 0x5A | ViewportUpdate | the connection's stored window[^9] |
 
@@ -156,12 +157,13 @@ measured and pinned by test; the shape and its consequences are in the
 
 [^1]: Archive sweep 2026-09-01 over 341 of 342 capture sessions in `runs/bot` and `runs/sniff` (one carries no magic and cannot be XOR-decoded), decoded through `capture.frames.split_payload_frames` + `capture.xor.build_session_xor_table` + `protocol.try_decode_binary_message`, with client commands decoded through `sim.transport.decode_client_payload` (folded on 2026-10-05 into `sim.transport.route_client_frames`, which decodes commands the same way). Re-runnable as `scripts/analyze_recipient_policy.py`.
 [^2]: `runs/bot/bot-20260826-003928.capture_session.json`; decoded 0x42 body `{tank_id: 709, source_x: 253, source_y: 9, drop_x: 254, drop_y: 9, direction: 0, obstacle_type: 2, flag: 0}`. `direction=0` is a DROP and `obstacle_type=2` is placed-on-land per [[movable-blocks]].
-[^3]: `src/tankpit_bot/sim/emissions.py::emit_mine_press` docstring, archive-cited.
-[^4]: `src/tankpit_bot/sim/emissions.py::emit_chat` docstring; sniff-20260729-214411.
-[^5]: `src/tankpit_bot/sim/emissions.py::emit_fuel_pickup_close` docstring; ~1,600 archive windows byte-mined 2026-08-01.
-[^6]: `src/tankpit_bot/sim/emissions.py` module docstring.
-[^7]: `src/tankpit_bot/sim/emissions.py::emit_equipment_pickup` docstring; 2,170 archive windows.
-[^8]: `src/tankpit_bot/sim/server.py::_process_stateless_command`, the `statistics` branch.
+[^3]: `src/tankpit_bot/sim/narrate/resources.py:93` `narrate_mine_press`, whose docstring counts "Every one of the 23 placements in the whole archive names the capturing client" and the 0x45 detonation's "296 of them against 23 placements"; `src/tankpit_bot/sim/narrate/combat.py:31` `narrate_shot`, whose docstring calls the 0x53 echo and the 0x41 kill announcement room-wide. Cited as `sim/emissions.py::emit_mine_press` until 2026-10-08; that file was split into the `sim/narrate/` package (this page's provenance).
+[^4]: `src/tankpit_bot/sim/narrate/world.py:28` `narrate_chat` docstring, which mirrors sniff-20260729-214411: the 0x4D comes back "to everyone, INCLUDING the sender". Cited as `sim/emissions.py::emit_chat` until 2026-10-08.
+[^5]: `src/tankpit_bot/sim/narrate/movement.py:230` `narrate_fuel_pickup` docstring, "Byte-mined 2026-08-01 from ~1,600 archive windows": "Records broadcast (observers track consumption through them); the 0x44 and the 0x52 close are per-connection." Cited as `sim/emissions.py::emit_fuel_pickup_close` until 2026-10-08.
+[^6]: `src/tankpit_bot/sim/narrate/resources.py:99-101`, in `narrate_mine_press`: the 0x4B placement "is the placer's own receipt, the same discipline the 0x52 rejections and the fuel sync follow". Cited as the `sim/emissions.py` module docstring until 2026-10-08.
+[^7]: `src/tankpit_bot/sim/narrate/resources.py:131` `narrate_equipment_pickup` docstring, the live order "over 2,170 archive windows"; the SELF-gain reading of any 0x67 is stated in `narrate_shot`'s docstring (`narrate/combat.py:39`). Cited as `sim/emissions.py::emit_equipment_pickup` until 2026-10-08.
+[^8]: `src/tankpit_bot/sim/server_queries.py:147` `_answer_connection_query`, the `ClientCommandKind.STATISTICS` branch at `:178` ("the statistics of the tank that asked, and only to that tank"), which `server.py::_process_stateless_command` (`:258`) consults first. Cited as the `statistics` branch of `_process_stateless_command` until 2026-10-08; the answer moved to the connection-query handler in `cf474b6b7` (2026-09-03, repo API).
 [^9]: `src/tankpit_bot/sniffer/constants.py:50` — `0x5A: "ViewportUpdate"`, listed as a radar message type at `:63` and declared PARTIAL-decode at `:168`; the decoded viewport pair is formatted at `src/tankpit_bot/sniffer/formatters.py:223`. The 0x5A origin is the connection's stored window. (Cited only as [[viewport-shift-protocol]] until 2026-09-03 — a wiki-internal pointer is not a locator, and SCHEMA bans citing this wiki as evidence for a claim; the wikilink stays in `related` where it belongs.)
 [^10]: `src/tankpit_bot/sim/server_move.py::_process_move_command` docstring; archive 2026-08-06.
-[^11]: `src/tankpit_bot/sim/server_queries.py:51` — `def handshake`. This footnote cited `server.py::handshake` until 2026-09-03; the symbol moved when the server was split, and `server.py` no longer contains the string `handshake` at all. The blob it also quoted (`57be451a…`) was `server.py`'s hash at the time of writing and is not a locator for the symbol, which is why the move went unnoticed.
+[^12]: `src/tankpit_bot/sim/narrate/resources.py:184` `narrate_fuel_deposit`, whose docstring at `:205-211` reads "All three are PER-RECIPIENT, the record included. That is measured, not assumed from the fuel statements: the 120-day atlas found zero cross-tank 0x64s and zero cross-tank refill records against hundreds of INFERRED refills", and whose body returns nothing to any observer but the depositor (`:221-222`). Added to this table 2026-10-08.
+[^11]: `src/tankpit_bot/sim/server_queries.py:51` — `def handshake(self, tank_id: int)`, which since `8674f4c65` (2026-10-05, repo API, the server admitting each connection with `connect(tank_id)`) takes the joining connection's tank id (it read `def handshake(self)` at blob `29c39c2a`). This footnote cited `server.py::handshake` until 2026-09-03; the symbol moved when the server was split, and `server.py` no longer contains the string `handshake` at all. The blob it also quoted (`57be451a…`) was `server.py`'s hash at the time of writing and is not a locator for the symbol, which is why the move went unnoticed.

@@ -15,16 +15,21 @@ source_paths:
   - "src/tankpit_bot/fleetshare/types.py"
   - "src/tankpit_bot/bot/tick_body.py"
   - "src/tankpit_bot/bot/ai/threat_primitives.py"
+  - "src/tankpit_bot/fleetshare/replace_window.py"
+  - "src/tankpit_bot/service/fleet_config.py"
 source_git_blobs:
-  "src/tankpit_bot/fleetshare/__init__.py": 1ecd74a7fd8e92f51bded120de10491f284647d4
-  "src/tankpit_bot/fleetshare/codecs.py": 6ea9e778248510a390779ebdf2bab0d835991140
-  "src/tankpit_bot/fleetshare/merge.py": bce1c259f0e79d5709f3634d30ec3686344d565d
-  "src/tankpit_bot/fleetshare/report.py": a462fdd983bbce1484c7668b326222cf9fcd3e68
-  "src/tankpit_bot/fleetshare/role.py": 61fd24552ab946b2bd0b3993b435666956ce981d
-  "src/tankpit_bot/fleetshare/types.py": 7bc23b7b1177ba508258d777be91da1cc93704de
-  "src/tankpit_bot/bot/tick_body.py": 45addc1e7e7a2e82116c7bd4f4d177941a394f3d
+  "src/tankpit_bot/fleetshare/__init__.py": 7091367e6d64ef44cea289f2b7edf9f4681555aa
+  "src/tankpit_bot/fleetshare/codecs.py": 9953182dde6c4dff3cb165b22c639a2849403e1f
+  "src/tankpit_bot/fleetshare/merge.py": aef2586f2f1e8745010754cf1bb1bbf7345e698a
+  "src/tankpit_bot/fleetshare/report.py": cfc0608da47dc6e2b559ecd46d6248a054ccdce9
+  "src/tankpit_bot/fleetshare/role.py": 0afb2e185dbc13eb334f67c0d31733ca4df0b579
+  "src/tankpit_bot/fleetshare/types.py": c64e2927eb240c56f69bdf929ea0a5bfdc010f4b
+  "src/tankpit_bot/bot/tick_body.py": 69d1b2a658e53a95a11477a2c73dad7e246901f3
   "src/tankpit_bot/bot/ai/threat_primitives.py": 20f08cdeabfa0843d4e382394b99ec3434990b40
+  "src/tankpit_bot/fleetshare/replace_window.py": 56bb265f15d0b2fc18759f79b95ce8c1828f7fe9
+  "src/tankpit_bot/service/fleet_config.py": 74d5793285f55c76e9498db448378a72f58f739e
 fact_checked: "2026-08-19"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; the replace-window reading described under The exchange matches merge.py and replace_window.py, FleetRole and EngagementDoctrine are string enums with role validation through resolve_role, and tick_body still exchanges knowledge right after publishing the HUD)
 confidence: high
 hubs: [architecture]
 ---
@@ -212,8 +217,10 @@ Codecs: `fleetshare.codecs` — full `require_*` validation on decode.
   `test_hop_toward_equipment_declines_when_every_slot_at_rank_cap`.
 
 The fleet manager's spawn API carries the role per bot (2026-08-20:
-`POST /bots` gained `"role"`, validated against `FLEET_ROLES`, empty
-means fighter): the manager sets the child's `TANKPIT_ROLE`
+`POST /bots` gained `"role"`, validated by `resolve_role` in
+`service/fleet_config.py:53` against the `FleetRole` string enum,
+empty means fighter; the `FLEET_ROLES` tuple it was first checked
+against was replaced by that enum on 2026-09-26): the manager sets the child's `TANKPIT_ROLE`
 explicitly on every spawn — never inherited, so a stray value in the
 manager's own environment cannot silently re-role the fleet — and
 restart carries the stored role ([[bot-service-architecture]]).

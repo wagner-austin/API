@@ -10,11 +10,12 @@ source_paths:
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/resource_search.py": "a833600b7b71a469608603c5407fb022979d595d"
+  "src/tankpit_bot/bot/ai/resource_search.py": "a265961655cbf56391afe0136948dec28e926b7f"
   "src/tankpit_bot/state/scan_coverage.py": "143210fd78dd06544d635b734ca459b6b4de348f"
 provenance:
   - "runs/bot/bot-20260729-232252.events.jsonl -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
+verified: 2026-10-08 (code re-read against API HEAD for MCPs board task 3d71a8e1; resource_search.py changed only to name its liveness, reason and release codes through TankLiveness, ReasonKind and PlanReleaseReason)
 confidence: high
 hubs: [architecture, combat]
 ---
