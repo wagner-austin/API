@@ -28,7 +28,6 @@ from platform_core.logging import (
     QueueListenerFactory,
     load_queue_handler_factory,
     load_queue_listener_factory,
-    stdlib_logging,
 )
 from platform_workers.redis import (
     redis_for_kv,
@@ -552,37 +551,6 @@ def inject_fake_image_as_pil() -> PILImage:
     }
     exec(code, globs)
     return namespace["result"]
-
-
-class _MinimalHandler:
-    """Handler-like object without flush attribute for testing.
-
-    This class does NOT inherit from logging.Handler so it lacks the flush
-    attribute. Used to test the defensive hasattr check in _child_entry.
-    """
-
-    level: int
-
-    def __init__(self) -> None:
-        self.level = stdlib_logging.DEBUG
-
-    def handle(self, record: stdlib_logging.LogRecord) -> bool:
-        """Handle a log record (no-op). Required by logging internals."""
-        _ = record
-        return True
-
-
-def inject_no_flush_handler(log: stdlib_logging.Logger) -> None:
-    """Inject a handler without flush attribute into a logger.
-
-    Uses compile/exec to bypass static type checking. The log.handlers
-    list expects logging.Handler but we inject _MinimalHandler which
-    lacks the flush attribute. This tests the defensive hasattr branch.
-    """
-    handler = _MinimalHandler()
-    code = compile("log.handlers.append(handler)", "<test>", "exec")
-    globs: dict[str, stdlib_logging.Logger | _MinimalHandler] = {"log": log, "handler": handler}
-    exec(code, globs)
 
 
 get_autocast_context: GetAutocastContextProtocol = _default_get_autocast_context

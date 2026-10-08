@@ -8,6 +8,7 @@ the actual default implementations are exercised for coverage.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 import torch
@@ -18,10 +19,21 @@ from handwriting_ai._hook_defaults import _default_artifact_store_factory, _defa
 from handwriting_ai._hook_defaults_ml import _default_principal_angle
 from handwriting_ai._hook_defaults_system import _default_event_factory, _default_thread_factory
 from handwriting_ai._hook_defaults_training import (
+    _default_calibrate_input_pipeline,
     _default_mp_get_all_start_methods,
     _default_mp_get_context,
+    _default_orchestrator_factory,
 )
-from handwriting_ai._hook_protocols_ml import InferenceTorchModelProtocol, LoadStateResultProtocol
+from handwriting_ai._hook_protocols_ml import (
+    InferenceTorchModelProtocol,
+    LoadStateResultProtocol,
+    PreprocessDatasetProtocol,
+    ResourceLimitsDict,
+)
+from handwriting_ai.training.calibration._types import BudgetConfig, Candidate, CandidateOutcome
+from handwriting_ai.training.calibration.cache import _write_cache
+from handwriting_ai.training.calibration.ds_spec import BaseKind, PreprocessSpec
+from handwriting_ai.training.calibration.signature import make_signature
 
 
 def test_default_mp_get_all_start_methods_returns_spawn() -> None:
@@ -396,24 +408,6 @@ def test_center_on_square_pix_none_returns_original() -> None:
         _test_hooks.otsu_binarize = original_hook
 
 
-def test_minimal_handler_handle_returns_true() -> None:
-    """Test _MinimalHandler.handle returns True (required by logging)."""
-    from platform_core.logging import stdlib_logging
-
-    handler = _test_hooks._MinimalHandler()
-    record = stdlib_logging.LogRecord(
-        name="test",
-        level=stdlib_logging.INFO,
-        pathname="",
-        lineno=0,
-        msg="test message",
-        args=(),
-        exc_info=None,
-    )
-    result = handler.handle(record)
-    assert result is True
-
-
 def test_default_artifact_store_factory_creates_store() -> None:
     """Test _default_artifact_store_factory creates a valid ArtifactStore."""
     # Call the factory with dummy credentials - it just constructs objects
@@ -424,3 +418,117 @@ def test_default_artifact_store_factory_creates_store() -> None:
     )
     # Verify it returns the expected concrete type
     assert type(store).__name__ == "ArtifactStore"
+
+
+class _OneResultRunner:
+    """A CandidateRunner that answers every candidate with itself at 1 sample/s."""
+
+    def run(
+        self,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
+        cand: Candidate,
+        samples: int,
+        budget: BudgetConfig,
+    ) -> CandidateOutcome:
+        _ = (ds, samples, budget)
+        return {
+            "ok": True,
+            "res": {
+                "intra_threads": cand["intra_threads"],
+                "interop_threads": cand["interop_threads"],
+                "num_workers": cand["num_workers"],
+                "batch_size": cand["batch_size"],
+                "samples_per_sec": 1.0,
+                "p95_ms": 1.0,
+            },
+            "error": None,
+        }
+
+
+def _inline_spec() -> PreprocessSpec:
+    return {
+        "base_kind": BaseKind.INLINE,
+        "mnist": None,
+        "inline": {"n": 2, "sleep_s": 0.0, "fail": False},
+        "augment": {
+            "augment": False,
+            "aug_rotate": 0.0,
+            "aug_translate": 0.0,
+            "noise_prob": 0.0,
+            "noise_salt_vs_pepper": 0.5,
+            "dots_prob": 0.0,
+            "dots_count": 0,
+            "dots_size_px": 1,
+            "blur_sigma": 0.0,
+            "morph": "none",
+        },
+    }
+
+
+def test_default_orchestrator_factory_builds_an_orchestrator_on_the_runner(
+    tmp_path: Path,
+) -> None:
+    """The default factory's orchestrator runs stage A through the runner it was given."""
+    budget: BudgetConfig = {
+        "start_pct_max": 100.0,
+        "abort_pct": 100.0,
+        "timeout_s": 1.0,
+        "max_failures": 1,
+    }
+    orch = _default_orchestrator_factory(
+        runner=_OneResultRunner(),
+        config={
+            "stage_a_budget": budget,
+            "stage_b_budget": budget,
+            "checkpoint_path": tmp_path / "ckpt.json",
+        },
+    )
+    cand: Candidate = {
+        "intra_threads": 2,
+        "interop_threads": None,
+        "num_workers": 0,
+        "batch_size": 4,
+    }
+    results = orch.run_stage_a(_inline_spec(), [cand], 1)
+    assert [(r["intra_threads"], r["batch_size"]) for r in results] == [(2, 4)]
+
+
+def test_default_calibrate_input_pipeline_returns_a_valid_cached_result(tmp_path: Path) -> None:
+    """The default hook is the real calibrator: a fresh cache for this host is returned as is.
+
+    The cache hit is the one path of the real calibrator that spawns no
+    training subprocess, so it is how this default is exercised directly.
+    """
+    limits: ResourceLimitsDict = {
+        "cpu_cores": 2,
+        "memory_bytes": None,
+        "optimal_threads": 1,
+        "optimal_workers": 0,
+        "max_batch_size": None,
+    }
+    cache = tmp_path / "calibration.json"
+    _write_cache(
+        cache,
+        make_signature(limits),
+        {
+            "intra_threads": 2,
+            "interop_threads": 1,
+            "num_workers": 1,
+            "batch_size": 16,
+            "samples_per_sec": 9.0,
+            "p95_ms": 3.0,
+        },
+    )
+    ec = _default_calibrate_input_pipeline(
+        _inline_spec(),
+        limits=limits,
+        requested_batch_size=8,
+        samples=1,
+        cache_path=cache,
+        ttl_seconds=3600,
+        force=False,
+    )
+    assert ec["intra_threads"] == 2
+    assert ec["interop_threads"] == 1
+    assert ec["batch_size"] == 16
+    assert ec["loader_cfg"]["num_workers"] == 1

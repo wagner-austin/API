@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
 
+import pytest
 import torch
 from PIL import Image
 from platform_ml import RequestedDevice
@@ -14,6 +15,8 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
 from handwriting_ai.training import safety as _safety
 from handwriting_ai.training.train_config import TrainConfig, default_train_config
+
+pytestmark = pytest.mark.usefixtures("fixed_calibration")
 
 
 class MnistRawWriter(Protocol):

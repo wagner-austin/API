@@ -482,9 +482,7 @@ def _measure_training(
         samples += int(y.shape[0])
         del x, y, logits, loss
         # Memory tracking: use configured guard threshold consistently
-        from handwriting_ai.monitoring import get_memory_snapshot
-
-        pct = float(get_memory_snapshot()["cgroup_usage"]["percent"])
+        pct = float(_test_hooks.get_memory_snapshot()["cgroup_usage"]["percent"])
         if pct > peak_pct:
             peak_pct = pct
         # Enforce calibration backoff under two conditions:

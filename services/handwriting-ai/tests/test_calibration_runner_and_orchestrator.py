@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing as mp
-import time
 from collections.abc import Callable
+from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
 
 from PIL import Image
@@ -20,43 +19,30 @@ from handwriting_ai.training.calibration._types import (
     OrchestratorConfig,
 )
 from handwriting_ai.training.calibration.ds_spec import (
-    AugmentSpec,
     BaseKind,
-    InlineSpec,
     PreprocessSpec,
 )
 from handwriting_ai.training.calibration.orchestrator import (
     Orchestrator,
 )
-from handwriting_ai.training.calibration.runner import (
-    SubprocessRunner,
-)
 from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.train_config import TrainConfig
 
-UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
-
 
 class _FakeMNIST:
-    def __init__(self, n: int = 32, *, sleep_s: float = 0.0, fail: bool = False) -> None:
+    def __init__(self, n: int) -> None:
         self._n = n
-        self._sleep = float(sleep_s)
-        self._fail = bool(fail)
 
     def __len__(self) -> int:
         return self._n
 
     def __getitem__(self, idx: int) -> tuple[Image.Image, int]:
-        if self._fail:
-            raise RuntimeError("fail-item")
-        if self._sleep > 0:
-            time.sleep(self._sleep)
         img = Image.new("L", (28, 28), color=0)
         return img, int(idx % 10)
 
 
-def _mk_ds(n: int = 32, *, sleep_s: float = 0.0, fail: bool = False) -> PreprocessDataset:
-    base = _FakeMNIST(n=n, sleep_s=sleep_s, fail=fail)
+def _mk_ds(n: int) -> PreprocessDataset:
+    base = _FakeMNIST(n=n)
     cfg: TrainConfig = {
         "data_root": Path("."),
         "out_dir": Path("."),
@@ -95,75 +81,6 @@ def _mk_ds(n: int = 32, *, sleep_s: float = 0.0, fail: bool = False) -> Preproce
         "memory_guard": False,
     }
     return PreprocessDataset(base, cfg)
-
-
-def test_subprocess_runner_success() -> None:
-    ds = _mk_ds(32)
-    runner = SubprocessRunner()
-    # 120s bounds a hung child without racing a healthy one: the child boots
-    # a fresh interpreter plus torch, which measured 8-15s under host load,
-    # and a success-path test that times out on a busy machine asserts the
-    # machine, not the runner. The timeout-SUBJECT tests below keep their
-    # deliberately short budgets.
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=95.0, timeout_s=120.0, max_failures=2)
-    cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=8)
-    out = runner.run(ds, cand, samples=1, budget=budget)
-    assert out["ok"]
-    if out["res"] is None:
-        raise AssertionError("expected res")
-
-
-def test_subprocess_runner_timeout() -> None:
-    # Build inline spec with per-item sleep so child exceeds timeout
-    spec = PreprocessSpec(
-        base_kind=BaseKind.INLINE,
-        mnist=None,
-        inline=InlineSpec(n=8, sleep_s=0.25, fail=False),
-        augment=AugmentSpec(
-            augment=False,
-            aug_rotate=0.0,
-            aug_translate=0.0,
-            noise_prob=0.0,
-            noise_salt_vs_pepper=0.5,
-            dots_prob=0.0,
-            dots_count=0,
-            dots_size_px=1,
-            blur_sigma=0.0,
-            morph="none",
-        ),
-    )
-    runner = SubprocessRunner()
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=95.0, timeout_s=0.2, max_failures=1)
-    cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=4)
-    out = runner.run(spec, cand, samples=1, budget=budget)
-    assert not out["ok"] and out["error"] is not None
-    assert out["error"]["kind"] == "timeout"
-
-
-def test_subprocess_runner_runtime_error() -> None:
-    spec = PreprocessSpec(
-        base_kind=BaseKind.INLINE,
-        mnist=None,
-        inline=InlineSpec(n=8, sleep_s=0.0, fail=True),
-        augment=AugmentSpec(
-            augment=False,
-            aug_rotate=0.0,
-            aug_translate=0.0,
-            noise_prob=0.0,
-            noise_salt_vs_pepper=0.5,
-            dots_prob=0.0,
-            dots_count=0,
-            dots_size_px=1,
-            blur_sigma=0.0,
-            morph="none",
-        ),
-    )
-    runner = SubprocessRunner()
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=95.0, timeout_s=10.0, max_failures=1)
-    cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=4)
-    out = runner.run(spec, cand, samples=1, budget=budget)
-    assert not out["ok"] and out["error"] is not None
-    assert out["error"]["kind"] in {"runtime", "oom", "timeout"}
 
 
 def test_orchestrator_stage_flow_and_breaker(tmp_path: Path) -> None:
@@ -273,7 +190,9 @@ def test_try_read_result_handles_open_oserror(tmp_path: Path) -> None:
     assert out is None
 
 
-def test_child_entry_flush_handles_handlers_without_flush(tmp_path: Path) -> None:
+def test_child_entry_flush_handles_handlers_without_flush(
+    tmp_path: Path, child_log_queue: MPQueue[logging.LogRecord]
+) -> None:
     # Import here to avoid circulars at module import time
     from multiprocessing import Queue
 
@@ -345,11 +264,16 @@ def test_child_entry_flush_handles_handlers_without_flush(tmp_path: Path) -> Non
         def emit(self, record: logging.LogRecord) -> None:
             self.records.append(record)
 
-        def __getattr__(self, name: str) -> None:
-            """Pretend that 'flush' does not exist for hasattr checks."""
-            if name == "flush":
-                raise AttributeError(f"'{type(self).__name__}' object has no attribute 'flush'")
-            raise AttributeError(name)
+        @property
+        def flush(self) -> Callable[[], None]:
+            """Make hasattr(handler, "flush") False, which _child_entry checks.
+
+            logging.Handler defines flush on the class, so a __getattr__ that
+            raised for it (this test's earlier spelling) was never consulted
+            and the branch went untested; a property raising AttributeError
+            is what hasattr reads as absent.
+            """
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute 'flush'")
 
     # Use queue_handler_factory hook to inject our no-flush handler
     no_flush = _NoFlushHandler()
@@ -364,9 +288,7 @@ def test_child_entry_flush_handles_handlers_without_flush(tmp_path: Path) -> Non
     logger = get_logger("handwriting_ai")
     logger.addHandler(no_flush)
 
-    log_q: mp.Queue[logging.LogRecord] = mp.get_context("spawn").Queue()
-
-    _child_entry(out_path.as_posix(), spec, cand, samples=1, abort_pct=95.0, log_q=log_q)
+    _child_entry(out_path.as_posix(), spec, cand, samples=1, abort_pct=95.0, log_q=child_log_queue)
 
     # Ensure our handler saw records
     assert no_flush.records

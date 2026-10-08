@@ -9,6 +9,8 @@ from platform_ml import RequestedDevice, RequestedPrecision, ResolvedDevice, Res
 from handwriting_ai.jobs.digits import _run_training
 from handwriting_ai.training.train_config import TrainConfig
 
+pytestmark = pytest.mark.usefixtures("fixed_calibration")
+
 
 def _write_mnist_images_gz(path: Path, n: int) -> None:
     """Write a valid MNIST images .gz file with n 28x28 images."""
@@ -92,6 +94,9 @@ def test_run_training_with_valid_mnist_data(tmp_path: Path) -> None:
     assert 0.0 <= val_acc <= 1.0, f"val_acc {val_acc} must be in [0,1]"
     metadata = result["metadata"]
     assert metadata["epochs"] == 1
+    # The config requests precision "auto" on the CPU, which resolves to fp32
+    assert metadata["precision"] is ResolvedPrecision.FP32
+    assert metadata["device"] is ResolvedDevice.CPU
 
 
 def test_run_training_missing_train_data(tmp_path: Path) -> None:
@@ -114,21 +119,6 @@ def test_run_training_missing_test_data(tmp_path: Path) -> None:
         _run_training(cfg)
 
 
-def test_run_training_precision_auto_resolves_to_fp32_on_cpu(tmp_path: Path) -> None:
-    """Test precision="auto" resolves to "fp32" on CPU."""
-    _create_mnist_files(tmp_path, "train", 4)
-    _create_mnist_files(tmp_path, "t10k", 2)
-
-    cfg = _train_cfg(tmp_path)
-    cfg["precision"] = RequestedPrecision.AUTO
-    cfg["device"] = RequestedDevice.CPU
-    result = _run_training(cfg)
-
-    # Verify precision resolved to fp32 on CPU
-    assert result["metadata"]["precision"] is ResolvedPrecision.FP32
-    assert result["metadata"]["device"] is ResolvedDevice.CPU
-
-
 def test_run_training_precision_fp32_explicit(tmp_path: Path) -> None:
     """Test precision="fp32" works explicitly on CPU."""
     _create_mnist_files(tmp_path, "train", 4)
@@ -142,22 +132,6 @@ def test_run_training_precision_fp32_explicit(tmp_path: Path) -> None:
     # Verify precision is fp32
     assert result["metadata"]["precision"] is ResolvedPrecision.FP32
     assert 0.0 <= result["val_acc"] <= 1.0
-
-
-def test_run_training_precision_recorded_in_metadata(tmp_path: Path) -> None:
-    """Test that precision is recorded in training metadata."""
-    _create_mnist_files(tmp_path, "train", 4)
-    _create_mnist_files(tmp_path, "t10k", 2)
-
-    cfg = _train_cfg(tmp_path)
-    result = _run_training(cfg)
-
-    metadata = result["metadata"]
-    # Verify all expected metadata fields
-    assert "precision" in metadata
-    assert metadata["precision"] in ("fp32", "fp16", "bf16")
-    assert "device" in metadata
-    assert metadata["device"] in ("cpu", "cuda")
 
 
 def test_run_training_precision_fp16_on_cpu_raises(tmp_path: Path) -> None:

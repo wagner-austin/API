@@ -13,6 +13,7 @@ from platform_core.testing import make_fake_env
 from platform_ml import torch_types as platform_ml_torch_types
 from platform_workers.rq_harness import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
+from tests._calibration_fixtures import child_log_queue, fixed_calibration
 
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols import ArtifactStoreFactoryProtocol, ArtifactStoreProtocol
@@ -522,7 +523,9 @@ __all__ = [
     "FakeArtifactStore",
     "FakeFuture",
     "MnistRawWriter",
+    "child_log_queue",
     "digits_redis",
+    "fixed_calibration",
     "make_fake_artifact_store",
     "write_mnist_raw",
 ]

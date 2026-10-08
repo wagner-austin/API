@@ -26,7 +26,7 @@ class MnistRawWriter(Protocol):
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
-pytestmark = pytest.mark.usefixtures("digits_redis")
+pytestmark = pytest.mark.usefixtures("digits_redis", "fixed_calibration")
 
 
 @pytest.fixture(autouse=True)

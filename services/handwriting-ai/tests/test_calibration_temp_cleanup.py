@@ -64,3 +64,10 @@ def test_result_directory_removed_after_child_exit(
             "message": "candidate timed out",
             "exit_code": None,
         }
+    if child_fails:
+        # The child's dataset raises on its first item, so the child exits 1
+        assert outcome["error"] == {
+            "kind": "runtime",
+            "message": "child exited code=1",
+            "exit_code": 1,
+        }

@@ -26,6 +26,8 @@ from handwriting_ai.training.progress import (
 )
 from handwriting_ai.training.train_config import TrainConfig, default_train_config
 
+pytestmark = pytest.mark.usefixtures("fixed_calibration")
+
 
 class MnistRawWriter(Protocol):
     def __call__(self, root: Path, n: int = 8) -> None: ...

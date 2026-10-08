@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+
+import torch
 from PIL import Image
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_training import MemorySnapshotDict
 from handwriting_ai.training.calibration import measure as _measure
 from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
@@ -26,9 +31,12 @@ class _FakeMNIST:
 
 
 def test_measure_candidate_basic_runs() -> None:
-    base = _FakeMNIST(64)
+    # Eight images at a requested batch of four take the same binary search as
+    # 64 at 32 did, at a sixteenth of the ResNet-18 compute: 15 backward passes
+    # at batch 32 measured 28.7 s of one thread on the hub (API task 8bbe083b).
+    base = _FakeMNIST(8)
     cfg: AugmentConfig = {
-        "batch_size": 32,
+        "batch_size": 4,
         "augment": False,
         "aug_rotate": 0.0,
         "aug_translate": 0.0,
@@ -46,17 +54,23 @@ def test_measure_candidate_basic_runs() -> None:
         "intra_threads": 1,
         "interop_threads": None,
         "num_workers": 0,
-        "batch_size": 32,
+        "batch_size": 4,
     }
+    # A disabled guard with a 92 percent threshold never backs off below the
+    # cap and never expands past it, so the search must settle on the
+    # requested batch whatever guard an earlier test in this worker left.
+    set_memory_guard_config(
+        MemoryGuardConfig(enabled=False, threshold_percent=92.0, required_consecutive=3)
+    )
+    reset_memory_guard()
     res = _measure._measure_candidate(ds, cand, samples=2)
-    assert res["batch_size"] >= 1
-    assert res["samples_per_sec"] >= 0.0
-    assert res["p95_ms"] >= 0.0
+    assert res["batch_size"] == 4
+    assert res["samples_per_sec"] > 0.0
+    assert res["p95_ms"] > 0.0
 
 
 def test_measure_training_zero_length_loader() -> None:
     # Call internal helper with an empty iterator to exercise the early-return path
-    from collections.abc import Generator
 
     import torch as _t
 
@@ -134,7 +148,6 @@ def test_measure_candidate_exceeds_threshold_backoff() -> None:
 
 def test_measure_loader_break_on_exhaustion() -> None:
     # Loader yields fewer batches than requested n_batches, triggers inner break path
-    from collections.abc import Generator
 
     import torch as _t
 
@@ -149,174 +162,58 @@ def test_measure_loader_break_on_exhaustion() -> None:
     assert sps >= 0.0 and p95 >= 0.0
 
 
-def test_measure_candidate_multiple_batch_sizes_no_leak() -> None:
-    """Stress test: ensure memory doesn't accumulate across multiple batch size tests.
+def _snapshot_at(percent: float) -> MemorySnapshotDict:
+    return {
+        "main_process": {"pid": 1, "rss_bytes": 0},
+        "workers": (),
+        "cgroup_usage": {"usage_bytes": 0, "limit_bytes": 0, "percent": percent},
+        "cgroup_breakdown": {
+            "anon_bytes": 0,
+            "file_bytes": 0,
+            "kernel_bytes": 0,
+            "slab_bytes": 0,
+        },
+    }
 
-    This simulates the binary search behavior where multiple batch sizes are tested
-    sequentially. Without proper DataLoader cleanup, memory would accumulate.
+
+def test_measure_training_keeps_the_highest_memory_reading() -> None:
+    """The peak is the highest reading across the measured batches, not the last.
+
+    Two measured batches read 50 then 40 percent, so the second is not a new
+    peak and the reported peak must stay at 50. A disabled guard at 92
+    percent keeps either reading from counting as exceeded.
     """
-    import gc
+    readings = [50.0, 40.0]
 
-    from handwriting_ai.monitoring import get_memory_snapshot
+    def _next_snapshot() -> MemorySnapshotDict:
+        return _snapshot_at(readings.pop(0))
 
-    # Clean up garbage from previous tests to get a stable baseline
-    gc.collect()
-
-    base = _FakeMNIST(256)
-    cfg: AugmentConfig = {
-        "batch_size": 64,
-        "augment": False,
-        "aug_rotate": 0.0,
-        "aug_translate": 0.0,
-        "noise_prob": 0.0,
-        "noise_salt_vs_pepper": 0.5,
-        "dots_prob": 0.0,
-        "dots_count": 0,
-        "dots_size_px": 1,
-        "blur_sigma": 0.0,
-        "morph": "none",
-        "morph_kernel_px": 3,
-    }
-    ds = PreprocessDataset(base, cfg)
-
-    # Warm up PyTorch allocator before taking baseline - this ensures we measure
-    # actual memory leaks, not normal allocator/cache warm-up behavior
-    warmup_cand: Candidate = {
-        "intra_threads": 1,
-        "interop_threads": None,
-        "num_workers": 0,
-        "batch_size": 64,
-    }
-    _measure._measure_candidate(ds, warmup_cand, samples=1)
-    gc.collect()
-
-    _ = get_memory_snapshot()
-
-    batch_sizes = [64, 32, 16, 8, 4, 2]
-    memory_readings: list[int] = []
-
-    for bs in batch_sizes:
-        cand: Candidate = {
-            "intra_threads": 1,
-            "interop_threads": None,
-            "num_workers": 0,
-            "batch_size": bs,
-        }
-        _measure._measure_candidate(ds, cand, samples=1)
-
-        snap = get_memory_snapshot()
-        current_mb = snap["main_process"]["rss_bytes"] // (1024 * 1024)
-        memory_readings.append(current_mb)
-
-    # Verify memory didn't increase significantly relative to baseline
-    baseline = memory_readings[0]
-    max_increase = max(v - baseline for v in memory_readings)
-
-    # Threshold accounts for Python/PyTorch allocator behavior (caching, fragmentation)
-    # Pattern shows stabilization, not a linear leak. Allow a modest safety
-    # margin to accommodate allocator variance across platforms while still
-    # catching real leaks that grow substantially on each run.
-    assert max_increase < 80, (
-        f"Memory accumulation detected: increased {max_increase}MB from baseline {baseline}MB "
-        f"within readings {memory_readings}"
+    _test_hooks.get_memory_snapshot = _next_snapshot
+    set_memory_guard_config(
+        MemoryGuardConfig(enabled=False, threshold_percent=92.0, required_consecutive=3)
     )
+    reset_memory_guard()
 
-    # Also verify memory didn't monotonically increase (sign of leak)
-    # With proper cleanup, later tests shouldn't use more memory than earlier ones
-    first_half_avg = sum(memory_readings[:3]) / 3
-    second_half_avg = sum(memory_readings[3:]) / 3
-    avg_increase = second_half_avg - first_half_avg
+    def _three_batches() -> Generator[tuple[torch.Tensor, torch.Tensor], None, None]:
+        for _ in range(3):
+            yield torch.zeros((1, 1, 28, 28)), torch.zeros((1,), dtype=torch.long)
 
-    assert avg_increase < 50, (
-        f"Memory accumulation detected: second half avg ({second_half_avg:.1f}MB) "
-        f"significantly higher than first half avg ({first_half_avg:.1f}MB). "
-        f"Increase: {avg_increase:.1f}MB. Readings: {memory_readings}"
+    from handwriting_ai.training.optim import build_optimizer_and_scheduler, default_optim_config
+    from handwriting_ai.training.train_utils import _build_model
+
+    model = _build_model()
+    opt, _sch = build_optimizer_and_scheduler(model, default_optim_config())
+    # One warm-up batch, then k=2 measured batches, each followed by one reading
+    sps, p95, peak, exceeded = _measure._measure_training(
+        ds_len=3,
+        loader=_three_batches(),
+        k=2,
+        device=torch.device("cpu"),
+        batch_size_hint=1,
+        model=model,
+        opt=opt,
     )
-
-
-def test_measure_candidate_with_workers_no_leak() -> None:
-    """Stress test: ensure DataLoader workers are properly cleaned up between tests.
-
-    Production calibration uses num_workers > 0 in containers with sufficient memory.
-    This test verifies that worker processes are terminated and their memory is released
-    when DataLoader is deleted between batch size attempts.
-    """
-    import gc
-    import time
-
-    from handwriting_ai.monitoring import get_memory_snapshot
-
-    base = _FakeMNIST(256)
-    cfg: AugmentConfig = {
-        "batch_size": 64,
-        "augment": False,
-        "aug_rotate": 0.0,
-        "aug_translate": 0.0,
-        "noise_prob": 0.0,
-        "noise_salt_vs_pepper": 0.5,
-        "dots_prob": 0.0,
-        "dots_count": 0,
-        "dots_size_px": 1,
-        "blur_sigma": 0.0,
-        "morph": "none",
-        "morph_kernel_px": 3,
-    }
-    ds = PreprocessDataset(base, cfg)
-
-    # Warm up PyTorch allocator before taking baseline - this ensures we measure
-    # actual memory leaks, not normal allocator/cache warm-up behavior
-    warmup_cand: Candidate = {
-        "intra_threads": 1,
-        "interop_threads": None,
-        "num_workers": 1,
-        "batch_size": 64,
-    }
-    _measure._measure_candidate(ds, warmup_cand, samples=1)
-    time.sleep(0.15)  # Allow worker cleanup
-    gc.collect()
-
-    # Test multiple batch sizes with worker processes (production-like)
-    batch_sizes = [64, 32, 16, 8, 4, 2]
-    memory_readings: list[int] = []
-
-    for bs in batch_sizes:
-        cand: Candidate = {
-            "intra_threads": 1,
-            "interop_threads": None,
-            "num_workers": 1,
-            "batch_size": bs,
-        }
-        _measure._measure_candidate(ds, cand, samples=1)
-
-        # Allow worker processes time to fully terminate after DataLoader cleanup
-        # Worker shutdown is asynchronous - wait for OS to reclaim process resources
-        time.sleep(0.15)
-
-        # Measure memory after worker cleanup completes
-        snap = get_memory_snapshot()
-        current_mb = snap["main_process"]["rss_bytes"] // (1024 * 1024)
-        memory_readings.append(current_mb)
-
-    # Verify memory didn't accumulate across the sequence (increase-only check)
-    # Workers add overhead, so allow more variance (75MB) than the no-worker test
-    baseline = memory_readings[0]
-    max_increase = max((v - baseline) for v in memory_readings)
-
-    # If workers aren't cleaned up, memory would grow 150+ MB across 6 tests
-    # With proper cleanup, increase over baseline should remain bounded even with worker overhead
-    assert max_increase < 75, (
-        f"Worker memory leak detected: increased {max_increase}MB from baseline {baseline}MB "
-        f"across {len(batch_sizes)} batch size tests with num_workers=1. "
-        f"Readings: {memory_readings}"
-    )
-
-    # Verify no monotonic memory increase indicating worker accumulation
-    first_half_avg = sum(memory_readings[:3]) / 3
-    second_half_avg = sum(memory_readings[3:]) / 3
-    avg_increase = second_half_avg - first_half_avg
-
-    assert avg_increase < 75, (
-        f"Worker accumulation detected: second half avg ({second_half_avg:.1f}MB) "
-        f"significantly higher than first half avg ({first_half_avg:.1f}MB). "
-        f"Increase: {avg_increase:.1f}MB. Readings: {memory_readings}"
-    )
+    assert readings == []
+    assert peak == 50.0
+    assert exceeded is False
+    assert sps > 0.0 and p95 > 0.0

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import gzip
 import logging
+from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
 from typing import Protocol
 
 from PIL import Image
-from platform_core.logging import get_logger
 
 from handwriting_ai.training.calibration._types import (
     BudgetConfig,
@@ -24,8 +23,6 @@ from handwriting_ai.training.calibration.runner import (
     _child_entry,
 )
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
-
-UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 
 class _ChildEntryFn(Protocol):
@@ -75,25 +72,9 @@ _CFG: AugmentConfig = {
 }
 
 
-def _write_gzip(path: Path, data: bytes) -> None:
-    with gzip.open(path, "wb") as f:
-        f.write(data)
-
-
-def _mk_images_header(n: int, rows: int = 28, cols: int = 28, magic: int = 2051) -> bytes:
-    return (
-        magic.to_bytes(4, "big")
-        + int(n).to_bytes(4, "big")
-        + int(rows).to_bytes(4, "big")
-        + int(cols).to_bytes(4, "big")
-    )
-
-
-def _mk_labels_header(n: int, magic: int = 2049) -> bytes:
-    return magic.to_bytes(4, "big") + int(n).to_bytes(4, "big")
-
-
-def test_child_entry_inline_executes_and_writes_result(tmp_path: Path) -> None:
+def test_child_entry_inline_executes_and_writes_result(
+    tmp_path: Path, child_log_queue: MPQueue[logging.LogRecord]
+) -> None:
     # Build a minimal inline spec and candidate
     aug: AugmentSpec = {
         "augment": False,
@@ -115,9 +96,6 @@ def test_child_entry_inline_executes_and_writes_result(tmp_path: Path) -> None:
         "augment": aug,
     }
 
-    import multiprocessing as mp
-    from multiprocessing.queues import Queue as MPQueue
-
     cand: Candidate = {
         "intra_threads": 1,
         "interop_threads": None,
@@ -126,9 +104,8 @@ def test_child_entry_inline_executes_and_writes_result(tmp_path: Path) -> None:
     }
     out_file = str(tmp_path / "child_result.txt")
 
-    q: MPQueue[logging.LogRecord] = mp.get_context("spawn").Queue()
     # Run inline inside this process
-    _child_entry(out_file, spec, cand, samples=1, abort_pct=99.0, log_q=q)
+    _child_entry(out_file, spec, cand, samples=1, abort_pct=99.0, log_q=child_log_queue)
     content = Path(out_file).read_text(encoding="utf-8")
     assert "ok=1" in content and "batch_size=2" in content
 
@@ -286,76 +263,3 @@ def test_run_finally_kills_alive_child(tmp_path: Path) -> None:
     out = runner.run(ds, cand, samples=1, budget=budget)
     assert out["ok"] and out["res"] is not None and int(out["res"]["batch_size"]) == 1
     assert not out_dir.exists()
-
-
-def test_child_entry_flush_branch_no_flush_handler(tmp_path: Path) -> None:
-    import logging
-    import multiprocessing as mp
-    from multiprocessing.queues import Queue as MPQueue
-
-    from handwriting_ai import _test_hooks
-
-    class _QH(logging.Handler):
-        """Minimal queue handler that appears to lack a usable ``flush``.
-
-        Subclasses logging.Handler to keep types strict while exercising the
-        branch that checks for a flush attribute without providing one that
-        can be called successfully.
-        """
-
-        def __init__(self, q: mp.Queue[logging.LogRecord]) -> None:
-            super().__init__()
-            self._queue = q
-
-        def emit(self, record: logging.LogRecord) -> None:
-            """Emit a record by putting it in the queue."""
-            self._queue.put_nowait(record)
-
-        def __getattr__(self, name: str) -> None:
-            """Pretend that 'flush' does not exist for hasattr checks."""
-            if name == "flush":
-                raise AttributeError(f"'{type(self).__name__}' object has no attribute 'flush'")
-            raise AttributeError(name)
-
-    def _make_qh(queue: mp.Queue[logging.LogRecord]) -> _QH:
-        return _QH(queue)
-
-    _test_hooks.queue_handler_factory = _make_qh
-
-    aug: AugmentSpec = {
-        "augment": False,
-        "aug_rotate": 0.0,
-        "aug_translate": 0.0,
-        "noise_prob": 0.0,
-        "noise_salt_vs_pepper": 0.5,
-        "dots_prob": 0.0,
-        "dots_count": 0,
-        "dots_size_px": 1,
-        "blur_sigma": 0.0,
-        "morph": "none",
-    }
-    inline: InlineSpec = {"n": 1, "sleep_s": 0.0, "fail": False}
-    spec: PreprocessSpec = {
-        "base_kind": BaseKind.INLINE,
-        "mnist": None,
-        "inline": inline,
-        "augment": aug,
-    }
-    out_file = str(tmp_path / "child_nf.txt")
-
-    cand: Candidate = {
-        "intra_threads": 1,
-        "interop_threads": None,
-        "num_workers": 0,
-        "batch_size": 1,
-    }
-
-    q: MPQueue[logging.LogRecord] = mp.get_context("spawn").Queue()
-    _child_entry(out_file, spec, cand, samples=1, abort_pct=99.0, log_q=q)
-    # Cleanup: remove our stub handler if it was attached
-    app_log = get_logger("handwriting_ai")
-    for h in list(app_log.handlers):
-        if h.__class__.__name__ == _QH.__name__:
-            app_log.removeHandler(h)
-    assert Path(out_file).exists()
-    _child_entry(out_file, spec, cand, samples=1, abort_pct=99.0, log_q=q)

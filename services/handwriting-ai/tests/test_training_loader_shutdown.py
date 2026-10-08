@@ -24,16 +24,14 @@ from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import Dataset
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
 from handwriting_ai._hook_protocols_training import (
     BatchIterableProtocol,
     BatchLoaderProtocol,
-    EffectiveConfig,
 )
-from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
-from handwriting_ai.training.dataset import DataLoaderConfig
 from handwriting_ai.training.mnist_train import train_with_config
 from handwriting_ai.training.train_config import TrainConfig, default_train_config
+
+pytestmark = pytest.mark.usefixtures("fixed_calibration")
 
 
 @pytest.fixture(autouse=True)
@@ -94,43 +92,12 @@ def _cfg(tmp: Path) -> TrainConfig:
         out_dir=tmp / "out",
         model_id="mnist_resnet18_v1",
         epochs=1,
-        batch_size=2,
+        batch_size=1,
         seed=0,
         device=RequestedDevice.CPU,
         calibrate=True,
         calibration_samples=1,
     )
-
-
-def _bind_fast_calibration() -> None:
-    """Bind the calibration hook to a fixed workerless EffectiveConfig."""
-    loader_cfg = DataLoaderConfig(
-        batch_size=1,
-        num_workers=0,
-        pin_memory=False,
-        persistent_workers=False,
-        prefetch_factor=2,
-    )
-    fixed: EffectiveConfig = {
-        "intra_threads": 1,
-        "interop_threads": None,
-        "batch_size": 1,
-        "loader_cfg": loader_cfg,
-    }
-
-    def _fixed_calibrate(
-        ds: PreprocessSpec,
-        *,
-        limits: ResourceLimitsDict,
-        requested_batch_size: int,
-        samples: int,
-        cache_path: Path,
-        ttl_seconds: int,
-        force: bool,
-    ) -> EffectiveConfig:
-        return fixed
-
-    _test_hooks.calibrate_input_pipeline = _fixed_calibrate
 
 
 def _bind_train_epoch(outcome: float | None) -> None:
@@ -166,7 +133,6 @@ def test_a_completed_run_shuts_down_both_loaders(tmp_path: Path) -> None:
     """
     recorder = _RecordingShutdown()
     _test_hooks.shutdown_loader = recorder
-    _bind_fast_calibration()
     _bind_train_epoch(0.0)
 
     result = train_with_config(_cfg(tmp_path), (_TinyBase(2), _TinyBase(1)))
@@ -185,7 +151,6 @@ def test_a_failing_training_loop_still_shuts_down_both_loaders(tmp_path: Path) -
     """The finally runs on the raising path, and the failure still propagates."""
     recorder = _RecordingShutdown()
     _test_hooks.shutdown_loader = recorder
-    _bind_fast_calibration()
     _bind_train_epoch(None)
 
     with pytest.raises(RuntimeError, match="epoch deliberately failed"):
@@ -199,7 +164,6 @@ def test_a_failure_before_the_loaders_exist_shuts_down_nothing(tmp_path: Path) -
     finally with no loaders, and the shutdown hook must not be handed None."""
     recorder = _RecordingShutdown()
     _test_hooks.shutdown_loader = recorder
-    _bind_fast_calibration()
 
     def _has_interop() -> bool:
         return True

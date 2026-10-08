@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -39,7 +40,9 @@ def test_build_dataset_from_spec_inline_ok() -> None:
     assert len(ds) == 1
 
 
-def test_child_entry_removes_stream_handlers(tmp_path: Path) -> None:
+def test_child_entry_removes_stream_handlers(
+    tmp_path: Path, child_log_queue: MPQueue[logging.LogRecord]
+) -> None:
     # Ensure the application logger has a StreamHandler to exercise removal
     log = get_logger("handwriting_ai")
     h = logging.StreamHandler()
@@ -72,10 +75,6 @@ def test_child_entry_removes_stream_handlers(tmp_path: Path) -> None:
     }
     out_file = str(tmp_path / "child_log_remove.txt")
 
-    # Use a real multiprocessing queue to satisfy types but keep test lightweight
-    import multiprocessing as mp
-    from multiprocessing.queues import Queue as MPQueue
-
-    q: MPQueue[logging.LogRecord] = mp.get_context("spawn").Queue()
-    _child_entry(out_file, spec, cand, samples=1, abort_pct=99.0, log_q=q)
+    _child_entry(out_file, spec, cand, samples=1, abort_pct=99.0, log_q=child_log_queue)
+    assert h not in log.handlers
     assert (tmp_path / "child_log_remove.txt").exists()
