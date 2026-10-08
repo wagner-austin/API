@@ -24,7 +24,9 @@ THE DEFINITION IS SHARED WITH MCPs (board task c96e8791):
   ``SIGTERM``, or a client library's connection or timeout failure
   (``OperationalError``, ``ConnectionError``, ``ConnectError``,
   ``ConnectTimeout``, ``ReadTimeout``, ``TimeoutException``,
-  ``ClientConnectorError``, ``ServerDisconnectedError``); calls ``kill``,
+  ``ClientConnectorError``, ``ServerDisconnectedError``), or the OS
+  refusing a file swap (``PermissionError``, ``FileNotFoundError``,
+  ``FileExistsError``, ``IsADirectoryError``, ``NotADirectoryError``); calls ``kill``,
   ``terminate`` or ``killpg``; reads an attribute (or string key)
   ``timed_out`` or ``killed``; compares an exit code
   (``exit_code``, ``returncode``, ``exitcode``, ``code``) equal to a
@@ -69,6 +71,23 @@ FAILURE_NAMES = frozenset(
         "TimeoutException",
         "ClientConnectorError",
         "ServerDisconnectedError",
+        # A file swap cannot time out, exit or be killed; it fails with the
+        # OS refusing it, and a target held open is exactly the mid-swap
+        # failure that left the harness gate's launcher missing.
+        "PermissionError",
+        "FileNotFoundError",
+        "FileExistsError",
+        "IsADirectoryError",
+        "NotADirectoryError",
+        # Their errno spellings, which MCPs' table carries for Node and a
+        # Python test reads as ``errno.ENOENT``; the two tables stay equal.
+        "ENOENT",
+        "EEXIST",
+        "EISDIR",
+        "ENOTDIR",
+        "EPERM",
+        "EACCES",
+        "EBUSY",
     }
 )
 KILL_CALLS = frozenset({"kill", "terminate", "killpg"})
