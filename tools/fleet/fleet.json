@@ -705,7 +705,7 @@
     },
     "MCPs/scripts/ps-harness": {
       "worker_ram_gb": 0.5,
-      "minimum_workers": 1,
+      "minimum_workers": 3,
       "expected_minutes": 25,
       "required_tags": ["windows", "elevated"],
       "source": {
