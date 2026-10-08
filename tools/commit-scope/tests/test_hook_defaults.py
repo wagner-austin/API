@@ -77,8 +77,9 @@ def test_the_real_runner_reads_a_real_repository(tmp_path: pathlib.Path) -> None
     """
     _init_repo(tmp_path)
 
-    assert _test_hooks.run_git(_at(tmp_path, REPO_ROOT_ARGUMENTS)).strip()
-    assert decode_staged_paths(_test_hooks.run_git(_at(tmp_path, STAGED_PATHS_ARGUMENTS))) == ()
+    assert _test_hooks._default_run_git(_at(tmp_path, REPO_ROOT_ARGUMENTS)).strip()
+    staged = _test_hooks._default_run_git(_at(tmp_path, STAGED_PATHS_ARGUMENTS))
+    assert decode_staged_paths(staged) == ()
 
     (tmp_path / "staged.py").write_text("x = 1\n", encoding="utf-8")
     subprocess.run(
@@ -87,9 +88,8 @@ def test_the_real_runner_reads_a_real_repository(tmp_path: pathlib.Path) -> None
         capture_output=True,
         encoding="utf-8",
     )
-    assert decode_staged_paths(_test_hooks.run_git(_at(tmp_path, STAGED_PATHS_ARGUMENTS))) == (
-        "staged.py",
-    )
+    staged = _test_hooks._default_run_git(_at(tmp_path, STAGED_PATHS_ARGUMENTS))
+    assert decode_staged_paths(staged) == ("staged.py",)
 
 
 def test_a_directory_that_is_not_a_repository_names_the_repository(
@@ -100,7 +100,7 @@ def test_a_directory_that_is_not_a_repository_names_the_repository(
     An index error here would point at staging, which is not the problem.
     """
     with pytest.raises(AppError) as caught:
-        _test_hooks.run_git(_at(tmp_path, REPO_ROOT_ARGUMENTS))
+        _test_hooks._default_run_git(_at(tmp_path, REPO_ROOT_ARGUMENTS))
     assert caught.value.code is CommitScopeErrorCode.GIT_REPO_ROOT_UNRESOLVED
 
 
@@ -115,8 +115,14 @@ def test_a_failing_index_query_raises_rather_than_reporting_nothing_staged(
     """
     _init_repo(tmp_path)
     with pytest.raises(AppError) as caught:
-        _test_hooks.run_git(_at(tmp_path, ("diff", "--cached", "--this-flag-does-not-exist")))
+        _test_hooks._default_run_git(
+            _at(tmp_path, ("diff", "--cached", "--this-flag-does-not-exist"))
+        )
     assert caught.value.code is CommitScopeErrorCode.GIT_INDEX_UNREADABLE
+    # The refusal carries git's own status, 129 for a usage error, so the
+    # reader sees that git exited and how rather than a bare "failed".
+    exit_code = int(caught.value.message.split("failed with status ")[1].split(",")[0])
+    assert exit_code == 129
 
 
 def test_the_real_environment_reader_normalises_blank_to_unset() -> None:
