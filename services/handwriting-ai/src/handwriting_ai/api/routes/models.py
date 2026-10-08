@@ -6,15 +6,12 @@ from fastapi import APIRouter
 
 from ...inference.engine import InferenceEngine
 
-# Non-recursive JSON value type for flat API responses
-_FlatJsonValue = str | int | float | bool | list[float] | None
-
 
 def build_router(engine: InferenceEngine) -> APIRouter:
     """Build models router with /v1/models/active endpoint."""
     router = APIRouter()
 
-    async def _model_active() -> dict[str, _FlatJsonValue]:
+    async def _model_active() -> dict[str, str | int | float | bool | list[float] | None]:
         man = engine.manifest
         if man is None:
             return {"model_loaded": False, "model_id": None}

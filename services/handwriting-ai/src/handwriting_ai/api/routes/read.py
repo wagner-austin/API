@@ -22,9 +22,6 @@ from ...inference.engine import InferenceEngine
 from ...preprocess import PreprocessOptions
 from ..schemas import PredictResponse
 
-# Non-recursive JSON value type for flat API responses
-_FlatJsonValue = str | int | float | bool | list[float] | None
-
 # Ensure truncated images fail cleanly
 ImageFile.LOAD_TRUNCATED_IMAGES = False
 
@@ -121,7 +118,7 @@ def build_router(
         center: bool = True,
         visualize: bool = False,
         content_length: int | None = Header(default=None, alias="Content-Length"),
-    ) -> dict[str, _FlatJsonValue]:
+    ) -> dict[str, str | int | float | bool | list[float] | None]:
         engine = provide_engine()
         settings = provide_settings()
         limits = provide_limits()

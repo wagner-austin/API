@@ -17,9 +17,6 @@ from ...config import Settings
 from ...inference.engine import InferenceEngine
 from ...inference.manifest import from_json_manifest
 
-# Non-recursive JSON value type for flat API responses
-_FlatJsonValue = str | int | float | bool | list[float] | None
-
 # Defaults for admin upload endpoint parameters (satisfy Ruff B008).
 _form_model_id: str = Form(...)
 _form_activate: bool = Form(False)
@@ -55,7 +52,7 @@ def build_router(
         activate: bool = _form_activate,
         manifest: UploadFile = _file_required_manifest,
         model: UploadFile = _file_required_model,
-    ) -> dict[str, _FlatJsonValue]:
+    ) -> dict[str, str | int | float | bool | list[float] | None]:
         get_logger("handwriting_ai").info(
             f"upload_files_received manifest.filename={manifest.filename} "
             f"model.filename={model.filename} same_object={manifest is model}"
@@ -123,7 +120,7 @@ def build_router(
                     handwriting_status_for(HandwritingErrorCode.invalid_model),
                 )
 
-        out: dict[str, _FlatJsonValue] = {
+        out: dict[str, str | int | float | bool | list[float] | None] = {
             "ok": True,
             "model_id": model_id,
             "run_id": man["created_at"].isoformat(),
