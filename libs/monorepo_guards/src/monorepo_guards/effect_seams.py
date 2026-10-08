@@ -432,7 +432,9 @@ def _bound_seams(
 
     Returns:
         ``name: P = imported_fn`` (resolved into the package) and
-        ``name = <primitive>`` or ``name: P = <primitive>`` bindings.
+        ``name = <primitive>``, ``name: P = <primitive>``, a lambda or a
+        package function's product bound the same way. None of these has a
+        twin form: only a bundle field gets ``factory().field``.
     """
     seams: list[Seam] = []
     for node in module.tree.body:
@@ -445,8 +447,10 @@ def _bound_seams(
             continue
         if not isinstance(target, ast.Name):
             continue
-        if bound_primitive(value, module.bindings) is not None or _factory_built(
-            index, module, value
+        if (
+            isinstance(value, ast.Lambda)
+            or bound_primitive(value, module.bindings) is not None
+            or _factory_built(index, module, value)
         ):
             seams.append(
                 Seam(module, target.id, node.lineno, frozenset(), frozenset(), module, value)
