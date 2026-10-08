@@ -14,7 +14,10 @@ their recipes in PowerShell, so each takes a Windows node and installs
 through its own make check (MCPs board task ddd25310). LSTM's check is the
 same shape: PowerShell recipes, a poetry install inside make check, and no
 repository beside it, since platform_core arrives as a git dependency
-(board task bc12f18b). The Dashboards root's
+(board task bc12f18b). It also takes the gpu tag, because its resume test
+restores CUDA RNG states on the card, the only place the bug it guards
+reproduces; on serendipity, with no card, that left train.py at 99.67% and
+the check under its 100% floor (fleet job 1b48e90e). The Dashboards root's
 check ends in a provenance gate that runs the deliverable-write validator
 against the wikis its articles cite, all found beside the repository as a
 workstation keeps them in ``~/PROJECTS``, so the root carries those five
@@ -58,7 +61,7 @@ MCPS_COMPANION = ProjectCompanion(
         ("metabolomics-dashboard", (NodeTag.WINDOWS,), (), (MCPS_COMPANION,)),
         ("corvis-stick", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
         ("tree-bot", (NodeTag.WINDOWS,), (), ()),
-        ("LSTM", (NodeTag.WINDOWS,), (), ()),
+        ("LSTM", (NodeTag.GPU, NodeTag.WINDOWS), (), ()),
     ],
 )
 def test_each_repository_s_root_check_is_declared_with_what_it_reads(
