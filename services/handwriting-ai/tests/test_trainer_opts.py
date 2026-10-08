@@ -36,8 +36,11 @@ class _TinyBase(Dataset[tuple[Image.Image, int]]):
 def test_optimizer_scheduler_variants() -> None:
     for opt in ("sgd", "adam", "adamw"):
         for sched in ("none", "cosine", "step"):
-            # Fresh model each iteration to ensure loss can decrease
-            model = _build_model()
+            # Fresh model each iteration to ensure loss can decrease. The builder
+            # reads only model.parameters(), so a linear model over the 28x28
+            # input exercises it as fully as the ResNet-18 this built nine
+            # times did, which cost 12.4 s of one thread (API task 8bbe083b).
+            model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(28 * 28, 10))
             cfg = default_train_config(optim=opt, scheduler=sched, epochs=2, step_size=1)
             optimizer, scheduler = _build_optimizer_and_scheduler(model, cfg)
 
