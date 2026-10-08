@@ -8,16 +8,6 @@ from platform_core.digits_metrics_decode import (
     DigitsEventV1,
     decode_digits_event,
 )
-from platform_core.digits_metrics_events import (
-    DigitsArtifactV1,
-    DigitsBatchMetricsV1,
-    DigitsBestMetricsV1,
-    DigitsCompletedMetricsV1,
-    DigitsConfigV1,
-    DigitsEpochMetricsV1,
-    DigitsPruneV1,
-    DigitsUploadV1,
-)
 from platform_core.job_events import (
     JobCompletedV1,
     JobDomain,
@@ -30,33 +20,16 @@ from platform_core.job_events import (
 from platform_core.json_utils import InvalidJsonError, JSONTypeError
 from platform_discord.trainer.handler import TrainerEventV1, decode_trainer_event
 
-# Event data can be a dict with string keys, or None if decode fails
-EventValue = str | int | float | bool | None | list[str | int | float | bool | None]
-EventData = dict[str, EventValue] | None
-
-DigitsEvent = (
-    DigitsConfigV1
-    | DigitsBatchMetricsV1
-    | DigitsEpochMetricsV1
-    | DigitsBestMetricsV1
-    | DigitsArtifactV1
-    | DigitsUploadV1
-    | DigitsPruneV1
-    | DigitsCompletedMetricsV1
-    | JobFailedV1
-    | None
-)
-TrainerEvent = TrainerEventV1 | None
-TranscriptEvent = JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1 | None
-
 
 class ServiceDef(TypedDict):
     id: str
     channel: str
-    decode_event: Callable[[str], DigitsEvent | TrainerEvent | TranscriptEvent]
+    decode_event: Callable[[str], DigitsEventV1 | TrainerEventV1 | None]
 
 
-def _decode_transcript(payload: str) -> TranscriptEvent:
+def _decode_transcript(
+    payload: str,
+) -> JobStartedV1 | JobProgressV1 | JobCompletedV1 | JobFailedV1 | None:
     ev = decode_job_event(payload)
     return ev if ev["domain"] is JobDomain.TRANSCRIPT else None
 
