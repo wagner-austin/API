@@ -3,8 +3,9 @@
 MCPs board task 45a4f22b; the budget and the incident behind it are
 :mod:`fleet.contracts.runner_slice`. Three pieces, all idempotent:
 
-1. The slice unit, carrying the host's ``MemoryHigh``, ``MemoryMax`` and
-   ``CPUWeight``, written and reloaded only when its text differs. systemd
+1. The slice unit, carrying the host's ``MemoryHigh``, ``MemoryMax``,
+   ``MemorySwapMax``, ``CPUWeight`` and root-disk read bounds (board task
+   cb264851), written and reloaded only when its text differs. systemd
    re-applies a loaded slice's cgroup limits on reload, so a changed budget
    reaches runners already inside it without restarting any of them.
 2. A per-runner drop-in naming the slice, beside the restart policy of
@@ -18,7 +19,7 @@ MCPs board task 45a4f22b; the budget and the incident behind it are
 
 from __future__ import annotations
 
-from fleet.contracts.runner_slice import CI_SLICE_NAME, CiSlice
+from fleet.contracts.runner_slice import CI_SLICE_NAME, IO_BOUND_PATH, CiSlice
 from fleet.contracts.runners import RunnerInstall
 from fleet.core.script_values import scriptable
 
@@ -32,6 +33,32 @@ SLICE_DROP_IN = f"[Service]\nSlice={CI_SLICE_NAME}\n"
 SLICE_UNIT_PATH = f"/etc/systemd/system/{CI_SLICE_NAME}"
 
 
+#: The controllers the slice accounts, so each bound below is enforced and
+#: ``systemctl show`` reports the slice's use against it.
+SLICE_ACCOUNTING = ("MemoryAccounting=yes", "CPUAccounting=yes", "IOAccounting=yes")
+
+
+def render_slice_bounds(budget: CiSlice) -> list[str]:
+    """The slice's bound directives for one host's budget.
+
+    Args:
+        budget: The host's CI budget.
+
+    Returns:
+        One ``Name=value`` directive per bound: memory, swap, CPU weight and
+        the root disk's read bandwidth and read operations, in that order.
+        systemd reads ``G`` as 2^30 bytes and a bandwidth's ``M`` as 10^6.
+    """
+    return [
+        f"MemoryHigh={budget['memory_high_gb']}G",
+        f"MemoryMax={budget['memory_max_gb']}G",
+        f"MemorySwapMax={budget['swap_max_gb']}G",
+        f"CPUWeight={budget['cpu_weight']}",
+        f"IOReadBandwidthMax={IO_BOUND_PATH} {budget['io_read_mb_per_s']}M",
+        f"IOReadIOPSMax={IO_BOUND_PATH} {budget['io_read_iops']}",
+    ]
+
+
 def render_slice_unit(budget: CiSlice) -> str:
     """The slice unit's text for one host's budget.
 
@@ -41,17 +68,13 @@ def render_slice_unit(budget: CiSlice) -> str:
     Returns:
         The unit file, newline-terminated.
     """
+    directives = [*SLICE_ACCOUNTING, *render_slice_bounds(budget)]
     return (
         "[Unit]\n"
         "Description=GitHub Actions runners' share of this VM, rendered by fleet-runners "
-        "(MCPs board task 45a4f22b)\n"
+        "(MCPs board tasks 45a4f22b, cb264851)\n"
         "\n"
-        "[Slice]\n"
-        "MemoryAccounting=yes\n"
-        f"MemoryHigh={budget['memory_high_gb']}G\n"
-        f"MemoryMax={budget['memory_max_gb']}G\n"
-        "CPUAccounting=yes\n"
-        f"CPUWeight={budget['cpu_weight']}\n"
+        "[Slice]\n" + "".join(f"{directive}\n" for directive in directives)
     )
 
 
@@ -74,8 +97,7 @@ def render_slice_unit_lines(budget: CiSlice) -> list[str]:
         body.rstrip("\n"),
         "SLICE_EOF",
         "    systemctl daemon-reload",
-        f"    echo 'ci budget set: {CI_SLICE_NAME} MemoryHigh={budget['memory_high_gb']}G "
-        f"MemoryMax={budget['memory_max_gb']}G CPUWeight={budget['cpu_weight']}'",
+        f"    echo 'ci budget set: {CI_SLICE_NAME} {' '.join(render_slice_bounds(budget))}'",
         "fi",
         f"systemctl start {CI_SLICE_NAME}",
     ]
@@ -128,10 +150,12 @@ def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
 
 
 __all__ = [
+    "SLICE_ACCOUNTING",
     "SLICE_DROP_IN",
     "SLICE_DROP_IN_NAME",
     "SLICE_UNIT_PATH",
     "render_runner_slice_lines",
+    "render_slice_bounds",
     "render_slice_unit",
     "render_slice_unit_lines",
 ]

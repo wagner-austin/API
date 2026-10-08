@@ -13,6 +13,7 @@ import subprocess
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runner_slice import (
     CI_SLICE_NAME,
     CiSlice,
@@ -120,7 +121,17 @@ class TestContract:
     def test_a_host_with_the_default_vm_size_is_checked_only_against_itself(self) -> None:
         assert decode_ci_slice(_budget(memory_max_gb=64), vm_memory_gb=None)["memory_max_gb"] == 64
 
-    @pytest.mark.parametrize("field", ["memory_high_gb", "memory_max_gb", "cpu_weight"])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "memory_high_gb",
+            "memory_max_gb",
+            "swap_max_gb",
+            "cpu_weight",
+            "io_read_mb_per_s",
+            "io_read_iops",
+        ],
+    )
     def test_a_missing_field_is_refused(self, field: str) -> None:
         raw = _budget()
         del raw[field]
@@ -130,6 +141,21 @@ class TestContract:
     def test_a_throttle_point_of_nothing_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="memory_high_gb must be positive, got 0"):
             decode_ci_slice(_budget(memory_high_gb=0), vm_memory_gb=26)
+
+    def test_a_slice_may_be_allowed_no_swap_at_all(self) -> None:
+        assert decode_ci_slice(_budget(swap_max_gb=0), vm_memory_gb=26)["swap_max_gb"] == 0
+
+    def test_a_negative_swap_bound_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="swap_max_gb must be 0 or more, got -1"):
+            decode_ci_slice(_budget(swap_max_gb=-1), vm_memory_gb=26)
+
+    @pytest.mark.parametrize("field", ["io_read_mb_per_s", "io_read_iops"])
+    @pytest.mark.parametrize("bound", [0, -5])
+    def test_a_read_bound_of_nothing_is_refused(self, field: str, bound: int) -> None:
+        with pytest.raises(
+            JSONTypeError, match=f"ci_slice.{field} must be positive, got {bound}; a read bound"
+        ):
+            decode_ci_slice(_budget(**{field: bound}), vm_memory_gb=26)
 
     def test_a_ceiling_below_the_throttle_point_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="kill jobs before systemd ever throttled"):
@@ -150,10 +176,36 @@ class TestSliceUnit:
     """The slice unit and the lines that keep it current."""
 
     def test_the_unit_carries_the_budget(self) -> None:
-        unit = runner_slice_render.render_slice_unit(a_ci_slice())
-        assert "[Slice]\n" in unit
-        assert "MemoryHigh=16G\nMemoryMax=18G\n" in unit
-        assert unit.endswith("CPUAccounting=yes\nCPUWeight=20\n")
+        assert runner_slice_render.render_slice_unit(a_ci_slice()) == (
+            "[Unit]\n"
+            "Description=GitHub Actions runners' share of this VM, rendered by fleet-runners "
+            "(MCPs board tasks 45a4f22b, cb264851)\n"
+            "\n"
+            "[Slice]\n"
+            "MemoryAccounting=yes\n"
+            "CPUAccounting=yes\n"
+            "IOAccounting=yes\n"
+            "MemoryHigh=16G\n"
+            "MemoryMax=18G\n"
+            "MemorySwapMax=2G\n"
+            "CPUWeight=20\n"
+            "IOReadBandwidthMax=/ 200M\n"
+            "IOReadIOPSMax=/ 5000\n"
+        )
+
+    def test_the_roster_s_lavender_unit_bounds_swap_and_root_disk_reads(self) -> None:
+        """The unit rendered from runners.json itself, so a roster edit that
+        drops either bound fails here rather than on the host."""
+        roster = load_runner_spec(str(pathlib.Path(__file__).parent.parent / "runners.json"))
+        lavender = next(host for host in roster["hosts"] if host["name"] == "lavender")
+        unit = runner_slice_render.render_slice_unit(lavender["ci_slice"])
+        assert "\nMemorySwapMax=2G\n" in unit
+        assert "\nIOReadBandwidthMax=/ 200M\nIOReadIOPSMax=/ 5000\n" in unit
+
+    def test_a_slice_allowed_no_swap_renders_a_zero_bound(self) -> None:
+        budget = a_ci_slice()
+        budget["swap_max_gb"] = 0
+        assert "\nMemorySwapMax=0G\n" in runner_slice_render.render_slice_unit(budget)
 
     def test_the_unit_is_rewritten_only_when_it_differs_and_always_started(self) -> None:
         path = runner_slice_render.SLICE_UNIT_PATH
@@ -167,7 +219,8 @@ class TestSliceUnit:
             body,
             "SLICE_EOF",
             "    systemctl daemon-reload",
-            "    echo 'ci budget set: runners.slice MemoryHigh=16G MemoryMax=18G CPUWeight=20'",
+            "    echo 'ci budget set: runners.slice MemoryHigh=16G MemoryMax=18G "
+            "MemorySwapMax=2G CPUWeight=20 IOReadBandwidthMax=/ 200M IOReadIOPSMax=/ 5000'",
             "fi",
             "systemctl start runners.slice",
         ]

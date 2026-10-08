@@ -210,7 +210,10 @@
       "ci_slice": {
         "memory_high_gb": 16,
         "memory_max_gb": 18,
-        "cpu_weight": 20
+        "swap_max_gb": 2,
+        "cpu_weight": 20,
+        "io_read_mb_per_s": 200,
+        "io_read_iops": 5000
       }
     }
   ]
