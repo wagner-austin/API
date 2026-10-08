@@ -157,9 +157,9 @@
           "path": "/opt/corvis/model-cache/Xenova/gte-small/onnx/model.onnx",
           "sha256": null,
           "writable": false,
-          "reason": "MCPs packages/embed and mcp-proxy load gte-small from this cache; absent, the 133 MB fetch times the embed suite out",
+          "reason": "MCPs packages/embed and mcp-proxy load gte-small from this cache; absent, the 133 MB fetch times the embed suite out; /opt/corvis itself must be traversable too, since curl --create-dirs makes it 750 as root and the runner then cannot reach the cache (CI mcp-proxy red at MCPs 657c01563, 2026-10-08)",
           "manual": false,
-          "provision_command": "for f in config.json tokenizer.json tokenizer_config.json onnx/model.onnx; do curl -fsSL --create-dirs -o /opt/corvis/model-cache/Xenova/gte-small/$f https://huggingface.co/Xenova/gte-small/resolve/main/$f; done && chmod -R a+rX /opt/corvis/model-cache"
+          "provision_command": "for f in config.json tokenizer.json tokenizer_config.json onnx/model.onnx; do curl -fsSL --create-dirs -o /opt/corvis/model-cache/Xenova/gte-small/$f https://huggingface.co/Xenova/gte-small/resolve/main/$f; done && chmod a+rX /opt/corvis && chmod -R a+rX /opt/corvis/model-cache"
         }
       ],
       "base": {
