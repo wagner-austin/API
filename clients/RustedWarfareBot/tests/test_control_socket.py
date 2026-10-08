@@ -12,6 +12,8 @@ import socket
 import threading
 from types import TracebackType
 
+import pytest
+
 from rw_bot.control import _test_hooks
 
 
@@ -78,7 +80,7 @@ class _Listener:
 
 def test_a_real_connection_reads_the_lines_the_peer_sent() -> None:
     with _Listener(["first", "second"]) as listener:
-        connection = _test_hooks.connect("127.0.0.1", listener.port, 5.0)
+        connection = _test_hooks._connect_impl("127.0.0.1", listener.port, 5.0)
         assert connection.read_line() == "first"
         assert connection.read_line() == "second"
         connection.close()
@@ -86,7 +88,7 @@ def test_a_real_connection_reads_the_lines_the_peer_sent() -> None:
 
 def test_a_real_connection_delivers_the_lines_it_sends() -> None:
     with _Listener([]) as listener:
-        connection = _test_hooks.connect("127.0.0.1", listener.port, 5.0)
+        connection = _test_hooks._connect_impl("127.0.0.1", listener.port, 5.0)
         connection.send_line('{"kind":"move","unit_id":1,"x":0.0,"y":0.0}')
         connection.send_line('{"kind":"move","unit_id":2,"x":1.0,"y":2.0}')
         connection.close()
@@ -110,10 +112,25 @@ def test_a_peer_that_hangs_up_reads_as_end_of_stream() -> None:
 
     closer = threading.Thread(target=hang_up, daemon=True)
     closer.start()
-    connection = _test_hooks.connect("127.0.0.1", port, 5.0)
+    connection = _test_hooks._connect_impl("127.0.0.1", port, 5.0)
     closer.join(timeout=5.0)
     try:
         assert connection.read_line() == ""
     finally:
         connection.close()
         server.close()
+
+
+def test_an_agent_that_never_bound_refuses_the_connection() -> None:
+    """The planner's first sign the agent is not up is a refusal, raised.
+
+    The port is one a listener held and released, so nothing is bound to it.
+    Five seconds covers Windows, which retries a refused loopback connect for
+    about two seconds before it raises.
+    """
+    released = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    released.bind(("127.0.0.1", 0))
+    bound: tuple[str, int] = released.getsockname()
+    released.close()
+    with pytest.raises(ConnectionRefusedError):
+        _test_hooks._connect_impl("127.0.0.1", bound[1], 5.0)

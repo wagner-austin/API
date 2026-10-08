@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -37,11 +38,12 @@ from rw_bot.harness._hook_defaults import (
     _read_platform_impl,
     _remove_path_impl,
     _resolve_root_impl,
+    _run_capture_impl,
     _run_inherited_impl,
     _sleep_impl,
     _spawn_game_impl,
 )
-from rw_bot.harness._hook_protocols import SpawnedMatchProto
+from rw_bot.harness._hook_protocols import CAPTURE_TIMEOUT_STATUS, SpawnedMatchProto
 from rw_bot.harness.process_tree import spawn_isolation
 from rw_bot.platform_id import WINDOWS, is_windows
 
@@ -145,6 +147,27 @@ class TestRemovingPaths:
         _remove_path_impl(absent)
         assert not absent.exists()
 
+    def test_a_tree_that_cannot_be_removed_raises_rather_than_staying(self, tmp_path: Path) -> None:
+        """A path that is there and will not go is a leak, not teardown noise.
+
+        A read-only file blocks its own removal on Windows and a read-only
+        directory blocks its children's on POSIX, so the tree carries both
+        and fails the same way on every node.
+        """
+        locked = tmp_path / "play-x"
+        locked.mkdir()
+        member = locked / "Agent.class"
+        member.write_bytes(b"cafebabe")
+        member.chmod(stat.S_IREAD)
+        locked.chmod(stat.S_IREAD | stat.S_IEXEC)
+        try:
+            with pytest.raises(PermissionError):
+                _remove_path_impl(locked)
+        finally:
+            locked.chmod(stat.S_IRWXU)
+            member.chmod(stat.S_IREAD | stat.S_IWRITE)
+        assert member.read_bytes() == b"cafebabe"
+
 
 class TestProbingTheChannel:
     def test_a_listening_socket_is_seen(self) -> None:
@@ -156,14 +179,16 @@ class TestProbingTheChannel:
         finally:
             listener.close()
 
-    def test_a_closed_port_reports_the_reason_rather_than_a_bare_failure(self) -> None:
+    def test_a_closed_port_reports_the_refusal_rather_than_a_bare_failure(self) -> None:
         """A refused connection means the engine is up and the agent never
         bound; a timeout with no route means the engine died during boot.
-        The reason is what tells them apart."""
-        failure = _probe_port_impl(_UNUSED_PORT, 0.3)
+        The reason is what tells them apart, so it is named exactly. The
+        wait is long enough for Windows, which retries a refused loopback
+        connect for about two seconds before it reports the refusal."""
+        failure = _probe_port_impl(_UNUSED_PORT, _WAIT_SECONDS)
         if failure is None:
             raise AssertionError(f"port {_UNUSED_PORT} unexpectedly had a listener")
-        assert "Error" in failure
+        assert failure.startswith("ConnectionRefusedError: ")
 
 
 class TestMeasuringAStreamFile:
@@ -267,6 +292,35 @@ class TestRunningAChild:
                 dict(_read_environment_impl()),
                 0.5,
             )
+
+
+class TestCapturingAChild:
+    def test_a_failing_child_returns_its_status_and_both_streams_in_order(self) -> None:
+        """The batch scripts read a remote match's verdict from this: the
+        exit status and one transcript, launcher and planner interleaved."""
+        returncode, lines = _run_capture_impl(
+            [
+                sys.executable,
+                "-c",
+                "import sys; print('launcher up', flush=True);"
+                " sys.stderr.write('planner refused\\n'); sys.exit(3)",
+            ],
+            _TEST_WALL_SECONDS,
+        )
+        assert returncode == 3
+        assert lines == ("launcher up", "planner refused")
+
+    def test_a_child_past_its_wall_is_felled_and_keeps_what_it_printed(self) -> None:
+        """The wall is the condition the caller asked about, so it comes back
+        as a status, with the output from before the fell."""
+        started = _monotonic_impl()
+        returncode, lines = _run_capture_impl(
+            [sys.executable, "-c", "import time; print('booting', flush=True); time.sleep(60)"],
+            1.0,
+        )
+        assert returncode == CAPTURE_TIMEOUT_STATUS
+        assert lines == ("booting",)
+        assert _monotonic_impl() - started < _TEST_WALL_SECONDS
 
 
 class TestSpawningTheEngine:

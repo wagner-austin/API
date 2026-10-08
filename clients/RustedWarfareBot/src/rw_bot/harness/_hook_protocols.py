@@ -469,6 +469,10 @@ class RemovePathProto(Protocol):
             path: File or directory to remove. A path that is already gone is
                 not an error: this runs in teardown, where the interesting
                 failure is the match's, not the cleanup's.
+
+        Raises:
+            OSError: When the path is there and cannot be removed, which
+                would otherwise leave the copy behind unannounced.
         """
         ...
 

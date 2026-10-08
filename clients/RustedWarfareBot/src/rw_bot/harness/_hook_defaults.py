@@ -449,11 +449,21 @@ def _sleep_impl(seconds: float) -> None:
 def _remove_path_impl(path: Path) -> None:
     """Production implementation of :class:`RemovePathProto`.
 
+    A path that is already gone is not an error; one that is there and cannot
+    be removed is. The tree once went through ``ignore_errors=True``, which
+    left a locked clone where it was and said nothing, the 1.7 GB-per-batch
+    leak :func:`rw_bot.harness.campaign_match.main` closes; a file already
+    raised, and now a tree raises the same way (board task cc7222ca).
+
     Args:
         path: File or directory to remove.
+
+    Raises:
+        OSError: ``PermissionError`` and its kin when the path, or anything
+            under it, cannot be removed.
     """
     if path.is_dir():
-        shutil.rmtree(path, ignore_errors=True)
+        shutil.rmtree(path)
         return
     path.unlink(missing_ok=True)
 
