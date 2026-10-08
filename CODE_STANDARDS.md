@@ -38,8 +38,10 @@ while this file was being written.
 It is not a second linter, and in this repo that is not a hedge — it is a
 measurement. Every one of the 48 packages runs, at `make check`:
 
-- **`python -m scripts.guard`** — 45 rule classes from `libs/monorepo_guards`,
-  including `MockBanRule`, `MonkeyPatchBanRule`, `WeakAssertionRule`,
+- **`python -m scripts.guard`**: every rule class
+  `libs/monorepo_guards/src/monorepo_guards/orchestrator.py` registers in
+  `_run_with_config` (a list, not a count: the count written here drifted),
+  including `EffectSeamTwinRule`, `StateChangeVerifiedRule`, `MockBanRule`, `MonkeyPatchBanRule`, `WeakAssertionRule`,
   `TypingRule`, `SuppressRule`, `ExceptionsRule`, `AllExportsRule`,
   `FileSizeRule`, `RunRecordRule`, `RunFingerprintLiteralRule`. Each package's
   `scripts/guard.py` is a byte-identical shim into that shared package,
@@ -107,6 +109,71 @@ Two consequences worth stating, because they are what the table is FOR:
 - **The reverse also holds.** A shape none of these rules catches is a judgment
   item, and belongs in the section below with its reasoning, not asserted as if
   the tooling had already ruled on it.
+
+## A fake needs a real twin, and a change verifies itself
+
+The operator, 2026-10-07, on learning a fake could stand in for an effect that
+no test ever ran: *"i thought qe banned fakes? ok sounds like we need to enforce
+a fake ana cross the entire mcps and ai cooridnation sysyem"*, and then *"ok so
+do we need to update the code standards too? this cannot stand"* (board task
+cc7222ca; MCPs carries the same two rules, board task c96e8791, and a test
+there pins both repositories' vocabularies equal). Both rules run in every
+package's `make lint`, over `src`, `tests` and `scripts`, with no allow-list.
+
+### `effect-seam-twin`: every faked effect has a test that runs the real one through a failure
+
+Rule: `EffectSeamTwinRule`, `libs/monorepo_guards/src/monorepo_guards/effect_seam_rules.py`.
+What is a seam and what it reaches: `effect_seams.py`, with the effect
+primitives in `effect_primitives.py`. Which tests run it: `effect_seam_twins.py`.
+Which failures count: `effect_failures.py`.
+
+- **What it applies to.** A seam is a module-level function in a hooks module
+  (any path component starting `_test_hooks`), a hook bound to an imported
+  package function, or a bundle field (`Hooks(run=_default_run)`), whose code
+  reaches an effect primitive (a process, a socket or HTTP call, an atomic
+  file swap or removal, a database or service connect), following the
+  package's own calls.
+- **PASS** when at least one test under `tests/` calls or references the
+  implementation itself (`_default_run`, `build_hooks().run`), and that test
+  or a helper in its own file names a failure **of the seam's kind**: process
+  (`TimeoutExpired`, `CalledProcessError`, a nonzero exit compared or stated,
+  an inline script that exits nonzero, a kill), network (`ConnectError`,
+  `URLError`, `HTTPError`, `ConnectionRefusedError`, a status of 400 or more,
+  a bind failure `EADDRNOTAVAIL`), file swap (`PermissionError`,
+  `FileNotFoundError`, the `E*` errno names, a kill), or service
+  (`OperationalError`, `ConnectionError`, `ECONNREFUSED`).
+- **FAIL `effect-seam-twin-missing`** when no test runs the implementation:
+  every test reaches it through the hook name, an accessor (`get_hooks()`,
+  which returns whatever is installed, fakes included), or not at all.
+- **FAIL `effect-seam-twin-no-failure`** when its real tests only ever see it
+  succeed, or fail with a failure of another kind.
+- **A primitive bound straight to a hook** (`remove_temp_tree = rmtree`) has no
+  name a test can call and always fails: give it a named `_default_*`.
+- **What a reviewer still judges.** The rule sees that a failure is named; it
+  cannot see that the failure is the one production meets. A twin that fails a
+  socket by a typo'd host where production's failure is a refused port is
+  marked green and is still a finding.
+
+### `state-change-verified`: a change to a machine checks it took, and undoes a half
+
+Rule: `StateChangeVerifiedRule`, `libs/monorepo_guards/src/monorepo_guards/state_change_rules.py`.
+
+- **What it applies to.** A function in `src` or `scripts` whose first name
+  word is `install`, `reinstall`, `uninstall`, `swap`, `deploy`, `redeploy`,
+  `restart`, `promote` or `upgrade`, and whose code reaches an effect primitive
+  or calls an effect seam's hook.
+- **PASS** when it, or a helper in its own module it calls, makes a VERIFY
+  call (a name starting `verify`, `check` or `probe`, or containing `exists`)
+  and a RESTORE call (starting `restore`, `rollback`, `roll_back` or `revert`)
+  under an `if`/`else`, `except` or `finally`. The reference shape is
+  `tools/fleet/src/fleet/core/toolchain_install.py` `install_missing`: re-probe
+  the node, and remove what an unfinished install landed before raising.
+- **FAIL `state-change-unverified`** naming the function and line when either
+  is missing.
+- **A name is not a dodge.** A function named for a change it does not make
+  is renamed for what it does (`tools/fleet`'s `restart_job`, which runs five
+  session verbs and verifies none of them itself, is `session_job`); a function
+  that does make the change and is renamed to escape the rule is a finding.
 
 ## The harness a package must SHIP
 
