@@ -66,10 +66,12 @@ import os
 import pathlib
 import sys
 from collections.abc import Sequence
-from typing import Final, Literal, TypedDict
+from enum import StrEnum
+from typing import Final, TypedDict
 
 from platform_core import cli_args
 from platform_core.env_assignments import parse_env_assignments
+from platform_core.members import find_member
 
 from fleet.cli import rolled as rolled_cli
 from fleet.core import _test_hooks, names
@@ -80,26 +82,28 @@ LANE_FLAG: Final = "--lane"
 NODE_FLAG: Final = "--node"
 _FLAGS: Final = (API_ROOT_FLAG, LOG_DIRECTORY_FLAG, LANE_FLAG, NODE_FLAG)
 
-Lane = Literal["hub", "hub-announce", "node", "announce", "elevated", "elevated-announce"]
-_LANES: Final[tuple[Lane, ...]] = (
-    "hub",
-    "hub-announce",
-    "node",
-    "announce",
-    "elevated",
-    "elevated-announce",
-)
+
+class Lane(StrEnum):
+    """The tick a scheduled task runs; each value is its ``--lane`` word."""
+
+    HUB = "hub"
+    HUB_ANNOUNCE = "hub-announce"
+    NODE = "node"
+    ANNOUNCE = "announce"
+    ELEVATED = "elevated"
+    ELEVATED_ANNOUNCE = "elevated-announce"
+
 
 #: The lanes the hub runner serves: its tick and its one-time check-in.
-_HUB_LANES: Final[tuple[Lane, ...]] = ("hub", "hub-announce")
+_HUB_LANES: Final[frozenset[Lane]] = frozenset({Lane.HUB, Lane.HUB_ANNOUNCE})
 
 #: The node lanes that run a node's ELEVATED runner (MCPs board task
 #: a98d7083): its own identity and log, claiming only the jobs requiring the
 #: ``elevated`` tag.
-_ELEVATED_LANES: Final[tuple[Lane, ...]] = ("elevated", "elevated-announce")
+_ELEVATED_LANES: Final[frozenset[Lane]] = frozenset({Lane.ELEVATED, Lane.ELEVATED_ANNOUNCE})
 
 #: The node lanes that post the runner's check-in and claim nothing.
-_ANNOUNCE_LANES: Final[tuple[Lane, ...]] = ("announce", "elevated-announce")
+_ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset({Lane.ANNOUNCE, Lane.ELEVATED_ANNOUNCE})
 
 #: The hub runner's board identity: its label and the session it posts as.
 HUB_AGENT: Final = "fleet-runner-austinpc"
@@ -122,15 +126,16 @@ def require_lane(value: str) -> Lane:
         value: The ``--lane`` value.
 
     Returns:
-        ``hub``, ``node`` or ``announce``.
+        The :class:`Lane` whose word is ``value``.
 
     Raises:
         ValueError: ``FLEET_TICK_USAGE`` for any other value.
     """
-    for lane in _LANES:
-        if value == lane:
-            return lane
-    raise ValueError(f"FLEET_TICK_USAGE: {LANE_FLAG} is one of {list(_LANES)}, not {value!r}")
+    lane = find_member(value, Lane)
+    if lane is not None:
+        return lane
+    words = [member.value for member in Lane]
+    raise ValueError(f"FLEET_TICK_USAGE: {LANE_FLAG} is one of {words}, not {value!r}")
 
 
 class TickPlan(TypedDict):
@@ -166,7 +171,7 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
     repo = str(api_root)
     if lane in _HUB_LANES:
         if node is not None:
-            raise ValueError(f"FLEET_TICK_USAGE: the {lane} lane takes no {NODE_FLAG}")
+            raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane takes no {NODE_FLAG}")
         hub = (
             rolled_cli.REPO_ROOT_FLAG,
             repo,
@@ -180,8 +185,8 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
             "--repo-root",
             repo,
         )
-        if lane == "hub-announce":
-            return TickPlan(arguments=(*hub, "--announce"), stem="fleet-agent", header=lane)
+        if lane is Lane.HUB_ANNOUNCE:
+            return TickPlan(arguments=(*hub, "--announce"), stem="fleet-agent", header=lane.value)
         mcps_root = api_root.parent / "MCPs"
         return TickPlan(
             arguments=(
@@ -192,10 +197,10 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
                 str(mcps_root / "fleet-mcp" / "fleet-nodes.json"),
             ),
             stem="fleet-agent",
-            header=lane,
+            header=lane.value,
         )
     if node is None:
-        raise ValueError(f"FLEET_TICK_USAGE: the {lane} lane needs {NODE_FLAG}")
+        raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane needs {NODE_FLAG}")
     announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
     elevated = lane in _ELEVATED_LANES
     runner = names.runner_name(node, elevated=elevated)
@@ -212,7 +217,7 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
             *announce,
         ),
         stem=f"fleet-node-{runner}",
-        header=f"{lane} {runner}",
+        header=f"{lane.value} {runner}",
     )
 
 
