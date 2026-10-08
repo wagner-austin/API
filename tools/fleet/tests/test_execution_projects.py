@@ -111,10 +111,22 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     project = require_project(workspace, "MCPs/execution-testdb")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX)
     assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
-    assert project["source"]["path"] == "execution"
-    assert project["source"]["companions"] == (
-        ProjectCompanion(
-            remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
+    prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=(
+            InstallStep(phase="install", argv=(*prepare, "install")),
+            InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(
+                phase="test-database",
+                argv=(*prepare, "test-database", "CONTAINER=corvis-fleet-testdb"),
+            ),
+        ),
+        companions=(
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
+            ),
         ),
     )
 
