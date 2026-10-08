@@ -17,14 +17,13 @@ being cheaper than the run it prevents. The solo precondition's own ordering
 from __future__ import annotations
 
 import pathlib
-import runpy
-import sys
 from collections.abc import Generator
+from typing import TypedDict
 
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from platform_core.run_record import decode_run_record
+from platform_core.run_record import RunRecord, decode_run_record
 
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _trait_hooks as trait_hooks
@@ -37,12 +36,17 @@ from model_trainer.core.services.model.cartridge_sweep_checkpoint import checkpo
 from model_trainer.core.services.model.cartridge_trait_plans import TRAIT_SWEEP_PLANS
 from model_trainer.core.services.model.trait_roster import prepare_traits
 from model_trainer.core.types import LMModelProto
+from tests._module_run import run_module_as_main
 from tests._trait_sweep_support import (
     TINY_TRAIT_PLAN,
     fake_trait_reader,
     install_fakes,
     restore_fakes,
 )
+
+#: The module-scoped walk is shared by TestTheWholeGrid, so this file's tests
+#: run on one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_trait_sweep.py")
 
 #: A block, whose output is a tuple. Used only to make the steering cell fail
 #: on purpose, so the checkpoint's contents can be asserted.
@@ -188,28 +192,69 @@ class TestPreparingTheRoster:
         assert all(len(split.held_out) == 6 for split in prepared)
 
 
-class TestTheWholeGrid:
-    """One run, and the rows it must carry."""
+class _Walk(TypedDict):
+    """One ``python -m`` run of the tiny plan, what it wrote and where."""
 
-    def test_the_record_carries_every_family_of_row(self, tmp_path: pathlib.Path) -> None:
+    code: int | str | None
+    record: RunRecord
+    checkpoints: pathlib.Path
+
+
+@pytest.fixture(name="walk", scope="module")
+def _walk(tmp_path_factory: pytest.TempPathFactory) -> _Walk:
+    """Run the tiny plan once through ``python -m``, for :class:`TestTheWholeGrid`.
+
+    Module-scoped, so it runs before the function-scoped ``wired`` fixture
+    and installs the fakes itself.
+
+    Args:
+        tmp_path_factory: Source of the run's own directory.
+
+    Returns:
+        The exit code, the decoded record and the checkpoint directory the
+        command line derived from its output path.
+    """
+    root = tmp_path_factory.mktemp("walk")
+    install_fakes()
+    try:
+        code = run_module_as_main("model_trainer.cli.cartridge_trait_sweep", _argv(root))
+    finally:
+        restore_fakes()
+    text = (root / "nested" / "record.json").read_text(encoding="utf-8")
+    return {
+        "code": code,
+        "record": decode_run_record(load_json_str(text)),
+        "checkpoints": root / "nested" / "checkpoints",
+    }
+
+
+class TestTheWholeGrid:
+    """One run, and the rows it must carry.
+
+    ONE RUN SERVES EVERY TEST HERE BUT THE INTERRUPTED ONE (MCPs board task
+    2f90d785). Six tests each ran this same plan, 3.4 to 11.4 s apiece alone
+    and 66 s for the file in CI: three read ``measure_grid``'s rows or its
+    checkpoints, one ``main()`` and two the console entry and ``python -m``.
+    ``python -m`` runs the ``__main__`` guard, which calls ``entrypoint()``,
+    which calls ``main()`` on the process arguments, which records
+    ``measure_grid``'s rows unchanged and labels them with its digest; so the
+    module-scoped ``walk`` proves every form on one execution, and each test
+    keeps its own assertion on what that execution wrote.
+    """
+
+    def test_the_module_run_exits_zero_with_a_decodable_record(self, walk: _Walk) -> None:
+        """The artifact is the deliverable; a run that wrote nothing is not one."""
+        assert walk["code"] == 0
+        assert walk["record"]["experiment"] == TRAIT_SWEEP_EXPERIMENT
+        assert walk["record"]["label"].startswith("tiny-gpt2-traitsbullets.")
+
+    def test_the_record_carries_every_family_of_row(self, walk: _Walk) -> None:
         """The gate's numbers, the solo cell, the composed cells, the steering.
 
         Asserted by NAME rather than by count, because a count passes while a
         whole family is missing and the name is what a later reader greps for.
-
-        Args:
-            tmp_path: The test's temporary directory.
         """
-        observations, digest = sweep.measure_grid(
-            TINY_TRAIT_PLAN,
-            plan_name="tiny",
-            corpus=tmp_path,
-            device="cpu",
-            checkpoints=tmp_path / "checkpoints",
-            merge=None,
-        )
-        names = {row["name"] for row in observations}
-        assert digest
+        names = {row["name"] for row in walk["record"]["observations"]}
         assert {
             "held_out_pairs",
             "training_pairs",
@@ -228,47 +273,24 @@ class TestTheWholeGrid:
         assert "bullets-steer-n3-coherence_p_value" in names
         assert "composed_expression_noise_floor" in names
 
-    def test_the_gate_numbers_are_the_realised_ones(self, tmp_path: pathlib.Path) -> None:
+    def test_the_gate_numbers_are_the_realised_ones(self, walk: _Walk) -> None:
         """The record must carry the count the run actually scored on.
 
         A plan's cap is an upper bound the corpus may fall short of, and the
         retracted question-set headline came from exactly that gap.
-
-        Args:
-            tmp_path: The test's temporary directory.
         """
-        observations, _digest = sweep.measure_grid(
-            TINY_TRAIT_PLAN,
-            plan_name="tiny",
-            corpus=tmp_path,
-            device="cpu",
-            checkpoints=tmp_path / "checkpoints",
-            merge=None,
-        )
-        values = {row["name"]: row["value"] for row in observations}
+        values = {row["name"]: row["value"] for row in walk["record"]["observations"]}
         assert values["held_out_pairs"] == 6.0
         assert values["training_pairs"] == 6.0
         assert values["resolvable_floor"] == pytest.approx(1.0)
 
-    def test_a_completed_run_leaves_no_checkpoint_behind(self, tmp_path: pathlib.Path) -> None:
+    def test_a_completed_run_leaves_no_checkpoint_behind(self, walk: _Walk) -> None:
         """A leftover file is indistinguishable from an interrupted run.
 
         The next submission would skip cells it should have re-measured.
-
-        Args:
-            tmp_path: The test's temporary directory.
         """
-        checkpoints = tmp_path / "checkpoints"
-        sweep.measure_grid(
-            TINY_TRAIT_PLAN,
-            plan_name="tiny",
-            corpus=tmp_path,
-            device="cpu",
-            checkpoints=checkpoints,
-            merge=None,
-        )
-        assert not checkpoint_path(checkpoints, "trait-tiny-anchor").exists()
-        assert not checkpoint_path(checkpoints, "trait-tiny-composed").exists()
+        assert not checkpoint_path(walk["checkpoints"], "trait-tiny-anchor").exists()
+        assert not checkpoint_path(walk["checkpoints"], "trait-tiny-composed").exists()
 
     def test_an_interrupted_run_keeps_the_cells_it_finished(self, tmp_path: pathlib.Path) -> None:
         """The hours an eviction cannot take are the ones already written.
@@ -328,20 +350,7 @@ class TestHookDefaults:
 
 
 class TestInvocationForms:
-    """The console entry and `python -m` must both measure and write."""
-
-    def test_main_writes_a_decodable_record(self, tmp_path: pathlib.Path) -> None:
-        """The artifact is the deliverable; a run that wrote nothing is not one.
-
-        Args:
-            tmp_path: The test's temporary directory.
-        """
-        assert sweep.main(_argv(tmp_path)) == 0
-        restored = decode_run_record(
-            load_json_str((tmp_path / "nested" / "record.json").read_text(encoding="utf-8"))
-        )
-        assert restored["experiment"] == TRAIT_SWEEP_EXPERIMENT
-        assert restored["label"].startswith("tiny-gpt2-traitsbullets.")
+    """A command line naming no plan this table holds is refused by name."""
 
     def test_an_unknown_plan_names_the_ones_that_exist(self, tmp_path: pathlib.Path) -> None:
         """A mistyped plan's answer is nearly always the list.
@@ -357,44 +366,3 @@ class TestInvocationForms:
                 checkpoints=tmp_path / "checkpoints",
                 merge=None,
             )
-
-    def test_the_console_entry_point_runs_and_exits_zero(self, tmp_path: pathlib.Path) -> None:
-        """The installed command must be the same measurement.
-
-        Args:
-            tmp_path: The test's temporary directory.
-        """
-        saved = sys.argv
-        sys.argv = ["modeltrainer-cartridge-trait-sweep", *_argv(tmp_path)]
-        try:
-            with pytest.raises(SystemExit) as excinfo:
-                sweep.entrypoint()
-        finally:
-            sys.argv = saved
-
-        assert excinfo.value.code == 0
-        assert (tmp_path / "nested" / "record.json").is_file()
-
-    def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
-        """Without the ``__main__`` guard this imports, runs nothing and exits 0.
-
-        Args:
-            tmp_path: The test's temporary directory.
-        """
-        module_name = "model_trainer.cli.cartridge_trait_sweep"
-        saved_argv = sys.argv
-        saved_module = sys.modules.pop(module_name, None)
-        sys.argv = ["x", *_argv(tmp_path)]
-        try:
-            with pytest.raises(SystemExit) as raised:
-                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
-        finally:
-            sys.argv = saved_argv
-            if saved_module is not None:
-                sys.modules[module_name] = saved_module
-
-        assert raised.value.code == 0
-        restored = decode_run_record(
-            load_json_str((tmp_path / "nested" / "record.json").read_text(encoding="utf-8"))
-        )
-        assert restored["experiment"] == TRAIT_SWEEP_EXPERIMENT
