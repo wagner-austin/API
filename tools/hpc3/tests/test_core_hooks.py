@@ -9,6 +9,7 @@ not satisfy would otherwise pass the whole suite.
 from __future__ import annotations
 
 import pathlib
+import subprocess
 import sys
 from collections.abc import Sequence
 
@@ -19,23 +20,33 @@ from hpc3.core import _test_hooks as core_hooks
 
 
 class TestRealRun:
+    """The production runner itself, called by name rather than through ``run``.
+
+    ``run`` is the hook every other test rebinds, so a case reaching the
+    runner through it runs whatever the last binding left there; naming the
+    implementation is what makes these the runner's real twins
+    (``effect-seam-twin``, board task cc7222ca).
+    """
+
     def test_it_captures_stdout_and_a_zero_exit(self) -> None:
-        result = core_hooks.run([sys.executable, "-c", "print('hello')"])
+        result = core_hooks._default_run([sys.executable, "-c", "print('hello')"])
         assert result["returncode"] == 0
         assert "hello" in result["stdout"]
         assert result["stderr"] == ""
 
     def test_it_returns_a_non_zero_exit_rather_than_raising(self) -> None:
         """The caller decides what a failure means; the runner does not."""
-        result = core_hooks.run([sys.executable, "-c", "raise SystemExit(3)"])
+        result = core_hooks._default_run([sys.executable, "-c", "raise SystemExit(3)"])
         assert result["returncode"] == 3
 
     def test_it_captures_stderr(self) -> None:
-        result = core_hooks.run([sys.executable, "-c", "import sys; sys.stderr.write('bad')"])
+        result = core_hooks._default_run(
+            [sys.executable, "-c", "import sys; sys.stderr.write('bad')"]
+        )
         assert "bad" in result["stderr"]
 
     def test_it_writes_stdin_bytes_to_the_process(self) -> None:
-        result = core_hooks.run(
+        result = core_hooks._default_run(
             [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"],
             stdin_bytes=b"piped",
         )
@@ -43,11 +54,25 @@ class TestRealRun:
 
     def test_undecodable_output_is_replaced_not_lost(self) -> None:
         """A mangled character in a diagnostic beats losing the diagnostic."""
-        result = core_hooks.run(
+        result = core_hooks._default_run(
             [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'\\xff\\xfe')"]
         )
         assert result["returncode"] == 0
         assert result["stdout"] != ""
+
+    def test_the_awaited_child_reports_a_failing_exit_and_its_reason(self) -> None:
+        """The layer under the payload handling, against a closed stdin.
+
+        An ssh refused by the cluster exits 255 with its reason on stderr;
+        this child does the same so the status and the stream both arrive.
+        """
+        result = core_hooks._awaited(
+            [sys.executable, "-c", "import sys; sys.stderr.write('refused'); sys.exit(255)"],
+            stdin_source=subprocess.DEVNULL,
+        )
+        assert result["returncode"] == 255
+        assert result["stderr"] == "refused"
+        assert result["stdout"] == ""
 
 
 class TestRealFileHooks:
