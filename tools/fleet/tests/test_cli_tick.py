@@ -65,7 +65,7 @@ class TestTheLanes:
     def test_the_hub_lane_runs_the_fleet_agent_as_the_hub_runner(self) -> None:
         root = pathlib.Path("C:/Users/Test/PROJECTS/API")
         mcps = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
-        assert tick.plan_tick(root, "hub", None) == tick.TickPlan(
+        assert tick.plan_tick(root, tick.Lane.HUB, None) == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -92,7 +92,7 @@ class TestTheLanes:
     # once, into the hub's own log, and claims nothing.
     def test_the_hub_announce_lane_checks_the_hub_runner_in_and_claims_nothing(self) -> None:
         root = pathlib.Path("C:/Users/Test/PROJECTS/API")
-        assert tick.plan_tick(root, "hub-announce", None) == tick.TickPlan(
+        assert tick.plan_tick(root, tick.Lane.HUB_ANNOUNCE, None) == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -113,7 +113,7 @@ class TestTheLanes:
 
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:
         root = pathlib.Path("C:/api")
-        assert tick.plan_tick(root, "node", "sedona") == tick.TickPlan(
+        assert tick.plan_tick(root, tick.Lane.NODE, "sedona") == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -128,7 +128,7 @@ class TestTheLanes:
         )
 
     def test_the_announce_lane_checks_in_and_shares_its_nodes_log(self) -> None:
-        plan = tick.plan_tick(pathlib.Path("C:/api"), "announce", "sedona")
+        plan = tick.plan_tick(pathlib.Path("C:/api"), tick.Lane.ANNOUNCE, "sedona")
         assert plan["arguments"][-3:] == ("--node", "sedona", "--announce")
         assert plan["stem"] == "fleet-node-sedona"
         assert plan["header"] == "announce sedona"
@@ -138,9 +138,13 @@ class TestTheLanes:
     @pytest.mark.parametrize(
         ("lane", "tail", "header"),
         [
-            ("elevated", ("--node", "serendipity", "--elevated"), "elevated serendipity-elevated"),
             (
-                "elevated-announce",
+                tick.Lane.ELEVATED,
+                ("--node", "serendipity", "--elevated"),
+                "elevated serendipity-elevated",
+            ),
+            (
+                tick.Lane.ELEVATED_ANNOUNCE,
                 ("--node", "serendipity", "--elevated", "--announce"),
                 "elevated-announce serendipity-elevated",
             ),
@@ -154,21 +158,39 @@ class TestTheLanes:
         assert plan["stem"] == "fleet-node-serendipity-elevated"
         assert plan["header"] == header
 
-    @pytest.mark.parametrize("lane", ["hub", "hub-announce"])
-    def test_a_hub_lane_naming_a_node_is_refused(self, lane: tick.Lane) -> None:
+    @pytest.mark.parametrize(
+        ("lane", "word"), [(tick.Lane.HUB, "hub"), (tick.Lane.HUB_ANNOUNCE, "hub-announce")]
+    )
+    def test_a_hub_lane_naming_a_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
             tick.plan_tick(pathlib.Path("C:/api"), lane, "sedona")
-        assert str(refused.value) == f"FLEET_TICK_USAGE: the {lane} lane takes no --node"
+        assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane takes no --node"
 
-    @pytest.mark.parametrize("lane", ["node", "announce", "elevated", "elevated-announce"])
-    def test_a_node_lane_naming_no_node_is_refused(self, lane: tick.Lane) -> None:
+    @pytest.mark.parametrize(
+        ("lane", "word"),
+        [
+            (tick.Lane.NODE, "node"),
+            (tick.Lane.ANNOUNCE, "announce"),
+            (tick.Lane.ELEVATED, "elevated"),
+            (tick.Lane.ELEVATED_ANNOUNCE, "elevated-announce"),
+        ],
+    )
+    def test_a_node_lane_naming_no_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
             tick.plan_tick(pathlib.Path("C:/api"), lane, None)
-        assert str(refused.value) == f"FLEET_TICK_USAGE: the {lane} lane needs --node"
+        assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane needs --node"
 
-    def test_each_lane_name_is_accepted_and_nothing_else(self) -> None:
+    def test_each_lane_word_narrows_to_its_member_and_nothing_else_does(self) -> None:
         names = ("hub", "hub-announce", "node", "announce", "elevated", "elevated-announce")
-        assert [tick.require_lane(name) for name in names] == list(names)
+        assert [tick.require_lane(name) for name in names] == [
+            tick.Lane.HUB,
+            tick.Lane.HUB_ANNOUNCE,
+            tick.Lane.NODE,
+            tick.Lane.ANNOUNCE,
+            tick.Lane.ELEVATED,
+            tick.Lane.ELEVATED_ANNOUNCE,
+        ]
+        assert all(type(tick.require_lane(name)) is tick.Lane for name in names)
         with pytest.raises(ValueError) as refused:
             tick.require_lane("agent")
         assert str(refused.value) == (
