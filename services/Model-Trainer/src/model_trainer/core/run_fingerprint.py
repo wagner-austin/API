@@ -52,6 +52,9 @@ from model_trainer.core import _test_hooks
 
 CUDA_DEVICE = "cuda"
 
+#: The program the driver version is read from, found on the PATH.
+NVIDIA_SMI = "nvidia-smi"
+
 #: The libraries whose arithmetic decides this service's numbers.
 #:
 #: Not every installed distribution. A fingerprint over all of them would
@@ -123,7 +126,7 @@ def capture_run_fingerprint(
     return RunFingerprint(
         image_digest=digest if digest is not None else NO_GPU,
         gpu_model=_test_hooks.cuda_device_name() if on_cuda else NO_GPU,
-        driver_version=_test_hooks.cuda_driver_version() if on_cuda else NO_GPU,
+        driver_version=_test_hooks.cuda_driver_version(NVIDIA_SMI) if on_cuda else NO_GPU,
         determinism=determinism,
         host=capture_host_record(_test_hooks.host_probe()),
         packages=capture_package_versions(distributions, _test_hooks.installed_version),

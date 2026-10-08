@@ -14,6 +14,8 @@ import importlib.metadata
 import os
 import platform
 import re
+import subprocess
+import sys
 from collections.abc import Generator
 
 import pytest
@@ -38,6 +40,7 @@ from model_trainer.core.run_fingerprint import (
     CUDA_DEVICE,
     FINGERPRINT_DISTRIBUTIONS,
     NO_GPU,
+    NVIDIA_SMI,
     capture_run_fingerprint,
     describe_run_fingerprint,
 )
@@ -67,8 +70,8 @@ class _Recorder:
         self.calls.append("device_name")
         return self.name
 
-    def driver_version(self) -> str:
-        self.calls.append("driver_version")
+    def driver_version(self, nvidia_smi: str) -> str:
+        self.calls.append(f"driver_version {nvidia_smi}")
         return self.driver
 
 
@@ -146,6 +149,7 @@ def test_a_cuda_run_records_the_card_and_the_driver() -> None:
         "host": SAMPLE_HOST,
         "packages": _SAMPLE_VERSIONS,
     }
+    assert rec.calls[-1] == "driver_version nvidia-smi"
 
 
 @pytest.mark.usefixtures("restore_hooks")
@@ -203,12 +207,24 @@ def test_the_driver_hook_reads_the_real_driver_not_the_cuda_toolkit() -> None:
     (12.4 here), not the driver (591.86), and it would sail through any
     non-empty check while making two different drivers compare equal.
     """
-    version = _default_cuda_driver_version()
+    version = _default_cuda_driver_version(NVIDIA_SMI)
 
     match = re.fullmatch(r"\d+(\.\d+)+", version)
     if match is None:
         raise AssertionError(f"driver version is not a version number: {version!r}")
     assert match.group(0) == version
+
+
+def test_the_driver_hook_raises_when_the_query_is_refused() -> None:
+    """A query the program refuses is raised, never recorded as a version.
+
+    The interpreter stands in for a broken nvidia-smi: it rejects the query
+    flags with exit 2, the same path a driver that cannot answer takes.
+    """
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        _default_cuda_driver_version(sys.executable)
+
+    assert caught.value.returncode == 2
 
 
 def test_describe_names_the_three_fields_a_reader_compares() -> None:

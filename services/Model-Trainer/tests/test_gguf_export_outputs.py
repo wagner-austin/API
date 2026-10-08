@@ -199,6 +199,40 @@ class TestRealGgufConverter:
 
         export_hooks.reset_hooks()
 
+    def test_real_converter_raises_with_the_script_s_words_on_a_nonzero_exit(
+        self, tmp_path: Path
+    ) -> None:
+        """A conversion script that fails is raised with what it said.
+
+        The failure is the script's own exit 2, not a missing script or a
+        missing adapter, so the raise is the converter reading a real
+        nonzero exit.
+        """
+        from model_trainer.core.services.export._test_hooks import _real_gguf_converter
+
+        script = tmp_path / "failing_convert.py"
+        script.write_text(
+            "import sys\nsys.stderr.write('adapter_config.json not found')\nsys.exit(2)\n"
+        )
+
+        def failing_paths() -> tuple[Path, ...]:
+            return (script,)
+
+        export_hooks.convert_script_paths = failing_paths
+        output_path = tmp_path / "output.gguf"
+
+        with pytest.raises(RuntimeError) as exc:
+            _real_gguf_converter(
+                adapter_dir=str(tmp_path / "adapter"),
+                base_model_id="model",
+                output_path=str(output_path),
+                output_type="f16",
+            )
+
+        assert str(exc.value) == "GGUF conversion failed: adapter_config.json not found"
+        assert not output_path.exists()
+        export_hooks.reset_hooks()
+
 
 class TestQueueEncodingGgufExportInvalidType:
     """Tests for gguf_export decoding with invalid types."""

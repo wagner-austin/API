@@ -11,7 +11,14 @@ check is a branch no caller can reach and no machine with a GPU can execute.
 
 from __future__ import annotations
 
+from typing import Final
+
 import torch
+
+#: Wall-clock bound on one ``nvidia-smi`` query. It answers in well under a
+#: second on a healthy driver; a wedged one is exactly when it hangs, and an
+#: unbounded query held the run that asked (board task cc7222ca).
+NVIDIA_SMI_WALL_SECONDS: Final[int] = 60
 
 
 def _default_cuda_is_available() -> bool:
@@ -50,7 +57,7 @@ def _default_sdpa_cuda_eligibility(
     }
 
 
-def _default_cuda_driver_version() -> str:
+def _default_cuda_driver_version(nvidia_smi: str) -> str:
     """Production cuda_driver_version - used as default hook.
 
     Read from ``nvidia-smi`` rather than from torch. ``torch.version.cuda``
@@ -66,18 +73,29 @@ def _default_cuda_driver_version() -> str:
     for a run that HAD a driver would make two different configurations
     compare equal, which is the one outcome this field exists to prevent.
 
+    The executable is the caller's argument (``run_fingerprint.NVIDIA_SMI``)
+    so the production query can be run, in a test, against a program that
+    refuses its flags: the failure path of the real implementation, on any
+    machine, GPU or not.
+
+    Args:
+        nvidia_smi: The ``nvidia-smi`` executable to ask.
+
     Returns:
         The NVIDIA driver version, e.g. ``"591.86"``.
 
     Raises:
         CalledProcessError: When nvidia-smi exits non-zero.
         FileNotFoundError: When nvidia-smi is not present.
+        TimeoutExpired: When it has not answered within
+            :data:`NVIDIA_SMI_WALL_SECONDS`, after it is killed.
     """
     import subprocess as _sp
 
     out = _sp.check_output(
-        ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+        [nvidia_smi, "--query-gpu=driver_version", "--format=csv,noheader"],
         stderr=_sp.DEVNULL,
+        timeout=NVIDIA_SMI_WALL_SECONDS,
     )
     return out.decode("utf-8").strip().splitlines()[0].strip()
 

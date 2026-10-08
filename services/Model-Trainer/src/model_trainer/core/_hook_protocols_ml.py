@@ -110,8 +110,15 @@ class CudaDriverVersionProto(Protocol):
     other is a driver difference rather than a broken image.
     """
 
-    def __call__(self) -> str:
-        """Get the NVIDIA driver version. Callers gate on cuda_is_available."""
+    def __call__(self, nvidia_smi: str) -> str:
+        """Get the NVIDIA driver version. Callers gate on cuda_is_available.
+
+        Args:
+            nvidia_smi: The ``nvidia-smi`` executable to ask.
+
+        Returns:
+            The driver version, e.g. ``"591.86"``.
+        """
         ...
 
 
