@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from platform_core.json_utils import (
     dump_json_str,
     narrow_json_to_dict,
@@ -14,6 +15,10 @@ from platform_core.json_utils import (
 
 from covenant_radar_api.worker.train_external_job import run_external_training
 from tests._real_datasets import copy_real_polish, copy_real_taiwan, copy_real_us
+
+# Trains torch models: shares one xdist worker with the other torch modules
+# (tests/conftest.py, pytest_itemcollected).
+pytestmark = pytest.mark.xdist_group("torch")
 
 
 class TestXGBoostTraining:

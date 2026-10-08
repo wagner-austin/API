@@ -29,6 +29,10 @@ from tests._worker_entry_fixtures import (
     _RecordingLogger,
 )
 
+# Loads torch models: shares one xdist worker with the other torch modules
+# (tests/conftest.py, pytest_itemcollected).
+pytestmark = pytest.mark.xdist_group("torch")
+
 
 @pytest.fixture()
 def restore_hooks() -> Generator[None, None, None]:

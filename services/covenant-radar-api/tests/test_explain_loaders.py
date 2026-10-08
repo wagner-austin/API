@@ -30,6 +30,10 @@ from tests._explain_loaders_fixtures import (
     _TorchSaveFn,
 )
 
+# Builds torch models: shares one xdist worker with the other torch modules
+# (tests/conftest.py, pytest_itemcollected).
+pytestmark = pytest.mark.xdist_group("torch")
+
 
 class TestLoadModelForBackendXGBoost:
     """Tests for load_model_for_backend with XGBoost."""

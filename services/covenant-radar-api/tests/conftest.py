@@ -256,6 +256,33 @@ def make_route_test_client(router: APIRouter) -> TestClient:
 
 
 # =============================================================================
+# xdist Scheduling
+# =============================================================================
+
+
+def pytest_itemcollected(item: pytest.Item) -> None:
+    """Give a test without an ``xdist_group`` its module as its group.
+
+    The suite runs under ``--dist loadgroup`` (pyproject.toml), which keeps the
+    tests of one group on one xdist worker. A module therefore still runs on one
+    worker, as it did under ``--dist loadscope``, and pays the libraries its code
+    imports lazily once. The few modules that train or load torch models share
+    the ``torch`` group instead, so only one worker imports torch and the
+    ``torch._dynamo`` that every optimizer step pulls in: on serendipity both
+    workers paid them, 16.9 s and 17.6 s of first calls on one and 4.4 s and
+    8.2 s on the other (fleet job 95800201, board task dbbb9758). Collection
+    calls this for each test as it is collected, before the
+    ``pytest_collection_modifyitems`` in which xdist reads the marks to suffix
+    each node id with its group.
+
+    Args:
+        item: The test just collected, marked in place.
+    """
+    if item.get_closest_marker("xdist_group") is None:
+        item.add_marker(pytest.mark.xdist_group(item.nodeid.split("::")[0]))
+
+
+# =============================================================================
 # Pytest Fixtures
 # =============================================================================
 

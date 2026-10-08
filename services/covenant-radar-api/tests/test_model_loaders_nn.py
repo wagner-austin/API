@@ -20,6 +20,10 @@ from covenant_radar_api.worker._model_loaders import (
     load_mlp_model,
 )
 
+# Builds torch models: shares one xdist worker with the other torch modules
+# (tests/conftest.py, pytest_itemcollected).
+pytestmark = pytest.mark.xdist_group("torch")
+
 
 class TestLoadMlpModel:
     """Tests for load_mlp_model function."""
