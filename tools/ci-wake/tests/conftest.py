@@ -136,20 +136,11 @@ class FakeGh:
         self._replies = dict(replies)
         self.calls = []
 
-    def __call__(
-        self,
-        args: Sequence[str],
-        *,
-        capture_output: bool,
-        text: bool,
-        timeout: int,
-    ) -> FakeCompleted:
+    def __call__(self, args: Sequence[str], *, timeout: int) -> FakeCompleted:
         """Answer one scripted command.
 
         Args:
             args: The argument vector.
-            capture_output: Ignored; asserted by the caller's tests.
-            text: Ignored; asserted by the caller's tests.
             timeout: Ignored; asserted by the caller's tests.
 
         Returns:

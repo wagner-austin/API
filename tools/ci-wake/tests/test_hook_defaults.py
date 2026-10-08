@@ -9,6 +9,7 @@ is a seam whose production side is untested.
 from __future__ import annotations
 
 import pathlib
+import subprocess
 import sys
 import time
 from collections.abc import Sequence
@@ -66,10 +67,8 @@ class TestRunProcess:
         """Against a real subprocess, because the whole ``gh`` boundary is
         three fields off a finished process and a fake proves nothing about
         which three :mod:`subprocess` actually populates."""
-        completed = _test_hooks.run_process(
+        completed = _test_hooks._default_run_process(
             [sys.executable, "-c", "import sys; print('out'); print('err', file=sys.stderr)"],
-            capture_output=True,
-            text=True,
             timeout=30,
         )
 
@@ -81,14 +80,21 @@ class TestRunProcess:
         """``check=True`` would raise a ``CalledProcessError`` whose message
         is the argv and nothing else, and the useful half -- the CLI's own
         words on stderr -- would have to be recovered from an attribute."""
-        completed = _test_hooks.run_process(
-            [sys.executable, "-c", "import sys; sys.exit(7)"],
-            capture_output=True,
-            text=True,
+        completed = _test_hooks._default_run_process(
+            [sys.executable, "-c", "import sys; sys.stderr.write('not logged in'); sys.exit(7)"],
             timeout=30,
         )
 
         assert completed.returncode == 7
+        assert completed.stderr == "not logged in"
+
+    def test_a_process_past_its_timeout_is_killed_and_raises(self) -> None:
+        """A ``gh`` that never answers ends the cycle loudly instead of
+        holding the pump: the scheduler records the failure."""
+        with pytest.raises(subprocess.TimeoutExpired):
+            _test_hooks._default_run_process(
+                [sys.executable, "-c", "import time; time.sleep(30)"], timeout=1
+            )
 
 
 class TestReportAndClock:
@@ -135,9 +141,7 @@ class TestReset:
         def _swallow(path: pathlib.Path, line: str) -> None:
             held.append(line)
 
-        def _no_process(
-            args: Sequence[str], *, capture_output: bool, text: bool, timeout: int
-        ) -> _test_hooks.CompletedProto:
+        def _no_process(args: Sequence[str], *, timeout: int) -> _test_hooks.CompletedProto:
             raise AssertionError("should have been reset")
 
         original_post = _test_hooks.http_post

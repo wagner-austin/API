@@ -145,23 +145,20 @@ class TestGhJson:
 
         assert decode_runs(gh_json(argv))[0]["workflow"] == "Check"
 
-    def test_it_asks_for_captured_text_within_the_timeout(self) -> None:
-        """The three arguments are the contract with :mod:`subprocess`, and
-        a cycle that forgot ``capture_output`` would read an empty stdout and
-        report every push as having no runs."""
+    def test_it_asks_within_the_timeout(self) -> None:
+        """The deadline is the boundary's to name; capturing both streams as
+        text is the runner's own, run for real in ``test_hook_defaults``."""
         argv = runs_argv(REPO, SHA)
-        recorded: list[tuple[bool, bool, int]] = []
+        recorded: list[tuple[tuple[str, ...], int]] = []
 
-        def _run_process(
-            args: Sequence[str], *, capture_output: bool, text: bool, timeout: int
-        ) -> FakeCompleted:
-            recorded.append((capture_output, text, timeout))
+        def _run_process(args: Sequence[str], *, timeout: int) -> FakeCompleted:
+            recorded.append((tuple(args), timeout))
             return FakeCompleted(stdout=dump_json_str(_listing()))
 
         _test_hooks.run_process = _run_process
         gh_json(argv)
 
-        assert recorded == [(True, True, GH_TIMEOUT_SECONDS)]
+        assert recorded == [(argv, GH_TIMEOUT_SECONDS)]
 
     def test_a_non_zero_exit_refuses_and_carries_the_cli_s_own_words(self) -> None:
         """Not caught, not retried. ``gh`` reports absence, being logged out
