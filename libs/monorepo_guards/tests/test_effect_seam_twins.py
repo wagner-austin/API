@@ -1,14 +1,16 @@
-"""Tests for finding each effect seam's real tests and their failure evidence."""
+"""Tests for finding each effect seam's real tests and the failures they name."""
 
 from __future__ import annotations
 
-import ast
-import textwrap
 from pathlib import Path
 
-from monorepo_guards.effect_seam_twins import RealTest, failure_evidence, real_tests
+from monorepo_guards.effect_failures import PROCESS
+from monorepo_guards.effect_seam_twins import RealTest, real_tests
 from monorepo_guards.effect_seams import effect_seams, index_package
 from tests._effect_support import files_of, write
+
+PROCESS_FAILURE = frozenset({PROCESS})
+NO_FAILURE: frozenset[str] = frozenset()
 
 HOOKS = """
 import subprocess
@@ -39,58 +41,6 @@ def _real(root: Path) -> dict[tuple[str, str], list[RealTest]]:
     files = files_of(root)
     index = index_package(files, root)
     return real_tests(files, root, index, effect_seams(index))
-
-
-def _fails(source: str) -> bool:
-    """Read failure evidence from one function's source.
-
-    Args:
-        source: A function definition.
-
-    Returns:
-        Whether it names a failure.
-    """
-    return failure_evidence(ast.parse(textwrap.dedent(source)))
-
-
-class TestFailureEvidence:
-    def test_failure_names_attributes_and_keys(self) -> None:
-        assert _fails("with raises(subprocess.TimeoutExpired):\n    pass\n")
-        assert _fails("assert result.timed_out\n")
-        assert _fails('assert result["killed"] is True\n')
-        assert _fails("raise ConnectError\n")
-        assert _fails("with raises(PermissionError):\n    pass\n")
-        assert not _fails("timed_out = False\n")
-        assert not _fails('assert result["stdout"] == "x"\n')
-        assert not _fails("value = items[0]\n")
-
-    def test_kill_calls_and_nonzero_exit_text(self) -> None:
-        assert _fails("child.terminate()\n")
-        assert _fails('script = "import sys; sys.exit(3)"\n')
-        assert _fails('script = "process.exit(1)"\n')
-        assert _fails('script = "exit 2"\n')
-        assert not _fails('script = "sys.exit(0)"\n')
-        assert not _fails("make()()\n")
-
-    def test_exit_code_comparisons(self) -> None:
-        assert _fails("assert result.returncode == 3\n")
-        assert _fails("assert 3 == result.returncode\n")
-        assert _fails('assert result["returncode"] != 0\n')
-        assert _fails("assert result.exit_code > 0\n")
-        assert _fails("assert 0 < result.code\n")
-        assert not _fails("assert result.returncode == 0\n")
-        assert not _fails("assert result.returncode != 1\n")
-        assert not _fails("assert result.returncode > 1\n")
-        assert not _fails("assert 0 > result.code\n")
-        assert not _fails("assert result.returncode == expected\n")
-        assert not _fails("assert result.returncode == True\n")
-        assert not _fails("assert size == 3\n")
-
-    def test_status_comparisons(self) -> None:
-        assert _fails("assert response.status_code == 503\n")
-        assert _fails("assert 404 == response.status\n")
-        assert not _fails("assert response.status_code == 200\n")
-        assert not _fails("assert response.status == expected\n")
 
 
 class TestRealTests:
@@ -125,13 +75,15 @@ class TestRealTests:
         )
         found = _real(tmp_path)
         assert found[("pkg._test_hooks", "_default_kill")] == [
-            RealTest("tests/test_real.py::test_named_kill_of_a_dead_pid", True)
+            RealTest("tests/test_real.py::test_named_kill_of_a_dead_pid", PROCESS_FAILURE)
         ]
         assert found[("pkg._test_hooks", "_default_run")] == [
-            RealTest("tests/test_real.py::test_module_object_run_success", False)
+            RealTest("tests/test_real.py::test_module_object_run_success", NO_FAILURE)
         ]
         assert found[("pkg._test_hooks", "default_hooks.spawn")] == [
-            RealTest("tests/test_real.py::TestFactory.test_spawn_through_the_bundle", True)
+            RealTest(
+                "tests/test_real.py::TestFactory.test_spawn_through_the_bundle", PROCESS_FAILURE
+            )
         ]
 
     def test_the_rebindable_hook_is_not_the_implementation(self, tmp_path: Path) -> None:
@@ -175,8 +127,8 @@ class TestRealTests:
         )
         found = _real(tmp_path)
         assert found[("pkg._test_hooks", "_default_run")] == [
-            RealTest("tests/test_bundle.py::test_assigned_bundle_field", True),
-            RealTest("tests/test_bundle.py::test_whole_bundle_handed_over", False),
+            RealTest("tests/test_bundle.py::test_assigned_bundle_field", PROCESS_FAILURE),
+            RealTest("tests/test_bundle.py::test_whole_bundle_handed_over", NO_FAILURE),
         ]
 
     def test_helpers_and_fixtures_reach_but_only_helpers_carry_failure(
@@ -229,8 +181,8 @@ class TestRealTests:
         )
         found = _real(tmp_path)
         assert found[("pkg._test_hooks", "_default_run")] == [
-            RealTest("tests/sub/test_reach.py::test_through_a_helper", True),
-            RealTest("tests/sub/test_reach.py::test_through_a_fixture", False),
+            RealTest("tests/sub/test_reach.py::test_through_a_helper", PROCESS_FAILURE),
+            RealTest("tests/sub/test_reach.py::test_through_a_fixture", NO_FAILURE),
         ]
 
     def test_a_local_fixture_shadows_a_conftest_one(self, tmp_path: Path) -> None:
