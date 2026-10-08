@@ -49,8 +49,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
         and name not in prepared
     )
 
-    # 54 since MCPs/sms-gateway joined (MCPs board task 1da15750).
-    assert len(prepared) == 54
+    # 54 since MCPs/sms-gateway joined (MCPs board task 1da15750); 55 since
+    # MCPs/execution-testdb, the execution suite's testdb lane (MCPs board
+    # task c04519f9, A2).
+    assert len(prepared) == 55
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -70,7 +72,8 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
         if step["argv"][:4] == PREPARE and step["argv"][4] == "test-database"
     ]
 
-    assert len(databases) == 27
+    # 28 since MCPs/execution-testdb (MCPs board task c04519f9, A2).
+    assert len(databases) == 28
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
