@@ -41,7 +41,7 @@ from fleet.cli import _config
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.toolchain import describe_gap, is_ready
 from fleet.contracts.workspace import require_node
-from fleet.core import toolchain
+from fleet.core import toolchain, toolchain_install
 
 _log = get_logger(__name__)
 
@@ -76,11 +76,11 @@ def bootstrap_node(name: str, node: NodeConfig, *, install: bool) -> tuple[str, 
     if not install:
         return describe_gap(name, reports), is_ready(reports)
 
-    installed = toolchain.install_missing(node, reports)
+    installed = toolchain_install.installable(reports)
     if not installed:
         return describe_gap(name, reports), is_ready(reports)
 
-    after = toolchain.probe_toolchain(node, writer=PROBE_WRITER)
+    after = toolchain_install.install_missing(node, reports, writer=PROBE_WRITER)
     return (
         f"{describe_gap(name, after)} (installed {', '.join(installed)})",
         is_ready(after),

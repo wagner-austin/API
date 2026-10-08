@@ -11,19 +11,22 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodePlatform
+from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.tagged_tools import TAGGED_TOOLS
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
     PINNED_PYTHON,
     PYTHON_REGISTERED_GUARD,
     REQUIRED_PYTHON,
+    REQUIRED_TOOLS,
     ToolReport,
     available_managers,
     install_command,
     missing,
     python_is_right,
+    uninstall_command,
 )
-from fleet.core import _test_hooks, toolchain
+from fleet.core import _test_hooks, toolchain, toolchain_install
 from tests._toolchain_fixtures import (
     DIPHTHERIA_2026_09_23,
     LAVENDER_2026_09_23,
@@ -132,7 +135,7 @@ class TestInstall:
             ToolReport(name="choco", present=True, version="2.7.4"),
         )
 
-        assert toolchain.installable(reports) == ("python", "make")
+        assert toolchain_install.installable(reports) == ("python", "make")
 
     def test_a_node_behind_the_store_alias_is_offered_the_real_python(self) -> None:
         """LAVENDER'S RUNNER, 2026-09-22/23: python resolved to the WindowsApps
@@ -145,8 +148,8 @@ class TestInstall:
         node."""
         reports = toolchain.parse_probe(LAVENDER_STORE_STUB)
 
-        assert toolchain.installable(reports) == ("python",)
-        body = toolchain.install_script(
+        assert toolchain_install.installable(reports) == ("python",)
+        body = toolchain_install.install_script(
             ("python",), available_managers(reports), platform=NodePlatform.WINDOWS
         )
         assert "Write-Output 'installing python'" in body
@@ -156,7 +159,7 @@ class TestInstall:
     def test_todays_nodes_need_nothing(self) -> None:
         for answer in (LAVENDER_2026_09_23, SEDONA_2026_09_23, DIPHTHERIA_2026_09_23):
             reports = toolchain.parse_probe(answer)
-            assert toolchain.installable(reports) == ()
+            assert toolchain_install.installable(reports) == ()
             assert missing(reports) == ()
             assert python_is_right(reports)
 
@@ -173,11 +176,11 @@ class TestInstall:
             ToolReport(name="choco", present=False, version=""),
         )
 
-        assert toolchain.installable(reports) == ()
+        assert toolchain_install.installable(reports) == ()
 
     def test_the_install_script_echoes_each_step(self) -> None:
         """So a transcript says which command produced which failure."""
-        body = toolchain.install_script(
+        body = toolchain_install.install_script(
             ("poetry", "make"), ("pip", "choco"), platform=NodePlatform.WINDOWS
         )
 
@@ -186,7 +189,7 @@ class TestInstall:
         assert "choco install make -y" in body
 
     def test_a_linux_node_gets_sh_echoes_and_its_own_managers(self) -> None:
-        body = toolchain.install_script(
+        body = toolchain_install.install_script(
             ("poetry", "make"), ("pipx", "apt-get"), platform=NodePlatform.LINUX
         )
 
@@ -203,10 +206,10 @@ class TestInstall:
         generalised to three. lavender has no choco at all, so that command
         would have failed there with choco's own 'not recognized'.
         """
-        on_lavender = toolchain.install_script(
+        on_lavender = toolchain_install.install_script(
             ("make",), ("pip", "winget"), platform=NodePlatform.WINDOWS
         )
-        on_loki = toolchain.install_script(
+        on_loki = toolchain_install.install_script(
             ("make",), ("pip", "choco"), platform=NodePlatform.WINDOWS
         )
 
@@ -220,32 +223,35 @@ class TestInstall:
         it claimed, and the caller would re-probe to find the tool absent
         with no explanation."""
         with pytest.raises(ValueError, match="no install command"):
-            toolchain.install_script(("make",), ("pip",), platform=NodePlatform.WINDOWS)
+            toolchain_install.install_script(("make",), ("pip",), platform=NodePlatform.WINDOWS)
 
-    def test_installing_runs_the_command_and_names_what_it_did(self) -> None:
-        runner = FakeRun([ok(""), ok("installing make")])
+    def test_installing_runs_the_command_and_re_probes_to_verify_it(self) -> None:
+        """An install that ran is not an install that worked."""
+        runner = FakeRun([ok(""), ok("installing make"), ok(""), ok(SEDONA_2026_09_23)])
         _test_hooks.run = runner
 
-        installed = toolchain.install_missing(node(), toolchain.parse_probe(SEDONA))
+        reports = toolchain.parse_probe(SEDONA)
 
-        assert installed == ("make",)
+        after = toolchain_install.install_missing(node(), reports, writer=WRITER)
+
+        assert after == toolchain.parse_probe(SEDONA_2026_09_23)
         # sedona has BOTH managers, and winget is the declared preference.
         assert b"winget install --id GnuWin32.Make" in (runner.stdin[0] or b"")
         assert runner.calls[0][-1].endswith("C:/fleet/stage/fleet-install.ps1' -Encoding utf8\"")
+        assert runner.calls[2][-1].endswith(
+            "C:/fleet/stage/fleet-toolchain-fleet-bootstrap.ps1' -Encoding utf8\""
+        )
+        assert len(runner.calls) == 4
 
     def test_a_linux_node_is_installed_through_sh(self) -> None:
-        runner = FakeRun([ok(""), ok("installing make")])
+        runner = FakeRun([ok(""), ok("installing make"), ok(""), ok(_linux_probe(make=True))])
         _test_hooks.run = runner
-        linux = node("diphtheria")
-        linux["platform"] = NodePlatform.LINUX
-        linux["stage_root"] = "/home/corvis/fleet/stage"
-        reports = toolchain.parse_probe(
-            "python=yes=Python 3.11.9\npoetry=yes=Poetry (version 2.5.1)\n"
-            "git=yes=git version 2.43.0\nmake=no=\ntar=yes=tar (GNU tar) 1.35\n"
-            "apt-get=yes=apt 2.8.3\npipx=yes=1.4.3\n"
+
+        after = toolchain_install.install_missing(
+            _linux_node(), toolchain.parse_probe(_linux_probe(make=False)), writer=WRITER
         )
 
-        assert toolchain.install_missing(linux, reports) == ("make",)
+        assert "make" in {report["name"] for report in after if report["present"]}
         assert runner.stdin[0] == (
             b"printf '%s\\n' 'installing make'\nsudo apt-get install -y make\n"
         )
@@ -254,15 +260,138 @@ class TestInstall:
     def test_a_node_with_nothing_installable_is_left_alone(self) -> None:
         """No ssh call at all, which is what the empty reply list asserts."""
         _test_hooks.run = FakeRun([])
+        reports = toolchain.parse_probe(LOKI)
 
-        assert toolchain.install_missing(node("loki"), toolchain.parse_probe(LOKI)) == ()
+        assert toolchain_install.install_missing(node("loki"), reports, writer=WRITER) is reports
 
-    def test_a_failing_install_is_not_softened(self) -> None:
-        """A half-installed node is worse than an untouched one: it looks ready."""
-        _test_hooks.run = FakeRun([ok(""), failed(1, "choco: not found")])
+    def test_a_failing_install_that_landed_nothing_rolls_back_nothing(self) -> None:
+        """Not softened, and the rollback probe finds nothing to remove."""
+        runner = FakeRun([ok(""), failed(1, "choco: not found"), ok(""), ok(SEDONA)])
+        _test_hooks.run = runner
 
         with pytest.raises(AppError) as excinfo:
-            toolchain.install_missing(node(), toolchain.parse_probe(SEDONA))
+            toolchain_install.install_missing(node(), toolchain.parse_probe(SEDONA), writer=WRITER)
 
         assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
         assert "choco: not found" in excinfo.value.message
+        assert excinfo.value.message.endswith("; rolled back nothing: none of them had landed")
+        assert len(runner.calls) == 4
+
+    def test_an_install_that_left_a_tool_absent_removes_what_it_landed(self) -> None:
+        """A half-installed node looks closer to ready than it is."""
+        runner = FakeRun(
+            [
+                *(ok(""), ok("installing poetry")),
+                *(ok(""), ok(_half(poetry=True))),
+                *(ok(""), ok(_half(poetry=True))),
+                *(ok(""), ok("uninstalling poetry")),
+                *(ok(""), ok(_half(poetry=False))),
+            ]
+        )
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as excinfo:
+            toolchain_install.install_missing(
+                node(), toolchain.parse_probe(_half(poetry=False)), writer=WRITER
+            )
+
+        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
+        assert excinfo.value.message == (
+            "lavender: installing poetry, make exited 0 but the probe still finds make absent; "
+            "rolled back poetry"
+        )
+        assert runner.stdin[6] == (
+            b"Write-Output 'uninstalling poetry'\npython -m pip uninstall -y poetry\n"
+        )
+        assert runner.calls[6][-1].endswith("C:/fleet/stage/fleet-uninstall.ps1' -Encoding utf8\"")
+
+    def test_a_rollback_that_leaves_a_tool_names_the_command_to_remove_it(self) -> None:
+        _test_hooks.run = FakeRun(
+            [
+                *(ok(""), ok("installing poetry")),
+                *(ok(""), ok(_half(poetry=True))),
+                *(ok(""), ok(_half(poetry=True))),
+                *(ok(""), ok("uninstalling poetry")),
+                *(ok(""), ok(_half(poetry=True))),
+            ]
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            toolchain_install.install_missing(
+                node(), toolchain.parse_probe(_half(poetry=False)), writer=WRITER
+            )
+
+        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
+        assert excinfo.value.message == (
+            "lavender: rolling back an unfinished install left poetry installed; "
+            "remove by hand: python -m pip uninstall -y poetry"
+        )
+
+
+class TestUninstall:
+    def test_each_tool_is_removed_by_the_manager_that_installed_it(self) -> None:
+        assert uninstall_command("git", ("pip", "winget", "choco")).startswith("winget uninstall")
+        assert uninstall_command("git", ("pip", "choco")) == "choco uninstall git -y"
+        assert uninstall_command("poetry", ("pipx", "apt-get")) == "pipx uninstall poetry"
+        assert uninstall_command("tar", ("winget", "choco")) == ""
+
+    def test_every_install_has_an_uninstall_on_the_same_managers(self) -> None:
+        """A manager with an install and no removal would leave a rollback
+        nothing to run; the key sets must be the same for every row."""
+        for tool in REQUIRED_TOOLS + TAGGED_TOOLS:
+            assert sorted(tool["uninstall"]) == sorted(tool["install"]), tool["name"]
+
+    def test_a_tool_with_no_removal_for_these_managers_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="no uninstall command"):
+            toolchain_install.uninstall_script(("make",), ("pip",), platform=NodePlatform.WINDOWS)
+
+
+#: The probe writer these tests install as, which names the probe scripts.
+WRITER = "fleet-bootstrap"
+
+
+def _half(*, poetry: bool) -> str:
+    """A Windows node missing make and, unless ``poetry``, poetry.
+
+    Pip installs poetry and winget make, so an install of both can land one.
+
+    Args:
+        poetry: Whether poetry answers present.
+
+    Returns:
+        The probe's output.
+    """
+    line = "poetry=yes=Poetry (version 2.4.2)\n" if poetry else "poetry=no=\n"
+    return (
+        f"python=yes=Python 3.11.9\n{line}git=yes=git version 2.55.0\nmake=no=\n"
+        "tar=yes=bsdtar 3.8.8\nwinget=yes=v1.29.380\nchoco=no=\npip=yes=pip 24.0\n"
+    )
+
+
+def _linux_probe(*, make: bool) -> str:
+    """A Linux node that has everything but, unless ``make``, make.
+
+    Args:
+        make: Whether make answers present.
+
+    Returns:
+        The probe's output.
+    """
+    line = "make=yes=GNU Make 4.3\n" if make else "make=no=\n"
+    return (
+        "python=yes=Python 3.11.9\npoetry=yes=Poetry (version 2.5.1)\n"
+        f"git=yes=git version 2.43.0\n{line}tar=yes=tar (GNU tar) 1.35\n"
+        "apt-get=yes=apt 2.8.3\npipx=yes=1.4.3\n"
+    )
+
+
+def _linux_node() -> NodeConfig:
+    """Diphtheria's declaration, staging under its home.
+
+    Returns:
+        The node.
+    """
+    linux = node("diphtheria")
+    linux["platform"] = NodePlatform.LINUX
+    linux["stage_root"] = "/home/corvis/fleet/stage"
+    return linux

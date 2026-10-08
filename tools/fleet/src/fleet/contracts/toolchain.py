@@ -149,6 +149,14 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
                 f"{PYTHON_REGISTERED_GUARD}choco install python311 --version {PINNED_PYTHON} -y"
             ),
         },
+        uninstall={
+            "winget": (
+                f"winget uninstall --id Python.Python.3.11 --version {PINNED_PYTHON} -e "
+                "--scope user --source winget --silent --accept-source-agreements "
+                "--disable-interactivity"
+            ),
+            "choco": f"choco uninstall python311 --version {PINNED_PYTHON} -y",
+        },
     ),
     RequiredTool(
         name="poetry",
@@ -156,6 +164,10 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         install={
             "pip": "python -m pip install --user poetry",
             "pipx": "pipx install poetry",
+        },
+        uninstall={
+            "pip": "python -m pip uninstall -y poetry",
+            "pipx": "pipx uninstall poetry",
         },
     ),
     RequiredTool(
@@ -165,6 +177,11 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "winget": "winget install --id Git.Git -e --source winget --accept-source-agreements",
             "choco": "choco install git -y",
             "apt-get": "sudo apt-get install -y git",
+        },
+        uninstall={
+            "winget": "winget uninstall --id Git.Git -e --source winget --accept-source-agreements",
+            "choco": "choco uninstall git -y",
+            "apt-get": "sudo apt-get remove -y git",
         },
     ),
     RequiredTool(
@@ -177,6 +194,13 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "choco": "choco install make -y",
             "apt-get": "sudo apt-get install -y make",
         },
+        uninstall={
+            "winget": (
+                "winget uninstall --id GnuWin32.Make -e --source winget --accept-source-agreements"
+            ),
+            "choco": "choco uninstall make -y",
+            "apt-get": "sudo apt-get remove -y make",
+        },
     ),
     RequiredTool(
         name="node",
@@ -188,11 +212,19 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             ),
             "choco": "choco install nodejs-lts -y",
         },
+        uninstall={
+            "winget": (
+                "winget uninstall --id OpenJS.NodeJS.LTS -e --source winget --silent "
+                "--accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco uninstall nodejs-lts -y",
+        },
     ),
     RequiredTool(
         name="tar",
         reason="staging sends a gzipped tar and the node unpacks it",
         install={},
+        uninstall={},
     ),
 )
 
@@ -378,14 +410,45 @@ def install_command(tool: str, managers: tuple[str, ...]) -> str:
         caller must not conflate with failure: a tool this package never
         installs, and a node whose managers do not cover it.
     """
+    chosen = _chosen_manager(tool, managers)
+    return "" if chosen is None else chosen[0]["install"][chosen[1]]
+
+
+def uninstall_command(tool: str, managers: tuple[str, ...]) -> str:
+    """Choose how to remove one tool that :func:`install_command` installed.
+
+    Args:
+        tool: The tool's name.
+        managers: The node's available managers, in preference order.
+
+    Returns:
+        The removal command for the SAME manager :func:`install_command`
+        chooses on these managers, so a rollback undoes the install that
+        ran rather than asking another manager about a package it never
+        placed; empty exactly when :func:`install_command` is.
+    """
+    chosen = _chosen_manager(tool, managers)
+    return "" if chosen is None else chosen[0]["uninstall"][chosen[1]]
+
+
+def _chosen_manager(tool: str, managers: tuple[str, ...]) -> tuple[RequiredTool, str] | None:
+    """Find a tool's row and the first of these managers that installs it.
+
+    Args:
+        tool: The tool's name.
+        managers: The node's available managers, in preference order.
+
+    Returns:
+        The tool's row and the chosen manager, or None when the tool has no
+        install command for any of them.
+    """
     for required in REQUIRED_TOOLS + TAGGED_TOOLS:
         if required["name"] != tool:
             continue
         for manager in managers:
-            command = required["install"].get(manager)
-            if command:
-                return command
-    return ""
+            if required["install"].get(manager):
+                return required, manager
+    return None
 
 
 def describe_gap(node: str, reports: tuple[ToolReport, ...]) -> str:
@@ -498,5 +561,6 @@ __all__ = [
     "node_is_right",
     "python_is_right",
     "reported_version",
+    "uninstall_command",
     "version_number",
 ]

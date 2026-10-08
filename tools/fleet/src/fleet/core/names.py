@@ -91,6 +91,11 @@ STAGE_SUFFIX = ".stage"
 #: The install script, under a node's stage root.
 INSTALL_STEM = "fleet-install"
 
+#: The script that rolls back an install that did not finish, under a node's
+#: stage root. Its own file so the install script a failure left behind is
+#: still there to read beside it.
+UNINSTALL_STEM = "fleet-uninstall"
+
 #: The script the collector runs to read the tail of a build's transcript,
 #: the lines the verdict's counts are parsed from (MCPs board task fd5cabfa,
 #: A3).
@@ -417,6 +422,7 @@ __all__ = [
     "PID_NAME",
     "RESULT_NAME",
     "STAGE_SUFFIX",
+    "UNINSTALL_STEM",
     "cache_root",
     "capacity_probe_stem",
     "companion_directory",

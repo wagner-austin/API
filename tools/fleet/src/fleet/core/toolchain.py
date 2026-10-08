@@ -1,4 +1,4 @@
-"""Asking a node what it has installed, and installing what it does not.
+"""Asking a node what it has installed; :mod:`fleet.core.toolchain_install` installs.
 
 THE PROBE IS A CONSTANT SCRIPT, sent and run by path like every other remote
 act here -- see :mod:`fleet.core.remote` for the two failed attempts that made
@@ -11,11 +11,8 @@ call that node ready, it would stage, and the build would fail resolving a
 lockfile against the wrong interpreter -- which reads as a broken project
 rather than a misconfigured node.
 
-INSTALLING IS A SEPARATE FUNCTION AND A SEPARATE FLAG. These are other
-people's machines, and a dispatcher that installed software because a build
-wanted it would be doing the thing this whole package exists to stop: acting
-on somebody else's computer without their knowing. :func:`install_missing`
-exists, is explicit, and is never called by a dispatch.
+INSTALLING IS A SEPARATE MODULE AND A SEPARATE FLAG, for the reason
+:mod:`fleet.core.toolchain_install` gives: these are other people's machines.
 """
 
 from __future__ import annotations
@@ -25,7 +22,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.contracts.capability import PROBE_NAME, Capability, measured
 from fleet.contracts.detection import GPU_PROBE, TESTDB_PROBE
 from fleet.contracts.elevation import INTEGRITY_PROBE
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.contracts.tagged_tools import TAGGED_TOOLS
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
@@ -347,108 +344,9 @@ def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, .
         raise gap
 
 
-def install_script(
-    tools: tuple[str, ...], managers: tuple[str, ...], *, platform: NodePlatform
-) -> str:
-    """Render the script that installs the named tools on one node.
-
-    Args:
-        tools: The tools to install, each of which must have a command for
-            one of ``managers`` -- :func:`installable` is what guarantees
-            that, and calling this with anything else is a caller error.
-        managers: That node's available package managers, in preference
-            order. Taken as an argument rather than looked up, because the
-            same missing ``make`` is a winget command on lavender and a choco
-            one on loki, and this function must not guess which node it is
-            rendering for.
-        platform: The node's declared platform, for the echo that precedes
-            each command.
-
-    Returns:
-        The script's text, one command per tool, each preceded by an echo so
-        a transcript says which command produced which failure.
-
-    Raises:
-        ValueError: If a named tool has no command for any of these
-            managers. Refused rather than skipped: silently omitting it
-            would report an install that covered less than it claimed, and
-            the caller would then re-probe and see the tool still absent
-            with no explanation.
-    """
-    spoken = dialect.for_platform(platform)
-    lines: list[str] = []
-    for name in tools:
-        command = install_command(name, managers)
-        if not command:
-            raise ValueError(
-                f"{name!r} has no install command for managers {managers}; "
-                "installable() is what filters these and it was not consulted"
-            )
-        lines.append(spoken.echo_command(f"installing {name}"))
-        lines.append(command)
-    return "\n".join(lines) + "\n"
-
-
-def installable(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
-    """Name the absent tools this node can have installed automatically.
-
-    Node-specific in two ways at once: which tools are absent, and which
-    managers are present to install them. Measured 2026-09-04, lavender had
-    only winget and loki only choco, so a fleet-wide answer to this question
-    does not exist.
-
-    Args:
-        reports: What a node answered, covering both the required tools and
-            the package managers.
-
-    Returns:
-        The absent tools with a command for a manager this node has. A tool
-        is left out when the package knows no command for it on this node's
-        managers -- tar carries none, and python and node none for apt-get
-        -- and also when the node lacks the manager that command needs,
-        which is a gap to report rather than a failure to raise.
-    """
-    managers = available_managers(reports)
-    return tuple(name for name in missing(reports) if install_command(name, managers))
-
-
-def install_missing(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
-    """Install what a node is missing and this package can supply.
-
-    Args:
-        node: The node to install on.
-        reports: What it answered when probed.
-
-    Returns:
-        The tools that were installed. Empty when there was nothing to do,
-        which is a real answer rather than an error -- a node may be missing
-        only things that have no automatic install.
-
-    Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` when the
-            install command itself fails, carrying the node's own stderr. Not
-            softened: a half-installed node is worse than an untouched one
-            because it looks ready.
-    """
-    tools = installable(reports)
-    if not tools:
-        return ()
-    spoken = dialect.for_platform(node["platform"])
-    remote.run_script(
-        node["host"],
-        spoken.script_path(node["stage_root"], names.INSTALL_STEM),
-        install_script(tools, available_managers(reports), platform=node["platform"]),
-        platform=node["platform"],
-    )
-    return tools
-
-
 __all__ = [
     "absent_tagged",
     "attempt_toolchain",
-    "install_missing",
-    "install_script",
-    "installable",
     "parse_probe",
     "probe_toolchain",
     "read_reports",

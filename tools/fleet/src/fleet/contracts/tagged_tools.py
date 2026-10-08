@@ -44,11 +44,18 @@ class RequiredTool(TypedDict):
             Measured 2026-09-04: sedona has both managers, lavender has ONLY
             winget, loki has ONLY choco. No single command works fleet-wide,
             so the manager is chosen per node from what that node reported.
+        uninstall: The command per package manager that removes what that
+            manager's ``install`` command put there, keyed exactly as
+            ``install`` is. It is how an install that did not finish is
+            rolled back (:func:`fleet.core.toolchain_install.rollback_install`), so
+            the node is left as it was found rather than holding part of a
+            toolchain that looks ready.
     """
 
     name: str
     reason: str
     install: dict[str, str]
+    uninstall: dict[str, str]
 
 
 #: The route file a node's Claude Code hooks reach the board through, under
@@ -105,6 +112,14 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "choco": "choco install ffmpeg -y",
             "apt-get": "sudo apt-get install -y ffmpeg",
         },
+        uninstall={
+            "winget": (
+                "winget uninstall --id Gyan.FFmpeg.Essentials -e --source winget --silent "
+                "--accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco uninstall ffmpeg -y",
+            "apt-get": "sudo apt-get remove -y ffmpeg",
+        },
     ),
     RequiredTool(
         name="hooks",
@@ -115,6 +130,10 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         ),
         install={
             "pip": "python -m pip install --user " + " ".join(HOOKS_CHECK_PACKAGES),
+        },
+        uninstall={
+            "pip": "python -m pip uninstall -y "
+            + " ".join(package.split("==")[0] for package in HOOKS_CHECK_PACKAGES),
         },
     ),
     RequiredTool(
@@ -127,6 +146,14 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             ),
             "choco": "choco install golang -y",
             "apt-get": "sudo apt-get install -y golang-go",
+        },
+        uninstall={
+            "winget": (
+                "winget uninstall --id GoLang.Go -e --source winget --silent "
+                "--accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco uninstall golang -y",
+            "apt-get": "sudo apt-get remove -y golang-go",
         },
     ),
 )

@@ -206,7 +206,7 @@ def rebuild_job(
     return job
 
 
-def restart_job(
+def session_job(
     credentials: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
@@ -221,6 +221,14 @@ def restart_job(
     ``compact``); this runner composes one invocation per verb through
     :func:`fleet.core.restart.session_invocation` and reports what it said
     (module docstring of :mod:`fleet.core.restart`).
+
+    Named for the job kind rather than one of its five verbs. It was
+    ``restart_job``, which named one verb and claimed a state change this
+    runner does not make: the change, and the check of each step before
+    the next (the old process gone before a resume is typed, a new record
+    on the installed build before a restart is reported), are the sealed
+    ``session_audit`` release's, whose exit status this closes the job
+    with (``state-change-verified``, board task cc7222ca).
 
     Args:
         credentials: The queue's endpoint and headers.
@@ -326,7 +334,7 @@ def claim_pass(
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
         return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
-    return restart_job(credentials, job, identity)
+    return session_job(credentials, job, identity)
 
 
 def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
@@ -463,5 +471,5 @@ __all__ = [
     "main",
     "observe_pass",
     "rebuild_job",
-    "restart_job",
+    "session_job",
 ]
