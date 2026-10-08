@@ -15,20 +15,23 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py
+  - services/Model-Trainer/src/model_trainer/cli/cartridge_crowd_adapters.py
   - docs/RESEARCH.md
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 9300942991b85dcc3bb354ecca84e4680ce9ee2d
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 645ac50af73bf5e238f2e804ca26122b8552c9c2
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py": 9cb8dec410c4bb82a4a5dfddb693a46d18a02252
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": f2143579c9fd9bda4e36f04fd2c47f3322b25d15
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 4c945f9a06595920bfbad632d6e5027f57aae8c5
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": a4bf5df8c3862963e10904ba449407e2c9ec0157
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 5e0977ff68e908b5e0db0ca287de1cae1c0275ec
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": 2476f0cd4d1ecccd4ced4b0a5e5d33e956dcfb02
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": 75b3370cb8fd7ba5a7d5cac712e2a61c3abe6fdb
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 51621f94781dd5b27149fcc5931c4bb6e7209006
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 8016cdc60390944dff4bc6d9c6e28e8a2f2349d8
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dfa5a7d174611bbff80a1509c61c5236ae3ad670
-  "docs/RESEARCH.md": 073bcaf3d6bc252560aace54f84aeb9c3ee1f4f4
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 1abd02b6fd571ad8241d7cf9a6dbbc320f2f687f
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": c025bde31da408347a62197b3d7d6e72ba7f062e
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": 48e89e20b28aa3aad5e54547a47788c88ee1c7bc
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_crowd_adapters.py": be82e631f14401274b743e53ad1cd07c72b2d393
+  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1. The base-LoRA and content-LoRA sweeps lost their inline adapter construction to cli/cartridge_crowd_adapters.py in 6c5a2b293 (board task 83c25b86), which now owns LORA_TRAIN_SEED 53, POOL_SEED_BASE 61 and the pool-teacher-wrap-distil order, so the trait-repair sweep builds the same adapters; its commit says the corpus records are row-for-row what they were, and the module joins source_paths. The other moves are type-only: setup_logging takes LogLevel and LogFormat members in all five sweeps (7db06d411), optimizer is typed OptimizerName in cartridge_content_lora.py (03b337867), and cartridge_varied.py gains companioned_replicates with an explicit seed_stride (d2ac35525). docs/RESEARCH.md was re-read at the epochs line this page quotes (e48 mean -0.240, nine of nine seeds negative), unchanged in substance"
   - "the three sweep pins repinned 2026-09-11 after establishing that their deletions are a MOVE rather than a removal. Each lost 100-150 non-comment lines to cartridge_lora_families.py, whose own docstring records why: the companion-cross arms, the two cell families and the per-family floors were byte-identical between the base-LoRA and content-LoRA sweeps, and two copies of a measurement are two copies of its ARM NAMES -- which is what pairs a run against this page's ladder. The identifiers this page names, train_on and train_composition_lora_invariant, both resolve at HEAD, and all three sweeps still expose measure_grid and main."
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -56,7 +59,7 @@ provenance:
   - "hyperparameter grid 2026-09-09, board task 47d5f8c6 (operator-directed): cartridge_solo_grid CLI (commit 103bdaf7), image v47 sha256 290794b0 (truncated) from fcb39991, jobs 55841983 + twin 55841997 (1h08m each), records BYTE-IDENTICAL sha256 bc18d701 (truncated, same-node k54-05); the lr0.01xc64 anchor cell reproduces the certified 445e345f bf16 record BIT-FOR-BIT seed for seed; lr {0.001,0.003,0.01,0.03} x slots {64,256} at nine seeds: 0.001 all-negative, 0.03 divergent (means to -1.67), 0.003 indistinguishable-to-worse (t -1.04), 256 slots never better than 64 (at lr0.003 significantly worse, t -5.19) -- the recorded knobs sit at the grid's maximum; bounds added post-audit: failure counts carry exact 95% Clopper-Pearson intervals (anchor 2/9 -> [2.8%, 60.0%]; 9/9-negative cells -> [66.4%, 100%]) and paired-vs-anchor MDEs 0.087 / 0.091 / 0.060 nats, an order below the 0.36-nat recovery being hunted"
   - "epochs line 2026-09-09, board task e03cd293: cartridge_solo_grid --cells epochs-line (declared-cells refactor fe692719: SoloGridCell/SoloCellSet carry knobs AND recorded observation tokens as data, cell_set_for refuses undeclared selectors), image v48 sha256 dd04cb08 (truncated), jobs 55848106 + twin 55848109 (~55 min each), records BYTE-IDENTICAL sha256 114acee2 (truncated); the reused anchor cell reproduces BOTH bc18d701 and 445e345f BIT-FOR-BIT seed for seed; e24 halves the mean (+0.046 vs +0.102; paired -0.055, t -2.14, MDE 0.060) and e48 destroys it (mean -0.240, 9/9 negative -> CP [66.4%, 100%]; paired -0.342, t -5.55, MDE 0.142); per-cell CP bounds e12 2/9 -> [2.8%, 60.0%], e24 1/9 -> [0.3%, 48.2%]; every training axis now measured with the recorded knobs at each maximum -- method-level conclusion filed in RESEARCH.md: KV-prefix capacity does not transfer to pythia-6.9b under naive solo training, and a 7B rung for THIS page's recipe is a method change, not a knob"
   - "THE 7B RUNG OF THIS PAGE'S RECIPE, measured 2026-09-09, board task 68a96413: cartridge_diverse_companion_sweep --plan pythia-6.9b-companions-diverse (precision-through-plans refactor fd1f242a; the sweep grew an in-record naive-solo arm), image v49 sha256 0a38233c (truncated), jobs 55858713 + twin 55858759 (~2h07m each), records BYTE-IDENTICAL sha256 c7fcd094 (truncated); the naive arm reproduces the certified 445e345f solo record BIT-FOR-BIT all nine seeds; VERDICT, two eliminations in one record: companioned-alone minus naive-solo -0.0016 (t -0.04, MDE 0.093; CP95 on 1/9 negative [0.3%, 48.2%]) -- the recipe does not move the 7B solo gain -- and composition INVERTS: n4 composed -0.216 (9/9 negative, CP [66.4%, 100%], retention -216% against the medium record's +44.6%), n8 -0.284 (9/9), content effect at n4 -0.106 vs noise (t -3.38) where gpt2 measured +0.20, companion-cross arms -0.75 to -1.0 nats; this page's recipe is a gpt2-family finding, and the 7B compartmental question is a base-adaptation or retrieval question, per RESEARCH.md's standing verdict"
-fact_checked: "2026-09-09"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---
@@ -197,7 +200,10 @@ The lever every cartridge-side measurement pointed at: a rank-8 LoRA on
 the base's attention trains to do language modeling behind a DRAWN number
 of frozen composed cartridges (uniform one to eight, from the three
 held-out pool corpora), through the same ``train_on`` loop that trained
-every recorded cartridge -- only which side learns switched. On gpt2 it
+every recorded cartridge -- only which side learns switched. (Since
+2026-10-07 this adapter and the crowd-invariance one below are built by
+`cartridge_crowd_adapters`, one owner for every sweep that measures behind
+them.) On gpt2 it
 settles both questions at once. Base-side alone repairs the STRUCTURAL
 catastrophe (plain cartridges at n4: -45.4% naive to -6.9% adapted, with
 the noise-composition control leaping -0.12 to +0.28) but leaves content

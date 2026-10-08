@@ -22,12 +22,13 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/score_run.py": 7da2bc858f6ed213b0e19d54deabcd4915170697
   "services/Model-Trainer/src/model_trainer/worker/baseline_cloze_job.py": 4d2eedae3cb07a886317d9b1618bd005f7b49c43
   "services/Model-Trainer/src/model_trainer/worker/cloze_job.py": 5d914f43283c0c04cea638cfa73a77153f5a53d9
-  "docs/RESEARCH.md": 501940c688722b74b5b1a49b1825b2a22e2322e4
+  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section under mi. The floor section [^research] cites, its Provenance: bullet and its generation table, is untouched"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the floor section, its Provenance bullet and generation table that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "read from code at API commit 2e0511ee7 on 2026-10-05"
   - "the scoring rule itself (total-NLL substitution, strict-minimum ties) is described from captured source in the tech wiki's page model-trainer-cloze-substitution-scoring, pinned at commit 46fb6bcc; this page does not restate it beyond one paragraph and covers the paths around it"
-fact_checked: "2026-10-05"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---

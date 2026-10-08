@@ -9,15 +9,16 @@ source_paths:
   - "services/Model-Trainer/src/model_trainer/cluster/preflight.py"
   - "services/Model-Trainer/tests/test_device_auto.py"
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/worker/job_utils.py": "f9adcdedbf7f5933186b917008eda8024c39cf07"
-  "services/Model-Trainer/src/model_trainer/core/compute/device_selector.py": "6777b63d027855332f2bb635776779b5e7cdbfae"
+  "services/Model-Trainer/src/model_trainer/worker/job_utils.py": "684485c8b8701172b79a28ce2d90485db0bcdb37"
+  "services/Model-Trainer/src/model_trainer/core/compute/device_selector.py": "f25cdb80b592540b8038c172c8c524c9bacd6063"
   "services/Model-Trainer/src/model_trainer/cluster/preflight.py": "5f8fb62bc7ba9d6bfee563da70a4ef72e8ea2db9"
-  "services/Model-Trainer/tests/test_device_auto.py": "2d900f80d0c025b60b5bc8bd10a1d7d7269d8530"
+  "services/Model-Trainer/tests/test_device_auto.py": "981a1689468a6697a52b05d9b94b7f876344d73a"
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1, over 7cbc92188 (board task 1374feba: device and precision typed as platform_ml's RequestedDevice, RequestedPrecision, ResolvedDevice and ResolvedPrecision; device_selector.py drops its unused ModelFamily alias and _CUDA and _CPU constants; test_device_auto.py drops five tests that re-tested platform_ml's resolvers) and the job_utils.py enum moves of 7db06d411, f560de52e and 8459613dd. Every claim here still holds: device_selector.py's docstring still records the removal of recommended_batch_size_for in past tense, build_cfg still keeps the declared batch size with the comment saying why, and test_build_cfg_resolves_auto_and_keeps_the_declared_batch_size still asserts 4"
   - "job 55744675, code-style.qlora-qwen-v1 on an A30, 2026-09-04: CUDA OOM allocating 9.27 GiB, log line 'batch_size=16' against a payload declaring 4"
   - "job 55746427, the same document after the fix: 'batch_size=4', 1633 steps, 1h02m, exit 0"
   - "tools/hpc3/runs/code-style-qlora-v1.json -- the payload, which declares 4 in both runs"
-fact_checked: 2026-09-04
+fact_checked: 2026-10-08
 confidence: high
 ---
 

@@ -13,9 +13,11 @@ source_paths:
 source_git_blobs:
   "libs/cleargbm_rs/src/binning/edges.rs": be806fdfb21bf1461b0ff1db9be7ace47e57fef0
   "libs/cleargbm_rs/src/training/config_rules.rs": a5020894551ab7042b5d6f40789469560e052cae
-  "services/covenant-radar-api/scripts/cv_external.py": 4dbecf61f6e6da09f323e455dfaf513cc84528e0
+  "services/covenant-radar-api/scripts/cv_external.py": c776e01339eecb1efc446fd81f351bb0895d4e8f
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_min_data_in_bin.md": c65dfbd8a00299d9f70659a3f1720f598f7649c1
-fact_checked: "2026-08-25"
+provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: cv_external.py's backend, growth-strategy and device words are now BackendName, GrowthStrategy and RequestedDevice members where they were string literals (1db8dae46, 8447e984c, e72018fe3), and nothing else in it changed. The optional fifth argument this page describes is unchanged: main still refuses a min_data_in_bin below 2 and refuses one given with the lightgbm backend"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [libs]
 ---

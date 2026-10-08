@@ -13,17 +13,18 @@ source_paths:
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": fc13f65bf30747f8d9f7b3a2b3df405babb84b78
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": e01f44ad8a2432e4f3fa478cd8f94d8822c67fd8
   "libs/covenant_ml/src/covenant_ml/backends/cleargbm/config_resolution.py": 01a6e7afb76b784ec6a5a724ee7fae40d5288279
-  "libs/covenant_ml/src/covenant_ml/optimizer/objectives/cleargbm_objective.py": 01eff0e2bcda1d7fad9e16bdc23ad0b2e38ba90d
+  "libs/covenant_ml/src/covenant_ml/optimizer/objectives/cleargbm_objective.py": abb84503f09cdebf3ce5fdf8e2884f806e3d1abe
   "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md": 92bd0abb9052968564d52919c274b45ad11d2cea
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": f544b40fa8e4619fbe29c525bd1ef8d694c4ecd9
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: both moves are literal-to-member swaps. backend.py's name is BackendName.CLEARGBM and its objective Objective.BINARY_LOG_LOSS (2821e0fae, 6766777fd); cleargbm_objective.py's growth_strategy and objective become GrowthStrategy.DEPTH_WISE and Objective.BINARY_LOG_LOSS and its preset test compares against FeaturePreset.NONE (acc8df319, 6766777fd). Each StrEnum member equals the word it replaced, and no other line changed, so no knob this page lists gained or lost a reader"
   - "repinned 2026-09-11, three entries, each on a mechanical argument rather than a re-reading of the claims. The two benchmark documents changed +49/-0 and +42/-0 -- Power sections appended by the power audit, board 1e4ab572 -- so no line either one could be cited at was removed or altered."
   - "backend.py changed +4/-2 and the whole of it is a type alias being inlined: ProgressCallback became Callable[[TrainProgress], None] on one parameter, same signature, no logic. No page in this wiki cites the removed name (grepped). The same edit was made to three sibling regressors in the same sweep."
   - "THE APPENDED POWER SECTIONS ARE ADVERSE TO THE DOCUMENTS THEY SIT IN and a reader of this page should know it: the scale_pos_weight one argues the +/- figures in its table are the across-fold spread rather than the paired dispersion either comparison needs, and the knob-closure one argues its 'statistical wash' is a null reported without a resolvable effect."
-fact_checked: "2026-08-22"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [libs]
 ---

@@ -11,16 +11,19 @@ source_paths:
   - libs/cleargbm_rs/Cargo.toml
   - libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py
   - libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py
+  - libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap_decode.py
 source_git_blobs:
   "libs/cleargbm/src/cleargbm/ensemble.py": d855968ef0fd5be83716ae0a331765004dee690f
   "libs/cleargbm/src/cleargbm/_rust.py": 5f8ba08dec7197ffe2a203a44385d3337f0b47db
   "libs/cleargbm_rs/pyproject.toml": 4082850e2dbc7a7d9b962066ac5d1b44d46ac2b2
   "libs/cleargbm_rs/Cargo.toml": 472c6cc568ce46dba53caba924b7fa1b7a3cf0d8
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": fc13f65bf30747f8d9f7b3a2b3df405babb84b78
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": e01f44ad8a2432e4f3fa478cd8f94d8822c67fd8
   "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py": b1b17fa189ff6fae7a1af1527e186aff840802e5
+  "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap_decode.py": f755b920e4403228596c7df83164dd6bb16f881c
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1. backend.py changed only by type (2821e0fae made BackendName a StrEnum, 6766777fd typed growth_strategy by cleargbm's GrowthStrategy). The re-read found two footnotes that had drifted before that, both corrected: [^6] cited backend.py:121, where the __import__ line has been at 129 since at least the previous pin, and cleargbm_shap.py:72 for a line that left that file when bb4d5360e (2026-08-21) split it, so the explainer's import is now cleargbm_shap_decode.py:49 and that module joins source_paths; [^5] cited ensemble.py's import, converter and call at 24-29, 63 and 139-141 and called it the single hand-off, but ensemble.py now has two training entry points, classification at 190-192 and regression at 251-253"
   - "backend.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +4/-2, the whole of which is a type alias being inlined -- ProgressCallback became Callable[[TrainProgress], None] on one parameter. Same signature, no logic, and no page in this wiki cites the removed name. Check with: git diff 6f29219931d6bb9d551b5bb779732244686d2dcf fc13f65bf30747f8d9f7b3a2b3df405babb84b78"
-fact_checked: "2026-08-17"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [libs]
 ---
@@ -67,7 +70,9 @@ venvs (cleargbm, cleargbm_rs dev, covenant_ml) and ran each `make check` green:
 
 `covenant_ml` reaches the extension the same way `cleargbm/_rust.py` does, by importing
 `cleargbm_rs` as a top-level module (its `backends/cleargbm/backend.py` and
-`explainers/cleargbm_shap.py` were repointed in `ea7835d2`)[^6]. No consumer imports
+`explainers/cleargbm_shap.py` were repointed in `ea7835d2`; the explainer's
+import has lived in `explainers/cleargbm_shap_decode.py` since the 2026-08-21
+file split)[^6]. No consumer imports
 through a nested `cleargbm_rs.cleargbm_rs` path any more; that spelling died with the
 shim.
 
@@ -75,5 +80,5 @@ shim.
 [^2]: libs/cleargbm_rs/Cargo.toml:18,21 — `extension-module = ["pyo3/extension-module"]`; `pyo3 = { version = "0.27.2" }`. Build backend and module name: libs/cleargbm_rs/pyproject.toml:3,32-33 — `build-backend = "maturin"`, `features = ["extension-module"]`, `module-name = "cleargbm_rs"`, with no `python-source` key remaining.
 [^3]: libs/cleargbm/src/cleargbm/_rust.py:10-11 — the docstring's guarantee, verbatim on line 11: "there is no Python fallback".
 [^4]: libs/cleargbm/src/cleargbm/_rust.py:1-15 — module docstring: built by maturin as a top-level module, imported exactly once, each callable pinned to a Protocol; strict typing, no `Any`, no `cast`.
-[^6]: libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py:121 and libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py:72 — both read `_native_mod: types.ModuleType = __import__("cleargbm_rs")`.
-[^5]: libs/cleargbm/src/cleargbm/ensemble.py:24-29,63,139-141 — the import from `cleargbm._rust`, `_config_to_rust_dict`, and the single `train_gradient_boosting_rs(...)` call that is the entire hand-off.
+[^6]: libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py:129 and libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap_decode.py:49 — both read `_native_mod: types.ModuleType = __import__("cleargbm_rs")`. (Cited as backend.py:121 and cleargbm_shap.py:72 until 2026-10-08.)
+[^5]: libs/cleargbm/src/cleargbm/ensemble.py:35-42,75,190-192,251-253 — the import from `cleargbm._rust`, `_config_to_rust_dict`, and the two training hand-offs, `train_gradient_boosting_rs(...)` in `train_gradient_boosting` and `train_gradient_boosting_regression_rs(...)` in `train_gradient_boosting_regression`; each is the whole of its entry point's work after input validation. (Cited as 24-29, 63 and 139-141, with one call, until 2026-10-08.)

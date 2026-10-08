@@ -32,12 +32,13 @@ source_git_blobs:
   "services/covenant-radar-api/src/covenant_radar_api/worker/evaluate_job.py": 09cfcc5396bdedfc4b50131f54774655772e049c
   "libs/covenant_domain/src/covenant_domain/rules.py": 9420c46c2e125feb2834be050292dc1e0fa938fa
   "libs/platform_core/src/platform_core/config/covenant_radar.py": 7846daf5cc69c4b2609c9f07e403dd8c6411b2ae
-  "services/covenant-radar-api/pyproject.toml": 8f420f4aa5698d2bb311e5dba284bb81acbe72ca
+  "services/covenant-radar-api/pyproject.toml": 15a4bee017f291001ca546a6e8b72648c671b120
   "services/covenant-radar-api/README.md": 34f48ed308cbe2cbffc9e867e2b4a41748c9a90b
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: pyproject.toml's only change is db91ba401, pytest addopts distributing with --dist loadgroup instead of loadscope plus the comment saying why. The [tool.poetry.scripts] block this page cites at :68-70 is unchanged and still on those lines"
   - "every claim read from code at API commit 2e0511ee7 on 2026-10-05; no process was started to observe it"
   - "'nothing enqueues run_batch_evaluation' is a grep over services/ and libs/ for the symbol outside tests/, which found only its definition and __all__"
-fact_checked: "2026-10-05"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---

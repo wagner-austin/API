@@ -11,9 +11,10 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/contracts/replicated_measurement.py": 8189df19d95ad70a03b11e5c0be11ae7b2478cf3
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 32427d62f7e123078e671532a78ea09f3feeeaae
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": c53942502b03a2239836fa7bebcf055dcca133f9
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 8311628f7d7c217293518e7d77a12a0a486c0889
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: cartridge_benchmark.py's only change since the last pin is 7db06d411, setup_logging called with LogLevel and LogFormat members. The re-read found the sweep-and-composition floor split cited at L367-L368, which in the pinned blob were already the wait() and sweep_seconds lines; the split is noise_floor(sweep) and noise_floor([alone, composed]) at L396-L397, and the citation now says so"
   - "cartridge_benchmark.py repinned 2026-09-11: it removed two lines, both DOCSTRING, saying sweep_observations emits 'two observations per adjacent pair'. It now emits five, the extra three being the paired sd, the minimum detectable effect and the paired verdict -- which is the statistic THIS PAGE ARGUED FOR. No page in this wiki makes the 'two observations' claim (grepped), so nothing here is stale; the change is this page's own recommendation landing."
   - "cartridge_plans.py repinned 2026-09-11: its six removed lines are the body of corpus_digest being replaced by a call to a new digest_parts, whose body is byte-for-byte the same length-prefixed sha256 loop. The digest VALUE is unchanged, which matters because this page cites corpus digest e2f23c635583."
   - "replicated_measurement.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +201/-0, the paired-separation machinery this page argued FOR being added beside the range statistic it criticises. Nothing was removed, so noise_floor is still max(gains) - min(gains) maxed over arms, exactly as cited. Check with: git diff 2c6af8b1ad7bdae264d03ae689a8d76dcc89f0eb 8189df19d95ad70a03b11e5c0be11ae7b2478cf3"
@@ -22,7 +23,7 @@ provenance:
   - "corpus e2f23c635583 = the 12 me-wiki pages carrying visibility: public; second corpus legal-wiki, both archived byte-for-byte"
   - "reproduction: the 7/8/9 subset of the nine-seed run matches the three-seed record to six decimals (slots-8 +0.822426 vs +0.822426228296; slots-32 +0.880853 vs +0.880852517628)"
   - "board task 1fc5afed-89a7-400e-b79e-378f322711c7 carries the full trail; per-seed observations added in commit 0633816e"
-fact_checked: "2026-09-06"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---
@@ -93,7 +94,7 @@ It is not being replaced, and it is not a defect. Within one plan every arm
 shares `n`, so the maximum range is a fair estimate of how much one arm of that
 kind wobbles, which is what its docstring claims and all it claims. It is also
 correctly split into a sweep floor and a composition floor
-(`cartridge_benchmark.py` L367-L368), because a composed arm trains two
+(`cartridge_benchmark.py` L396-L397, `sweep_floor` and `composition_floor`), because a composed arm trains two
 cartridges and runs a doubled prefix and is noisier for reasons that say
 nothing about the sweep.
 

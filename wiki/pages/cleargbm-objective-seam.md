@@ -11,15 +11,18 @@ source_paths:
   - libs/cleargbm_rs/src/losses/squared_error.rs
   - libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p1_objective_regression.md
+  - libs/cleargbm/src/cleargbm/_types_config.py
 source_git_blobs:
+  "libs/cleargbm/src/cleargbm/_types_config.py": f18bc02dabea8cdee8a252c050e015c02f4958f6
   "libs/cleargbm_rs/src/training/labels.rs": d9a4f02e3bb4f2dd84edcee07a3768e47f4da207
   "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
   "libs/cleargbm_rs/src/losses/squared_error.rs": c641a0d7a662b729b2ff5accfceaea3627c0427b
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py": 2c526a5ec62e32f8687b6aae73860f3064a09d31
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py": d78c4d34c5a4d11452eb02d1cc9effdc444aa7f6
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p1_objective_regression.md": 957460c1e7c3df106a7b2604d89791cf95a1e304
 provenance:
   - "regressor.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +2/-2, the whole of which is a type alias being inlined -- RegressorProgressCallback became Callable[[RegressionTrainProgress], None] on one parameter. Same signature, no logic, and no page in this wiki cites the removed name. Check with: git diff 906b7e0bfffbb5b337078588644e88760b70170d 2c526a5ec62e32f8687b6aae73860f3064a09d31"
-fact_checked: "2026-08-22"
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: regressor.py's diff is two literal-to-member swaps, its name as RegressorBackendName.CLEARGBM_REG (2821e0fae) and its objective as Objective.SQUARED_ERROR (6766777fd), plus the import. bdc043690 made Objective itself a StrEnum in _types_config.py, whose member values are the wire spellings, so the spelling-identity bullet below still holds; the same enum now also carries multiclass_softmax and lambdarank, the later objectives this page says the seam was built for. _types_config.py joins source_paths for that claim"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [libs]
 ---

@@ -30,12 +30,13 @@ source_git_blobs:
   "services/covenant-radar-api/scripts/optimize/history.py": f7eefd5f3fa9bc64b0c8e673e37a203ab06bf0f6
   "libs/platform_core/src/platform_core/determinism_record.py": 1b098cb9098ce0db9079a87f3e3e9b39dd00f250
   "libs/covenant_ml/src/covenant_ml/optimizer/search_spaces/config.py": 7aef2d032b17daaa8b98c00cf5eb4487b2c7373d
-  "docs/RESEARCH.md": 501940c688722b74b5b1a49b1825b2a22e2322e4
+  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section under mi. The cleargbm section this page cites, including the Provenance: bullet beginning that scripts/optimize HAS pinned since 2026-08-29, is untouched"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the cleargbm section and its Provenance bullet that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "measured 2026-10-05 on austinpc: ~/PROJECTS/API/services/covenant-radar-api/models/optimization_history.jsonl is 3,068 lines, all 3,068 carry \"fingerprint\":null, last modified 2026-08-28 02:25; no *.runrecords.jsonl file exists beside it. The file is machine-local and untracked, so this reading is not reproducible from the repository."
   - "dates: git log -S'UNPINNED because this entry point pins nothing' -- scripts/optimize/_runners.py -> a92a31ace, 2026-08-28; git log -1 -- scripts/optimize/__main__.py -> 460c20382, 2026-08-29 (the pin)"
-fact_checked: "2026-10-05"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---

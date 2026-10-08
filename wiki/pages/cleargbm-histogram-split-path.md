@@ -30,10 +30,12 @@ source_git_blobs:
   "libs/cleargbm_rs/src/binning/feature_bins.rs": 75cdd19ed161603d031e2bef9e5edf51373094e5
   "libs/cleargbm/src/cleargbm/_rust.py": 5f8ba08dec7197ffe2a203a44385d3337f0b47db
   "libs/cleargbm/src/cleargbm/ensemble.py": d855968ef0fd5be83716ae0a331765004dee690f
-  "libs/cleargbm/src/cleargbm/_types_config.py": 478cf51b7bcdd0e00b630f358397a1d4d4138e44
+  "libs/cleargbm/src/cleargbm/_types_config.py": f18bc02dabea8cdee8a252c050e015c02f4958f6
   "libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md": c601efb92c2f596c97e60fdddade03d9dc1fa379
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md": 3f95cc90aaf624a9f250c4b5f892c570ac27c4df
-fact_checked: "2026-09-03"
+provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: bdc043690 made GrowthStrategy and Objective in _types_config.py StrEnum classes whose values are the wire spellings, which moved GradientBoostingConfigDict's max_bins: int from line 180 to 186. It is still a required key with no default, so the correction below stands; only its line anchor moves"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [libs]
 ---
@@ -46,7 +48,7 @@ Split finding runs entirely in Rust. The Python surface (`cleargbm.ensemble.trai
 
 Rust's `find_best_split_from_histogram` scans `n_regular_bins - 1` bins with prefix sums for gradient sums, hessian sums, and counts. Wall-time is bounded by K (= `max_bins`), independent of the number of samples in the node. Empirically measured on random inputs at K=64: 100× more samples produces 0.92× the split-scan time [^2].
 
-`max_bins` has **no default** in `GradientBoostingConfig` — it is a required parameter, validated to `2 <= max_bins <= 255` (`libs/cleargbm_rs/src/training/config_rules.rs:54` and `:64`, the upper bound being the `u8` bin index; the checks moved out of `config.rs` since this was written). Bin edges + per-sample bin assignments are precomputed once per training run and reused across every tree [^3]. **Corrected 2026-08-05:** this sentence read "`max_bins` is 64 by default in `GradientBoostingConfig`". No such default exists: `GradientBoostingConfigDict` declares `max_bins: int` as a required key (`libs/cleargbm/src/cleargbm/_types_config.py:180`; it lived in `_types_model.py` when this correction was first written), and every `64` in the tree is a script or test default — `libs/cleargbm/scripts/autotune.py:73`, `libs/cleargbm/scripts/benchmark.py:140`, `libs/cleargbm/tests/conftest.py:14`. **The likely origin of the error is `libs/cleargbm/scripts/benchmark.py:215`, which labels its own sweep entry `"max_bins=64 (default)"`** — a mislabel in the script, since the library has no default to be. See [[cleargbm-perf-uint8-histogram-bins]], which correctly attributes 64 to the harness rather than the library.
+`max_bins` has **no default** in `GradientBoostingConfig` — it is a required parameter, validated to `2 <= max_bins <= 255` (`libs/cleargbm_rs/src/training/config_rules.rs:54` and `:64`, the upper bound being the `u8` bin index; the checks moved out of `config.rs` since this was written). Bin edges + per-sample bin assignments are precomputed once per training run and reused across every tree [^3]. **Corrected 2026-08-05:** this sentence read "`max_bins` is 64 by default in `GradientBoostingConfig`". No such default exists: `GradientBoostingConfigDict` declares `max_bins: int` as a required key (`libs/cleargbm/src/cleargbm/_types_config.py:186`; it lived in `_types_model.py` when this correction was first written, and at line 180 until the 2026-09-26 enum change), and every `64` in the tree is a script or test default — `libs/cleargbm/scripts/autotune.py:73`, `libs/cleargbm/scripts/benchmark.py:140`, `libs/cleargbm/tests/conftest.py:14`. **The likely origin of the error is `libs/cleargbm/scripts/benchmark.py:215`, which labels its own sweep entry `"max_bins=64 (default)"`** — a mislabel in the script, since the library has no default to be. See [[cleargbm-perf-uint8-histogram-bins]], which correctly attributes 64 to the harness rather than the library.
 
 ## Sibling subtraction
 

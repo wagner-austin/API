@@ -28,11 +28,12 @@ source_git_blobs:
   "services/covenant-radar-api/src/covenant_radar_api/generic_worker_entry.py": 4ab93469361f573434c42b3d9394183e79e59c72
   "services/covenant-radar-api/Dockerfile": 1609785a17251ca8a306cd640c83a117aa099883
   "services/covenant-radar-api/docker-compose.yml": f18715070a89c105837afcff1bcef89b6c315896
-  "services/covenant-radar-api/pyproject.toml": 8f420f4aa5698d2bb311e5dba284bb81acbe72ca
+  "services/covenant-radar-api/pyproject.toml": 15a4bee017f291001ca546a6e8b72648c671b120
   "services/covenant-radar-api/README.md": 34f48ed308cbe2cbffc9e867e2b4a41748c9a90b
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: pyproject.toml's only change is db91ba401, pytest addopts distributing with --dist loadgroup instead of loadscope plus the comment saying why. The covenant-streaming-worker script this page cites at :70 is unchanged and still on that line"
   - "read from code at API commit 2e0511ee7 on 2026-10-05. The replay and crash-loop consequences below are DERIVED from the code and the compose restart policy, not observed on a broker; no streaming worker was started for this page."
-fact_checked: "2026-10-05"
+fact_checked: "2026-10-08"
 confidence: medium
 hubs: [services]
 ---

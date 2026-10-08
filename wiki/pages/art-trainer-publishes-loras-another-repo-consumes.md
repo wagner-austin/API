@@ -11,13 +11,14 @@ source_paths:
 source_git_blobs:
   "services/Art-Trainer/README.md": 13d03b8f6eb7a340b4aceca1c85126582e14fd20
   "services/Art-Trainer/src/art_trainer/core/services/deployment/lora_deployer.py": cd8e99c89800fc18240d8582378a0a5cad67c63d
-  "services/Art-Trainer/pyproject.toml": 40124a973a5eb4359b5c040aca2130e49c2b7aa8
+  "services/Art-Trainer/pyproject.toml": 1d5e63e46bebcafc70a64c0d2115b5d8aa06ee27
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: services/Art-Trainer/pyproject.toml changed one comment line in 8d75a7455, which repoints the 2026-08-19 incident note from scripts/run-tests.ps1 to tools/maketools/src/maketools/reap.py when the make layer became shell-portable. No dependency, script or setting this page reads moved"
   - "THE CONSUMER IS IN ANOTHER REPOSITORY and therefore cannot be a source_path here: ~/PROJECTS/chat, whose workspaceRoot this wiki does not cover. Cited by path and commit instead. src/chat/domain/lora_provenance.py declares the LoraProvenance TypedDict (filename, base_model, training_name) and the sd15/sdxl/flux1/unknown family literal; src/chat/infra/lora_metadata.py reads it off disk."
   - "chat commit 3702b89 (2026-09-11) added the cross-repo sentence to that repo's README. Before it, NEITHER repository's README named the other."
   - "chat commit c3734f2 (2026-09-11) corrected docs/image-generation-roadmap.md, which had listed 'LoRA training pipeline' under 'What's missing' while this service existed and shipped."
   - "NOT A RESEARCH SURFACE, measured 2026-09-11 rather than assumed: services/Art-Trainer/runs/ is EMPTY (0 entries) and no file under its src/ references RunRecord, run_record or RunFingerprint. That is why it is absent from docs/RESEARCH.md and why it belongs here instead -- it produces ARTIFACTS, not numbers anyone subtracts."
-fact_checked: "2026-09-11"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---

@@ -28,7 +28,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_question_set.py": 0bfe2ff9a9e2e2bd310898af8e5a980d0514bb01
   "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 0789465e4cc23a2ee2cc2ca735e0ee7e0697c096
   "services/Model-Trainer/src/model_trainer/cli/cartridge_solo_seeds.py": f77d37acd17b88451fc0264ec29417931035ebcc
-  "tools/hpc3/specs/abl-image.json": 8d82403dbdd8e7c2051ee2521e93d0efa1aacd52
+  "tools/hpc3/specs/abl-image.json": b9d8948d2bd4ec6a6f51b001d9e419e556b23d15
   "tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-stage.json": fb3cb4a487382c897508c8b1b1f4890c22babd4a
   "tools/hpc3/runs/qa-corpus-wiki-full-ee6e6d12-digests.txt": 27c0615da115d3c684e8d6e6ad96a0965589f03a
   "tools/hpc3/runs/qa-full-wiki-gpt2-v52.json": fa3fa9a9a37c9530a9b5e7648c0ba329f1feb913
@@ -36,6 +36,7 @@ source_git_blobs:
   "tools/hpc3/runs/qa-full-wiki-pythia-6.9b-a30-v56.json": 56724d50894f22738093e4560e1e7221cc37aad0
   "tools/hpc3/runs/hpc3-cartridge-qa.json": 86660ee5bed1f6ec195f74c846b55fa8b8c5d0cb
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: a1492d90e (board task 83c25b86) added the trait, repair, shard and style symbols to specs/abl-image.json and a 55th smoke command checking every trait plan's seed gate, while its git_commit still names v56's 0e9f177f until an image is built from a commit that carries them. So the spec at HEAD has one more smoke check than the 54 the v56 build below ran; the fiftieth entry [^image] cites is byte-identical to the pinned one, and the v56 image this page's runs use is unchanged"
   - "item counts measured 2026-10-04 on austinpc by running cartridge_question_set.build_question_set over ~/PROJECTS/wiki/pages at wiki commit ee6e6d12 (885 pages, `git status --porcelain -- pages` empty): gpt2 tokenizer, 1,634,715 tokens, 3,753 items at window 128, 3,827 at 256, 3,278 at 512; EleutherAI/pythia-6.9b tokenizer, 1,589,449 tokens, 3,793 items at window 256; corpus digest a756664dbb4e"
   - "the same builder over ~/PROJECTS/API/wiki/pages (38 pages, 104,524 gpt2 tokens) yields 275 items at window 256, against plans whose max_items was 240"
   - "HPC3 ledger rows for the earlier full-wiki submissions: 55898551 FAILED in 332s (image v50 lacked gpt2-full-wiki-qa, KeyError in the job's .err), 55901956 FAILED in 1454s (torch.OutOfMemoryError in the dense embedder's BERT forward, 22.86 GiB requested), 55914185 PREEMPTED at 1341s on hpc3-gpu-l54-04 while still building items"
@@ -44,7 +45,7 @@ provenance:
   - "image v56: build job 57748479 COMPLETED on free in 48m15s, 54 of 54 smoke checks, /pub/wagnera3/images/v56/abl sha256 890e444560d4c5caa43860bfd3235849471eadc01acbe77b968ae30e6aa7d5be; its GIT_COMMIT file read 0e9f177f56d5e6895b6a148f6ae86901d18d4e89 over ssh on 2026-10-05"
   - "hpc3-preflight on 2026-10-05 against the A100 default: GPU_MODEL_EXHAUSTED, free-gpu A100 0/2 free, A30 10/28, V100 5/12; on A30 the array was admitted at 156.00 projected GPU-hours and the 7B run at 36.00, against the project's 200.00"
   - "submitted 2026-10-05 by hpc3-sweep and hpc3-submit: job array 57783112_[0-12] (qa-full-wiki-v56) and job 57783131 (qa-full-wiki-pythia-6.9b-a30-v56), both on free-gpu"
-fact_checked: "2026-10-05"
+fact_checked: "2026-10-08"
 confidence: medium
 hubs: [services]
 ---

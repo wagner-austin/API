@@ -9,13 +9,14 @@ source_paths:
   - tools/hpc3/runs/qa-full-wiki-gpt2-v52.json
   - tools/hpc3/runs/ledger.jsonl
 source_git_blobs:
-  "docs/RESEARCH.md": 575670696f235494c5f7c5a9d61f3dcedd208e77
+  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
   "tools/hpc3/runs/qa-full-wiki-gpt2-v52.json": fa3fa9a9a37c9530a9b5e7648c0ba329f1feb913
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1. docs/RESEARCH.md moved from blob 57567069 by six commits (b2c82ca2a, 1c11a6da2, 82dd38dc5, 8d71b732c, c0c80420b, 24b4ad65b). One moves what [^1] cites: 1c11a6da2 registered cartridge-qa as its own project through hpc3-register, so the `cartridge_qa_benchmark` entry under `mi` is now the `cartridge-qa` project section, and [^1] names it that way. 82dd38dc5 and 8d71b732c rewrote that section's cluster-path bullet for the v56 run documents and their 2026-10-05 submission, not the paragraphs [^1] summarises: the 0 of 571 registration gap, the a98769b5 and dc5f2408 retraction, require_resolvable_question_set and the 9b011256 guard rule corrected in bd4dfb97 all still read as cited. The ledger still holds exactly the four rows [^3] names, re-read in the hub checkout's 16064-row ledger, with no later row on any of the four jobs"
   - "`tools/hpc3/runs/ledger.jsonl` is in source_paths but NOT in source_git_blobs, and that is deliberate rather than an omission the all-or-nothing rule missed: `git ls-files --error-unmatch` reports it untracked, so it is an untracked artifact and exempt by nature. Pinning it would also be the wrong instrument even if it were tracked -- it is append-only and grows on every cluster submission, so its hash would go red within hours for reasons unrelated to any claim on this page. Read against API HEAD 15562dbb."
   - "THE 24-ITEM RUN IS NOT A SOURCE_PATH AND CANNOT BE ONE. It is recorded only in the closure of agent-board task 1fc5afed by session opus-weight-injection-0902, which is a self-report on an append-only coordination surface with no artifact behind it and no mechanism for marking itself superseded. It is cited on this page as a second under-powered reading, never as a result."
   - "This page was first written in the `personal` wiki on 2026-09-11 and moved here the same day. The move is the point: `personal` is a pdf-corvis wiki, which pins PDFs, and every factual claim here is about files in this repository. Measured before moving -- 0 of the personal wiki's pages pin a repo file, so its citations of docs/RESEARCH.md were paths in a footnote with nothing detecting a change."
-fact_checked: "2026-09-11"
+fact_checked: "2026-10-08"
 confidence: high
 hubs: [services]
 ---
@@ -127,7 +128,7 @@ different state from either of the answers previously given for it.
 - Nothing here evaluates whether cartridges beat retrieval. It is about what the
   runs to date could and could not establish.
 
-[^1]: `docs/RESEARCH.md`, the `cartridge_qa_benchmark` entry. Records the
+[^1]: `docs/RESEARCH.md` § "`cartridge-qa` — can the model USE what the cartridge carries, and does it beat retrieval" (the `cartridge_qa_benchmark` entry under `mi` until 2026-10-05). Records the
     retraction (commits `a98769b5`, `dc5f2408`, dated 2026-09-09), the 0.0521
     and 0.0417 differences over 32 items, the five-discordant-pair floor, the
     surviving 8.7 and 8.3 item gains against base, the

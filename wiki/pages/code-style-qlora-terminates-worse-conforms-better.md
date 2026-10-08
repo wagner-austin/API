@@ -41,7 +41,7 @@ source_git_blobs:
   "tools/code-style-eval/runs/gen-v1/base.outcomes.jsonl": 06ec61b8eec320c038f58671d1bfc3849ccf606b
   "tools/code-style-eval/runs/gen-v1/candidate.outcomes.jsonl": cefb9901a37630e030f4155456c257b1a1b5ea9e
   "libs/platform_core/src/platform_core/continuation_task.py": eaab054bfd2b59a0227261e6455a2067630af31b
-  "services/Model-Trainer/src/model_trainer/cli/_test_hooks.py": bb812bd0b9d9b2945d556dba0f81ebc82af5d3ad
+  "services/Model-Trainer/src/model_trainer/cli/_test_hooks.py": d29041d543147e938584eea42785c106e5317cc5
   "tools/code-style-eval/README.md": 0d5b561e739e680393d9aa3906e7df0143c6a92e
   "tools/code-style-eval/pyproject.toml": 110037c5f0646c8fb6f44ae30ea2112767bffb30
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
@@ -60,6 +60,7 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/cli/clustering.py": 0e5c0f9a2ed85a28523bb6660743af36b0221e11
   "tools/code-style-eval/src/code_style_eval/contracts/generation.py": c1e757eba479597c84fb1e98e64fe2b0b7156e54
 provenance:
+  - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: cli/_test_hooks.py now bounds the cuBLASLt benchmark child at BENCHMARK_CHILD_WALL_SECONDS, an hour (51dac3123, board task 0d891468), and compares the continuation arm by identity against ContinuationArm members (d26c14bfa). The docstring [^1] quotes, that candidate reattaches the adapter and base loads the weights it was trained against and attaches nothing, is unchanged"
   - "power_distributions.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +81/-0, a require_probability validator and its helpers appended. No line was removed or altered, so the mid-p and exact rejection regions this page's verdicts were computed under are byte-identical. Check with: git diff 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56 34420ac8a768198e03a96de0f9d175eac9b15f41"
   - "trained 2026-09-07, job 55806443, A30 on hpc3-gpu-l54-09, 3731s, image digest 5dfd78a7eb14"
   - "generated 2026-09-07, jobs 55809956 (base, A30 hpc3-gpu-k54-01) and 55809960 (candidate, A30 hpc3-gpu-l54-08)"
@@ -70,7 +71,7 @@ provenance:
   - "cluster structure counted 2026-09-09 over the 875 shared item ids in runs/gen-v2/{base,candidate}.outcomes.jsonl: k = 14 / 64 / 336 by path segment, largest package 165, median 5"
   - "tech-wiki/sources/killip-2004-intracluster-correlation.txt sha256 2fae776213c2ab342d4380f8b5dabb92ed66e487d001e3e9b33bd9a18400877e -- outside this wiki's workspaceRoot; the design-effect formula and its equal-cluster-size limit, read from the archived text"
   - "tech-wiki/sources/lazic-2010-pseudoreplication-neuroscience.txt sha256 57643fecd2130189bffc9a8ea105de68dfc927a6ac24b357ba6d110a566bc0af -- outside this wiki's workspaceRoot; the IC=0.30 -> 37% figure, read from the archived text"
-fact_checked: 2026-09-09
+fact_checked: 2026-10-08
 confidence: high
 hubs: [services]
 ---
