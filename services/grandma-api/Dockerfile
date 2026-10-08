@@ -52,9 +52,31 @@ RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
 
 WORKDIR /workspace
 
+# torch comes from the PyTorch CPU index, as in handwriting-ai: the wheel's
+# platform_langid needs torch, and from PyPI pip takes the CUDA build and its
+# nvidia libraries, for a service whose language detector runs on
+# platform_langid's DEFAULT_DEVICE "cpu" and whose compose file reserves no
+# GPU. Measured on lavender-wsl's rootless daemon (MCPs board task
+# 90c135ac): the install stage rebuilt cold in 668 s with the CUDA build and
+# 292 s with this index, and the image holds torch 2.14.1+cpu at 2.47 GB.
+#
+# platform_langid's model stack gets its own layer, before the wheel and the
+# libs are copied in, so a change to the service's source or to any lib
+# reinstalls only those and never this layer: every lib change made the
+# whole install a cold one, the slowest case of tools/maketools-execution.
+# Each requirement is the constraint its lib declares (platform_langid for
+# torch, torchaudio and transformers, platform_stt for numpy), which
+# tests/test_dockerfile_model_layer.py pins to their pyproject files: with
+# bare names this layer took transformers 5 and numpy 2, and the install
+# below spent 106 s replacing them.
+RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+        "torch>=2.0.0,<3.0.0" "torchaudio>=2.0.0,<3.0.0" "transformers>=4.30.0,<5.0.0" "numpy<2.0" \
+    && rm -rf /root/.cache
+
 COPY --from=builder /workspace/services/grandma-api/dist/*.whl /workspace/dist/
 COPY --from=builder /workspace/libs /workspace/libs
-RUN pip install /workspace/dist/*.whl /workspace/libs/platform_core /workspace/libs/platform_stt \
+RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+        /workspace/dist/*.whl /workspace/libs/platform_core /workspace/libs/platform_stt \
     && rm -rf /workspace/dist /workspace/libs /root/.cache
 
 WORKDIR /app
