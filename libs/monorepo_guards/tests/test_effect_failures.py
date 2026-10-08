@@ -51,6 +51,8 @@ class TestNames:
         assert _kinds("with raises(PermissionError):\n    pass\n") == {FILE_SWAP}
         assert _kinds("with raises(OperationalError):\n    pass\n") == {SERVICE}
         assert _kinds("assert error.errno == errno.ENOENT\n") == {FILE_SWAP}
+        assert _kinds("assert refused.errno == errno.EADDRNOTAVAIL\n") == {NETWORK}
+        assert _kinds("assert taken.errno == errno.EADDRINUSE\n") == {NETWORK}
         assert _kinds("assert result.timed_out\n") == {PROCESS}
         assert _kinds('assert result["killed"] is True\n') == KILL_KINDS
         assert _kinds("os.kill(pid, signal.SIGKILL)\n") == KILL_KINDS

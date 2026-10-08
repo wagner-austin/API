@@ -129,6 +129,51 @@ class TestRealTests:
             RealTest("tests/test_bundle.py::test_whole_bundle_handed_over", NO_FAILURE),
         ]
 
+    def test_an_accessor_returns_the_installed_bundle_and_is_no_twin(self, tmp_path: Path) -> None:
+        """A lazy ``get_hooks`` builds the real bundle only when none is
+        installed, so reading through it may be reading a test's fakes."""
+        write(
+            tmp_path,
+            "src/pkg/_test_hooks.py",
+            """
+            import subprocess
+
+            _installed = None
+
+            def _default_run(argv):
+                return subprocess.run(argv, timeout=5)
+
+            def _get_hooks():
+                global _installed
+                if _installed is None:
+                    _installed = Hooks(run=_default_run)
+                return _installed
+
+            def build_hooks():
+                return Hooks(run=_default_run)
+            """,
+        )
+        write(
+            tmp_path,
+            "tests/test_accessor.py",
+            """
+            from pkg._test_hooks import _get_hooks, build_hooks
+
+            def test_through_the_accessor():
+                hooks = _get_hooks()
+                assert hooks.run(["false"]).returncode == 1
+                assert _get_hooks().run(["false"]).returncode == 1
+                install(_get_hooks())
+
+            def test_through_the_builder():
+                assert build_hooks().run(["false"]).returncode == 1
+            """,
+        )
+        found = _real(tmp_path)
+        assert found[("pkg._test_hooks", "_default_run")] == [
+            RealTest("tests/test_accessor.py::test_through_the_builder", PROCESS_FAILURE),
+        ]
+
     def test_helpers_and_fixtures_reach_but_only_helpers_carry_failure(
         self, tmp_path: Path
     ) -> None:

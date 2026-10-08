@@ -17,8 +17,8 @@ The markers are read in the test and its same-file helpers:
   :data:`FAILURE_NAME_KINDS`, e.g. ``subprocess.TimeoutExpired``,
   ``pytest.raises(OperationalError)``, ``errno.ENOENT``, or any WORD of a
   string literal that is one (``"connect ECONNREFUSED 127.0.0.1:1"``), and
-  the phrases ``fetch failed`` and ``connection refused`` (any case):
-  network;
+  the phrases ``fetch failed`` and ``connection refused`` (any case), and
+  a listener's bind failures ``EADDRINUSE`` and ``EADDRNOTAVAIL``: network;
 * a read of ``timed_out`` (attribute or key): process; a read of
   ``killed``, ``SIGKILL`` or ``SIGTERM``, and a call whose final name
   carries ``kill`` or ``terminate`` as a snake or camel word
@@ -68,6 +68,10 @@ FAILURE_NAME_KINDS: dict[str, frozenset[str]] = {
     "ServerDisconnectedError": frozenset({NETWORK}),
     "ECONNRESET": frozenset({NETWORK}),
     "AbortError": frozenset({NETWORK}),
+    # A listener fails at bind, not at connect: aiohttp's TCPSite on an
+    # address the machine does not hold (board task cc7222ca).
+    "EADDRINUSE": frozenset({NETWORK}),
+    "EADDRNOTAVAIL": frozenset({NETWORK}),
     "ConnectionRefusedError": frozenset({NETWORK, SERVICE}),
     "ConnectionError": frozenset({NETWORK, SERVICE}),
     "ETIMEDOUT": frozenset({NETWORK, SERVICE}),

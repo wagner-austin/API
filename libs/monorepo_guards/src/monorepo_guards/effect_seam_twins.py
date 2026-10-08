@@ -33,6 +33,11 @@ from monorepo_guards.effect_primitives import import_bindings, qualified_name
 from monorepo_guards.effect_seams import EffectSeam, PackageModule, resolve_function
 from monorepo_guards.util import parse_source
 
+#: The first words of an accessor's name, leading underscores dropped: a
+#: function that reads, sets or installs the bundle in force rather than
+#: building the real one (MCPs board task c96e8791).
+ACCESSOR_PREFIXES = frozenset({"get", "current", "set", "reset", "install"})
+
 
 class RealTest(NamedTuple):
     """One test that runs a seam's real implementation.
@@ -127,6 +132,27 @@ def _seam_key(index: dict[str, PackageModule], qualified: str | None) -> tuple[s
     return (found[0].name, found[1].name)
 
 
+def _bundle_key(index: dict[str, PackageModule], qualified: str | None) -> tuple[str, str] | None:
+    """Resolve a called dotted name to the package factory that builds a bundle.
+
+    An accessor never builds one: ``get_hooks()`` returns whatever bundle is
+    installed, a test's fakes included, so ``h = get_hooks(); h.run()`` is no
+    twin. The table is MCPs' ``ACCESSOR_PREFIXES`` (board task c96e8791).
+
+    Args:
+        index: The package's modules.
+        qualified: The call's qualified name.
+
+    Returns:
+        ``(defining module, function)`` as :func:`_seam_key` resolves it,
+        or None for an accessor or a name outside the package.
+    """
+    key = _seam_key(index, qualified)
+    if key is None or key[1].lstrip("_").split("_")[0] in ACCESSOR_PREFIXES:
+        return None
+    return key
+
+
 def _direct_calls(
     index: dict[str, PackageModule],
     module: ParsedTestFile,
@@ -196,7 +222,7 @@ def _bound_factories(
     factories: dict[str, tuple[str, str]] = {}
     for node in ast.walk(function):
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
-            key = _seam_key(index, qualified_name(node.value.func, module.bindings))
+            key = _bundle_key(index, qualified_name(node.value.func, module.bindings))
             if key is not None:
                 factories.update((t.id, key) for t in node.targets if isinstance(t, ast.Name))
     return factories
@@ -224,7 +250,7 @@ def _handed_bundles(
             continue
         for argument in [*node.args, *(keyword.value for keyword in node.keywords)]:
             if isinstance(argument, ast.Call):
-                made = _seam_key(index, qualified_name(argument.func, module.bindings))
+                made = _bundle_key(index, qualified_name(argument.func, module.bindings))
                 if made is not None:
                     handed.add((made[0], made[1], "*"))
     return handed
@@ -249,7 +275,7 @@ def _factory_of(
         with ``real = factory()``, else None.
     """
     if isinstance(receiver, ast.Call):
-        return _seam_key(index, qualified_name(receiver.func, module.bindings))
+        return _bundle_key(index, qualified_name(receiver.func, module.bindings))
     if isinstance(receiver, ast.Name):
         return factories.get(receiver.id)
     return None
