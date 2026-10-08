@@ -11,6 +11,7 @@ from platform_core.json_utils import JSONValue
 from platform_ml import OptimizerName, ResolvedDevice, ResolvedPrecision
 from platform_ml.testing import WandbTableProtocol
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel
 from model_trainer.core.contracts.strategy_names import StrategyName
@@ -199,10 +200,16 @@ def _eval_trainer(*, cancelled: bool) -> bt.BaseTrainer:
 
 
 def _make_settings() -> Settings:
-    """Create minimal test settings."""
-    from model_trainer.core.config.settings import load_settings
+    """Return the settings conftest's autouse fixture installed for this test.
 
-    return load_settings()
+    Their artifacts, runs, logs and data roots sit under the test's own
+    tmp_path, so the trainers built here, which share run ids such as
+    test-run, never save into one checkpoint file from two xdist workers.
+
+    Returns:
+        The current test's settings, read through ``_test_hooks.load_settings``.
+    """
+    return _test_hooks.load_settings()
 
 
 class _WandbTestState:

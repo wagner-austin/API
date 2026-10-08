@@ -27,6 +27,18 @@ from model_trainer.core.types import (
 )
 
 
+def test_make_settings_keeps_artifacts_under_this_tests_tmp_path(tmp_path: Path) -> None:
+    """The trainers built here save checkpoints only inside the test's own tmp_path.
+
+    They share run ids such as test-run, so settings that pointed at the
+    process-wide artifacts root would have xdist workers saving and replacing
+    the same checkpoint file at once.
+    """
+    settings = _make_settings()
+
+    assert Path(settings["app"]["artifacts_root"]) == tmp_path / "artifacts"
+
+
 def test_trainer_train_one_epoch_progress_none_inside_loop() -> None:
     """Test _train_one_epoch when progress is None."""
 
