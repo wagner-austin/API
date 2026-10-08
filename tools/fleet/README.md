@@ -38,6 +38,8 @@ runs/
   ledger.jsonl    append-only; every dispatch ever made from this machine
   feed.jsonl      append-only; the event stream subscribers tail
   leases.json     live state; who holds which project's environment
+  retires.jsonl   append-only; each settled run whose node did not answer its
+                  retire, owed until a later collect pass retires it
   mirrors/        one bare git mirror per sourced project; the node runners
                   fetch a submitted sha into it and archive it from there
 ```
