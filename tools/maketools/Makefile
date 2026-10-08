@@ -54,6 +54,14 @@ lift-refresh:
 # rootless daemon, and each case refuses any other daemon. It fails with
 # HOST_EXECUTION_INCOMPLETE when a case is skipped or none ran. Coverage is
 # off because the subset is not the suite; ``make check`` holds the 100.
+#
+# --dist load hands each case to the next free worker. The pyproject's
+# --dist loadscope keeps a module's cases on one worker, and the deploy
+# cases are one parametrized test, so every fleet run deployed the eight
+# services one after another on gw0 while the dispatcher's other workers sat
+# idle: 1422 s at API 780395705 on lavender-wsl, over the 300 s budget (MCPs
+# board task 90c135ac). --durations=0 prints each case's time in the fleet
+# log, which is where a slow image build shows up by service.
 execution:
 	poetry sync --with dev
-	$(PYTHON) scripts/run.py test --host-execution --no-cov
+	$(PYTHON) scripts/run.py test --host-execution --no-cov --dist load --durations=0

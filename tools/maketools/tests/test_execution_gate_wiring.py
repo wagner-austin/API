@@ -92,7 +92,7 @@ def test_every_service_deploy_asks_for_a_passed_deploy_run_at_head() -> None:
     ]
     assert _recipe("tools/maketools/Makefile", "execution") == [
         "poetry sync --with dev",
-        "$(PYTHON) scripts/run.py test --host-execution --no-cov",
+        "$(PYTHON) scripts/run.py test --host-execution --no-cov --dist load --durations=0",
     ]
 
 
