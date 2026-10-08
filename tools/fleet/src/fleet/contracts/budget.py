@@ -30,6 +30,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    optional_int,
     require_float,
     require_int,
 )
@@ -57,12 +58,23 @@ class NodeBudget(TypedDict):
             Counted because the first dispatch to a node is a cold stage of a
             whole monorepo, and a node that fills its system drive is a node
             its owner has to fix by hand.
+        checks_at_once: How many budgeted checks the machine's CPUs carry at
+            once, across every runner identity it has, or None where the
+            cores pool alone bounds them. Declared from a measurement,
+            because a check's install, build and lint phases run wider than
+            its test workers, so the pool's worker count does not say what
+            two checks cost together. Measured 2026-10-08 on serendipity
+            (8 cores, 4 reserved; MCPs board task a85ef09e): MCPs/sms-gateway
+            took 162 s alone (build 48.8 s, suite 109.5 s) and 306 s beside
+            MCPs/execution-elevated with 2 + 2 workers inside the pool's 4
+            (build 73.7 s, suite 195.6 s), over its 300 s budget.
     """
 
     reserved_cores: int
     reserved_ram_gb: float
     worker_ram_gb: float
     max_disk_gb: float
+    checks_at_once: int | None
 
 
 def admissible_workers(budget: NodeBudget, *, logical_cores: int, free_ram_gb: float) -> int:
@@ -110,6 +122,7 @@ def encode_node_budget(budget: NodeBudget) -> JSONObject:
         "reserved_ram_gb": budget["reserved_ram_gb"],
         "worker_ram_gb": budget["worker_ram_gb"],
         "max_disk_gb": budget["max_disk_gb"],
+        "checks_at_once": budget["checks_at_once"],
     }
 
 
@@ -156,7 +169,37 @@ def decode_node_budget(value: JSONValue) -> NodeBudget:
         reserved_ram_gb=reserved_ram_gb,
         worker_ram_gb=worker_ram_gb,
         max_disk_gb=max_disk_gb,
+        checks_at_once=_decode_checks_at_once(value),
     )
+
+
+def _decode_checks_at_once(value: JSONObject) -> int | None:
+    """Read how many budgeted checks a node's CPUs carry at once.
+
+    Args:
+        value: The budget's declaration.
+
+    Returns:
+        The count, or None where the cores pool alone bounds them.
+
+    Raises:
+        JSONTypeError: If the key is absent, so a node nobody measured reads
+            the same as one measured to need no cap, or holds a count under
+            one, which would let the node take no check at all.
+    """
+    if "checks_at_once" not in value:
+        raise JSONTypeError(
+            "node budget must declare 'checks_at_once': how many budgeted checks the node's "
+            "CPUs carry at once across its runners, measured, or null where the cores pool "
+            "alone bounds them"
+        )
+    checks_at_once = optional_int(value, "checks_at_once")
+    if checks_at_once is not None and checks_at_once < 1:
+        raise JSONTypeError(
+            f"checks_at_once must be at least 1 or null, got {checks_at_once}; a node that "
+            "carries no check is disabled in fleet.json instead"
+        )
+    return checks_at_once
 
 
 __all__ = [

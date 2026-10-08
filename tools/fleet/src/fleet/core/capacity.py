@@ -156,6 +156,12 @@ def assess(
     is left is granted. One grant is capped at :func:`job_ceiling`, so the
     first job leaves room for a second instead of taking the whole node.
 
+    WHERE A SECOND CHECK DOES NOT FIT ITS CPUS, THE NODE SAYS SO (MCPs board
+    task a85ef09e). A node whose budget declares ``checks_at_once`` takes no
+    run past that many, counting every run live or launching on it from any
+    of its runners, before the pool is asked: on serendipity two checks
+    inside the pool's 4 cores pushed MCPs/sms-gateway from 162 s to 306 s.
+
     Args:
         node: The node's declaration.
         state: What it reported when last probed.
@@ -191,6 +197,19 @@ def assess(
             ),
         )
     live = state["live"]
+    carried_at_once = node["budget"]["checks_at_once"]
+    if carried_at_once is not None and live["runs"] >= carried_at_once:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_OWNER_RESERVED,
+            reason=(
+                f"{node['host']}'s CPUs carry {carried_at_once} budgeted check(s) at once "
+                f"across its runners, and {live['runs']} are live or launching on it now"
+                f"{_live_clause(state)}. A check runs wider than its test workers, so a "
+                "second would push both past their budget; it takes the next job when one "
+                "of them ends."
+            ),
+        )
     budget = _project_budget(node, project)
     workers = min(
         admissible_workers(

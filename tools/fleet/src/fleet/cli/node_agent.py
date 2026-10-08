@@ -104,7 +104,7 @@ from fleet.cli.node_settle import require_sha
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.tags import runner_tags
 from fleet.contracts.workspace import require_node
-from fleet.core import _test_hooks, names, queue, rolled, tick_report
+from fleet.core import _test_hooks, host_claims, names, queue, rolled, tick_report
 
 _log = get_logger(__name__)
 
@@ -179,6 +179,13 @@ def claim_pass(
     tool's tag (:func:`fleet.cli.node_ready.ready_state`), so the queue keeps
     the jobs that need it for another node (MCPs board task 939ec5c7).
 
+    THE HOST'S RUNNERS CLAIM IN TURN (MCPs board task a85ef09e). The gate,
+    the claim and the claimed job's host claim all run inside the host's
+    claim turn (:func:`fleet.core.host_claims.claim_turn`), so a node's
+    ordinary and elevated runners, two processes, never both read the room
+    one claim is about to take; on 2026-10-07 serendipity's two runners did,
+    and held three runs and 6 workers against its 4 cores.
+
     Returns:
         The job id of the job claimed and handed to its launch; None when
         this node could take nothing, nothing in the lane matched it, or
@@ -195,14 +202,59 @@ def claim_pass(
             message verbatim and does not propagate: transport, not
             recovery.
     """
-    launching = launcher.launching()
+    with host_claims.claim_turn(
+        loaded.host_claims, alias=alias, runner=node_identity(alias, elevated=elevated)[0]
+    ):
+        return _claim_in_turn(
+            loaded,
+            credentials,
+            identity,
+            alias=alias,
+            node=node,
+            elevated=elevated,
+            launcher=launcher,
+        )
+
+
+def _claim_in_turn(
+    loaded: _config.LoadedWorkspace,
+    credentials: McpCredentials,
+    identity: JSONObject,
+    *,
+    alias: str,
+    node: NodeConfig,
+    elevated: bool,
+    launcher: Launcher,
+) -> str | None:
+    """The claim pass's gate and claim, run while this runner holds its host's turn.
+
+    The gate charges every claim the host's runners have under way, this
+    runner's and the other's, beside the ledger's live runs, and leaves out
+    their projects (:func:`fleet.core.host_claims.live_claims`).
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        credentials: The queue's endpoint and headers.
+        identity: This runner's identity arguments.
+        alias: This node's workspace name.
+        node: Its declaration.
+        elevated: Whether this is the node's elevated runner.
+        launcher: The serve's launches, which the claimed job's launch joins.
+
+    Returns:
+        As :func:`claim_pass`.
+
+    Raises:
+        AppError: As :func:`claim_pass`.
+    """
+    claims = host_claims.live_claims(loaded.host_claims, alias=alias)
     gate = ready_state(
         loaded,
         alias=alias,
         node=node,
         elevated=elevated,
-        launching=launching["load"],
-        launching_projects=launching["projects"],
+        launching=host_claims.host_load(claims),
+        launching_projects=frozenset(claim["project"] for claim in claims),
     )
     ready = gate["ready"]
     if ready is None:

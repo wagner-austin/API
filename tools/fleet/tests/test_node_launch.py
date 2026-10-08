@@ -17,12 +17,10 @@ from __future__ import annotations
 
 import pathlib
 import threading
-from collections.abc import Sequence
 
 import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
-from platform_core.mcp_client import McpHttpResponse
 
 from fleet.cli import _config, node_agent, node_collect, node_watch
 from fleet.cli.node_launch import Launcher, Launching
@@ -30,9 +28,10 @@ from fleet.cli.node_prepare import Admitted
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.workspace import require_project
-from fleet.core import _test_hooks, queue, records, staging
+from fleet.core import _test_hooks, host_claims, queue, records, staging
 from fleet.core.queue_transport import answering
 from tests._holder_fakes import RecordingHolder
+from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -49,7 +48,6 @@ from tests._queue_fakes import (
     Unanswered,
     queue_job,
 )
-from tests._thread_fakes import await_event
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -57,122 +55,8 @@ __all__ = ["_credentials_in_env", "_sourced_config"]
 #: This node's runner.
 LAVENDER = "fleet-node-lavender"
 
-#: The prefix of a launch thread's name (:class:`fleet.cli.node_launch.Launcher`).
-LAUNCH_THREAD = "fleet-launch-"
-
 #: What the launcher holds with no launch under way.
-NOTHING_LAUNCHING = Launching(
-    load=LiveLoad(runs=0, workers=0, ram_gb=0.0), projects=frozenset(), jobs=frozenset()
-)
-
-
-def _on_a_launch_thread() -> bool:
-    """Whether the caller runs on one of the launcher's threads.
-
-    Returns:
-        True on a launch thread.
-    """
-    return threading.current_thread().name.startswith(LAUNCH_THREAD)
-
-
-class ThreadRoutedRun:
-    """The node and the hub's git, answering the claim and the launch from scripts of their own.
-
-    Satisfies :class:`~fleet.core._test_hooks.RunProtocol`. The launch's first
-    command waits for the case's go-ahead, so the launch is under way for as
-    long as the case holds it.
-
-    Attributes:
-        claims: The claim's answers, the probes.
-        launches: The launch's answers.
-    """
-
-    claims: FakeRun
-    launches: FakeRun
-
-    def __init__(
-        self,
-        *,
-        claims: FakeRun,
-        launches: FakeRun,
-        release: threading.Event,
-    ) -> None:
-        """Bind the scripts and the go-ahead.
-
-        Args:
-            claims: The claim's answers.
-            launches: The launch's answers.
-            release: Set when the launch may go on.
-        """
-        self.claims = claims
-        self.launches = launches
-        self._release = release
-
-    def __call__(
-        self,
-        argv: Sequence[str],
-        *,
-        timeout_seconds: int,
-        stdin_bytes: bytes | None = None,
-        unset_env: Sequence[str] = (),
-        set_env: Sequence[tuple[str, str]] = (),
-    ) -> _test_hooks.CommandResult:
-        """Answer from the caller's thread's script.
-
-        Args:
-            argv: The command.
-            timeout_seconds: The deadline the caller chose.
-            stdin_bytes: Its standard input, or None.
-            unset_env: The variables the caller withheld from the child.
-            set_env: The variables the caller set in the child.
-
-        Returns:
-            The next scripted result for that thread.
-        """
-        script = self.launches if _on_a_launch_thread() else self.claims
-        if script is self.launches and not script.calls:
-            await_event(self._release, what="the case's go-ahead to launch")
-        return script(
-            argv,
-            timeout_seconds=timeout_seconds,
-            stdin_bytes=stdin_bytes,
-            unset_env=unset_env,
-            set_env=set_env,
-        )
-
-
-class ThreadRoutedQueue:
-    """The queue, answering the claim and the launch from scripts of their own.
-
-    Satisfies :class:`~platform_core.mcp_client.McpPostProtocol`.
-    """
-
-    def __init__(self, *, claims: FakeQueue, launches: FakeQueue) -> None:
-        """Bind the scripts.
-
-        Args:
-            claims: The claim's answers.
-            launches: The launch's answers.
-        """
-        self._claims = claims
-        self._launches = launches
-
-    def __call__(
-        self, url: str, *, headers: dict[str, str], body: bytes, timeout_seconds: int
-    ) -> McpHttpResponse:
-        """Answer from the caller's thread's script.
-
-        Args:
-            url: Absolute URL posted to.
-            headers: Every request header.
-            body: The encoded JSON-RPC body.
-            timeout_seconds: The caller's timeout.
-
-        Returns:
-            The next scripted answer for that thread.
-        """
-        script = self._launches if _on_a_launch_thread() else self._claims
-        return script(url, headers=headers, body=body, timeout_seconds=timeout_seconds)
+NOTHING_LAUNCHING = Launching(load=LiveLoad(runs=0, workers=0, ram_gb=0.0), jobs=frozenset())
 
 
 def _launcher(
@@ -248,6 +132,7 @@ class TestAClaimWhileItsJobLaunches:
         with caplog.at_level("INFO"), launcher:
             claimed = _fill(loaded, launcher)
             during = launcher.launching()
+            claimed_on_host = host_claims.live_claims(loaded.host_claims, alias="lavender")
             release.set()
 
         assert claimed == (DEFAULT_JOB_ID,)
@@ -260,14 +145,18 @@ class TestAClaimWhileItsJobLaunches:
                 ram_gb=row["workers"]
                 * require_project(loaded.workspace, "libs/demo")["worker_ram_gb"],
             ),
-            projects=frozenset({"libs/demo"}),
             jobs=frozenset({DEFAULT_JOB_ID}),
         )
+        assert [
+            (claim["job_id"], claim["runner"], claim["project"]) for claim in claimed_on_host
+        ] == [(DEFAULT_JOB_ID, LAVENDER, "libs/demo")]
+        assert claimed_on_host[0]["workers"] == row["workers"]
         assert (
             "lavender leaves out what it is launching now, whose lease is not yet taken: libs/demo"
         ) in [record.getMessage() for record in caplog.records]
         assert held == [frozenset({DEMO_RUN_ID})]
         assert launcher.launching() == NOTHING_LAUNCHING
+        assert host_claims.live_claims(loaded.host_claims, alias="lavender") == ()
 
 
 def _admitted(loaded: _config.LoadedWorkspace) -> Admitted:

@@ -42,6 +42,8 @@ runs/
                   retire, owed until a later collect pass retires it
   mirrors/        one bare git mirror per sourced project; the node runners
                   fetch a submitted sha into it and archive it from there
+  host-claims/    live state; each node's claims whose launch is under way,
+                  one file each, and the lock its runners claim in turn by
 ```
 
 **`fleet.json` is tracked and the three records are not**, because they are
@@ -682,6 +684,27 @@ the owner's reservation — never the other way round.
 
 `reserved_cores` and `reserved_ram_gb` have no cluster analogue at all. Slurm
 never has to leave a core for the person sitting at the node.
+
+**The limit is the host's, not each runner's, and a node may say how many
+checks its CPUs carry** (MCPs board task a85ef09e). A node declaring
+`elevated` has two runner identities, two processes on the hub, and each
+used to charge the launches it had under way from its own memory, for the
+40 to 80 s before a run reaches the ledger. On 2026-10-07 serendipity (8
+cores, 4 reserved) held three runs and 6 workers that way, and fleet job
+c858b46b's sms-gateway check ran 321 s of its 300 s budget. Now every claim
+under way is written to `runs/host-claims/<node>/<job>.json` until its
+launch ends (`fleet.core.host_claims`), every runner of the host charges all
+of them, and a claim pass runs inside the host's claim turn
+(`runs/host-claims/<node>.lock`), so the two runners claim one at a time and
+never both read the room one claim is about to take. The pool alone was
+still too generous there: fleet job 25d07c7c's sms-gateway check, granted
+2 of the 4 spare cores beside an execution-elevated run granted the other 2,
+took 306 s (build 73.7 s, suite 195.6 s) where it takes 162 s alone (build
+48.8 s, suite 109.5 s), because a check's install, build and lint phases run
+wider than its test workers. So `budget.checks_at_once` is how many
+budgeted checks a node's CPUs carry at once, across its runners, measured:
+serendipity's is 1, and `null` leaves a node to its pools until someone
+measures it.
 
 **On the stack host, free memory is net of what capped containers are
 promised, and the reservation is only the uncapped stack's margin** (MCPs board

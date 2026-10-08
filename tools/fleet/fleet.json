@@ -16,7 +16,8 @@
         "reserved_cores": 4,
         "reserved_ram_gb": 4.0,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
       },
       "enabled": true,
       "test_database": true,
@@ -43,7 +44,8 @@
         "reserved_cores": 4,
         "reserved_ram_gb": 6.0,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
       },
       "enabled": false,
       "test_database": false,
@@ -65,7 +67,8 @@
         "reserved_cores": 4,
         "reserved_ram_gb": 6.0,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
       },
       "enabled": true,
       "test_database": false,
@@ -92,7 +95,8 @@
         "reserved_cores": 4,
         "reserved_ram_gb": 2.0,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
       },
       "enabled": true,
       "test_database": true,
@@ -119,7 +123,8 @@
         "reserved_cores": 8,
         "reserved_ram_gb": 6.0,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
       },
       "enabled": true,
       "test_database": true,
@@ -141,7 +146,8 @@
         "reserved_cores": 4,
         "reserved_ram_gb": 4.0,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": 1
       },
       "enabled": true,
       "test_database": false,
@@ -163,7 +169,8 @@
         "reserved_cores": 8,
         "reserved_ram_gb": 2.5,
         "worker_ram_gb": 1.1,
-        "max_disk_gb": 40.0
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
       },
       "enabled": true,
       "test_database": false,

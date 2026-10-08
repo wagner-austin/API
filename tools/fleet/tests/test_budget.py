@@ -26,6 +26,7 @@ def _budget(
     reserved_ram_gb: float = 4.0,
     worker_ram_gb: float = 1.1,
     max_disk_gb: float = 20.0,
+    checks_at_once: int | None = None,
 ) -> NodeBudget:
     """Build a budget, letting a test name only the field it is about.
 
@@ -34,6 +35,7 @@ def _budget(
         reserved_ram_gb: Memory left for the node's owner.
         worker_ram_gb: Memory one test worker holds.
         max_disk_gb: Disk reserved for staged trees.
+        checks_at_once: Budgeted checks the node's CPUs carry at once.
 
     Returns:
         The budget.
@@ -43,6 +45,7 @@ def _budget(
         reserved_ram_gb=reserved_ram_gb,
         worker_ram_gb=worker_ram_gb,
         max_disk_gb=max_disk_gb,
+        checks_at_once=checks_at_once,
     )
 
 
@@ -121,3 +124,31 @@ class TestDecode:
     def test_a_zero_disk_reservation_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="max_disk_gb must be positive"):
             decode_node_budget(encode_node_budget(_budget(max_disk_gb=0.0)))
+
+    def test_a_measured_check_count_survives_encoding(self) -> None:
+        """serendipity's 1, measured on 2026-10-08 (MCPs board task a85ef09e)."""
+        original = _budget(checks_at_once=1)
+
+        assert decode_node_budget(load_json_str(dump_json_str(encode_node_budget(original)))) == (
+            original
+        )
+        assert decode_node_budget(encode_node_budget(original))["checks_at_once"] == 1
+
+    def test_a_budget_that_does_not_declare_its_check_count_is_refused(self) -> None:
+        """Absent is not null: a node nobody measured must not read as uncapped."""
+        declared = encode_node_budget(_budget())
+        del declared["checks_at_once"]
+
+        with pytest.raises(JSONTypeError, match="must declare 'checks_at_once'"):
+            decode_node_budget(declared)
+
+    def test_a_check_count_under_one_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="checks_at_once must be at least 1 or null, got 0"):
+            decode_node_budget(encode_node_budget(_budget(checks_at_once=0)))
+
+    def test_a_check_count_that_is_not_an_integer_is_refused(self) -> None:
+        declared = encode_node_budget(_budget())
+        declared["checks_at_once"] = "one"
+
+        with pytest.raises(JSONTypeError, match="'checks_at_once' must be an integer"):
+            decode_node_budget(declared)

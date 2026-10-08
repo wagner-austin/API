@@ -46,6 +46,7 @@ def _node(
     max_disk_gb: float = 20.0,
     platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
+    checks_at_once: int | None = None,
 ) -> NodeConfig:
     """Build a node declaration.
 
@@ -57,6 +58,7 @@ def _node(
         max_disk_gb: Disk reserved for staged trees.
         platform: The node's dialect.
         gpu: Its CUDA device, or None for a CPU-only node.
+        checks_at_once: Budgeted checks its CPUs carry at once, or None.
 
     Returns:
         The node.
@@ -81,6 +83,7 @@ def _node(
             reserved_ram_gb=reserved_ram_gb,
             worker_ram_gb=1.1,
             max_disk_gb=max_disk_gb,
+            checks_at_once=checks_at_once,
         ),
     )
 
@@ -346,6 +349,60 @@ class TestLivePools:
             "16 cores against 2 reserved, and its 2 live fleet run(s) hold 14 worker(s) and "
             "15.4 GB. Nothing is left for a dispatch" in verdict["reason"]
         )
+
+
+class TestChecksAtOnce:
+    """MCPs board task a85ef09e: serendipity, 8 cores with 4 reserved, ran
+    MCPs/sms-gateway in 162 s alone and in 306 s beside a second check the
+    pool admitted, 2 + 2 workers inside its 4 cores, so its budget declares
+    how many checks its CPUs carry at once."""
+
+    def test_a_node_at_its_check_count_takes_no_second_however_roomy_its_pool(self) -> None:
+        node = _node(host="serendipity", cores=8, reserved_cores=4, checks_at_once=1)
+        live = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+
+        verdict = assess(
+            node,
+            _state(host="serendipity", free_ram_gb=11.6, live=live),
+            _project(minimum_workers=1),
+            WINDOWS_TAGS,
+        )
+
+        assert verdict == {
+            "workers": 0,
+            "code": FleetErrorCode.NODE_OWNER_RESERVED,
+            "reason": (
+                "serendipity's CPUs carry 1 budgeted check(s) at once across its runners, and 1 "
+                "are live or launching on it now, and its 1 live fleet run(s) hold 2 worker(s) "
+                "and 2.2 GB. A check runs wider than its test workers, so a second would push "
+                "both past their budget; it takes the next job when one of them ends."
+            ),
+        }
+
+    def test_a_node_under_its_check_count_is_weighed_on_its_pools(self) -> None:
+        node = _node(host="serendipity", cores=8, reserved_cores=4, checks_at_once=1)
+
+        verdict = assess(
+            node,
+            _state(host="serendipity", free_ram_gb=11.6),
+            _project(minimum_workers=1),
+            WINDOWS_TAGS,
+        )
+
+        assert verdict == {"workers": 2, "code": None, "reason": ""}
+
+    def test_a_node_with_no_check_count_takes_a_second_its_pool_holds(self) -> None:
+        node = _node(host="serendipity", cores=8, reserved_cores=4)
+        live = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+
+        verdict = assess(
+            node,
+            _state(host="serendipity", free_ram_gb=11.6, live=live),
+            _project(minimum_workers=1),
+            WINDOWS_TAGS,
+        )
+
+        assert verdict == {"workers": 2, "code": None, "reason": ""}
 
 
 class TestPlanDispatch:

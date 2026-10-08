@@ -15,15 +15,19 @@ runs it while the fill pass claims again.
 WHAT THE CLAIM STILL DECIDES. Everything the node's room depends on: the
 gate (:func:`fleet.cli.node_ready.ready_state`), the claim, and the job's
 registry line, tags and grant (:func:`fleet.cli.node_prepare.admit`). A
-claimed job is charged to the node from that moment: until its launch has
-run, :meth:`Launcher.launching` adds its grant to what the ledger's live
-runs hold and names its project, which the next gate leaves out as it
-leaves out a project a lease holds, so two launches never share one
-project's environment and a node is never granted more than the probe and
-the owner's reservation allow. Its run then reaches the ledger, which
-charges it from there on. The launch keeps its order and its refusals: the
-commit's fetch before the lease, the lease given back when the launch
-fails after it, and every local refusal reported to the queue verbatim.
+claimed job is charged to its HOST from that moment: :meth:`Launcher.start`
+writes its grant as a host claim (:mod:`fleet.core.host_claims`), which
+every runner of the host adds to what the ledger's live runs hold and whose
+project every gate leaves out as it leaves out a project a lease holds, so
+two launches never share one project's environment and a host is never
+granted more than the probe and the owner's reservation allow, whichever of
+its runners claimed. Until MCPs board task a85ef09e the charge lived in this
+launcher's memory, which the host's other runner, another process, could not
+read. The launch removes the claim once it has ended, by which time its run
+is on the ledger, which charges it from there on. The launch keeps its order
+and its refusals: the commit's fetch before the lease, the lease given back
+when the launch fails after it, and every local refusal reported to the
+queue verbatim.
 """
 
 from __future__ import annotations
@@ -44,9 +48,11 @@ from fleet.cli.node_claim import refuse
 from fleet.cli.node_prepare import Admitted, Prepared, prepare
 from fleet.cli.node_start import report_started
 from fleet.contracts.dispatch import DispatchJob
+from fleet.contracts.host_claim import HostClaim
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad, NodeConfig
-from fleet.core import _test_hooks, dispatch, export, run_lease
+from fleet.core import _test_hooks, dispatch, export, host_claims, run_lease
+from fleet.core.claim_window import CLAIM_LEASE_SECONDS
 from fleet.core.queue_transport import unanswered
 
 _log = get_logger(__name__)
@@ -57,16 +63,19 @@ LAUNCH_WORKERS: Final = 4
 
 
 class Launching(TypedDict):
-    """What a runner's launches under way hold on its node.
+    """What this runner's own launches under way hold on its node.
+
+    The gate charges the host's claims instead, every runner's
+    (:mod:`fleet.core.host_claims`); these are what this runner must wait
+    for and leave alone.
 
     Attributes:
-        load: Their grants, counted as live runs are.
-        projects: Their projects, which the gate leaves out.
+        load: Their grants, counted as live runs are; a serve hands over
+            only once its count is zero.
         jobs: Their queue jobs, which the collect pass leaves to them.
     """
 
     load: LiveLoad
-    projects: frozenset[str]
     jobs: frozenset[str]
 
 
@@ -214,12 +223,15 @@ class Launcher:
                 workers=sum(flight["workers"] for flight in flights.values()),
                 ram_gb=sum(flight["ram_gb"] for flight in flights.values()),
             ),
-            projects=frozenset(flight["project"] for flight in flights.values()),
             jobs=frozenset(flights),
         )
 
     def start(self, job: DispatchJob, *, admitted: Admitted, sha: str) -> Future[str | None]:
-        """Charge a claimed job to the node and hand its launch to the pool.
+        """Charge a claimed job to its host and hand its launch to the pool.
+
+        Called inside the host's claim turn that claimed the job
+        (:func:`fleet.core.host_claims.claim_turn`), so the host's other
+        runner reads the claim before it next claims.
 
         Args:
             job: The claimed job.
@@ -230,12 +242,25 @@ class Launcher:
             The launch: the run id once its start is reported, or None when
             it was refused.
         """
+        flight = _InFlight(
+            project=job["project"],
+            workers=admitted["workers"],
+            ram_gb=admitted["workers"] * admitted["plan"]["worker_ram_gb"],
+        )
+        host_claims.record(
+            self._loaded.host_claims,
+            alias=self._alias,
+            claim=HostClaim(
+                job_id=job["job_id"],
+                runner=self._agent,
+                project=flight["project"],
+                workers=flight["workers"],
+                ram_gb=flight["ram_gb"],
+                until_unix=_test_hooks.now() + CLAIM_LEASE_SECONDS,
+            ),
+        )
         with self._changed:
-            self._in_flight[job["job_id"]] = _InFlight(
-                project=job["project"],
-                workers=admitted["workers"],
-                ram_gb=admitted["workers"] * admitted["plan"]["worker_ram_gb"],
-            )
+            self._in_flight[job["job_id"]] = flight
         launch = self._executor.submit(self._launch, job, admitted, sha)
         launch.add_done_callback(self._launched)
         return launch
@@ -356,6 +381,7 @@ class Launcher:
             self._hold(frozenset({row["run_id"]}))
             return row["run_id"]
         finally:
+            host_claims.discharge(self._loaded.host_claims, alias=self._alias, job_id=job["job_id"])
             with self._changed:
                 del self._in_flight[job["job_id"]]
 

@@ -19,7 +19,7 @@ from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
-from fleet.core import _test_hooks, export, retire_owed
+from fleet.core import _test_hooks, export, host_claims, retire_owed
 
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
@@ -137,6 +137,18 @@ class LoadedWorkspace:
             The resolved directory.
         """
         return self.ledger.parent / export.MIRRORS_DIRECTORY
+
+    @property
+    def host_claims(self) -> pathlib.Path:
+        """Directory holding each host's claims under way and its claim turn.
+
+        Beside the ledger, because both runners of a host read the same
+        ledger and must read the same claims (:mod:`fleet.core.host_claims`).
+
+        Returns:
+            The resolved directory.
+        """
+        return self.ledger.parent / host_claims.HOST_CLAIMS_DIRECTORY
 
     @property
     def retires(self) -> pathlib.Path:

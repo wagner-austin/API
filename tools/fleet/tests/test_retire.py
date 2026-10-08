@@ -58,6 +58,7 @@ def _node(platform: NodePlatform) -> NodeConfig:
             "reserved_ram_gb": 4.0,
             "worker_ram_gb": 1.1,
             "max_disk_gb": 20.0,
+            "checks_at_once": None,
         },
     )
 
