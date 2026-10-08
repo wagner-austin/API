@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from shutil import rmtree
 
 import torch
 from PIL.Image import Image as PILImage
@@ -103,6 +102,7 @@ from handwriting_ai._hook_defaults_training import (
     _default_on_batch_check,
     _default_orchestrator_factory,
     _default_random,
+    _default_remove_temp_tree,
     _default_run_training,
     _default_safe_loader,
     _default_shutdown_loader,
@@ -454,7 +454,7 @@ train_epoch: TrainEpochProtocol = _default_train_epoch
 calibrate_input_pipeline: CalibrateInputPipelineProtocol = _default_calibrate_input_pipeline
 
 tempfile_mkdtemp: TempfileMkdtempProtocol = _default_tempfile_mkdtemp
-remove_temp_tree: Callable[[str], None] = rmtree
+remove_temp_tree: Callable[[str], None] = _default_remove_temp_tree
 
 queue_handler_factory: QueueHandlerFactory = load_queue_handler_factory()
 

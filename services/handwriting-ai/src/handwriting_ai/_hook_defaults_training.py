@@ -288,6 +288,25 @@ def _default_tempfile_mkdtemp(prefix: str) -> str:
     return _tmp.mkdtemp(prefix=prefix)
 
 
+def _default_remove_temp_tree(path: str) -> None:
+    """Production implementation - removes a calibration's temp directory.
+
+    A named function rather than ``shutil.rmtree`` bound straight to the
+    hook, so a test can run the production remover itself through a failure
+    (``effect-seam-twin``, board task cc7222ca).
+
+    Args:
+        path: The directory :func:`_default_tempfile_mkdtemp` made.
+
+    Raises:
+        OSError: ``FileNotFoundError`` when it is already gone, and its kin
+            when something under it cannot be removed.
+    """
+    import shutil as _shutil
+
+    _shutil.rmtree(path)
+
+
 def _default_get_training_progress_module() -> TrainingProgressModuleProtocol | None:
     """Production implementation - imports training progress module."""
     from handwriting_ai.training import progress
