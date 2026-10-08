@@ -77,15 +77,23 @@ BeforeAll {
         } else {
             $pins = @(Get-Pin $Name)
             $sum = @($pins + ('0' * 64))[0]
+            # Each probe is told apart by cmd's own substring substitution:
+            # the line differs from itself with the probe's words removed.
+            # An 'echo %* | findstr' per word started a cmd and a findstr.exe
+            # each, 554 processes a run over audit-lavender's 52 WSL probes,
+            # which made this suite 116 to 131 s of the harness's 300 s
+            # budget (MCPs board task 8e8e8769). No probe's words carry a
+            # double quote, so the quoted comparison holds every argument.
             $wsl = Initialize-Batch 'wsl' @(
-                'echo %* | findstr /c:"--audit" >nul', 'if not errorlevel 1 goto reaped',
-                'echo %* | findstr /c:"free -m" >nul', 'if not errorlevel 1 goto free',
-                'echo %* | findstr /c:"df -BG" >nul', 'if not errorlevel 1 goto df',
-                'echo %* | findstr /c:"du -s -BG" >nul', 'if not errorlevel 1 goto du',
-                'echo %* | findstr /c:"nvidia-smi" >nul', 'if not errorlevel 1 goto gpu',
-                'echo %* | findstr /c:"is-enabled" >nul', 'if not errorlevel 1 goto enabled',
-                'echo %* | findstr /c:"is-active" >nul', 'if not errorlevel 1 goto active',
-                'echo %* | findstr /c:"sha256sum" >nul', 'if not errorlevel 1 goto sum',
+                'set "said=%*"',
+                'if not "%said:--audit=%"=="%said%" goto reaped',
+                'if not "%said:free -m=%"=="%said%" goto free',
+                'if not "%said:df -BG=%"=="%said%" goto df',
+                'if not "%said:du -s -BG=%"=="%said%" goto du',
+                'if not "%said:nvidia-smi=%"=="%said%" goto gpu',
+                'if not "%said:is-enabled=%"=="%said%" goto enabled',
+                'if not "%said:is-active=%"=="%said%" goto active',
+                'if not "%said:sha256sum=%"=="%said%" goto sum',
                 'exit /b 0',
                 ':reaped', "echo $Reaped", 'exit /b 0',
                 ':free', 'echo               total        used', 'echo Mem:          64000        2000', 'exit /b 0',
@@ -136,11 +144,16 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         $script:ids = Get-CheckId $script:name
     }
 
-    It 'reports every row OK, in the order the roster declares them, on a healthy host' {
+    It 'reports every row OK, in the order the roster declares them, on a healthy host, asking each WSL runner''s own PATH for the GPU' {
         $healthy = Initialize-Host $script:name
         $said = [string[]]@(Invoke-Rendered $script:name $healthy.Parameters)
         $said | Should -Be @($script:ids | ForEach-Object { "CHECK $_ OK" })
         @(Read-CallRecord $healthy.Wsl)[0] | Should -BeLike '-d * -- free -m'
+        $gpu = @(Read-CallRecord $healthy.Wsl | Where-Object { $_ -like '*nvidia-smi*' })
+        $gpu.Count | Should -Be @($script:ids | Where-Object { $_ -like 'gpu:*' }).Count
+        foreach ($call in $gpu) {
+            $call | Should -Match "PATH=\$\(cat /home/gharunner/[^/]+/\.path\) nvidia-smi --query-gpu=name --format=csv,noheader"
+        }
     }
     It 'reports every row DRIFT with the probe''s own words on a sick host, and never comes up short' {
         $sick = Initialize-Host $script:name -Sick
@@ -205,15 +218,6 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         $variant = Initialize-Host $script:name -Processes @((Get-ProcessRow 9300 1 'young.exe' "${root}_work\young.exe" (Get-Date).AddMinutes(-5)))
         @(Invoke-Rendered $script:name $variant.Parameters | Where-Object { $_ -like 'CHECK * DRIFT *' }).Count | Should -Be 0
     }
-    It 'asks each WSL runner''s own PATH for the GPU' {
-        $healthy = Initialize-Host $script:name
-        [void](Invoke-Rendered $script:name $healthy.Parameters)
-        $gpu = @(Read-CallRecord $healthy.Wsl | Where-Object { $_ -like '*nvidia-smi*' })
-        $gpu.Count | Should -Be @($script:ids | Where-Object { $_ -like 'gpu:*' }).Count
-        foreach ($call in $gpu) {
-            $call | Should -Match "PATH=\$\(cat /home/gharunner/[^/]+/\.path\) nvidia-smi --query-gpu=name --format=csv,noheader"
-        }
-    }
     It 'drifts exactly the one row whose answer is <Case>' -ForEach @(
         @{ Case = 'a disk one GB past its ceiling'; Variant = @{ Used = '151G' }; Row = 'disk:*'; Detail = 'the distro root uses 151 GB against a ceiling of 150 GB*' }
         @{ Case = 'a cache past every ceiling'; Variant = @{ Cached = '61G' }; Row = 'cache:*'; Detail = '/* holds 61 GB against a ceiling of *GB; du said: 61G /the/directory (exit 0)' }
@@ -233,14 +237,12 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
             $line | Should -BeLike "CHECK $Row DRIFT $Detail"
         }
     }
-    It 'holds a disk at its ceiling to it' {
-        $full = Initialize-Host $script:name -Used '150G'
-        @(Invoke-Rendered $script:name $full.Parameters | Where-Object { $_ -like 'CHECK disk:* OK' }).Count | Should -Be 1
-    }
-    It 'holds each cache directory at its ceiling to it, and asks du for every one' {
-        $full = Initialize-Host $script:name -Cached '15G'
+    It 'holds a disk and each cache directory at its ceiling to it, and asks du for every one' {
+        $full = Initialize-Host $script:name -Used '150G' -Cached '15G'
         $cache = @($script:ids | Where-Object { $_ -like 'cache:*' })
-        @(Invoke-Rendered $script:name $full.Parameters | Where-Object { $_ -like 'CHECK cache:* OK' }).Count | Should -Be $cache.Count
+        $said = [string[]]@(Invoke-Rendered $script:name $full.Parameters)
+        @($said | Where-Object { $_ -like 'CHECK disk:* OK' }).Count | Should -Be 1
+        @($said | Where-Object { $_ -like 'CHECK cache:* OK' }).Count | Should -Be $cache.Count
         @(Read-CallRecord $full.Wsl | Where-Object { $_ -like '*du -s -BG*' } | ForEach-Object { ($_ -split "'")[1] }) |
             Should -Be @($cache | ForEach-Object { $_.Substring(6, $_.LastIndexOf(':') - 6) })
     }
