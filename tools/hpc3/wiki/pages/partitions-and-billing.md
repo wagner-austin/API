@@ -6,10 +6,10 @@ related: ["[[facts-are-code]]", "[[submission-rules]]", "[[budget-model]]"]
 source_paths:
   - "src/hpc3/clusters/hpc3.py"
 source_git_blobs:
-  "src/hpc3/clusters/hpc3.py": "7bb86a2753a78657365f4bd69c3a0dedd0f1e82c"
+  "src/hpc3/clusters/hpc3.py": "ab26dc348ecfa27716bc6d0bf2f08e359c2676b6"
 provenance:
   - "sshare RawUsage measurement 2026-08-23 (cjmayer_lab)"
-fact_checked: 2026-09-09
+fact_checked: 2026-10-08
 confidence: high
 ---
 

@@ -8,8 +8,8 @@ source_paths:
   - "src/hpc3/core/budget.py"
 source_git_blobs:
   "src/hpc3/contracts/budget.py": "ed533e9bba6ad5616ac448a5b8979412929a80fe"
-  "src/hpc3/core/budget.py": "55346abe18818dd299abf50cb27cb7a80a20c789"
-fact_checked: 2026-09-01
+  "src/hpc3/core/budget.py": "9ebdae0532c6781121404c1c157e9bf1504476f8"
+fact_checked: 2026-10-08
 confidence: high
 ---
 

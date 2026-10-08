@@ -9,11 +9,11 @@ source_paths:
   - "src/hpc3/contracts/array.py"
 source_git_blobs:
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
-  "src/hpc3/core/array_submit.py": "3cfb28a65c2dcd94613daa91b35bf4055d6e20e8"
+  "src/hpc3/core/array_submit.py": "fe8cbc08c92c7956c5e74e3491fb967f5d7885b8"
   "src/hpc3/contracts/array.py": "3ac2482e4cf1f25db5a90cbfc76de537e94c4811"
 provenance:
   - "probe job 55678543 (free, --array=0-3%2), 2026-09-01"
-fact_checked: 2026-09-14
+fact_checked: 2026-10-08
 confidence: high
 ---
 

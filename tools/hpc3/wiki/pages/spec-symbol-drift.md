@@ -9,12 +9,12 @@ source_paths:
   - "src/hpc3/contracts/image_spec.py"
 source_git_blobs:
   "tests/test_committed_specs.py": "6de85126912111f818440366c667a96af7f78472"
-  "specs/abl-image.json": "fa51c3bd9abe519a9ccc54fdc38e5e532b0f0cc5"
-  "src/hpc3/contracts/image_spec.py": "26354bdfe7ae4f19d4bac5fa6936f851010f93e2"
+  "specs/abl-image.json": "b9d8948d2bd4ec6a6f51b001d9e419e556b23d15"
+  "src/hpc3/contracts/image_spec.py": "700f96a66f104da1401405b8b32bb76c02dec51d"
 provenance:
   - "services/Model-Trainer/src/model_trainer/cli/_measurement_hooks.py -- the module `probed_shapes_hook` moved to, added in commit 5bea978c and outside this wiki's workspaceRoot"
   - "jobs 55736151, 55736405 and 55736689, mi.image-v32 on the free partition, 2026-09-03 -- the build this was found while preparing; the first two were preempted and cancelled"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 ---
 

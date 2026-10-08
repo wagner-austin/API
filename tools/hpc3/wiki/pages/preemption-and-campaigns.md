@@ -8,12 +8,12 @@ source_paths:
   - "src/hpc3/core/inflight.py"
   - "src/hpc3/core/campaign.py"
 source_git_blobs:
-  "src/hpc3/contracts/job.py": "1bc6b5aaafdbf0f5dc0e8b3c8b61ddca89db936f"
+  "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
   "src/hpc3/core/inflight.py": "03cf4ad35a0e4c2987b9d5e8ed20e440b3891c55"
-  "src/hpc3/core/campaign.py": "16eb99599f73899e856393e48ee7f3fe7addc71e"
+  "src/hpc3/core/campaign.py": "c9c4428b8cd03f5f218784bbed5ed41bb705f0fa"
 provenance:
   - "scontrol show partition free-gpu (2026-08-28)"
-fact_checked: 2026-09-14
+fact_checked: 2026-10-08
 confidence: high
 ---
 

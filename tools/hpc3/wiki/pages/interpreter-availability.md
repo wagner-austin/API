@@ -15,8 +15,8 @@ source_git_blobs:
   "src/hpc3/core/bootstrap.py": "4b8e0a34981b22430f8465bdafe040a579db03b7"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "src/hpc3/core/interpreter.py": "44152c39c9674c78771a2f01288110c0438c5617"
-  "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
-  "pyproject.toml": "48c300ade70f6240e0aadf87dbf988e96fbe3dfe"
+  "README.md": "4441ec919e2853916b586587e36520a4c5a801e2"
+  "pyproject.toml": "24ef0f6ae4b06d1f5b6151fdf597866b4b49adbe"
 provenance:
   - "module -t avail python on hpc3 login-i15, 2026-09-03: python/2.7.17, 3.8.0, 3.10.2, 3.14.3"
   - "/usr/bin/python3 -V on hpc3 login-i15, 2026-09-03: Python 3.9.25; which python3.11 finds nothing"
@@ -30,7 +30,7 @@ provenance:
   - "/opt/env/bin/python inside all eight registered .sif images on hpc3 login-i16, 2026-10-05: version 3.11, sys.base_prefix /usr/local, bin/python a symlink to /usr/local/bin/python"
   - "os.stat st_dev inside tankpit v2 and cleargbm-v1 images, 2026-10-05: / = /usr/local = /opt/env = 2097157; /pub/wagnera3 = /dfs6b/pub/wagnera3/envs/cleargbm = 46; /proc/mounts lists beegfs_dfs6b /dfs6b although only /pub/wagnera3 is bound"
   - "probe_environment run live against hpc3, 2026-10-05: three images and three host envs pass, envs/tankpit refused ENV_INTERPRETER_BORROWED"
-fact_checked: 2026-10-05
+fact_checked: 2026-10-08
 confidence: high
 ---
 

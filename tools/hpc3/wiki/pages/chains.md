@@ -7,11 +7,11 @@ source_paths:
   - "src/hpc3/cli/chain.py"
   - "src/hpc3/core/chain.py"
 source_git_blobs:
-  "src/hpc3/cli/chain.py": "69397052e46245ca787a2419773f548dac7933fa"
-  "src/hpc3/core/chain.py": "c021a89a36385bd6a7e52a1c040d6ac4b02c1dea"
+  "src/hpc3/cli/chain.py": "e2fecfb69238a79a0ea557a51fb7ed924348b78c"
+  "src/hpc3/core/chain.py": "7f18195ea86e1c4bc441be144b473d56c917e66b"
 provenance:
   - "squeue sample: 261 of 621 pending GPU jobs on DependencyNeverSatisfied"
-fact_checked: 2026-09-01
+fact_checked: 2026-10-08
 confidence: high
 ---
 

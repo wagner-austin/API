@@ -12,10 +12,10 @@ source_git_blobs:
   "src/hpc3/cli/image_capture.py": "0f69c719d6d77b7154cb84a7c21ae8f34a2495bf"
   "src/hpc3/core/image_capture.py": "93694214e390085f1920ccd78d7aaa4fcb836bd5"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
-  "specs/abl-image.json": "fa51c3bd9abe519a9ccc54fdc38e5e532b0f0cc5"
+  "specs/abl-image.json": "b9d8948d2bd4ec6a6f51b001d9e419e556b23d15"
 provenance:
   - "cluster environment /pub/wagnera3/envs/abl-pinned (not in this repo)"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 ---
 

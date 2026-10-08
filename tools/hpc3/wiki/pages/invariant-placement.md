@@ -8,16 +8,16 @@ source_paths:
   - "src/hpc3/contracts/project.py"
   - "src/hpc3/cli/_config.py"
 source_git_blobs:
-  "src/hpc3/core/preflight.py": "c642109e539eb3a0a7cfb97c6e44ff161fe7cb0a"
+  "src/hpc3/core/preflight.py": "84695824400bf77e8994327845bd48e55e43ea3f"
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
-  "src/hpc3/cli/_config.py": "81b8e8ee8fc1a7f8a747da7fa481fee84b114a71"
+  "src/hpc3/cli/_config.py": "ed1ac321669e1b9158a63f7f4f24064dc6f91516"
 provenance:
   - "PROJECT_UNIMAGED observed raised from contracts/workspace.py at decode, 2026-09-02, while that file was uncommitted work in progress"
   - "decode_workspace observed reached from cli/_config.py, the shared loader, 2026-09-02"
   - "811c64cb landed the fix on 2026-09-03 by splitting the reader, not by moving the rule; this page's original prescription was superseded and is corrected in place"
   - "hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit refused with PROJECT_UNIMAGED, 2026-09-02"
   - "hpc3-preflight on the same project after its image was built: OK tankpit.tankpit-sim-smoke, 2026-09-02"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 ---
 
@@ -41,6 +41,12 @@ where each refusal is raised:[^2]
 | may this project *run work* — environment present, packages pinned, image resolvable? | `core/preflight.py` |
 
 `ENV_PATH_MISSING` is a "not ready to run" check and it lives in preflight.[^1]
+Re-read 2026-10-08, preflight's question has grown along the same line:
+since 2026-10-05 it also refuses an environment running another
+environment's interpreter (`ENV_INTERPRETER_BORROWED`) and a run whose
+declared `repo_commit` is not the cluster checkout's HEAD
+(`REPO_COMMIT_NOT_HEAD`), both "may this run work" checks, both raised in
+`core/` and none of them in decode ([[submission-rules]]).
 It has never deadlocked anything, and the reason is worth stating plainly:
 **capture does not preflight.** The commands that build an image are free to
 read a project that is not yet runnable, because the gate that would stop
@@ -148,11 +154,11 @@ only the ones still being built — so it looks correct precisely until
 somebody tries to start something.
 
 [^1]: `src/hpc3/core/preflight.py` — `ENV_PATH_MISSING` is raised there, and in `core/array_submit.py` and `core/image_exec.py`, all on the submit path.
-[^2]: `grep -rn ENV_PATH_MISSING src/hpc3/` → `core/preflight.py`, `core/array_submit.py`, `core/image_exec.py`; `grep -rn PROJECT_UNIMAGED src/hpc3/` → `contracts/workspace.py` only. Measured 2026-09-02.
+[^2]: `grep -rn ENV_PATH_MISSING src/hpc3/` → `core/preflight.py`, `core/array_submit.py`, `core/image_exec.py` (and `core/submit.py`, which this list left out: re-run 2026-10-08, the file has carried the code since `c48c3dc59`, 2026-08-22, and it too is on the submit path); `grep -rn PROJECT_UNIMAGED src/hpc3/` → `contracts/workspace.py` only. Measured 2026-09-02.
 [^3]: Observed in `src/hpc3/contracts/workspace.py` on 2026-09-02 while that file was uncommitted work in progress; recorded under `provenance:` rather than pinned, since a blob pin on a live edit would be stale within the hour.
 [^4]: `grep -rln decode_workspace src/hpc3/cli/` → `_config.py` (the shared loader) and `research_index.py`. Measured 2026-09-02.
 [^5]: `hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit --commit bfdce7a5 --base-image python:3.11.16-slim-bookworm --env-prefix /opt/env --first-party platform_core,monorepo_guards,tankpit_bot --out specs/tankpit-image.json`, run 2026-09-02, refused with `PROJECT_UNIMAGED`.
 [^6]: Decoding each committed workspace individually on 2026-09-02: `hpc3-floor.json`, `hpc3-mi.json`, `hpc3-rusted.json`, `hpc3-tankpit.json` and `hpc3-turkic-lstm.json` all OK; `hpc3.json` alone refused. `hpc3-research-index --write` failed with the same error.
 [^7]: `tools/hpc3/src/hpc3/core/research_index.py`, regenerated 2026-09-02 by importing the generator from a `git archive` extract of HEAD, whose contract predates the rule, with `index_path` and `runs_directory` rebound to the real paths. All six rows restored and `tankpit`'s image digest picked up; one line changed.
 [^8]: Commit `811c64cb`, "Every registered project ships an image, and onboarding can still make one" — 15 files, including a new 333-line `src/hpc3/contracts/project.py` and 63 added lines in `src/hpc3/cli/_config.py`. Read 2026-09-03.
-[^9]: `src/hpc3/contracts/project.py:233` raises `Hpc3ErrorCode.PROJECT_UNIMAGED` from `require_image`; `src/hpc3/cli/_config.py:49` is `load_workspace_connection`, whose docstring states it leaves "the project registry unread" for the onboarding path. `grep -rn PROJECT_UNIMAGED src/hpc3/` now returns `contracts/project.py` and a docstring reference in `contracts/workspace.py`, and no longer the shared loader's decode path. Measured 2026-09-03.
+[^9]: `src/hpc3/contracts/project.py:255` raises `Hpc3ErrorCode.PROJECT_UNIMAGED` from `_require_project_image` (`:233` and `require_image` until re-read 2026-10-08, when neither was where this footnote put it); `src/hpc3/cli/_config.py:52` (`:49` until re-taken 2026-10-08) is `load_workspace_connection`, whose docstring states it leaves "the project registry unread" for the onboarding path. `grep -rn PROJECT_UNIMAGED src/hpc3/` returned `contracts/project.py` and a docstring reference in `contracts/workspace.py`, and no longer the shared loader's decode path, measured 2026-09-03; on 2026-10-08 it also returns docstrings in `cli/bootstrap.py` and in `core/register.py`, the `hpc3-register` onboarding command, and still nothing on the loader's decode path.

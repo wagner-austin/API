@@ -6,11 +6,11 @@ related: ["[[image-build-flow]]", "[[determinism-posture]]", "[[staging-identity
 source_paths:
   - "src/hpc3/core/image_selfcheck.py"
 source_git_blobs:
-  "src/hpc3/core/image_selfcheck.py": "14a72028e8f5fc4e80d5ce7742ba018f46f5b40c"
+  "src/hpc3/core/image_selfcheck.py": "8c6470fe50a94423e3757f0f39d271b56ef599a3"
 provenance:
   - "wiki/tools/extraction-eval/runs/known-answers.json (the wiki repo, not this one)"
   - "model_trainer.cli.known_answer_registry (services/Model-Trainer, outside this workspaceRoot)"
-fact_checked: 2026-09-01
+fact_checked: 2026-10-08
 confidence: high
 ---
 

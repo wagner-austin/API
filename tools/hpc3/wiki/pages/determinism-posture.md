@@ -9,12 +9,12 @@ source_paths:
   - "src/hpc3/contracts/ledger.py"
 source_git_blobs:
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
-  "src/hpc3/contracts/job.py": "1bc6b5aaafdbf0f5dc0e8b3c8b61ddca89db936f"
-  "src/hpc3/contracts/ledger.py": "d059693188c3d50b7634458f885c385842c2764c"
+  "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
+  "src/hpc3/contracts/ledger.py": "960ee5617aba5aa9ed459b082419e99e5ec6484f"
 provenance:
   - "measured: RTX 3090 Ti, torch 2.6.0+cu124, transformers 4.46.3"
   - "platform_core.determinism_env (libs/platform_core, outside this workspaceRoot)"
-fact_checked: 2026-09-14
+fact_checked: 2026-10-08
 confidence: high
 ---
 

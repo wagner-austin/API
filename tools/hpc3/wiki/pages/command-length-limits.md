@@ -16,16 +16,16 @@ source_git_blobs:
   "src/hpc3/core/status.py": "c89b8061f970b1677c1eff9c76010912c2b80828"
   "src/hpc3/core/squeue.py": "62002937c50a30b2a5032d082e3813d3a989b711"
   "src/hpc3/core/logs.py": "436b22a97e08bf32b046ea8e3b154796189ab614"
-  "src/hpc3/core/campaign.py": "16eb99599f73899e856393e48ee7f3fe7addc71e"
-  "src/hpc3/core/cancel.py": "7587c162b2b98e55431303b5eb21723926a6a623"
-  "src/hpc3/cli/triage.py": "46fd93061aff3ed3ebd76e0bc9407657d3db5859"
+  "src/hpc3/core/campaign.py": "c9c4428b8cd03f5f218784bbed5ed41bb705f0fa"
+  "src/hpc3/core/cancel.py": "340fa0dbeb4c7445755bc1d087e5999964604b0d"
+  "src/hpc3/cli/triage.py": "7118b0b35b4a4805fd9e0bb8b41c68f9a9e60649"
 provenance:
   - "campaign existence probe truncated mid-loop, vhsearch2-r0, 2026-09-02"
   - "hpc3-triage WinError 206 with runs/ledger.jsonl at 6645 rows, austinpc, 2026-09-05"
   - "bash 'unexpected EOF while looking for matching' from a ~29 KB age probe, hpc3 login-i15, 2026-09-05"
   - "hpc3-triage 2026-09-05 run 1: 6706 recorded, 6417 open, 12 findings, 6345 newly closed; run 2: 72 open, 0 newly closed"
   - "fix committed fa8f87f9 (repo ~/PROJECTS/API)"
-fact_checked: 2026-09-30
+fact_checked: 2026-10-08
 confidence: high
 ---
 

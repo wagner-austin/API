@@ -8,12 +8,12 @@ source_paths:
   - "runs/hpc3-code-style.json"
 source_git_blobs:
   "runs/code-style-run-train.json": "d60c063f583e12b75e85651d00ae6c24e54ebc04"
-  "runs/hpc3-code-style.json": "6a6adee0f76926efbd62ef677880eefe43ecb5f2"
+  "runs/hpc3-code-style.json": "721e6e3d6a9f1a8502672f374e7a124a65f8ede7"
 provenance:
   - "huggingface_hub file_download.py, function _cache_commit_hash_for_specific_revision -- read from the installed 0.x in services/Model-Trainer/.venv, outside this wiki's workspaceRoot"
   - "job 55744648, code-style.qlora-qwen-v1 on an A30, 2026-09-04: OSError after 9 seconds, 'couldn't find it in the cached files'"
   - "/pub/wagnera3/hf/hub/models--Qwen--Qwen2.5-Coder-1.5B -- no refs/ directory, against models--gpt2 which has refs/main"
-fact_checked: 2026-09-04
+fact_checked: 2026-10-08
 confidence: high
 ---
 

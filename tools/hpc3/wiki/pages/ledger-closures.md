@@ -7,11 +7,11 @@ source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/ledger.py"
 source_git_blobs:
-  "src/hpc3/cli/triage.py": "46fd93061aff3ed3ebd76e0bc9407657d3db5859"
+  "src/hpc3/cli/triage.py": "7118b0b35b4a4805fd9e0bb8b41c68f9a9e60649"
   "src/hpc3/core/ledger.py": "94065680790919c0a68e097320d228400805b564"
 provenance:
   - "MinJobAge 300s, read from scontrol show config"
-fact_checked: 2026-09-06
+fact_checked: 2026-10-08
 confidence: high
 ---
 

@@ -8,10 +8,10 @@ source_paths:
   - "src/hpc3/core/env_probe.py"
   - "README.md"
 source_git_blobs:
-  "src/hpc3/contracts/job.py": "1bc6b5aaafdbf0f5dc0e8b3c8b61ddca89db936f"
+  "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
-  "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
-fact_checked: 2026-09-14
+  "README.md": "4441ec919e2853916b586587e36520a4c5a801e2"
+fact_checked: 2026-10-08
 confidence: high
 ---
 

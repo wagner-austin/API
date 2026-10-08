@@ -11,14 +11,14 @@ source_paths:
 source_git_blobs:
   "src/hpc3/core/sbatch.py": "0a247eba2978d1fc73886bf5153003ed127fc5e7"
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
-  "src/hpc3/core/preflight.py": "87e0e78c26f696fd02d60245a82928ed8a45d699"
+  "src/hpc3/core/preflight.py": "84695824400bf77e8994327845bd48e55e43ea3f"
   "src/hpc3/core/remote.py": "10c5e4e3a13c6f0004fd05cdb01d2ebbc251d8ea"
 provenance:
   - "probe job 55675199 on hpc3-l18-04, 2026-09-01"
   - "rusted engine log champion-s2707 (ab48-v7), 2026-09-01"
   - "clients/RustedWarfareBot src/rw_bot/harness/campaign.py@member_command (outside this workspaceRoot)"
   - "login-i17, 2026-09-30 23:40Z: /proc/<pid>/task/*/wchan of a hung apptainer exec showed __IBVSocket_waitForRecvCompletionEvent (D) in syscall 262, newfstatat; board task 465689f5"
-fact_checked: 2026-09-30
+fact_checked: 2026-10-08
 confidence: high
 ---
 

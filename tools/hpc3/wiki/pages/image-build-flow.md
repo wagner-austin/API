@@ -14,23 +14,25 @@ source_paths:
   - "src/hpc3/core/env_probe.py"
   - "src/hpc3/core/image_capture.py"
   - "README.md"
+  - "src/hpc3/core/register.py"
 source_git_blobs:
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
   "src/hpc3/contracts/workspace.py": "852c2abe6b41fd6b033b1c97c5fdcb0cde2dc086"
-  "src/hpc3/contracts/image_spec.py": "26354bdfe7ae4f19d4bac5fa6936f851010f93e2"
-  "src/hpc3/contracts/image_spec_fields.py": "88d23d5fc4d2646f89f75b1ad5c85d7df9c4c4b2"
+  "src/hpc3/contracts/image_spec.py": "700f96a66f104da1401405b8b32bb76c02dec51d"
+  "src/hpc3/contracts/image_spec_fields.py": "9487ac8838828b8a911afd7a990ae54e5b08a43b"
   "src/hpc3/cli/image.py": "596fbb22fa96cf0b4d418b62732c527d3f31bd34"
-  "src/hpc3/cli/image_build.py": "690afc1d5b6cc9732ead9a3d619346b50f563643"
+  "src/hpc3/cli/image_build.py": "b4afec06e96f198504ec9b764345ff3c69edb263"
   "src/hpc3/cli/image_capture.py": "0f69c719d6d77b7154cb84a7c21ae8f34a2495bf"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "src/hpc3/core/image_capture.py": "93694214e390085f1920ccd78d7aaa4fcb836bd5"
-  "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
+  "README.md": "4441ec919e2853916b586587e36520a4c5a801e2"
+  "src/hpc3/core/register.py": "d3cfcc55d9f580ef1c7b55cfcabe25b2de733baf"
 provenance:
   - "runs/hpc3*.json -- the six committed workspace documents; every project declares an image as of 2026-09-03"
   - "runs/ledger.jsonl -- image-build rows; earliest recorded build artifact is images/v23, while floor declares images/v4"
   - "registry-1.docker.io Docker-Content-Digest for python:3.11-slim-bookworm, read 2026-09-03: sha256:528257d4..., against the sha256:0bee7276... rusted pinned"
   - "/pub/wagnera3/api/libs/cleargbm_rs/target/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl -- the built wheel on the cluster"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 ---
 
@@ -138,6 +140,16 @@ Then put the built image's path and `sha256` in the project's `image`, set
 packages are checked **inside the image** rather than against a directory
 someone can edit[^9].
 
+Re-read 2026-10-08: that last step is a command now. Since 2026-10-05
+(`521d3cc89`, board task `cf5f54c0`) **`hpc3-register`** is onboarding's fifth
+and final step. It accepts no digest: it reads the image file's digest on the
+cluster, proves the declared environment and pins inside that image with the
+same probe preflight runs, and only then writes the project's one workspace
+document and regenerates the `docs/RESEARCH.md` table from the workspace
+documents. The project's section in `RESEARCH.md` is a precondition it checks
+rather than writes, and every unmet precondition is named in one refusal, so
+the order is bootstrap, capture, image, build, register.[^register]
+
 ## Onboarding, and the deadlock it used to be
 
 Registration needs a digest. The digest comes from a build. The build is
@@ -204,3 +216,4 @@ name is validated for well-formedness, so it can be wrong but not malformed[^12]
 [^12]: `src/hpc3/cli/image_capture.py` section `_environment_to_probe`, and its module docstring "TWO ROUTES".
 [^13]: `src/hpc3/cli/image_build.py` section `main`, where the registry lookup was removed because `check_name_agrees` runs first.
 [^14]: `runs/ledger.jsonl` image-build rows against the `image` each project declares in `runs/hpc3*.json` (see `provenance`).
+[^register]: `src/hpc3/core/register.py` § module docstring ("WHAT THIS WRITES, AND WHAT IT REFUSES TO", "WHY IT CANNOT RUN EARLY", "EVERY LOCAL PRECONDITION IS REPORTED AT ONCE") and § `require_registrable`; `README.md` § "Registering it"; API commit `521d3cc89` (2026-10-05).
