@@ -14,17 +14,17 @@ source_paths:
   - "agent/src/rwbot/agent/Scoreboard.java"
   - "agent/src/rwbot/agent/LedgerNames.java"
   - "src/rw_bot/harness/sweep.py:290"
-  - "src/rw_bot/harness/results_layout.py:106"
+  - "src/rw_bot/harness/results_layout.py:107"
 source_git_blobs:
   "src/rw_bot/policy/trace.py": "60378d14c073f5941f4f650df3d19082bc4156a6"
-  "src/rw_bot/policy/recorder.py": "3dac235b7ca9d03776025fa0a83c449a24c10a99"
-  "src/rw_bot/policy/scoreboard.py": "7d20e66fbc39878a0562a158d09d344fafa3b3a3"
+  "src/rw_bot/policy/recorder.py": "131b9fe646775f4abfc085b2b9718c9ccb9a7224"
+  "src/rw_bot/policy/scoreboard.py": "450abc83a65136f7920c0a002581dd4ed5906841"
   "agent/src/rwbot/agent/Scoreboard.java": "bd6285fc06b3ed05a9244cd9b5c68d4f12ba3f09"
   "agent/src/rwbot/agent/LedgerNames.java": "c7b8c5c2005b89de12af597dd478d76323264661"
   "src/rw_bot/harness/sweep.py": "e8b6f40bca00e03903fb7b823e69812193ed78fb"
-  "src/rw_bot/harness/results_layout.py": "bf31143781274b48e5f24bc1dffc6fcdfd372879"
+  "src/rw_bot/harness/results_layout.py": "cc4bf68f1a7ec84a7b6cfd04d6623f296671e8f8"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-13
+fact_checked: 2026-10-08
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -104,4 +104,4 @@ Sweeps used to pass `-` for the trace path and keep only the scorecard, on the r
 
 [^1]: `runs/trace-12345.ndjson` against `runs/sweeps/upgrade-fixed/long-s12345.txt`.
 [^2]: `runs/traces/r01..r12-s12345.ndjson`; `wiki/log.md:661`. Peak worth averages 67,650 and arrives 63% of the way through; final worth averages 7,237.
-[^3]: `src/rw_bot/harness/sweep.py:290` for `play_args`, and `src/rw_bot/harness/results_layout.py:106` for `trace_path`. Both were attributed to `sweep.py` until 2026-09-03; `trace_path` now lives in the results-layout module alongside the rest of the on-disk path scheme.
+[^3]: `src/rw_bot/harness/sweep.py:290` for `play_args`, and `src/rw_bot/harness/results_layout.py:107` for `trace_path` (`:106` until re-taken 2026-10-08, after `de514a3a2` moved the module's sweep types to platform_core). Both were attributed to `sweep.py` until 2026-09-03; `trace_path` now lives in the results-layout module alongside the rest of the on-disk path scheme.

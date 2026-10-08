@@ -13,11 +13,11 @@ source_paths:
   - "scripts/search.py"
 source_git_blobs:
   "src/rw_bot/harness/margin.py": "835989ddc3f65ce4acd988a3bed9f45cf383f9f1"
-  "src/rw_bot/harness/search.py": "01e1923a6b6e2f0f5f565dd38d5491960323db90"
+  "src/rw_bot/harness/search.py": "e9d928387191e7ae9506662590f07de1317b0d67"
   "scripts/margin.py": "9f91f992224f3c558281cdc1ba45a1270e3981ef"
-  "scripts/search.py": "d39d8e219ff34c256454e1483425815bf4009849"
+  "scripts/search.py": "9d5596e82857fb3c1fb3e2e51339bec30dfd6bbb"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-10-08
 confidence: high
 hubs: [headless-harness]
 ---

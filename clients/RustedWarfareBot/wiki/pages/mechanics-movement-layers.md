@@ -20,11 +20,11 @@ source_paths:
 source_git_blobs:
   "wiki/sources/m16-enums/enum-names.txt": "919c505b3f4d41a4c8dc599a37653ddbfb4e5e1e"
   "wiki/sources/m17-movement/reachability.txt": "6e1637370797ebac09c7e3f6429318c57a99ed67"
-  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
+  "wiki/sources/m6-wire/world-sample.ndjson": "641ea6ce9a6e5ba6619d3a6cb6d7a7360b02a784"
   "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
   "src/rw_bot/policy/siting.py": "82023004583aac091037280e8f864070c317f6b8"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 hubs: [game-mechanics, bot-architecture]
 ---
@@ -90,5 +90,5 @@ Nothing here uses the layers for anything but pools. The same comparison would a
 [^3]: `runs/decompiled/com/corrodinggames/rts/gameFramework/utility/y.java:388` — the predicate quoted above, including the `l.g("pathPossible: no isolatedGroups found!")` line that names it.
 [^4]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:175` — the AI's zone-reachability check, which tries the zone centre and then four points at 0.4× its radius; the AI carries its own copy of the two-point predicate at `:188`.
 [^5]: `src/rw_bot/policy/siting.py:466` — `_can_walk_to`, and the reasoning for rejecting negatives rather than mirroring the engine's comparison. Attributed to `build_order.py` until 2026-09-03; commit 3e6765a7 (2026-07-28) moved the siting logic into its own module.
-[^6]: `wiki/sources/m17-movement/reachability.txt` — the component census of the archived capture, derived from `wiki/sources/m6-wire/world-sample.ndjson` with no game running.
+[^6]: `wiki/sources/m17-movement/reachability.txt` — the component census of the archived capture (re-derived 2026-10-08 from the capture `619f2f07c` re-took on 2026-09-13: the same 46 pools in land components 1:34, 16:2, 17:2, 18:2, 19:2, 22:2 and 24:2, and the same owned commandCenter NONE -3, builder LAND 1 and editorOrBuilder LAND -2), derived from `wiki/sources/m6-wire/world-sample.ndjson` with no game running.
 [^7]: `src/rw_bot/policy/siting.py:355` — `survey_pools` and the `unreachable` count it returns, declared on `PoolSurvey` at `:350`, incremented at `:447` and returned at `:460`; rendered into the wait reason by `no_pool_reason` at `:534`. Two corrections against the earlier version of this footnote: the module is `siting.py`, not `build_order.py`, and the renderer lost its leading underscore when it became part of that module's public surface — it is `no_pool_reason`, not `_no_pool_reason`.

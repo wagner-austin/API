@@ -368,7 +368,7 @@ last 25 members, the long games, file.[^24]
 
 [^20]: `spend96.py` over `runs/traces/attrbar96` (columns 2, 6, 7, 12 at samples 750-2,500 and over the window) and the cards' `reinforced` and `samples seen` lines.
 [^21]: `bank96.py` over the same traces: credits, idle producers, refusals and orders per 100-sample block from 800 to 1,900; the plateau is a game whose mean credits over samples 1,000-1,500 exceed 1,800, and its heavy count is the cards' `owned peak` line.
-[^22]: plateau wins: s8925001 s8925209 s8925313 s8925833 s8926977 s8927393 s8928017 s8928121 s8928225 s8928433 s8929369 s8929681 s8931001 s8931729 s8932041 s8933185 s8933289; plateau losses: s8925729 s8926249 s8926353 s8926457 s8927185 s8927497 s8929161 s8929889 s8932249 s8933601 s8934225 s8934641 s8935057 s8935473 s8935681. Compare the gained and lost lists in footnotes 12, 13 and 19.
+[^22]: plateau wins: s8925001 s8925209 s8925313 s8925833 s8926977 s8927393 s8928017 s8928121 s8928225 s8928433 s8929369 s8929681 s8931001 s8931729 s8932041 s8933185 s8933289; plateau losses: s8925729 s8926249 s8926353 s8926457 s8927185 s8927497 s8929161 s8929889 s8932249 s8933601 s8934225 s8934641 s8935057 s8935473 s8935681. Compare the gained and lost lists in footnotes 12, 13 and 19. The lists are the cards `runs/sweeps/attrbar96/champ-s<seed>.txt` § verdict and § owned peak, a plateau game being one whose `owned peak` names no `heavyTank`; re-derived 2026-10-08 from those 96 cards alone, the rule gives these same 17 and 15 seeds, and 52 wins among the 64 others, as the table above records.
 [^23]: `src/rw_bot/policy/spending.py`, `unlock_tech`, commit 6048b74a2; `sweeps/techbar96.txt`.
 
 ## The response built from the reading: the turtle
@@ -439,4 +439,4 @@ omits, the lesson the opener probes already taught.
 
 [^1]: `runs/sweeps/divebar192/champ-*.txt` -- `enemy peak`, `units lost to`, `samples seen` on all 96 cards, read by `corpus96.py`.
 [^2]: `runs/traces/divebar192/champ-*.ndjson` -- the tick table at samples 1000/1500/2000/2500 on all 96 traces, read by `early96.py`.
-[^3]: `runs/sweeps/divebar192`, `bloodbar96`, `prangebar96`, `condcbar192` -- paired verdicts per seed; the s8925833 anatomy is the pair's per-loss tables in the window 80k-160k.
+[^3]: `runs/sweeps/divebar192`, `bloodbar96`, `prangebar96`, `condcbar192` -- paired verdicts per seed, each card's `verdict` line; the s8925833 anatomy is the pair's per-loss tables in the window 80k-160k. The pair is `runs/sweeps/divebar192/champ-s8925833.txt` § verdict, "won (won)", against `runs/sweeps/divebar192/dive-s8925833.txt` § verdict, "wiped (wiped)" (read 2026-10-08; the hub's artifact store holds 192 divebar192 cards and 96 each for bloodbar96 and prangebar96, and its `runs/sweeps/` lists no `condcbar192`, only `condc10`, so that batch's cards are the cluster copy under `/pub/wagnera3/rusted/runs/sweeps/`).

@@ -13,14 +13,16 @@ source_paths:
   - "src/rw_bot/harness/runner.py"
   - "scripts/sweep.py"
   - "Makefile"
+  - "../../tools/hpc3/runs/hpc3-rusted.json"
 source_git_blobs:
   "src/rw_bot/harness/sweep.py": "e8b6f40bca00e03903fb7b823e69812193ed78fb"
   "src/rw_bot/harness/clone.py": "6083a9f62b07cde157b0956f7b6801a7de5fe2f5"
   "src/rw_bot/harness/runner.py": "ac33271ebd336b570468a3eb8508e5e4badd664f"
   "scripts/sweep.py": "04784a693860f6845c4932175751ed3d8a09f305"
-  "Makefile": "d4a3f7442441fb2445ff62601341247b66f41cf8"
+  "Makefile": "7a346cd5a3410c17b20ce8668dc1213c9020c986"
+  "../../tools/hpc3/runs/hpc3-rusted.json": "85a9f52dd959a453a6021a202db9314083726e15"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-10-08
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -102,8 +104,12 @@ An earlier estimate of ~10 was taken from the JVM working set alone and was wron
 
 The pinned game is a Windows binary with native libraries — `lwjgl64.dll`, `freetype.dll`, `OpenAL64.dll` — and its own bundled JVM. A Linux container means Wine, which changes the runtime substrate underneath every engine claim in this wiki; those pages are pinned to one build for exactly that reason. Windows containers or VMs each carry an OS image, and since the binding constraint is memory, an OS per instance makes density *worse* rather than better. Orchestration across machines solves a scheduling problem that does not exist here.
 
+Re-read 2026-10-08, this section describes the host it was written on and not the only place matches run now. Since 2026-08-30 (`9ae66117e`) matches also run on HPC3, as scheduled jobs inside the digest-pinned image `rusted.sif`, each campaign member owning its clone, port and display, against the game's Linux depot staged on the cluster; `tools/hpc3/runs/hpc3-rusted.json` names the image at `/pub/wagnera3/rusted/images/v5/rusted.sif` with a 180-minute array wall clock. The first measurement that path produced was a negative one: cross-invocation replay did not hold under Java 8. What the paragraph above still holds for is this Windows host, where the pinned build is the Windows binary.[^cluster]
+
 ## Running one
 
     make sweep SWEEP_JOBS=sweeps/wave-mass.txt SWEEP_NAME=wave-mass SWEEP_WORKERS=4
 
 A job file is one match per line — `label | seed | goals | max_workers | samples | mass` — with blanks and `#` comments skipped so an arm can be commented out of a batch rather than deleted from it. The format is positional and narrow deliberately: a missing field is an error naming the line, not a default quietly changing what the arm means.
+
+[^cluster]: API commit `9ae66117e` (2026-08-30), "rusted on HPC3: the panel runs, and cross-invocation replay does not hold under Java 8", whose message records "digest-pinned image, staged game and payload trees, a campaign whose members each own their clone, port and display" and the panel run "inside rusted.sif"; API commit `619f2f07c` (2026-09-13), whose message names "the staged Linux depot" on a cluster compute node; `../../tools/hpc3/runs/hpc3-rusted.json` § the rusted project's `minutes` (`180`) and image `path`.

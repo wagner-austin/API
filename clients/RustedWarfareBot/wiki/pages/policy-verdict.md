@@ -12,9 +12,9 @@ source_paths:
 source_git_blobs:
   "src/rw_bot/policy/verdict.py": "095d8c64f2e8723feeffa924ea39c48848b65dc6"
   "src/rw_bot/policy/campaign.py": "b04a2a2e3dbec7b0625f7e1a0f66b67ccb8f4beb"
-  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
+  "wiki/sources/m6-wire/world-sample.ndjson": "641ea6ce9a6e5ba6619d3a6cb6d7a7360b02a784"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-10-08
 confidence: high
 hubs: [bot-architecture]
 ---

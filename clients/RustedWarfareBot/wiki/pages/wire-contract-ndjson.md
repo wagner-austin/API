@@ -14,11 +14,12 @@ related:
 source_paths:
   - "wiki/sources/m6-wire/world-sample.ndjson:1"
   - "wiki/sources/m6-wire/world-sample.ndjson:2"
-  - "wiki/sources/m6-wire/world-sample.ndjson:22"
-  - "wiki/sources/m6-wire/world-sample.ndjson:69"
-  - "wiki/sources/m6-wire/world-sample.ndjson:75"
-  - "wiki/sources/m6-wire/world-sample.ndjson:234"
-  - "wiki/sources/m6-wire/world-sample.ndjson:467"
+  - "wiki/sources/m6-wire/world-sample.ndjson:23"
+  - "wiki/sources/m6-wire/world-sample.ndjson:70"
+  - "wiki/sources/m6-wire/world-sample.ndjson:76"
+  - "wiki/sources/m6-wire/world-sample.ndjson:235"
+  - "wiki/sources/m6-wire/world-sample.ndjson:469"
+  - "tests/test_wire_state.py"
   - "agent/src/rwbot/agent/BuildOptions.java"
   - "agent/src/rwbot/agent/StateStream.java"
   - "agent/src/rwbot/agent/WireChecks.java"
@@ -27,16 +28,17 @@ source_paths:
   - "src/rw_bot/wire/state.py"
   - "src/rw_bot/wire/codec.py"
 source_git_blobs:
-  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
+  "wiki/sources/m6-wire/world-sample.ndjson": "641ea6ce9a6e5ba6619d3a6cb6d7a7360b02a784"
   "agent/src/rwbot/agent/BuildOptions.java": "0d5a8a58756ee70bab724662c398ec09c225edbb"
-  "agent/src/rwbot/agent/StateStream.java": "206a05fdc2dc96ab22e61714fb6727b68a15930b"
-  "agent/src/rwbot/agent/WireChecks.java": "65d943ad0858873fa084717938e217081210d000"
+  "agent/src/rwbot/agent/StateStream.java": "373f299d5f168dde272b1249cb6ce08b7bea83d2"
+  "agent/src/rwbot/agent/WireChecks.java": "379ea389d0c3dcf33d01545ae74b6ec0507fc206"
   "src/rw_bot/control/channel.py": "e5c4521155fea78be4e037ca2e9f631d3a8b8443"
   "src/rw_bot/wire/ndjson.py": "25a0dba01f56dbe42e1bcbdedc8330b00b8d7765"
-  "src/rw_bot/wire/state.py": "4cbdd31f7f3d23470ea1e009f8641bd07d10ae2e"
-  "src/rw_bot/wire/codec.py": "7caa7903e5e14dc20bac2eafb718411f7295dba0"
+  "src/rw_bot/wire/state.py": "7a38cdcd0429b6f5841fbd3d2c2914358c3857a5"
+  "src/rw_bot/wire/codec.py": "c87dd0e2c887b9d03f0576b4300b34714d0ba11e"
+  "tests/test_wire_state.py": "da41b6c80be2abffb584e4bf787296c86f8ba83e"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-01
+fact_checked: 2026-10-08
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -94,14 +96,14 @@ The sample is rendered on the game thread and written off it. A position read mi
 
 ## Replay falls out of it
 
-A JSONL stream is itself a corpus. Decoding is a pure function of the lines it is given and reads no file, so the same code serves a live tail and an archived replay with no branch between them.[^6] The tests decode the real capture archived here rather than a fixture written to match the parser, and they cross-check it: the clock advances exactly 3 ms per frame across every pair of samples, which is the pinned frame delta the determinism regime sets rather than a measured rate ([[policy-determinism]]).[^3][^6]
+A JSONL stream is itself a corpus. Decoding is a pure function of the lines it is given and reads no file, so the same code serves a live tail and an archived replay with no branch between them.[^6] The tests decode the real capture archived here rather than a fixture written to match the parser, and they cross-check it: the clock advances by one whole number of milliseconds per frame, the same between every pair of samples, so the clock and the counter are locked at the engine's fixed step rather than merely correlated.[^3][^6] Re-read 2026-10-08: this page said the step was exactly 3 ms and that it was the pinned frame delta the determinism regime sets ([[policy-determinism]]). It was the platform. The capture is a sandbox boot, and the agent's 3 ms pin installs only through a requested match, so the step in it is the depot's own, 3 ms on the Windows depot and 5 ms on the Linux depot the cluster image runs; since 2026-09-13 (`619f2f07c`) the capture is taken on a cluster compute node, its frames advance 5 ms apiece, and the test asserts one integer step in {3, 5}.[^3]
 
-[^1]: `wiki/sources/m6-wire/world-sample.ndjson:1` — the opening frame record of a real capture from a live headless skirmish, declaring 20 visible entities, 46 pools, 161 build options, 5 players and 0 refused builds.
+[^1]: `wiki/sources/m6-wire/world-sample.ndjson:1` — the opening frame record of a real capture from a headless skirmish, declaring 21 visible entities, 46 pools, 161 build options, 5 players and 0 refused builds (20 visible in the capture this page was written against, re-taken on 2026-09-13 in `619f2f07c`; re-read 2026-10-08). The example block above is that earlier capture's lines, kept as written; at HEAD the frames are 2090, 2261 and 2436 and every `player` record also carries `units_killed`, `buildings_killed`, `units_lost` and `buildings_lost`, the engine's kill ledger, since the same commit.
 [^2]: `wiki/sources/m6-wire/world-sample.ndjson:2` — the entity record at index 0, an opposing team's `commandCenter` carrying `"mine":false`.
-[^3]: `wiki/sources/m6-wire/world-sample.ndjson:234` and `:467` — the second and third frame records, 1951 at 18073 ms and 2248 at 18964 ms; 297 frames across 891 ms is exactly 3 ms per frame.
-[^7]: `wiki/sources/m6-wire/world-sample.ndjson:22` — the first pool record, tile (115, 6) at world (2310.0, 130.0).
+[^3]: `wiki/sources/m6-wire/world-sample.ndjson:235` and `:469` — the second and third frame records, 2261 at 17294 ms and 2436 at 18169 ms, 175 frames across 875 ms, 5 ms per frame; `tests/test_wire_state.py` § `test_the_real_capture_advances_at_one_fixed_step_per_frame`, whose docstring says "3ms on the Windows depot, 5ms on the Linux depot the cluster image runs, where the fixture is now taken. An earlier version asserted 3 exactly and called it the pin; it was the platform." Until 2026-10-08 this footnote cited `:234` and `:467`, 1951 at 18073 ms and 2248 at 18964 ms, 297 frames across 891 ms, of the capture `619f2f07c` replaced.
+[^7]: `wiki/sources/m6-wire/world-sample.ndjson:23` (`:22` until the 2026-09-13 capture, re-read 2026-10-08) — the first pool record, tile (115, 6) at world (2310.0, 130.0).
 [^8]: `src/rw_bot/control/channel.py` — `_complete_or_none` waits for `declared_children(opening) + 1` lines before decoding; `declared_children` sums `CHILD_COUNT_FIELDS` (`src/rw_bot/wire/state.py`), the one list every record kind registers in.
-[^9]: `wiki/sources/m6-wire/world-sample.ndjson:69` and `:75` — the Command Center's `builder` option (`"placed":false`) and the Builder's `landFactory` (`"placed":true`); `agent/src/rwbot/agent/BuildOptions.java` is the producer, and the predicate that reads as "makes something" is `a.s.g()`, false on `a.v` (build a structure) and true on `a.l` (produce a unit).
+[^9]: `wiki/sources/m6-wire/world-sample.ndjson:70` and `:76` (`:69` and `:75` until the 2026-09-13 capture) — the Command Center's `builder` option (`"placed":false`) and the Builder's `landFactory` (`"placed":true`); `agent/src/rwbot/agent/BuildOptions.java` is the producer, and the predicate that reads as "makes something" is `a.s.g()`, false on `a.v` (build a structure) and true on `a.l` (produce a unit).
 [^10]: `src/rw_bot/wire/command.py` — `encode_produce` emits `kind`, `unit_id` and `type` and no coordinate; `encode_build` carries `x` and `y`.
 [^4]: `agent/src/rwbot/agent/StateStream.java:31` — the producer, with the flatness constraint and its rationale in the class javadoc; the render-on-game-thread and await are in `Premain.writeSample`.
 [^5]: `src/rw_bot/wire/ndjson.py` — the strict reader, with the `disallow_any_expr` constraint recorded in the module docstring and one traceable code per rejection (`RW-NDJSON-001` … `-006`).

@@ -8,13 +8,13 @@ source_paths:
   - "src/rw_bot/policy/doom.py"
 source_git_blobs:
   "src/rw_bot/policy/campaign.py": "b04a2a2e3dbec7b0625f7e1a0f66b67ccb8f4beb"
-  "src/rw_bot/policy/trace.py": "9bc4d266a0258debb350a1044bc4c241f22e85c3"
+  "src/rw_bot/policy/trace.py": "60378d14c073f5941f4f650df3d19082bc4156a6"
   "src/rw_bot/policy/doom.py": "69fbc15602e4f48a97c4e82fdbc4eaac4fe6866c"
 provenance:
   - "/pub/wagnera3/rusted/runs/traces -- 7,830 per-sample trace files, 931MB, one per cluster match through impincome96 (ls | wc -l and du -sh, read 2026-09-06)"
   - "wiki/log.md verdict entries 2026-09-06 (impincome96) and 2026-09-06 (detpair24)"
   - "wiki/log.md entries 2026-09-07 (detpair24b floor re-pricing; corpus label measurement over rw_matches/data.csv, 6,643,204 rows / 1,980 matches, exporter commit aaa8f780)"
-fact_checked: 2026-09-07
+fact_checked: 2026-10-08
 confidence: medium
 hubs: [bot-architecture]
 ---

@@ -22,7 +22,7 @@ source_paths:
   - "src/rw_bot/policy/siting.py:550"
   - "agent/src/rwbot/agent/Perception.java"
 source_git_blobs:
-  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
+  "wiki/sources/m6-wire/world-sample.ndjson": "641ea6ce9a6e5ba6619d3a6cb6d7a7360b02a784"
   "wiki/sources/m14-threat/threat-survey.txt": "2ec77e81fc8d8751a0ae32e8965a3da8d0e0807d"
   "wiki/sources/m18-reach/attack-range.txt": "473274e62d337bdad4342210f921112b2c1cd72c"
   "src/rw_bot/policy/threat.py": "0c81fc3abc464da9e16197c55cd718f450ea2ff9"
@@ -30,7 +30,7 @@ source_git_blobs:
   "src/rw_bot/policy/siting.py": "82023004583aac091037280e8f864070c317f6b8"
   "agent/src/rwbot/agent/Perception.java": "78629ad554596a6fd28fbd245c37a57a6b1e4743"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 hubs: [bot-architecture, game-mechanics]
 ---
@@ -97,7 +97,7 @@ Confidence here is `high` on the claims and deliberately narrow on the scope. Ev
 [^2]: `runs/decompiled/com/corrodinggames/rts/game/n.java:1096` — `public final boolean c(n n2) { if (n2 == i || this == i) { return false; } return this.r != n2.r; }`, where `i` is the neutral team and `r` the alliance group. Note it compares `r`, not the team number `k` the wire already carried.
 [^3]: `runs/decompiled/com/corrodinggames/rts/game/n.java:1103` — `d(n)`, identical but for `==` and for answering true when both sides are neutral.
 [^4]: `src/rw_bot/policy/threat.py` — `route_is_exposed` and the point-to-segment distance it rests on. The segment is bounded rather than an infinite line, which is what keeps a hostile 400 units behind the builder off a walk that never goes near it.
-[^5]: `wiki/sources/m6-wire/world-sample.ndjson:2` — `…"team":5,"mine":false,"hostile":true,…`. Across the capture the field partitions cleanly, and that partition is the claim: every `mine:true` record is `hostile:false` and every `mine:false` record is `hostile:true`, with no record in either off-diagonal cell. The tallies are 9 entity records at `team:0, mine:true, hostile:false` against 51 across teams 1, 3, 5 and 7 at `mine:false, hostile:true` (12/15/12/12), over the capture's three frames. This footnote read 48 until 2026-09-03, a figure that matched neither the capture it was pinned to (39) nor the 2026-09-01 regeneration (51); the partition it was offered as evidence for holds in both, which is why the wrong count survived unnoticed. The map is a free-for-all, so it does not exercise the allied case; that the predicate distinguishes it is read from the engine, not from this capture. Written by `Perception.isHostileToLocalPlayer`, whose binding `make execution` verifies against the jar.
+[^5]: `wiki/sources/m6-wire/world-sample.ndjson:2` — `…"team":5,"mine":false,"hostile":true,…`. Across the capture the field partitions cleanly, and that partition is the claim: every `mine:true` record is `hostile:false` and every `mine:false` record is `hostile:true`, with no record in either off-diagonal cell. The tallies are 9 entity records at `team:0, mine:true, hostile:false` against 54 across teams 1, 3, 5 and 7 at `mine:false, hostile:true` (12/15/12/15), over the capture's three frames, re-counted 2026-10-08 against the capture `619f2f07c` re-took on 2026-09-13; the 2026-09-01 capture's tally was 51 (12/15/12/12). This footnote read 48 until 2026-09-03, a figure that matched neither the capture it was pinned to (39) nor the 2026-09-01 regeneration (51); the partition it was offered as evidence for holds in both, which is why the wrong count survived unnoticed. The map is a free-for-all, so it does not exercise the allied case; that the predicate distinguishes it is read from the engine, not from this capture. Written by `Perception.isHostileToLocalPlayer`, whose binding `make execution` verifies against the jar.
 [^6]: `src/rw_bot/policy/threat.py` — `reach_of`, which indexes the registry reach table rather than defaulting through a miss.
 [^7]: `src/rw_bot/policy/siting.py:355` — `survey_pools` returns the chosen pool with the counts behind the choice (the `PoolSurvey` shape at `:329`), and `no_pool_reason` at `:534` turns them into the wait reason. Attributed to `build_order.py` and spelled `_no_pool_reason` until 2026-09-03; commit 3e6765a7 moved the function and dropped the underscore.
 [^8]: `wiki/sources/m14-threat/threat-survey.txt` — one sample taken over the agent channel after a 700-sample run on `[z;p10]Crossing Large (10p)`, with the survey run against it and no order sent. The file carries the hostility partition, the per-pool table and the old-rule/new-rule comparison, plus the drift note against an earlier probe.

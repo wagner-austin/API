@@ -14,7 +14,7 @@ source_paths:
   - "wiki/sources/m11-pools/type-flags.ndjson:85"
   - "wiki/sources/m11-pools/pool-build-run.log:401"
   - "wiki/sources/m11-pools/pool-build-run.log:403"
-  - "wiki/sources/m6-wire/world-sample.ndjson:22"
+  - "wiki/sources/m6-wire/world-sample.ndjson:23"
   - "wiki/sources/m11-pools/builder-travel-timing.txt:13"
   - "src/rw_bot/policy/build_order.py"
   - "src/rw_bot/policy/siting.py:44"
@@ -27,13 +27,13 @@ source_paths:
 source_git_blobs:
   "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
   "wiki/sources/m11-pools/pool-build-run.log": "d661b6813fdcc17b1cdc08da7fc390fe22ce67b6"
-  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
+  "wiki/sources/m6-wire/world-sample.ndjson": "641ea6ce9a6e5ba6619d3a6cb6d7a7360b02a784"
   "wiki/sources/m11-pools/builder-travel-timing.txt": "c73ead926dfb2d281ba4ec591f56d6545ce2e948"
   "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
   "src/rw_bot/policy/siting.py": "82023004583aac091037280e8f864070c317f6b8"
   "agent/src/rwbot/agent/MapTiles.java": "cacf4bfc7ff02bb68ee5f843cd3436aade34dd81"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-03
+fact_checked: 2026-10-08
 confidence: high
 hubs: [game-mechanics, engine-internals]
 ---
@@ -104,7 +104,7 @@ And the fog filter over pools has never filtered anything, because fog is disabl
 [^2]: `com/corrodinggames/rts/game/b/g.java:215` in the decompiled tree — `if (properties.getProperty("res_pool") != null) { ((g)object).i = true; }`, one arm of the block that also sets the water, lava and cliff flags.
 [^3]: `com/corrodinggames/rts/game/units/y.java:4636` — `if (this.r().p()) { l2.bL.a(this.eo, this.ep); object = l2.bL.e(l2.bL.T, l2.bL.U); if (object == null || !((g)object).i) return "{2}"; }`. The `"{2}"` sentinel is mapped to the message field holding `gui.cannotPlace.needsResourcePool` at `com/corrodinggames/rts/gameFramework/f/g.java:1885`, set at `:356`.
 [^4]: `wiki/sources/m11-pools/pool-build-run.log:401` — `[rw-agent] map scan: 46 resource pool(s)`.
-[^5]: `wiki/sources/m6-wire/world-sample.ndjson:22` — `{"kind":"pool","frame":1666,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0,"group_land":19}`, the first pool record of the archived capture; the frame record at `:1` declares `"pools":46`. The capture was regenerated on 2026-09-01, which moved every line offset and re-stamped the frame numbers (2703/2991/3289 became 1666/1951/2248); the pool geometry this footnote rests on — index 0 at tile (115, 6) — is identical across both, as is the count of 46. Frame numbers here are an artifact of when the sample was taken and carry no claim.
+[^5]: `wiki/sources/m6-wire/world-sample.ndjson:23` — `{"kind":"pool","frame":2090,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0,"group_land":19}`, the first pool record of the archived capture; the frame record at `:1` declares `"pools":46`. Re-read 2026-10-08: the capture was re-taken on a cluster compute node on 2026-09-13 (`619f2f07c`), which moved the record from `:22` to `:23` and its frame from 1666 to 2090; the geometry, index 0 at tile (115, 6) with 46 pools, is unchanged again. The capture was regenerated on 2026-09-01, which moved every line offset and re-stamped the frame numbers (2703/2991/3289 became 1666/1951/2248); the pool geometry this footnote rests on — index 0 at tile (115, 6) — is identical across both, as is the count of 46. Frame numbers here are an artifact of when the sample was taken and carry no claim.
 [^6]: `.game/assets/maps/skirmish/[z;p10]Crossing Large (10p).tmx:1424` [synthesis] — the map's `Items` layer is base64 gzip; decompressed and scanned for gid 375 it yields 46 cells, the first at tile (115, 6), matching [^5]. Derived rather than archived because the map file is the primary source and ships with the game.
 [^7]: `.game/assets/units/extractor/extractor_common.ini:25` — `placeOnlyOnResPool: true`, with `radius: 18` at `:20` and `isBuilding: true` at `:23`. Every shipped extractor tier inherits this file via `copyFrom`. The loader reads the key at `com/corrodinggames/rts/game/units/custom/ag.java:1710` into the field the type predicate returns at `custom/l.java:723`.
 [^8]: `.game/assets/translations/Strings.properties:557` — `units.extractor.description=[[Generates credits.]]  [[Can only be built on resource pools.]] [[Upgradable to T3]]`. The same English sentence appears verbatim in the Japanese bundle, which is what shows it to be untranslated prose rather than generated text.

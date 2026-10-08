@@ -12,15 +12,15 @@ source_paths:
   - "scripts/margin.py"
   - "../../tools/hpc3/runs/hpc3-rusted.json"
 source_git_blobs:
-  "scripts/search.py": "d39d8e219ff34c256454e1483425815bf4009849"
+  "scripts/search.py": "9d5596e82857fb3c1fb3e2e51339bec30dfd6bbb"
   "scripts/search_specs.py": "18e1f7f78068784afe348f1db9ff7542358db24b"
   "scripts/panel.py": "7e2e5c2b2ff5b88570f3ba1595faf1b778876fb9"
   "scripts/evolve.py": "0902cc9522f990abf6ca21db21b3ecb751825c44"
   "scripts/batch.py": "812ee628b2fa8274f6e96b75790ed340f6bc798c"
   "scripts/pairs.py": "18311147e3897a81608c1d551c83a488000176ed"
   "scripts/margin.py": "9f91f992224f3c558281cdc1ba45a1270e3981ef"
-  "../../tools/hpc3/runs/hpc3-rusted.json": "6f97e362db8befa63107a201d3f9d25a2014ca1a"
-fact_checked: 2026-09-04
+  "../../tools/hpc3/runs/hpc3-rusted.json": "85a9f52dd959a453a6021a202db9314083726e15"
+fact_checked: 2026-10-08
 confidence: high
 hubs: [headless-harness]
 ---
