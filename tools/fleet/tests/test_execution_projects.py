@@ -13,6 +13,10 @@ a docker project's build as the node's execdocker user against that user's
 rootless daemon (MCPs board task a8ee9b21), which only a node carrying the
 tag has. slime/execution and idle/execution require it for the same
 reason: each builds and starts its game's containers.
+
+MCPs/execution-testdb carries MCPs itself as a companion: its pushed-tests
+case replays a 2026-09-28 push, whose commits a node can read only from a
+clone the hub sent beside the export (MCPs board task 93d7d7f4).
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import load_json_str
 
-from fleet.contracts.source import InstallStep, ProjectSource
+from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 
@@ -87,6 +91,31 @@ def test_each_games_suite_runs_isolated_on_a_rootless_daemon(game: str) -> None:
         path="execution",
         install=(InstallStep(phase="install", argv=("npm", "ci")),),
         companions=(),
+    )
+
+
+def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> None:
+    """MCPs/execution-testdb clones MCPs' history to ``../MCPs``.
+
+    Its pushed-tests case fetches 53274ebe9, bbee12d4b, 49b8cb6a1 and
+    ea4e20239 to replay the push pre-push now refuses. The node holds no git
+    credential, and job 9f8b9628 on lavender-wsl failed at that fetch from
+    GitHub with "could not read Username"; the companion is the hub's
+    full-history bundle of ``main``, which holds all four as ancestors, at
+    the path a workstation's worktree reaches the main checkout by
+    (MCPs board task 93d7d7f4). The lane holds the shared test database
+    exclusively, since the replayed suite runs against ``corvis_test``.
+    """
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    project = require_project(workspace, "MCPs/execution-testdb")
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX)
+    assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
+    assert project["source"]["path"] == "execution"
+    assert project["source"]["companions"] == (
+        ProjectCompanion(
+            remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
+        ),
     )
 
 

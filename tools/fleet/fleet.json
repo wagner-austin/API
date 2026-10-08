@@ -992,7 +992,9 @@
           {"phase": "workspace-build", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "workspace-build"]},
           {"phase": "test-database", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "test-database", "CONTAINER=corvis-fleet-testdb"]}
         ],
-        "companions": []
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/MCPs.git", "ref": "main", "directory": "MCPs"}
+        ]
       }
     },
     "MCPs/gitiles-mcp": {
