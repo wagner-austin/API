@@ -14,12 +14,13 @@ import pathlib
 import subprocess
 
 import pytest
+from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import _test_hooks, dialect, names, retire
 from fleet.core.dialect_linux import PROLOGUE
 from tests._host_bash import host_bash
-from tests.conftest import DEMO_RUN_ID, FakeRun, ok, retire_replies
+from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 #: Each platform's stage root, as the roster declares them.
 STAGE_ROOTS = {
@@ -102,6 +103,29 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
     ).encode("utf-8")
     assert script_path in " ".join(runner.calls[0])
     assert runner.calls[1][-1].endswith(script_path)
+
+
+@pytest.mark.parametrize(
+    ("result", "code"),
+    [
+        (
+            failed(255, "Connection timed out during banner exchange"),
+            FleetErrorCode.NODE_UNREACHABLE,
+        ),
+        (failed(1, "Remove-Item: access denied"), FleetErrorCode.DISPATCH_FAILED),
+    ],
+)
+def test_a_retire_that_fails_raises_its_transport_code(
+    result: _test_hooks.CommandResult, code: FleetErrorCode
+) -> None:
+    """The stop and the hub's collect retire before the row closes, so a
+    failure is raised for the next tick to settle the run again."""
+    _test_hooks.run = FakeRun([ok(""), result])
+
+    with pytest.raises(AppError) as raised:
+        retire.retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)
+
+    assert raised.value.code is code
 
 
 def test_each_holder_the_retire_ended_is_logged_by_its_line(
