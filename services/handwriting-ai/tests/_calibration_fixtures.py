@@ -15,6 +15,9 @@ and, worse, its ability to finish (API board task 8bbe083b):
   tests whose subject is training, not calibration.
 
 conftest.py re-exports both, which is what registers them as fixtures.
+
+:data:`CHILD_HANG_BOUND_S` is the one timeout every test that spawns a real
+calibration child gives a child it expects to finish.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ import multiprocessing
 from collections.abc import Generator
 from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
+from typing import Final
 
 import pytest
 
@@ -32,6 +36,16 @@ from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
 from handwriting_ai._hook_protocols_training import EffectiveConfig
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.dataset import DataLoaderConfig
+
+#: The budget timeout, in seconds, for a real spawned calibration child that
+#: is expected to finish: a bound on a hung child, never on a slow one. The
+#: child boots a fresh interpreter, imports torch and torchvision and builds
+#: ResNet-18 before its dataset is read; on 2026-10-08 that took 5 s on an
+#: idle hub, and under load the child first logged 38 s after its spawn and
+#: had not finished at the 60 s the cleanup test then allowed, which failed a
+#: healthy run (API board task 8bbe083b). The timeout path itself is tested
+#: with a timeout of 0.
+CHILD_HANG_BOUND_S: Final[float] = 120.0
 
 
 @pytest.fixture()

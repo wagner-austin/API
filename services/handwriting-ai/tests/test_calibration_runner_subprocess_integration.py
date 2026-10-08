@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
+from pathlib import Path
 
 import pytest
 from PIL import Image
+from tests._calibration_fixtures import CHILD_HANG_BOUND_S
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.training.calibration._types import BudgetConfig, Candidate
 from handwriting_ai.training.calibration.runner import SubprocessRunner
 from handwriting_ai.training.dataset import PreprocessDataset
@@ -23,24 +27,37 @@ class _FakeMNIST:
 
 
 def test_subprocess_runner_child_writes_result_and_logs(caplog: pytest.LogCaptureFixture) -> None:
-    """One real spawned child: its result file reaches the parent, and so do its logs.
+    """One real spawned child: its result reaches the parent, then nothing of it is left.
 
-    The package's only test that spawns the calibration child, so it carries
-    both halves of the child's contract. Its sibling that asserted only the
-    result ran the identical spawn, one more fresh interpreter and torch
-    import, and was merged into this one (API board task 8bbe083b).
+    The package's only test that spawns a calibration child which finishes,
+    so it carries the whole contract of a clean run: the result file is read
+    back, the child's logs reach the parent, and the result directory and the
+    child are gone when ``run`` returns. Its sibling that asserted only the
+    result, and the clean-run case of tests/test_calibration_temp_cleanup.py,
+    each ran the identical spawn, one more fresh interpreter and torch import,
+    and were merged into this one (API board task 8bbe083b).
 
     Without setup_logging() in _child_entry(), child processes would timeout
     silently because logging wasn't initialized, making all log statements
     no-ops; the lifecycle records asserted below are that regression's test.
     """
+    # The real mkdtemp makes the result directory; the test only learns its path
+    made: list[str] = []
+    real_mkdtemp = _test_hooks.tempfile_mkdtemp
+
+    def _recording_mkdtemp(prefix: str) -> str:
+        path = real_mkdtemp(prefix)
+        made.append(path)
+        return path
+
+    _test_hooks.tempfile_mkdtemp = _recording_mkdtemp
+    before = {child.pid for child in multiprocessing.active_children()}
     base = _FakeMNIST(8)
     ds = PreprocessDataset(base, default_train_config(batch_size=4))
     cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=2)
-    # 120s bounds a hung child without racing a healthy one -- the child
-    # boots a fresh interpreter plus torch, measured at 8-15s under host
-    # load, and a busy host must not fail this test by wall clock.
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=99.0, timeout_s=120.0, max_failures=1)
+    budget = BudgetConfig(
+        start_pct_max=99.0, abort_pct=99.0, timeout_s=CHILD_HANG_BOUND_S, max_failures=1
+    )
 
     with caplog.at_level(logging.INFO, logger="handwriting_ai"):
         out = SubprocessRunner().run(ds, cand, samples=1, budget=budget)
@@ -48,6 +65,9 @@ def test_subprocess_runner_child_writes_result_and_logs(caplog: pytest.LogCaptur
     # The child's result file was written and read back
     assert out["ok"] and out["res"] is not None, "Child process failed or timed out"
     assert out["res"]["batch_size"] >= 1
+    assert len(made) == 1 and Path(made[0]).name.startswith("calib_child_")
+    assert not Path(made[0]).exists()
+    assert {child.pid for child in multiprocessing.active_children()} == before
 
     # Verify child lifecycle logs were emitted through the application logger
     messages = [rec.message for rec in caplog.records if rec.name == "handwriting_ai"]
