@@ -39,6 +39,7 @@ SEDONA_SPEC: Final[JSONObject] = {
     "urgent": False,
     "cause": None,
     "room": "coordination",
+    "title": None,
     "what": "sedona's free disk is below its floor of 20GB",
     "why": (
         "a full disk stops every build, container and backup on it, and what to delete is a "
@@ -192,12 +193,21 @@ class TestDecodeStatement:
             ("disk-floor:sedona", None)
         ]
         (ask,) = statement["asks"]
-        assert (ask["kind"], ask["urgent"], ask["cause"], ask["room"]) == (
+        assert (ask["kind"], ask["urgent"], ask["cause"], ask["room"], ask["title"]) == (
             "decision",
             False,
             None,
             "coordination",
+            None,
         )
+
+    def test_refuses_an_ask_written_before_it_declared_a_title(self) -> None:
+        """An ask with no ``title`` is the pre-e6514287 audit's: refused, never read as null."""
+        ask: JSONObject = {**SEDONA_SPEC}
+        del ask["title"]
+        value = load_json_str(dump_json_str({"source": "s", "at": "a", "asks": [ask]}))
+        with pytest.raises(JSONTypeError, match="'title' is absent"):
+            decode_statement(value)
 
     def test_refuses_an_ask_written_before_its_route_was_stated(self) -> None:
         """An ask with no ``urgent`` is the pre-db98562b audit's: refused, never read as false."""

@@ -70,6 +70,9 @@ class AskSpec(TypedDict):
         urgent: Whether a texted kind is texted at once; False for a filed one.
         cause: The failure it stems from, shared by every ask it causes, or None.
         room: The room a filed kind naming no task is filed in, or None.
+        title: A texted kind's one line on the operator's phone (MCPs board
+            task e6514287), or None for a filed kind, which the audit's
+            decision is.
         what: What happened, with no reading in it.
         why: Why it needs the operator.
         action: The one thing to do.
@@ -82,6 +85,7 @@ class AskSpec(TypedDict):
     urgent: bool
     cause: str | None
     room: str | None
+    title: str | None
     what: str
     why: str
     action: str
@@ -145,6 +149,7 @@ def decode_ask_spec(value: JSONValue) -> AskSpec:
         urgent=require_bool(obj, "urgent"),
         cause=_nullable_str(obj, "cause"),
         room=_nullable_str(obj, "room"),
+        title=_nullable_str(obj, "title"),
         what=require_str(obj, "what"),
         why=require_str(obj, "why"),
         action=require_str(obj, "action"),
@@ -188,6 +193,7 @@ def encode_ask_spec(ask: AskSpec) -> JSONObject:
         "urgent": ask["urgent"],
         "cause": ask["cause"],
         "room": ask["room"],
+        "title": ask["title"],
         "what": ask["what"],
         "why": ask["why"],
         "action": ask["action"],
