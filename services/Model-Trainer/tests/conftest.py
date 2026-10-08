@@ -336,18 +336,28 @@ def _dump_stacks_when_a_test_stops_making_progress() -> Generator[None, None, No
 #: took 1118.9 s in job 113056567370 and passed the 900 s timeout, a test that
 #: takes 1.83 s alone on the hub. Eight concurrent copies of that file on the
 #: hub took 6.7 to 7.0 s per run of it at torch's default and 3.1 to 3.4 s
-#: under the fixture below.
+#: under the pin below.
 _TORCH_THREADS_PER_TEST: Final[int] = 1
 
 
-@pytest.fixture(autouse=True)
-def _one_torch_thread_per_test() -> None:
-    """Pin torch's intra-op pool to one thread before every test.
+def pytest_runtest_setup() -> None:
+    """Pin torch's intra-op pool to one thread before a test's fixtures exist.
 
     Per test rather than once per worker, because the training jobs pin the
     pool themselves (``job_utils`` asks for the configured count, every core
     when none is set), and a pin one test's job made must not carry into the
     tests that worker runs after it.
+
+    A HOOK RATHER THAN AN AUTOUSE FIXTURE, because a module-scoped fixture is
+    set up before every function-scoped one, autouse included. The modules
+    that train once and assert many times (``scope="module"`` fixtures, see
+    ``tests/test_xdist_grouping.py``) did that training under whatever pool
+    the previous test's job had left, every core included. pytest's own
+    ``pytest_runtest_setup`` (``_pytest/runner.py``) is the one that creates
+    a test's fixtures, whatever their scope, and pluggy calls a conftest's
+    implementation before it because the conftest registered later; the
+    ``tryfirst`` marker that would say so outright types as ``Any`` under
+    this package's mypy. ``tests/test_torch_thread_pin.py`` checks the order.
     """
     torch.set_num_threads(_TORCH_THREADS_PER_TEST)
 
