@@ -222,7 +222,7 @@
     },
     "tools/maketools-execution": {
       "worker_ram_gb": 1.0,
-      "minimum_workers": 1,
+      "minimum_workers": 8,
       "expected_minutes": 60,
       "required_tags": ["linux", "docker"],
       "source": {
