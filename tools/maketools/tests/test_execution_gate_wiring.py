@@ -18,6 +18,10 @@ import re
 from pathlib import Path
 from typing import Final
 
+from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_dict, require_int
+
+from tests.test_service_entry import SERVICES
+
 #: The repository root: tools/maketools/tests/ is three levels below it.
 ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
@@ -104,3 +108,23 @@ def test_the_execution_project_runs_tools_fleet_host_cases() -> None:
         "poetry sync --with dev",
         "$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov",
     ]
+
+
+def test_the_deploy_project_asks_the_fleet_for_one_worker_per_case() -> None:
+    """Every deploy case runs at once, so the check takes the slowest one.
+
+    MCPs board task 90c135ac. Each case is its own image build, mostly its
+    pip install and image export: turkic-api took 190 s built alone on
+    lavender-wsl's rootless daemon and 188 s beside three others, so the
+    cases do not slow each other and the check's wall is the sum of its
+    rounds. Four workers made two rounds, 374 s against the 300 s budget at
+    API 9686df19d. The dispatcher grants at most the larger of a project's
+    minimum_workers and half a node's spare cores, so the minimum is what
+    puts every case in one round, and a node that cannot give that many
+    refuses the job rather than running it into the budget.
+    """
+    workspace = narrow_json_to_dict(
+        load_json_str((ROOT / "tools" / "fleet" / "fleet.json").read_text(encoding="utf-8"))
+    )
+    project = require_dict(require_dict(workspace, "projects"), "tools/maketools-execution")
+    assert require_int(project, "minimum_workers") == len(SERVICES)
