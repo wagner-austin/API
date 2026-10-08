@@ -130,6 +130,27 @@ class TestStatusMarkers:
         assert _kinds("assert 404 == response.status\n") == {NETWORK}
         assert _kinds("assert response.status_code == 200\n") == frozenset()
         assert _kinds("assert response.status == expected\n") == frozenset()
+        assert _kinds("assert response.status_code >= 500\n") == {NETWORK}
+        assert _kinds("assert 400 <= response.statusCode\n") == {NETWORK}
+        assert _kinds("assert response.status_code != 404\n") == frozenset()
+
+    def test_a_status_below_the_ceiling_read_the_exit_way_is_a_process_failure(self) -> None:
+        """Node's spawnSync reports a child's exit as ``.status``."""
+        for failing in (
+            "assert result.status == 37\n",
+            "assert result.statusCode != 0\n",
+            "assert 0 < result.status\n",
+            "finished(status=2)\n",
+        ):
+            assert _kinds(failing) == {PROCESS}
+        for passing in (
+            "assert result.status == 0\n",
+            "assert result.status == 100\n",
+            "assert result.status == 302\n",
+            "assert result.status != 1\n",
+            "finished(status=0)\n",
+        ):
+            assert _kinds(passing) == frozenset()
 
     def test_kinds_accumulate_across_a_function(self) -> None:
         source = """

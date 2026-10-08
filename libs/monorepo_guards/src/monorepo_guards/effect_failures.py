@@ -107,7 +107,12 @@ KILL_WORDS = frozenset({"kill", "terminate"})
 KILL_KINDS = frozenset({PROCESS, FILE_SWAP})
 FAILURE_ATTRIBUTES = frozenset({"timed_out", "killed"})
 EXIT_NAMES = frozenset({"exit_code", "returncode", "exitcode", "code"})
-STATUS_NAMES = frozenset({"status", "status_code"})
+STATUS_NAMES = frozenset({"status", "status_code", "statusCode"})
+#: A status read the exit way below this is a child's exit, not HTTP: Node's
+#: spawnSync reports a child's exit as ``.status`` (MCPs wiki-check's curl
+#: seam fails with 37), and no HTTP status is below 100, so the two ranges
+#: never meet. From MCPs' table (board task c96e8791).
+EXIT_STATUS_CEILING = 100
 NETWORK_PHRASES = ("fetch failed", "connection refused")
 #: Text that says a process failed: a nonzero exit, stated as code or as a
 #: message (``pg_dump exited 2``, ``exit status 2``), or a spawn that found
@@ -145,15 +150,18 @@ def _stated_kind(name: str | None, value: int | None) -> str | None:
         value: The integer it is stated or compared equal to.
 
     Returns:
-        Process for a nonzero exit code, network for a status of 400 or
-        more, None otherwise.
+        Process for a nonzero exit code or a status between 0 and
+        :data:`EXIT_STATUS_CEILING`, network for a status of 400 or more,
+        None otherwise.
     """
     if value is None:
         return None
-    if name in STATUS_NAMES:
-        return NETWORK if value >= 400 else None
     if name in EXIT_NAMES:
         return PROCESS if value != 0 else None
+    if name in STATUS_NAMES:
+        if value >= 400:
+            return NETWORK
+        return PROCESS if 0 < value < EXIT_STATUS_CEILING else None
     return None
 
 
@@ -229,31 +237,66 @@ def _compare_kind(node: ast.Compare) -> str | None:
             comparisons are not how a test states an exit code).
 
     Returns:
-        Process for a nonzero exit code, network for a status of 400 or
-        more, None otherwise.
+        Process for a nonzero exit code, or a status read the exit way below
+        :data:`EXIT_STATUS_CEILING`; network for a status equal to or at
+        least 400; None otherwise. Exit members are read first.
     """
     left, op, right = node.left, node.ops[0], node.comparators[0]
     names = (terminal_name(left), terminal_name(right))
     values = (_int_literal(right), _int_literal(left))
-    if any(name in STATUS_NAMES for name in names):
-        failed = any(value is not None and value >= 400 for value in values)
-        return NETWORK if failed else None
-    if names[0] in EXIT_NAMES:
-        value, flipped = values[0], False
-    elif names[1] in EXIT_NAMES:
-        value, flipped = values[1], True
-    else:
-        return None
+    sides = ((names[0], values[0], False), (names[1], values[1], True))
+    for name, value, flipped in sides:
+        if name in EXIT_NAMES:
+            failed = value is not None and _asserts_nonzero(op, value, flipped, ceiling=None)
+            return PROCESS if failed else None
+    for name, value, flipped in sides:
+        if name in STATUS_NAMES:
+            return _status_kind(op, value, flipped)
+    return None
+
+
+def _status_kind(op: ast.cmpop, value: int | None, flipped: bool) -> str | None:
+    """Name the failure a comparison of a status against a literal asserts.
+
+    Args:
+        op: The comparison's operator.
+        value: The literal compared against, or None when it is not one.
+        flipped: True when the status is the right-hand side.
+
+    Returns:
+        Network for ``== N`` or ``>= N`` with N of 400 or more, process for
+        a nonzero exit read below :data:`EXIT_STATUS_CEILING`, else None.
+    """
     if value is None:
         return None
+    at_least = ast.LtE if flipped else ast.GtE
+    if value >= 400 and isinstance(op, (ast.Eq, at_least)):
+        return NETWORK
+    if _asserts_nonzero(op, value, flipped, ceiling=EXIT_STATUS_CEILING):
+        return PROCESS
+    return None
+
+
+def _asserts_nonzero(op: ast.cmpop, value: int, flipped: bool, *, ceiling: int | None) -> bool:
+    """Report whether comparing an exit against a literal asserts it is nonzero.
+
+    Args:
+        op: The comparison's operator.
+        value: The literal.
+        flipped: True when the exit is the right-hand side.
+        ceiling: For a status, the bound an equal value must stay under to
+            be an exit; None for an exit member, where any nonzero counts.
+
+    Returns:
+        True for ``== N`` with N nonzero (and between 0 and ``ceiling`` when
+        one is given), ``!= 0``, and ``> 0`` (``0 <`` flipped).
+    """
     if isinstance(op, ast.Eq):
-        failed = value != 0
-    elif isinstance(op, ast.NotEq):
-        failed = value == 0
-    else:
-        above = ast.Lt if flipped else ast.Gt
-        failed = isinstance(op, above) and value == 0
-    return PROCESS if failed else None
+        return value != 0 if ceiling is None else 0 < value < ceiling
+    if isinstance(op, ast.NotEq):
+        return value == 0
+    above = ast.Lt if flipped else ast.Gt
+    return isinstance(op, above) and value == 0
 
 
 def _only(kind: str | None) -> frozenset[str]:
