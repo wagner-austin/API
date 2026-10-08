@@ -6651,3 +6651,29 @@ replayed" and footnote 6; [[container-census]] re-pins
   `read_replay`, `run_conformance` and `run_census`.
 - A scan of the 451 captures under `runs/bot` and `runs/probe` decoded
   all 163,688 commands, so no archived capture stops a run.
+
+## [2026-10-08] audit | Code re-read of the 22 pages the corvis wiki audit failed
+
+MCPs board task 3d71a8e1. The corvis wiki audit reported 58 errors on this
+wiki, nearly all source pins left behind by the 2026-09-26 string-enum pass
+and the multiplayer track. Each page's cited code was re-read at API HEAD
+and its prose corrected where the code had moved; `fact_checked` is left as
+it was, because nothing was re-observed in the game, and each page records
+the re-read in `verified:` instead.
+Pages updated: capture-conformance, capture-differ, coding-standards,
+committed-intent, container-census, feature-corpus-provenance,
+ferry-mechanics, flag-triage-20260729, flag-triage-20260902,
+fleet-coordination, fleet-forage-allocation, fleet-lifecycle,
+fleet-live-reads, guard-mutation-sweep, make-targets, multiplayer-field,
+packaged-data-assets, quad-sweep-doctrine, recipient-policy,
+server-push-gating, session-state-deglobalisation, sim-world-parameterization
+Notes: the substantive corrections were committed-intent's twelve release
+reasons and its lock mutators moving into `intent.py`, feature-corpus's
+build stamp having shipped, recipient-policy's footnotes leaving the
+deleted `sim/emissions.py`, the free-radar frontier's walk-then-pan,
+`make check` and `make lint` as they now run, the bring-up gate on
+`make up`, and the HPC3 image; coding-standards and make-targets now say
+that the contract, layer, protocol-constant, state-sentinel, mine-layer and
+hook-restore rules in `scripts/` are reached only from their tests since
+`57fd5ab40`, and of those only hook-restore and layer have a test that runs
+them over the real tree. The audit then reported 0 errors.
