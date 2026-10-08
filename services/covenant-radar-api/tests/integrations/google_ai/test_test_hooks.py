@@ -366,27 +366,24 @@ class TestRealGeminiClientCountTokensWithFake:
 class TestRealGeminiClient:
     """Tests for RealGeminiClient instantiation (no API calls)."""
 
-    def test_instantiation_stores_api_key(self) -> None:
-        """Test that RealGeminiClient stores the API key."""
+    def test_factory_builds_client_holding_key_and_sdk_client(self) -> None:
+        """The real factory builds a RealGeminiClient over a real SDK client.
+
+        One construction drives _real_gemini_client_factory, RealGeminiClient's
+        constructor and _create_genai_client, each of which used to build its
+        own google-genai client in a test of its own.
+        """
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             RealGeminiClient,
+            _real_gemini_client_factory,
         )
 
         api_key = "test-api-key-12345"
-        client = RealGeminiClient(api_key)
+        client = _real_gemini_client_factory(api_key)
+        assert isinstance(client, RealGeminiClient)
         assert client._api_key == api_key
-
-    def test_instantiation_creates_inner_client(self) -> None:
-        """Test that RealGeminiClient creates an inner client."""
-        from covenant_radar_api.integrations.google_ai._test_hooks import (
-            RealGeminiClient,
-        )
-
-        api_key = "test-api-key-12345"
-        client = RealGeminiClient(api_key)
-        # Verify client has models attribute (the API interface)
-        models = client._client.models
-        assert models.__class__.__name__ == "Models"
+        # The SDK client's models attribute is the API interface.
+        assert client._client.models.__class__.__name__ == "Models"
 
     def test_generate_content_returns_text(self) -> None:
         """Test that generate_content returns generated text with real API."""
@@ -412,32 +409,3 @@ class TestRealGeminiClient:
         result = client.count_tokens("gemini-2.5-flash", "Hello world")
         assert result[0] > 0  # Input tokens
         assert result[1] == 0  # Output tokens always 0
-
-
-class TestCreateGenaiClient:
-    """Tests for _create_genai_client function."""
-
-    def test_creates_genai_client(self) -> None:
-        """Test that _create_genai_client creates a client."""
-        from covenant_radar_api.integrations.google_ai._test_hooks import (
-            _create_genai_client,
-        )
-
-        api_key = "test-api-key-12345"
-        client = _create_genai_client(api_key)
-        # Verify client has models attribute
-        assert client.models.__class__.__name__ == "Models"
-
-
-class TestRealGeminiClientFactory:
-    """Tests for _real_gemini_client_factory function."""
-
-    def test_creates_real_gemini_client(self) -> None:
-        """Test that factory creates a RealGeminiClient."""
-        from covenant_radar_api.integrations.google_ai._test_hooks import (
-            _real_gemini_client_factory,
-        )
-
-        api_key = "test-api-key-12345"
-        client = _real_gemini_client_factory(api_key)
-        assert client.__class__.__name__ == "RealGeminiClient"
