@@ -59,6 +59,7 @@ class TestFailureEvidence:
         assert _fails("assert result.timed_out\n")
         assert _fails('assert result["killed"] is True\n')
         assert _fails("raise ConnectError\n")
+        assert _fails("with raises(PermissionError):\n    pass\n")
         assert not _fails("timed_out = False\n")
         assert not _fails('assert result["stdout"] == "x"\n')
         assert not _fails("value = items[0]\n")
