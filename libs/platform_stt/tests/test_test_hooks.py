@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -216,6 +218,43 @@ class TestDefaultSubprocessRun:
         stdout = result.stdout or b""
         stdout_bytes = stdout if isinstance(stdout, bytes) else stdout.encode()
         assert b"bytes input" in stdout_bytes
+
+    def test_a_failing_child_returns_its_status_and_stderr(self) -> None:
+        """Unchecked, a nonzero exit is the caller's to read, with its words."""
+        result = _default_subprocess_run(
+            [sys.executable, "-c", "import sys; sys.stderr.write('no audio'); sys.exit(3)"],
+            capture_output=True,
+            text=False,
+        )
+        assert result.returncode == 3
+        assert result.stderr == b"no audio"
+
+    def test_a_failing_child_under_check_raises_called_process_error(self) -> None:
+        with pytest.raises(subprocess.CalledProcessError) as caught:
+            _default_subprocess_run(
+                [sys.executable, "-c", "import sys; sys.stderr.write('no audio'); sys.exit(3)"],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+        assert caught.value.returncode == 3
+
+    def test_a_child_past_its_deadline_is_killed_before_the_timeout_is_raised(
+        self, tmp_path: Path
+    ) -> None:
+        """Left running, it would write the marker three seconds in.
+
+        ``Popen.communicate`` alone raises and leaves the child alive, so the
+        marker's absence well after that moment is the kill, observed.
+        """
+        marker = tmp_path / "still-running"
+        script = f"import time; time.sleep(3); open({str(marker)!r}, 'w').close()"
+        with pytest.raises(subprocess.TimeoutExpired):
+            _default_subprocess_run(
+                [sys.executable, "-c", script], capture_output=True, timeout=0.5
+            )
+        time.sleep(5)
+        assert not marker.exists()
 
 
 class TestDefaultOsFunctions:

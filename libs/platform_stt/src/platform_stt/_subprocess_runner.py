@@ -17,7 +17,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from types import TracebackType
-from typing import IO, Protocol
+from typing import IO, AnyStr, Protocol
 
 
 class SubprocessRunResult(Protocol):
@@ -142,6 +142,36 @@ class _PayloadOnAFile:
             self._handle.close()
 
 
+def _communicate_within(
+    proc: subprocess.Popen[AnyStr], timeout: float | None
+) -> tuple[AnyStr | None, AnyStr | None]:
+    """Collect a child's output within its deadline, killing it past one.
+
+    ``Popen.communicate`` raises ``TimeoutExpired`` and leaves the child
+    RUNNING; ``subprocess.run`` kills it before re-raising, and this does the
+    same, so a hung ffmpeg past its wall is ended and reaped rather than
+    left holding the audio file and a core (board task cc7222ca).
+
+    Args:
+        proc: The started child.
+        timeout: Seconds it may take, or None for no bound.
+
+    Returns:
+        Its standard output and standard error, None for a stream not piped.
+
+    Raises:
+        subprocess.TimeoutExpired: When it outlasts ``timeout``, after it
+            has been killed and reaped.
+    """
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise
+    return stdout, stderr
+
+
 def _run_subprocess_bytes(
     args: list[str],
     capture_output: bool,
@@ -164,7 +194,7 @@ def _run_subprocess_bytes(
             cwd=cwd,
             env=env,
         )
-        stdout_bytes, stderr_bytes = proc.communicate(timeout=timeout)
+        stdout_bytes, stderr_bytes = _communicate_within(proc, timeout)
     returncode: int = proc.returncode
 
     if check and returncode != 0:
@@ -200,7 +230,7 @@ def _run_subprocess_text(
             cwd=cwd,
             env=env,
         )
-        stdout_str, stderr_str = proc.communicate(timeout=timeout)
+        stdout_str, stderr_str = _communicate_within(proc, timeout)
     returncode: int = proc.returncode
 
     if check and returncode != 0:
