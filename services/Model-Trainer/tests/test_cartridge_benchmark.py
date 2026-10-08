@@ -17,13 +17,12 @@ against, would produce a file that looks complete and cannot be read.
 from __future__ import annotations
 
 import pathlib
-import runpy
-import sys
 from collections.abc import Generator, Mapping
+from typing import TypedDict
 
 import pytest
 from platform_core.json_utils import load_json_str
-from platform_core.run_record import decode_run_record
+from platform_core.run_record import RunRecord, decode_run_record
 from platform_ml.determinism import (
     ATTENTION_MATH_ONLY,
     ATTENTION_SETTING,
@@ -42,7 +41,12 @@ from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_EXPERIME
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import LMModelProto
+from tests._module_run import run_module_as_main
 from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
+
+#: The module-scoped walk is shared by most of this file's tests, so they run
+#: on one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_benchmark.py")
 
 #: A plan small enough to run in a test and shaped like the real one: a sweep
 #: with two points so the separation logic has a pair to compare, a
@@ -119,17 +123,107 @@ def _fake_corpus_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
     return _documents(corpus_dir.name[0])
 
 
-@pytest.fixture(name="wired", autouse=True)
-def _wired() -> Generator[None, None, None]:
-    """Install the three fakes, and put the real hooks back afterwards."""
+def _install_fakes() -> None:
+    """Point the plan, corpus and hub hooks at this file's fakes."""
     measurement_hooks.cartridge_plans = _fake_plans
     cli_hooks.read_corpus_documents = _fake_corpus_reader
     hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
     hf_hooks.Hooks.load_hf_model = _fake_model
-    yield None
+
+
+def _restore_hooks() -> None:
+    """Put the production hooks back."""
     measurement_hooks.cartridge_plans = measurement_hooks._default_cartridge_plans
     cli_hooks.read_corpus_documents = cli_hooks._default_read_corpus_documents
     hf_hooks.Hooks.reset()
+
+
+@pytest.fixture(name="wired", autouse=True)
+def _wired() -> Generator[None, None, None]:
+    """Install the three fakes, and put the real hooks back afterwards."""
+    _install_fakes()
+    yield None
+    _restore_hooks()
+
+
+def _staged_argv(tmp_path: pathlib.Path) -> list[str]:
+    """Stage two corpora and build the untreated command line against them.
+
+    Args:
+        tmp_path: The directory the corpora and the record live under.
+
+    Returns:
+        The flags, without a program name.
+    """
+    first = tmp_path / "alpha"
+    second = tmp_path / "beta"
+    first.mkdir()
+    second.mkdir()
+    return [
+        "--plan",
+        "tiny",
+        "--corpus",
+        str(first),
+        "--second-corpus",
+        str(second),
+        "--device",
+        "cpu",
+        "--controls",
+        "none",
+        "--out",
+        str(tmp_path / "record.json"),
+    ]
+
+
+class _Walk(TypedDict):
+    """One ``python -m`` run of the tiny plan and the record it wrote."""
+
+    code: int | str | None
+    record: RunRecord
+
+
+@pytest.fixture(name="walk", scope="module")
+def _walk(tmp_path_factory: pytest.TempPathFactory) -> _Walk:
+    """Run the tiny plan once through ``python -m``, untreated.
+
+    ONE RUN SERVES TestMeasurePlan, TestRunRecord AND TestInvocationForms
+    (MCPs board task 2f90d785), where nine tests each ran this same plan.
+    ``python -m`` runs the ``__main__`` guard, which calls ``entrypoint()``,
+    which calls ``main()`` on the process arguments, which records
+    ``measure_plan``'s observations unchanged and labels them with its
+    digest; so this one execution proves every invocation form and carries
+    every assertion those tests made. Module-scoped, so it installs the
+    fakes itself, ahead of the function-scoped ``wired``.
+
+    Args:
+        tmp_path_factory: Source of the run's own directory.
+
+    Returns:
+        The exit code and the decoded record.
+    """
+    root = tmp_path_factory.mktemp("walk")
+    argv = _staged_argv(root)
+    _install_fakes()
+    try:
+        code = run_module_as_main("model_trainer.cli.cartridge_benchmark", argv)
+    finally:
+        _restore_hooks()
+    text = (root / "record.json").read_text(encoding="utf-8")
+    return {"code": code, "record": decode_run_record(load_json_str(text))}
+
+
+def _values(walk: _Walk) -> dict[str, float]:
+    """Return the walked record's observations by name.
+
+    Args:
+        walk: The shared run.
+
+    Returns:
+        Each observation's value under its name.
+    """
+    return {
+        observation["name"]: observation["value"] for observation in walk["record"]["observations"]
+    }
 
 
 class TestSweepObservations:
@@ -212,22 +306,13 @@ class TestSweepObservations:
 
 
 class TestMeasurePlan:
-    def test_every_arm_is_named_once(self, tmp_path: pathlib.Path) -> None:
+    def test_every_arm_is_named_once(self, walk: _Walk) -> None:
         """Two arms sharing an observation name would silently overwrite.
 
         The sweep points differ only in slot count, so this is the collision
         that would actually happen.
         """
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
-
-        observations, _digest = bench.measure_plan(
-            TINY_PLAN, corpus=first, second_corpus=second, device="cpu"
-        )
-
-        names = [observation["name"] for observation in observations]
+        names = [observation["name"] for observation in walk["record"]["observations"]]
         assert len(names) == len(set(names))
 
     def test_it_records_each_phase_against_a_scripted_clock(self, tmp_path: pathlib.Path) -> None:
@@ -256,17 +341,8 @@ class TestMeasurePlan:
         assert named["composition_seconds"] == 7.5
         assert named["training_seconds"] == 17.5
 
-    def test_it_names_the_floor_and_the_retention(self, tmp_path: pathlib.Path) -> None:
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
-
-        observations, _digest = bench.measure_plan(
-            TINY_PLAN, corpus=first, second_corpus=second, device="cpu"
-        )
-
-        named = {observation["name"] for observation in observations}
+    def test_it_names_the_floor_and_the_retention(self, walk: _Walk) -> None:
+        named = set(_values(walk))
         assert "sweep_noise_floor" in named
         assert "composition_noise_floor" in named
         assert "composition_retention" in named
@@ -276,7 +352,7 @@ class TestMeasurePlan:
         assert "composition-alone_mean" in named
         assert "composition-composed_mean" in named
 
-    def test_the_sweep_floor_comes_from_the_sweep_arms_alone(self, tmp_path: pathlib.Path) -> None:
+    def test_the_sweep_floor_comes_from_the_sweep_arms_alone(self, walk: _Walk) -> None:
         """The regression guard for a defect that shipped in the first record.
 
         The floor was once the largest spread of ANY arm, and the largest
@@ -285,15 +361,7 @@ class TestMeasurePlan:
         0.0671 it buried a sweep step of +0.0584 that two independent runs had
         found real.
         """
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
-
-        observations, _digest = bench.measure_plan(
-            TINY_PLAN, corpus=first, second_corpus=second, device="cpu"
-        )
-        values = {observation["name"]: observation["value"] for observation in observations}
+        values = _values(walk)
 
         assert values["sweep_noise_floor"] == pytest.approx(
             max(values[f"slots-{count}_spread"] for count in TINY_PLAN["slot_counts"])
@@ -302,39 +370,21 @@ class TestMeasurePlan:
             max(values["composition-alone_spread"], values["composition-composed_spread"])
         )
 
-    def test_the_digest_is_of_the_primary_corpus(self, tmp_path: pathlib.Path) -> None:
-        """Not of the second, which varies independently and is not what the label names."""
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
+    def test_the_digest_is_of_the_primary_corpus(self, walk: _Walk) -> None:
+        """Not of the second, which varies independently and is not what the label names.
 
-        _observations, digest = bench.measure_plan(
-            TINY_PLAN, corpus=first, second_corpus=second, device="cpu"
-        )
-
+        The label ends in the first 12 characters of the digest measure_plan
+        returned, so this is that digest, read off the record.
+        """
         from model_trainer.core.services.model.cartridge_plans import corpus_digest
 
-        assert digest == corpus_digest(_documents("a"))
+        assert walk["record"]["label"].endswith(f"-{corpus_digest(_documents('a'))[:12]}")
+        assert not walk["record"]["label"].endswith(f"-{corpus_digest(_documents('b'))[:12]}")
 
 
 class TestRunRecord:
-    def test_it_carries_the_experiment_and_a_corpus_stamped_label(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
-
-        record = bench.cartridge_run_record(
-            "tiny",
-            corpus=first,
-            second_corpus=second,
-            device="cpu",
-            remove_split_k=False,
-            math_attention=False,
-        )
+    def test_it_carries_the_experiment_and_a_corpus_stamped_label(self, walk: _Walk) -> None:
+        record = walk["record"]
 
         assert record["experiment"] == CARTRIDGE_EXPERIMENT
         assert record["label"].startswith("tiny-tiny-under-test-w8-s3-e1-lr0.05-slots2.4-c4-seeds")
@@ -350,14 +400,17 @@ class TestRunRecord:
                 math_attention=False,
             )
 
-    def test_the_treated_arm_is_recorded_in_the_fingerprint(self, tmp_path: pathlib.Path) -> None:
+    def test_the_treated_arm_is_recorded_in_the_fingerprint(
+        self, tmp_path: pathlib.Path, walk: _Walk
+    ) -> None:
         """THE POINT OF THE FLAG.
 
         A record measured under the controls has to be distinguishable from
         one measured without them, or the cross-card comparison this exists
         for would silently difference two different configurations. The
         settings keys are written only when the control was applied, so their
-        presence is the evidence.
+        presence is the evidence. The untreated side is the shared run, which
+        the command line made with ``--controls none``.
         """
         first = tmp_path / "alpha"
         second = tmp_path / "beta"
@@ -372,17 +425,9 @@ class TestRunRecord:
             remove_split_k=True,
             math_attention=True,
         )
-        untreated = bench.cartridge_run_record(
-            "tiny",
-            corpus=first,
-            second_corpus=second,
-            device="cpu",
-            remove_split_k=False,
-            math_attention=False,
-        )
 
         treated_settings = dict(treated["fingerprint"]["determinism"]["settings"])
-        untreated_settings = dict(untreated["fingerprint"]["determinism"]["settings"])
+        untreated_settings = dict(walk["record"]["fingerprint"]["determinism"]["settings"])
         assert treated_settings[SPLIT_K_SETTING] == SPLIT_K_REMOVED
         assert treated_settings[ATTENTION_SETTING] == ATTENTION_MATH_ONLY
         assert SPLIT_K_SETTING not in untreated_settings
@@ -390,34 +435,6 @@ class TestRunRecord:
 
 
 class TestMain:
-    def test_it_writes_a_decodable_record(self, tmp_path: pathlib.Path) -> None:
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
-        out = tmp_path / "nested" / "record.json"
-
-        code = bench.main(
-            [
-                "--plan",
-                "tiny",
-                "--corpus",
-                str(first),
-                "--second-corpus",
-                str(second),
-                "--device",
-                "cpu",
-                "--controls",
-                "none",
-                "--out",
-                str(out),
-            ]
-        )
-
-        assert code == 0
-        restored = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
-        assert restored["experiment"] == CARTRIDGE_EXPERIMENT
-
     def test_the_controls_arm_is_required(self, tmp_path: pathlib.Path) -> None:
         """Same reasoning as the second corpus: no default would be honest.
 
@@ -503,65 +520,12 @@ class TestInvocationForms:
     NOTHING -- exits 0, writes no file -- while the console script works. The
     two forms then disagree, and the broken one looks exactly like a
     measurement that legitimately produced nothing. That shape cost real time
-    on 2026-08-27; both forms are exercised here so it cannot come back.
+    on 2026-08-27. The shared ``walk`` is the ``python -m`` form, which runs
+    the guard, the console ``entrypoint()`` it calls and the ``main()`` that
+    calls, so all three are exercised on one execution.
     """
 
-    def _argv(self, tmp_path: pathlib.Path) -> list[str]:
-        """Build a complete command line against two staged corpora.
-
-        Args:
-            tmp_path: The test's temporary directory.
-
-        Returns:
-            The flags, without a program name.
-        """
-        first = tmp_path / "alpha"
-        second = tmp_path / "beta"
-        first.mkdir()
-        second.mkdir()
-        return [
-            "--plan",
-            "tiny",
-            "--corpus",
-            str(first),
-            "--second-corpus",
-            str(second),
-            "--device",
-            "cpu",
-            "--controls",
-            "none",
-            "--out",
-            str(tmp_path / "record.json"),
-        ]
-
-    def test_the_console_entry_point_runs_and_exits_zero(self, tmp_path: pathlib.Path) -> None:
-        saved = sys.argv
-        sys.argv = ["modeltrainer-cartridge-benchmark", *self._argv(tmp_path)]
-        try:
-            with pytest.raises(SystemExit) as excinfo:
-                bench.entrypoint()
-        finally:
-            sys.argv = saved
-
-        assert excinfo.value.code == 0
-        assert (tmp_path / "record.json").is_file()
-
-    def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
+    def test_running_it_as_a_module_actually_measures(self, walk: _Walk) -> None:
         """And writes the record, which is the half that silently went missing."""
-        module_name = "model_trainer.cli.cartridge_benchmark"
-        saved_argv = sys.argv
-        saved_module = sys.modules.pop(module_name, None)
-        sys.argv = ["x", *self._argv(tmp_path)]
-        try:
-            with pytest.raises(SystemExit) as raised:
-                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
-        finally:
-            sys.argv = saved_argv
-            if saved_module is not None:
-                sys.modules[module_name] = saved_module
-
-        assert raised.value.code == 0
-        restored = decode_run_record(
-            load_json_str((tmp_path / "record.json").read_text(encoding="utf-8"))
-        )
-        assert restored["experiment"] == CARTRIDGE_EXPERIMENT
+        assert walk["code"] == 0
+        assert walk["record"]["experiment"] == CARTRIDGE_EXPERIMENT
