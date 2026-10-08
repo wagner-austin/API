@@ -9,8 +9,10 @@ and the real installer, hung and killed mid-swap, left the machine with no
 launcher (MCPs board tasks 5895c980 and c96e8791).
 
 So for every EFFECT seam (:mod:`monorepo_guards.effect_seams`) some test must
-run the real implementation, and one of those must take it through a
-failure (:mod:`monorepo_guards.effect_seam_twins`). There is no allow-list:
+run the real implementation (:mod:`monorepo_guards.effect_seam_twins`), and
+one of those must take it through a failure of its own kind
+(:mod:`monorepo_guards.effect_failures`): a process seam a timeout, exit or
+kill, a file swap the OS refusing it. There is no allow-list:
 a seam that cannot be run failing is a seam whose failure nobody has seen.
 
 The rule and its wording are MCPs' (mcp-shared and mcp-shared-py, board task
@@ -23,6 +25,7 @@ from pathlib import Path
 
 from monorepo_guards import Violation
 from monorepo_guards.config import GuardConfig
+from monorepo_guards.effect_failures import SATISFIED_BY
 from monorepo_guards.effect_seam_twins import real_tests
 from monorepo_guards.effect_seams import effect_seams, index_package
 
@@ -58,15 +61,16 @@ class EffectSeamTwinRule:
         for effect in seams:
             seam = effect.seam
             tests = twins[(seam.module.name, seam.label)]
-            if any(test.fails for test in tests):
+            effect_kind = effect.reach.primitive.kind
+            if any(test.kinds & SATISFIED_BY[effect_kind] for test in tests):
                 continue
             chain = " -> ".join((seam.label, *effect.reach.chain))
             where = seam.module.path.relative_to(self._root).as_posix()
-            head = f"{where}:{seam.label} ({effect.reach.primitive.kind}: {chain})"
+            head = f"{where}:{seam.label} ({effect_kind}: {chain})"
             if tests:
                 names = ", ".join(test.label for test in tests)
                 kind = "effect-seam-twin-no-failure"
-                text = f"{head} its real tests {names} exercise no failure"
+                text = f"{head} its real tests {names} exercise no {effect_kind} failure"
             else:
                 kind = "effect-seam-twin-missing"
                 text = f"{head} no test runs its real implementation"

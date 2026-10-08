@@ -17,84 +17,21 @@ THE DEFINITION IS SHARED WITH MCPs (board task c96e8791):
   implementation into a fake bundle and runs the code under test. Reaching
   it through a same-file helper function, or a pytest fixture the test
   requests (from its own file or a ``conftest.py``), counts.
-* It EXERCISES A FAILURE when the test, or a same-file helper it calls,
-  names a failure: ``TimeoutExpired``, ``TimeoutError``,
-  ``CalledProcessError``, ``URLError``, ``HTTPError``,
-  ``ConnectionRefusedError``, ``ConnectionResetError``, ``SIGKILL`` or
-  ``SIGTERM``, or a client library's connection or timeout failure
-  (``OperationalError``, ``ConnectionError``, ``ConnectError``,
-  ``ConnectTimeout``, ``ReadTimeout``, ``TimeoutException``,
-  ``ClientConnectorError``, ``ServerDisconnectedError``), or the OS
-  refusing a file swap (``PermissionError``, ``FileNotFoundError``,
-  ``FileExistsError``, ``IsADirectoryError``, ``NotADirectoryError``); calls ``kill``,
-  ``terminate`` or ``killpg``; reads an attribute (or string key)
-  ``timed_out`` or ``killed``; compares an exit code
-  (``exit_code``, ``returncode``, ``exitcode``, ``code``) equal to a
-  nonzero literal, unequal to 0 or above 0; compares a ``status`` or
-  ``status_code`` to a literal of 400 or more; or carries a string literal
-  that exits nonzero (``sys.exit(3)``, ``process.exit(1)``, ``exit 2``),
-  the child script a real process test runs. A bare ``pytest.raises`` is
-  not one: ``raises(ValueError)`` on bad input is not a timeout, an exit
-  or a kill.
+* What it EXERCISES is the set of failure kinds the test, or a same-file
+  helper it calls, names (:mod:`monorepo_guards.effect_failures`); the
+  rule asks for one of the seam's own kind.
 """
 
 from __future__ import annotations
 
 import ast
-import re
 from pathlib import Path
 from typing import NamedTuple
 
+from monorepo_guards.effect_failures import failure_kinds, terminal_name
 from monorepo_guards.effect_primitives import import_bindings, qualified_name
 from monorepo_guards.effect_seams import EffectSeam, PackageModule, resolve_function
 from monorepo_guards.util import parse_source
-
-FAILURE_NAMES = frozenset(
-    {
-        "TimeoutExpired",
-        "TimeoutError",
-        "CalledProcessError",
-        "URLError",
-        "HTTPError",
-        "ConnectionRefusedError",
-        "ConnectionResetError",
-        "SIGKILL",
-        "SIGTERM",
-        # The connection and timeout failures of the client libraries on the
-        # primitive list: RustedWarfareBot runs the real psycopg connect
-        # against a closed port under pytest.raises(OperationalError).
-        "OperationalError",
-        "ConnectionError",
-        "ConnectError",
-        "ConnectTimeout",
-        "ReadTimeout",
-        "TimeoutException",
-        "ClientConnectorError",
-        "ServerDisconnectedError",
-        # A file swap cannot time out, exit or be killed; it fails with the
-        # OS refusing it, and a target held open is exactly the mid-swap
-        # failure that left the harness gate's launcher missing.
-        "PermissionError",
-        "FileNotFoundError",
-        "FileExistsError",
-        "IsADirectoryError",
-        "NotADirectoryError",
-        # Their errno spellings, which MCPs' table carries for Node and a
-        # Python test reads as ``errno.ENOENT``; the two tables stay equal.
-        "ENOENT",
-        "EEXIST",
-        "EISDIR",
-        "ENOTDIR",
-        "EPERM",
-        "EACCES",
-        "EBUSY",
-    }
-)
-KILL_CALLS = frozenset({"kill", "terminate", "killpg"})
-FAILURE_ATTRIBUTES = frozenset({"timed_out", "killed"})
-EXIT_NAMES = frozenset({"exit_code", "returncode", "exitcode", "code"})
-STATUS_NAMES = frozenset({"status", "status_code"})
-NONZERO_EXIT_TEXT = re.compile(r"(?:sys\.exit|process\.exit)\(\s*[1-9]\d*\s*\)|\bexit\s+[1-9]\d*\b")
 
 
 class RealTest(NamedTuple):
@@ -102,114 +39,11 @@ class RealTest(NamedTuple):
 
     Attributes:
         label: ``<file>::<Class>.<test>`` relative to the package root.
-        fails: Whether it exercises a failure.
+        kinds: The failure kinds it exercises, empty when it exercises none.
     """
 
     label: str
-    fails: bool
-
-
-def _int_literal(node: ast.expr) -> int | None:
-    """Read an integer literal, refusing a bool.
-
-    Args:
-        node: Expression.
-
-    Returns:
-        The integer, or None when the node is not one.
-    """
-    if isinstance(node, ast.Constant) and type(node.value) is int:
-        return node.value
-    return None
-
-
-def _terminal_name(node: ast.expr) -> str | None:
-    """Name a ``Name``, the last part of an ``Attribute``, or a string key.
-
-    A string-keyed subscript reads the same field an attribute does: the
-    command results here are TypedDicts, so a test states a timeout as
-    ``result["timed_out"]`` and an exit as ``result["returncode"] == 3``
-    (tools/fleet's ``test_core_io.py``), never ``result.timed_out``.
-
-    Args:
-        node: Expression.
-
-    Returns:
-        The identifier or key, or None for anything else.
-    """
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    if (
-        isinstance(node, ast.Subscript)
-        and isinstance(node.slice, ast.Constant)
-        and isinstance(node.slice.value, str)
-    ):
-        return node.slice.value
-    return None
-
-
-def _compare_fails(node: ast.Compare) -> bool:
-    """Report whether a comparison asserts an exit code or status failed.
-
-    Args:
-        node: One comparison (only its first operator is read; chained
-            comparisons are not how a test states an exit code).
-
-    Returns:
-        True for a nonzero exit code or a status of 400 or more.
-    """
-    left, op, right = node.left, node.ops[0], node.comparators[0]
-    names = (_terminal_name(left), _terminal_name(right))
-    values = (_int_literal(right), _int_literal(left))
-    if any(name in STATUS_NAMES for name in names):
-        return any(value is not None and value >= 400 for value in values)
-    if names[0] in EXIT_NAMES:
-        value, flipped = values[0], False
-    elif names[1] in EXIT_NAMES:
-        value, flipped = values[1], True
-    else:
-        return False
-    if value is None:
-        return False
-    if isinstance(op, ast.Eq):
-        return value != 0
-    if isinstance(op, ast.NotEq):
-        return value == 0
-    above = ast.Lt if flipped else ast.Gt
-    return isinstance(op, above) and value == 0
-
-
-def failure_evidence(node: ast.AST) -> bool:
-    """Report whether a function names a failure, by the shared definition.
-
-    Args:
-        node: A test function or helper.
-
-    Returns:
-        True when any marker in the module docstring appears in it.
-    """
-    for child in ast.walk(node):
-        if isinstance(child, (ast.Name, ast.Attribute, ast.Subscript)):
-            name = _terminal_name(child)
-            if name in FAILURE_NAMES:
-                return True
-            if not isinstance(child, ast.Name) and name in FAILURE_ATTRIBUTES:
-                return True
-        elif isinstance(child, ast.Call):
-            if _terminal_name(child.func) in KILL_CALLS:
-                return True
-        elif isinstance(child, ast.Compare):
-            if _compare_fails(child):
-                return True
-        elif (
-            isinstance(child, ast.Constant)
-            and isinstance(child.value, str)
-            and NONZERO_EXIT_TEXT.search(child.value)
-        ):
-            return True
-    return False
+    kinds: frozenset[str]
 
 
 class ParsedTestFile(NamedTuple):
@@ -240,7 +74,7 @@ def _is_fixture(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """
     for decorator in node.decorator_list:
         target = decorator.func if isinstance(decorator, ast.Call) else decorator
-        if _terminal_name(target) == "fixture":
+        if terminal_name(target) == "fixture":
             return True
     return False
 
@@ -581,21 +415,16 @@ def real_tests(
             hits = _calls_reached(index, module, test, fixtures) & wanted.keys()
             if not hits:
                 continue
-            fails = any(failure_evidence(node) for node in _helpers_reached(module, test))
+            kinds: frozenset[str] = frozenset().union(
+                *(failure_kinds(node) for node in _helpers_reached(module, test))
+            )
             for key in sorted({key for hit in hits for key in wanted[hit]}):
-                found[key].append(RealTest(label=f"{relative}::{label}", fails=fails))
+                found[key].append(RealTest(label=f"{relative}::{label}", kinds=kinds))
     return found
 
 
 __all__ = [
-    "EXIT_NAMES",
-    "FAILURE_ATTRIBUTES",
-    "FAILURE_NAMES",
-    "KILL_CALLS",
-    "NONZERO_EXIT_TEXT",
-    "STATUS_NAMES",
     "ParsedTestFile",
     "RealTest",
-    "failure_evidence",
     "real_tests",
 ]
