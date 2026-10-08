@@ -1389,7 +1389,9 @@
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "phone-companion",
-        "install": [],
+        "install": [
+          {"phase": "install", "argv": ["make", "-s", "-C", "phone-companion", "fetch"]}
+        ],
         "companions": []
       }
     },
