@@ -217,6 +217,58 @@ class TestEffectSeams:
             "table.rename",
         ]
 
+    def test_factory_built_hooks_reach_through_the_factory_or_what_it_is_handed(
+        self, tmp_path: Path
+    ) -> None:
+        write(
+            tmp_path,
+            "src/pkg/spawn.py",
+            """
+            import subprocess
+
+            def spawn_and_collect(argv):
+                return subprocess.run(argv)
+
+            def make_run_git(spawn, root):
+                return lambda args: spawn(["git", "-C", root, *args])
+
+            def make_dialer(host):
+                import socket
+                return socket.create_connection((host, 1))
+
+            def make_clock():
+                return 1
+            """,
+        )
+        write(
+            tmp_path,
+            "src/pkg/_test_hooks.py",
+            """
+            import shutil
+            from pkg import spawn
+            from pkg.spawn import make_clock, make_run_git, spawn_and_collect
+
+            def default_hooks():
+                return Hooks(
+                    run_git=make_run_git(spawn_and_collect, "."),
+                    remove=make_run_git(shutil.rmtree, "."),
+                    dial=spawn.make_dialer("hub"),
+                    clock=make_clock(),
+                    again=make_run_git(make_run_git, ".", os.sep),
+                )
+
+            run_git = make_run_git(spawn_and_collect, ".")
+            clock = make_clock()
+            """,
+        )
+        found = effect_seams(index_package(files_of(tmp_path), tmp_path))
+        assert sorted((e.seam.label, e.reach.chain) for e in found) == [
+            ("default_hooks.dial", ("make_dialer", "socket.create_connection")),
+            ("default_hooks.remove", ("shutil.rmtree",)),
+            ("default_hooks.run_git", ("spawn_and_collect", "subprocess.run")),
+            ("run_git", ("spawn_and_collect", "subprocess.run")),
+        ]
+
     def test_modules_that_are_not_hooks_modules_declare_no_seams(self, tmp_path: Path) -> None:
         write(
             tmp_path,

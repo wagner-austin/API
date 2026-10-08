@@ -8,6 +8,7 @@ import textwrap
 from monorepo_guards.effect_failures import (
     FAILURE_NAME_KINDS,
     FILE_SWAP,
+    KILL_KINDS,
     NETWORK,
     PROCESS,
     SATISFIED_BY,
@@ -40,6 +41,7 @@ class TestTables:
         } == SATISFIED_BY
         assert FAILURE_NAME_KINDS["TimeoutError"] == frozenset({PROCESS, NETWORK, SERVICE})
         assert FAILURE_NAME_KINDS["EBUSY"] == frozenset({FILE_SWAP})
+        assert FAILURE_NAME_KINDS["SIGKILL"] == KILL_KINDS == frozenset({PROCESS, FILE_SWAP})
 
 
 class TestNames:
@@ -50,7 +52,15 @@ class TestNames:
         assert _kinds("with raises(OperationalError):\n    pass\n") == {SERVICE}
         assert _kinds("assert error.errno == errno.ENOENT\n") == {FILE_SWAP}
         assert _kinds("assert result.timed_out\n") == {PROCESS}
-        assert _kinds('assert result["killed"] is True\n') == {PROCESS}
+        assert _kinds('assert result["killed"] is True\n') == KILL_KINDS
+        assert _kinds("os.kill(pid, signal.SIGKILL)\n") == KILL_KINDS
+
+    def test_a_failure_name_counts_as_any_word_of_a_string(self) -> None:
+        assert _kinds('match = "connect ECONNREFUSED 127.0.0.1:1"\n') == {NETWORK, SERVICE}
+        assert _kinds('match = "TypeError: fetch failed"\n') == {NETWORK}
+        assert _kinds('match = "Connection Refused by host"\n') == {NETWORK}
+        assert _kinds('match = "[Errno 13] PermissionError held"\n') == {FILE_SWAP}
+        assert _kinds('match = "connection reset"\n') == frozenset()
 
     def test_names_that_are_not_failures(self) -> None:
         assert _kinds("timed_out = False\n") == frozenset()
@@ -60,8 +70,24 @@ class TestNames:
 
 
 class TestProcessMarkers:
+    def test_named_kills_count_for_the_process_and_an_interrupted_swap(self) -> None:
+        assert _kinds("child.terminate()\n") == KILL_KINDS
+        assert _kinds("terminate_process(pid)\n") == KILL_KINDS
+        assert _kinds("nodeTerminateProcess(pid)\n") == KILL_KINDS
+        assert _kinds("os.killpg(group, 9)\n") == KILL_KINDS
+        assert _kinds("killer(pid)\n") == frozenset()
+
+    def test_stated_exit_codes_and_statuses(self) -> None:
+        assert _kinds("finished(returncode=3)\n") == {PROCESS}
+        assert _kinds("finished(returncode=0)\n") == frozenset()
+        assert _kinds("respond(status=502)\n") == {NETWORK}
+        assert _kinds("respond(status=200, **extra)\n") == frozenset()
+        assert _kinds('reply = {"status": 503, "exit_code": 0}\n') == {NETWORK}
+        assert _kinds('reply = {"exit_code": 2, 3: 4, **rest}\n') == {PROCESS}
+        assert _kinds("finished(returncode=code)\n") == frozenset()
+        assert _kinds("run(argv, timeout=5)\n") == frozenset()
+
     def test_kill_calls_and_nonzero_exit_text(self) -> None:
-        assert _kinds("child.terminate()\n") == {PROCESS}
         assert _kinds('script = "import sys; sys.exit(3)"\n') == {PROCESS}
         assert _kinds('script = "process.exit(1)"\n') == {PROCESS}
         assert _kinds('script = "exit 2"\n') == {PROCESS}

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from monorepo_guards.effect_failures import PROCESS
+from monorepo_guards.effect_failures import KILL_KINDS, PROCESS
 from monorepo_guards.effect_seam_twins import RealTest, real_tests
 from monorepo_guards.effect_seams import effect_seams, index_package
 from tests._effect_support import files_of, write
@@ -75,15 +75,13 @@ class TestRealTests:
         )
         found = _real(tmp_path)
         assert found[("pkg._test_hooks", "_default_kill")] == [
-            RealTest("tests/test_real.py::test_named_kill_of_a_dead_pid", PROCESS_FAILURE)
+            RealTest("tests/test_real.py::test_named_kill_of_a_dead_pid", KILL_KINDS)
         ]
         assert found[("pkg._test_hooks", "_default_run")] == [
             RealTest("tests/test_real.py::test_module_object_run_success", NO_FAILURE)
         ]
         assert found[("pkg._test_hooks", "default_hooks.spawn")] == [
-            RealTest(
-                "tests/test_real.py::TestFactory.test_spawn_through_the_bundle", PROCESS_FAILURE
-            )
+            RealTest("tests/test_real.py::TestFactory.test_spawn_through_the_bundle", KILL_KINDS)
         ]
 
     def test_the_rebindable_hook_is_not_the_implementation(self, tmp_path: Path) -> None:
