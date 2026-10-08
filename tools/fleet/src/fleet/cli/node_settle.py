@@ -23,10 +23,13 @@ and the settle runs again. A second line is visible and harmless; a verdict
 posted only after a close that then failed would be one nobody ever saw.
 
 After the close, the ledger row is finished (this machine's files) and the
-directory retired (the node). A retire that fails there leaves the run's
-directory on the node and the verdict naming a transcript not yet moved;
-it raises, so the serve's log says so, but the row and the queue job are
-both already closed and nothing else waits on it.
+directory retired (the node). A RETIRE THE NODE DID NOT ANSWER IS OWED, NOT
+RAISED (MCPs board task 8776b828): the row and the queue job are already
+closed, so no later settle would retry it, and raising ended the serve and
+every run it held. It is recorded beside the ledger and each later collect
+pass sends it until the node answers (:mod:`fleet.core.retire_owed`); until
+then the verdict names a transcript not yet moved. A retire the node
+answered and failed still raises, so the serve's log says so.
 
 THE TAIL IS READ FIRST, AS A READ THE NODE MAY MISS (MCPs board task
 c1d48330). The settle read the transcript's tail with a raising read, and
@@ -51,7 +54,17 @@ from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
-from fleet.core import collect, dialect, dispatch, names, queue, remote, retire, venv_sweep, verdict
+from fleet.core import (
+    collect,
+    dialect,
+    dispatch,
+    names,
+    queue,
+    remote,
+    retire_owed,
+    venv_sweep,
+    verdict,
+)
 
 
 def settle(
@@ -97,8 +110,11 @@ def settle(
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries no sha;
             ``QUEUE_UNANSWERED`` when the board or the queue did not answer,
-            with nothing on this machine or the node changed; or a node,
-            board or queue failure. Not caught.
+            with nothing on this machine or the node changed;
+            ``DISPATCH_FAILED`` when the node answered the retire and it
+            failed there, with the row and the job already closed; or a
+            node, board or queue failure. Not caught. A node that did not
+            answer the retire raises nothing: the retire is owed.
     """
     sha = require_sha(job)
     read = read_tail(node, run_id=row["run_id"])
@@ -157,10 +173,12 @@ def settle(
         exit_code=exit_code,
         detail=detail,
     )
-    retire.retire_on_node(node, run_id=row["run_id"])
     # After the queue close, so the session waiting on this row is not kept
     # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
-    venv_sweep.sweep_on_node(node)
+    # A node that did not answer owes the retire to a later collect pass,
+    # which sweeps after it (MCPs board task 8776b828).
+    if retire_owed.retire_or_owe(loaded.retires, node, alias=row["node"], run_id=row["run_id"]):
+        venv_sweep.sweep_on_node(node)
     return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {line}")
 
 

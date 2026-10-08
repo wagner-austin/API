@@ -19,7 +19,7 @@ from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
-from fleet.core import _test_hooks, export
+from fleet.core import _test_hooks, export, retire_owed
 
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
@@ -137,6 +137,20 @@ class LoadedWorkspace:
             The resolved directory.
         """
         return self.ledger.parent / export.MIRRORS_DIRECTORY
+
+    @property
+    def retires(self) -> pathlib.Path:
+        """Absolute path to the append-only record of retires owed and done.
+
+        Beside the ledger, because it is this machine's running state as the
+        ledger is: the runs whose settle closed their row but could not
+        retire their directory (:mod:`fleet.core.retire_owed`, MCPs board
+        task 8776b828).
+
+        Returns:
+            The resolved path.
+        """
+        return self.ledger.parent / retire_owed.RETIRES_FILE
 
     @property
     def leases(self) -> pathlib.Path:

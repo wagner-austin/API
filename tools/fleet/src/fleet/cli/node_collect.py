@@ -64,7 +64,7 @@ from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus,
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import _test_hooks, collect, queue, stop
+from fleet.core import _test_hooks, collect, queue, retire_owed, stop
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
 
 _log = get_logger(__name__)
@@ -465,7 +465,8 @@ def collect_pass(
     holder: RunHolder,
     launching: frozenset[str],
 ) -> None:
-    """Settle every running job this runner holds, reconcile every claim an
+    """Send every retire this node owes (:mod:`fleet.core.retire_owed`),
+    settle every running job this runner holds, reconcile every claim an
     earlier tick left without a start, then stop what was cancelled.
 
     Args:
@@ -485,9 +486,14 @@ def collect_pass(
             design, which are left to them rather than reconciled.
 
     Raises:
-        AppError: As :func:`collect_one_job`, :func:`reconcile_claim` and
-            :func:`stop_cancelled` describe.
+        AppError: As :func:`collect_one_job`, :func:`reconcile_claim`,
+            :func:`stop_cancelled` and :func:`fleet.core.retire_owed.retire_owed`
+            describe.
     """
+    # First, so a retire a settle of this pass owes waits for the next pass
+    # rather than meeting the node that just missed it again at once
+    # (MCPs board task 8776b828).
+    retire_owed.retire_owed(loaded.retires, require_node(loaded.workspace, alias), alias=alias)
     held = queue.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     holder.hold(running)
