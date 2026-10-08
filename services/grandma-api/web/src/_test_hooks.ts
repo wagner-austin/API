@@ -312,10 +312,15 @@ export async function initTsEbml(): Promise<void> {
 /**
  * Create default hooks using browser globals.
  *
+ * Exported so a test can run the real implementations themselves through a
+ * failure: getHooks() returns whatever bundle is installed, a test's fakes
+ * included, so reading through it proves nothing about the real one
+ * (effect-seam-twin, board task cc7222ca).
+ *
  * Returns:
  *   Hooks object with real browser implementations
  */
-function createDefaultHooks(): Hooks {
+export function createDefaultHooks(): Hooks {
   return {
     fetch: globalThis.fetch.bind(globalThis),
     getUserMedia: (constraints: MediaStreamConstraints) =>

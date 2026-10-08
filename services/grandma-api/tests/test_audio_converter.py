@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
+import tempfile
+from pathlib import Path
+
+import pytest
+
 from grandma_api.core.audio import _test_hooks as audio_hooks
-from grandma_api.core.audio.converter import _default_convert_to_wav
+from grandma_api.core.audio.converter import _default_convert_to_wav, conversion_prefix
 
 from .conftest import generate_test_wav
 
@@ -16,6 +22,30 @@ def test_convert_to_wav_with_real_wav() -> None:
     # Result should be valid WAV
     assert result[:4] == b"RIFF"
     assert result[8:12] == b"WAVE"
+    assert _conversion_dirs() == frozenset()
+
+
+def test_convert_to_wav_raises_when_ffmpeg_refuses_and_leaves_nothing() -> None:
+    """Bytes that are not audio are ffmpeg's nonzero exit, raised, and the
+    conversion's working files are gone afterwards, as after a success."""
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        _default_convert_to_wav(b"this is not audio", "upload.webm")
+    assert caught.value.returncode != 0
+    assert _conversion_dirs() == frozenset()
+
+
+def _conversion_dirs() -> frozenset[str]:
+    """Name this process's conversion directories left in the temp directory.
+
+    Returns:
+        The names that start with this process's conversion prefix.
+    """
+    prefix = conversion_prefix()
+    return frozenset(
+        entry.name
+        for entry in Path(tempfile.gettempdir()).iterdir()
+        if entry.name.startswith(prefix)
+    )
 
 
 def test_audio_hooks_reset() -> None:
