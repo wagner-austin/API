@@ -162,6 +162,8 @@ class TestEffectSeams:
             count: int
             limit: int = 3
             settings.value = rmtree
+            spawn = lambda argv: subprocess.Popen(argv)
+            idle = lambda: 1
             """,
         )
         index = index_package(files_of(tmp_path), tmp_path)
@@ -170,7 +172,10 @@ class TestEffectSeams:
             ("run_process", ("subprocess.run",)),
             ("remove_tree", ("shutil.rmtree",)),
             ("dialer", ("socket.create_connection",)),
+            ("spawn", ("subprocess.Popen",)),
         ]
+        assert found[3].seam.names == frozenset()
+        assert found[3].seam.fields == frozenset()
         dialer = found[2].seam
         assert dialer.names == frozenset({"dial"})
         assert dialer.owner.name == "pkg.net"
