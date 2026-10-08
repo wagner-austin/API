@@ -15,13 +15,12 @@ nest.
 from __future__ import annotations
 
 import pathlib
-import runpy
-import sys
 from collections.abc import Generator, Mapping
+from typing import TypedDict
 
 import pytest
 from platform_core.json_utils import load_json_str
-from platform_core.run_record import decode_run_record
+from platform_core.run_record import RunRecord, decode_run_record
 
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
@@ -39,7 +38,12 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import LMModelProto
+from tests._module_run import run_module_as_main
 from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
+
+#: The module-scoped walk is shared by TestTheWalk, so this file's tests run on
+#: one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_diverse_companion_sweep.py")
 
 #: A plan small enough to run in a test and shaped like the real one.
 TINY_DIVERSE_PLAN: VariedCompanionSweepPlan = {
@@ -97,19 +101,29 @@ def _fake_corpus_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
     return _documents(corpus_dir.name[0])
 
 
-@pytest.fixture(name="wired", autouse=True)
-def _wired() -> Generator[None, None, None]:
-    """Install the fakes, and put the real hooks back afterwards."""
+def _install_fakes() -> None:
+    """Point the plan, corpus and hub hooks at this file's fakes."""
     measurement_hooks.diverse_companion_sweep_plans = _fake_plans
     cli_hooks.read_corpus_documents = _fake_corpus_reader
     hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
     hf_hooks.Hooks.load_hf_model = _fake_model
-    yield None
+
+
+def _restore_hooks() -> None:
+    """Put the production hooks back."""
     measurement_hooks.diverse_companion_sweep_plans = (
         measurement_hooks._default_diverse_companion_sweep_plans
     )
     cli_hooks.read_corpus_documents = cli_hooks._default_read_corpus_documents
     hf_hooks.Hooks.reset()
+
+
+@pytest.fixture(name="wired", autouse=True)
+def _wired() -> Generator[None, None, None]:
+    """Install the fakes, and put the real hooks back afterwards."""
+    _install_fakes()
+    yield None
+    _restore_hooks()
 
 
 def _staged(tmp_path: pathlib.Path, names: tuple[str, ...]) -> list[pathlib.Path]:
@@ -130,47 +144,104 @@ def _staged(tmp_path: pathlib.Path, names: tuple[str, ...]) -> list[pathlib.Path
     return created
 
 
-class TestMeasureGrid:
-    def test_every_arm_is_named_once(self, tmp_path: pathlib.Path) -> None:
-        primary, beta, gamma, delta, echo = _staged(
-            tmp_path, ("alpha", "beta", "gamma", "delta", "echo")
+def _argv(tmp_path: pathlib.Path, *, others: str, companions: str) -> list[str]:
+    """Build a complete command line against staged corpora.
+
+    Args:
+        tmp_path: The test's temporary directory.
+        others: The ``--other-corpora`` value, verbatim.
+        companions: The ``--companion-corpora`` value, verbatim.
+
+    Returns:
+        The flags, without a program name.
+    """
+    return [
+        "--plan",
+        "tiny",
+        "--corpus",
+        str(tmp_path / "alpha"),
+        "--other-corpora",
+        others,
+        "--companion-corpora",
+        companions,
+        "--device",
+        "cpu",
+        "--out",
+        str(tmp_path / "nested" / "record.json"),
+    ]
+
+
+class _Walk(TypedDict):
+    """One ``python -m`` run of the tiny grid and the record it wrote."""
+
+    code: int | str | None
+    record: RunRecord
+
+
+@pytest.fixture(name="walk", scope="module")
+def _walk(tmp_path_factory: pytest.TempPathFactory) -> _Walk:
+    """Walk the tiny grid once through ``python -m``, for :class:`TestTheWalk`.
+
+    Module-scoped, so it runs before the function-scoped ``wired`` fixture
+    and installs the fakes itself; the companion value ends in a comma,
+    which the walk must read as no third companion corpus.
+
+    Args:
+        tmp_path_factory: Source of the walk's own directory.
+
+    Returns:
+        The exit code and the decoded record.
+    """
+    root = tmp_path_factory.mktemp("walk")
+    _staged(root, ("alpha", "beta", "gamma", "delta", "echo"))
+    _install_fakes()
+    try:
+        code = run_module_as_main(
+            "model_trainer.cli.cartridge_diverse_companion_sweep",
+            _argv(
+                root,
+                others=f"{root / 'beta'},{root / 'gamma'}",
+                companions=f"{root / 'delta'},{root / 'echo'},",
+            ),
+        )
+    finally:
+        _restore_hooks()
+    text = (root / "nested" / "record.json").read_text(encoding="utf-8")
+    return {"code": code, "record": decode_run_record(load_json_str(text))}
+
+
+class TestTheWalk:
+    """What the one walk of the tiny grid recorded.
+
+    ONE WALK SERVES EVERY TEST HERE (MCPs board task 2f90d785). Eight tests
+    each walked this same grid, 2.2 to 5.6 s apiece alone and 52 s for the
+    file in CI: three read ``measure_grid``'s observations, one the run
+    record, two ``main()`` and two the console entry and ``python -m``.
+    ``python -m`` runs the ``__main__`` guard, which calls ``entrypoint()``,
+    which calls ``main()`` on the process arguments, which builds the run
+    record from ``measure_grid``'s observations unchanged; so the
+    module-scoped ``walk`` proves every form on one execution, and each test
+    keeps its own assertion on what that execution wrote.
+    """
+
+    def test_the_module_run_exits_zero_with_a_decodable_record(self, walk: _Walk) -> None:
+        # The companion value ends in a comma, which must name no third
+        # corpus: the fake reader keys on a directory's first character and
+        # an empty name has none, and the plan refuses a pool not two strong.
+        assert walk["code"] == 0
+        assert walk["record"]["experiment"] == DIVERSE_COMPANION_SWEEP_EXPERIMENT
+
+    def test_it_carries_a_corpus_stamped_label(self, walk: _Walk) -> None:
+        assert walk["record"]["label"].startswith(
+            "tiny-gpt2-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-seeds7.8.9-"
         )
 
-        observations, _digest = sweep.measure_grid(
-            TINY_DIVERSE_PLAN,
-            corpus=primary,
-            other_corpora=[beta, gamma],
-            companion_corpora=[delta, echo],
-            device="cpu",
-            load_precision=None,
-            plan_name="tiny",
-            precision_token="",
-            checkpoints=tmp_path / "checkpoints",
-        )
-
-        names = [observation["name"] for observation in observations]
+    def test_every_arm_is_named_once(self, walk: _Walk) -> None:
+        names = [observation["name"] for observation in walk["record"]["observations"]]
         assert len(names) == len(set(names))
 
-    def test_it_names_the_cells_the_companion_crosses_and_the_floor(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        primary, beta, gamma, delta, echo = _staged(
-            tmp_path, ("alpha", "beta", "gamma", "delta", "echo")
-        )
-
-        observations, _digest = sweep.measure_grid(
-            TINY_DIVERSE_PLAN,
-            corpus=primary,
-            other_corpora=[beta, gamma],
-            companion_corpora=[delta, echo],
-            device="cpu",
-            load_precision=None,
-            plan_name="tiny",
-            precision_token="",
-            checkpoints=tmp_path / "checkpoints",
-        )
-
-        named = {observation["name"] for observation in observations}
+    def test_it_names_the_cells_the_companion_crosses_and_the_floor(self, walk: _Walk) -> None:
+        named = {observation["name"] for observation in walk["record"]["observations"]}
         assert "max_companions" in named
         assert "companion-cross-0_mean" in named
         assert "companion-cross-1_mean" in named
@@ -184,7 +255,7 @@ class TestMeasureGrid:
         assert "diverse-K2-p0.5-n2-cross-0_mean" in named
         assert "diverse_composed_noise_floor" in named
 
-    def test_the_naive_arm_is_the_solo_formula_bit_for_bit(self, tmp_path: pathlib.Path) -> None:
+    def test_the_naive_arm_is_the_solo_formula_bit_for_bit(self, walk: _Walk) -> None:
         """The record's readability gate: ``naive-solo_seed{s}_gain`` must be
         exactly what the solo formula produces -- a fresh base, the plan's own
         knobs, the plain seed -- because on the 7B row these values are
@@ -204,21 +275,10 @@ class TestMeasureGrid:
             train_cartridge,
         )
 
-        primary, beta, gamma, delta, echo = _staged(
-            tmp_path, ("alpha", "beta", "gamma", "delta", "echo")
-        )
-        observations, _digest = sweep.measure_grid(
-            TINY_DIVERSE_PLAN,
-            corpus=primary,
-            other_corpora=[beta, gamma],
-            companion_corpora=[delta, echo],
-            device="cpu",
-            load_precision=None,
-            plan_name="tiny",
-            precision_token="",
-            checkpoints=tmp_path / "checkpoints",
-        )
-        recorded = {observation["name"]: observation["value"] for observation in observations}
+        recorded = {
+            observation["name"]: observation["value"]
+            for observation in walk["record"]["observations"]
+        }
 
         tokenizer = FakeHFTokenizer(vocab_size=_VOCAB)
         encoded = [tokenizer.encode(document) for document in _documents("a")]
@@ -240,6 +300,8 @@ class TestMeasureGrid:
             gain = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
             assert recorded[f"naive-solo_seed{seed}_gain"] == gain
 
+
+class TestMeasureGrid:
     def test_a_companion_count_mismatching_the_plan_is_refused(
         self, tmp_path: pathlib.Path
     ) -> None:
@@ -308,25 +370,6 @@ class TestMeasureGrid:
 
 
 class TestRunRecord:
-    def test_it_carries_the_experiment_and_a_corpus_stamped_label(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        primary, beta, gamma, delta, echo = _staged(
-            tmp_path, ("alpha", "beta", "gamma", "delta", "echo")
-        )
-
-        record = sweep.diverse_companion_sweep_run_record(
-            "tiny",
-            corpus=primary,
-            other_corpora=[beta, gamma],
-            companion_corpora=[delta, echo],
-            device="cpu",
-            checkpoints=tmp_path / "checkpoints",
-        )
-
-        assert record["experiment"] == DIVERSE_COMPANION_SWEEP_EXPERIMENT
-        assert record["label"].startswith("tiny-gpt2-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-seeds7.8.9-")
-
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(KeyError, match="tiny"):
             sweep.diverse_companion_sweep_run_record(
@@ -411,47 +454,7 @@ class TestProductionPlan:
         assert "/" not in label
 
 
-def _argv(tmp_path: pathlib.Path, *, others: str, companions: str) -> list[str]:
-    """Build a complete command line against staged corpora.
-
-    Args:
-        tmp_path: The test's temporary directory.
-        others: The ``--other-corpora`` value, verbatim.
-        companions: The ``--companion-corpora`` value, verbatim.
-
-    Returns:
-        The flags, without a program name.
-    """
-    return [
-        "--plan",
-        "tiny",
-        "--corpus",
-        str(tmp_path / "alpha"),
-        "--other-corpora",
-        others,
-        "--companion-corpora",
-        companions,
-        "--device",
-        "cpu",
-        "--out",
-        str(tmp_path / "nested" / "record.json"),
-    ]
-
-
 class TestMain:
-    def test_it_writes_a_decodable_record(self, tmp_path: pathlib.Path) -> None:
-        _staged(tmp_path, ("alpha", "beta", "gamma", "delta", "echo"))
-        others = f"{tmp_path / 'beta'},{tmp_path / 'gamma'}"
-        companions = f"{tmp_path / 'delta'},{tmp_path / 'echo'}"
-
-        code = sweep.main(_argv(tmp_path, others=others, companions=companions))
-
-        assert code == 0
-        restored = decode_run_record(
-            load_json_str((tmp_path / "nested" / "record.json").read_text(encoding="utf-8"))
-        )
-        assert restored["experiment"] == DIVERSE_COMPANION_SWEEP_EXPERIMENT
-
     def test_the_companion_corpora_flag_is_required(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--companion-corpora"):
             sweep.main(
@@ -468,51 +471,3 @@ class TestMain:
                     str(tmp_path / "r.json"),
                 ]
             )
-
-    def test_a_trailing_comma_names_no_extra_corpus(self, tmp_path: pathlib.Path) -> None:
-        _staged(tmp_path, ("alpha", "beta", "gamma", "delta", "echo"))
-        others = f"{tmp_path / 'beta'},{tmp_path / 'gamma'}"
-        companions = f"{tmp_path / 'delta'},{tmp_path / 'echo'},"
-
-        assert sweep.main(_argv(tmp_path, others=others, companions=companions)) == 0
-
-
-class TestInvocationForms:
-    """The console entry and `python -m` must both measure and write."""
-
-    def test_the_console_entry_point_runs_and_exits_zero(self, tmp_path: pathlib.Path) -> None:
-        _staged(tmp_path, ("alpha", "beta", "gamma", "delta", "echo"))
-        others = f"{tmp_path / 'beta'},{tmp_path / 'gamma'}"
-        companions = f"{tmp_path / 'delta'},{tmp_path / 'echo'}"
-        saved = sys.argv
-        sys.argv = [
-            "modeltrainer-cartridge-diverse-companion-sweep",
-            *_argv(tmp_path, others=others, companions=companions),
-        ]
-        try:
-            with pytest.raises(SystemExit) as excinfo:
-                sweep.entrypoint()
-        finally:
-            sys.argv = saved
-
-        assert excinfo.value.code == 0
-        assert (tmp_path / "nested" / "record.json").is_file()
-
-    def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
-        _staged(tmp_path, ("alpha", "beta", "gamma", "delta", "echo"))
-        others = f"{tmp_path / 'beta'},{tmp_path / 'gamma'}"
-        companions = f"{tmp_path / 'delta'},{tmp_path / 'echo'}"
-        module_name = "model_trainer.cli.cartridge_diverse_companion_sweep"
-        saved_argv = sys.argv
-        saved_module = sys.modules.pop(module_name, None)
-        sys.argv = ["x", *_argv(tmp_path, others=others, companions=companions)]
-        try:
-            with pytest.raises(SystemExit) as raised:
-                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
-        finally:
-            sys.argv = saved_argv
-            if saved_module is not None:
-                sys.modules[module_name] = saved_module
-
-        assert raised.value.code == 0
-        assert (tmp_path / "nested" / "record.json").is_file()
