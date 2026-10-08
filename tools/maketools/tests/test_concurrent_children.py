@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from maketools import _test_hooks
+from maketools.concurrent_children import run_children_concurrently
 from maketools.concurrent_run import run_targets_concurrently
 from maketools.makefile_grammar import SHELL_INCLUDE
 
@@ -31,7 +32,7 @@ SHELL_PROLOGUE = Path(__file__).resolve().parents[3] / SHELL_INCLUDE
 
 
 def test_every_child_runs_and_answers_in_the_order_named(tmp_path: Path) -> None:
-    outcomes = _test_hooks.run_concurrently(
+    outcomes = run_children_concurrently(
         [
             [sys.executable, "-c", "import time, sys; time.sleep(2); print('slow'); sys.exit(3)"],
             [
@@ -55,7 +56,7 @@ def test_every_child_runs_and_answers_in_the_order_named(tmp_path: Path) -> None
 
 def test_a_child_writing_more_than_a_pipe_holds_is_captured_whole(tmp_path: Path) -> None:
     """Two megabytes, far past a pipe's buffer, from a child nobody reads while it runs."""
-    outcomes = _test_hooks.run_concurrently(
+    outcomes = run_children_concurrently(
         [
             [sys.executable, "-c", "import sys; sys.stdout.write('x' * 2_000_000)"],
             [sys.executable, "-c", "pass"],
@@ -77,7 +78,7 @@ def test_a_batch_past_its_wall_kills_the_children_still_running(tmp_path: Path) 
         "time.sleep(60)"
     )
     with pytest.raises(subprocess.TimeoutExpired) as raised:
-        _test_hooks.run_concurrently(
+        run_children_concurrently(
             [[sys.executable, "-c", sleeper], [sys.executable, "-c", "pass"]],
             cwd=tmp_path,
             env=_test_hooks.environ(),

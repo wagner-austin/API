@@ -24,7 +24,7 @@ PROBE_WALL_SECONDS = 120
 
 
 def test_run_inheriting_returns_the_childs_status(tmp_path: Path) -> None:
-    code = _test_hooks.run_inheriting(
+    code = _test_hooks._default_run_inheriting(
         [sys.executable, "-c", "import sys; sys.exit(7)"],
         cwd=tmp_path,
         env=_test_hooks.environ(),
@@ -47,7 +47,7 @@ def test_run_inheriting_fells_a_child_that_outlives_its_wall(tmp_path: Path) -> 
     not know the run had been cut short.
     """
     with pytest.raises(subprocess.TimeoutExpired):
-        _test_hooks.run_inheriting(
+        _test_hooks._default_run_inheriting(
             [sys.executable, "-c", "import time; time.sleep(30)"],
             cwd=tmp_path,
             env=_test_hooks.environ(),
@@ -60,7 +60,7 @@ def test_run_inheriting_passes_the_environment_and_cwd(tmp_path: Path) -> None:
     marker = tmp_path / "seen.txt"
     environment = _test_hooks.environ()
     environment["MAKETOOLS_PROBE"] = "yes"
-    code = _test_hooks.run_inheriting(
+    code = _test_hooks._default_run_inheriting(
         [
             sys.executable,
             "-c",
@@ -77,7 +77,7 @@ def test_run_inheriting_passes_the_environment_and_cwd(tmp_path: Path) -> None:
 
 
 def test_run_capturing_collects_both_streams_and_the_status(tmp_path: Path) -> None:
-    result = _test_hooks.run_capturing(
+    result = _test_hooks._default_run_capturing(
         [
             sys.executable,
             "-c",
@@ -135,18 +135,23 @@ def test_the_real_process_table_lists_this_process() -> None:
 
 def test_kill_ends_a_real_child_and_refuses_a_gone_one() -> None:
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
-    _test_hooks.kill(child.pid)
-    assert child.wait(timeout=10) != 0
+    _test_hooks._default_kill(child.pid)
+    child.wait(timeout=10)
+    assert child.returncode != 0
     with pytest.raises(OSError):
-        _test_hooks.kill(child.pid)
+        _test_hooks._default_kill(child.pid)
 
 
 def test_remove_tree_and_remove_file_delete(tmp_path: Path) -> None:
     tree = tmp_path / "tree"
     (tree / "inner").mkdir(parents=True)
     (tree / "inner" / "f").write_bytes(b"")
-    _test_hooks.remove_tree(tree)
+    _test_hooks._default_remove_tree(tree)
     assert not tree.exists()
+    # The removal a reap makes of a tree another process already removed is
+    # refused by the OS, not reported as done.
+    with pytest.raises(FileNotFoundError):
+        _test_hooks._default_remove_tree(tree)
     lone = tmp_path / "lone"
     lone.write_bytes(b"")
     _test_hooks.remove_file(lone)
