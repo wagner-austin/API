@@ -11,7 +11,10 @@ companion_repository_commands). idle's check reads nothing beside it, and its
 browser project draws with WebGL in Chromium, so it takes slime's tags.
 tree-bot's and Dashboards/rabbit's checks read nothing beside them and run
 their recipes in PowerShell, so each takes a Windows node and installs
-through its own make check (MCPs board task ddd25310). The Dashboards root's
+through its own make check (MCPs board task ddd25310). LSTM's check is the
+same shape: PowerShell recipes, a poetry install inside make check, and no
+repository beside it, since platform_core arrives as a git dependency
+(board task bc12f18b). The Dashboards root's
 check ends in a provenance gate that runs the deliverable-write validator
 against the wikis its articles cite, all found beside the repository as a
 workstation keeps them in ``~/PROJECTS``, so the root carries those five
@@ -55,6 +58,7 @@ MCPS_COMPANION = ProjectCompanion(
         ("metabolomics-dashboard", (NodeTag.WINDOWS,), (), (MCPS_COMPANION,)),
         ("corvis-stick", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
         ("tree-bot", (NodeTag.WINDOWS,), (), ()),
+        ("LSTM", (NodeTag.WINDOWS,), (), ()),
     ],
 )
 def test_each_repository_s_root_check_is_declared_with_what_it_reads(
