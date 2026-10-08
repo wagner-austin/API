@@ -56,6 +56,10 @@ from model_trainer.core.services.model.cartridge_scoring import (
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 
+#: The module-scoped experiment is shared by this file's tests, so they run on
+#: one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_trait_expression.py")
+
 #: The trait marker, and the token that stands in its place when the trait is
 #: absent. Disjoint from the filler range so neither can be produced by chance.
 _TRAIT = 77

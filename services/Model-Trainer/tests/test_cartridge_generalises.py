@@ -56,6 +56,10 @@ from model_trainer.core.services.model.cartridge_scoring import score_held_out, 
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 
+#: The module-scoped experiment is shared by this file's tests, so they run on
+#: one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_generalises.py")
+
 #: The structure the corpus carries: four marker tokens in a fixed order, each
 #: followed by a filler drawn from a disjoint range. A model that has learned
 #: the corpus predicts the markers; the fillers are unpredictable by

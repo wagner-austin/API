@@ -34,6 +34,10 @@ from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import CacheCapableLMProto
 
+#: The module-scoped corpus is shared by this file's tests, so they run on one
+#: xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("core/services/model/test_cartridge_measurement.py")
+
 #: Short enough that the prefix and the input both fit the tiny rung's 64
 #: positions with room to spare: 8 tokens plus 8 slots is 16.
 WINDOW = 8

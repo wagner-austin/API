@@ -36,6 +36,10 @@ from model_trainer.core.services.model.trait_arms import (
 from model_trainer.core.services.model.trait_families import plain_trait_build
 from model_trainer.core.types import CacheCapableLMProto, SteerableLMProto
 
+#: The module-scoped measurement and cell are shared by this file's tests, so
+#: they run on one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("core/services/model/test_trait_arms.py")
+
 _SITE = "transformer.h.0.mlp.c_proj"
 
 #: Three is the fewest replicates a gain may be built from, and the arms

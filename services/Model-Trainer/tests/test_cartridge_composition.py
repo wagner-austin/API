@@ -64,6 +64,10 @@ from model_trainer.core.services.model.cartridge_scoring import score_held_out, 
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 
+#: The module-scoped composition is shared by this file's tests, so they run on
+#: one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_composition.py")
+
 #: Two corpora with different structure: different marker tokens, same shape.
 #: Same shape on purpose -- it makes the two cartridges genuinely confusable,
 #: which is the hard case for composition rather than the easy one.

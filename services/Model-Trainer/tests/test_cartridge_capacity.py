@@ -80,6 +80,10 @@ from model_trainer.core.services.model.cartridge_scoring import score_held_out, 
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 
+#: The module-scoped sweep is shared by this file's tests, so they run on one
+#: xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_capacity.py")
+
 #: Positions the tiny rung's model has. The prefix and the input share them.
 _CONTEXT = PROBE_SHAPES["tiny"]["sequence_len"]
 
