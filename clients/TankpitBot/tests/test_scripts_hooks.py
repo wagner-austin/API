@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import socket
 import sys
 from collections.abc import Generator
 from pathlib import Path
 
+import httpx
 import pytest
 
 from scripts import _test_hooks
@@ -130,3 +132,16 @@ def test_real_http_get_returns_response() -> None:
     response = _test_hooks._real_http_get("https://tankpit.com/play/field01.gif")
     assert response.status_code == 200
     assert response.content != b""
+
+
+def test_real_http_get_raises_when_nothing_answers() -> None:
+    """A host that refuses the connection is raised, never a quiet empty response.
+
+    The port is one a listener held and released, so nothing is bound to it.
+    """
+    released = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    released.bind(("127.0.0.1", 0))
+    bound: tuple[str, int] = released.getsockname()
+    released.close()
+    with pytest.raises(httpx.ConnectError):
+        _test_hooks._real_http_get(f"http://127.0.0.1:{bound[1]}/play/field01.gif")

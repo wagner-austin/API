@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import socket
 
 import pytest
 from aiohttp import web
@@ -63,6 +65,28 @@ class TestRealHookImplementations:
 
         # We do not call ``start`` — that would open a socket. But the
         # cleanup exercise proves the AppRunner setup ran.
+        await site.cleanup()
+
+    async def test_real_build_site_refuses_an_address_this_machine_does_not_hold(
+        self,
+    ) -> None:
+        """Starting on an address no interface holds is raised, not served.
+
+        192.0.2.1 is TEST-NET-1, assigned to no machine. A plain bind there
+        fails with ``EADDRNOTAVAIL`` on every platform; aiohttp's start on
+        Windows drops that errno from its own error, so the address is
+        shown unassignable first and the site's start is then held to fail
+        on it.
+        """
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        with pytest.raises(OSError) as refused:
+            probe.bind(("192.0.2.1", 0))
+        probe.close()
+        assert refused.value.errno == errno.EADDRNOTAVAIL
+
+        site = await _real_build_site(web.Application(), "192.0.2.1", 27555)
+        with pytest.raises(OSError, match="bind"):
+            await site.start()
         await site.cleanup()
 
 

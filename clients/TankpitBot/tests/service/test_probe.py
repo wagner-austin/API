@@ -9,17 +9,20 @@ running on the developer's machine.
 from __future__ import annotations
 
 import asyncio
+import socket
 from collections.abc import Awaitable, Callable
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
+from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.service.constants import health_url, resolve_service_port
 from tankpit_bot.service.probe import (
     default_probe_existing_instance,
     probe_health_url,
 )
+from tests.conftest import FakeEnv
 
 
 class TestProbeHealthURL:
@@ -174,3 +177,24 @@ class TestDefaultProbeExistingInstance:
         assert default_probe_existing_instance() == probe_health_url(
             health_url(resolve_service_port())
         )
+
+    def test_default_probe_finds_no_instance_on_a_port_that_refuses(self) -> None:
+        """A refused connection on the resolved port reads as "no instance".
+
+        The port is one a listener held and released, named through
+        ``TANKPIT_BOT_SERVICE_PORT``, and shown to refuse a plain connect
+        before the probe is asked, so the False is the refusal and not a
+        foreign server's wrong body.
+        """
+        released = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        released.bind(("127.0.0.1", 0))
+        bound: tuple[str, int] = released.getsockname()
+        released.close()
+        with pytest.raises(ConnectionRefusedError):
+            socket.create_connection(("127.0.0.1", bound[1]), timeout=5.0)
+        original_get_env = top_hooks.get_env
+        top_hooks.get_env = FakeEnv({"TANKPIT_BOT_SERVICE_PORT": str(bound[1])})
+        try:
+            assert default_probe_existing_instance() is False
+        finally:
+            top_hooks.get_env = original_get_env

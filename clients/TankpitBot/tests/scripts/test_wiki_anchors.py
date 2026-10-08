@@ -7,6 +7,7 @@ the repository's actual anchor state.
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Generator
 from pathlib import Path
 
@@ -300,6 +301,17 @@ class TestRealResolver:
         assert set(blob) <= set("0123456789abcdef")
 
     def test_untracked_path_resolves_to_none(self) -> None:
-        """A path absent from HEAD resolves to None rather than raising."""
+        """A path absent from HEAD resolves to None rather than raising.
+
+        None is how the resolver reports git refusing the question, so the
+        test first shows git really does refuse it, with its exit 128.
+        """
         project_root = Path(__file__).resolve().parents[2]
+        refused = subprocess.run(
+            ["git", "rev-parse", "HEAD:./no/such/path.xyz"],
+            cwd=project_root,
+            capture_output=True,
+            check=False,
+        )
+        assert refused.returncode == 128
         assert script_hooks._real_resolve_tree_hash(project_root, "no/such/path.xyz") is None

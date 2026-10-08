@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import threading
@@ -107,9 +108,34 @@ def test_git_head_ref_answers_empty_outside_any_repository(tmp_path: Path) -> No
 
     The release tree is a ``git archive`` and HAS no repository; the
     stamp records that nothing identified the build rather than
-    inventing one.
+    inventing one. The empty answer is git's refusal, exit 128, which
+    the test shows first.
     """
+    refused = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, check=False
+    )
+    assert refused.returncode == 128
     assert _git_head_ref(str(tmp_path)) == ""
+
+
+def test_resolve_build_ref_answers_empty_unstamped_and_repository_less(tmp_path: Path) -> None:
+    """The release-tree class: no stamp, and git refuses, so nothing is invented."""
+    from tankpit_bot._test_hooks import env as env_hooks
+    from tests.conftest import FakeEnv
+
+    original_env = env_hooks.get_env
+    original_cwd = Path.cwd()
+    env_hooks.get_env = FakeEnv()
+    os.chdir(tmp_path)
+    try:
+        refused = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, check=False)
+        ref = _real_resolve_build_ref()
+    finally:
+        os.chdir(original_cwd)
+        env_hooks.get_env = original_env
+
+    assert refused.returncode == 128
+    assert ref == ""
 
 
 def test_resolve_build_ref_prefers_the_stamped_environment() -> None:
