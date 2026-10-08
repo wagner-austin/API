@@ -12,18 +12,22 @@ arm scored on items another arm never saw, a spread reported without the mean
 it qualifies, or a base arm re-scored per seed and its spread reported as
 measured, would all produce a file that looks complete and says something
 false.
+
+TWO RUNS SERVE MOST OF THIS FILE (MCPs board task 2f90d785): ``measured``
+calls ``measure_qa_plan`` once and ``walk`` runs the command line once
+through ``python -m``. Thirteen tests each ran the same plan before, 1.1 to
+11.6 s apiece alone and 53 s for the file in CI.
 """
 
 from __future__ import annotations
 
 import pathlib
-import runpy
-import sys
 from collections.abc import Generator, Mapping
+from typing import TypedDict
 
 import pytest
 from platform_core.json_utils import load_json_str
-from platform_core.run_record import NO_PAYLOAD, decode_run_record
+from platform_core.run_record import NO_PAYLOAD, RunRecord, decode_run_record
 from platform_ml.determinism import (
     ATTENTION_MATH_ONLY,
     ATTENTION_SETTING,
@@ -37,9 +41,11 @@ from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Pre
 from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
+from model_trainer.core.services.model.cartridge_qa_report import QaMeasurement
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import LMModelProto
+from tests._module_run import run_module_as_main
 from tests._qa_benchmark_support import (
     DOCUMENTS as _DOCUMENTS,
 )
@@ -55,6 +61,10 @@ from tests._qa_benchmark_support import (
     values as _values,
 )
 
+#: The module-scoped runs are shared by many tests, so this file's tests run
+#: on one xdist worker (tests/test_xdist_grouping.py says why).
+pytestmark = pytest.mark.xdist_group("test_cartridge_qa_benchmark.py")
+
 
 @pytest.fixture(name="wired", autouse=True)
 def _wired() -> Generator[None, None, None]:
@@ -62,6 +72,84 @@ def _wired() -> Generator[None, None, None]:
     install_fakes()
     yield None
     restore_fakes()
+
+
+def _argv(tmp_path: pathlib.Path) -> list[str]:
+    """Build the untreated command line against a corpus directory.
+
+    Args:
+        tmp_path: The directory the corpus and the record live under.
+
+    Returns:
+        The flags, without a program name.
+    """
+    return [
+        "--plan",
+        "tiny",
+        "--corpus",
+        str(tmp_path),
+        "--device",
+        "cpu",
+        "--controls",
+        "none",
+        "--out",
+        str(tmp_path / "nested" / "record.json"),
+    ]
+
+
+@pytest.fixture(name="measured", scope="module")
+def _measured(tmp_path_factory: pytest.TempPathFactory) -> QaMeasurement:
+    """Run every arm of the tiny plan once, for the tests that read the arms.
+
+    Module-scoped, so it runs before the function-scoped ``wired`` fixture
+    and installs the fakes itself.
+
+    Args:
+        tmp_path_factory: Source of the run's own directory.
+
+    Returns:
+        What ``measure_qa_plan`` returned.
+    """
+    root = tmp_path_factory.mktemp("measured")
+    install_fakes()
+    try:
+        return bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=root, device="cpu", checkpoints=root / "ckpt"
+        )
+    finally:
+        restore_fakes()
+
+
+class _Walk(TypedDict):
+    """One ``python -m`` run of the tiny plan and the record it wrote."""
+
+    code: int | str | None
+    record: RunRecord
+
+
+@pytest.fixture(name="walk", scope="module")
+def _walk(tmp_path_factory: pytest.TempPathFactory) -> _Walk:
+    """Run the tiny plan once through ``python -m``, untreated.
+
+    ``python -m`` runs the ``__main__`` guard, which calls ``entrypoint()``,
+    which calls ``main()`` on the process arguments, which writes
+    ``qa_run_record``'s record; so this one execution stands for the module,
+    console and ``main()`` forms and for the run record.
+
+    Args:
+        tmp_path_factory: Source of the run's own directory.
+
+    Returns:
+        The exit code and the decoded record.
+    """
+    root = tmp_path_factory.mktemp("walk")
+    install_fakes()
+    try:
+        code = run_module_as_main("model_trainer.cli.cartridge_qa_benchmark", _argv(root))
+    finally:
+        restore_fakes()
+    text = (root / "nested" / "record.json").read_text(encoding="utf-8")
+    return {"code": code, "record": decode_run_record(load_json_str(text))}
 
 
 class TestBuildQuestionSet:
@@ -97,25 +185,17 @@ class TestBuildQuestionSet:
 
 
 class TestMeasureQaPlan:
-    def test_every_observation_is_named_once(self, tmp_path: pathlib.Path) -> None:
-        observations = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )["observations"]
-
-        names = [observation["name"] for observation in observations]
+    def test_every_observation_is_named_once(self, measured: QaMeasurement) -> None:
+        names = [observation["name"] for observation in measured["observations"]]
         assert len(names) == len(set(names))
 
-    def test_it_names_both_instruments_and_the_baseline(self, tmp_path: pathlib.Path) -> None:
+    def test_it_names_both_instruments_and_the_baseline(self, measured: QaMeasurement) -> None:
         """Both, because they were measured to disagree.
 
         On gpt2 the accuracy arm did not move while the answer-likelihood arm
         halved; a record carrying only one would report half the finding.
         """
-        observations = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )["observations"]
-
-        named = _values(observations)
+        named = _values(measured["observations"])
         assert "base_accuracy" in named
         assert "retrieval_accuracy" in named
         assert "chance_accuracy" in named
@@ -124,65 +204,42 @@ class TestMeasureQaPlan:
         assert "cartridge-answer-nll-gain_mean" in named
         assert "cartridge-answer-nll-gain_spread" in named
 
-    def test_chance_follows_the_distractor_count(self, tmp_path: pathlib.Path) -> None:
-        observations = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )["observations"]
-
-        named = _values(observations)
+    def test_chance_follows_the_distractor_count(self, measured: QaMeasurement) -> None:
+        named = _values(measured["observations"])
         assert named["chance_accuracy"] == pytest.approx(1.0 / (TINY_PLAN["distractor_count"] + 1))
 
-    def test_every_gain_carries_a_spread_beside_its_mean(self, tmp_path: pathlib.Path) -> None:
+    def test_every_gain_carries_a_spread_beside_its_mean(self, measured: QaMeasurement) -> None:
         """A mean without its spread is what let a 0.02 difference read as a finding."""
-        observations = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )["observations"]
-
-        named = _values(observations)
+        named = _values(measured["observations"])
         for arm in ("cartridge-accuracy-gain", "cartridge-answer-nll-gain"):
             assert f"{arm}_mean" in named
             assert f"{arm}_spread" in named
             assert named[f"{arm}_spread"] >= 0.0
 
     def test_the_retrieval_gain_is_the_difference_it_claims_to_be(
-        self, tmp_path: pathlib.Path
+        self, measured: QaMeasurement
     ) -> None:
-        observations = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )["observations"]
-
-        named = _values(observations)
+        named = _values(measured["observations"])
         assert named["retrieval_accuracy_gain"] == pytest.approx(
             named["retrieval_accuracy"] - named["base_accuracy"]
         )
 
-    def test_the_item_count_is_reported(self, tmp_path: pathlib.Path) -> None:
+    def test_the_item_count_is_reported(self, measured: QaMeasurement) -> None:
         """A gain over six items and one over six hundred read very differently."""
-        observations = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )["observations"]
-
-        named = _values(observations)
+        named = _values(measured["observations"])
         assert 0.0 < named["items"] <= float(TINY_PLAN["max_items"])
 
 
 class TestRunRecord:
-    def test_it_carries_the_question_set_experiment(self, tmp_path: pathlib.Path) -> None:
+    def test_it_carries_the_question_set_experiment(self, walk: _Walk) -> None:
         """Not the loss experiment's, so the two cannot be differenced."""
-        record = bench.qa_run_record(
-            "tiny",
-            corpus=tmp_path,
-            device="cpu",
-            checkpoints=tmp_path / "ckpt",
-            remove_split_k=False,
-            math_attention=False,
+        assert walk["record"]["experiment"] == QA_EXPERIMENT
+        assert walk["record"]["label"].startswith(
+            "tiny-gpt2-w8-s2-c8-m48-e1-lr0.05-d2-n6-seeds7.8.9-"
         )
 
-        assert record["experiment"] == QA_EXPERIMENT
-        assert record["label"].startswith("tiny-gpt2-w8-s2-c8-m48-e1-lr0.05-d2-n6-seeds7.8.9-")
-
     def test_the_payload_digest_is_the_question_set_this_run_asked(
-        self, tmp_path: pathlib.Path
+        self, measured: QaMeasurement, walk: _Walk
     ) -> None:
         """THE FIELD THAT SEPARATES TWO RUNS OF ONE PLAN.
 
@@ -194,17 +251,7 @@ class TestRunRecord:
         both sides and this test keeps checking the wiring rather than a
         frozen hash.
         """
-        measured = bench.measure_qa_plan(
-            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
-        )
-        record = bench.qa_run_record(
-            "tiny",
-            corpus=tmp_path,
-            device="cpu",
-            checkpoints=tmp_path / "ckpt",
-            remove_split_k=False,
-            math_attention=False,
-        )
+        record = walk["record"]
 
         assert record["payload_digest"] == measured["question_set_digest"]
         assert record["payload_digest"] != NO_PAYLOAD
@@ -314,28 +361,10 @@ class TestThePlanDeclaresItsPrecision:
 
 
 class TestTheCommandLine:
-    def _argv(self, tmp_path: pathlib.Path) -> list[str]:
-        return [
-            "--plan",
-            "tiny",
-            "--corpus",
-            str(tmp_path),
-            "--device",
-            "cpu",
-            "--controls",
-            "none",
-            "--out",
-            str(tmp_path / "nested" / "record.json"),
-        ]
-
-    def test_it_writes_a_decodable_record(self, tmp_path: pathlib.Path) -> None:
-        code = bench.main(self._argv(tmp_path))
-
-        assert code == 0
-        restored = decode_run_record(
-            load_json_str((tmp_path / "nested" / "record.json").read_text(encoding="utf-8"))
-        )
-        assert restored["experiment"] == QA_EXPERIMENT
+    def test_running_it_as_a_module_writes_a_decodable_record(self, walk: _Walk) -> None:
+        """Without the __main__ guard the module imports, runs nothing, exits 0."""
+        assert walk["code"] == 0
+        assert walk["record"]["experiment"] == QA_EXPERIMENT
 
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--controls"):
@@ -358,31 +387,3 @@ class TestTheCommandLine:
                     "none",
                 ]
             )
-
-    def test_the_console_entry_point_exits_zero(self, tmp_path: pathlib.Path) -> None:
-        saved = sys.argv
-        sys.argv = ["modeltrainer-cartridge-qa", *self._argv(tmp_path)]
-        try:
-            with pytest.raises(SystemExit) as excinfo:
-                bench.entrypoint()
-        finally:
-            sys.argv = saved
-
-        assert excinfo.value.code == 0
-
-    def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
-        """Without the __main__ guard the module imports, runs nothing, exits 0."""
-        module_name = "model_trainer.cli.cartridge_qa_benchmark"
-        saved_argv = sys.argv
-        saved_module = sys.modules.pop(module_name, None)
-        sys.argv = ["x", *self._argv(tmp_path)]
-        try:
-            with pytest.raises(SystemExit) as raised:
-                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
-        finally:
-            sys.argv = saved_argv
-            if saved_module is not None:
-                sys.modules[module_name] = saved_module
-
-        assert raised.value.code == 0
-        assert (tmp_path / "nested" / "record.json").is_file()
