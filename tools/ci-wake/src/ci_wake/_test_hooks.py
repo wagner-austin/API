@@ -73,28 +73,49 @@ class RunProcessProtocol(Protocol):
     ``check=True`` would raise a ``CalledProcessError`` whose message is the
     argv and nothing else, and the useful half would have to be recovered
     from an attribute afterwards.
+
+    Capturing both streams as text is the implementation's to fix, not a
+    caller's to remember: the boundary reads stdout as JSON and stderr as the
+    CLI's words every time, and a call that forgot ``capture_output`` would
+    read an empty stdout and report every push as having no runs.
     """
 
-    def __call__(
-        self,
-        args: Sequence[str],
-        *,
-        capture_output: bool,
-        text: bool,
-        timeout: int,
-    ) -> CompletedProto:
+    def __call__(self, args: Sequence[str], *, timeout: int) -> CompletedProto:
         """Run the command to completion and return its outcome.
 
         Args:
             args: The full argument vector, program first.
-            capture_output: Always True here; both streams are read.
-            text: Always True here; both streams are decoded as text.
             timeout: Seconds before the process is abandoned.
 
         Returns:
-            The finished process.
+            The finished process, both streams captured as text.
+
+        Raises:
+            subprocess.TimeoutExpired: When it outlasts ``timeout``; the
+                child is killed first.
         """
         ...
+
+
+def _default_run_process(args: Sequence[str], *, timeout: int) -> CompletedProto:
+    """Run a real process, capturing both streams as text.
+
+    A named implementation rather than ``subprocess.run`` bound straight to
+    the hook, so a test can run the production runner itself through a
+    failure (``effect-seam-twin``, board task cc7222ca); a hook bound to the
+    library function has no name a test reaches except the rebindable one.
+
+    Args:
+        args: The full argument vector, program first.
+        timeout: Seconds before the process is killed.
+
+    Returns:
+        The finished process, whatever its status.
+
+    Raises:
+        subprocess.TimeoutExpired: When it outlasts ``timeout``.
+    """
+    return subprocess.run(list(args), capture_output=True, text=True, timeout=timeout, check=False)
 
 
 class ReadTextProtocol(Protocol):
@@ -230,7 +251,7 @@ def _default_now() -> int:
 
 
 http_post: McpPostProtocol = urllib_mcp_post
-run_process: RunProcessProtocol = subprocess.run
+run_process: RunProcessProtocol = _default_run_process
 read_text: ReadTextProtocol = _default_read_text
 append_text: AppendTextProtocol = _default_append_text
 file_exists: FileExistsProtocol = _default_file_exists
@@ -242,7 +263,7 @@ def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
     global http_post, run_process, read_text, append_text, file_exists, emit, now
     http_post = urllib_mcp_post
-    run_process = subprocess.run
+    run_process = _default_run_process
     read_text = _default_read_text
     append_text = _default_append_text
     file_exists = _default_file_exists

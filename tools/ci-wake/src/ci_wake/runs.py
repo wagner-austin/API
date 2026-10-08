@@ -218,9 +218,7 @@ def gh_json(argv: Sequence[str]) -> JSONValue:
             a failed cycle; a caught timeout would be a cycle that announced
             nothing and said it succeeded.
     """
-    completed = _test_hooks.run_process(
-        list(argv), capture_output=True, text=True, timeout=GH_TIMEOUT_SECONDS
-    )
+    completed = _test_hooks.run_process(list(argv), timeout=GH_TIMEOUT_SECONDS)
     if completed.returncode != 0:
         raise AppError(
             code=CiWakeErrorCode.GH_COMMAND_FAILED,
