@@ -46,9 +46,12 @@ PYTEST_TAIL = (
 
 
 class TestMirrorPath:
-    def test_the_key_folds_its_slashes_into_one_directory(self, tmp_path: pathlib.Path) -> None:
-        assert export.mirror_path(tmp_path, PROJECT) == tmp_path / "MCPs-packages-wiki-search.git"
-        assert export.mirror_path(tmp_path, "slime") == tmp_path / "slime.git"
+    def test_the_key_names_one_bare_directory(self, tmp_path: pathlib.Path) -> None:
+        mcps = export.mirror_path(tmp_path, "wagner-austin-MCPs")
+        slime = export.mirror_path(tmp_path, "wagner-austin-slime")
+
+        assert mcps == tmp_path / "wagner-austin-MCPs.git"
+        assert slime == tmp_path / "wagner-austin-slime.git"
 
 
 class TestEnsureMirror:
@@ -264,13 +267,49 @@ class TestRequireSourceAndPrepare:
         runner = FakeRun([ok(""), failed(128, "missing"), ok("")])
         _test_hooks.run = runner
 
-        mirror = export.prepare_mirror(tmp_path, project=PROJECT, remote=REMOTE, sha=SHA)
+        mirror = export.prepare_mirror(tmp_path, remote=REMOTE, sha=SHA)
 
-        assert mirror == tmp_path / "MCPs-packages-wiki-search.git"
+        assert mirror == tmp_path / "wagner-austin-MCPs.git"
         assert runner.calls[0][:2] == ("git", "init")
         assert runner.calls[1][3] == "cat-file"
         assert runner.calls[2][3] == "fetch"
         assert len(runner.calls) == 3
+
+    def test_a_second_package_of_the_remote_reuses_the_mirror_and_its_commit(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Every package of one repository shares one mirror: the second
+        prepare finds the directory, finds the commit the first fetched, and
+        neither initialises nor fetches."""
+        (tmp_path / "wagner-austin-MCPs.git").mkdir()
+        runner = FakeRun([ok("")])
+        _test_hooks.run = runner
+
+        mirror = export.prepare_mirror(tmp_path, remote=REMOTE, sha=SHA)
+
+        assert mirror == tmp_path / "wagner-austin-MCPs.git"
+        assert runner.calls == [
+            ("git", "-C", str(mirror), "cat-file", "-e", f"{SHA}^{{commit}}"),
+        ]
+
+
+class TestRemoteMirrorKey:
+    @pytest.mark.parametrize(
+        "remote",
+        [
+            "https://github.com/wagner-austin/MCPs.git",
+            "git@github.com:wagner-austin/MCPs.git",
+            "ssh://git@github.com/wagner-austin/MCPs.git",
+        ],
+    )
+    def test_every_spelling_of_one_repository_names_one_mirror(self, remote: str) -> None:
+        assert export.remote_mirror_key(remote) == "wagner-austin-MCPs"
+
+    def test_two_repositories_of_one_name_do_not_share_a_mirror(self) -> None:
+        ours = export.remote_mirror_key("https://github.com/wagner-austin/MCPs.git")
+        theirs = export.remote_mirror_key("https://github.com/someone-else/MCPs.git")
+
+        assert ours != theirs
 
 
 class TestCompanionMirrorKey:

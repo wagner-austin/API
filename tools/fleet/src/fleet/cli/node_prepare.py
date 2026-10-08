@@ -167,9 +167,7 @@ def prepare(
     """
     plan = admitted["plan"]
     source = export.require_source(job["project"], plan["source"])
-    mirror = export.prepare_mirror(
-        loaded.mirrors, project=job["project"], remote=source["remote"], sha=sha
-    )
+    mirror = export.prepare_mirror(loaded.mirrors, remote=source["remote"], sha=sha)
     export.require_install_paths(mirror, sha, source["install"])
     companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
     run_cli.require_resources_free(loaded, plan)

@@ -74,7 +74,7 @@ def _claim_and_start(config_path: pathlib.Path, *, commit_present: bool = True) 
 
 
 def _mirror(config_path: pathlib.Path) -> str:
-    """Where the tick keeps the demo project's bare mirror.
+    """Where the tick keeps the bare mirror of the demo project's remote.
 
     Args:
         config_path: The workspace document.
@@ -82,7 +82,7 @@ def _mirror(config_path: pathlib.Path) -> str:
     Returns:
         The mirror's path as git is given it.
     """
-    return str(config_path.parent / "runs" / "mirrors" / "libs-demo.git")
+    return str(config_path.parent / "runs" / "mirrors" / "wagner-austin-API.git")
 
 
 def _companion_config(config_path: pathlib.Path) -> pathlib.Path:

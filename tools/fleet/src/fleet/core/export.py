@@ -33,7 +33,7 @@ from fleet.contracts.source import PATH_PATTERN, InstallStep, ProjectCompanion, 
 from fleet.core import _test_hooks
 
 #: The directory under the workspace's ``runs`` that holds one bare mirror
-#: per project, named after the project key with its slashes folded.
+#: per remote (:func:`remote_mirror_key`).
 MIRRORS_DIRECTORY = "mirrors"
 
 #: The local ref a companion's declared ref is fetched into, inside that
@@ -69,18 +69,34 @@ NOT_ON_REMOTE_MARKERS = (
 )
 
 
-def mirror_path(mirrors_root: pathlib.Path, project: str) -> pathlib.Path:
-    """Where a project's bare mirror lives on the hub.
+def mirror_path(mirrors_root: pathlib.Path, key: str) -> pathlib.Path:
+    """Where one bare mirror lives on the hub.
 
     Args:
         mirrors_root: The mirrors directory under the workspace's records.
-        project: The project key, as the registry spells it.
+        key: :func:`remote_mirror_key` or :func:`companion_mirror_key`.
 
     Returns:
-        ``<mirrors_root>/<key with / as ->.git``; the key's grammar admits
-        nothing else a path could misread.
+        ``<mirrors_root>/<key>.git``.
     """
-    return mirrors_root / f"{project.replace('/', '-')}.git"
+    return mirrors_root / f"{key}.git"
+
+
+def remote_mirror_key(remote: str) -> str:
+    """Name the bare mirror a project's commits are fetched into.
+
+    Keyed by REMOTE, not project key, so all packages of one repository share
+    one history; per project, 107 hub mirrors held 122.8 GB on 2026-10-08.
+
+    Args:
+        remote: The project's declared remote, in the source grammar.
+
+    Returns:
+        ``<owner>-<repository>``, which :func:`mirror_path` can spell.
+    """
+    trimmed = remote.removesuffix(".git").replace(":", "/")
+    owner, repository = trimmed.rsplit("/", 2)[-2:]
+    return f"{owner}-{repository}"
 
 
 def companion_mirror_key(remote: str) -> str:
@@ -89,19 +105,15 @@ def companion_mirror_key(remote: str) -> str:
     Derived from the REMOTE and not from the directory a companion lands in,
     because the directory is a per-project choice: two projects could both
     stage a companion as ``MCPs`` from different remotes, and one mirror
-    serving both would flip between two repositories under one ref. The
-    remote's owner and repository name identify it the way a clone does.
+    serving both would flip between two repositories under one ref.
 
     Args:
         remote: The companion's declared remote, in the source grammar.
 
     Returns:
-        ``companion-<owner>-<repository>``; the grammar admits only
-        characters :func:`mirror_path` can spell.
+        ``companion-<owner>-<repository>``.
     """
-    trimmed = remote.removesuffix(".git").replace(":", "/")
-    owner, repository = trimmed.rsplit("/", 2)[-2:]
-    return f"companion-{owner}-{repository}"
+    return f"companion-{remote_mirror_key(remote)}"
 
 
 def _failure(code: FleetErrorCode, verb: str, stderr: str) -> AppError[FleetErrorCode]:
@@ -374,17 +386,14 @@ def require_source(project: str, source: ProjectSource | None) -> ProjectSource:
     return source
 
 
-def prepare_mirror(
-    mirrors_root: pathlib.Path, *, project: str, remote: str, sha: str
-) -> pathlib.Path:
-    """Make sure the project's mirror exists and holds the commit.
+def prepare_mirror(mirrors_root: pathlib.Path, *, remote: str, sha: str) -> pathlib.Path:
+    """Make sure the remote's mirror exists and holds the commit.
 
     The fetch happens HERE, before any lease is taken by the caller, so a sha
     the remote has never seen is refused with nothing held.
 
     Args:
         mirrors_root: The mirrors directory under the workspace's records.
-        project: The project key.
         remote: The project's declared remote.
         sha: The commit the queue row names.
 
@@ -394,7 +403,7 @@ def prepare_mirror(
     Raises:
         AppError: As :func:`ensure_mirror` and :func:`fetch_commit` describe.
     """
-    mirror = mirror_path(mirrors_root, project)
+    mirror = mirror_path(mirrors_root, remote_mirror_key(remote))
     ensure_mirror(mirror)
     fetch_commit(mirror, remote, sha)
     return mirror
@@ -585,6 +594,7 @@ __all__ = [
     "mirror_path",
     "prepare_companion",
     "prepare_mirror",
+    "remote_mirror_key",
     "require_install_paths",
     "require_source",
 ]
