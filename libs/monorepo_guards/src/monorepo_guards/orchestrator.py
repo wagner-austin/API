@@ -12,6 +12,7 @@ from monorepo_guards.config_loader import _decode_monorepo_guard_config
 from monorepo_guards.config_rules import ConfigRule
 from monorepo_guards.dataclass_rules import DataclassRule
 from monorepo_guards.dependency_rules import EscapingPathDependencyRule
+from monorepo_guards.effect_seam_rules import EffectSeamTwinRule
 from monorepo_guards.entrypoint_rules import EntrypointRule
 from monorepo_guards.env_rules import EnvRule
 from monorepo_guards.error_rules import ErrorsRule
@@ -48,6 +49,7 @@ from monorepo_guards.rust_rules import (
 from monorepo_guards.security_rules import SecurityRule
 from monorepo_guards.shim_rules import ShimRule
 from monorepo_guards.standardization_rules import StandardizationRule
+from monorepo_guards.state_change_rules import StateChangeVerifiedRule
 from monorepo_guards.subprocess_timeout_rules import SubprocessTimeoutRule
 from monorepo_guards.suppress_rules import SuppressRule
 from monorepo_guards.test_quality_rules import WeakAssertionRule
@@ -105,6 +107,8 @@ def _run_with_config(config: GuardConfig) -> int:
         EscapingPathDependencyRule(config),
         WorkflowTimeoutRule(config),
         SubprocessTimeoutRule(),
+        EffectSeamTwinRule(config),
+        StateChangeVerifiedRule(config),
         RustTestRule(config),
         RustCargoLintRule(config),
         RustManualSerializeRule(config),

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from monorepo_guards.config import GuardConfig
 from monorepo_guards.orchestrator import _run_with_config
 from tests._literal_set_support import write_declared_sets
@@ -62,6 +64,40 @@ def test_orchestrator_pass_no_files(tmp_path: Path) -> None:
     )
     rc = _run_with_config(cfg)
     assert rc == 0
+
+
+def test_orchestrator_runs_the_effect_rules_and_fails_on_each(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``make lint`` reaches both rules: an untwinned seam and an unverified
+    install each fail the run and are counted under their own names."""
+    write_declared_sets(tmp_path)
+    _write(
+        tmp_path / "src" / "pkg" / "_test_hooks.py",
+        "import subprocess\n\n\ndef _default_run(argv):\n"
+        "    return subprocess.run(argv, timeout=5)\n",
+    )
+    _write(
+        tmp_path / "src" / "pkg" / "setup.py",
+        "import subprocess\n\n\ndef install_tools():\n"
+        "    subprocess.run(['installer'], timeout=5)\n",
+    )
+    cfg = GuardConfig(
+        root=tmp_path,
+        monorepo_root=tmp_path,
+        directories=("src", "tests"),
+        exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
+        forbid_pyi=True,
+        allow_print_in_tests=False,
+        dataclass_ban_segments=(),
+    )
+
+    rc = _run_with_config(cfg)
+
+    summary = capsys.readouterr().out.splitlines()
+    assert rc != 0
+    assert "  effect-seam-twin: 1 violations" in summary
+    assert "  state-change-verified: 1 violations" in summary
 
 
 def test_orchestrator_truncates_long_line(tmp_path: Path) -> None:
