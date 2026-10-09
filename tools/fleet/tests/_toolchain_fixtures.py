@@ -206,10 +206,41 @@ GO_WINGET = (
 )
 
 #: How the tagged gap reads go's entry on a node whose managers cover none
-#: of its installs, the tail every such gap line now ends with.
+#: of its installs.
 GO_NO_INSTALL = (
     f"; go -- {GO_REASON}, so those jobs go to a node that has it -- no automatic install on "
     "this node"
+)
+
+#: Why a node is told about Chrome, in the tagged gap's words (MCPs board
+#: task 2f596185): web-scraper's three real-browser cases launch Playwright's
+#: channel chrome, which diphtheria lacked on 2026-10-04 and 2026-10-09.
+CHROME_REASON = (
+    "MCPs web-scraper's check launches Playwright's channel chrome, the system Google Chrome, "
+    "in three real-browser cases"
+)
+
+#: The winget line a Windows node is offered for Chrome.
+CHROME_WINGET = (
+    "winget install --id Google.Chrome -e --source winget --silent "
+    "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+)
+
+#: The line a Linux node is offered for Chrome: the .deb Google ships, the
+#: same command runners.json provisions the asset with, because no apt
+#: repository a node already has carries it.
+CHROME_APT = (
+    "curl -fsSL -o /tmp/google-chrome-stable_current_amd64.deb "
+    "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && "
+    "sudo apt-get install -y -qq /tmp/google-chrome-stable_current_amd64.deb && "
+    "rm -f /tmp/google-chrome-stable_current_amd64.deb"
+)
+
+#: How the tagged gap reads Chrome's entry on a node whose managers cover
+#: none of its installs, the tail every such gap line now ends with.
+CHROME_NO_INSTALL = (
+    f"; chrome -- {CHROME_REASON}, so those jobs go to a node that has it -- no automatic "
+    "install on this node"
 )
 
 

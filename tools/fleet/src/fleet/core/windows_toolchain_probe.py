@@ -13,9 +13,22 @@ from __future__ import annotations
 
 from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
+    CHROME_WINDOWS_RELATIVE,
     GO_VERSION_ARGUMENT,
     HOOKS_CHECK_MODULES,
     HOOKS_ROUTE_FILE,
+)
+
+#: The roots the probe tries for Google Chrome, in Playwright's order: the
+#: machine-wide installs under either Program Files, then a per-user one.
+CHROME_ROOTS = ("$env:ProgramFiles", "${env:ProgramFiles(x86)}", "$env:LOCALAPPDATA")
+
+#: The ``$Chrome`` parameter's default: each root joined to
+#: :data:`fleet.contracts.tagged_tools.CHROME_WINDOWS_RELATIVE`, quoted for
+#: the PowerShell array literal the script opens.
+_CHROME_DEFAULT = ", ".join(
+    '"' + root + "".join(f"\\{part}" for part in CHROME_WINDOWS_RELATIVE) + '"'
+    for root in CHROME_ROOTS
 )
 
 #: The toolchain probe, verbatim.
@@ -86,6 +99,18 @@ from fleet.contracts.tagged_tools import (
 #: :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_MODULES` in one ``-c``; a
 #: node without the file is never asked to import. Measured 2026-10-02:
 #: sedona carries the file, pendragon and serendipity do not.
+#: ``chrome`` is Google Chrome at the path Playwright's channel ``chrome``
+#: launches (MCPs board task 2f596185): the first of ``$Chrome``'s candidates
+#: that exists, a parameter defaulting to :data:`CHROME_ROOTS` joined to
+#: :data:`fleet.contracts.tagged_tools.CHROME_WINDOWS_RELATIVE` so the suite
+#: can name a stand-in, answered as ``yes=<ProductVersion>`` read from the
+#: file's version resource rather than by launching a browser, and ``no``
+#: when none exists. It is never looked for on the PATH, where Chrome is not.
+#: The answer is built in ``$chromeLine``, never ``$chrome``: PowerShell
+#: variable names are case-insensitive, so ``$chrome = 'chrome=no='`` would
+#: overwrite the ``$Chrome`` parameter before the loop read it, and the probe
+#: answered ``no`` with a stand-in Chrome in place (measured 2026-10-09 while
+#: this line was written).
 #: ``integrity`` is the ssh session's token (:mod:`fleet.contracts.elevation`):
 #: ``yes=administrator`` only when ``WindowsPrincipal.IsInRole`` finds the
 #: Administrators role, which a filtered token never reports, so a node's
@@ -103,6 +128,9 @@ TOOLCHAIN_PROBE_SCRIPT = (
     [string]$HooksRoute = "$env:USERPROFILE"""
     + "".join(f"\\{part}" for part in HOOKS_ROUTE_FILE)
     + r"""",
+    [string[]]$Chrome = @("""
+    + _CHROME_DEFAULT
+    + r"""),
     [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
@@ -205,6 +233,15 @@ if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {
     }
 }
 $hooks
+$chromeLine = 'chrome=no='
+foreach ($candidate in $Chrome) {
+    if ([System.IO.File]::Exists($candidate)) {
+        $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($candidate).ProductVersion
+        $chromeLine = "chrome=yes=$version"
+        break
+    }
+}
+$chromeLine
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {
@@ -215,4 +252,4 @@ exit 0
 )
 
 
-__all__ = ["TOOLCHAIN_PROBE_SCRIPT"]
+__all__ = ["CHROME_ROOTS", "TOOLCHAIN_PROBE_SCRIPT"]

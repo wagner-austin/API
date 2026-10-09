@@ -87,6 +87,25 @@ HOOKS_CHECK_PACKAGES: Final = (
 #: ask ``go version`` instead of every other tool's ``--version``.
 GO_VERSION_ARGUMENT: Final = "version"
 
+#: Where Playwright's channel ``chrome`` launches Google Chrome on Linux, the
+#: one path MCPs ``web-scraper``'s real-browser cases open
+#: (``src/hooks/browser.ts``), so it is the one path the Linux probe asks for.
+#: ``/usr/bin/google-chrome`` is a symlink the same package installs, but a
+#: node that carries only the symlink would answer present and fail the
+#: suite, so the probe asks for the binary itself. Measured 2026-10-09 (MCPs
+#: board task 2f596185): diphtheria had Playwright's bundled chromium-1243
+#: under ``~/.cache/ms-playwright`` and no such file, and MCPs/web-scraper
+#: fleet jobs 56d7fbb5 and 3f9131af failed there with ``browserType.launch:
+#: Chromium distribution 'chrome' is not found at /opt/google/chrome/chrome``.
+CHROME_LINUX_PATH: Final = "/opt/google/chrome/chrome"
+
+#: Where Playwright's channel ``chrome`` launches Google Chrome on Windows,
+#: relative to each of the three roots it tries in order: ``%ProgramFiles%``,
+#: ``%ProgramFiles(x86)%`` and ``%LOCALAPPDATA%`` (a per-user install). The
+#: Windows probe takes the roots as a parameter so its Pester suite can lay
+#: out a stand-in, and answers the first that exists.
+CHROME_WINDOWS_RELATIVE: Final = ("Google", "Chrome", "Application", "chrome.exe")
+
 #: Tools only some projects need, each the source of a capability tag
 #: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
 #: them every tick like the required tools, but a node without one is refused
@@ -100,6 +119,19 @@ GO_VERSION_ARGUMENT: Final = "version"
 #: an older go from any of these managers fetches that toolchain itself
 #: (``GOTOOLCHAIN=auto``, Go 1.21 onward), so the distribution's package is
 #: enough.
+#:
+#: ``chrome`` because MCPs ``web-scraper``'s check launches Playwright's
+#: channel ``chrome``, the system Google Chrome and never the bundled
+#: Chromium, in three real-browser cases, and a node without it fails those
+#: three and passes the other 490 (MCPs board task 2f596185: fleet job
+#: 874c160c on 2026-10-04 and 56d7fbb5 on 2026-10-09, both on diphtheria,
+#: while lavender-wsl, whose runner provisioning installs Chrome as a
+#: ``runners.json`` asset, passed the same suite). It is not an executable on
+#: a PATH on either platform, so each probe asks for it at the path
+#: Playwright opens (:data:`CHROME_LINUX_PATH`, :data:`CHROME_WINDOWS_RELATIVE`)
+#: rather than through ``report``'s ``command -v`` or ``Find-Tool``. The
+#: apt-get install is the asset's own ``provision_command``: Google ships the
+#: .deb from its own host, not from any apt repository the node already has.
 TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="ffmpeg",
@@ -156,10 +188,40 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "apt-get": "sudo apt-get remove -y golang-go",
         },
     ),
+    RequiredTool(
+        name="chrome",
+        reason=(
+            "MCPs web-scraper's check launches Playwright's channel chrome, the system Google "
+            "Chrome, in three real-browser cases"
+        ),
+        install={
+            "winget": (
+                "winget install --id Google.Chrome -e --source winget --silent "
+                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco install googlechrome -y",
+            "apt-get": (
+                "curl -fsSL -o /tmp/google-chrome-stable_current_amd64.deb "
+                "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && "
+                "sudo apt-get install -y -qq /tmp/google-chrome-stable_current_amd64.deb && "
+                "rm -f /tmp/google-chrome-stable_current_amd64.deb"
+            ),
+        },
+        uninstall={
+            "winget": (
+                "winget uninstall --id Google.Chrome -e --source winget --silent "
+                "--accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco uninstall googlechrome -y",
+            "apt-get": "sudo apt-get remove -y google-chrome-stable",
+        },
+    ),
 )
 
 
 __all__ = [
+    "CHROME_LINUX_PATH",
+    "CHROME_WINDOWS_RELATIVE",
     "GO_VERSION_ARGUMENT",
     "HOOKS_CHECK_MODULES",
     "HOOKS_CHECK_PACKAGES",

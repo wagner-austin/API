@@ -13,6 +13,7 @@ from __future__ import annotations
 from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
+    CHROME_LINUX_PATH,
     GO_VERSION_ARGUMENT,
     HOOKS_CHECK_MODULES,
     HOOKS_ROUTE_FILE,
@@ -75,6 +76,13 @@ from fleet.contracts.tagged_tools import (
 #: ``--version`` unless given: ``go`` has no such flag and answers its usage,
 #: so it is asked :data:`fleet.contracts.tagged_tools.GO_VERSION_ARGUMENT`
 #: (MCPs board task 1da15750).
+#:
+#: THE ``chrome`` LINE is Google Chrome at the one path Playwright's channel
+#: ``chrome`` launches, :data:`fleet.contracts.tagged_tools.CHROME_LINUX_PATH`
+#: (MCPs board task 2f596185), asked as an ``if`` on the binary being
+#: executable rather than through ``report``, whose ``command -v`` walks the
+#: PATH Chrome is not on; its answer is the binary's own ``--version``,
+#: ``Google Chrome 155.0.8059.39`` on diphtheria after its 2026-10-09 install.
 TOOLCHAIN_PROBE_BODY = (
     "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -139,6 +147,12 @@ TOOLCHAIN_PROBE_BODY = (
     f"  printf 'hooks=yes=%s\\n' \"$HOME/{'/'.join(HOOKS_ROUTE_FILE)}\"\n"
     "else\n"
     "  printf 'hooks=no=\\n'\n"
+    "fi\n"
+    f'if [ -x "{CHROME_LINUX_PATH}" ]; then\n'
+    f'  printf \'chrome=yes=%s\\n\' "$("{CHROME_LINUX_PATH}" --version 2>&1'
+    " | head -n 1 | tr -d '\\r')\"\n"
+    "else\n"
+    "  printf 'chrome=no=\\n'\n"
     "fi\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"

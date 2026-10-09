@@ -79,6 +79,17 @@ the interpreter imports every tool the check runs.
 server it reads and both host processes had to become fleet projects (MCPs
 board task 1da15750). It is a tool tag like ``ffmpeg``: the probe's ``go``
 line answers present when ``go`` is on the build account's PATH.
+``chrome`` because MCPs ``web-scraper``'s check launches Playwright's
+channel ``chrome``, the system Google Chrome, in three real-browser cases,
+and diphtheria, a ``cxx`` node without it, failed exactly those three on
+2026-10-04 (fleet job 874c160c) and again on 2026-10-09 (56d7fbb5) while
+passing the other 490, so the suite's verdict depended on which node
+claimed it (MCPs board task 2f596185). It is a tool tag like ``ffmpeg``,
+with one difference in how it is found: Chrome is not on a PATH, so the
+probe's ``chrome`` line answers present when the binary exists at the path
+Playwright launches, ``/opt/google/chrome/chrome`` on Linux and
+``Google\\Chrome\\Application\\chrome.exe`` under a Program Files root on
+Windows (:mod:`fleet.contracts.tagged_tools`).
 ``elevated`` because MCPs' Task Scheduler
 installers register what only an administrator may register, and every
 build launches as an S4U task at RunLevel Limited (MCPs board task
@@ -115,8 +126,8 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615, 622, 639, 648 and 668) is the same twelve words as these
-    members' values, in this order.
+    570, 571, 615, 622, 639, 648, 668 and 707) is the same thirteen words as
+    these members' values, in this order.
     """
 
     WINDOWS = "windows"
@@ -131,6 +142,7 @@ class NodeTag(StrEnum):
     FFMPEG = "ffmpeg"
     HOOKS = "hooks"
     GO = "go"
+    CHROME = "chrome"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -151,14 +163,16 @@ CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
 
 #: The tag each detected tool carries, keyed by the line the toolchain probe
 #: reports it under (:class:`fleet.contracts.toolchain.ToolReport`): the
-#: executable's name, or ``hooks`` for the hooks check's environment. These
-#: are the one kind of tag no declaration holds: a runner adds them when this
+#: executable's name, ``hooks`` for the hooks check's environment, or
+#: ``chrome`` for Google Chrome at the path Playwright launches. These are
+#: the one kind of tag no declaration holds: a runner adds them when this
 #: tick's probe found the tool, so installing it makes the node eligible on
 #: its next tick and removing it takes the tag away on the next.
 TOOL_TAG: Final[dict[str, NodeTag]] = {
     "ffmpeg": NodeTag.FFMPEG,
     "hooks": NodeTag.HOOKS,
     "go": NodeTag.GO,
+    "chrome": NodeTag.CHROME,
 }
 
 
@@ -258,9 +272,9 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
         "fleet test database, a Rust or C++ toolchain, the execution suite's rootless "
-        "Docker daemon, an elevated runner, the corvis compose stack, or a tool or the "
-        "hooks check's environment its probe found), and one it does not carry could never "
-        "be satisfied"
+        "Docker daemon, an elevated runner, the corvis compose stack, or a tool, the "
+        "hooks check's environment or Google Chrome its probe found), and one it does not "
+        "carry could never be satisfied"
     )
 
 

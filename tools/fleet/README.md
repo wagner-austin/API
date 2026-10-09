@@ -519,10 +519,21 @@ outage on 2026-10-05 showed a host process needed a check a closure could
 cite; no fleet node had go that day, and a node without it is offered
 `winget install --id GoLang.Go`, `choco install golang` or
 `sudo apt-get install -y golang-go` (any go from 1.21 fetches the 1.27.1
-toolchain the module names). lavender's distro, which is the node
-lavender-wsl, gets go and ffmpeg from `runners.json`'s base `apt_packages`, so
-a `--rebuild` keeps both tags, and `test_runner_contracts.py` fails if a tagged
-tool apt can supply is missing from that list. Installing a tool therefore makes a
+toolchain the module names). `chrome` is Google Chrome at the path
+Playwright's channel `chrome` launches, `/opt/google/chrome/chrome` on Linux
+and `Google\Chrome\Application\chrome.exe` under a Program Files root on
+Windows, never looked for on a PATH it is not on (MCPs board task 2f596185).
+It routes MCPs `web-scraper`, whose check launches that channel in three
+real-browser cases: diphtheria, a `cxx` node without Chrome, failed exactly
+those three on 2026-10-04 (fleet job 874c160c) and 2026-10-09 (56d7fbb5)
+and passed the other 490, so the verdict depended on which node claimed the
+suite. A node without it is offered `winget install --id Google.Chrome`,
+`choco install googlechrome` or the .deb Google ships, the same command
+`runners.json` provisions the asset with. lavender's distro, which is the node
+lavender-wsl, gets go and ffmpeg from `runners.json`'s base `apt_packages` and
+Chrome from its `assets`, so a `--rebuild` keeps all three tags, and
+`test_runner_contracts.py` fails if a tagged tool apt can supply is missing
+from that list or Chrome's path from those assets. Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
 disappears takes its tag with it. Each difference from `fleet.json` is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its

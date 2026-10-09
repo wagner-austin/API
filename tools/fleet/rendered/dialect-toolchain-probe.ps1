@@ -2,6 +2,7 @@ param(
     [string]$Cmd = "$env:SystemRoot\System32\cmd.exe",
     [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
     [string]$HooksRoute = "$env:USERPROFILE\.claude\corvis-hooks.json",
+    [string[]]$Chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"),
     [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
@@ -98,6 +99,15 @@ if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {
     }
 }
 $hooks
+$chromeLine = 'chrome=no='
+foreach ($candidate in $Chrome) {
+    if ([System.IO.File]::Exists($candidate)) {
+        $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($candidate).ProductVersion
+        $chromeLine = "chrome=yes=$version"
+        break
+    }
+}
+$chromeLine
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {

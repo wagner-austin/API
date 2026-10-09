@@ -30,6 +30,8 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue
 from tests._toolchain_fixtures import (
+    CHROME_REASON,
+    CHROME_WINGET,
     GO_REASON,
     GO_WINGET,
     HOOKS_INSTALL,
@@ -91,10 +93,12 @@ class TestTheToolTagsAClaimCarries:
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg present; hooks absent; go absent",
+            "poetry, git, make, tar present; ffmpeg present; hooks absent; go absent; "
+            "chrome absent",
             f"lavender claims without the tag of every tool it lacks: hooks -- {HOOKS_REASON}, "
             f"so those jobs go to a node that has it -- {HOOKS_INSTALL}; go -- {GO_REASON}, so "
-            f"those jobs go to a node that has it -- {GO_WINGET}",
+            f"those jobs go to a node that has it -- {GO_WINGET}; chrome -- {CHROME_REASON}, so "
+            f"those jobs go to a node that has it -- {CHROME_WINGET}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,
@@ -107,10 +111,12 @@ class TestTheToolTagsAClaimCarries:
         (MCPs board task ec895824): the runner claims with hooks beside
         windows, so the queue may hand it that package's check; with go found
         too (MCPs board task 1da15750) it claims with go, so rcs-bridge's check
-        may land here, and with every tagged tool present it logs no gap."""
+        may land here, with Chrome found (MCPs board task 2f596185) it claims
+        with chrome, so web-scraper's check may land here, and with every
+        tagged tool present it logs no gap."""
         found = (
             "ffmpeg=yes=ffmpeg 7.1.1\nhooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
-            "go=yes=go version go1.27.1 windows/amd64\n"
+            "go=yes=go version go1.27.1 windows/amd64\nchrome=yes=155.0.8059.39\n"
         )
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_2026_09_23 + found)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
@@ -119,11 +125,12 @@ class TestTheToolTagsAClaimCarries:
         with caplog.at_level("INFO"):
             assert node_agent.main(node_argv(sourced_config)) == 0
 
-        assert endpoint.arguments[1]["tags"] == ["ffmpeg", "go", "hooks", "windows"]
+        assert endpoint.arguments[1]["tags"] == ["chrome", "ffmpeg", "go", "hooks", "windows"]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-4:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg present; hooks present; go present",
+            "poetry, git, make, tar present; ffmpeg present; hooks present; go present; "
+            "chrome present",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,
@@ -186,13 +193,15 @@ class TestAToolchainThatCanBuild:
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
             "lavender toolchain ready: python 3.11.9; node v24.20.0; "
-            "poetry, git, make, tar present; ffmpeg absent; hooks absent; go absent",
+            "poetry, git, make, tar present; ffmpeg absent; hooks absent; go absent; "
+            "chrome absent",
             "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
             "--accept-package-agreements --accept-source-agreements --disable-interactivity; "
             f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- {HOOKS_INSTALL}; "
-            f"go -- {GO_REASON}, so those jobs go to a node that has it -- {GO_WINGET}",
+            f"go -- {GO_REASON}, so those jobs go to a node that has it -- {GO_WINGET}; "
+            f"chrome -- {CHROME_REASON}, so those jobs go to a node that has it -- {CHROME_WINGET}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,

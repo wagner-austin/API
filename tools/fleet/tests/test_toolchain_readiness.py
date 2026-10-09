@@ -68,12 +68,12 @@ class TestReadySummary:
         assert (
             toolchain.ready_summary(toolchain.read_reports(LAVENDER_2026_09_23))
             == "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent"
+            "hooks absent; go absent; chrome absent"
         )
         assert (
             toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23))
             == "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent"
+            "hooks absent; go absent; chrome absent"
         )
 
     def test_it_names_a_tagged_tool_the_probe_found(self) -> None:
@@ -82,7 +82,7 @@ class TestReadySummary:
         found = toolchain.read_reports(LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg version 7.1.1\n")
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg present; "
-            "hooks absent; go absent"
+            "hooks absent; go absent; chrome absent"
         )
 
     def test_it_names_the_hooks_environment_the_probe_found(self) -> None:
@@ -93,7 +93,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks present; go absent"
+            "hooks present; go absent; chrome absent"
         )
 
     def test_it_names_go_the_probe_found(self) -> None:
@@ -104,7 +104,19 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go present"
+            "hooks absent; go present; chrome absent"
+        )
+
+    def test_it_names_chrome_the_probe_found(self) -> None:
+        """diphtheria after its 2026-10-09 install (MCPs board task 2f596185):
+        its runner claims with chrome, and the summary says so on the same
+        line, so the tag web-scraper's check waits for is visible each tick."""
+        found = toolchain.read_reports(
+            LAVENDER_2026_09_23 + "chrome=yes=Google Chrome 155.0.8059.39\n"
+        )
+        assert toolchain.ready_summary(found) == (
+            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
+            "hooks absent; go absent; chrome present"
         )
 
 

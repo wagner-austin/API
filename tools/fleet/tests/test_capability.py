@@ -246,13 +246,13 @@ class TestTheReadinessGate:
         assert toolchain.readiness_gap("diphtheria", declared, reports) is None
         assert toolchain.ready_summary(reports) == (
             "python 3.11.15; node v24.21.0; poetry, git, make, tar present; cargo 1.98.1; "
-            "cxx 13.3.0; ffmpeg absent; hooks absent; go absent"
+            "cxx 13.3.0; ffmpeg absent; hooks absent; go absent; chrome absent"
         )
 
     def test_a_node_without_either_says_nothing_of_them(self) -> None:
         assert toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
             "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent"
+            "hooks absent; go absent; chrome absent"
         )
 
     def test_a_disagreeing_declaration_closes_no_gate(self) -> None:

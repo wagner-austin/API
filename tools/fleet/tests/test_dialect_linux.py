@@ -533,6 +533,7 @@ class TestForRealUnderSh:
             "gpu",
             "testdb",
             "hooks",
+            "chrome",
             "apt-get",
             "pipx",
         }

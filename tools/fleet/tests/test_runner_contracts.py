@@ -24,7 +24,7 @@ from fleet.contracts.runners import (
     encode_host_runner_spec,
     encode_runner_spec,
 )
-from fleet.contracts.tagged_tools import TAGGED_TOOLS
+from fleet.contracts.tagged_tools import CHROME_LINUX_PATH, TAGGED_TOOLS
 from fleet.contracts.workspace import decode_fleet_workspace
 from tests._runner_fixtures import base_json, ci_slice_json
 
@@ -389,20 +389,31 @@ class TestRunnerSpec:
         lost on the next ``--rebuild``, and every job needing its tag would
         silently wait for another node: on 2026-10-05 no node had go, and MCPs
         rcs-bridge's check had nowhere to run (MCPs board task 1da15750). So
-        the roster's base installs each tagged tool's apt-get package.
+        the roster's base installs each tagged tool's apt-get package, and
+        carries as an asset the one tagged tool no apt repository supplies:
+        Chrome, the .deb Google ships, whose asset path is the file the
+        probe's chrome line asks for (MCPs board task 2f596185).
         """
         spec = decode_runner_spec(load_json_str(SHIPPED_ROSTER.read_text(encoding="utf-8")))
         workspace = decode_fleet_workspace(
             load_json_str(SHIPPED_WORKSPACE.read_text(encoding="utf-8"))
         )
         wsl_hosts = {node["wsl_host"] for node in workspace["nodes"].values()}
-        apt_supplied = {
-            tool["install"]["apt-get"].split()[-1]
+        apt_installs = {
+            tool["name"]: tool["install"]["apt-get"]
             for tool in TAGGED_TOOLS
             if "apt-get" in tool["install"]
         }
+        apt_supplied = {
+            install.split()[-1]
+            for install in apt_installs.values()
+            if install.startswith("sudo apt-get install -y ")
+        }
         assert apt_supplied == {"ffmpeg", "golang-go"}
+        assert set(apt_installs) - {"ffmpeg", "go"} == {"chrome"}
+        assert apt_installs["chrome"].startswith("curl -fsSL -o ")
         node_hosts = [host for host in spec["hosts"] if host["name"] in wsl_hosts]
         assert [host["name"] for host in node_hosts] == ["lavender"]
         for host in node_hosts:
             assert apt_supplied <= set(host["base"]["apt_packages"]), host["name"]
+            assert CHROME_LINUX_PATH in {asset["path"] for asset in host["assets"]}, host["name"]
