@@ -83,6 +83,18 @@ from fleet.contracts.tagged_tools import (
 #: executable rather than through ``report``, whose ``command -v`` walks the
 #: PATH Chrome is not on; its answer is the binary's own ``--version``,
 #: ``Google Chrome 155.0.8059.39`` on diphtheria after its 2026-10-09 install.
+#:
+#: THE ``stack`` AND ``testdb`` LINES ASK FROM INSIDE A USER UNIT (``unit``,
+#: ``systemd-run --user --wait --pipe``), the place every build runs
+#: (:mod:`fleet.core.dialect_linux`), never from the probe's own ssh process.
+#: A unit's supplementary groups are the user manager's, read when it started,
+#: and an ssh login's are read at login, so the two can differ: colossus's
+#: manager predated its account's docker group, a login reached the PATH
+#: daemon and the probe answered ``testdb`` while every build it claimed died
+#: on ``docker start corvis-fleet-testdb`` with permission denied (MCPs board
+#: task 28c43011, fleet jobs 1f0c3d62, 3afd25c9, a29925d0, 3eab5dab and
+#: c63aac8f on 2026-10-09). A unit that cannot start, or whose docker is
+#: refused, answers ``no`` on both lines, as a build there would fail.
 TOOLCHAIN_PROBE_BODY = (
     "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -122,9 +134,12 @@ TOOLCHAIN_PROBE_BODY = (
     "else\n"
     "  printf 'docker=no=\\n'\n"
     "fi\n"
-    f"if docker network inspect {STACK_NETWORK} > /dev/null 2>&1 &&"
-    f" docker image inspect {' '.join(STACK_IMAGES)} > /dev/null 2>&1 &&"
-    " v=\"$(docker version --format '{{.Server.Version}}' 2>/dev/null)\"; then\n"
+    "unit() {\n"
+    '  systemd-run --user --wait --pipe --quiet --collect "$@"\n'
+    "}\n"
+    f"if unit docker network inspect {STACK_NETWORK} > /dev/null 2>&1 &&"
+    f" unit docker image inspect {' '.join(STACK_IMAGES)} > /dev/null 2>&1 &&"
+    " v=\"$(unit docker version --format '{{.Server.Version}}' 2>/dev/null)\"; then\n"
     "  printf 'stack=yes=%s\\n' \"$v\"\n"
     "else\n"
     "  printf 'stack=no=\\n'\n"
@@ -136,7 +151,8 @@ TOOLCHAIN_PROBE_BODY = (
     "else\n"
     "  printf 'gpu=no=\\n'\n"
     "fi\n"
-    f"if t=\"$(docker container inspect --format '{{{{.Config.Image}}}}' {TESTDB_CONTAINER}"
+    'if t="$(unit docker container inspect'
+    f" --format '{{{{.Config.Image}}}}' {TESTDB_CONTAINER}"
     ' 2>/dev/null)"; then\n'
     "  printf 'testdb=yes=%s\\n' \"$t\"\n"
     "else\n"
