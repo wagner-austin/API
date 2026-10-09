@@ -65,6 +65,12 @@ from fleet.contracts.tagged_tools import (
 #: for the ``set -e`` reason above. Measured 2026-10-02: diphtheria answers
 #: ``NVIDIA RTX A2000 12GB, 8.6`` and lavender-wsl ``NVIDIA GeForce GTX 1630,
 #: 7.5``, and both run the container from ``pgvector/pgvector:pg16-bookworm``.
+#: nvidia-smi's own exit status decides the ``gpu`` line, and only then is its
+#: first line taken: piped straight into ``head`` its failure was the pipe's
+#: success, and colossus, which carries nvidia-utils-595 and an Intel Arc Pro
+#: B60, answered ``gpu=yes=NVIDIA-SMI has failed because it couldn't
+#: communicate with the NVIDIA driver...`` (exit 9 on stdout) and claimed
+#: with the gpu tag (MCPs board task 28c43011, its runner log of 2026-10-09).
 #:
 #: THE ``hooks`` LINE is the MCPs claude-hooks check's environment (MCPs
 #: board task ec895824): the route file under the account's home and one
@@ -145,8 +151,8 @@ TOOLCHAIN_PROBE_BODY = (
     "  printf 'stack=no=\\n'\n"
     "fi\n"
     "if command -v nvidia-smi > /dev/null 2>&1 &&"
-    ' g="$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader 2>/dev/null'
-    ' | head -n 1)" && [ -n "$g" ]; then\n'
+    ' g="$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader 2>/dev/null)" &&'
+    ' g="$(printf \'%s\\n\' "$g" | head -n 1)" && [ -n "$g" ]; then\n'
     "  printf 'gpu=yes=%s\\n' \"$g\"\n"
     "else\n"
     "  printf 'gpu=no=\\n'\n"
