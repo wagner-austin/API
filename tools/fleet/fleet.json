@@ -927,7 +927,6 @@
         "path": "execution",
         "install": [
           {"phase": "install", "argv": ["npm", "ci", "--ignore-scripts"]},
-          {"phase": "install", "argv": ["npx", "patch-package"]},
           {"phase": "workspace-build", "argv": ["node", "scripts/ci-build-consumed-workspaces.mjs"]},
           {"phase": "workspace-build", "argv": ["npm", "rebuild", "mcp-shared"]}
         ],
@@ -944,7 +943,6 @@
         "path": "execution",
         "install": [
           {"phase": "install", "argv": ["npm", "ci", "--ignore-scripts"]},
-          {"phase": "install", "argv": ["npx", "patch-package"]},
           {"phase": "workspace-build", "argv": ["node", "scripts/ci-build-consumed-workspaces.mjs"]},
           {"phase": "workspace-build", "argv": ["npm", "rebuild", "mcp-shared"]}
         ],
@@ -961,7 +959,6 @@
         "path": "execution",
         "install": [
           {"phase": "install", "argv": ["npm", "ci", "--ignore-scripts"]},
-          {"phase": "install", "argv": ["npx", "patch-package"]},
           {"phase": "workspace-build", "argv": ["node", "scripts/ci-build-consumed-workspaces.mjs"]},
           {"phase": "workspace-build", "argv": ["npm", "rebuild", "mcp-shared"]}
         ],
@@ -978,7 +975,6 @@
         "path": "execution",
         "install": [
           {"phase": "install", "argv": ["npm", "ci", "--ignore-scripts"]},
-          {"phase": "install", "argv": ["npx", "patch-package"]},
           {"phase": "workspace-build", "argv": ["node", "scripts/ci-build-consumed-workspaces.mjs"]},
           {"phase": "workspace-build", "argv": ["npm", "rebuild", "mcp-shared"]}
         ],
