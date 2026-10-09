@@ -61,6 +61,7 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
             _Completed("health-out\n", "health-err\n", 0),
             _Completed("tunnel-out\n", "tunnel-err\n", 0),
             _Completed("diphtheria-out\n", "diphtheria-err\n", 0),
+            _Completed("rcs-out\n", "rcs-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake
@@ -216,6 +217,9 @@ class TestMain:
             mark6,
             out6,
             err6,
+            mark7,
+            out7,
+            err7,
         ) = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
         assert mark1 == "-- hpc-wake"
@@ -230,6 +234,8 @@ class TestMain:
         assert (out5, err5) == ("tunnel-out", "tunnel-err")
         assert mark6 == "-- lock-wake-diphtheria"
         assert (out6, err6) == ("diphtheria-out", "diphtheria-err")
+        assert mark7 == "-- rcs-pair-watch"
+        assert (out7, err7) == ("rcs-out", "rcs-err")
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -300,6 +306,17 @@ class TestMain:
         ]
         assert remote_cwd == (root / "..\\lock-wake").resolve()
         assert remote_env == env
+        rcs_args, rcs_cwd, rcs_env = runner.calls[6]
+        assert list(rcs_args) == [
+            "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "rcs-pair-watch",
+            "--workspace",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ]
+        assert rcs_cwd == pathlib.Path("C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
+        assert rcs_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
         assert ci_env == env
@@ -318,7 +335,7 @@ class TestMain:
         root = _staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 6
+        assert len(runner.calls) == 7
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -379,6 +396,7 @@ class TestHealthRecord:
             "fleet-health-wake",
             "hub-tunnel-wake",
             "lock-wake-diphtheria",
+            "rcs-pair-watch",
         }
         assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
         assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
@@ -411,6 +429,7 @@ class TestHealthRecord:
             _Completed("", "", 0),
             _Completed("", "", 0),
             _Completed("", "", 0),
+            _Completed("", "", 0),
         ] * 2
         root = _staged_root(tmp_path, GOOD_ENV)
 
@@ -426,7 +445,7 @@ class TestHealthRecord:
 
 
 class TestPublishers:
-    def test_the_inventory_is_the_six_rows_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_seven_rows_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
         become sibling scheduled tasks -- has a diff to point at."""
@@ -437,6 +456,7 @@ class TestPublishers:
             "fleet-health-wake",
             "hub-tunnel-wake",
             "lock-wake-diphtheria",
+            "rcs-pair-watch",
         ]
         assert run_cycle.PUBLISHERS[0]["cwd"] == "."
         assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
@@ -473,6 +493,16 @@ class TestPublishers:
             "--remote-journal",
             "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
             "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        )
+        # MCPs' maketools command (board task 21366226), run in the hub
+        # checkout like MCPs' own scheduled maketools tasks.
+        assert run_cycle.PUBLISHERS[6]["cwd"] == "C:\\Users\\Test\\PROJECTS\\MCPs"
+        assert run_cycle.PUBLISHERS[6]["args"][1:] == (
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "rcs-pair-watch",
+            "--workspace",
             "C:\\Users\\Test\\PROJECTS\\MCPs",
         )
 
