@@ -162,6 +162,28 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         ),
         "cwd": "..\\lock-wake",
     },
+    # rcs-pair-watch (MCPs board task 21366226): rcs-bridge's log -> one
+    # re-pair. When bridge.log carries RCS_BRIDGE_SESSION_LOST or
+    # RCS_BRIDGE_LOGGED_OUT from the last ten minutes, MCPs' maketools runs
+    # `make rcs-pair` as a child at most once an hour and states an operator
+    # ask in room coordination only when that run fails, naming the failed
+    # step. A tick with no loss returns at once. An attempt is bounded at
+    # 900 s inside the command, under PUBLISHER_WALL_SECONDS, so the pump
+    # never kills a run before it puts the Pixel back to sleep. It runs the
+    # hub checkout's maketools with the interpreter MCPs' other scheduled
+    # maketools tasks use, as they do.
+    {
+        "name": "rcs-pair-watch",
+        "args": (
+            "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "rcs-pair-watch",
+            "--workspace",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ),
+        "cwd": "C:\\Users\\Test\\PROJECTS\\MCPs",
+    },
 )
 
 
