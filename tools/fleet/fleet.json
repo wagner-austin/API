@@ -180,10 +180,32 @@
       "stack": null,
       "elevated": false,
       "wsl_host": null
+    },
+    "colossus": {
+      "host": "colossus",
+      "platform": "linux",
+      "stage_root": "/home/user/fleet/stage",
+      "logical_cores": 12,
+      "ram_gb": 31.3,
+      "gpu": null,
+      "budget": {
+        "reserved_cores": 4,
+        "reserved_ram_gb": 6.0,
+        "worker_ram_gb": 1.1,
+        "max_disk_gb": 40.0,
+        "checks_at_once": null
+      },
+      "enabled": true,
+      "test_database": true,
+      "rust": null,
+      "cxx": "13.3.0",
+      "docker": "29.8.1",
+      "stack": null,
+      "elevated": false,
+      "wsl_host": null
     }
   },
   "not_dispatchable": {
-    "colossus": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Move it to `nodes` with that budget when he decides; this line is the hold, not the verdict.",
     "lavender": "Its WINDOWS lane, retired 2026-09-29 by MCPs board task 7e467416; the node stays declared above because lavender-wsl names it as its wsl_host, and stays enabled in fleet-mcp/fleet-nodes.json because the audit and the session observer still visit it. The WSL VM on the same 31.7 GB machine is capped at 26 GB by .wslconfig and holds lavender-wsl (a fleet lane, corvis-fleet-testdb) and five GitHub Actions runners. Measured that day: vmmemWSL 24.63 GB with Windows free 1.7 GB against this lane's 6 GB reserve; 13 GB of page cache dropped inside the VM did not return to Windows (vmmemWSL 23.5 GB right after, 25.1 GB at 11:04Z); and inside the guest lavender-wsl's own probe logged room for nothing on 90 of 129 ticks, MemAvailable 1.7 to 12.8 GB against its 12 GB reserve, so the VM's in-guest use, not only its cache, fills it. The two lanes cannot both fit, and lavender-wsl is the one kept: it is the fleet's second testdb and docker lane beside diphtheria, whose production reservation keeps it idle while production is warm, while serendipity and sedona carry the Windows lanes. Revisit if lavender gains memory or the GitHub runners leave the VM.",
     "ziggurat": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Move it to `nodes` with that budget when he decides; this line is the hold, not the verdict.",
     "austinpc": "The hub, and the machine the dispatcher itself runs on. A dispatch here would run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database -- the three-way contention this whole package exists to escape. Enabled in the identity registry because it must answer for tunnels and DNS, which is a different question from whether work may be sent to it.",
