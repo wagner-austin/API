@@ -428,6 +428,23 @@ Docker Desktop for the container's image as the Linux probe asks its daemon
 at the account's logon), the probe answers `testdb=no=` and sedona simply
 claims no testdb job until it is back.
 
+**A testdb node also carries the gte-small model directory** (MCPs board
+tasks 1d8e2e0e, f7085447 and f28396f8). MCPs `packages/embed` and
+mcp-proxy's live tool-search block load `Xenova/gte-small` from
+`<stage root>/cache/models` with remote fetch off, and a node whose directory
+lacks the model fails the block by name instead of waiting on
+huggingface.co. Every node's directory was filled by hand on 2026-10-07, and
+the two nodes that joined after it, colossus and loki, each failed their
+first mcp-proxy check with no directory at all on 2026-10-09. The linux
+provisioners fill it (MCPs `scripts/host/lib/fleet-node.sh`,
+`step_fleet_model_cache`); on a Windows node
+`scripts/install-windows-model-cache.ps1`, run over ssh as the build account
+beside the testdb installer, fetches the four files a feature-extraction
+pipeline opens into `C:\fleet\stage\cache\models\Xenova\gte-small` where the
+directory lacks them, through a `.partial` rename so an interrupted run
+leaves no half file, and refuses weights under 100 MB as a truncated copy; a
+rerun on a filled directory fetches nothing and measures the same.
+
 **`corvis-fleet-testdb` is node-local** (MCPs board task c4fc4f3e). The
 workspace's `node_local_resources` lists the exclusive resources each node
 runs its own copy of, and a lease holds such a name as `<name>@<node>`, so
