@@ -41,6 +41,20 @@ The cursor itself (the offset file and the complete-line reader) is
 `tools/fleet-health-wake` needed the same one (MCPs board task `ebc80a03`);
 what stays here is the lock journal's line decoder and the announcement.
 
+A third journal sits beside them, `.action-events.jsonl` (MCPs board task
+`b00ab472`): every MCPs command that changes state and takes no lock (a
+backup, a restore, a production Keycloak account, an APK on the phone, the
+mirror push every commit makes) journals its start, each line it said and
+how it ended there, through `packages/maketools`'s `cli_command.Action`.
+Its rows are `step`, `failed` and `refused` only, and anything else in the
+file is refused, not announced. It is its own file because the MCPs
+readers of `.fleet-events.jsonl` (the deploy gates, `make fleet-status`)
+read that file whole on every call, and the mirror hook alone writes on
+every commit of fifteen repositories; for the same reason `make
+fleet-follow` and `make fleet-status` do not show an action, and this
+bridge, which follows the file by offset, is where its outcome is
+announced.
+
 ## A journal on another host (MCPs board task `03590bf9`)
 
 Every deploy takes its fleet lock on diphtheria, so its boundaries are in
@@ -80,10 +94,19 @@ Finished check runs join that same post under a `CHECKS` heading, one line
 each, naming the runner without an `@`: the runner saw its own output, so
 the post reaches only the sessions subscribed to the standing task.
 
+Actions join it under an `ACTIONS` heading, and only those that did not
+finish: one that ended `failed` or `refused` gets a line in a hold's form
+(`restore (restore, pid 7): FAILED 21:00:09Z (...) by @label`) and its
+session an `@`, because that is the result nobody watching a terminal saw.
+A finished action closes with a `step` and is silent, as a hold's progress
+is. A host's action journal is read by its own row with
+`--remote-action-journal host:/path`, the same ssh window as
+`--remote-journal`.
+
 ## Running
 
 ```
-lock-wake --journal C:\Users\Test\PROJECTS\MCPs\.fleet-events.jsonl --check-journal C:\Users\Test\PROJECTS\MCPs\.check-events.jsonl
+lock-wake --journal C:\Users\Test\PROJECTS\MCPs\.fleet-events.jsonl --check-journal C:\Users\Test\PROJECTS\MCPs\.check-events.jsonl --action-journal C:\Users\Test\PROJECTS\MCPs\.action-events.jsonl
 ```
 
 One cycle, then exit. The interval belongs to the pump
