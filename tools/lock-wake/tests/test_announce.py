@@ -49,7 +49,7 @@ def _required(events: Sequence[LockEvent]) -> Announcement:
         AssertionError: When the slice produced no post -- the progress-only
             outcome, which the tests that expect it assert directly.
     """
-    post = announcement(tuple(events), "hub")
+    post = announcement(tuple(events), (), "hub")
     if post is None:
         raise AssertionError("expected an announcement, got the progress-only outcome")
     return post
@@ -121,7 +121,7 @@ class TestAnnouncement:
             _event(ts="2026-09-09T19:28:01.0000000Z", kind="waiting", detail="pid=1 ..."),
             _event(ts="2026-09-09T19:28:02.0000000Z", kind="step", detail="build"),
         )
-        assert announcement(events, "hub") is None
+        assert announcement(events, (), "hub") is None
 
     def test_two_holds_share_one_post_and_deduplicated_mentions(self) -> None:
         events = (
@@ -308,7 +308,7 @@ class TestAnnouncement:
             _event(ts="2026-10-05T02:59:15.0000000Z", kind="released", label="deploy"),
         )
 
-        assert announcement(events, "diphtheria") == {
+        assert announcement(events, (), "diphtheria") == {
             "body": "\n".join(
                 [
                     "FLEET-LOCK on diphtheria: 1 hold(s) transitioned",
@@ -320,4 +320,122 @@ class TestAnnouncement:
             "agents": ("opus-mosh-reboot-0909",),
             "holds": 1,
             "checks": 0,
+            "actions": 0,
         }
+
+
+class TestActions:
+    """Rows of MCPs commands that change state and take no lock (MCPs board task b00ab472)."""
+
+    def test_an_action_that_finished_is_not_a_post(self) -> None:
+        actions = tuple(
+            _event(
+                ts="2026-10-10T21:00:00.0000000Z",
+                kind="step",
+                holder_pid=5,
+                label="wiki-mirror-hook",
+                detail=detail,
+            )
+            for detail in ("wiki-mirror-hook: started", "wiki-mirror-hook: finished")
+        )
+        assert announcement((), actions, "hub") is None
+
+    def test_a_failed_and_a_refused_action_share_the_post_with_a_hold_each_tagged(self) -> None:
+        events = (
+            _event(ts="2026-09-09T19:28:00.0000000Z", kind="acquired", holder_pid=1),
+            _event(ts="2026-09-09T19:28:05.0000000Z", kind="released", holder_pid=1),
+        )
+        actions = (
+            _event(
+                ts="2026-10-10T21:00:00.0000000Z",
+                kind="step",
+                holder_pid=7,
+                label="restore",
+                op="restore",
+                detail="restore: started",
+                agent="opus-a",
+            ),
+            _event(
+                ts="2026-10-10T21:00:09.0000000Z",
+                kind="failed",
+                holder_pid=7,
+                label="restore",
+                op="restore",
+                detail="restore exited 1",
+                agent="opus-a",
+            ),
+            _event(
+                ts="2026-10-10T21:01:00.0000000Z",
+                kind="refused",
+                holder_pid=8,
+                label="db-script",
+                op="db-script",
+                detail="no BOARD_AGENT_LABEL",
+                agent="",
+            ),
+            _event(
+                ts="2026-10-10T21:02:00.0000000Z",
+                kind="step",
+                holder_pid=9,
+                label="phone-up",
+                op="phone-up",
+                detail="phone-up: finished",
+                agent="opus-b",
+            ),
+        )
+
+        post = announcement(events, actions, "hub")
+
+        assert post == {
+            "body": "\n".join(
+                [
+                    "FLEET-LOCK on hub: 1 hold(s) transitioned",
+                    "up-transcriber (service-up, pid 1): acquired 19:28:00Z RELEASED after 5s "
+                    "by @opus-mosh-reboot-0909",
+                    "ACTIONS on hub: 2 action(s) did not finish",
+                    "restore (restore, pid 7): FAILED 21:00:09Z (restore exited 1) "
+                    "+1 step(s) this window by @opus-a",
+                    "db-script (db-script, pid 8): REFUSED 21:01:00Z (no BOARD_AGENT_LABEL)",
+                    "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned",
+                    "@opus-a your action on hub did not finish",
+                ]
+            ),
+            "agents": ("opus-mosh-reboot-0909", "opus-a"),
+            "holds": 1,
+            "checks": 0,
+            "actions": 2,
+        }
+
+    def test_a_session_behind_a_hold_and_an_action_is_tagged_once_in_agents(self) -> None:
+        events = tuple(
+            _event(ts=ts, kind=kind, holder_pid=1, agent="opus-a")
+            for ts, kind in (
+                ("2026-09-09T19:28:00.0000000Z", "acquired"),
+                ("2026-09-09T19:28:05.0000000Z", "failed"),
+            )
+        )
+        actions = (
+            _event(
+                ts="2026-10-10T21:00:00.0000000Z",
+                kind="failed",
+                holder_pid=2,
+                label="restore",
+                agent="opus-a",
+            ),
+        )
+
+        post = _required_with(events, actions)
+
+        assert post["agents"] == ("opus-a",)
+        assert post["body"].endswith(
+            "@opus-a your fleet-lock operation on hub transitioned\n"
+            "@opus-a your action on hub did not finish"
+        )
+
+
+def _required_with(events: tuple[LockEvent, ...], actions: tuple[LockEvent, ...]) -> Announcement:
+    """The announcement of holds and actions together, or a named failure."""
+    post = announcement(events, actions, "hub")
+    if post is None:
+        raise AssertionError("expected an announcement, got the progress-only outcome")
+    return post

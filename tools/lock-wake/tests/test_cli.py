@@ -13,12 +13,25 @@ from lock_wake import _test_hooks
 from lock_wake.cli import wake
 from tests.conftest import (
     CONFIGURED_ENV,
+    action_journal_path,
     check_journal_path,
     journal_line,
     offset_of,
     pin_env,
     stage_journal,
 )
+
+
+def local_argv(tmp_path: pathlib.Path, journal: pathlib.Path) -> list[str]:
+    """The hub row's three journals, the fleet journal named by the caller."""
+    return [
+        "--journal",
+        str(journal),
+        "--check-journal",
+        str(check_journal_path(tmp_path)),
+        "--action-journal",
+        str(action_journal_path(tmp_path)),
+    ]
 
 
 class TestMain:
@@ -33,8 +46,7 @@ class TestMain:
         journal = stage_journal(tmp_path, content)
         _test_hooks.http_post = announcing_poster()
 
-        checks = check_journal_path(tmp_path)
-        assert wake.main(["--journal", str(journal), "--check-journal", str(checks)]) == 0
+        assert wake.main(local_argv(tmp_path, journal)) == 0
         assert offset_of(journal) == len(content)
 
     def test_a_missing_journal_flag_refuses(self) -> None:
@@ -45,16 +57,44 @@ class TestMain:
         with pytest.raises(ValueError, match="--check-journal"):
             wake.main(["--journal", str(tmp_path / ".fleet-events.jsonl")])
 
-    def test_a_remote_journal_beside_a_local_one_refuses(self, tmp_path: pathlib.Path) -> None:
-        with pytest.raises(ValueError, match="takes no --journal or --check-journal"):
+    def test_a_missing_action_journal_flag_refuses(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="--action-journal"):
             wake.main(
                 [
-                    "--remote-journal",
-                    "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
                     "--journal",
                     str(tmp_path / ".fleet-events.jsonl"),
                     "--check-journal",
                     str(tmp_path / ".check-events.jsonl"),
+                ]
+            )
+
+    @pytest.mark.parametrize("remote_flag", ["--remote-journal", "--remote-action-journal"])
+    def test_a_remote_journal_beside_a_local_one_refuses(
+        self, tmp_path: pathlib.Path, remote_flag: str
+    ) -> None:
+        with pytest.raises(
+            ValueError,
+            match=f"{remote_flag} reads one remote journal and takes no --journal or "
+            "--check-journal or --action-journal",
+        ):
+            wake.main(
+                [
+                    remote_flag,
+                    "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
+                    *local_argv(tmp_path, tmp_path / ".fleet-events.jsonl"),
+                    "--cursor-dir",
+                    str(tmp_path),
+                ]
+            )
+
+    def test_both_remote_journals_in_one_row_refuse(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="are one row each"):
+            wake.main(
+                [
+                    "--remote-journal",
+                    "diphtheria:/home/corvis/PROJECTS/MCPs/.fleet-events.jsonl",
+                    "--remote-action-journal",
+                    "diphtheria:/home/corvis/PROJECTS/MCPs/.action-events.jsonl",
                     "--cursor-dir",
                     str(tmp_path),
                 ]
@@ -65,13 +105,12 @@ class TestMain:
             wake.main(["--remote-journal", "diphtheria:/home/corvis/j.jsonl"])
 
     def test_a_cursor_dir_for_local_journals_refuses(self, tmp_path: pathlib.Path) -> None:
-        with pytest.raises(ValueError, match="--cursor-dir belongs to --remote-journal"):
+        with pytest.raises(
+            ValueError, match="--cursor-dir belongs to --remote-journal or --remote-action-journal"
+        ):
             wake.main(
                 [
-                    "--journal",
-                    str(tmp_path / ".fleet-events.jsonl"),
-                    "--check-journal",
-                    str(tmp_path / ".check-events.jsonl"),
+                    *local_argv(tmp_path, tmp_path / ".fleet-events.jsonl"),
                     "--cursor-dir",
                     str(tmp_path),
                 ]
@@ -86,20 +125,14 @@ class TestInvocationForms:
         journal = stage_journal(tmp_path, b"")
         _test_hooks.http_post = FakeHttpPost([])
         saved_argv = list(sys.argv)
-        sys.argv = [
-            "lock-wake",
-            "--journal",
-            str(journal),
-            "--check-journal",
-            str(check_journal_path(tmp_path)),
-        ]
+        sys.argv = ["lock-wake", *local_argv(tmp_path, journal)]
         try:
             with pytest.raises(SystemExit) as caught:
                 wake.entrypoint()
         finally:
             sys.argv[:] = saved_argv
         assert caught.value.code == 0
-        assert emitted == ["hub journals quiet; offsets 0, 0"]
+        assert emitted == ["hub journals quiet; offsets 0, 0, 0"]
 
     def test_running_as_a_module_actually_runs(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -113,13 +146,7 @@ class TestInvocationForms:
         module_name = "lock_wake.cli.wake"
         saved_argv = list(sys.argv)
         saved_module = sys.modules.pop(module_name, None)
-        sys.argv = [
-            "lock-wake",
-            "--journal",
-            str(journal),
-            "--check-journal",
-            str(check_journal_path(tmp_path)),
-        ]
+        sys.argv = ["lock-wake", *local_argv(tmp_path, journal)]
         try:
             with pytest.raises(SystemExit) as caught:
                 runpy.run_module(module_name, run_name="__main__", alter_sys=False)
@@ -128,4 +155,4 @@ class TestInvocationForms:
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
-        assert emitted == ["hub journals quiet; offsets 0, 0"]
+        assert emitted == ["hub journals quiet; offsets 0, 0, 0"]

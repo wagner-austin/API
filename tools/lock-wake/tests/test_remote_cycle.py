@@ -22,7 +22,7 @@ from platform_core.journal_cursor import (
     write_file_text,
     write_offset,
 )
-from platform_core.json_utils import require_str
+from platform_core.json_utils import JSONTypeError, require_str
 from platform_core.mcp_testing import FakeHttpPost, announcing_poster, notes_sent
 
 from lock_wake import _test_hooks
@@ -134,7 +134,8 @@ class TestDiphtheriaRow:
         ]
         assert _offset(cursor_dir) == len(RELEASED_DEPLOY)
         assert emitted == [
-            f"diphtheria: posted 1 hold(s) and 0 check run(s) from 3 line(s): tagged @{_HOLDER}"
+            "diphtheria: posted 1 hold(s), 0 check run(s) and 0 unfinished action(s) from "
+            f"3 line(s): tagged @{_HOLDER}"
         ]
 
     def test_a_failed_deploy_is_posted_from_the_cursor_on(
@@ -196,4 +197,84 @@ class TestDiphtheriaRow:
             wake.main(_argv(cursor_dir))
 
         assert fake.calls == []
+        assert emitted == []
+
+
+#: The pump row's action journal flag value, verbatim (MCPs board task b00ab472).
+REMOTE_ACTION_JOURNAL: Final = "diphtheria:/home/corvis/PROJECTS/MCPs/.action-events.jsonl"
+
+
+def _action_line(kind: str, detail: str) -> str:
+    """One row of a restore run on diphtheria, as ``cli_command.Action`` writes it."""
+    return journal_line(
+        ts="2026-10-10T21:30:00.000000Z",
+        kind=kind,
+        holder_pid=2210,
+        label="restore",
+        op="restore",
+        only="",
+        detail=detail,
+        agent=_HOLDER,
+    )
+
+
+def _stage_actions(tmp_path: pathlib.Path, content: bytes) -> pathlib.Path:
+    """Stage diphtheria's action journal behind the fake ssh.
+
+    Args:
+        tmp_path: The test's temporary directory.
+        content: The remote action journal's bytes.
+
+    Returns:
+        The local cursor directory.
+    """
+    local = tmp_path / "remote" / "action-events.jsonl"
+    local.parent.mkdir()
+    local.write_bytes(content)
+    install_ssh(
+        FakeSsh("diphtheria", {"/home/corvis/PROJECTS/MCPs/.action-events.jsonl": local}, None)
+    )
+    cursor_dir = tmp_path / "MCPs"
+    cursor_dir.mkdir()
+    return cursor_dir
+
+
+class TestDiphtheriaActionRow:
+    def test_a_failed_restore_is_posted_as_an_action_naming_who_ran_it(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        content = (
+            _action_line("step", "restore: started")
+            + _action_line("failed", "MAKETOOLS_FLEET_STEP: replay failed")
+        ).encode("utf-8")
+        cursor_dir = _stage_actions(tmp_path, content)
+        pin_env(CONFIGURED_ENV)
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        argv = ["--remote-action-journal", REMOTE_ACTION_JOURNAL, "--cursor-dir", str(cursor_dir)]
+        assert wake.main(argv) == 0
+
+        assert require_str(notes_sent(poster)[0], "body").splitlines() == [
+            "ACTIONS on diphtheria: 1 action(s) did not finish",
+            "restore (restore, pid 2210): FAILED 21:30:00Z "
+            f"(MAKETOOLS_FLEET_STEP: replay failed) +1 step(s) this window by @{_HOLDER}",
+            f"@{_HOLDER} your action on diphtheria did not finish",
+        ]
+        marks = remote_cursor_path(cursor_dir, parse_remote_journal(REMOTE_ACTION_JOURNAL))
+        assert read_offset(file_is_present, read_file_bytes, marks) == len(content)
+        assert marks.name == ".action-events.jsonl.lock-wake-diphtheria-offset.json"
+
+    def test_a_lock_transition_in_the_remote_action_journal_is_refused(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        cursor_dir = _stage_actions(tmp_path, RELEASED_DEPLOY)
+        pin_env(CONFIGURED_ENV)
+        _test_hooks.http_post = FakeHttpPost([])
+
+        with pytest.raises(JSONTypeError, match=r"diphtheria:/home/corvis/PROJECTS/MCPs/\.action"):
+            wake.main(
+                ["--remote-action-journal", REMOTE_ACTION_JOURNAL, "--cursor-dir", str(cursor_dir)]
+            )
+
         assert emitted == []

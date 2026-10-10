@@ -20,11 +20,13 @@ from lock_wake.identity import BRIDGE_AGENT, HARNESS, IDENTITY, PURPOSE
 from tests.conftest import (
     CONFIGURED_ENV,
     TASK_ID,
+    action_journal_path,
     check_journal_path,
     journal_line,
     offset_of,
     pin_env,
     set_offset,
+    stage_action_journal,
     stage_check_journal,
     stage_journal,
 )
@@ -48,6 +50,36 @@ CHECK_RUN = journal_line(
 )
 
 
+def action_line(kind: str, detail: str, *, agent: str = "opus-mcps-1009-74be") -> str:
+    """One row of an MCPs action, as ``cli_command.Action`` writes it."""
+    return journal_line(
+        ts="2026-10-10T21:00:00.000000Z",
+        kind=kind,
+        holder_pid=9100,
+        label="restore",
+        op="restore",
+        only="",
+        detail=detail,
+        agent=agent,
+    )
+
+
+#: A restore that finished: its start, two lines it said, its finish.
+FINISHED_ACTION = (
+    action_line("step", "restore: started")
+    + action_line("step", "restoring from corvis-20261010T000000Z.sql.gz")
+    + action_line("step", "RESTORE COMPLETE from corvis-20261010T000000Z.sql.gz")
+    + action_line("step", "restore: finished")
+)
+
+#: A restore that failed halfway.
+FAILED_ACTION = (
+    action_line("step", "restore: started")
+    + action_line("step", "schema public reset")
+    + action_line("failed", "MAKETOOLS_FLEET_STEP: replay of corvis.sql.gz failed")
+)
+
+
 class TestRunCycle:
     def test_posts_the_digest_then_advances_the_offset(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -57,7 +89,7 @@ class TestRunCycle:
         poster = announcing_poster()
         _test_hooks.http_post = poster
 
-        run_cycle(journal, check_journal_path(tmp_path))
+        run_cycle(journal, check_journal_path(tmp_path), action_journal_path(tmp_path))
 
         # The registering checkin is bodies[0] since 2026-09-21; the
         # digest is the post behind it. Its own shape is pinned by
@@ -70,7 +102,8 @@ class TestRunCycle:
         assert "RELEASED after 165s" in body
         assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
         assert emitted == [
-            "hub: posted 1 hold(s) and 0 check run(s) from 3 line(s): tagged @opus-mosh-reboot-0909"
+            "hub: posted 1 hold(s), 0 check run(s) and 0 unfinished action(s) from 3 line(s): "
+            "tagged @opus-mosh-reboot-0909"
         ]
 
     def test_a_refused_post_leaves_the_offset_unmoved(
@@ -81,15 +114,17 @@ class TestRunCycle:
         pin_env(CONFIGURED_ENV)
         journal = stage_journal(tmp_path, COMPLETED_HOLD.encode("utf-8"))
         checks = stage_check_journal(tmp_path, CHECK_RUN.encode("utf-8"))
+        actions = stage_action_journal(tmp_path, FAILED_ACTION.encode("utf-8"))
         _test_hooks.http_post = FakeHttpPost(
             [{"status": 500, "content_type": "text/plain", "body": "board down"}]
         )
 
         with pytest.raises(AppError):
-            run_cycle(journal, checks)
+            run_cycle(journal, checks, actions)
 
         assert offset_of(journal) == 0
         assert offset_of(checks) == 0
+        assert offset_of(actions) == 0
         assert emitted == []
 
     def test_the_second_cycle_repeats_what_the_first_failed_to_mark(
@@ -98,15 +133,16 @@ class TestRunCycle:
         pin_env(CONFIGURED_ENV)
         journal = stage_journal(tmp_path, COMPLETED_HOLD.encode("utf-8"))
         checks = check_journal_path(tmp_path)
+        actions = action_journal_path(tmp_path)
         _test_hooks.http_post = FakeHttpPost(
             [{"status": 500, "content_type": "text/plain", "body": "board down"}]
         )
         with pytest.raises(AppError):
-            run_cycle(journal, checks)
+            run_cycle(journal, checks, actions)
 
         retry_poster = announcing_poster()
         _test_hooks.http_post = retry_poster
-        run_cycle(journal, checks)
+        run_cycle(journal, checks, actions)
 
         assert len(notes_sent(retry_poster)) == 1
         assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
@@ -120,10 +156,12 @@ class TestRunCycle:
         poster = FakeHttpPost([])
         _test_hooks.http_post = poster
 
-        run_cycle(journal, check_journal_path(tmp_path))
+        run_cycle(journal, check_journal_path(tmp_path), action_journal_path(tmp_path))
 
         assert poster.bodies == []
-        assert emitted == [f"hub journals quiet; offsets {len(COMPLETED_HOLD.encode('utf-8'))}, 0"]
+        assert emitted == [
+            f"hub journals quiet; offsets {len(COMPLETED_HOLD.encode('utf-8'))}, 0, 0"
+        ]
 
     def test_progress_only_lines_advance_without_a_post(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -138,11 +176,11 @@ class TestRunCycle:
         poster = FakeHttpPost([])
         _test_hooks.http_post = poster
 
-        run_cycle(journal, check_journal_path(tmp_path))
+        run_cycle(journal, check_journal_path(tmp_path), action_journal_path(tmp_path))
 
         assert poster.bodies == []
         assert offset_of(journal) == len(content)
-        assert emitted == [f"hub: 2 progress line(s), no boundary; offsets {len(content)}, 0"]
+        assert emitted == [f"hub: 2 progress line(s), no boundary; offsets {len(content)}, 0, 0"]
 
     def test_an_unlabelled_hold_posts_unaddressed_and_says_so(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -155,9 +193,12 @@ class TestRunCycle:
         journal = stage_journal(tmp_path, content)
         _test_hooks.http_post = announcing_poster()
 
-        run_cycle(journal, check_journal_path(tmp_path))
+        run_cycle(journal, check_journal_path(tmp_path), action_journal_path(tmp_path))
 
-        assert emitted == ["hub: posted 1 hold(s) and 0 check run(s) from 2 line(s): unaddressed"]
+        assert emitted == [
+            "hub: posted 1 hold(s), 0 check run(s) and 0 unfinished action(s) from 2 line(s): "
+            "unaddressed"
+        ]
 
     def test_a_finished_check_run_in_the_check_journal_posts_unaddressed(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -168,14 +209,17 @@ class TestRunCycle:
         poster = announcing_poster()
         _test_hooks.http_post = poster
 
-        run_cycle(journal, checks)
+        run_cycle(journal, checks, action_journal_path(tmp_path))
 
         body = require_str(notes_sent(poster)[0], "body")
         assert "CHECKS: 1 make test run(s) finished" in body
         assert "@" not in body
         assert offset_of(checks) == len(CHECK_RUN.encode("utf-8"))
         assert offset_of(journal) == 0
-        assert emitted == ["hub: posted 0 hold(s) and 1 check run(s) from 1 line(s): unaddressed"]
+        assert emitted == [
+            "hub: posted 0 hold(s), 1 check run(s) and 0 unfinished action(s) from 1 line(s): "
+            "unaddressed"
+        ]
 
     def test_a_hold_and_a_check_run_share_one_post_and_both_offsets_advance(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -186,7 +230,7 @@ class TestRunCycle:
         poster = announcing_poster()
         _test_hooks.http_post = poster
 
-        run_cycle(journal, checks)
+        run_cycle(journal, checks, action_journal_path(tmp_path))
 
         (note,) = notes_sent(poster)
         body = require_str(note, "body")
@@ -194,6 +238,50 @@ class TestRunCycle:
         assert "CHECKS: 1 make test run(s) finished" in body
         assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
         assert offset_of(checks) == len(CHECK_RUN.encode("utf-8"))
+
+    def test_a_failed_action_is_posted_and_tags_who_ran_it(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        pin_env(CONFIGURED_ENV)
+        journal = stage_journal(tmp_path, b"")
+        actions = stage_action_journal(tmp_path, FAILED_ACTION.encode("utf-8"))
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        run_cycle(journal, check_journal_path(tmp_path), actions)
+
+        body = require_str(notes_sent(poster)[0], "body")
+        assert body == (
+            "ACTIONS on hub: 1 action(s) did not finish\n"
+            "restore (restore, pid 9100): FAILED 21:00:00Z "
+            "(MAKETOOLS_FLEET_STEP: replay of corvis.sql.gz failed) +2 step(s) this window "
+            "by @opus-mcps-1009-74be\n"
+            "@opus-mcps-1009-74be your action on hub did not finish"
+        )
+        assert offset_of(actions) == len(FAILED_ACTION.encode("utf-8"))
+        assert emitted == [
+            "hub: posted 0 hold(s), 0 check run(s) and 1 unfinished action(s) from 3 line(s): "
+            "tagged @opus-mcps-1009-74be"
+        ]
+
+    def test_a_finished_action_is_silent_and_its_offset_advances(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        """A mirror push on every commit of fifteen repositories is not a post."""
+        pin_env(CONFIGURED_ENV)
+        journal = stage_journal(tmp_path, b"")
+        actions = stage_action_journal(tmp_path, FINISHED_ACTION.encode("utf-8"))
+        poster = FakeHttpPost([])
+        _test_hooks.http_post = poster
+
+        run_cycle(journal, check_journal_path(tmp_path), actions)
+
+        assert poster.bodies == []
+        assert offset_of(actions) == len(FINISHED_ACTION.encode("utf-8"))
+        assert emitted == [
+            "hub: 4 progress line(s), no boundary; "
+            f"offsets 0, 0, {len(FINISHED_ACTION.encode('utf-8'))}"
+        ]
 
     def test_a_lock_transition_in_the_check_journal_is_refused(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -204,9 +292,27 @@ class TestRunCycle:
         _test_hooks.http_post = FakeHttpPost([])
 
         with pytest.raises(JSONTypeError, match="acquired, released, step rows"):
-            run_cycle(journal, checks)
+            run_cycle(journal, checks, action_journal_path(tmp_path))
 
         assert offset_of(checks) == 0
+        assert emitted == []
+
+    def test_a_lock_transition_in_the_action_journal_is_refused(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        pin_env(CONFIGURED_ENV)
+        journal = stage_journal(tmp_path, b"")
+        actions = stage_action_journal(tmp_path, COMPLETED_HOLD.encode("utf-8"))
+        _test_hooks.http_post = FakeHttpPost([])
+
+        with pytest.raises(
+            JSONTypeError,
+            match=r"holds acquired, released rows; the action journal carries only step, "
+            r"failed, refused rows",
+        ):
+            run_cycle(journal, check_journal_path(tmp_path), actions)
+
+        assert offset_of(actions) == 0
         assert emitted == []
 
     def test_missing_credentials_refuse_before_any_read(
@@ -214,7 +320,11 @@ class TestRunCycle:
     ) -> None:
         pin_env({})
         with pytest.raises(AppError):
-            run_cycle(tmp_path / "never-read.jsonl", tmp_path / "never-read-either.jsonl")
+            run_cycle(
+                tmp_path / "never-read.jsonl",
+                tmp_path / "never-read-either.jsonl",
+                tmp_path / "never-read-at-all.jsonl",
+            )
         assert emitted == []
 
 
@@ -232,7 +342,7 @@ class TestLedgerRegistration:
         poster = announcing_poster()
         _test_hooks.http_post = poster
 
-        run_cycle(journal, check_journal_path(tmp_path))
+        run_cycle(journal, check_journal_path(tmp_path), action_journal_path(tmp_path))
 
         checkin = sent_arguments(poster.bodies[0])
         assert checkin["kind"] == "checkin"
@@ -256,6 +366,6 @@ class TestLedgerRegistration:
         poster = FakeHttpPost([])
         _test_hooks.http_post = poster
 
-        run_cycle(journal, check_journal_path(tmp_path))
+        run_cycle(journal, check_journal_path(tmp_path), action_journal_path(tmp_path))
 
         assert poster.bodies == []
