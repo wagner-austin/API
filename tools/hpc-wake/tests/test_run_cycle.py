@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import pathlib
+import subprocess
 from collections.abc import Generator, Mapping, Sequence
 
 import pytest
@@ -39,9 +40,11 @@ class _RecordingRunner:
         *,
         cwd: pathlib.Path,
         env: Mapping[str, str],
-        timeout: int,
+        capture_output: bool,
+        text: bool,
     ) -> _Completed:
-        assert timeout == run_cycle.PUBLISHER_WALL_SECONDS
+        assert capture_output is True
+        assert text is True
         self.calls.append((args, cwd, dict(env)))
         return self.results[len(self.calls) - 1]
 
@@ -62,11 +65,12 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
             _Completed("tunnel-out\n", "tunnel-err\n", 0),
             _Completed("diphtheria-out\n", "diphtheria-err\n", 0),
             _Completed("rcs-out\n", "rcs-err\n", 0),
+            _Completed("login-out\n", "login-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake
     yield fake
-    _test_hooks.run_process = _test_hooks._default_run_process
+    _test_hooks.run_process = subprocess.run
 
 
 class _FrozenClock:
@@ -220,6 +224,9 @@ class TestMain:
             mark7,
             out7,
             err7,
+            mark8,
+            out8,
+            err8,
         ) = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
         assert mark1 == "-- hpc-wake"
@@ -236,6 +243,8 @@ class TestMain:
         assert (out6, err6) == ("diphtheria-out", "diphtheria-err")
         assert mark7 == "-- rcs-pair-watch"
         assert (out7, err7) == ("rcs-out", "rcs-err")
+        assert mark8 == "-- login-probe"
+        assert (out8, err8) == ("login-out", "login-err")
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -317,6 +326,17 @@ class TestMain:
         ]
         assert rcs_cwd == pathlib.Path("C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
         assert rcs_env == env
+        login_args, login_cwd, login_env = runner.calls[7]
+        assert list(login_args) == [
+            "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "login-probe",
+            "--workspace",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ]
+        assert login_cwd == pathlib.Path("C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
+        assert login_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
         assert ci_env == env
@@ -335,7 +355,7 @@ class TestMain:
         root = _staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 7
+        assert len(runner.calls) == 8
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -397,6 +417,7 @@ class TestHealthRecord:
             "hub-tunnel-wake",
             "lock-wake-diphtheria",
             "rcs-pair-watch",
+            "login-probe",
         }
         assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
         assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
@@ -430,6 +451,7 @@ class TestHealthRecord:
             _Completed("", "", 0),
             _Completed("", "", 0),
             _Completed("", "", 0),
+            _Completed("", "", 0),
         ] * 2
         root = _staged_root(tmp_path, GOOD_ENV)
 
@@ -457,6 +479,7 @@ class TestPublishers:
             "hub-tunnel-wake",
             "lock-wake-diphtheria",
             "rcs-pair-watch",
+            "login-probe",
         ]
         assert run_cycle.PUBLISHERS[0]["cwd"] == "."
         assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
@@ -505,6 +528,17 @@ class TestPublishers:
             "--workspace",
             "C:\\Users\\Test\\PROJECTS\\MCPs",
         )
+        # The login real-use check (MCPs board task 2ce5fc24), the same
+        # interpreter in the same checkout.
+        assert run_cycle.PUBLISHERS[7]["cwd"] == "C:\\Users\\Test\\PROJECTS\\MCPs"
+        assert run_cycle.PUBLISHERS[7]["args"] == (
+            run_cycle.PUBLISHERS[6]["args"][0],
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "login-probe",
+            "--workspace",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        )
 
 
 class TestMainBlock:
@@ -540,4 +574,5 @@ class TestMainBlock:
 
 class TestHookDefault:
     def test_the_production_runner_is_the_real_one(self) -> None:
-        assert _test_hooks.run_process is _test_hooks._default_run_process
+        expected: _test_hooks.RunProcess = subprocess.run
+        assert _test_hooks.run_process is expected

@@ -124,6 +124,7 @@ scheduled tasks — the random-task count goes down, not up.
 | hub-tunnel-wake | the hub tunnel's health journal | `88b20894` | none |
 | lock-wake-diphtheria | diphtheria's fleet-lock journal, over ssh (MCPs `03590bf9`: every deploy locks there) | `5d86be8d` | journal `agent` |
 | rcs-pair-watch | rcs-bridge's `bridge.log`: a lost pairing runs MCPs' `make rcs-pair` at most once an hour (MCPs `21366226`) | an operator ask in room coordination, stated only when that run fails | none: an ask, not a post |
+| login-probe | MCPs' login real-use check: every three hours a real Chromium signs in to corvis with the probe's passkey, connects and refreshes a client, calls one tool and signs out, against production (MCPs `2ce5fc24`) | a critical operator ask (texted) and a note in room corvis, only when the set of failing checks changes; every run in the hub checkout's `fleet-mcp/state/login-probe.json` | none: an ask and an unaddressed note |
 
 Every publisher batches per tick (a 103-job Slurm batch or a 126-line
 lock-journal backlog is ONE post) and mentions only whoever acted — the
