@@ -314,12 +314,44 @@ def require_check_rows(events: tuple[LockEvent, ...], journal: pathlib.Path) -> 
         )
 
 
+#: What an action writes (MCPs ``packages/maketools`` ``cli_command.Action``):
+#: its start, each line it said and its finish as steps, a refusal before it
+#: began, and a failure.
+ACTION_KINDS: Final = ("step", "failed", "refused")
+
+
+def require_action_rows(events: tuple[LockEvent, ...], journal: str) -> None:
+    """Refuse an action journal slice holding a lock transition or a check run.
+
+    An action takes no lock, so ``acquired``, ``released`` or ``checked`` in
+    ``.action-events.jsonl`` is a writer pointed at the wrong file, and
+    announcing it as an action would report something that never happened.
+
+    Args:
+        events: The action journal slice's events.
+        journal: The action journal as the refusal names it: a local path,
+            or ``host:/path`` for one read over ssh, kept as written because
+            a Windows path type would turn its slashes round.
+
+    Raises:
+        JSONTypeError: When any event's kind is not one an action writes.
+    """
+    strays = sorted({event["kind"] for event in events if event["kind"] not in ACTION_KINDS})
+    if strays:
+        raise JSONTypeError(
+            f"{journal} holds {', '.join(strays)} rows; the action journal carries only "
+            f"{', '.join(ACTION_KINDS)} rows, and anything else means a writer chose the wrong file"
+        )
+
+
 __all__ = [
+    "ACTION_KINDS",
     "EVENT_KINDS",
     "JournalSlice",
     "LockEvent",
     "decode_lines",
     "decode_lock_event",
     "read_journal_slice",
+    "require_action_rows",
     "require_check_rows",
 ]

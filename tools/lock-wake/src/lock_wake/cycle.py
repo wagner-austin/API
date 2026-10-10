@@ -19,10 +19,11 @@ a later window (:mod:`lock_wake.announce` states the trade). The offset
 still advances only AFTER the decision that there is nothing to post, and
 that decision is pure, so nothing can be lost between them.
 
-TWO CYCLES, ONE PUBLISH. :func:`run_cycle` reads the hub's two local
+TWO CYCLES, ONE PUBLISH. :func:`run_cycle` reads the hub's three local
 journals; :func:`run_remote_cycle` reads one journal on another host over
-ssh (MCPs board task 03590bf9: every deploy takes its lock on diphtheria).
-Each is its own pump row with its own cursor, and both hand their slices to
+ssh (MCPs board task 03590bf9: every deploy takes its lock on diphtheria),
+a fleet journal or an action journal by the row's declaration. Each is its
+own pump row with its own cursor, and both hand their slices to
 :func:`_publish`, so the order above is written once.
 """
 
@@ -40,7 +41,12 @@ from typing_extensions import TypedDict
 from lock_wake import _test_hooks
 from lock_wake.announce import announcement
 from lock_wake.identity import CURSOR_READER, HARNESS, IDENTITY, PURPOSE, load_task_id
-from lock_wake.journal import JournalSlice, read_journal_slice, require_check_rows
+from lock_wake.journal import (
+    JournalSlice,
+    read_journal_slice,
+    require_action_rows,
+    require_check_rows,
+)
 from lock_wake.remote import RemoteJournal, read_remote_slice, remote_cursor_path
 
 #: The name the hub's own journals are announced under. The local cycle runs
@@ -49,24 +55,29 @@ HUB: Final = "hub"
 
 
 class _Stream(TypedDict):
-    """One journal's slice and the cursor it advances.
+    """One journal's slice, the cursor it advances, and what kind of record it holds.
 
     Attributes:
         journal_slice: What this tick read from the journal.
         cursor: The position file the slice's next offset is written to.
+        actions: Whether the journal is an action journal (MCPs board task
+            b00ab472), whose rows are announced apart from holds.
     """
 
     journal_slice: JournalSlice
     cursor: pathlib.Path
+    actions: bool
 
 
-def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
-    """Run one bridge cycle against the hub's fleet journal and check journal.
+def run_cycle(
+    journal: pathlib.Path, check_journal: pathlib.Path, action_journal: pathlib.Path
+) -> None:
+    """Run one bridge cycle against the hub's fleet, check and action journals.
 
-    Both are read from their own positions, folded into at most one post,
-    and both positions advance only after that post, or after the decision
-    that there is nothing to post -- so the at-least-once order holds for
-    each file.
+    All three are read from their own positions, folded into at most one
+    post, and every position advances only after that post, or after the
+    decision that there is nothing to post -- so the at-least-once order
+    holds for each file.
 
     Args:
         journal: Path to ``.fleet-events.jsonl``, the lock wrapper's
@@ -75,12 +86,16 @@ def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
             lock's record of finished ``make test`` runs, kept apart from the
             fleet journal because every checkout's older reader of that file
             refuses a kind it does not declare (MCPs board task ea2ea29c).
+        action_journal: Path to ``.action-events.jsonl``, every MCPs command
+            that changes state and takes no lock (MCPs board task b00ab472),
+            kept apart because the fleet journal's readers read it whole.
 
     Raises:
         AppError: Configuration (missing credentials or task id) or the
             board refusing a post.
         JSONTypeError: A journal line or position file that does not
-            decode, or a check journal holding a lock transition.
+            decode, a check journal holding a lock transition, or an action
+            journal holding a row no action writes.
         InvalidJsonError: A journal line or position file that is not
             JSON at all.
         ValueError: A position pointing past a journal's end -- the
@@ -93,32 +108,39 @@ def run_cycle(journal: pathlib.Path, check_journal: pathlib.Path) -> None:
     task_id = load_task_id()
     marks = cursor_path(journal, CURSOR_READER)
     check_marks = cursor_path(check_journal, CURSOR_READER)
+    action_marks = cursor_path(action_journal, CURSOR_READER)
     journal_slice = read_journal_slice(journal, _offset(marks))
     check_slice = read_journal_slice(check_journal, _offset(check_marks))
+    action_slice = read_journal_slice(action_journal, _offset(action_marks))
     require_check_rows(check_slice["events"], check_journal)
+    require_action_rows(action_slice["events"], str(action_journal))
     _publish(
         credentials,
         task_id,
         HUB,
         (
-            _Stream(journal_slice=journal_slice, cursor=marks),
-            _Stream(journal_slice=check_slice, cursor=check_marks),
+            _Stream(journal_slice=journal_slice, cursor=marks, actions=False),
+            _Stream(journal_slice=check_slice, cursor=check_marks, actions=False),
+            _Stream(journal_slice=action_slice, cursor=action_marks, actions=True),
         ),
     )
 
 
-def run_remote_cycle(journal: RemoteJournal, cursor_dir: pathlib.Path) -> None:
-    """Run one bridge cycle against a fleet journal on another host.
+def run_remote_cycle(journal: RemoteJournal, cursor_dir: pathlib.Path, *, actions: bool) -> None:
+    """Run one bridge cycle against a fleet journal or an action journal on another host.
 
     Args:
         journal: The host and the journal's path there.
         cursor_dir: The local directory holding this reader's position in
             it (:func:`lock_wake.remote.remote_cursor_path`).
+        actions: Whether the journal is that host's action journal, whose
+            rows are checked as an action's and announced as actions.
 
     Raises:
         AppError: Configuration, the board refusing a post, or the ssh read
             failing (:func:`lock_wake.remote.read_remote_slice`).
-        JSONTypeError: A journal line or position file that does not decode.
+        JSONTypeError: A journal line or position file that does not decode,
+            or an action journal holding a row no action writes.
         InvalidJsonError: A journal line or position file that is not JSON.
         ValueError: A position past the remote journal's end.
         OSError: A position file that cannot be read or written.
@@ -128,11 +150,13 @@ def run_remote_cycle(journal: RemoteJournal, cursor_dir: pathlib.Path) -> None:
     task_id = load_task_id()
     marks = remote_cursor_path(cursor_dir, journal)
     journal_slice = read_remote_slice(journal, _offset(marks))
+    if actions:
+        require_action_rows(journal_slice["events"], f"{journal['host']}:{journal['path']}")
     _publish(
         credentials,
         task_id,
         journal["host"],
-        (_Stream(journal_slice=journal_slice, cursor=marks),),
+        (_Stream(journal_slice=journal_slice, cursor=marks, actions=actions),),
     )
 
 
@@ -165,16 +189,28 @@ def _publish(
         AppError: The board refusing a post; no cursor moves.
         OSError: A position file that cannot be written.
     """
-    events = tuple(event for stream in streams for event in stream["journal_slice"]["events"])
+    events = tuple(
+        event
+        for stream in streams
+        if not stream["actions"]
+        for event in stream["journal_slice"]["events"]
+    )
+    actions = tuple(
+        event
+        for stream in streams
+        if stream["actions"]
+        for event in stream["journal_slice"]["events"]
+    )
+    lines = len(events) + len(actions)
     offsets = ", ".join(str(stream["journal_slice"]["next_offset"]) for stream in streams)
-    if events == ():
+    if lines == 0:
         _test_hooks.emit(f"{host} journals quiet; offsets {offsets}")
         return
 
-    post = announcement(events, host)
+    post = announcement(events, actions, host)
     if post is None:
         _advance(streams)
-        _test_hooks.emit(f"{host}: {len(events)} progress line(s), no boundary; offsets {offsets}")
+        _test_hooks.emit(f"{host}: {lines} progress line(s), no boundary; offsets {offsets}")
         return
 
     # THE LEDGER GATE COMES FIRST, and it is why all three bridges went
@@ -201,8 +237,9 @@ def _publish(
     _advance(streams)
     tagged = " ".join(f"@{agent}" for agent in post["agents"])
     _test_hooks.emit(
-        f"{host}: posted {post['holds']} hold(s) and {post['checks']} check run(s) "
-        f"from {len(events)} line(s)" + (f": tagged {tagged}" if tagged != "" else ": unaddressed")
+        f"{host}: posted {post['holds']} hold(s), {post['checks']} check run(s) and "
+        f"{post['actions']} unfinished action(s) from {lines} line(s)"
+        + (f": tagged {tagged}" if tagged != "" else ": unaddressed")
     )
 
 

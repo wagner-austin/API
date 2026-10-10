@@ -27,6 +27,17 @@ already watched its own output, and a mention would buy it a wake or a
 turn-boundary continuation for every run it made. A session that wants
 check results subscribes to this bridge's standing task, and the
 subscription is what makes the post reach it.
+
+ACTIONS RIDE IT TOO, AND ONLY WHEN THEY DID NOT FINISH (MCPs board task
+b00ab472). Every MCPs command that changes state and takes no lock (a
+backup, a restore, a production Keycloak account, a mirror push) journals
+its start, each line it said and how it ended into ``.action-events.jsonl``
+beside the fleet journal. An action is not a hold, so its rows are passed
+apart and posted under their own ACTIONS heading; one that ended ``failed``
+or ``refused`` gets a line, and its session an ``@``, because that is the
+result nobody watching a terminal saw. A clean finish is a ``step`` and
+stays silent, as a hold's progress does: a mirror push runs on every commit
+of fifteen repositories.
 """
 
 from __future__ import annotations
@@ -50,6 +61,10 @@ BOUNDARY_KINDS: Final = ("acquired", "released", "failed", "timeout", "gate-bloc
 #: pre-hold refusals, which are their own beginning and end.
 _ENDING_KINDS: Final = ("released", "failed", "timeout", "gate-blocked", "refused")
 
+#: Kinds that make an action worth a line: it did not finish. A finished
+#: action closes with a ``step``, which is silent.
+ACTION_BOUNDARY_KINDS: Final = ("failed", "refused")
+
 
 class Announcement(TypedDict):
     """One cycle's post, ready for the board.
@@ -57,16 +72,18 @@ class Announcement(TypedDict):
     Attributes:
         body: The full post text.
         agents: Distinct non-empty session labels behind the announced
-            holds, in first-seen order -- the @mention targets. Check runs
-            add none.
+            holds and actions, in first-seen order -- the @mention targets.
+            Check runs add none.
         holds: How many holds the post covers, for the cycle's report line.
         checks: How many finished check runs the post covers.
+        actions: How many actions that did not finish the post covers.
     """
 
     body: str
     agents: tuple[str, ...]
     holds: int
     checks: int
+    actions: int
 
 
 def parse_journal_ts(ts: str) -> datetime.datetime:
@@ -147,51 +164,117 @@ def _check_line(event: LockEvent) -> str:
     return f"{event['label']} {event['ts'][11:19]}Z: {event['detail']}{runner}"
 
 
-def announcement(events: tuple[LockEvent, ...], host: str) -> Announcement | None:
-    """Fold one slice's events into one post, or nothing worth posting.
+def _by_process(
+    events: tuple[LockEvent, ...], boundaries: tuple[str, ...]
+) -> dict[int, tuple[LockEvent, ...]]:
+    """Group a slice's rows by the process that wrote them, keeping those that crossed a boundary.
 
     Args:
-        events: The slice's events, in file order.
-        host: The machine whose journal the events came from (``hub``,
-            ``diphtheria``), named in the heading and the mention line: a
-            pid and a target label mean nothing until the reader knows which
-            machine's lock they held (MCPs board task 03590bf9).
+        events: Rows of one kind of record, in file order.
+        boundaries: The kinds that make a process's rows worth a line.
 
     Returns:
-        The post, or None when no hold crossed a boundary and no check run
-        finished -- progress-only slices are consumed silently by design
-        (module docstring).
+        Each such process's rows, in first-seen order.
+    """
+    grouped: dict[int, list[LockEvent]] = {}
+    for event in events:
+        grouped.setdefault(event["holder_pid"], []).append(event)
+    return {
+        holder: tuple(rows)
+        for holder, rows in grouped.items()
+        if any(event["kind"] in boundaries for event in rows)
+    }
+
+
+def _mention(agents: list[str], what: str) -> str | None:
+    """The line that tags each session behind a group of lines, or None for nobody.
+
+    Args:
+        agents: The labels, in first-seen order, empty ones excluded.
+        what: What happened to their operations, ending the line.
+
+    Returns:
+        The line, or None when no label is known.
+    """
+    if len(agents) == 0:
+        return None
+    return " ".join(f"@{agent}" for agent in agents) + f" {what}"
+
+
+def _labels(groups: dict[int, tuple[LockEvent, ...]]) -> list[str]:
+    """The distinct non-empty labels behind groups of rows, in first-seen order.
+
+    Args:
+        groups: Each process's rows.
+
+    Returns:
+        The labels.
+    """
+    labels: list[str] = []
+    for rows in groups.values():
+        agent = rows[0]["agent"]
+        if agent != "" and agent not in labels:
+            labels.append(agent)
+    return labels
+
+
+def announcement(
+    events: tuple[LockEvent, ...], actions: tuple[LockEvent, ...], host: str
+) -> Announcement | None:
+    """Fold one slice's rows into one post, or nothing worth posting.
+
+    Args:
+        events: The slice's fleet-lock and check rows, in file order.
+        actions: The slice's action rows (module docstring), in file order.
+        host: The machine whose journals the rows came from (``hub``,
+            ``diphtheria``), named in each heading and mention line: a pid
+            and a label mean nothing until the reader knows which machine
+            they ran on (MCPs board task 03590bf9).
+
+    Returns:
+        The post, or None when no hold crossed a boundary, no check run
+        finished and every action finished -- progress-only slices are
+        consumed silently by design (module docstring).
     """
     checks = tuple(event for event in events if event["kind"] == "checked")
-    holds: dict[int, list[LockEvent]] = {}
-    for event in events:
-        if event["kind"] != "checked":
-            holds.setdefault(event["holder_pid"], []).append(event)
-    announced = {
-        holder: tuple(hold)
-        for holder, hold in holds.items()
-        if any(event["kind"] in BOUNDARY_KINDS for event in hold)
-    }
-    if len(announced) == 0 and len(checks) == 0:
+    holds = _by_process(
+        tuple(event for event in events if event["kind"] != "checked"), BOUNDARY_KINDS
+    )
+    unfinished = _by_process(actions, ACTION_BOUNDARY_KINDS)
+    if len(holds) == 0 and len(checks) == 0 and len(unfinished) == 0:
         return None
     lines: list[str] = []
-    agents: list[str] = []
-    if len(announced) > 0:
-        lines.append(f"FLEET-LOCK on {host}: {len(announced)} hold(s) transitioned")
-        for hold_events in announced.values():
-            lines.append(_hold_line(hold_events))
-            agent = hold_events[0]["agent"]
-            if agent != "" and agent not in agents:
-                agents.append(agent)
+    if len(holds) > 0:
+        lines.append(f"FLEET-LOCK on {host}: {len(holds)} hold(s) transitioned")
+        lines.extend(_hold_line(hold) for hold in holds.values())
+    if len(unfinished) > 0:
+        lines.append(f"ACTIONS on {host}: {len(unfinished)} action(s) did not finish")
+        lines.extend(_hold_line(action) for action in unfinished.values())
     if len(checks) > 0:
         lines.append(f"CHECKS: {len(checks)} make test run(s) finished")
         lines.extend(_check_line(event) for event in checks)
-    if len(agents) > 0:
-        mentions = " ".join(f"@{agent}" for agent in agents)
-        lines.append(f"{mentions} your fleet-lock operation on {host} transitioned")
+    holders = _labels(holds)
+    actors = _labels(unfinished)
+    for mention in (
+        _mention(holders, f"your fleet-lock operation on {host} transitioned"),
+        _mention(actors, f"your action on {host} did not finish"),
+    ):
+        if mention is not None:
+            lines.append(mention)
+    agents = [*holders, *(actor for actor in actors if actor not in holders)]
     return Announcement(
-        body="\n".join(lines), agents=tuple(agents), holds=len(announced), checks=len(checks)
+        body="\n".join(lines),
+        agents=tuple(agents),
+        holds=len(holds),
+        checks=len(checks),
+        actions=len(unfinished),
     )
 
 
-__all__ = ["BOUNDARY_KINDS", "Announcement", "announcement", "parse_journal_ts"]
+__all__ = [
+    "ACTION_BOUNDARY_KINDS",
+    "BOUNDARY_KINDS",
+    "Announcement",
+    "announcement",
+    "parse_journal_ts",
+]
