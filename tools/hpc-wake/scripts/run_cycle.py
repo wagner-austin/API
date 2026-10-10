@@ -92,7 +92,11 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
     # The check journal beside it (MCPs board task ea2ea29c) carries the
     # check lock's finished make test runs, posted unaddressed in the same
     # post; it is its own file because older readers of the fleet journal
-    # refuse a kind they do not declare.
+    # refuse a kind they do not declare. The action journal (MCPs board task
+    # b00ab472) carries every MCPs command that changes state and takes no
+    # lock; an action that failed or was refused is posted under ACTIONS and
+    # tags who ran it, and its own file because the fleet journal's readers
+    # read that file whole.
     {
         "name": "lock-wake",
         "args": (
@@ -103,6 +107,8 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
             "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
             "--check-journal",
             "C:\\Users\\Test\\PROJECTS\\MCPs\\.check-events.jsonl",
+            "--action-journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.action-events.jsonl",
         ),
         "cwd": "..\\lock-wake",
     },
