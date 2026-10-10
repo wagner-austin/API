@@ -380,7 +380,10 @@ class TestRealGeminiClient:
 
         api_key = "test-api-key-12345"
         client = _real_gemini_client_factory(api_key)
-        assert isinstance(client, RealGeminiClient)
+        # The factory's product is the real client itself, not a stand-in or
+        # a subclass: an exact class identity, which is what the factory
+        # promises, rather than an isinstance that a stand-in would satisfy.
+        assert type(client) is RealGeminiClient
         assert client._api_key == api_key
         # The SDK client's models attribute is the API interface.
         assert client._client.models.__class__.__name__ == "Models"
