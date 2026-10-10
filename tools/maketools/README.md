@@ -58,6 +58,7 @@ says why.
 
 | command | what it does |
 |---|---|
+| `align --commit SHA [--drop SHA,SHA]` | move this main checkout to a commit origin/main contains, the route `make align-commit` takes because the hub's hook refuses hand-run git verbs that move a checkout with linked trees; a local commit the target carries (patch-equivalent, or every path's blob equal) is dropped and named, one it does not carry is refused unless `--drop` names it, and tracked dirt or an untracked path the target tracks refuses the move |
 | `venv-check` | remove `.venv` when `poetry run mypy --version` cannot answer, so the `poetry sync` that follows builds a fresh one |
 | `guard` | run `poetry run python -m scripts.guard` when the package has a shim; say "not applicable, 0 rules run" when it has none |
 | `test [--no-sweep] [pytest args...]` | the shared launcher, the port of `scripts/run-tests.ps1`: a kill-on-close job object on Windows, a new session and a descendant reap on POSIX, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |

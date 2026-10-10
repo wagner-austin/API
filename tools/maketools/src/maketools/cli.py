@@ -16,6 +16,7 @@ from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
 
 from maketools import _test_hooks, workspace
+from maketools.align_command import command_align
 from maketools.budget_run import run_check_budget
 from maketools.concurrent_run import command_concurrent
 from maketools.env_run import run_env
@@ -474,6 +475,7 @@ def require_integer(flag: str, value: str) -> int:
 
 
 COMMANDS: Final[Mapping[str, Callable[[Sequence[str]], int]]] = {
+    "align": command_align,
     "venv-check": command_venv_check,
     "guard": command_guard,
     "test": command_test,

@@ -27,6 +27,7 @@ def cwd(tmp_path: Path) -> Generator[Path, None, None]:
 
 def test_every_command_is_registered() -> None:
     assert sorted(COMMANDS) == [
+        "align",
         "check-budget",
         "compose-down",
         "compose-up",
