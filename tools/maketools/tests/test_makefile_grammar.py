@@ -64,6 +64,8 @@ def test_the_include_line_is_computed_per_depth() -> None:
 def test_the_recipe_body_drops_make_prefixes() -> None:
     assert recipe_body("\t@-echo hi") == "echo hi"
     assert recipe_body("\t  poetry run x  ") == "poetry run x"
+    assert recipe_body("\t+echo hi") == "echo hi"
+    assert recipe_body("\t@ -\t+echo hi") == "echo hi"
 
 
 @pytest.mark.parametrize(
@@ -95,6 +97,11 @@ def test_the_recipe_body_drops_make_prefixes() -> None:
         ("@echo 'left ran'", "echo without double-quoted text (make 3.81 runs it as a program)"),
         ("@echo done", "echo without double-quoted text (make 3.81 runs it as a program)"),
         ("@echo", "echo without double-quoted text (make 3.81 runs it as a program)"),
+        ("+echo 'left ran'", "echo without double-quoted text (make 3.81 runs it as a program)"),
+        ("@ -echo left", "echo without double-quoted text (make 3.81 runs it as a program)"),
+        ("-+@echo done", "echo without double-quoted text (make 3.81 runs it as a program)"),
+        ("+cd libs/platform_core", "cd (use make -C or a script)"),
+        ("+if test -f x", "sh control flow"),
     ],
 )
 def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -> None:
@@ -107,6 +114,8 @@ def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -
         "poetry run mypy src tests scripts",
         '@echo "=== ALL CHECKS PASSED ==="',
         '@echo ""',
+        '+echo "left ran"',
+        '@ -echo "left ran"',
         "@echoes-tool --flag",
         "$(PYTHON) ../../tools/maketools/scripts/run.py test",
         "poetry run pytest -n auto -v --cov-branch --cov=src",
