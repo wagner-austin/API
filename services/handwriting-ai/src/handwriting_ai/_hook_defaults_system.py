@@ -9,6 +9,8 @@ from pathlib import Path
 from types import ModuleType
 
 import psutil
+from platform_core.process_group import GroupApi, libc_group_api
+from platform_core.process_job import JobApi, kernel32_job_api
 
 from handwriting_ai._hook_protocols_system import (
     EventProtocol,
@@ -17,6 +19,16 @@ from handwriting_ai._hook_protocols_system import (
     ThreadTargetProtocol,
     VirtualMemoryResultProtocol,
 )
+
+
+def _default_job_api() -> JobApi:
+    """Production implementation - binds the real kernel32 (Windows only)."""
+    return kernel32_job_api()
+
+
+def _default_group_api() -> GroupApi:
+    """Production implementation - binds the real libc (Linux only)."""
+    return libc_group_api()
 
 
 def _default_psutil_process(pid: int | None = None) -> PsutilProcessProtocol:

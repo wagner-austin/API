@@ -69,7 +69,9 @@ from handwriting_ai._hook_defaults_ml import (
 )
 from handwriting_ai._hook_defaults_system import (
     _default_event_factory,
+    _default_group_api,
     _default_import_module,
+    _default_job_api,
     _default_limit_thread_pools,
     _default_os_cpu_count,
     _default_os_getpid,
@@ -97,7 +99,6 @@ from handwriting_ai._hook_defaults_training import (
     _default_get_training_progress_module,
     _default_measure_candidate_internal,
     _default_measure_training,
-    _default_mp_get_all_start_methods,
     _default_mp_get_context,
     _default_on_batch_check,
     _default_orchestrator_factory,
@@ -170,7 +171,9 @@ from handwriting_ai._hook_protocols_system import (
     CpuCountFactoryProtocol,
     EventFactoryProtocol,
     GetPidProtocol,
+    GroupApiFactoryProtocol,
     ImportModuleProtocol,
+    JobApiFactoryProtocol,
     LimitThreadPoolsProtocol,
     OsCpuCountProtocol,
     PsutilProcessProtocol,
@@ -205,7 +208,6 @@ from handwriting_ai._hook_protocols_training import (
     MeasureCandidateInternalProtocol,
     MeasureTrainingProtocol,
     MemoryGuardConfigDict,
-    MpGetAllStartMethodsProtocol,
     MpGetContextProtocol,
     MultiprocessingActiveChildrenProtocol,
     OnBatchCheckProtocol,
@@ -391,6 +393,10 @@ def _init_os_name() -> None:
 
 _init_os_name()
 
+job_api: JobApiFactoryProtocol = _default_job_api
+
+group_api: GroupApiFactoryProtocol = _default_group_api
+
 emit_batch: EmitBatchProtocol = _default_emit_batch
 
 build_model: BuildModelProtocol = _default_build_model
@@ -412,8 +418,6 @@ measure_training: MeasureTrainingProtocol = _default_measure_training
 gc_collect: GcCollectProtocol = _default_gc_collect
 
 mp_active_children: MultiprocessingActiveChildrenProtocol = _default_mp_active_children
-
-mp_get_all_start_methods: MpGetAllStartMethodsProtocol = _default_mp_get_all_start_methods
 
 mp_get_context: MpGetContextProtocol = _default_mp_get_context
 

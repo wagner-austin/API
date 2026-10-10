@@ -7,6 +7,7 @@ the actual default implementations are exercised for coverage.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -17,10 +18,14 @@ from platform_workers.rq_harness import WorkerConfig
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_defaults import _default_artifact_store_factory, _default_run_worker
 from handwriting_ai._hook_defaults_ml import _default_principal_angle
-from handwriting_ai._hook_defaults_system import _default_event_factory, _default_thread_factory
+from handwriting_ai._hook_defaults_system import (
+    _default_event_factory,
+    _default_group_api,
+    _default_job_api,
+    _default_thread_factory,
+)
 from handwriting_ai._hook_defaults_training import (
     _default_calibrate_input_pipeline,
-    _default_mp_get_all_start_methods,
     _default_mp_get_context,
     _default_orchestrator_factory,
 )
@@ -34,13 +39,6 @@ from handwriting_ai.training.calibration._types import BudgetConfig, Candidate, 
 from handwriting_ai.training.calibration.cache import _write_cache
 from handwriting_ai.training.calibration.ds_spec import BaseKind, PreprocessSpec
 from handwriting_ai.training.calibration.signature import make_signature
-
-
-def test_default_mp_get_all_start_methods_returns_spawn() -> None:
-    """Test _default_mp_get_all_start_methods returns a list containing 'spawn'."""
-    methods = _default_mp_get_all_start_methods()
-    # 'spawn' is available on all platforms (Windows, macOS, Linux)
-    assert "spawn" in methods
 
 
 def test_default_mp_get_context_returns_context_with_method() -> None:
@@ -69,6 +67,35 @@ def test_default_thread_factory_creates_working_thread() -> None:
     thread.join(timeout=1.0)
     # Verify the thread actually ran its target function
     assert executed["flag"] is True
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="kernel32 exists on Windows only")
+def test_default_job_api_binds_the_real_kernel32() -> None:
+    """The default job binding reaches kernel32: an invalid handle is refused."""
+    api = _default_job_api()
+    assert api.set_kill_on_close(0) is False
+    assert api.last_error() == 6  # ERROR_INVALID_HANDLE
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the refusal is the off-Windows behaviour")
+def test_default_job_api_cannot_load_off_windows() -> None:
+    """Off Windows there is no kernel32, and the default says so rather than faking one."""
+    with pytest.raises(OSError):
+        _default_job_api()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="libc.so.6 exists off Windows only")
+def test_default_group_api_binds_the_real_libc() -> None:
+    """The default group binding reaches libc: signal 0 to this group is delivered to nobody."""
+    api = _default_group_api()
+    assert api.killpg(0, 0) == 0
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the refusal is the Windows behaviour")
+def test_default_group_api_cannot_load_on_windows() -> None:
+    """On Windows there is no libc.so.6, and the default says so rather than faking one."""
+    with pytest.raises(OSError):
+        _default_group_api()
 
 
 def test_default_event_factory_creates_working_event() -> None:

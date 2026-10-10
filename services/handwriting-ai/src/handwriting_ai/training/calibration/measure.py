@@ -345,19 +345,19 @@ def _resolve_worker_context(
 ) -> str | None:
     """Resolve a stable multiprocessing context method for DataLoader workers.
 
-    In a spawned calibration child, prefer 'forkserver' on POSIX where
-    available to avoid forking a threaded process; otherwise use 'spawn'.
-    On Windows, always 'spawn'. Returns None when num_workers <= 0.
+    PyTorch's ManagerWatchdog watches a worker's OS parent. A forkserver
+    becomes that parent and survives when the calibration candidate is
+    killed, leaving workers waiting on queues nobody will consume (the
+    calib_child leak board task 49899fd2 measured). Spawn keeps the candidate
+    itself as the parent on both platforms without forking torch's threads,
+    so the workers see their owner exit. Returns None when num_workers <= 0.
 
     Returns the method name as a string (not a context object) since DataLoader
     accepts strings directly for multiprocessing_context.
     """
     if int(num_workers) <= 0:
         return None
-    if _test_hooks.os_name == "nt":
-        return "spawn"
-    methods = set(_test_hooks.mp_get_all_start_methods())
-    return "forkserver" if "forkserver" in methods else ("spawn" if "spawn" in methods else None)
+    return "spawn"
 
 
 def _safe_loader(

@@ -158,6 +158,8 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_perf_counter = _test_hooks.perf_counter
     original_os_access = _test_hooks.os_access
     original_os_name = _test_hooks.os_name
+    original_job_api = _test_hooks.job_api
+    original_group_api = _test_hooks.group_api
 
     # Store original values - progress hooks
     original_emit_batch = _test_hooks.emit_batch
@@ -181,7 +183,6 @@ def _reset_test_hooks() -> Generator[None, None, None]:
 
     # Store original values - multiprocessing hooks
     original_mp_active_children = _test_hooks.mp_active_children
-    original_mp_get_all_start_methods = _test_hooks.mp_get_all_start_methods
     original_mp_get_context = _test_hooks.mp_get_context
 
     # Store original values - PIL preprocessing hooks
@@ -298,6 +299,8 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     _test_hooks.perf_counter = original_perf_counter
     _test_hooks.os_access = original_os_access
     _test_hooks.os_name = original_os_name
+    _test_hooks.job_api = original_job_api
+    _test_hooks.group_api = original_group_api
 
     # Restore original values - progress hooks
     _test_hooks.emit_batch = original_emit_batch
@@ -323,7 +326,6 @@ def _reset_test_hooks() -> Generator[None, None, None]:
 
     # Restore original values - multiprocessing hooks
     _test_hooks.mp_active_children = original_mp_active_children
-    _test_hooks.mp_get_all_start_methods = original_mp_get_all_start_methods
     _test_hooks.mp_get_context = original_mp_get_context
 
     # Restore original values - PIL preprocessing hooks

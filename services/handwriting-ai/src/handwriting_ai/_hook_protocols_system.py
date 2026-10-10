@@ -8,6 +8,21 @@ from pathlib import Path
 from types import ModuleType
 from typing import Protocol
 
+from platform_core.process_group import GroupApi
+from platform_core.process_job import JobApi
+
+
+class JobApiFactoryProtocol(Protocol):
+    """Protocol for the Windows kill-on-close job binding a candidate joins."""
+
+    def __call__(self) -> JobApi: ...
+
+
+class GroupApiFactoryProtocol(Protocol):
+    """Protocol for the POSIX process-group binding a candidate isolates with."""
+
+    def __call__(self) -> GroupApi: ...
+
 
 class VirtualMemoryResultProtocol(Protocol):
     """Protocol for psutil.virtual_memory() result (a NamedTuple with total and used)."""

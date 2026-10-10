@@ -283,12 +283,6 @@ class MultiprocessingProcessProtocol(Protocol):
     def exitcode(self) -> int | None: ...
 
 
-class MpGetAllStartMethodsProtocol(Protocol):
-    """Protocol for multiprocessing.get_all_start_methods."""
-
-    def __call__(self) -> list[str]: ...
-
-
 class MultiprocessingContextProtocol(Protocol):
     """Protocol for multiprocessing context (returned by mp.get_context).
 

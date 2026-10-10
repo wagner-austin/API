@@ -35,6 +35,7 @@ from handwriting_ai.training.calibration.ds_spec import (
     InlineSpec,
     PreprocessSpec,
 )
+from handwriting_ai.training.calibration.process_lifetime import close_candidate, isolate_candidate
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
 from handwriting_ai.training.safety import set_memory_guard_config
 
@@ -185,6 +186,28 @@ def _child_entry(
         _gc.collect()
 
 
+def _isolated_child_entry(
+    out_path: str,
+    spec: PreprocessSpec,
+    cand: Candidate,
+    samples: int,
+    abort_pct: float,
+    log_q: _mp.Queue[stdlib_logging.LogRecord],
+) -> None:
+    """Establish process ownership before the candidate can create loaders.
+
+    Args:
+        out_path: Where the child writes its result.
+        spec: The dataset spec the child builds from.
+        cand: The candidate measured.
+        samples: How many samples it measures.
+        abort_pct: The abort threshold.
+        log_q: The queue the child's log records go to.
+    """
+    isolate_candidate()
+    _child_entry(out_path, spec, cand, samples, abort_pct, log_q)
+
+
 class SubprocessRunner:
     def __init__(self) -> None:
         # Use spawn for consistent behavior across OSes.
@@ -218,7 +241,7 @@ class SubprocessRunner:
             )
             listener.start()
             proc = self._ctx.Process(
-                target=_child_entry,
+                target=_isolated_child_entry,
                 args=(out_path, spec, cand, int(samples), float(budget["abort_pct"]), log_q),
             )
             # Ensure non-daemonic to allow DataLoader workers in child
@@ -239,13 +262,16 @@ class SubprocessRunner:
             try:
                 return self._wait_for_outcome(proc, out_path, start, float(budget["timeout_s"]))
             finally:
-                if proc.is_alive():
-                    with _suppress(Exception):
-                        proc.kill()
-                    with _suppress(Exception):
-                        proc.join(1.0)
-                with _suppress(Exception):
+                # The candidate and every process it made share one lifetime
+                # (its own group on POSIX, a kill-on-close job on Windows), so
+                # closing it here leaves no loader behind, whatever the outcome.
+                try:
+                    close_candidate(proc)
+                finally:
                     listener.stop()
+                    log_q.close()
+                    log_q.join_thread()
+                    proc.close()
                 _gc.collect()
         finally:
             _test_hooks.remove_temp_tree(out_dir)
@@ -270,11 +296,8 @@ class SubprocessRunner:
                         proc.join(timeout=join_timeout)
                 return outcome
             if (_test_hooks.perf_counter() - start) >= timeout_s:
-                # Timeout: terminate and mark
-                with _suppress(Exception):
-                    proc.terminate()
-                with _suppress(Exception):
-                    proc.join(2.0)
+                # Timed out: run() owns the whole process tree and closes it
+                # in its finally, so the candidate is only marked here.
                 return {
                     "ok": False,
                     "res": None,

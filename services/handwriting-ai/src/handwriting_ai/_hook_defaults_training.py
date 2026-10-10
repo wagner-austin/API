@@ -154,13 +154,6 @@ def _default_gc_collect() -> int:
     return _gc.collect()
 
 
-def _default_mp_get_all_start_methods() -> list[str]:
-    """Production implementation."""
-    import multiprocessing as _mp
-
-    return list(_mp.get_all_start_methods())
-
-
 def _default_mp_get_context(method: str | None) -> MultiprocessingContextProtocol:
     """Production implementation - returns context with requested method.
 
