@@ -87,6 +87,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
           Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
+          # The runner image is not always handed PSGallery registered: run
+          # 38082588823 at 168990285 failed here with "Unable to find
+          # repository 'PSGallery'" before any harness ran, and its rerun on
+          # another runner passed. Get-PSRepository with no name lists what is
+          # registered without writing an error, so the default repository is
+          # registered exactly when it is absent.
+          $registered = @(Get-PSRepository | Where-Object { $_.Name -eq 'PSGallery' })
+          if ($registered.Count -eq 0) { Register-PSRepository -Default }
           $moduleRoot = Join-Path $env:RUNNER_TEMP ('api-powershell-' + [guid]::NewGuid().ToString('N'))
           & .\scripts\ci\Save-HarnessModules.ps1 -RepoRoot . -McpsRoot (Join-Path '${{ runner.workspace }}' 'MCPs') -ModuleRoot $moduleRoot
           "PSModulePath=$moduleRoot;$env:PSModulePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
