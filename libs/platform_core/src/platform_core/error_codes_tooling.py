@@ -428,6 +428,12 @@ class MaketoolsErrorCode(ErrorCodeBase):
     # the refusal leaves the lock and the lifted files as they were.
     LIFT = "MAKETOOLS_LIFT"
 
+    # ``make align-commit`` could not move this main checkout to the named
+    # commit: the tree is dirty, the commit is not on origin/main, or a
+    # local commit the move would drop is not carried by the target and was
+    # not named in DROP (MCPs board task f2f89c69). Nothing moved.
+    ALIGN = "MAKETOOLS_ALIGN"
+
 
 __all__ = [
     "BoardBridgeErrorCode",
