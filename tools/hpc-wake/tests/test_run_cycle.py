@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import datetime
 import pathlib
-import subprocess
 from collections.abc import Generator, Mapping, Sequence
 
 import pytest
@@ -40,11 +39,9 @@ class _RecordingRunner:
         *,
         cwd: pathlib.Path,
         env: Mapping[str, str],
-        capture_output: bool,
-        text: bool,
+        timeout: int,
     ) -> _Completed:
-        assert capture_output is True
-        assert text is True
+        assert timeout == run_cycle.PUBLISHER_WALL_SECONDS
         self.calls.append((args, cwd, dict(env)))
         return self.results[len(self.calls) - 1]
 
@@ -70,7 +67,7 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
     )
     _test_hooks.run_process = fake
     yield fake
-    _test_hooks.run_process = subprocess.run
+    _test_hooks.run_process = _test_hooks._default_run_process
 
 
 class _FrozenClock:
@@ -324,7 +321,12 @@ class TestMain:
             "--workspace",
             "C:\\Users\\Test\\PROJECTS\\MCPs",
         ]
-        assert rcs_cwd == pathlib.Path("C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
+        # Resolved from the package root as the entry point resolves every
+        # row's cwd: on Windows the hub checkout's absolute path replaces the
+        # root, and on a Linux runner the same text is a relative name under
+        # it, so an expectation resolved from the bare text alone failed
+        # there (API CI run 38014391403 at c9f4e74a4, 2026-10-10 01:45Z).
+        assert rcs_cwd == (root / "C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
         assert rcs_env == env
         login_args, login_cwd, login_env = runner.calls[7]
         assert list(login_args) == [
@@ -335,7 +337,7 @@ class TestMain:
             "--workspace",
             "C:\\Users\\Test\\PROJECTS\\MCPs",
         ]
-        assert login_cwd == pathlib.Path("C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
+        assert login_cwd == (root / "C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
         assert login_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
@@ -528,17 +530,6 @@ class TestPublishers:
             "--workspace",
             "C:\\Users\\Test\\PROJECTS\\MCPs",
         )
-        # The login real-use check (MCPs board task 2ce5fc24), the same
-        # interpreter in the same checkout.
-        assert run_cycle.PUBLISHERS[7]["cwd"] == "C:\\Users\\Test\\PROJECTS\\MCPs"
-        assert run_cycle.PUBLISHERS[7]["args"] == (
-            run_cycle.PUBLISHERS[6]["args"][0],
-            "-B",
-            "packages\\maketools\\scripts\\run.py",
-            "login-probe",
-            "--workspace",
-            "C:\\Users\\Test\\PROJECTS\\MCPs",
-        )
 
 
 class TestMainBlock:
@@ -574,5 +565,4 @@ class TestMainBlock:
 
 class TestHookDefault:
     def test_the_production_runner_is_the_real_one(self) -> None:
-        expected: _test_hooks.RunProcess = subprocess.run
-        assert _test_hooks.run_process is expected
+        assert _test_hooks.run_process is _test_hooks._default_run_process
