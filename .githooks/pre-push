@@ -149,14 +149,26 @@ printf '%s\n' "$PUSH_INPUT" | while read -r local_ref local_sha _remote_ref _rem
 done
 
 # The wiki mirror (MCPs board task 3952274e): every commit this push
-# publishes to main also goes to the bare mirror on diphtheria, fed the same
-# lines git gave this hook, so a commit published from a detached worktree
-# (which moved no local branch and fired no post-commit) reaches it too.
-# The script never fails the push; a host with no MCPs checkout beside this
-# one has no mirror role and says so.
-MIRROR="$REPO/../MCPs/scripts/ops/wiki-mirror-push.sh"
-if [ -f "$MIRROR" ]; then
-    printf '%s\n' "$PUSH_INPUT" | sh "$MIRROR" push "$REMOTE_NAME"
+# publishes to main also goes to the bare mirror on diphtheria, so a commit
+# published from a detached worktree (which moved no local branch and fired
+# no post-commit) reaches it too. MCPs' maketools wiki-mirror-hook makes the
+# push, as MCPs' origin/main carries it, fed git's lines as one
+# <local-sha>:<remote-ref> argument each (safe to split on whitespace, which
+# git refuses in a ref name), and run from the MCPs checkout so what it did is
+# journaled in that checkout's .action-events.jsonl (MCPs board task
+# b00ab472). It never fails the push; a host with no MCPs checkout beside
+# this one has no mirror role and says so.
+if [ -d "$MCPS/.git" ]; then
+    MIRROR_UPDATES=""
+    while read -r _mirror_local_ref mirror_sha mirror_ref _mirror_remote_sha; do
+        if [ -n "$mirror_sha" ]; then
+            MIRROR_UPDATES="$MIRROR_UPDATES $mirror_sha:$mirror_ref"
+        fi
+    done <<EOF
+$PUSH_INPUT
+EOF
+    (cd "$MCPS" && python "$REPO/.githooks/published_maketools.py" wiki-mirror-hook push --repo "$REPO" --remote "$REMOTE_NAME" $MIRROR_UPDATES < /dev/null) \
+        || echo "wiki-mirror: wiki-mirror-hook exited $?, so this push may not be mirrored; $MCPS/.action-events.jsonl says why" >&2
 else
-    echo "wiki-mirror: $MIRROR is not on this host; this push is not mirrored from here" >&2
+    echo "wiki-mirror: $MCPS is not on this host; this push is not mirrored from here" >&2
 fi
