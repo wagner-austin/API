@@ -4,7 +4,22 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles check-powershell
+.PHONY: align-commit commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles check-powershell
+
+# ---------------------------------------------------------------------------
+# The main checkout
+# ---------------------------------------------------------------------------
+# align-commit COMMIT=<sha> [DROP=<sha>,<sha>]: move THIS main checkout to a
+# commit origin/main contains, the one sanctioned mover of a checkout with
+# linked session trees beside it (MCPs board task f2f89c69). The hub's hook
+# refuses every hand-run git verb that moves such a checkout, and names this
+# target as the route, because git inside a recipe is what the recipe does.
+# The pump checkout's local commits are re-commits of content origin already
+# carries, so the move may drop them; a local commit whose change the target
+# does not carry is refused by name unless DROP names it. A dirty tracked
+# path refuses the move; an untracked one the target tracks refuses it too.
+align-commit:
+	$(MAKETOOLS) align --commit $(COMMIT) --drop $(DROP)
 
 # ---------------------------------------------------------------------------
 # Infrastructure
