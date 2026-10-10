@@ -107,14 +107,7 @@ param(
     [string]$Container = 'corvis-fleet-testdb',
     [string]$Image = 'pgvector/pgvector:pg16-bookworm',
     [int]$Port = 15432,
-    [scriptblock]$Listener = {
-        param([int]$LocalPort)
-        $bound = @(Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $LocalPort -State Listen -ErrorAction SilentlyContinue)
-        if ($bound.Count -eq 0) { return $null }
-        $owner = Get-Process -Id $bound[0].OwningProcess -ErrorAction SilentlyContinue
-        $name = if ($null -eq $owner) { 'an unnamed process' } else { $owner.ProcessName }
-        return "$name (pid $($bound[0].OwningProcess))"
-    },
+    [scriptblock]$Listener = { param([int]$LocalPort) Get-TestdbPortListener $LocalPort },
     [int]$ReadySeconds = 60,
     [scriptblock]$Sleep = { Start-Sleep -Seconds 1 },
     [System.EnvironmentVariableTarget]$PathScope = 'User'
@@ -124,6 +117,27 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $Cmd = "$env:SystemRoot\System32\cmd.exe"
+
+function Get-TestdbPortListener {
+    <#
+    .SYNOPSIS
+        The process listening on a loopback port, as '<name> (pid N)', or
+        $null when the port is free: what the default -Listener answers.
+    .DESCRIPTION
+        Filtered by pipeline, not by the cmdlets' own filters: a filter that
+        matches nothing makes Get-NetTCPConnection and Get-Process write an
+        error, and the harness refuses a suppressed one. No listener is an
+        answer here, and an owner that vanished between the two reads is
+        named by its pid alone.
+    .PARAMETER LocalPort
+        The loopback port.
+    #>
+    param([int]$LocalPort)
+    $bound = @(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalAddress -eq '127.0.0.1' -and $_.LocalPort -eq $LocalPort })
+    if ($bound.Count -eq 0) { return $null }
+    $names = @(Get-Process | Where-Object { $_.Id -eq $bound[0].OwningProcess } | ForEach-Object { $_.ProcessName })
+    return "$(@($names + 'an unnamed process')[0]) (pid $($bound[0].OwningProcess))"
+}
 
 function Invoke-Native {
     param([string]$Command)
