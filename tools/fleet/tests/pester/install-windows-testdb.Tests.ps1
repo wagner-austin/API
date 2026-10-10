@@ -47,27 +47,34 @@ BeforeAll {
         <#
         .SYNOPSIS
             A docker.cmd that records every call and answers ps, the pull,
-            run, port and inspect from files beside it: 'exists' (the
-            container), 'pull-fails', port.txt and mounts.txt.
+            run, rm, port and inspect from files beside it: 'exists' (the
+            container), 'pull-fails', port.txt (what an existing container
+            publishes), run-port.txt (what a container run publishes) and
+            mounts.txt.
         .OUTPUTS
             PSCustomObject: Path, Directory and Calls (the record).
         #>
-        param([string]$Port = '127.0.0.1:49157', [string]$Mounts = '0', [switch]$Exists, [switch]$PullFails)
+        param(
+            [string]$Port = '127.0.0.1:15432', [string]$RunPort = '127.0.0.1:15432', [string]$Mounts = '0',
+            [switch]$Exists, [switch]$PullFails
+        )
         $directory = Join-Path $TestDrive ('docker-' + [guid]::NewGuid().ToString('N'))
         [void][System.IO.Directory]::CreateDirectory($directory)
         $body = @(
             '@echo off', 'echo %*>>"%~dp0calls.txt"',
-            'if "%1"=="ps" goto ps', 'if "%1"=="--config" goto pull', 'if "%1"=="run" goto run',
+            'if "%1"=="ps" goto ps', 'if "%1"=="--config" goto pull', 'if "%1"=="run" goto run', 'if "%1"=="rm" goto rm',
             'if "%1"=="port" goto port', 'if "%1"=="inspect" goto inspect', 'exit /b 99',
             ':ps', 'if exist "%~dp0exists" echo 3f2a1b', 'exit /b 0',
             ':pull', 'echo PATH=%PATH%>>"%~dp0pull-path.txt"',
             'if exist "%~dp0pull-fails" (1>&2 echo error getting credentials & exit /b 1)', 'exit /b 0',
-            ':run', 'type nul > "%~dp0exists"', 'echo 3f2a1b', 'exit /b 0',
-            ':port', 'type "%~dp0port.txt"', 'exit /b 0',
+            ':run', 'type nul > "%~dp0exists"', 'copy /y "%~dp0run-port.txt" "%~dp0port.txt" >nul', 'echo 3f2a1b', 'exit /b 0',
+            ':rm', 'del "%~dp0exists"', 'exit /b 0',
+            ':port', 'if exist "%~dp0exists" type "%~dp0port.txt"', 'exit /b 0',
             ':inspect', 'type "%~dp0mounts.txt"', 'exit /b 0'
         ) -join "`r`n"
         [System.IO.File]::WriteAllText((Join-Path $directory 'docker.cmd'), "$body`r`n", [System.Text.Encoding]::ASCII)
         [System.IO.File]::WriteAllText((Join-Path $directory 'port.txt'), "$Port`r`n")
+        [System.IO.File]::WriteAllText((Join-Path $directory 'run-port.txt'), "$RunPort`r`n")
         [System.IO.File]::WriteAllText((Join-Path $directory 'mounts.txt'), "$Mounts`r`n")
         if ($Exists) {
             [System.IO.File]::WriteAllText((Join-Path $directory 'exists'), '')
@@ -140,8 +147,8 @@ Describe 'install-windows-testdb' {
         $bin = Join-Path $root 'bin'
         $said | Should -Be @(
             "fleet-testdb: unpacked 2 client file(s) into $bin", "fleet-testdb: added $bin to the Process PATH",
-            'fleet-testdb: created corvis-fleet-testdb',
-            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:49157, 0 volume mounts')
+            'fleet-testdb: created corvis-fleet-testdb on 127.0.0.1:15432',
+            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
         @([System.IO.Directory]::GetFiles($bin) | ForEach-Object { [System.IO.Path]::GetFileName($_) } | Sort-Object) |
             Should -Be @('isready.calls.txt', 'pg_isready.cmd', 'psql.cmd', 'ready')
         Test-Path -LiteralPath (Join-Path $root 'client.zip') | Should -BeFalse
@@ -153,14 +160,58 @@ Describe 'install-windows-testdb' {
             'ps -aq --filter "name=^corvis-fleet-testdb$"',
             "--config `"$anonymous`" pull pgvector/pgvector:pg16-bookworm",
             ('run -d --name corvis-fleet-testdb --label corvis.role=fleet-testdb --restart unless-stopped ' +
-                '-p 127.0.0.1::5432 --tmpfs /var/lib/postgresql/data:rw,size=4g -e POSTGRES_PASSWORD=postgres ' +
+                '-p 127.0.0.1:15432:5432 --tmpfs /var/lib/postgresql/data:rw,size=4g -e POSTGRES_PASSWORD=postgres ' +
                 'pgvector/pgvector:pg16-bookworm'),
             'port corvis-fleet-testdb 5432/tcp',
             'inspect corvis-fleet-testdb --format "{{len .Mounts}}"')
         [System.IO.File]::ReadAllText((Join-Path $docker.Directory 'pull-path.txt')).Trim() |
             Should -BeExactly "PATH=$env:SystemRoot\System32"
         [System.IO.File]::ReadAllLines((Join-Path $bin 'isready.calls.txt')) |
-            Should -Be @('-h 127.0.0.1 -p 49157 -U postgres', '-h 127.0.0.1 -p 49157 -U postgres')
+            Should -Be @('-h 127.0.0.1 -p 15432 -U postgres', '-h 127.0.0.1 -p 15432 -U postgres')
+    }
+    It 'removes a container published on another port and creates it again on the declared one' {
+        $root = Initialize-Installed
+        $docker = Initialize-Docker -Exists -Port '127.0.0.1:53681'
+        $env:PATH = "$env:PATH;$(Join-Path $root 'bin')"
+        $said = @(Invoke-Install (Get-InstallParameterSet $root $docker $null))
+        $said | Should -Be @(
+            "fleet-testdb: removed corvis-fleet-testdb published on '127.0.0.1:53681', not 127.0.0.1:15432",
+            'fleet-testdb: created corvis-fleet-testdb on 127.0.0.1:15432',
+            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+        $calls = [System.IO.File]::ReadAllLines($docker.Calls)
+        $calls[0..2] | Should -Be @(
+            'ps -aq --filter "name=^corvis-fleet-testdb$"', 'port corvis-fleet-testdb 5432/tcp', 'rm -f corvis-fleet-testdb')
+        $calls[4] | Should -Match '^run -d --name corvis-fleet-testdb .* -p 127\.0\.0\.1:15432:5432 '
+        $calls.Count | Should -Be 7
+    }
+    It 'refuses a port another process already holds, naming the port and the process, and runs nothing' {
+        $docker = Initialize-Docker
+        $parameters = Get-InstallParameterSet (Initialize-Installed) $docker $null
+        $parameters.Listener = { param([int]$LocalPort) "python (pid 4242) on $LocalPort" }
+        { Invoke-Install $parameters } | Should -Throw -ExpectedMessage (
+            'TESTDB_PORT_BOUND: 127.0.0.1:15432 is already bound by python (pid 4242) on 15432, so corvis-fleet-testdb cannot be published there')
+        [System.IO.File]::ReadAllLines($docker.Calls) | Should -Be @('ps -aq --filter "name=^corvis-fleet-testdb$"')
+        Test-Path -LiteralPath (Join-Path $docker.Directory 'exists') | Should -BeFalse
+    }
+    It 'reads a real loopback listener and its process through the default Listener' {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+        $listener.Start()
+        try {
+            $held = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+            $docker = Initialize-Docker
+            $parameters = Get-InstallParameterSet (Initialize-Installed) $docker $null
+            $parameters.Port = $held
+            $me = (Get-Process -Id $PID).ProcessName
+            { Invoke-Install $parameters } | Should -Throw -ExpectedMessage (
+                "TESTDB_PORT_BOUND: 127.0.0.1:$held is already bound by $me (pid $PID), so corvis-fleet-testdb cannot be published there")
+        } finally {
+            $listener.Stop()
+        }
+    }
+    It 'refuses a container that came up anywhere but the declared port' {
+        $docker = Initialize-Docker -RunPort '0.0.0.0:15432'
+        { Invoke-Install (Get-InstallParameterSet (Initialize-Installed) $docker $null) } |
+            Should -Throw -ExpectedMessage "TESTDB_NOT_ON_DECLARED_PORT: corvis-fleet-testdb is published on '0.0.0.0:15432', not 127.0.0.1:15432"
     }
     It 'leaves an unpacked client, a PATH that has it and an existing container as they are, and verifies them' {
         $root = Initialize-Installed
@@ -168,7 +219,7 @@ Describe 'install-windows-testdb' {
         $env:PATH = "$env:PATH;$(Join-Path $root 'bin')"
         $before = $env:PATH
         $said = @(Invoke-Install (Get-InstallParameterSet $root $docker $null))
-        $said | Should -Be @('fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:49157, 0 volume mounts')
+        $said | Should -Be @('fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
         $env:PATH | Should -BeExactly $before
         [System.IO.File]::ReadAllLines($docker.Calls) | Should -Be @(
             'ps -aq --filter "name=^corvis-fleet-testdb$"', 'port corvis-fleet-testdb 5432/tcp',
@@ -198,11 +249,6 @@ Describe 'install-windows-testdb' {
             "TESTDB_DOCKER_FAILED: docker --config `"$anonymous`" pull pgvector/pgvector:pg16-bookworm exited 1: error getting credentials*")
         Test-Path -LiteralPath (Join-Path $docker.Directory 'exists') | Should -BeFalse
     }
-    It 'refuses a container published off loopback' {
-        $docker = Initialize-Docker -Exists -Port '0.0.0.0:49157'
-        { Invoke-Install (Get-InstallParameterSet (Initialize-Installed) $docker $null) } |
-            Should -Throw -ExpectedMessage "TESTDB_NOT_LOOPBACK: corvis-fleet-testdb is published on '0.0.0.0:49157', not loopback"
-    }
     It 'refuses a container whose data is on a volume' {
         $docker = Initialize-Docker -Exists -Mounts '1'
         { Invoke-Install (Get-InstallParameterSet (Initialize-Installed) $docker $null) } |
@@ -215,7 +261,7 @@ Describe 'install-windows-testdb' {
         $parameters.ReadySeconds = 2
         $parameters.Sleep = { $sleeps.Add(1) }.GetNewClosure()
         { Invoke-Install $parameters } |
-            Should -Throw -ExpectedMessage 'TESTDB_NOT_READY: corvis-fleet-testdb not accepting on 127.0.0.1:49157 after 2 s'
+            Should -Throw -ExpectedMessage 'TESTDB_NOT_READY: corvis-fleet-testdb not accepting on 127.0.0.1:15432 after 2 s'
         $sleeps.Count | Should -Be 2
         @([System.IO.File]::ReadAllLines((Join-Path $root 'bin\isready.calls.txt'))).Count | Should -Be 3
     }

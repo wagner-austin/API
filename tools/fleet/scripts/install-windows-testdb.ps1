@@ -16,11 +16,25 @@
     tag on its next tick.
 
     THE CONTAINER IS MCPs' DEFINITION, scripts/host/lib/fleet-testdb.sh:
-    pgvector/pgvector:pg16-bookworm, published on a loopback port Docker
-    picks, its data on a 4 GB tmpfs so a restart empties it and no anonymous
-    volume leaks, and only the throwaway roles ci-bootstrap-testdb.sh
-    creates. An existing container is left as it is and verified, so a rerun
-    is the audit: loopback only, no volume mount, accepting connections.
+    pgvector/pgvector:pg16-bookworm, published on 127.0.0.1:15432, its data
+    on a 4 GB tmpfs so a restart empties it and no anonymous volume leaks,
+    and only the throwaway roles ci-bootstrap-testdb.sh creates. An existing
+    container on that port is left as it is and verified, so a rerun is the
+    audit: the declared loopback port, no volume mount, accepting connections.
+
+    THE PORT IS FIXED, NOT DOCKER'S PICK (MCPs board task c6fe2fe3). Until
+    2026-10-10 the container was published on 127.0.0.1::5432, a port the
+    daemon picked from the ephemeral range, and on lavender-wsl the docker
+    rehearsal lane's rootless daemon picked the same port for its postgres
+    (fleet job fe97a17a). 15432 is below Linux's range (32768 to 60999) and
+    Windows's dynamic range (49152 to 65535), so no allocator hands it out;
+    MCPs packages/maketools fleet/test_database.py declares the same number
+    as TESTDB_PORT and refuses a container published anywhere else. So a
+    container found on another port is removed and created again (it is
+    disposable: tmpfs data, throwaway roles), and before a create the port
+    is read for a listener: one already bound is refused by name with the
+    port and the owning process, instead of a docker run that fails on
+    'address already in use' and says nothing about who holds it.
 
     THE CLIENT TOOLS ARE EDB's BINARIES ZIP, PINNED BY ITS SHA256, and only
     its pgsql/bin entries are unpacked: testdb-setup.sh calls pg_isready and
@@ -64,6 +78,15 @@
 .PARAMETER Image
     The container's image.
 
+.PARAMETER Port
+    The loopback port the container publishes 5432 on, the fleet's one
+    declared test database port.
+
+.PARAMETER Listener
+    Reads the process listening on a loopback port, as its name and pid, or
+    $null when the port is free. The default asks Windows through
+    Get-NetTCPConnection; the test hands in a stand-in.
+
 .PARAMETER ReadySeconds
     How long a container may take to accept connections.
 
@@ -83,6 +106,15 @@ param(
     [string]$Docker = "$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe",
     [string]$Container = 'corvis-fleet-testdb',
     [string]$Image = 'pgvector/pgvector:pg16-bookworm',
+    [int]$Port = 15432,
+    [scriptblock]$Listener = {
+        param([int]$LocalPort)
+        $bound = @(Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $LocalPort -State Listen -ErrorAction SilentlyContinue)
+        if ($bound.Count -eq 0) { return $null }
+        $owner = Get-Process -Id $bound[0].OwningProcess -ErrorAction SilentlyContinue
+        $name = if ($null -eq $owner) { 'an unnamed process' } else { $owner.ProcessName }
+        return "$name (pid $($bound[0].OwningProcess))"
+    },
     [int]$ReadySeconds = 60,
     [scriptblock]$Sleep = { Start-Sleep -Seconds 1 },
     [System.EnvironmentVariableTarget]$PathScope = 'User'
@@ -149,21 +181,38 @@ if ($parts -notcontains $bin) {
     Write-Output "fleet-testdb: added $bin to the $PathScope PATH"
 }
 
-if (@(Invoke-Docker $Docker "ps -aq --filter `"name=^$Container$`"").Count -eq 0) {
+$declared = "127.0.0.1:$Port"
+$exists = @(Invoke-Docker $Docker "ps -aq --filter `"name=^$Container$`"").Count -gt 0
+$published = ''
+if ($exists) {
+    $published = [string](@(Invoke-Docker $Docker "port $Container 5432/tcp") | Select-Object -First 1)
+    if ($published -ne $declared) {
+        # A container from before the fixed port, or a stopped one publishing
+        # nothing: disposable, so it is removed and created again below.
+        [void](Invoke-Docker $Docker "rm -f $Container")
+        Write-Output "fleet-testdb: removed $Container published on '$published', not $declared"
+        $exists = $false
+    }
+}
+if (-not $exists) {
+    $holder = & $Listener $Port
+    if ($null -ne $holder) {
+        throw "TESTDB_PORT_BOUND: $declared is already bound by $holder, so $Container cannot be published there"
+    }
     $anonymous = Join-Path $Root 'docker-anonymous'
     [void][System.IO.Directory]::CreateDirectory($anonymous)
     [System.IO.File]::WriteAllText((Join-Path $anonymous 'config.json'), '{}')
     [void](Invoke-Docker $Docker "--config `"$anonymous`" pull $Image" "set `"PATH=$env:SystemRoot\System32`" && ")
     [void](Invoke-Docker $Docker ("run -d --name $Container --label corvis.role=fleet-testdb " +
-            "--restart unless-stopped -p 127.0.0.1::5432 " +
+            "--restart unless-stopped -p ${declared}:5432 " +
             "--tmpfs /var/lib/postgresql/data:rw,size=4g -e POSTGRES_PASSWORD=postgres $Image"))
-    Write-Output "fleet-testdb: created $Container"
+    Write-Output "fleet-testdb: created $Container on $declared"
+    $published = [string](@(Invoke-Docker $Docker "port $Container 5432/tcp") | Select-Object -First 1)
 }
-$published = [string](@(Invoke-Docker $Docker "port $Container 5432/tcp") | Select-Object -First 1)
-if (-not ($published -match '^127\.0\.0\.1:(\d+)$')) {
-    throw "TESTDB_NOT_LOOPBACK: $Container is published on '$published', not loopback"
+if ($published -ne $declared) {
+    throw "TESTDB_NOT_ON_DECLARED_PORT: $Container is published on '$published', not $declared"
 }
-$port = $Matches[1]
+$port = $Port
 $mounts = [string](@(Invoke-Docker $Docker "inspect $Container --format `"{{len .Mounts}}`"") | Select-Object -First 1)
 if ($mounts -ne '0') {
     throw "TESTDB_HAS_VOLUME: $Container has $mounts volume mount(s); the data must be tmpfs"
