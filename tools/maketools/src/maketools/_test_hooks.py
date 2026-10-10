@@ -34,6 +34,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final, Protocol
 
+from platform_core.process_job import JobApi, kernel32_job_api
+
 from maketools.commands import (
     CommandResult,
     RunCapturingProtocol,
@@ -41,7 +43,6 @@ from maketools.commands import (
     RunInheritingProtocol,
 )
 from maketools.concurrent_children import run_children_concurrently
-from maketools.job import JobApi, kernel32_job_api
 from maketools.processes import (
     LINUX_PROC_ROOT,
     ProcessRow,

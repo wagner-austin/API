@@ -9,7 +9,7 @@ so a Linux node can run the same ``make check``.
 WHAT THIS ADDS OVER THE INLINE RECIPE
 
 1. KILL-ON-CLOSE. On Windows the launcher joins a job object before it
-   spawns anything (:mod:`maketools.job`), so the whole tree dies with it.
+   spawns anything (:mod:`platform_core.process_job`), so the whole tree dies with it.
    On POSIX the suite starts in its own session and the launcher reaps its
    descendants on the way out; a launcher killed with ``SIGKILL`` cannot,
    and the pre-run sweep is what cleans that up next time.
@@ -45,8 +45,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
+from platform_core.process_job import join_kill_on_close_job
+
 from maketools import _test_hooks, reap
-from maketools.job import join_kill_on_close_job
 from maketools.venvs import venv_executable
 
 

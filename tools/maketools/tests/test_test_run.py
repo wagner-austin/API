@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from platform_core.testing_process_job import FakeJobApi
+
 from maketools.test_run import (
     NO_WORKER_RESTART,
     PYTEST_ARGV,
@@ -11,7 +13,7 @@ from maketools.test_run import (
     remove_run_files,
     run_tests,
 )
-from tests.conftest import FakeJobApi, World, row
+from tests.conftest import World, row
 
 
 def test_coverage_arguments_name_only_the_roots_that_exist(tmp_path: Path) -> None:
