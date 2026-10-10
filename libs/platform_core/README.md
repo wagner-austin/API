@@ -494,6 +494,24 @@ member = decode_sweep_member(
 assert encode_sweep_member(member)["artifact"] == "/r/s0.json"
 ```
 
+## Process Ownership
+
+A process that will spawn workers claims ownership of them BEFORE creating
+any, so that whoever later kills it can remove the whole tree. The two
+platforms do this differently and each has its own module; the test
+launcher in `tools/maketools` and the calibration candidate in
+`services/handwriting-ai` both use them (board task 49899fd2).
+
+| Module | Holds |
+|--------|-------|
+| `platform_core.process_job` | Windows: `join_kill_on_close_job(api)` puts this process in a kill-on-close job object every descendant inherits; `kernel32_job_api()` is the real binding and raises `OSError` off Windows |
+| `platform_core.process_group` | POSIX: `isolate_in_new_group(api)` makes this process a session and group leader, `kill_group(api, pgid)` sends `SIGKILL` to the group and reads an empty group as a completed sweep; `libc_group_api()` is the real binding and raises `OSError` on Windows |
+| `platform_core.testing_process_job`, `platform_core.testing_process_group` | `FakeJobApi` and `FakeGroupApi`, recording fakes whose answers a consumer's test configures |
+
+Each decision function returns the empty string on success or one sentence
+naming the call that failed and its error; the caller decides what refusing
+to start means for it.
+
 ## API Reference
 
 ### Error Types
