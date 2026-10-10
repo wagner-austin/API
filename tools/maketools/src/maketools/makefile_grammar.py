@@ -247,13 +247,20 @@ def expected_include(depth: int) -> str:
 def recipe_body(line: str) -> str:
     """The command of a recipe line, without make's own prefixes.
 
+    GNU make, 3.81 and 4.4.1 alike, skips ``@``, ``-``, ``+`` and blanks in
+    any order before it reads the command, so ``+echo 'x'`` and
+    ``@ -echo x`` reach the shell, or 3.81's CreateProcess, as ``echo ...``;
+    stripping only ``@`` and ``-`` once let both past every ``^`` rule
+    (MCPs board task 97a9e387).
+
     Args:
         line: A line beginning with a tab.
 
     Returns:
-        The line with the tab and any leading ``@`` / ``-`` stripped.
+        The line with the tab and its whole run of ``@``, ``-``, ``+`` and
+        blanks stripped, and trailing whitespace too.
     """
-    return line[1:].lstrip("@-").strip()
+    return line[1:].lstrip("@-+ \t").strip()
 
 
 def check_recipe_line(path: Path, line_number: int, line: str) -> list[Violation]:
