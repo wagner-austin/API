@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from platform_core.config import _test_hooks as config_env
 
 from art_trainer.core.services.captioning import _test_hooks
 from art_trainer.core.services.captioning.backends import CaptionBackendError, CaptionBackendType
@@ -365,18 +366,22 @@ def test_openai_captioner_real_imports_client(tmp_path: Path) -> None:
     assert error_type not in ("ModuleNotFoundError", "ImportError")
 
 
+@pytest.mark.skipif(
+    config_env.get_env("OPENAI_LIVE") != "1",
+    reason="live OpenAI API test; set OPENAI_LIVE=1 with a valid OPENAI_API_KEY",
+)
 def test_openai_captioner_integration_real_api(tmp_path: Path) -> None:
     """Integration test: OpenAICaptioner with real OpenAI API.
 
-    This test calls the real OpenAI API without hooks.
-    Requires OPENAI_API_KEY in settings.
+    This test calls the real OpenAI API without hooks. OPT-IN, because it
+    needs a valid key AND the network: it used to run whenever settings
+    carried any key, so the gate's verdict depended on the machine's secrets.
+    Fleet job 7bf09cf7 on sedona (MCPs board task b1089284, 2026-10-11) found
+    an invalid key in that node's environment and failed with a 401.
     """
     from platform_core.config.art_trainer import load_settings
 
-    settings = load_settings()
-    api_key = settings["app"]["openai_api_key"]
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY not set in settings")
+    api_key = load_settings()["app"]["openai_api_key"]
 
     # No hooks set - uses real API
     captioner = OpenAICaptioner(model_name="gpt-4o-mini", api_key=api_key)
