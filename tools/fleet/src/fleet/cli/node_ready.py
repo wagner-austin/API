@@ -166,12 +166,14 @@ def tick_load(state: NodeState) -> TickLoad:
         state: What the node reported this tick.
 
     Returns:
-        Its live runs and their workers, and its free memory.
+        Its live runs and their workers, its free memory and the free space
+        on its staging drive.
     """
     return TickLoad(
         runs=state["live"]["runs"],
         workers=state["live"]["workers"],
         free_ram_gb=state["free_ram_gb"],
+        free_disk_gb=state["free_disk_gb"],
     )
 
 

@@ -7,8 +7,8 @@ out why each node took nothing meant reading seven logs. The runner now
 sends this record through MCPs ``dispatch_tick`` at the end of every tick,
 which keeps one row per runner (MCPs mig 640), and ``fleet_status`` renders
 them node by node: the tags its probe detected, the runs and workers it
-holds, its free memory, the projects it could launch and why it is or is not
-claiming.
+holds, its free memory and free disk (MCPs board task b109a596), the
+projects it could launch and why it is or is not claiming.
 """
 
 from __future__ import annotations
@@ -37,11 +37,15 @@ class TickLoad(TypedDict):
         runs: The fleet runs live on it.
         workers: The workers those runs were granted.
         free_ram_gb: The memory its capacity probe read free.
+        free_disk_gb: The space its capacity probe read free on the node's
+            staging drive (MCPs board task b109a596, A1): the operator, by
+            text on 2026-10-03, "howcome you can't see the pcs?".
     """
 
     runs: int
     workers: int
     free_ram_gb: float
+    free_disk_gb: float
 
 
 class RunnerTick(TypedDict):
@@ -92,6 +96,7 @@ def encode_runner_tick(tick: RunnerTick) -> JSONObject:
             "runs": load["runs"],
             "workers": load["workers"],
             "freeRamGb": load["free_ram_gb"],
+            "freeDiskGb": load["free_disk_gb"],
         }
     return encoded
 
@@ -120,6 +125,7 @@ def decode_runner_tick(value: JSONValue) -> RunnerTick:
             runs=require_int(raw_load, "runs"),
             workers=require_int(raw_load, "workers"),
             free_ram_gb=require_float(raw_load, "freeRamGb"),
+            free_disk_gb=require_float(raw_load, "freeDiskGb"),
         )
     return RunnerTick(
         node=require_str(value, "node"),
