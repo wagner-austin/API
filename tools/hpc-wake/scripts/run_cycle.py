@@ -168,6 +168,29 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         ),
         "cwd": "..\\lock-wake",
     },
+    # lock-wake-diphtheria-actions (MCPs board task b00ab472): diphtheria's
+    # action journal -> board, the remote half of the lock-wake row's
+    # --action-journal. Every MCPs command run there that changes state and
+    # takes no lock journals beside the fleet journal (its 42 lines on
+    # 2026-10-11 were a deploy's prebuild steps), and an action that failed
+    # or was refused is posted under ACTIONS tagging who ran it, on the same
+    # standing task. It went live with no seeded cursor because none of
+    # those lines failed, so reading from byte 0 announced nothing.
+    # Its cursor is .action-events.jsonl.lock-wake-diphtheria-offset.json in
+    # the same clone root, under that root's /.action-events.jsonl.* ignore.
+    {
+        "name": "lock-wake-diphtheria-actions",
+        "args": (
+            "poetry",
+            "run",
+            "lock-wake",
+            "--remote-action-journal",
+            "diphtheria:/home/corvis/PROJECTS/MCPs/.action-events.jsonl",
+            "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ),
+        "cwd": "..\\lock-wake",
+    },
     # rcs-pair-watch (MCPs board task 21366226): rcs-bridge's log -> one
     # re-pair. When bridge.log carries RCS_BRIDGE_SESSION_LOST or
     # RCS_BRIDGE_LOGGED_OUT from the last ten minutes, MCPs' maketools runs
