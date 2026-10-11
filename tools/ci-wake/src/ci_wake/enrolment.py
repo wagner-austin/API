@@ -86,10 +86,16 @@ class PushAttempt(TypedDict):
         repo: ``owner/name`` as GitHub spells it -- the address the Actions
             API is queried under, not a local remote alias, because two
             machines can name one remote differently and the API cannot.
-        sha: The full 40-character commit sha the push would land.
-        ref: The ref being pushed, e.g. ``refs/heads/main``. Recorded but
-            never queried on: a run is found by head sha, and the ref is
-            here so a person reading the file can see what a stray row was.
+        sha: The full 40-character sha of the COMMIT the push would land:
+            for an annotated tag, the commit it points to, not the tag
+            object git hands the hook (:mod:`ci_wake.pushed_commit`).
+        ref: The ref the push updates on the remote, e.g.
+            ``refs/heads/main``, which decided whether it was enrolled at
+            all (:mod:`ci_wake.workflow_triggers`). Never queried on
+            afterwards: a run is found by head sha, and the ref is here so
+            a person reading the file can see what a stray row was. Rows
+            written before MCPs board task 24547f50 carry git's local ref,
+            usually ``HEAD``, which is why it is not re-validated on read.
         agent: The pushing session's board label as the board binds it,
             resolved by :mod:`platform_core.session_label` (MCPs board
             task 3843d29f), or the empty string when the session has none.
@@ -180,6 +186,27 @@ def require_sha(value: str) -> str:
     """
     if _SHA.match(value) is None:
         raise _refuse("--sha", value, "a full 40-character lowercase commit sha")
+    return value
+
+
+def require_ref(value: str) -> str:
+    """Validate the ref a push updates on the remote.
+
+    Args:
+        value: The candidate, as the ``--ref`` flag supplied it.
+
+    Returns:
+        The value unchanged.
+
+    Raises:
+        AppError: ``ENROLMENT_FIELD_MALFORMED`` when it is not a full ref
+            under ``refs/``. The hook must hand git's REMOTE ref (MCPs
+            board task 24547f50): the local one is ``HEAD`` for a worktree
+            publish, which names no branch a workflow's trigger could admit,
+            and judging by it would drop that push without a word.
+    """
+    if not value.startswith("refs/") or value == "refs/":
+        raise _refuse("--ref", value, "a full remote ref such as refs/heads/main")
     return value
 
 
@@ -336,6 +363,7 @@ __all__ = [
     "latest_attempts",
     "read_attempts",
     "require_agent",
+    "require_ref",
     "require_repository",
     "require_sha",
 ]

@@ -157,6 +157,86 @@ class FakeGh:
         return reply
 
 
+#: Lines 72 to 80 of MCPs's .github/workflows/check.yml at 4b4883ade (the
+#: commit the 2026-10-11 tag named), verbatim, then line 264's key, the
+#: next one at column zero: a push to main runs it, a tag does not.
+MCPS_CHECK: Final = """name: Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# One run per ref at a time. CANCELLATION IS OFF, and that is a
+concurrency:
+"""
+
+#: Lines 28 to 52 of MCPs's .github/workflows/check-live.yml at 4b4883ade,
+#: verbatim: comments inside the block, a schedule's sequence of mappings,
+#: path filters beside the branch filter, and an empty workflow_dispatch.
+MCPS_CHECK_LIVE: Final = """name: Check (live upstreams)
+
+on:
+  # UPSTREAMS CHANGE ON THEIR CLOCK. library.municode.com became a
+  # jurisdiction-blind SPA shell, and codelibrary.amlegal.com started
+  # 403ing one endpoint through the same TLS shape its siblings clear,
+  # with no commit here on either day. A push-only trigger would notice
+  # neither until somebody happened to touch a client.
+  schedule:
+    - cron: "17 11 * * *"
+  # And on any change that could break the wiring from this side: the
+  # clients, their suites, the precondition table and its census, the
+  # recipe, the vendored binaries, and this file.
+  push:
+    branches: [main]
+    paths:
+      - "mcp-shared/src/clients/**"
+      - "mcp-shared/tests/clients/**"
+      - "mcp-shared/Makefile"
+      - "vendor/curl-impersonate/**"
+      - ".github/workflows/check-live.yml"
+  workflow_dispatch:
+
+# One live run at a time, and a started one always finishes.
+#
+"""
+
+#: MCPs's two workflows at 4b4883ade, as git would list them.
+MCPS_WORKFLOWS: Final = {"check-live.yml": MCPS_CHECK_LIVE, "check.yml": MCPS_CHECK}
+
+#: The tag object the 2026-10-11 push of archive/dx-mod handed the hook.
+TAG_OBJECT: Final = "611e26a3cade388a645989338fae0d1524fc8dbf"
+
+
+def git_replies(
+    pushed: str, commit: str, workflows: dict[str, str]
+) -> dict[tuple[str, ...], FakeCompleted]:
+    """Script git's answers for one pushed object and the workflows in its commit.
+
+    Args:
+        pushed: The sha the hook hands the enrolment.
+        commit: The commit it peels to (itself, for a commit).
+        workflows: File name under ``.github/workflows`` to its content.
+
+    Returns:
+        Replies for :class:`FakeGh`: the peel, the listing (each workflow a
+        blob whose id is its position, in git's sorted order) and each read.
+    """
+    names = sorted(workflows)
+    blobs = {name: f"{index + 1:040x}" for index, name in enumerate(names)}
+    listing = "".join(f"100644 blob {blobs[name]}\t.github/workflows/{name}\0" for name in names)
+    replies = {
+        ("git", "rev-parse", "--verify", f"{pushed}^{{commit}}"): FakeCompleted(
+            stdout=f"{commit}\n"
+        ),
+        ("git", "ls-tree", "-z", commit, "--", ".github/workflows/"): FakeCompleted(stdout=listing),
+    }
+    for name in names:
+        replies[("git", "cat-file", "blob", blobs[name])] = FakeCompleted(stdout=workflows[name])
+    return replies
+
+
 def make_attempt(*, sha: str = SHA, agent: str = AGENT, repo: str = REPO) -> PushAttempt:
     """Build one enrolment row.
 

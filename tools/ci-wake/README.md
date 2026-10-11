@@ -60,6 +60,19 @@ with six sessions at 2am.
                                         BOARD_AGENT_LABEL)              the pusher
 ```
 
+**Only a push some workflow will run is enrolled** (MCPs board task
+`24547f50`). The hook hands `ci-wake-enrol` the REMOTE ref the push updates;
+the enrolment asks git, in the repository being pushed, for the commit the
+pushed object names (an annotated tag's object is peeled to its commit,
+which is the `head_sha` a run carries) and reads every workflow in that
+commit's `.github/workflows`. When no workflow's `on.push` admits the ref,
+nothing is enrolled and the hook prints each workflow's trigger instead:
+on 2026-10-11 the tag `archive/dx-mod` was enrolled in MCPs, whose workflows
+run on `main` alone, and announced fifteen minutes later as NO RUN EVER
+APPEARED. Path filters are not judged at enrolment (see
+`workflow_triggers.py`), and a workflow whose `on:` the reader does not read
+refuses the push as `WORKFLOW_TRIGGER_UNREAD`, naming the file and line.
+
 ## One cycle
 
 ```bash
@@ -97,7 +110,8 @@ written, so the next cycle retries.
 
 `abandoned` and `stalled` are the states that make this a monitor rather than
 a nicety. A push git refused as non-fast-forward lands there, and so does a
-workflow whose path filters matched nothing, and so does an Actions outage —
+workflow whose path filters matched nothing (a ref no trigger admits at all
+is never enrolled), and so does an Actions outage —
 and the third is the one that already cost this workspace hours while every
 local check stayed green.
 

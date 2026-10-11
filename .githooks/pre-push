@@ -139,13 +139,18 @@ esac
 # process inherits this loop's stdin and consumes the lines for the tips
 # after the first, so a push of three branches would enrol one -- and the
 # two it dropped would look exactly like pushes nobody made.
-printf '%s\n' "$PUSH_INPUT" | while read -r local_ref local_sha _remote_ref _remote_sha; do
+#
+# THE REF IS THE REMOTE'S, NOT OURS (MCPs board task 24547f50). The
+# enrolment enrols a push only when a workflow's push trigger admits the
+# ref it updates, and git's local ref for a push of HEAD is HEAD, which
+# names no branch.
+printf '%s\n' "$PUSH_INPUT" | while read -r _local_ref local_sha remote_ref _remote_sha; do
     [ "$local_sha" = "$ZERO" ] && continue
     "$PYTHON" -m ci_wake.cli.enrol \
         --enrolment "$LEDGER" \
         --repo "$NWO" \
         --sha "$local_sha" \
-        --ref "$local_ref" < /dev/null
+        --ref "$remote_ref" < /dev/null
 done
 
 # The wiki mirror (MCPs board task 3952274e): every commit this push

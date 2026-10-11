@@ -24,10 +24,15 @@ Environment:
         to nobody. The same variable ``hpc3`` resolves when recording a
         submitter, so both bridges name the same session the same way.
 
-This command writes one line and exits. Inside a session it reaches the
-taskboard where the MCPs stack declares it to ask who the session is, and nothing else; it does
-not consult GitHub, and does not care whether the push it is recording will
-succeed -- see :mod:`ci_wake.enrolment` on why the record names an attempt.
+This command writes at most one line and exits. Inside a session it reaches
+the taskboard where the MCPs stack declares it to ask who the session is.
+It asks the repository being pushed, through git in the hook's directory,
+for the commit the pushed object names and the workflows in that commit,
+and records the push only when some workflow's push trigger admits the
+remote ref (MCPs board task 24547f50: a tag no workflow runs on was enrolled
+and announced as NO RUN EVER APPEARED). It does not consult GitHub, and does
+not care whether the push it is recording will succeed -- see
+:mod:`ci_wake.enrolment` on why the record names an attempt.
 """
 
 from __future__ import annotations
@@ -45,9 +50,12 @@ from ci_wake.enrolment import (
     PushAttempt,
     append_attempt,
     require_agent,
+    require_ref,
     require_repository,
     require_sha,
 )
+from ci_wake.pushed_commit import WORKFLOWS_DIR, peel_commit, read_workflows
+from ci_wake.workflow_triggers import admits, describe
 
 ENROLMENT_FLAG = "--enrolment"
 REPO_FLAG = "--repo"
@@ -60,6 +68,9 @@ ALLOWED_FLAGS = (ENROLMENT_FLAG, REPO_FLAG, SHA_FLAG, REF_FLAG)
 def main(argv: Sequence[str]) -> int:
     """Append one enrolment row for the push named on the command line.
 
+    Or none, saying so with every workflow it read, when no workflow in the
+    pushed commit starts for the remote ref.
+
     Args:
         argv: Arguments excluding the program name.
 
@@ -68,8 +79,11 @@ def main(argv: Sequence[str]) -> int:
         fails the push rather than printing a status line nobody reads.
 
     Raises:
-        AppError: ``ENROLMENT_FIELD_MALFORMED`` when the repository, sha or
-            resolved agent label cannot address anything;
+        AppError: ``ENROLMENT_FIELD_MALFORMED`` when the repository, sha,
+            ref or resolved agent label cannot address anything;
+            ``PUSHED_COMMIT_UNREADABLE`` when git cannot peel the pushed
+            object or read its workflows; ``WORKFLOW_TRIGGER_UNREAD`` when
+            a workflow's ``on:`` is in a shape the reader does not read;
             ``SESSION_LABEL_MISMATCH`` when the shell's label is not the one
             the board bound to the acting session; ``SESSION_ID_MALFORMED``,
             ``STACK_ENDPOINT_UNDECLARED`` or
@@ -80,17 +94,34 @@ def main(argv: Sequence[str]) -> int:
         OSError: The enrolment record cannot be written.
     """
     parsed = cli_args.parse_single_flags(argv, ALLOWED_FLAGS)
-    label = resolve_label(
-        session_id=_optional_env_str(SESSION_ID_VARIABLE),
-        exported=_optional_env_str(LABEL_VARIABLE),
-        read_text=_test_hooks.read_text,
-        post=_test_hooks.http_post,
+    agent = require_agent(
+        resolve_label(
+            session_id=_optional_env_str(SESSION_ID_VARIABLE),
+            exported=_optional_env_str(LABEL_VARIABLE),
+            read_text=_test_hooks.read_text,
+            post=_test_hooks.http_post,
+        )
     )
+    repo = require_repository(cli_args.require_flag(parsed, REPO_FLAG))
+    ref = require_ref(cli_args.require_flag(parsed, REF_FLAG))
+    commit = peel_commit(require_sha(cli_args.require_flag(parsed, SHA_FLAG)))
+    workflows = read_workflows(commit)
+    starts = [w.name for w in workflows if w.push is not None and admits(w.push, ref)]
+    read = f"{len(starts)} of {len(workflows)} workflow(s) in {WORKFLOWS_DIR}"
+    if not starts:
+        triggers = "; ".join(describe(workflow) for workflow in workflows)
+        _test_hooks.emit(
+            f"ci-wake: {ref} at {commit[:7]} starts no workflow, so no run will ever exist "
+            f"for it: {read} admit it"
+            + (f" ({triggers})" if triggers else "")
+            + "; nothing to enrol"
+        )
+        return 0
     record = PushAttempt(
-        repo=require_repository(cli_args.require_flag(parsed, REPO_FLAG)),
-        sha=require_sha(cli_args.require_flag(parsed, SHA_FLAG)),
-        ref=cli_args.require_flag(parsed, REF_FLAG),
-        agent=require_agent(label),
+        repo=repo,
+        sha=commit,
+        ref=ref,
+        agent=agent,
         attempted_unix=_test_hooks.now(),
     )
     append_attempt(pathlib.Path(cli_args.require_flag(parsed, ENROLMENT_FLAG)), record)
@@ -101,6 +132,7 @@ def main(argv: Sequence[str]) -> int:
             if record["agent"] != ""
             else f"nobody (no ${LABEL_VARIABLE} and no board binding)"
         )
+        + f"; {ref} starts {', '.join(starts)} ({read})"
     )
     return 0
 

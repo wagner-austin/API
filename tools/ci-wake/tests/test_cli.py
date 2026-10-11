@@ -40,7 +40,41 @@ from ci_wake import _test_hooks
 from ci_wake.cli import enrol as enrol_cli
 from ci_wake.cli import wake as wake_cli
 from ci_wake.enrolment import read_attempts
-from tests.conftest import AGENT, CONFIGURED_ENV, FROZEN_NOW, REPO, SHA, FakeGh, pin_env
+from tests.conftest import (
+    AGENT,
+    CONFIGURED_ENV,
+    FROZEN_NOW,
+    MCPS_WORKFLOWS,
+    REPO,
+    SHA,
+    TAG_OBJECT,
+    FakeGh,
+    git_replies,
+    pin_env,
+)
+
+#: What every enrolment of :func:`_enrol_argv`'s push adds: the ref, the
+#: workflows that start for it, and how many were read.
+STARTS = (
+    "; refs/heads/main starts check-live.yml, check.yml (2 of 2 workflow(s) in .github/workflows)"
+)
+
+
+@pytest.fixture(autouse=True)
+def _mcps_git() -> FakeGh:
+    """Answer git as MCPs at a commit carrying its two workflows would.
+
+    Every enrolment asks the pushed repository for the commit and its
+    workflows; a case about the push's other fields gets this answer, and a
+    case about the workflows binds its own.
+
+    Returns:
+        The runner, whose calls a case may read.
+    """
+    gh = FakeGh(git_replies(SHA, SHA, MCPS_WORKFLOWS))
+    _test_hooks.run_process = gh
+    return gh
+
 
 #: The session of the 20:38Z case (MCPs board task 3843d29f).
 SESSION = "4f8a2c1e-9b3d-4e7f-8a6b-1c2d3e4f5a6b"
@@ -136,7 +170,7 @@ class TestEnrolMain:
         assert rows[0]["ref"] == "refs/heads/main"
         assert rows[0]["agent"] == AGENT
         assert rows[0]["attempted_unix"] == FROZEN_NOW
-        assert emitted == [f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{AGENT}"]
+        assert emitted == [f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{AGENT}{STARTS}"]
 
     def test_a_push_with_no_label_is_recorded_unaddressed_rather_than_refused(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
@@ -152,7 +186,7 @@ class TestEnrolMain:
         assert read_attempts(path)[0]["agent"] == ""
         assert emitted == [
             f"ci-wake: enrolled {SHA[:7]} in {REPO} for nobody "
-            f"(no ${LABEL_VARIABLE} and no board binding)"
+            f"(no ${LABEL_VARIABLE} and no board binding){STARTS}"
         ]
 
     def test_inside_a_session_an_unset_label_is_filled_from_the_boards_binding(
@@ -165,7 +199,7 @@ class TestEnrolMain:
         assert enrol_cli.main(_enrol_argv(path)) == 0
 
         assert read_attempts(path)[0]["agent"] == BOUND
-        assert emitted == [f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{BOUND}"]
+        assert emitted == [f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{BOUND}{STARTS}"]
         assert read == [STACK_ENDPOINTS_PATH, STACK_ENV_PATH]
         assert post.urls == [DECLARED_TASKBOARD_URL]
         assert post.headers[0]["x-api-key"] == "internal-key"
@@ -263,6 +297,88 @@ class TestEnrolMain:
 
         with pytest.raises(AppError):
             enrol_cli.main(argv)
+
+    def test_a_tag_no_workflow_runs_on_is_not_enrolled_and_says_why(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        """The 2026-10-11 push (MCPs board task 24547f50): the annotated tag
+        archive/dx-mod, whose object git handed the hook, over a commit whose
+        two workflows run on pushes to main alone."""
+        pin_env({LABEL_VARIABLE: AGENT})
+        gh = FakeGh(git_replies(TAG_OBJECT, SHA, MCPS_WORKFLOWS))
+        _test_hooks.run_process = gh
+        path = tmp_path / "pushes.jsonl"
+        argv = _enrol_argv(path)
+        argv[argv.index(enrol_cli.SHA_FLAG) + 1] = TAG_OBJECT
+        argv[argv.index(enrol_cli.REF_FLAG) + 1] = "refs/tags/archive/dx-mod"
+
+        assert enrol_cli.main(argv) == 0
+
+        assert read_attempts(path) == ()
+        assert emitted == [
+            f"ci-wake: refs/tags/archive/dx-mod at {SHA[:7]} starts no workflow, so no run will "
+            "ever exist for it: 0 of 2 workflow(s) in .github/workflows admit it "
+            "(check-live.yml: push on branches main; check.yml: push on branches main); "
+            "nothing to enrol"
+        ]
+        assert gh.calls[0] == ("git", "rev-parse", "--verify", f"{TAG_OBJECT}^{{commit}}")
+
+    def test_a_tag_a_workflow_runs_on_is_enrolled_under_its_commit(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        """This repository's packages.yml runs for every tag, so the same
+        push here has a run, and that run's head_sha is the commit."""
+        pin_env({LABEL_VARIABLE: AGENT})
+        _test_hooks.run_process = FakeGh(
+            git_replies(TAG_OBJECT, SHA, {"packages.yml": "on:\n  push:\n  pull_request:\n"})
+        )
+        path = tmp_path / "pushes.jsonl"
+        argv = _enrol_argv(path)
+        argv[argv.index(enrol_cli.SHA_FLAG) + 1] = TAG_OBJECT
+        argv[argv.index(enrol_cli.REF_FLAG) + 1] = "refs/tags/v1"
+
+        assert enrol_cli.main(argv) == 0
+
+        rows = read_attempts(path)
+        assert [(row["sha"], row["ref"]) for row in rows] == [(SHA, "refs/tags/v1")]
+        assert emitted == [
+            f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{AGENT}; refs/tags/v1 starts "
+            "packages.yml (1 of 1 workflow(s) in .github/workflows)"
+        ]
+
+    def test_a_commit_with_no_workflows_is_not_enrolled(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        pin_env({})
+        _test_hooks.run_process = FakeGh(git_replies(SHA, SHA, {}))
+        path = tmp_path / "pushes.jsonl"
+
+        assert enrol_cli.main(_enrol_argv(path)) == 0
+
+        assert read_attempts(path) == ()
+        assert emitted == [
+            f"ci-wake: refs/heads/main at {SHA[:7]} starts no workflow, so no run will ever "
+            "exist for it: 0 of 0 workflow(s) in .github/workflows admit it; nothing to enrol"
+        ]
+
+    def test_git_s_local_ref_is_refused_before_git_is_asked(
+        self, tmp_path: pathlib.Path, emitted: list[str], _mcps_git: FakeGh
+    ) -> None:
+        """A hook still handing git's local ref would hand HEAD for every
+        worktree publish, and judging HEAD would drop each of them unsaid."""
+        pin_env({})
+        argv = _enrol_argv(tmp_path / "pushes.jsonl")
+        argv[argv.index(enrol_cli.REF_FLAG) + 1] = "HEAD"
+
+        with pytest.raises(AppError) as caught:
+            enrol_cli.main(argv)
+
+        assert caught.value.code is CiWakeErrorCode.ENROLMENT_FIELD_MALFORMED
+        assert caught.value.message.startswith(
+            "--ref 'HEAD' is not a full remote ref such as refs/heads/main;"
+        )
+        assert _mcps_git.calls == []
+        assert emitted == []
 
     def test_a_missing_flag_refuses(self, tmp_path: pathlib.Path) -> None:
         pin_env({})

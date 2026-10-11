@@ -109,13 +109,20 @@ def _default_run_process(args: Sequence[str], *, timeout: int) -> CompletedProto
         args: The full argument vector, program first.
         timeout: Seconds before the process is killed.
 
+    Decoded as UTF-8, never the locale's codepage: ``gh`` writes UTF-8, and
+    so does ``git cat-file`` for a workflow saved as UTF-8, which Windows'
+    cp1252 would mangle, or refuse at a byte it leaves undefined (MCPs board
+    task 24547f50).
+
     Returns:
         The finished process, whatever its status.
 
     Raises:
         subprocess.TimeoutExpired: When it outlasts ``timeout``.
     """
-    return subprocess.run(list(args), capture_output=True, text=True, timeout=timeout, check=False)
+    return subprocess.run(
+        list(args), capture_output=True, encoding="utf-8", timeout=timeout, check=False
+    )
 
 
 class ReadTextProtocol(Protocol):

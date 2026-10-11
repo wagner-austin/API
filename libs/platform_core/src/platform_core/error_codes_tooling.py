@@ -325,6 +325,20 @@ class CiWakeErrorCode(ErrorCodeBase):
     # minutes later that cannot say whose push it was.
     ENROLMENT_FIELD_MALFORMED = "ENROLMENT_FIELD_MALFORMED"
 
+    # git could not peel the pushed object to a commit, or could not list or
+    # read the workflows in it (MCPs board task 24547f50). Whether a run can
+    # exist for a push is read from that commit's own workflows, so a push
+    # whose commit cannot be read cannot be judged, and is refused rather
+    # than enrolled blind or skipped.
+    PUSHED_COMMIT_UNREADABLE = "PUSHED_COMMIT_UNREADABLE"
+
+    # A workflow's ``on:`` block is written in a shape the trigger reader
+    # does not read: a flow mapping, a key GitHub's push filter does not
+    # define, a pattern operator beyond ``*`` and ``**``. Named with the file
+    # and line, because a reader that skipped what it could not read would
+    # decide "no workflow runs" for exactly the workflow it never read.
+    WORKFLOW_TRIGGER_UNREAD = "WORKFLOW_TRIGGER_UNREAD"
+
 
 class LockWakeErrorCode(ErrorCodeBase):
     """Reading a fleet-lock journal that lives on another host.
