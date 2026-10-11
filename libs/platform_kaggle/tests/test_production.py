@@ -32,7 +32,8 @@ class TestGetKaggleApi:
         which is why this module's two lines were unreachable in CI and the
         whole suite died on `SystemExit: 1`.
 
-        So CI sets two dummy values and these lines run. The API call that
+        So the Makefile's ``test`` target sets two dummy values, on every
+        runner alike, and these lines run. The API call that
         needs a REAL key lives in the live test below, which does not run by
         default.
         """
