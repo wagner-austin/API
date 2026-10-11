@@ -850,21 +850,6 @@
         "companions": []
       }
     },
-    "MCPs/dx-mod": {
-      "worker_ram_gb": 0.5,
-      "minimum_workers": 2,
-      "expected_minutes": 10,
-      "required_tags": ["cxx"],
-      "source": {
-        "remote": "https://github.com/wagner-austin/MCPs.git",
-        "path": "dx-mod",
-        "install": [
-          {"phase": "install", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "install"]},
-          {"phase": "workspace-build", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "workspace-build"]}
-        ],
-        "companions": []
-      }
-    },
     "MCPs/embed-api": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 2,

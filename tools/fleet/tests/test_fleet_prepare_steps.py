@@ -52,8 +52,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # 54 since MCPs/sms-gateway joined (MCPs board task 1da15750); 55 since
     # MCPs/execution-testdb, the execution suite's testdb lane (MCPs board
     # task c04519f9, A2); 56 since MCPs/login-probe, the login real-use
-    # check (MCPs board task 2ce5fc24).
-    assert len(prepared) == 56
+    # check (MCPs board task 2ce5fc24); 55 since MCPs/dx-mod was archived
+    # (MCPs board task 5d8b114b).
+    assert len(prepared) == 55
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
