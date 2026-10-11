@@ -309,6 +309,78 @@
         "companions": []
       }
     },
+    "tools/board-watch": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/board-watch",
+        "install": [],
+        "companions": []
+      }
+    },
+    "tools/code-corpus": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/code-corpus",
+        "install": [],
+        "companions": []
+      }
+    },
+    "tools/code-style-eval": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/code-style-eval",
+        "install": [],
+        "companions": []
+      }
+    },
+    "tools/commit-scope": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/commit-scope",
+        "install": [],
+        "companions": []
+      }
+    },
+    "tools/fleet-health-wake": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/fleet-health-wake",
+        "install": [],
+        "companions": []
+      }
+    },
+    "tools/lock-wake": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 2,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/lock-wake",
+        "install": [],
+        "companions": []
+      }
+    },
     "tools/ps-harness": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 1,
@@ -378,6 +450,222 @@
         "companions": []
       }
     },
+    "libs/cleargbm": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": ["rust"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/cleargbm",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/cleargbm_rs": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": ["rust"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/cleargbm_rs",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/covenant_domain": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/covenant_domain",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/covenant_nn": {
+      "worker_ram_gb": 1.6,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": ["windows", "rust"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/covenant_nn",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/covenant_persistence": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/covenant_persistence",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_calendar": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_calendar",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_codebase": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_codebase",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_devpost": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_devpost",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_discord": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_discord",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_email": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_email",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_kaggle": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_kaggle",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_langid": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_langid",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_ml": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_ml",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_music": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_music",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_stt": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_stt",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_translate": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_translate",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/platform_workers": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_workers",
+        "install": [],
+        "companions": []
+      }
+    },
+    "libs/procart": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/procart",
+        "install": [],
+        "companions": []
+      }
+    },
     "services/Model-Trainer": {
       "worker_ram_gb": 1.1,
       "minimum_workers": 6,
@@ -422,6 +710,114 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "services/covenant-radar-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/Art-Trainer": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/Art-Trainer",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/data-bank-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/data-bank-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/github-stats-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/github-stats-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/handwriting-ai": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/handwriting-ai",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/music-wrapped-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/music-wrapped-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/opportunity-radar-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/opportunity-radar-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/qr-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/qr-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/transcript-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/transcript-api",
+        "install": [],
+        "companions": []
+      }
+    },
+    "services/turkic-api": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 10,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/turkic-api",
         "install": [],
         "companions": []
       }
@@ -495,6 +891,30 @@
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "clients/TankpitBot/web",
         "install": [{"phase": "install", "argv": ["npm", "ci", "--prefix", "clients/TankpitBot/web"]}],
+        "companions": []
+      }
+    },
+    "clients/DiscordBot": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "clients/DiscordBot",
+        "install": [],
+        "companions": []
+      }
+    },
+    "clients/OrderedKernels": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 2,
+      "expected_minutes": 16,
+      "required_tags": ["gpu"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "clients/OrderedKernels",
+        "install": [],
         "companions": []
       }
     },
