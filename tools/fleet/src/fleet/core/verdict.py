@@ -53,7 +53,13 @@ LOG_TAIL_LINES: Final = 1500
 #: own total, after any per-file lines.
 PASSED: Final[re.Pattern[str]] = re.compile(r"(\d+) passed")
 
-#: ``N failed``, the same two families.
+#: ``N failed``, the same two families, read only off the line that carries
+#: the passed total: both runners print the two counts on that one line
+#: (``Tests  2 failed | 885 passed (887)``, ``3 failed, 1166 passed in
+#: 12.3s``), and anywhere else in the tail a service's own log can say it.
+#: Read off the whole tail, MCPs/watcher's ``attempt 1/3 failed, retrying``
+#: made a run of 2312 passed and none failed read ``2312p/3f`` (FLEET-CHECK
+#: 0bce943c, colossus, 2026-10-11).
 FAILED: Final[re.Pattern[str]] = re.compile(r"(\d+) failed")
 
 #: pytest-cov's total row: ``TOTAL  5756  0  1526  0  100%`` (branches on)
@@ -123,26 +129,11 @@ class Verdict(TypedDict):
     run_id: str
 
 
-def _last_int(pattern: re.Pattern[str], text: str) -> int | None:
-    """The integer of the pattern's last match, or None.
-
-    Args:
-        pattern: A pattern with one integer group.
-        text: The transcript tail.
-
-    Returns:
-        The last match's integer, or None when the pattern is absent.
-    """
-    last: str | None = None
-    for match in pattern.finditer(text):
-        last = match.group(1)
-    if last is None:
-        return None
-    return int(last)
-
-
 def read_tests(tail: str) -> str:
     """Read the test counts off a transcript tail.
+
+    The passed total is the last ``N passed`` in the tail; the failed count
+    is read off that same line only (:data:`FAILED` says why).
 
     Args:
         tail: The transcript's last lines.
@@ -152,11 +143,15 @@ def read_tests(tail: str) -> str:
         failed count is zero: both runners print it only when non-zero),
         else ``unread``.
     """
-    passed = _last_int(PASSED, tail)
-    if passed is None:
+    totals: re.Match[str] | None = None
+    for match in PASSED.finditer(tail):
+        totals = match
+    if totals is None:
         return "unread"
-    failed = _last_int(FAILED, tail)
-    return f"{passed}p/{0 if failed is None else failed}f"
+    line_start = tail.rfind("\n", 0, totals.start()) + 1
+    line_end = tail.find("\n", totals.end())
+    failed = FAILED.search(tail, line_start, len(tail) if line_end == -1 else line_end)
+    return f"{totals.group(1)}p/{'0' if failed is None else failed.group(1)}f"
 
 
 def read_coverage(tail: str) -> str:

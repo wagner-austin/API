@@ -491,6 +491,29 @@ class TestReadingTheTail:
 
         assert verdict.read_tests(tail) == "42p/0f"
 
+    def test_a_service_log_line_saying_failed_is_not_the_failed_count(self) -> None:
+        """Lines 3562, 4156 and 4157 of colossus's
+        MCPs-watcher-colossus-1791760604.log (FLEET-CHECK 0bce943c, MCPs/watcher
+        at 4ae0ec95f, 2026-10-11), byte for byte: the http client's retry
+        warning, then vitest's two total lines. The run failed nothing, and
+        the verdict read ``2312p/3f`` off the warning's ``1/3 failed``."""
+        tail = (
+            '{"ts":"2026-10-11T23:18:22.497Z","svc":"watcher","tid":"-","rid":"-",'
+            '"msg":"warn [http-retry] GET http://127.0.0.1:45133/AgendaViewer.php: '
+            'attempt 1/3 failed, retrying: fetch failed: other side closed"}\n'
+            "\x1b[2m Test Files \x1b[22m \x1b[1m\x1b[32m220 passed"
+            "\x1b[39m\x1b[22m\x1b[90m (220)\x1b[39m\n"
+            "\x1b[2m      Tests \x1b[22m \x1b[1m\x1b[32m2312 passed"
+            "\x1b[39m\x1b[22m\x1b[90m (2312)\x1b[39m\n"
+        )
+
+        assert verdict.read_tests(tail) == "2312p/0f"
+
+    def test_a_pytest_failed_count_is_read_off_the_totals_line(self) -> None:
+        tail = "test_a.py:3: AssertionError\n=== 3 failed, 1166 passed in 12.3s ==="
+
+        assert verdict.read_tests(tail) == "1166p/3f"
+
     def test_a_threshold_refusal_without_the_tree_row_names_the_figure(self) -> None:
         tail = "ERROR: Coverage for statements (99.5%) does not meet global threshold (100%)\n"
 
