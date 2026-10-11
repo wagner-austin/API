@@ -9,6 +9,7 @@ it.
 from __future__ import annotations
 
 import pathlib
+from typing import Final
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, require_dict
@@ -24,6 +25,11 @@ PROJECTS: JSONObject = {
     "MCPs": {"marker": "root"},
     "MCPs/fleet-mcp": {"marker": "fleet-mcp"},
 }
+
+#: The most lines one registry file may hold, the operator's file-size rule
+#: ("no monithic files. 400 - 600 lines", 2026-10-11) that split the
+#: 2252-line fleet.json into this directory.
+MAX_FILE_LINES: Final = 600
 
 
 def _document() -> JSONObject:
@@ -63,6 +69,27 @@ def test_the_shipped_registry_assembles_into_a_workspace_that_decodes() -> None:
         "feed",
         "leases",
     }
+
+
+def test_every_shipped_registry_file_is_at_most_six_hundred_lines() -> None:
+    lines = {
+        path.relative_to(SHIPPED_REGISTRY).as_posix(): len(
+            path.read_text(encoding="utf-8").splitlines()
+        )
+        for path in sorted(SHIPPED_REGISTRY.rglob("*"))
+        if path.is_file()
+    }
+
+    assert {"nodes.json", "settings.json"} < set(lines)
+    assert len(lines) == 2 + len(list((SHIPPED_REGISTRY / "projects").rglob("*.json")))
+    assert {name: count for name, count in lines.items() if count > MAX_FILE_LINES} == {}
+
+
+def test_the_single_file_registry_it_replaced_is_gone() -> None:
+    beside = {path.name for path in SHIPPED_REGISTRY.parent.iterdir()}
+
+    assert "registry" in beside
+    assert "fleet.json" not in beside
 
 
 def test_each_project_is_keyed_by_its_path_in_key_order(tmp_path: pathlib.Path) -> None:
