@@ -11,6 +11,7 @@ a PATH the suite lays out (MCPs board task d69786fa).
 
 from __future__ import annotations
 
+from fleet.contracts.capability import RUST_CHECK_SUBCOMMANDS, RUST_CHECK_TOOLS
 from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
     CHROME_WINDOWS_RELATIVE,
@@ -71,9 +72,14 @@ _CHROME_DEFAULT = ", ".join(
 #:
 #: ``cargo`` and ``cxx`` are asked though no build requires them: each answer
 #: is compared with the node's declaration (:mod:`fleet.contracts.capability`).
-#: ``cxx`` is what node-gyp's find-visualstudio needs, the VC tools component,
-#: read from vswhere as its installationVersion and collected whole, for the
-#: same PowerShell 5.1 reason as pip. A node without vswhere, or whose vswhere
+#: ``cargo`` answers ``no`` unless every subcommand of
+#: :data:`fleet.contracts.capability.RUST_CHECK_SUBCOMMANDS` answers its
+#: ``--version`` and every tool of ``RUST_CHECK_TOOLS`` is on the PATH (MCPs
+#: board task b1089284: serendipity's minimal rustup profile carried the
+#: ``rust`` tag without rustfmt). ``cxx`` is what node-gyp's
+#: find-visualstudio needs, the VC tools component, read from vswhere as its
+#: installationVersion and collected whole, for the same PowerShell 5.1
+#: reason as pip. A node without vswhere, or whose vswhere
 #: finds no VC tools (sedona on 2026-09-27: the installer present, the
 #: component absent), reports ``cxx=no=``. ``gpu`` is nvidia-smi's first
 #: device as ``<name>, <compute capability>``, ``no`` when nvidia-smi is not
@@ -170,6 +176,24 @@ foreach ($tool in $tools) {
     $found = $python
     if ($tool -ne 'python') {
         $found = Find-Tool $tool
+    }
+    if ($tool -eq 'cargo') {
+        foreach ($subcommand in @("""
+    + ", ".join(f"'{subcommand}'" for subcommand in RUST_CHECK_SUBCOMMANDS)
+    + r""")) {
+            if ($found -ne '') {
+                if (-not (Invoke-Answer $Cmd $found "$subcommand --version").Succeeded) {
+                    $found = ''
+                }
+            }
+        }
+        foreach ($companion in @("""
+    + ", ".join(f"'{tool}'" for tool in RUST_CHECK_TOOLS)
+    + r""")) {
+            if ((Find-Tool $companion) -eq '') {
+                $found = ''
+            }
+        }
     }
     $asked = '--version'
     if ($tool -eq 'go') {

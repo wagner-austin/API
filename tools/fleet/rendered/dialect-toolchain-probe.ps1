@@ -43,6 +43,20 @@ foreach ($tool in $tools) {
     if ($tool -ne 'python') {
         $found = Find-Tool $tool
     }
+    if ($tool -eq 'cargo') {
+        foreach ($subcommand in @('fmt', 'clippy', 'llvm-cov')) {
+            if ($found -ne '') {
+                if (-not (Invoke-Answer $Cmd $found "$subcommand --version").Succeeded) {
+                    $found = ''
+                }
+            }
+        }
+        foreach ($companion in @('uv')) {
+            if ((Find-Tool $companion) -eq '') {
+                $found = ''
+            }
+        }
+    }
     $asked = '--version'
     if ($tool -eq 'go') {
         $asked = 'version'

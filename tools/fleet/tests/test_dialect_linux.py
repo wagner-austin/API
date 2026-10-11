@@ -376,7 +376,8 @@ class TestTransportShape:
 
         assert "report python python3\n" in body
         assert "report go go version\n" in body
-        for tool in ("poetry", "git", "make", "node", "ffmpeg", "tar", "cargo", "apt-get", "pipx"):
+        # cargo is asked with the Rust check's toolchain (test_dialect_linux_rust).
+        for tool in ("poetry", "git", "make", "node", "ffmpeg", "tar", "apt-get", "pipx"):
             assert f"report {tool} {tool}\n" in body
         assert "printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n" in body
         # The docker line asks execdocker's own socket, never the PATH's

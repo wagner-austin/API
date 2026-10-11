@@ -10,7 +10,12 @@ is the probe's body without the dialect's prologue, which
 
 from __future__ import annotations
 
-from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
+from fleet.contracts.capability import (
+    RUST_CHECK_SUBCOMMANDS,
+    RUST_CHECK_TOOLS,
+    STACK_IMAGES,
+    STACK_NETWORK,
+)
 from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
     CHROME_LINUX_PATH,
@@ -101,6 +106,12 @@ from fleet.contracts.tagged_tools import (
 #: task 28c43011, fleet jobs 1f0c3d62, 3afd25c9, a29925d0, 3eab5dab and
 #: c63aac8f on 2026-10-09). A unit that cannot start, or whose docker is
 #: refused, answers ``no`` on both lines, as a build there would fail.
+#:
+#: THE ``cargo`` LINE answers cargo's version only when the Rust check's
+#: whole toolchain answers too (MCPs board task b1089284,
+#: :data:`fleet.contracts.capability.RUST_CHECK_SUBCOMMANDS` and
+#: ``RUST_CHECK_TOOLS``), one ``if`` condition for the ``set -e`` reason
+#: above, so a node with the compiler alone carries no ``rust`` tag.
 TOOLCHAIN_PROBE_BODY = (
     "report() {\n"
     '  if command -v "$2" > /dev/null 2>&1; then\n'
@@ -118,7 +129,17 @@ TOOLCHAIN_PROBE_BODY = (
     "report ffmpeg ffmpeg\n"
     f"report go go {GO_VERSION_ARGUMENT}\n"
     "report tar tar\n"
-    "report cargo cargo\n"
+    "if command -v cargo > /dev/null 2>&1"
+    + "".join(
+        f" && cargo {subcommand} --version > /dev/null 2>&1"
+        for subcommand in RUST_CHECK_SUBCOMMANDS
+    )
+    + "".join(f" && command -v {tool} > /dev/null 2>&1" for tool in RUST_CHECK_TOOLS)
+    + "; then\n"
+    "  printf 'cargo=yes=%s\\n' \"$(cargo --version 2>&1 | head -n 1 | tr -d '\\r')\"\n"
+    "else\n"
+    "  printf 'cargo=no=\\n'\n"
+    "fi\n"
     "if command -v g++ > /dev/null 2>&1; then\n"
     "  printf 'cxx=yes=%s\\n' \"$(g++ -dumpfullversion)\"\n"
     "else\n"

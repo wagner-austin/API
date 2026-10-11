@@ -7,7 +7,15 @@ the whole tree and before any test runs:
 - ``rust`` (MCPs board task 1e2da299). API ``services/covenant-radar-api``
   depends on the maturin crate ``libs/cleargbm_rs`` as a path dependency
   without ``develop = true``, so ``poetry sync`` builds it through ``cargo``.
-  On 2026-09-26 no fleet node had cargo.
+  On 2026-09-26 no fleet node had cargo. The crate's OWN check needs more
+  than the compiler (MCPs board task b1089284): ``cargo fmt``, ``cargo
+  clippy`` and ``cargo llvm-cov``, and ``uv`` for the venv its Python half
+  runs in. diphtheria and serendipity carried the tag with a minimal rustup
+  profile and none of them, and libs/cleargbm_rs's first fleet check (job
+  c1f2611b on serendipity, 2026-10-11) died at "'cargo-fmt.exe' is not
+  installed". So the ``cargo`` line answers only when every one of
+  :data:`RUST_CHECK_SUBCOMMANDS` and :data:`RUST_CHECK_TOOLS` answers too,
+  and a node with the compiler alone carries no ``rust`` tag.
 - ``cxx`` (MCPs board task 3f19c136). Every MCPs TypeScript project installs
   with a root ``npm ci``, which rebuilds ``hnswlib-node`` under node-gyp, and
   node-gyp needs a C++ toolchain: the Visual Studio VC tools on Windows, g++
@@ -83,6 +91,14 @@ STACK_IMAGES: Final[tuple[str, ...]] = (
     "mcps-transcriber-worker:latest",
     "mcps-pg-backup-sidecar:latest",
 )
+
+#: The cargo subcommands the ``cargo`` line asks ``--version`` of before it
+#: answers: libs/cleargbm_rs's Makefile gate, ``rust-lint`` and ``rust-cov``.
+RUST_CHECK_SUBCOMMANDS: Final[tuple[str, ...]] = ("fmt", "clippy", "llvm-cov")
+
+#: The executables beside cargo the ``cargo`` line requires on the PATH:
+#: libs/cleargbm_rs's ``uv-venv-check`` creates its venv with ``uv``.
+RUST_CHECK_TOOLS: Final[tuple[str, ...]] = ("uv",)
 
 #: The probe line each capability is read from. ``cargo`` is the tool's own
 #: name because maturin builds with it; ``cxx`` is a synthetic line, since the

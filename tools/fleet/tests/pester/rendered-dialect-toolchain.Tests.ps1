@@ -112,6 +112,40 @@ Describe 'The toolchain probe' {
         $said[11] | Should -BeExactly 'pip=no='
         $said[12] | Should -BeExactly 'cxx=no='
     }
+    It 'reports cargo only when fmt, clippy and llvm-cov answer and uv is on the PATH (MCPs b1089284)' {
+        $absent = Join-Path $script:root 'absent\vswhere.exe'
+        # A cargo.cmd that answers --version and each subcommand it is given,
+        # and refuses any other as cargo does, recording every call.
+        function Initialize-Cargo {
+            param([string]$Directory, [string[]]$Subcommands)
+            [void][System.IO.Directory]::CreateDirectory($Directory)
+            $record = Join-Path $Directory 'cargo.calls.txt'
+            $routes = @($Subcommands | ForEach-Object { "if `"%1`"==`"$_`" goto sub" }) -join "`r`n"
+            $body = "@echo off`r`necho %*>>`"$record`"`r`nif `"%1`"==`"--version`" goto version`r`n" +
+                "$routes`r`necho error: no such command 1>&2`r`nexit /b 101`r`n" +
+                ":version`r`necho cargo 1.99.0 5f94df478 2026-08-27`r`nexit /b 0`r`n" +
+                ":sub`r`necho %1 1.0.0`r`nexit /b 0`r`n"
+            [System.IO.File]::WriteAllText((Join-Path $Directory 'cargo.cmd'), $body, [System.Text.Encoding]::ASCII)
+            return $record
+        }
+        $whole = Join-Path $script:root 'whole'
+        $calls = Initialize-Cargo $whole @('fmt', 'clippy', 'llvm-cov')
+        [void](Initialize-Answer $whole 'uv' @('uv 0.13.0') 0)
+        $env:PATH = $whole
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[8] |
+            Should -BeExactly 'cargo=yes=cargo 1.99.0 5f94df478 2026-08-27'
+        [System.IO.File]::ReadAllLines($calls) |
+            Should -Be @('fmt --version', 'clippy --version', 'llvm-cov --version', '--version')
+        $minimal = Join-Path $script:root 'minimal'
+        [void](Initialize-Cargo $minimal @('clippy', 'llvm-cov'))
+        [void](Initialize-Answer $minimal 'uv' @('uv 0.13.0') 0)
+        $env:PATH = $minimal
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[8] | Should -BeExactly 'cargo=no='
+        $noUv = Join-Path $script:root 'no-uv'
+        [void](Initialize-Cargo $noUv @('fmt', 'clippy', 'llvm-cov'))
+        $env:PATH = $noUv
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[8] | Should -BeExactly 'cargo=no='
+    }
     It 'reports the CUDA device nvidia-smi lists, and none when it fails or lists nothing (MCPs 939ec5c7)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
         $card = Join-Path $script:root 'card'
