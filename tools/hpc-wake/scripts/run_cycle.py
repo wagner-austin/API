@@ -238,6 +238,28 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         ),
         "cwd": "C:\\Users\\Test\\PROJECTS\\MCPs",
     },
+    # search-probe (MCPs board task d84d37e3): https://search.austinwagner.org
+    # -> board. MCPs maketools' search-probe GETs the public search's declared
+    # checks through Cloudflare once its last run is 540 s old (every 9 to 12
+    # minutes at this pump's 3), keeps the runs in the hub checkout's
+    # fleet-mcp/state/search-probe.json for fleet_search_probe, and when the
+    # set of failing checks changes states one repair ask and posts a note in
+    # room civic. A run whose checks fail still exits 0; a red row means the
+    # probe could not measure or post, never a slow search. Last in the
+    # table, so a slow site delays no other row's post. The same interpreter
+    # as the two rows above.
+    {
+        "name": "search-probe",
+        "args": (
+            "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "search-probe",
+            "--workspace",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ),
+        "cwd": "C:\\Users\\Test\\PROJECTS\\MCPs",
+    },
 )
 
 
