@@ -82,6 +82,26 @@ Describe 'The transcript tail' {
         $log = Write-Transcript ([byte[]]@()) ([System.Text.Encoding]::UTF8.GetBytes("r$([char]0xE9)sum$([char]0xE9)`nFLEET-CHECK status=failed`n"))
         Read-Tail $log 1 | Should -Be @('FLEET-CHECK status=failed')
     }
+    It 'holds the test totals of the largest package at its rendered line count, <Name>' -ForEach @(
+        @{ Name = 'UTF-16'; Mark = [byte[]](255, 254); Encoding = [System.Text.Encoding]::Unicode }
+        @{ Name = 'UTF-8'; Mark = [byte[]](239, 187, 191); Encoding = [System.Text.Encoding]::UTF8 }
+    ) {
+        # MCPs board task 93a1c2c0: mcp-shared's vitest totals sat 826 lines
+        # from the end of its transcript, under a coverage table of rows
+        # about eighty characters wide; the render's own Lines is read.
+        $builder = [System.Text.StringBuilder]::new()
+        [void]$builder.Append("      Tests  10401 passed | 74 skipped (10475)`r`n")
+        [void]$builder.Append("All files          |     100 |      100 |     100 |     100 |`r`n")
+        for ($index = 0; $index -lt 822; $index++) {
+            [void]$builder.Append(('  file-{0:D4}.ts     |     100 |      100 |     100 |     100 |                   ' -f $index)).Append("`r`n")
+        }
+        [void]$builder.Append("CHECK BUDGET: mcp-shared took 73s of 300s.`r`n=== ALL CHECKS PASSED ===`r`n")
+        $log = Write-Transcript $Mark ($Encoding.GetBytes($builder.ToString()))
+        $printed = [string[]]@(Invoke-Rendered 'dialect-log-tail' @{ Log = $log })
+        $printed.Count | Should -Be 826
+        $printed[0] | Should -BeExactly '      Tests  10401 passed | 74 skipped (10475)'
+        $printed[-1] | Should -BeExactly '=== ALL CHECKS PASSED ==='
+    }
     It 'prints nothing for a build that wrote no transcript' {
         @(Read-Tail (Join-Path $TestDrive 'never.txt.log') 200).Count | Should -Be 0
     }

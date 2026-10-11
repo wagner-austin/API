@@ -36,9 +36,17 @@ CHECK_BANNER: Final = "=== ALL CHECKS PASSED ==="
 VERDICT_PREFIX: Final = "FLEET-CHECK"
 
 #: How many lines of the transcript the collector reads for the counts: the
-#: summary tables sit at the end, and two hundred lines holds vitest's
-#: per-file coverage table for the largest package here with room over.
-LOG_TAIL_LINES: Final = 200
+#: summary tables sit at the end, but vitest prints its per-file coverage
+#: table AFTER the test totals, one row per source file, so the distance
+#: grows with the package. Two hundred lines, the bound until MCPs board task
+#: 93a1c2c0, left every verdict of four MCPs packages 'unread': measured on
+#: colossus's 323 logs on 2026-10-11, the last 'N passed' line sat 252 lines
+#: from the end for MCPs/watcher, 284 for MCPs/mcp-proxy, 460 for
+#: MCPs/packages/db and 826 for MCPs/mcp-shared. Fifteen hundred holds the
+#: largest with 1.8 times its length to grow into, and at about eighty
+#: characters a row still fits the Windows dialect's bounded read
+#: (:data:`fleet.core.windows_log_tail.TAIL_BYTES`).
+LOG_TAIL_LINES: Final = 1500
 
 #: ``N passed`` as both vitest (``Tests  887 passed (887)``) and pytest
 #: (``1166 passed in 12.3s``) print it; the LAST occurrence is the suite's

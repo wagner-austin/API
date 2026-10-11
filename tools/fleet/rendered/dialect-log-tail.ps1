@@ -1,6 +1,6 @@
 param(
     [string]$Log = 'C:/fleet/stage/MCPs-packages-maketools-1790000000/result.txt.log',
-    [int]$Lines = 200
+    [int]$Lines = 1500
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

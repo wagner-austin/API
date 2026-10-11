@@ -33,11 +33,13 @@ from typing import Final
 from fleet.core.powershell_text import STRICT_HEADER
 from fleet.core.script_values import scriptable
 
-#: How many bytes from the end the tail reads. Two hundred lines of pytest's
-#: or vitest's summary and coverage table run to a few hundred characters
-#: each at most, so 256 KiB (128 Ki UTF-16 characters) holds the lines the
-#: verdict parses with room to spare, and stays small enough to cross ssh in
-#: well under a second.
+#: How many bytes from the end the tail reads. The verdict's
+#: :data:`fleet.core.verdict.LOG_TAIL_LINES` lines of pytest's or vitest's
+#: summary and coverage table run to about eighty characters a row, so
+#: 256 KiB holds them as UTF-8 with room to spare, and as UTF-16 (two bytes
+#: a character, a node still on a pre-2026-09-27 roll) still holds the
+#: 826-line distance of the largest package measured (MCPs board task
+#: 93a1c2c0); it stays small enough to cross ssh in well under a second.
 TAIL_BYTES: Final[int] = 262_144
 
 
