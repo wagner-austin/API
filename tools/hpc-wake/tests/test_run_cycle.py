@@ -2,160 +2,20 @@
 
 Real parsing, real log rotation, real file writes; the one fake is the
 process runner rebound through ``scripts._test_hooks``, which is how the
-suite covers the entry point without posting to the board.
+suite covers the entry point without posting to the board. The tree, the
+runner and the clock are :mod:`tests.run_cycle_tree`'s, shared with the
+health record's suite, ``test_run_cycle_health.py``.
 """
 
 from __future__ import annotations
 
-import datetime
 import pathlib
-from collections.abc import Generator, Mapping, Sequence
 
 import pytest
 from platform_core.errors import AppError, ErrorCode
 from scripts import _test_hooks, run_cycle
-from scripts.pump_health import HEALTH_FILENAME, PublisherHealth, read_health
 
-
-class _Completed:
-    """The three fields the entry point reads, as plain data."""
-
-    def __init__(self, stdout: str, stderr: str, returncode: int) -> None:
-        self.stdout = stdout
-        self.stderr = stderr
-        self.returncode = returncode
-
-
-class _RecordingRunner:
-    """A process runner that records calls and returns scripted results in order."""
-
-    def __init__(self, results: Sequence[_Completed]) -> None:
-        self.results = list(results)
-        self.calls: list[tuple[Sequence[str], pathlib.Path, dict[str, str]]] = []
-
-    def __call__(
-        self,
-        args: Sequence[str],
-        *,
-        cwd: pathlib.Path,
-        env: Mapping[str, str],
-        timeout: int,
-    ) -> _Completed:
-        assert timeout == run_cycle.PUBLISHER_WALL_SECONDS
-        self.calls.append((args, cwd, dict(env)))
-        return self.results[len(self.calls) - 1]
-
-
-@pytest.fixture(name="runner")
-def _runner() -> Generator[_RecordingRunner, None, None]:
-    """Install a recording runner, and put the real one back afterwards.
-
-    Scripted with one result per publisher, distinguishable by content so
-    ordering assertions mean something.
-    """
-    fake = _RecordingRunner(
-        [
-            _Completed("hpc-out\n", "hpc-err\n", 0),
-            _Completed("ci-out\n", "ci-err\n", 0),
-            _Completed("lock-out\n", "lock-err\n", 0),
-            _Completed("health-out\n", "health-err\n", 0),
-            _Completed("tunnel-out\n", "tunnel-err\n", 0),
-            _Completed("diphtheria-out\n", "diphtheria-err\n", 0),
-            _Completed("rcs-out\n", "rcs-err\n", 0),
-            _Completed("login-out\n", "login-err\n", 0),
-        ]
-    )
-    _test_hooks.run_process = fake
-    yield fake
-    _test_hooks.run_process = _test_hooks._default_run_process
-
-
-class _FrozenClock:
-    """A clock a test can move, standing in for ``_test_hooks.now``."""
-
-    def __init__(self, instant: datetime.datetime) -> None:
-        self.instant = instant
-
-    def __call__(self) -> datetime.datetime:
-        """Return the instant this clock is currently set to.
-
-        Returns:
-            The instant.
-        """
-        return self.instant
-
-
-@pytest.fixture(name="clock")
-def _clock() -> Generator[_FrozenClock, None, None]:
-    """Freeze the tick's clock, and put the real one back afterwards.
-
-    The header stamp and the health record both read it, so a test that
-    asserted either against the wall clock would assert nothing.
-    """
-    frozen = _FrozenClock(datetime.datetime(2026, 9, 21, 20, 43, 15, tzinfo=datetime.UTC))
-    _test_hooks.now = frozen
-    yield frozen
-    _test_hooks.now = _test_hooks._utc_now
-
-
-def _health_path(root: pathlib.Path) -> pathlib.Path:
-    """Where the tick writes its health record.
-
-    Args:
-        root: The staged package root.
-
-    Returns:
-        The record's path.
-    """
-    return root / "runs" / HEALTH_FILENAME
-
-
-def _publisher(root: pathlib.Path, name: str) -> PublisherHealth:
-    """One publisher's row out of the record the tick just wrote.
-
-    Read through the module's own reader rather than by splitting the file
-    here, so a rendering this reader cannot read back fails the test.
-
-    Args:
-        root: The staged package root.
-        name: The publisher's marker.
-
-    Returns:
-        Its entry.
-    """
-    return read_health(_health_path(root))[name]
-
-
-def _written_line(root: pathlib.Path) -> str:
-    """The record's ``written`` field, as the file spells it.
-
-    Args:
-        root: The staged package root.
-
-    Returns:
-        The instant.
-    """
-    lines = _health_path(root).read_text(encoding="utf-8").splitlines()
-    return next(line.split("\t")[1] for line in lines if line.startswith("written\t"))
-
-
-def _staged_root(tmp_path: pathlib.Path, env_body: str) -> pathlib.Path:
-    """Create a package-shaped tree holding one credentials file."""
-    runs = tmp_path / "runs"
-    runs.mkdir()
-    (runs / "env.ps1").write_text(env_body, encoding="utf-8")
-    return tmp_path
-
-
-GOOD_ENV = "\n".join(
-    [
-        "# hpc-wake credentials. UNTRACKED.",
-        "$env:TASKBOARD_MCP_API_KEY = 'key-value'",
-        "",
-        "$env:CORVIS_TENANT_ID = 'tenant-value'",
-        "$env:HPC_WAKE_TASK_ID = 'task-value'",
-    ]
-)
+from tests.run_cycle_tree import GOOD_ENV, Completed, RecordingRunner, staged_root
 
 
 class TestTheCredentialsFile:
@@ -165,7 +25,7 @@ class TestTheCredentialsFile:
         # The grammar is platform_core.env_assignments' and tested there;
         # what this package owns is that main reads runs/env.ps1 through it
         # and that a refusal lands before a publisher runs or a log is cut.
-        root = _staged_root(tmp_path, GOOD_ENV + '\n$env:DOUBLE = "quoted"\n')
+        root = staged_root(tmp_path, GOOD_ENV + '\n$env:DOUBLE = "quoted"\n')
         with pytest.raises(AppError) as caught:
             run_cycle.main(["--package-root", str(root)])
         assert caught.value.code is ErrorCode.CONFIG_ERROR
@@ -190,9 +50,9 @@ class TestPackageRootFrom:
 
 class TestMain:
     def test_runs_every_publisher_and_appends_marked_sections_in_order(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        root = _staged_root(tmp_path, GOOD_ENV)
+        root = staged_root(tmp_path, GOOD_ENV)
 
         code = run_cycle.main(["--package-root", str(root)])
 
@@ -224,6 +84,9 @@ class TestMain:
             mark8,
             out8,
             err8,
+            mark9,
+            out9,
+            err9,
         ) = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
         assert mark1 == "-- hpc-wake"
@@ -238,15 +101,17 @@ class TestMain:
         assert (out5, err5) == ("tunnel-out", "tunnel-err")
         assert mark6 == "-- lock-wake-diphtheria"
         assert (out6, err6) == ("diphtheria-out", "diphtheria-err")
-        assert mark7 == "-- rcs-pair-watch"
-        assert (out7, err7) == ("rcs-out", "rcs-err")
-        assert mark8 == "-- login-probe"
-        assert (out8, err8) == ("login-out", "login-err")
+        assert mark7 == "-- lock-wake-diphtheria-actions"
+        assert (out7, err7) == ("actions-out", "actions-err")
+        assert mark8 == "-- rcs-pair-watch"
+        assert (out8, err8) == ("rcs-out", "rcs-err")
+        assert mark9 == "-- login-probe"
+        assert (out9, err9) == ("login-out", "login-err")
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        root = _staged_root(tmp_path, GOOD_ENV)
+        root = staged_root(tmp_path, GOOD_ENV)
 
         run_cycle.main(["--package-root", str(root)])
 
@@ -314,7 +179,19 @@ class TestMain:
         ]
         assert remote_cwd == (root / "..\\lock-wake").resolve()
         assert remote_env == env
-        rcs_args, rcs_cwd, rcs_env = runner.calls[6]
+        actions_args, actions_cwd, actions_env = runner.calls[6]
+        assert list(actions_args) == [
+            "poetry",
+            "run",
+            "lock-wake",
+            "--remote-action-journal",
+            "diphtheria:/home/corvis/PROJECTS/MCPs/.action-events.jsonl",
+            "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ]
+        assert actions_cwd == (root / "..\\lock-wake").resolve()
+        assert actions_env == env
+        rcs_args, rcs_cwd, rcs_env = runner.calls[7]
         assert list(rcs_args) == [
             "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
             "-B",
@@ -330,7 +207,7 @@ class TestMain:
         # there (API CI run 38014391403 at c9f4e74a4, 2026-10-10 01:45Z).
         assert rcs_cwd == (root / "C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
         assert rcs_env == env
-        login_args, login_cwd, login_env = runner.calls[7]
+        login_args, login_cwd, login_env = runner.calls[8]
         assert list(login_args) == [
             "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
             "-B",
@@ -353,36 +230,36 @@ class TestMain:
         assert len(env) > 3
 
     def test_a_failing_first_publisher_does_not_stop_the_second(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        runner.results[0] = _Completed("", "cluster unreachable\n", 3)
-        root = _staged_root(tmp_path, GOOD_ENV)
+        runner.results[0] = Completed("", "cluster unreachable\n", 3)
+        root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 8
+        assert len(runner.calls) == 9
 
     def test_a_failing_second_publisher_reddens_the_tick(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        runner.results[1] = _Completed("", "actions api refused\n", 7)
-        root = _staged_root(tmp_path, GOOD_ENV)
+        runner.results[1] = Completed("", "actions api refused\n", 7)
+        root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 7
 
     def test_the_first_failure_names_the_tick_when_both_fail(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        runner.results[0] = _Completed("", "a\n", 3)
-        runner.results[1] = _Completed("", "b\n", 7)
-        root = _staged_root(tmp_path, GOOD_ENV)
+        runner.results[0] = Completed("", "a\n", 3)
+        runner.results[1] = Completed("", "b\n", 7)
+        root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
 
     def test_truncates_an_oversized_log_and_keeps_a_small_one(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
         runner.results.extend(runner.results)
-        root = _staged_root(tmp_path, GOOD_ENV)
+        root = staged_root(tmp_path, GOOD_ENV)
         log = root / "runs" / "cycle.log"
         log.write_text("old\n" * 300_000, encoding="utf-8")
         assert log.stat().st_size > 1_000_000
@@ -397,81 +274,8 @@ class TestMain:
         assert kept.count("== 20") == 2
 
 
-class TestHealthRecord:
-    """Every tick writes ``runs/pump-health.json``, and that file is the
-    only thing outside this machine's scheduler that can tell whether the
-    wake system is publishing. Between 2026-09-16 and 2026-09-21 all three
-    publishers failed on every tick and the only trace was a traceback in
-    cycle.log, which is truncated past 1 MB and had kept 80 minutes of it."""
-
-    def test_a_green_tick_records_every_publisher_as_succeeding(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
-    ) -> None:
-        root = _staged_root(tmp_path, GOOD_ENV)
-
-        run_cycle.main(["--package-root", str(root)])
-
-        assert _written_line(root) == "2026-09-21T20:43:15Z"
-        recorded = read_health(_health_path(root))
-        assert set(recorded) == {
-            "hpc-wake",
-            "ci-wake",
-            "lock-wake",
-            "fleet-health-wake",
-            "hub-tunnel-wake",
-            "lock-wake-diphtheria",
-            "rcs-pair-watch",
-            "login-probe",
-        }
-        assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
-        assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
-
-    def test_the_diphtheria_row_is_recorded_published(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
-    ) -> None:
-        """MCPs board task 03590bf9, A2: the row reading diphtheria's
-        fleet-lock journal is a publisher like the others, so its tick's
-        exit 0 lands in the health record as published."""
-        root = _staged_root(tmp_path, GOOD_ENV)
-
-        run_cycle.main(["--package-root", str(root)])
-
-        entry = _publisher(root, "lock-wake-diphtheria")
-        assert entry["exit_code"] == 0
-        assert entry["consecutive_failures"] == 0
-        assert entry["last_ok"] == "2026-09-21T20:43:15Z"
-
-    def test_a_publisher_failing_twice_is_recorded_as_a_streak_of_two(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
-    ) -> None:
-        """THE OUTAGE'S SHAPE, reproduced: ci-wake refused on consecutive
-        ticks while the pump itself went on running. The streak is what
-        tells a reader this is an outage rather than one bad minute."""
-        runner.results = [
-            _Completed("", "", 0),
-            _Completed("", "TASK_SESSION_UNLEDGERED\n", 1),
-            _Completed("", "", 0),
-            _Completed("", "", 0),
-            _Completed("", "", 0),
-            _Completed("", "", 0),
-            _Completed("", "", 0),
-            _Completed("", "", 0),
-        ] * 2
-        root = _staged_root(tmp_path, GOOD_ENV)
-
-        run_cycle.main(["--package-root", str(root)])
-        clock.instant = datetime.datetime(2026, 9, 21, 20, 46, 15, tzinfo=datetime.UTC)
-        run_cycle.main(["--package-root", str(root)])
-
-        failing = _publisher(root, "ci-wake")
-        assert failing["consecutive_failures"] == 2
-        assert failing["exit_code"] == 1
-        assert failing["last_ok"] == ""
-        assert _publisher(root, "lock-wake")["last_ok"] == "2026-09-21T20:46:15Z"
-
-
 class TestPublishers:
-    def test_the_inventory_is_the_seven_rows_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_nine_rows_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
         become sibling scheduled tasks -- has a diff to point at."""
@@ -482,6 +286,7 @@ class TestPublishers:
             "fleet-health-wake",
             "hub-tunnel-wake",
             "lock-wake-diphtheria",
+            "lock-wake-diphtheria-actions",
             "rcs-pair-watch",
             "login-probe",
         ]
@@ -524,10 +329,21 @@ class TestPublishers:
             "--cursor-dir",
             "C:\\Users\\Test\\PROJECTS\\MCPs",
         )
+        # The remote form's other flag, which tools/lock-wake's
+        # test_remote_cycle.py drives as an action journal (MCPs board task
+        # b00ab472), with the cursor in the same clone root.
+        assert run_cycle.PUBLISHERS[6]["cwd"] == "..\\lock-wake"
+        assert run_cycle.PUBLISHERS[6]["args"][2:] == (
+            "lock-wake",
+            "--remote-action-journal",
+            "diphtheria:/home/corvis/PROJECTS/MCPs/.action-events.jsonl",
+            "--cursor-dir",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        )
         # MCPs' maketools command (board task 21366226), run in the hub
         # checkout like MCPs' own scheduled maketools tasks.
-        assert run_cycle.PUBLISHERS[6]["cwd"] == "C:\\Users\\Test\\PROJECTS\\MCPs"
-        assert run_cycle.PUBLISHERS[6]["args"][1:] == (
+        assert run_cycle.PUBLISHERS[7]["cwd"] == "C:\\Users\\Test\\PROJECTS\\MCPs"
+        assert run_cycle.PUBLISHERS[7]["args"][1:] == (
             "-B",
             "packages\\maketools\\scripts\\run.py",
             "rcs-pair-watch",
@@ -538,7 +354,7 @@ class TestPublishers:
 
 class TestMainBlock:
     def test_running_as_a_module_actually_runs_a_cycle(
-        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
         """The half that silently goes missing without an ``if __name__``
         block — and the scheduler invokes exactly this form. Hermetic
@@ -549,7 +365,7 @@ class TestMainBlock:
         import runpy
         import sys
 
-        root = _staged_root(tmp_path, GOOD_ENV)
+        root = staged_root(tmp_path, GOOD_ENV)
         module_name = "scripts.run_cycle"
         saved_argv = list(sys.argv)
         saved_module = sys.modules.pop(module_name, None)

@@ -26,6 +26,7 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from hpc_wake import _test_hooks
 from hpc_wake.identity import TASK_ID_VARIABLE
+from tests import run_cycle_tree
 
 FROZEN_NOW: Final = "2026-09-06T07:00:00+00:00"
 
@@ -219,3 +220,5 @@ emitted = pytest.fixture(_make_emitted)
 fake_run = pytest.fixture(_make_fake_run)
 frozen_clock = pytest.fixture(_make_frozen_clock)
 moving_clock = pytest.fixture(_make_moving_clock)
+runner = pytest.fixture(run_cycle_tree.make_runner)
+clock = pytest.fixture(run_cycle_tree.make_clock)
