@@ -64,12 +64,13 @@ Describe 'The toolchain probe' {
         [void](Initialize-Answer $quoted 'make' @('GNU Make 4.4.1', 'Built for Windows32') 0)
         $vswhereCalls = Initialize-Answer (Join-Path $script:root 'vs') 'vswhere' @('17.11.35312.102') 0
         $env:PATH = "$first;;`"$quoted`""
-        # Chrome is named like the hooks route, at a path this case lays nothing
-        # under, so a Chrome installed on the machine running the suite does
-        # not read as a node's.
+        # Chrome and pdftotext are named like the hooks route, at paths this
+        # case lays nothing under, so a Chrome or a Git for Windows installed
+        # on the machine running the suite does not read as a node's.
         $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{
                 VsWhere = (Join-Path $script:root 'vs\vswhere.cmd'); HooksRoute = (Join-Path $script:root 'no-route.json')
                 Chrome = @((Join-Path $script:root 'no-chrome\chrome.exe'))
+                Pdftotext = (Join-Path $script:root 'no-git\pdftotext.exe')
             })
         # The default seam asks this session's own token, so the expected
         # line is read here the same way, independently of the script.
@@ -83,7 +84,7 @@ Describe 'The toolchain probe' {
             'make=yes=GNU Make 4.4.1', 'node=yes=v20.17.0', 'ffmpeg=yes=ffmpeg version 9.0.1-essentials_build-www.gyan.dev',
             'go=yes=go version go1.27.1 windows/amd64', 'tar=yes=', 'cargo=no=', 'winget=no=', 'choco=no=',
             'pip=yes=pip 24.2 from C:\py\Lib\site-packages\pip (python 3.11)', 'cxx=yes=17.11.35312.102', 'gpu=no=',
-            'testdb=no=', 'docker=no=', 'hooks=no=', 'chrome=no=', $integrity)
+            'testdb=no=', 'docker=no=', 'hooks=no=', 'chrome=no=', 'pdftotext=no=', $integrity)
         [System.IO.File]::ReadAllLines($pythonCalls) | Should -Be @('--version', '-m pip --version')
         [System.IO.File]::ReadAllLines($ffmpegCalls) | Should -Be @('--version')
         [System.IO.File]::ReadAllLines($goCalls) | Should -Be @('version')
@@ -221,6 +222,25 @@ Describe 'The toolchain probe' {
         $env:PATH = $onPath
         @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Chrome = @($perUser) })[17] |
             Should -BeExactly 'chrome=no='
+    }
+    It 'reports pdftotext from the Git for Windows path first, then from PATH, and none when neither has it (MCPs 6dd73ada)' {
+        $env:PATH = Join-Path $script:root 'empty'
+        $absent = Join-Path $script:root 'absent\vswhere.exe'
+        # poppler answers -v on stderr; cmd's own 2>&1 carries it into the line.
+        $git = Join-Path $script:root 'Git\mingw64\bin'
+        $gitCalls = Initialize-Answer $git 'pdftotext' @('pdftotext version 4.00') 0 -Stderr
+        $onPath = Join-Path $script:root 'onpath'
+        [void](Initialize-Answer $onPath 'pdftotext' @('pdftotext version 24.02.0') 0)
+        $env:PATH = $onPath
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Pdftotext = (Join-Path $git 'pdftotext.cmd') })[18] |
+            Should -BeExactly 'pdftotext=yes=pdftotext version 4.00'
+        [System.IO.File]::ReadAllLines($gitCalls) | Should -Be @('-v')
+        $missing = Join-Path $script:root 'no-git\pdftotext.exe'
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Pdftotext = $missing })[18] |
+            Should -BeExactly 'pdftotext=yes=pdftotext version 24.02.0'
+        $env:PATH = Join-Path $script:root 'empty'
+        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Pdftotext = $missing })[18] |
+            Should -BeExactly 'pdftotext=no='
     }
     It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {
         $env:PATH = Join-Path $script:root 'empty'

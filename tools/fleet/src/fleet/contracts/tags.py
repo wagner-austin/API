@@ -90,6 +90,12 @@ probe's ``chrome`` line answers present when the binary exists at the path
 Playwright launches, ``/opt/google/chrome/chrome`` on Linux and
 ``Google\\Chrome\\Application\\chrome.exe`` under a Program Files root on
 Windows (:mod:`fleet.contracts.tagged_tools`).
+``pdftotext`` because MCPs ``packages/wiki-check``'s audit rules read PDF
+sources through poppler's pdftotext and depend on its exact page breaks,
+and no tag named the tool, so the queue would offer the suite to a node
+without it (MCPs board task 6dd73ada). It is a tool tag like ``ffmpeg``,
+found on Linux through the PATH and on Windows first at the Git for
+Windows build the package's Makefile puts on PATH, then on the PATH.
 ``elevated`` because MCPs' Task Scheduler
 installers register what only an administrator may register, and every
 build launches as an S4U task at RunLevel Limited (MCPs board task
@@ -126,8 +132,8 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615, 622, 639, 648, 668 and 707) is the same thirteen words as
-    these members' values, in this order.
+    570, 571, 615, 622, 639, 648, 668, 707 and 722) is the same fourteen
+    words as these members' values, in this order.
     """
 
     WINDOWS = "windows"
@@ -143,6 +149,7 @@ class NodeTag(StrEnum):
     HOOKS = "hooks"
     GO = "go"
     CHROME = "chrome"
+    PDFTOTEXT = "pdftotext"
 
 
 #: The tag each platform carries. A table rather than a lookup by word, so
@@ -173,6 +180,7 @@ TOOL_TAG: Final[dict[str, NodeTag]] = {
     "hooks": NodeTag.HOOKS,
     "go": NodeTag.GO,
     "chrome": NodeTag.CHROME,
+    "pdftotext": NodeTag.PDFTOTEXT,
 }
 
 

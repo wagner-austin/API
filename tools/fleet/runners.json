@@ -182,6 +182,7 @@
           "postgresql-client",
           "ffmpeg",
           "golang-go",
+          "poppler-utils",
           "curl",
           "pipx",
           "git",

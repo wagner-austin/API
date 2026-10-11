@@ -86,7 +86,9 @@ from fleet.contracts.tagged_tools import (
 #: ``report``'s THIRD ARGUMENT is what a tool is asked its version with,
 #: ``--version`` unless given: ``go`` has no such flag and answers its usage,
 #: so it is asked :data:`fleet.contracts.tagged_tools.GO_VERSION_ARGUMENT`
-#: (MCPs board task 1da15750).
+#: (MCPs board task 1da15750), and ``pdftotext`` is asked ``-v``, which
+#: poppler's tools answer with ``pdftotext version 24.02.0`` on diphtheria,
+#: colossus and lavender-wsl (MCPs board task 6dd73ada, 2026-10-11).
 #:
 #: THE ``chrome`` LINE is Google Chrome at the one path Playwright's channel
 #: ``chrome`` launches, :data:`fleet.contracts.tagged_tools.CHROME_LINUX_PATH`
@@ -197,6 +199,7 @@ TOOLCHAIN_PROBE_BODY = (
     "else\n"
     "  printf 'chrome=no=\\n'\n"
     "fi\n"
+    "report pdftotext pdftotext -v\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"
 )

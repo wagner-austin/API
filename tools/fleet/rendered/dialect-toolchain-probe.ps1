@@ -3,6 +3,7 @@ param(
     [string]$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
     [string]$HooksRoute = "$env:USERPROFILE\.claude\corvis-hooks.json",
     [string[]]$Chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"),
+    [string]$Pdftotext = "C:\Program Files\Git\mingw64\bin\pdftotext.exe",
     [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
@@ -122,6 +123,15 @@ foreach ($candidate in $Chrome) {
     }
 }
 $chromeLine
+$pdfPath = Find-Tool 'pdftotext'
+if ([System.IO.File]::Exists($Pdftotext)) {
+    $pdfPath = $Pdftotext
+}
+if ($pdfPath -ne '') {
+    'pdftotext=yes=' + (Invoke-Answer $Cmd $pdfPath '-v').First
+} else {
+    'pdftotext=no='
+}
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {

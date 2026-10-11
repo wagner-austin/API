@@ -18,6 +18,7 @@ from fleet.contracts.tagged_tools import (
     GO_VERSION_ARGUMENT,
     HOOKS_CHECK_MODULES,
     HOOKS_ROUTE_FILE,
+    PDFTOTEXT_WINDOWS_PATH,
 )
 
 #: The roots the probe tries for Google Chrome, in Playwright's order: the
@@ -117,6 +118,14 @@ _CHROME_DEFAULT = ", ".join(
 #: overwrite the ``$Chrome`` parameter before the loop read it, and the probe
 #: answered ``no`` with a stand-in Chrome in place (measured 2026-10-09 while
 #: this line was written).
+#: ``pdftotext`` is the tool MCPs ``packages/wiki-check`` reads PDFs through
+#: (MCPs board task 6dd73ada), looked for in the order the suite resolves it:
+#: ``$Pdftotext``, a parameter defaulting to
+#: :data:`fleet.contracts.tagged_tools.PDFTOTEXT_WINDOWS_PATH`, the Git for
+#: Windows build the package's Makefile puts first on PATH, and then the
+#: PATH. It answers with the tool's own ``-v``. The path found is held in
+#: ``$pdfPath``, never ``$pdftotext``, for the case-insensitivity reason
+#: above.
 #: ``integrity`` is the ssh session's token (:mod:`fleet.contracts.elevation`):
 #: ``yes=administrator`` only when ``WindowsPrincipal.IsInRole`` finds the
 #: Administrators role, which a filtered token never reports, so a node's
@@ -137,6 +146,9 @@ TOOLCHAIN_PROBE_SCRIPT = (
     [string[]]$Chrome = @("""
     + _CHROME_DEFAULT
     + r"""),
+    [string]$Pdftotext = """
+    + f'"{PDFTOTEXT_WINDOWS_PATH}"'
+    + r""",
     [scriptblock]$Administrator = { Test-Administrator }
 )
 Set-StrictMode -Version Latest
@@ -266,6 +278,15 @@ foreach ($candidate in $Chrome) {
     }
 }
 $chromeLine
+$pdfPath = Find-Tool 'pdftotext'
+if ([System.IO.File]::Exists($Pdftotext)) {
+    $pdfPath = $Pdftotext
+}
+if ($pdfPath -ne '') {
+    'pdftotext=yes=' + (Invoke-Answer $Cmd $pdfPath '-v').First
+} else {
+    'pdftotext=no='
+}
 if ([bool](& $Administrator)) {
     'integrity=yes=administrator'
 } else {

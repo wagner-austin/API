@@ -237,10 +237,34 @@ CHROME_APT = (
 )
 
 #: How the tagged gap reads Chrome's entry on a node whose managers cover
-#: none of its installs, the tail every such gap line now ends with.
+#: none of its installs.
 CHROME_NO_INSTALL = (
     f"; chrome -- {CHROME_REASON}, so those jobs go to a node that has it -- no automatic "
     "install on this node"
+)
+
+#: Why a node is told about pdftotext, in the tagged gap's words (MCPs board
+#: task 6dd73ada): wiki-check's audit rules read PDFs through it.
+PDFTOTEXT_REASON = (
+    "MCPs wiki-check's audit rules read PDF sources through poppler's pdftotext and depend on "
+    "its exact page breaks"
+)
+
+#: The winget line a Windows node is offered for pdftotext: Git for Windows,
+#: whose full installer carries the build the package's Makefile runs.
+PDFTOTEXT_WINGET = (
+    "winget install --id Git.Git -e --source winget --silent "
+    "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+)
+
+#: The line a Linux node is offered for pdftotext.
+PDFTOTEXT_APT = "sudo apt-get install -y poppler-utils"
+
+#: How the tagged gap reads pdftotext's entry on a node whose managers cover
+#: none of its installs, the tail every such gap line now ends with.
+PDFTOTEXT_NO_INSTALL = (
+    f"; pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that has it -- no "
+    "automatic install on this node"
 )
 
 

@@ -106,6 +106,14 @@ CHROME_LINUX_PATH: Final = "/opt/google/chrome/chrome"
 #: out a stand-in, and answers the first that exists.
 CHROME_WINDOWS_RELATIVE: Final = ("Google", "Chrome", "Application", "chrome.exe")
 
+#: Where MCPs ``packages/wiki-check`` finds pdftotext on Windows: its
+#: Makefile runs vitest with ``C:/Program Files/Git/mingw64/bin`` first on
+#: PATH, the poppler build Git for Windows ships, because a vitest worker
+#: launched from PowerShell has no Git Bash PATH. The Windows probe asks for
+#: this file first and the PATH after it, the order the suite resolves the
+#: name in.
+PDFTOTEXT_WINDOWS_PATH: Final = "C:\\Program Files\\Git\\mingw64\\bin\\pdftotext.exe"
+
 #: Tools only some projects need, each the source of a capability tag
 #: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
 #: them every tick like the required tools, but a node without one is refused
@@ -132,6 +140,17 @@ CHROME_WINDOWS_RELATIVE: Final = ("Google", "Chrome", "Application", "chrome.exe
 #: rather than through ``report``'s ``command -v`` or ``Find-Tool``. The
 #: apt-get install is the asset's own ``provision_command``: Google ships the
 #: .deb from its own host, not from any apt repository the node already has.
+#:
+#: ``pdftotext`` because MCPs ``packages/wiki-check`` reads PDF sources
+#: through poppler's pdftotext and its audit rules depend on that tool's
+#: exact form-feed page breaks, so the suite cannot pass without it, and no
+#: tag named it (MCPs board task 6dd73ada). On 2026-10-11 every live runner
+#: had it only by accident: diphtheria, colossus and lavender-wsl in
+#: ``/usr/bin``, the Windows nodes at :data:`PDFTOTEXT_WINDOWS_PATH`, while
+#: the runner roster's ``apt_packages`` did not carry poppler-utils, so a
+#: lavender-wsl rebuild would have dropped it. On Windows the install is Git
+#: for Windows itself, whose full installer carries that build (MinGit does
+#: not).
 TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="ffmpeg",
@@ -216,6 +235,29 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "apt-get": "sudo apt-get remove -y google-chrome-stable",
         },
     ),
+    RequiredTool(
+        name="pdftotext",
+        reason=(
+            "MCPs wiki-check's audit rules read PDF sources through poppler's pdftotext and "
+            "depend on its exact page breaks"
+        ),
+        install={
+            "winget": (
+                "winget install --id Git.Git -e --source winget --silent "
+                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco install git -y",
+            "apt-get": "sudo apt-get install -y poppler-utils",
+        },
+        uninstall={
+            "winget": (
+                "winget uninstall --id Git.Git -e --source winget --silent "
+                "--accept-source-agreements --disable-interactivity"
+            ),
+            "choco": "choco uninstall git -y",
+            "apt-get": "sudo apt-get remove -y poppler-utils",
+        },
+    ),
 )
 
 
@@ -226,6 +268,7 @@ __all__ = [
     "HOOKS_CHECK_MODULES",
     "HOOKS_CHECK_PACKAGES",
     "HOOKS_ROUTE_FILE",
+    "PDFTOTEXT_WINDOWS_PATH",
     "TAGGED_TOOLS",
     "RequiredTool",
 ]

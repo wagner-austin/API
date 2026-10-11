@@ -535,6 +535,7 @@ class TestForRealUnderSh:
             "testdb",
             "hooks",
             "chrome",
+            "pdftotext",
             "apt-get",
             "pipx",
         }

@@ -68,12 +68,12 @@ class TestReadySummary:
         assert (
             toolchain.ready_summary(toolchain.read_reports(LAVENDER_2026_09_23))
             == "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome absent"
+            "hooks absent; go absent; chrome absent; pdftotext absent"
         )
         assert (
             toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23))
             == "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome absent"
+            "hooks absent; go absent; chrome absent; pdftotext absent"
         )
 
     def test_it_names_a_tagged_tool_the_probe_found(self) -> None:
@@ -82,7 +82,7 @@ class TestReadySummary:
         found = toolchain.read_reports(LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg version 7.1.1\n")
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg present; "
-            "hooks absent; go absent; chrome absent"
+            "hooks absent; go absent; chrome absent; pdftotext absent"
         )
 
     def test_it_names_the_hooks_environment_the_probe_found(self) -> None:
@@ -93,7 +93,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks present; go absent; chrome absent"
+            "hooks present; go absent; chrome absent; pdftotext absent"
         )
 
     def test_it_names_go_the_probe_found(self) -> None:
@@ -104,7 +104,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go present; chrome absent"
+            "hooks absent; go present; chrome absent; pdftotext absent"
         )
 
     def test_it_names_chrome_the_probe_found(self) -> None:
@@ -116,7 +116,19 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome present"
+            "hooks absent; go absent; chrome present; pdftotext absent"
+        )
+
+    def test_it_names_pdftotext_the_probe_found(self) -> None:
+        """diphtheria on 2026-10-11 (MCPs board task 6dd73ada): its runner
+        claims with pdftotext, and the summary says so on the same line, so
+        the tag wiki-check's check waits for is visible each tick."""
+        found = toolchain.read_reports(
+            LAVENDER_2026_09_23 + "pdftotext=yes=pdftotext version 24.02.0\n"
+        )
+        assert toolchain.ready_summary(found) == (
+            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
+            "hooks absent; go absent; chrome absent; pdftotext present"
         )
 
 

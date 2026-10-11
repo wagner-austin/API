@@ -45,6 +45,10 @@ from tests._toolchain_fixtures import (
     HOOKS_REASON,
     LAVENDER,
     LOKI,
+    PDFTOTEXT_APT,
+    PDFTOTEXT_NO_INSTALL,
+    PDFTOTEXT_REASON,
+    PDFTOTEXT_WINGET,
     SEDONA,
     SEDONA_2026_09_23,
     WRONG_PYTHON,
@@ -202,7 +206,7 @@ class TestReadiness:
 
         assert missing(reports) == ()
         assert describe_gap("serendipity", reports) == "serendipity: ready"
-        assert toolchain.absent_tagged(reports) == ("ffmpeg", "hooks", "go", "chrome")
+        assert toolchain.absent_tagged(reports) == ("ffmpeg", "hooks", "go", "chrome", "pdftotext")
         assert toolchain.tagged_gap("serendipity", reports) == (
             "serendipity claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
@@ -211,7 +215,8 @@ class TestReadiness:
             f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- no automatic "
             f"install on this node; go -- {GO_REASON}, so those jobs go to a node that has it "
             f"-- {GO_WINGET}; chrome -- {CHROME_REASON}, so those jobs go to a node that has it "
-            f"-- {CHROME_WINGET}"
+            f"-- {CHROME_WINGET}; pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node "
+            f"that has it -- {PDFTOTEXT_WINGET}"
         )
 
     def test_a_node_with_every_tagged_tool_has_no_tagged_gap(self) -> None:
@@ -220,17 +225,18 @@ class TestReadiness:
             "hooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
             "go=yes=go version go1.27.1 windows/amd64\n"
             "chrome=yes=155.0.8059.39\n"
+            "pdftotext=yes=pdftotext version 4.00\n"
         )
 
         assert toolchain.absent_tagged(reports) == ()
         assert toolchain.tagged_gap("sedona", reports) is None
 
     def test_a_tagged_tool_with_no_install_here_says_so(self) -> None:
-        """A node whose only manager is pip has no command for ffmpeg, go or
-        Chrome, and is offered the pinned pip line for the hooks check's
-        tools (MCPs board task ec895824)."""
+        """A node whose only manager is pip has no command for ffmpeg, go,
+        Chrome or pdftotext, and is offered the pinned pip line for the hooks
+        check's tools (MCPs board task ec895824)."""
         reports = toolchain.parse_probe(
-            "ffmpeg=no=\nhooks=no=\ngo=no=\nchrome=no=\npip=yes=pip 25.2\n"
+            "ffmpeg=no=\nhooks=no=\ngo=no=\nchrome=no=\npdftotext=no=\npip=yes=pip 25.2\n"
         )
 
         assert toolchain.tagged_gap("lenovoold", reports) == (
@@ -238,24 +244,31 @@ class TestReadiness:
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             f"it -- no automatic install on this node; hooks -- {HOOKS_REASON}, so those jobs go "
             f"to a node that has it -- {HOOKS_INSTALL}{GO_NO_INSTALL}{CHROME_NO_INSTALL}"
+            f"{PDFTOTEXT_NO_INSTALL}"
         )
 
-    def test_a_linux_node_is_offered_go_from_apt_get_and_chrome_as_the_deb(self) -> None:
+    def test_a_linux_node_is_offered_go_and_poppler_from_apt_get_and_chrome_as_the_deb(
+        self,
+    ) -> None:
         """diphtheria and lavender-wsl answered go=no= on 2026-10-05 (MCPs board
         task 1da15750); their manager is apt-get, whose golang-go fetches the
         go.mod's toolchain itself. diphtheria answered chrome=no= until its
         2026-10-09 install (MCPs board task 2f596185), and apt-get installs
-        Chrome only from the .deb Google ships, so that is the line."""
+        Chrome only from the .deb Google ships, so that is the line. A node
+        without pdftotext is offered poppler-utils (MCPs board task
+        6dd73ada)."""
         reports = toolchain.parse_probe(
             "ffmpeg=yes=ffmpeg version 6.1.1\nhooks=yes=/home/corvis/.claude/corvis-hooks.json\n"
-            "go=no=\nchrome=no=\napt-get=yes=apt 2.7.14 (amd64)\n"
+            "go=no=\nchrome=no=\npdftotext=no=\napt-get=yes=apt 2.7.14 (amd64)\n"
         )
 
-        assert toolchain.absent_tagged(reports) == ("go", "chrome")
+        assert toolchain.absent_tagged(reports) == ("go", "chrome", "pdftotext")
         assert toolchain.tagged_gap("diphtheria", reports) == (
             f"diphtheria claims without the tag of every tool it lacks: go -- {GO_REASON}, so "
             "those jobs go to a node that has it -- sudo apt-get install -y golang-go; chrome -- "
-            f"{CHROME_REASON}, so those jobs go to a node that has it -- {CHROME_APT}"
+            f"{CHROME_REASON}, so those jobs go to a node that has it -- {CHROME_APT}; "
+            f"pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that has it -- "
+            f"{PDFTOTEXT_APT}"
         )
 
     def test_the_wrong_python_is_not_ready_even_with_every_tool(self) -> None:

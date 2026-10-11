@@ -164,9 +164,9 @@ class TestNodeTags:
             (tag,) = node_tags(_node(platform=platform))
             assert tag.value == platform.value
 
-    def test_the_vocabulary_is_the_platforms_and_eleven_capabilities(self) -> None:
+    def test_the_vocabulary_is_the_platforms_and_twelve_capabilities(self) -> None:
         """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571,
-        615, 622, 639, 648, 668 and 707) is these thirteen words, so the
+        615, 622, 639, 648, 668, 707 and 722) is these fourteen words, so the
         members' values are pinned in order."""
         assert [tag.value for tag in NodeTag] == [
             "windows",
@@ -182,10 +182,11 @@ class TestNodeTags:
             "hooks",
             "go",
             "chrome",
+            "pdftotext",
         ]
 
     def test_no_declaration_carries_a_tool_tag(self) -> None:
-        """ffmpeg, hooks, go and chrome come only from the toolchain probe
+        """ffmpeg, hooks, go, chrome and pdftotext come only from the toolchain probe
         (:func:`tool_tags`), so a node with every declaration set carries
         none of them."""
         loaded = _node(test_database=True, rust="1.98.1", cxx="13.3.0", elevated=True)
@@ -193,6 +194,7 @@ class TestNodeTags:
         assert NodeTag.HOOKS not in node_tags(loaded)
         assert NodeTag.GO not in node_tags(loaded)
         assert NodeTag.CHROME not in node_tags(loaded)
+        assert NodeTag.PDFTOTEXT not in node_tags(loaded)
 
 
 class TestToolTags:
@@ -237,12 +239,21 @@ class TestToolTags:
         assert tool_tags(found) == frozenset({NodeTag.CHROME})
         assert tool_tags((ToolReport(name="chrome", present=False, version=""),)) == frozenset()
 
+    def test_a_probe_that_found_pdftotext_gives_its_tag(self) -> None:
+        """diphtheria, colossus and lavender-wsl on 2026-10-11 (MCPs board
+        task 6dd73ada): the line answers with poppler's own -v, and a node
+        without the tool carries nothing for it."""
+        found = (ToolReport(name="pdftotext", present=True, version="pdftotext version 24.02.0"),)
+        assert tool_tags(found) == frozenset({NodeTag.PDFTOTEXT})
+        assert tool_tags((ToolReport(name="pdftotext", present=False, version=""),)) == frozenset()
+
     def test_only_the_tagged_tools_have_tags(self) -> None:
         assert TOOL_TAG == {
             "ffmpeg": NodeTag.FFMPEG,
             "hooks": NodeTag.HOOKS,
             "go": NodeTag.GO,
             "chrome": NodeTag.CHROME,
+            "pdftotext": NodeTag.PDFTOTEXT,
         }
         assert tool_tags((ToolReport(name="make", present=True, version="4.4"),)) == frozenset()
 
@@ -315,7 +326,8 @@ class TestDecodeNodeTag:
         with pytest.raises(
             JSONTypeError,
             match=r"t must be one of windows, linux, gpu, testdb, rust, cxx, docker, elevated, "
-            r"stack, ffmpeg, hooks, go, chrome, got 'podman'; .* a Rust or C\+\+ toolchain, the "
+            r"stack, ffmpeg, hooks, go, chrome, pdftotext, got 'podman'; .* a Rust or C\+\+ "
+            r"toolchain, the "
             r"execution suite's rootless Docker daemon, an elevated runner, the corvis compose "
             r"stack, or a tool, the hooks check's environment or Google Chrome its probe found\), "
             r"and one it does not carry could never be satisfied$",

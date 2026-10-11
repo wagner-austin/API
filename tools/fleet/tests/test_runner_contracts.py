@@ -392,7 +392,9 @@ class TestRunnerSpec:
         the roster's base installs each tagged tool's apt-get package, and
         carries as an asset the one tagged tool no apt repository supplies:
         Chrome, the .deb Google ships, whose asset path is the file the
-        probe's chrome line asks for (MCPs board task 2f596185).
+        probe's chrome line asks for (MCPs board task 2f596185). poppler-utils
+        joined the base when pdftotext became a tag (MCPs board task
+        6dd73ada): lavender-wsl had it on 2026-10-11, but from no line here.
         """
         spec = decode_runner_spec(load_json_str(SHIPPED_ROSTER.read_text(encoding="utf-8")))
         workspace = decode_fleet_workspace(
@@ -409,8 +411,8 @@ class TestRunnerSpec:
             for install in apt_installs.values()
             if install.startswith("sudo apt-get install -y ")
         }
-        assert apt_supplied == {"ffmpeg", "golang-go"}
-        assert set(apt_installs) - {"ffmpeg", "go"} == {"chrome"}
+        assert apt_supplied == {"ffmpeg", "golang-go", "poppler-utils"}
+        assert set(apt_installs) - {"ffmpeg", "go", "pdftotext"} == {"chrome"}
         assert apt_installs["chrome"].startswith("curl -fsSL -o ")
         node_hosts = [host for host in spec["hosts"] if host["name"] in wsl_hosts]
         assert [host["name"] for host in node_hosts] == ["lavender"]

@@ -546,9 +546,18 @@ those three on 2026-10-04 (fleet job 874c160c) and 2026-10-09 (56d7fbb5)
 and passed the other 490, so the verdict depended on which node claimed the
 suite. A node without it is offered `winget install --id Google.Chrome`,
 `choco install googlechrome` or the .deb Google ships, the same command
-`runners.json` provisions the asset with. lavender's distro, which is the node
-lavender-wsl, gets go and ffmpeg from `runners.json`'s base `apt_packages` and
-Chrome from its `assets`, so a `--rebuild` keeps all three tags, and
+`runners.json` provisions the asset with. `pdftotext` routes MCPs
+`packages/wiki-check`, whose audit rules read PDF sources through poppler's
+pdftotext and depend on its exact page breaks (MCPs board task 6dd73ada). On
+Linux it is found on the PATH and asked `-v`; on Windows the probe asks first
+for `C:\Program Files\Git\mingw64\bin\pdftotext.exe`, the Git for Windows
+build the package's Makefile puts first on PATH, and then the PATH. Every
+live runner had it on 2026-10-11, but nothing declared it and the roster's
+apt packages lacked poppler-utils; a node without it is offered
+`sudo apt-get install -y poppler-utils`, or Git for Windows through winget or
+choco. lavender's distro, which is the node lavender-wsl, gets go, ffmpeg and
+pdftotext from `runners.json`'s base `apt_packages` and Chrome from its
+`assets`, so a `--rebuild` keeps all four tags, and
 `test_runner_contracts.py` fails if a tagged tool apt can supply is missing
 from that list or Chrome's path from those assets. Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
