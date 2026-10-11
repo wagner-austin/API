@@ -45,7 +45,15 @@
 set -eu
 
 REPO="$(git rev-parse --show-toplevel)"
-TOOL="$REPO/tools/ci-wake"
+
+# THE LEDGER IS THE PUMP'S, NOT THIS CHECKOUT'S (MCPs board task 88a2853f).
+# The scheduled pump reads the hub checkout's tools/ci-wake/runs/pushes.jsonl
+# and no other, so a worktree enrolling into its own copy wrote rows nothing
+# ever announced: 90 of them across 28 API worktrees on 2026-10-11. The tree,
+# its venv and its ledger are therefore the hub's, resolved exactly as
+# MCPs's .husky/pre-push resolves them; override CI_WAKE_HOME if that tree is
+# somewhere else on this machine.
+TOOL="${CI_WAKE_HOME:-$HOME/PROJECTS/API/tools/ci-wake}"
 LEDGER="$TOOL/runs/pushes.jsonl"
 
 # git hands pre-push the remote's name and its location.
@@ -109,7 +117,7 @@ else
     echo "This push cannot be enrolled, and an unenrolled push is one whose CI" >&2
     echo "verdict reaches nobody -- which is the silence ci-wake exists to remove," >&2
     echo "so it is refused rather than skipped." >&2
-    echo "Create it once:  make -C tools/ci-wake lint" >&2
+    echo "Create it once:  make -C \"$TOOL\" lint" >&2
     exit 1
 fi
 

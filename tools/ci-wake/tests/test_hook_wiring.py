@@ -16,6 +16,18 @@ from typing import Final
 ROOT: Final = Path(__file__).resolve().parents[3]
 
 
+def test_every_checkout_enrols_into_the_ledger_the_pump_reads() -> None:
+    """MCPs board task 88a2853f: the pump reads the hub checkout's ledger
+    alone, so the tree is the hub's whichever checkout pushes, resolved with
+    MCPs's own variable and default, and nothing names this checkout's."""
+    hook = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
+    executable = [line for line in hook.splitlines() if not line.lstrip().startswith("#")]
+
+    assert 'TOOL="${CI_WAKE_HOME:-$HOME/PROJECTS/API/tools/ci-wake}"' in executable
+    assert 'LEDGER="$TOOL/runs/pushes.jsonl"' in executable
+    assert not any("$REPO/tools/ci-wake" in line for line in executable)
+
+
 def test_the_enrolment_is_handed_the_ref_the_push_updates() -> None:
     hook = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
     loop = hook.index("while read -r _local_ref local_sha remote_ref _remote_sha; do")
