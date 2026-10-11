@@ -303,7 +303,7 @@ def test_a_whole_ordinary_tick_claims_nothing_while_an_elevated_job_waits(
             "elevated": False,
             "tags": ["windows"],
             "fits": [DEMO_PROJECT],
-            "load": {"runs": 0, "workers": 0, "freeRamGb": 27.0},
+            "load": {"runs": 0, "workers": 0, "freeRamGb": 27.0, "freeDiskGb": 860.0},
             "claiming": False,
             "verdict": "yields to its elevated runner; claiming nothing",
         }

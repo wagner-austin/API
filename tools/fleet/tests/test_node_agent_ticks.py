@@ -30,8 +30,9 @@ from tests.conftest import DEMO_PROJECT, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
-#: lavender's load with 27.0 GB free and no live run, PROBE_OK's answer.
-ROOMY = {"runs": 0, "workers": 0, "freeRamGb": 27.0}
+#: lavender's load with 27.0 GB of memory and 860.0 GB of disk free and no
+#: live run, PROBE_OK's answer.
+ROOMY = {"runs": 0, "workers": 0, "freeRamGb": 27.0, "freeDiskGb": 860.0}
 
 
 def _ticked(
@@ -133,7 +134,12 @@ class TestATickThatClaimsNothing:
 
         assert endpoint.tools == ["dispatch_list"]
         assert (tick["tags"], tick["fits"], tick["claiming"]) == (["windows"], [], False)
-        assert tick["load"] == {"runs": 0, "workers": 0, "freeRamGb": float(free)}
+        assert tick["load"] == {
+            "runs": 0,
+            "workers": 0,
+            "freeRamGb": float(free),
+            "freeDiskGb": 860.0,
+        }
         assert narrow_json_to_str(tick["verdict"]).startswith(verdict)
 
 

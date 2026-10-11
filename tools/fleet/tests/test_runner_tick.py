@@ -29,7 +29,7 @@ SEDONA = RunnerTick(
     elevated=False,
     tags=(NodeTag.CXX, NodeTag.GPU, NodeTag.WINDOWS),
     fits=("libs/platform_core", "tools/fleet"),
-    load=TickLoad(runs=1, workers=8, free_ram_gb=9.5),
+    load=TickLoad(runs=1, workers=8, free_ram_gb=9.5, free_disk_gb=412.5),
     claiming=True,
     verdict="sedona asked for 2 fitting project(s); nothing in the node lane matched",
 )
@@ -55,7 +55,7 @@ class TestTheWireShape:
             "fits": ["libs/platform_core", "tools/fleet"],
             "claiming": True,
             "verdict": SEDONA["verdict"],
-            "load": {"runs": 1, "workers": 8, "freeRamGb": 9.5},
+            "load": {"runs": 1, "workers": 8, "freeRamGb": 9.5, "freeDiskGb": 412.5},
         }
 
     def test_a_silent_node_omits_its_load(self) -> None:
