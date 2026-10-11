@@ -1808,6 +1808,59 @@
         "companions": []
       }
     },
+    "MCPs/packages/wiki-check": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "required_tags": ["cxx"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "packages/wiki-check",
+        "install": [
+          {"phase": "install", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "install"]},
+          {"phase": "workspace-build", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "workspace-build"]},
+          {"phase": "peer-wikis", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "peer-wikis"]}
+        ],
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/wiki.git", "ref": "main", "directory": "wiki"},
+          {"remote": "https://github.com/wagner-austin/tech-wiki.git", "ref": "main", "directory": "tech-wiki"},
+          {"remote": "https://github.com/wagner-austin/me-wiki.git", "ref": "main", "directory": "me-wiki"},
+          {"remote": "https://github.com/wagner-austin/legal-wiki.git", "ref": "main", "directory": "legal-wiki"},
+          {"remote": "https://github.com/wagner-austin/API.git", "ref": "main", "directory": "api"},
+          {"remote": "https://github.com/wagner-austin/corvis-stick.git", "ref": "main", "directory": "corvis-stick"},
+          {"remote": "https://github.com/wagner-austin/fiesta.git", "ref": "main", "directory": "fiesta"},
+          {"remote": "https://github.com/wagner-austin/offline-ai.git", "ref": "main", "directory": "offline-ai"},
+          {"remote": "https://github.com/wagner-austin/chat.git", "ref": "main", "directory": "chat"},
+          {"remote": "https://github.com/wagner-austin/hardware-wiki.git", "ref": "main", "directory": "hardware-wiki"},
+          {"remote": "https://github.com/wagner-austin/slime.git", "ref": "master", "directory": "slime"},
+          {"remote": "https://github.com/wagner-austin/irvine-civic-wiki.git", "ref": "master", "directory": "irvine-civic-wiki"},
+          {"remote": "https://github.com/wagner-austin/bookshelf.git", "ref": "main", "directory": "bookshelf"},
+          {"remote": "https://github.com/wagner-austin/chau.git", "ref": "main", "directory": "chau"}
+        ]
+      }
+    },
+    "MCPs/brief-generator": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 2,
+      "expected_minutes": 10,
+      "exclusive_resources": ["corvis-fleet-testdb"],
+      "required_tags": ["testdb", "cxx"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "brief-generator",
+        "install": [
+          {"phase": "install", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "install"]},
+          {"phase": "workspace-build", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "workspace-build"]},
+          {"phase": "test-database", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "test-database", "CONTAINER=corvis-fleet-testdb"]},
+          {"phase": "peer-wikis", "argv": ["make", "-s", "-C", "scripts/fleet-prepare", "peer-wikis"]}
+        ],
+        "companions": [
+          {"remote": "https://github.com/wagner-austin/irvine-civic-wiki.git", "ref": "master", "directory": "irvine-civic-wiki"},
+          {"remote": "https://github.com/wagner-austin/bookshelf.git", "ref": "main", "directory": "bookshelf"},
+          {"remote": "https://github.com/wagner-austin/chau.git", "ref": "main", "directory": "chau"}
+        ]
+      }
+    },
     "MCPs/pcsession-mcp": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 2,

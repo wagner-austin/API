@@ -53,8 +53,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # MCPs/execution-testdb, the execution suite's testdb lane (MCPs board
     # task c04519f9, A2); 56 since MCPs/login-probe, the login real-use
     # check (MCPs board task 2ce5fc24); 55 since MCPs/dx-mod was archived
-    # (MCPs board task 5d8b114b).
-    assert len(prepared) == 55
+    # (MCPs board task 5d8b114b); 57 since MCPs/packages/wiki-check and
+    # MCPs/brief-generator, which end with the peer-wikis phase (MCPs board
+    # task b1089284).
+    assert len(prepared) == 57
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -74,10 +76,34 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
         if step["argv"][:4] == PREPARE and step["argv"][4] == "test-database"
     ]
 
-    # 28 since MCPs/execution-testdb (MCPs board task c04519f9, A2).
-    assert len(databases) == 28
+    # 28 since MCPs/execution-testdb (MCPs board task c04519f9, A2); 29 since
+    # MCPs/brief-generator (MCPs board task b1089284).
+    assert len(databases) == 29
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
+
+
+def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
+    """MCPs fleet-prepare's peer-wikis phase copies three companions from
+    beside the export into the places docker-compose mounts them (MCPs board
+    task b1089284). It must run after install and workspace-build, which store
+    the tree's untracked files, and its row must declare the three, or the
+    phase refuses FLEET_COMPANION_MISSING on the node."""
+    path = Path(__file__).resolve().parents[1] / "fleet.json"
+    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    placing = {
+        name: project["source"]
+        for name, project in workspace["projects"].items()
+        if project["source"] is not None
+        and any(step["argv"][4:] == ("peer-wikis",) for step in project["source"]["install"])
+    }
+
+    assert sorted(placing) == ["MCPs/brief-generator", "MCPs/packages/wiki-check"]
+    for source in placing.values():
+        assert source["install"][-1]["phase"] == "peer-wikis"
+        assert {"irvine-civic-wiki", "bookshelf", "chau"} <= {
+            companion["directory"] for companion in source["companions"]
+        }
 
 
 def test_each_prepare_step_names_the_directory_an_older_commit_lacks() -> None:
