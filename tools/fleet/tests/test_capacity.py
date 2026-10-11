@@ -28,7 +28,7 @@ from tests.conftest import IDLE
 WINDOWS_TAGS = frozenset({NodeTag.WINDOWS})
 LINUX_TAGS = frozenset({NodeTag.LINUX})
 
-#: lavender's card as fleet.json declares it, for the nodes that carry one.
+#: lavender's card as the registry declares it, for the nodes that carry one.
 GTX_1630 = NodeGpu(
     model="NVIDIA GeForce GTX 1630",
     vram_mib=4096,

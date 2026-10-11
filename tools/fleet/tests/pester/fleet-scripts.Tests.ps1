@@ -173,7 +173,7 @@ Describe 'The schedules' {
                 Workspace = $workspace; TaskPrefix = $script:prefix; ApiRoot = $script:world.Api
                 LogDirectory = $script:world.Logs; Poetry = $script:world.Poetry
             } 6>&1 | ForEach-Object { "$_" })
-        $said[0] | Should -BeExactly "Unregistered ${script:prefix}delta-3min: fleet.json asks for no such runner."
+        $said[0] | Should -BeExactly "Unregistered ${script:prefix}delta-3min: the registry asks for no such runner."
         $said[1] | Should -BeLike "Registered ${script:prefix}alpha-3min (every 3 minutes and at boot, *, S4U, Limited) and announced it."
         @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min').TaskName | Should -Be @("${script:prefix}alpha-3min")
         $task = (Get-TaskDefinition "${script:prefix}alpha-3min").Task
@@ -209,7 +209,7 @@ Describe 'The schedules' {
         Read-PoetryCall $script:world | Should -Be @($announces + $announces)
         [System.IO.File]::WriteAllText($workspace, '{"nodes": {"alpha": {"enabled": true, "elevated": false}}}')
         $retired = @(Invoke-TestEntry $script:registerNodes $parameters 6>&1 | ForEach-Object { "$_" })
-        $retired[0] | Should -BeExactly "Unregistered ${script:prefix}alpha-elevated-3min: fleet.json asks for no such runner."
+        $retired[0] | Should -BeExactly "Unregistered ${script:prefix}alpha-elevated-3min: the registry asks for no such runner."
         @(Get-FleetScheduledTask -Prefix $script:prefix -Suffix '-3min').TaskName | Should -Be @("${script:prefix}alpha-3min")
     }
     It 'refuses a node whose announce fails, by its runner''s name' {
@@ -245,14 +245,14 @@ Describe 'The schedules' {
         [System.IO.File]::ReadAllLines($record) | Should -Be @("${script:prefix}hub|$($script:world.Poetry)|$($script:apiRoot)\tools\fleet|$arguments|" +
             'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.')
     }
-    It 'registers and announces each runner fleet.json asks for from this checkout, when neither is named' {
+    It 'registers and announces each runner the registry asks for from this checkout, when neither is named' {
         $record = Join-Path $TestDrive ('register-' + [guid]::NewGuid().ToString('N') + '.txt')
         $register = {
             param([string]$TaskName, [string]$Poetry, [string]$FleetRoot, [string]$Arguments, [string]$Description)
             [System.IO.File]::AppendAllText($record, "$TaskName|$Poetry|$FleetRoot|$Arguments|$Description`r`n")
             'recorded'
         }.GetNewClosure()
-        $document = [System.IO.File]::ReadAllText((Join-Path $script:scriptsRoot '..\fleet.json')) | ConvertFrom-Json
+        $document = [System.IO.File]::ReadAllText((Join-Path $script:scriptsRoot '..\registry\nodes.json')) | ConvertFrom-Json
         $enabled = @($document.nodes.PSObject.Properties | Where-Object { $_.Value.PSObject.Properties['enabled'] -and $_.Value.enabled -eq $true })
         $enabled.Count | Should -BeGreaterThan 0
         $fleet = "$($script:apiRoot)\tools\fleet"

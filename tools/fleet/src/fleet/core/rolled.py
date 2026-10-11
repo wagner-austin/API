@@ -51,6 +51,7 @@ import shutil
 from typing import Final, TypedDict
 
 from fleet.core import _test_hooks, commit_tree
+from fleet.core.workspace_files import NODES_FILE, SETTINGS_FILE
 
 #: The ref ``make fleet-roll`` sets and every tick reads.
 ROLLED_REF: Final = "refs/fleet/rolled"
@@ -61,7 +62,9 @@ FLEET_SRC: Final = "tools/fleet/src"
 PLATFORM_CORE_SRC: Final = "libs/platform_core/src"
 MONOREPO_GUARDS_SRC: Final = "libs/monorepo_guards/src"
 BOARD_WATCH_SRC: Final = "tools/board-watch/src"
-REGISTRY_FILE: Final = "tools/fleet/fleet.json"
+#: The registry directory (:mod:`fleet.core.workspace_files`; one file,
+#: ``tools/fleet/fleet.json``, until MCPs board task 4a78c916).
+REGISTRY_DIRECTORY: Final = "tools/fleet/registry"
 
 #: The source trees, in the order they go on ``PYTHONPATH``.
 SOURCE_TREES: Final[tuple[str, ...]] = (
@@ -71,17 +74,19 @@ SOURCE_TREES: Final[tuple[str, ...]] = (
     BOARD_WATCH_SRC,
 )
 
-ARCHIVED_PATHS: Final[tuple[str, ...]] = (*SOURCE_TREES, REGISTRY_FILE)
+ARCHIVED_PATHS: Final[tuple[str, ...]] = (*SOURCE_TREES, REGISTRY_DIRECTORY)
 
 #: Files whose absence means the extraction cannot run a tick: both agents'
-#: entry points, one module of each imported package, and the registry.
+#: entry points, one module of each imported package, and the registry's two
+#: fixed files (its projects directory is checked by the agent's own reader).
 REQUIRED_FILES: Final[tuple[str, ...]] = (
     f"{FLEET_SRC}/fleet/cli/agent.py",
     f"{FLEET_SRC}/fleet/cli/node_agent.py",
     f"{PLATFORM_CORE_SRC}/platform_core/__init__.py",
     f"{MONOREPO_GUARDS_SRC}/monorepo_guards/__init__.py",
     f"{BOARD_WATCH_SRC}/board_watch/__init__.py",
-    REGISTRY_FILE,
+    f"{REGISTRY_DIRECTORY}/{NODES_FILE}",
+    f"{REGISTRY_DIRECTORY}/{SETTINGS_FILE}",
 )
 
 #: Where the registry's relative record paths resolve in the checkout: the
@@ -185,7 +190,7 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
         python_path=os.pathsep.join(
             str(destination / pathlib.PurePosixPath(tree)) for tree in SOURCE_TREES
         ),
-        config=str(destination / pathlib.PurePosixPath(REGISTRY_FILE)),
+        config=str(destination / pathlib.PurePosixPath(REGISTRY_DIRECTORY)),
     )
 
 
@@ -228,7 +233,7 @@ __all__ = [
     "PLATFORM_CORE_SRC",
     "RECORDS_DIR",
     "REF_UNRESOLVED_CODE",
-    "REGISTRY_FILE",
+    "REGISTRY_DIRECTORY",
     "REQUIRED_FILES",
     "ROLLED_REF",
     "SOURCE_TREES",

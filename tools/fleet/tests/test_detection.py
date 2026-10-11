@@ -34,7 +34,7 @@ DIPHTHERIA_2026_10_02 = (
 #: pendragon's, the same day: no compiler, no card, no test database.
 PENDRAGON_2026_10_02 = "ffmpeg=yes=ffmpeg version 8.0\ncxx=no=\ngpu=no=\ntestdb=no=\ndocker=no=\n"
 
-#: diphtheria's card as fleet.json declares it.
+#: diphtheria's card as the registry declares it.
 A2000 = NodeGpu(
     model="NVIDIA RTX A2000 12GB",
     vram_mib=12282,
@@ -44,7 +44,7 @@ A2000 = NodeGpu(
 
 
 def _diphtheria() -> NodeConfig:
-    """diphtheria as fleet.json declares it.
+    """diphtheria as the registry declares it.
 
     Returns:
         The node.
@@ -97,9 +97,10 @@ class TestTagDrift:
 
         assert tag_drift(_diphtheria(), toolchain.read_reports(answer)) == (
             "declares gpu 'NVIDIA RTX A2000 12GB, 8.6' but nvidia-smi reports none, so it claims "
-            "without the gpu tag; correct gpu in fleet.json",
+            "without the gpu tag; correct gpu in registry/nodes.json",
             "declares test_database true but no corvis-fleet-testdb container exists, so it "
-            "claims without the testdb tag; set test_database to false in fleet.json, or "
+            "claims without the testdb tag; set test_database to false in registry/nodes.json, "
+            "or "
             "provision the container",
         )
 
@@ -112,10 +113,10 @@ class TestTagDrift:
 
         assert tag_drift(node("pendragon"), toolchain.read_reports(answer)) == (
             "declares gpu none but nvidia-smi reports 'NVIDIA GeForce GTX 1630, 7.5', so it "
-            "claims with the gpu tag; correct gpu in fleet.json",
+            "claims with the gpu tag; correct gpu in registry/nodes.json",
             "declares test_database false but corvis-fleet-testdb exists "
             "(pgvector/pgvector:pg16-bookworm), so it claims with the testdb tag; set "
-            "test_database to true in fleet.json",
+            "test_database to true in registry/nodes.json",
             "declares cxx none but its probe reports cxx '13.3.0', so it claims with the cxx "
-            "tag; set cxx to '13.3.0' in fleet.json",
+            "tag; set cxx to '13.3.0' in registry/nodes.json",
         )

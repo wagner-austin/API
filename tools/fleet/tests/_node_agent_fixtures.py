@@ -28,6 +28,7 @@ from fleet.contracts.source import (
 )
 from fleet.core import _test_hooks, staging
 from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_env, queue_job
+from tests._registry import write_registry
 from tests._thread_fakes import in_order_executor
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import (
@@ -151,8 +152,7 @@ def _sourced_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    config_path.write_text(dump_json_str(sourced_document((NPM_CI,))), encoding="utf-8")
-    return config_path
+    return write_registry(config_path, sourced_document((NPM_CI,)))
 
 
 def node_argv(config_path: pathlib.Path) -> list[str]:

@@ -26,13 +26,11 @@ from fleet.contracts.runners import (
 )
 from fleet.contracts.tagged_tools import CHROME_LINUX_PATH, TAGGED_TOOLS
 from fleet.contracts.workspace import decode_fleet_workspace
+from tests._registry import shipped_document
 from tests._runner_fixtures import base_json, ci_slice_json
 
 #: The shipped roster, resolved from this file so the test runs from any cwd.
 SHIPPED_ROSTER = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
-
-#: The shipped fleet registry beside it, which names the nodes runners claim as.
-SHIPPED_WORKSPACE = pathlib.Path(__file__).resolve().parent.parent / "fleet.json"
 
 
 def _install(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -384,7 +382,7 @@ class TestRunnerSpec:
         """A rebuild never takes a capability tag away from a fleet node.
 
         lavender's distro is both a CI runner host here and the fleet node
-        lavender-wsl in fleet.json, whose runner claims with the tags its
+        lavender-wsl in registry/nodes.json, whose runner claims with the tags its
         probe finds each tick. A tagged tool installed by hand there would be
         lost on the next ``--rebuild``, and every job needing its tag would
         silently wait for another node: on 2026-10-05 no node had go, and MCPs
@@ -397,9 +395,7 @@ class TestRunnerSpec:
         6dd73ada): lavender-wsl had it on 2026-10-11, but from no line here.
         """
         spec = decode_runner_spec(load_json_str(SHIPPED_ROSTER.read_text(encoding="utf-8")))
-        workspace = decode_fleet_workspace(
-            load_json_str(SHIPPED_WORKSPACE.read_text(encoding="utf-8"))
-        )
+        workspace = decode_fleet_workspace(shipped_document())
         wsl_hosts = {node["wsl_host"] for node in workspace["nodes"].values()}
         apt_installs = {
             tool["name"]: tool["install"]["apt-get"]

@@ -146,30 +146,30 @@ class TestVersionDrift:
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
         assert version_drift(RUST, None, reports) == (
             "declares rust none but its probe reports cargo '1.98.1', so it claims with the "
-            "rust tag; set rust to '1.98.1' in fleet.json"
+            "rust tag; set rust to '1.98.1' in registry/nodes.json"
         )
 
     def test_a_declared_toolchain_the_probe_does_not_find_is_claimed_without(self) -> None:
         assert version_drift(RUST, "1.98.1", toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
             "declares rust '1.98.1' but its probe reports no cargo, so it claims without the "
-            "rust tag; set rust to null in fleet.json"
+            "rust tag; set rust to null in registry/nodes.json"
         )
         assert version_drift(STACK, "29.8.1", _answered("stack", False, "")) == (
             "declares stack '29.8.1' but its probe reports no stack, so it claims without the "
-            "stack tag; set stack to null in fleet.json"
+            "stack tag; set stack to null in registry/nodes.json"
         )
 
     def test_another_version_keeps_the_tag_and_names_the_one_that_would_match(self) -> None:
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
         assert version_drift(CXX, "13.2.0", reports) == (
             "declares cxx '13.2.0' but its probe reports cxx '13.3.0', so it claims with the "
-            "cxx tag; set cxx to '13.3.0' in fleet.json"
+            "cxx tag; set cxx to '13.3.0' in registry/nodes.json"
         )
 
     def test_an_unreadable_answer_is_quoted_and_claims_without(self) -> None:
         assert version_drift(RUST, "1.98.1", _answered("cargo", True, SHIM_ERROR)) == (
             f"declares rust '1.98.1' but its probe reports cargo {SHIM_ERROR!r}, so it claims "
-            "without the rust tag; set rust to null in fleet.json"
+            "without the rust tag; set rust to null in registry/nodes.json"
         )
 
 

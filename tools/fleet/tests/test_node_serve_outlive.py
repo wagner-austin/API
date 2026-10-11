@@ -24,7 +24,6 @@ from concurrent.futures import Future
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import dump_json_str
 
 from fleet.cli import _config, node_serve, node_watch
 from fleet.cli.node_collected import Collected, CollectOutcome
@@ -36,6 +35,7 @@ from tests._node_agent_fixtures import (
     launch,
     sourced_document,
 )
+from tests._registry import write_registry
 from tests._thread_fakes import await_event
 from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeClock, FakeRun, ok, pin_clock
 from tests.test_node_serve import FIRST_FIRE, ScriptedWatch
@@ -222,7 +222,7 @@ class TestAServeWhoseQueueListingFails:
         launch(sourced_config)
         document = sourced_document((NPM_CI,))
         document["node_poll_seconds"] = 1
-        sourced_config.write_text(dump_json_str(document), encoding="utf-8")
+        write_registry(sourced_config, document)
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         clock = pin_clock(DEMO_NOW)
         # Read once still going, then once with its result written.

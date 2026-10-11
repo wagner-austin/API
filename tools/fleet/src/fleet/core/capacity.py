@@ -47,7 +47,7 @@ class Unassessed(TypedDict):
     unusable for this dispatch, so the obvious shape is one list of excuses --
     and that shape loses the only fact that tells the reader where to go. A
     node that was asked and stayed silent is a tailnet problem; a node nobody
-    asked is a line in ``fleet.json``. Merging them sends half of every
+    asked is a line in ``registry/nodes.json``. Merging them sends half of every
     refusal's readers to the wrong file.
 
     Attributes:
@@ -422,7 +422,7 @@ def _nothing_fits_code(
     """Classify a fleet-wide refusal by what actually happened.
 
     Four answers, because they send a reader to four different places: the
-    tailnet, ``fleet.json``, the project's ``required_tags``, or the clock.
+    tailnet, ``registry/nodes.json``, the project's ``required_tags``, or the clock.
     Order matters -- a node that was asked and stayed silent outranks one
     nobody asked, because it is the only one of the four with something to
     investigate.
@@ -498,7 +498,7 @@ def first_fit(
 
             ``NODE_DISABLED`` -- nothing was asked, because every node this
             workspace declares is switched off in it. Nothing failed; look at
-            ``fleet.json``.
+            ``registry/nodes.json``.
 
             ``NODE_LACKS_TAG`` -- nodes answered and every one of them is
             the wrong kind for this project's ``required_tags``. Nothing is

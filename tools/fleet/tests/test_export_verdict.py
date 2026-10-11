@@ -371,7 +371,7 @@ class TestFetchRef:
         self, tmp_path: pathlib.Path, marker: str
     ) -> None:
         """A sha the remote lacks is the submitter's unpushed commit; a ref it
-        lacks is a fleet.json line that is wrong for every job of that project,
+        lacks is a registry line that is wrong for every job of that project,
         so the two send their readers to different places."""
         _test_hooks.run = FakeRun([failed(128, f"fatal: {marker} main")])
 
@@ -380,7 +380,7 @@ class TestFetchRef:
 
         assert raised.value.code is FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE
         assert raised.value.message.startswith(f"{REMOTE} does not serve 'main'")
-        assert "fleet.json" in raised.value.message
+        assert "which the registry declares as a companion ref" in raised.value.message
         assert f"git said: fatal: {marker} main" in raised.value.message
 
     def test_any_other_fetch_failure_carries_gits_words(self, tmp_path: pathlib.Path) -> None:

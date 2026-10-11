@@ -3,7 +3,7 @@ remote, its path inside the repository and its install steps, every grammar
 refusal named, and the queue row's ``requiredTags`` and ``sha`` fields the
 same runner reads.
 
-Every refusal here is a fleet.json line somebody will write wrong once. The
+Every refusal here is a registry line somebody will write wrong once. The
 messages are asserted because they are what that person reads.
 """
 
@@ -53,7 +53,7 @@ NPM_CI = InstallStep(phase="install", argv=("npm", "ci"))
 
 
 def _step(*argv: str) -> JSONObject:
-    """One declared step of the install phase, as fleet.json spells it."""
+    """One declared step of the install phase, as the registry spells it."""
     tokens: list[JSONValue] = list(argv)
     return {"phase": "install", "argv": tokens}
 
@@ -199,7 +199,7 @@ class TestInstall:
 
 class TestCompanions:
     """The repositories a project's export carries beside it (MCPs board task
-    0515040d). Every refusal here is a fleet.json line somebody will write
+    0515040d). Every refusal here is a registry line somebody will write
     wrong once, and the message is what that person reads."""
 
     def test_a_declaration_decodes_to_its_three_fields(self) -> None:

@@ -1,7 +1,7 @@
 """CLI: stop a dispatch, and give its project's environment back.
 
 Usage:
-    fleet-cancel --config fleet.json --run services-Model-Trainer-1757000000
+    fleet-cancel --config registry --run services-Model-Trainer-1757000000
 
 WHAT IT ACTUALLY DOES, in the order that matters. It ends the build on the
 node, its whole process tree and not only the scheduled task (or, on a Linux

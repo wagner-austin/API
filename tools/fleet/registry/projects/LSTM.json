@@ -1,0 +1,15 @@
+{
+  "worker_ram_gb": 1.1,
+  "minimum_workers": 2,
+  "expected_minutes": 30,
+  "required_tags": [
+    "gpu",
+    "windows"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/LSTM.git",
+    "path": "",
+    "install": [],
+    "companions": []
+  }
+}

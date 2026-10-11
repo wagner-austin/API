@@ -43,6 +43,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
+from tests._registry import write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok, stage_replies
 
@@ -94,20 +95,17 @@ def _companion_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    config_path.write_text(
-        dump_json_str(
-            sourced_document(
-                (NPM_CI,),
-                (
-                    ProjectCompanion(
-                        remote=COMPANION_REMOTE, ref=COMPANION_REF, directory=COMPANION_DIRECTORY
-                    ),
+    return write_registry(
+        config_path,
+        sourced_document(
+            (NPM_CI,),
+            (
+                ProjectCompanion(
+                    remote=COMPANION_REMOTE, ref=COMPANION_REF, directory=COMPANION_DIRECTORY
                 ),
-            )
+            ),
         ),
-        encoding="utf-8",
     )
-    return config_path
 
 
 def _companion_commit_script() -> str:
@@ -507,8 +505,9 @@ class TestRefusals:
         )
 
         assert detail == (
-            "PROJECT_TAGS_MISMATCH: the job requires [gpu], which fleet.json does not declare "
-            "for libs/demo (it declares []); resubmit with the registry's tags"
+            "PROJECT_TAGS_MISMATCH: the job requires [gpu], which "
+            "registry/projects/libs/demo.json does not declare (it declares []); resubmit "
+            "with the registry's tags"
         )
         assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED)
 

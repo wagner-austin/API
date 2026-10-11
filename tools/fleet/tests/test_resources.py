@@ -14,13 +14,14 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONTypeError, dump_json_str
+from platform_core.json_utils import JSONTypeError
 
 from fleet.cli import _config, preflight, run
 from fleet.contracts.lease import Lease, contends, decode_lease, encode_lease
 from fleet.contracts.project import decode_project_config
 from fleet.contracts.resources import contended, decode_names
 from fleet.core import _test_hooks, leases, records, staging
+from tests._registry import write_registry
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -260,9 +261,7 @@ def _shared_workspace(tmp_path: pathlib.Path) -> pathlib.Path:
     plan = projects[DEMO_PROJECT]
     assert isinstance(plan, dict)
     plan["exclusive_resources"] = [SHARED_DB]
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(document), encoding="utf-8")
-    return path
+    return write_registry(tmp_path / "registry", document)
 
 
 class TestTheCommands:

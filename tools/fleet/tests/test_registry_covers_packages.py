@@ -1,6 +1,6 @@
 """Every API package with a ``make check`` is a fleet project (MCPs board task b1089284).
 
-THE GAP. A runner takes a check only of a project ``fleet.json`` declares, so
+THE GAP. A runner takes a check only of a project the registry declares, so
 a package missing from it can be verified on the machine that changed it and
 nowhere else, and nothing says so until a session's check sits queued: on
 2026-10-11 tools/ci-wake's waited until 7c96acfbd declared it (board task
@@ -22,9 +22,8 @@ import re
 from pathlib import Path
 from typing import Final
 
-from platform_core.json_utils import load_json_str
-
 from fleet.contracts.workspace import decode_fleet_workspace
+from tests._registry import shipped_document
 
 #: The repository root: tools/fleet/tests is three levels below it.
 ROOT: Final = Path(__file__).resolve().parents[3]
@@ -70,8 +69,7 @@ def _declared() -> set[str]:
     Returns:
         The declared paths.
     """
-    path = ROOT / "tools" / "fleet" / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     return {
         project["source"]["path"]
         for project in workspace["projects"].values()

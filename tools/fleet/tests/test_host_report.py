@@ -29,6 +29,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import FakeQueue
+from tests._registry import write_registry
 from tests.conftest import FakeRun, failed, ok, workspace_document
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -292,7 +293,7 @@ class TestTheTick:
         document = _with_nodes(
             sourced_document((NPM_CI,)), {"lavender-wsl": encode_node_config(_wsl_node())}
         )
-        sourced_config.write_text(dump_json_str(document), encoding="utf-8")
+        write_registry(sourced_config, document)
         _test_hooks.run = FakeRun(
             [
                 failed(255, "Connection timed out during banner exchange"),

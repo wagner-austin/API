@@ -18,7 +18,7 @@ and this is it.
 ## One cycle
 
 ```bash
-fleet-wake --config /path/to/fleet.json
+fleet-wake --config /path/to/tools/fleet/registry
 ```
 
 1. Read the fleet ledger's **current row per dispatch** (`records.latest_rows`).

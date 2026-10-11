@@ -32,8 +32,13 @@ structural — a shared mutable environment with no lock — not a rogue killer.
 ## The three files
 
 ```
-fleet.json        the workspace: where the nodes are, what each project costs,
-                  and where each project's commits come from (source)
+registry/         the workspace, split by concern (MCPs board task 4a78c916)
+  nodes.json      where the nodes are, and the machines that are not nodes
+  settings.json   fleet-wide settings: data paths, serve and poll seconds,
+                  the record paths below
+  projects/       one file per project, named by its path (projects/MCPs/
+                  mcp-shared.json is MCPs/mcp-shared): what it costs, what it
+                  needs and where its commits come from (source)
 runs/
   ledger.jsonl    append-only; every dispatch ever made from this machine
   feed.jsonl      append-only; the event stream subscribers tail
@@ -46,12 +51,18 @@ runs/
                   one file each, and the lock its runners claim in turn by
 ```
 
-**`fleet.json` is tracked and the three records are not**, because they are
+**`registry/` is tracked and the three records are not**, because they are
 different kinds of thing. The workspace describes the fleet and belongs to
 everybody; the records are this machine's own history and live under `runs/`,
-which the monorepo gitignores. It sat under `runs/` at first and was therefore
-invisible to git — so the one file every command requires would not have
-survived a fresh clone, and the package would have arrived unrunnable.
+which the monorepo gitignores. The workspace sat under `runs/` at first and
+was therefore invisible to git — so the one thing every command requires would
+not have survived a fresh clone, and the package would have arrived unrunnable.
+
+**One reader assembles the directory**, `fleet.core.workspace_files`, into the
+document the decoder has always read, so no command knows the split exists.
+It was one `fleet.json` until it reached 2252 lines; every file is now well
+under 600. Record paths still resolve against `tools/fleet`, the directory
+holding `registry/`.
 
 The ledger and feed are history and are never rewritten. Leases are live
 state and are: a release has to make a claim stop existing, and an
@@ -61,20 +72,20 @@ to answer one question.
 ## Commands
 
 ```bash
-fleet-nodes     --config fleet.json                 # what is free right now, and why each lane claims nothing
-fleet-preflight --config fleet.json --project P     # would it run, and where
-fleet-preflight --config fleet.json --project P --node lavender
-fleet-run       --config fleet.json --project P \
+fleet-nodes     --config registry                   # what is free right now, and why each lane claims nothing
+fleet-preflight --config registry --project P       # would it run, and where
+fleet-preflight --config registry --project P --node lavender
+fleet-run       --config registry --project P \
                 --agent <label> --session <uuid> --repo-root <path>
-fleet-collect   --config fleet.json                 # close out what finished
-fleet-collect   --config fleet.json --run <run-id>
-fleet-watch     --config fleet.json                 # the event stream
-fleet-watch     --config fleet.json --run <run-id>
-fleet-cancel    --config fleet.json --run <run-id>
-fleet-agent     --config fleet.json \               # one tick of the HUB lane's runner
+fleet-collect   --config registry                   # close out what finished
+fleet-collect   --config registry --run <run-id>
+fleet-watch     --config registry                   # the event stream
+fleet-watch     --config registry --run <run-id>
+fleet-cancel    --config registry --run <run-id>
+fleet-agent     --config registry \                 # one tick of the HUB lane's runner
                 --agent <label> --session <uuid> --repo-root <path> [--announce]
 poetry run python -m fleet.cli.node_agent \         # one tick of ONE node's runner
-                --config fleet.json --node <alias> [--announce]
+                --config registry --node <alias> [--announce]
 ```
 
 `fleet-run` returns as soon as the suite is running and does **not** wait for
@@ -95,8 +106,8 @@ which is the one moment somebody wants it still reporting.
 
 ```bash
 while true; do
-  fleet-collect --config fleet.json
-  fleet-watch   --config fleet.json
+  fleet-collect --config registry
+  fleet-watch   --config registry
   sleep 30
 done
 ```
@@ -222,7 +233,7 @@ export FLEET_MCP_API_KEY=...      # mcp-fleet's MCP_INTERNAL_KEY
 export TASKBOARD_MCP_API_KEY=...  # mcp-taskboard's MCP_INTERNAL_KEY (observe pass)
 export CORVIS_TENANT_ID=...       # the tenant whose queue this serves
 while true; do
-  fleet-agent --config fleet.json --agent fleet-runner-austinpc \
+  fleet-agent --config registry --agent fleet-runner-austinpc \
               --session <uuid> --repo-root ~/PROJECTS/API \
               --registry ~/PROJECTS/MCPs/fleet-mcp/fleet-nodes.json
   sleep 30
@@ -273,7 +284,7 @@ queues behind a check because no runner ever asks for both at once
 **Every enabled node has a runner of its own, on the hub.** `fleet-node-agent
 --config fleet.json --node <alias>` is one tick for one node
 (`fleet.cli.node_agent`; `scripts/register-node-agents.ps1` registers one
-`API-FleetNode-<alias>-3min` scheduled task per node `fleet.json` enables,
+`API-FleetNode-<alias>-3min` scheduled task per node `registry/nodes.json` enables,
 with exactly the hub task's registration: `poetry.exe` running
 `python -m fleet.cli.tick` as the action, never `powershell.exe`, which can
 stall before its engine loads under S4U on the hub (MCPs board task
@@ -309,7 +320,7 @@ it: loki's 77fee544 ended 05:53:35Z on 2026-10-05 and closed at 05:57:44Z.
 Now a start runs its collect and fill passes and keeps serving. Its watch,
 on a thread of its own, is handed the runs the queue says this runner holds
 running and each run the fill pass launches, reads each held run's result
-off the node every `node_poll_seconds` (5 in `fleet.json`) and settles one
+off the node every `node_poll_seconds` (5 in `registry/settings.json`) and settles one
 that has ended through the same `collect_one_job` the collect pass uses,
 under one lock so a run is settled once. At the same pace the main thread
 lists the queued jobs (one `dispatch_list`) and runs the fill pass again
@@ -321,7 +332,7 @@ because `FleetSchedule.ps1` registers each task at local midnight repeating
 every 3 minutes, it runs the collect pass again, which renews every running
 job's queue lease as each start did. It hands over only 10 s before a
 boundary and only while no settle is under way, once it has served
-`node_serve_seconds` (1200 in `fleet.json`, at most 1800 so a drain ends
+`node_serve_seconds` (1200 in `registry/settings.json`, at most 1800 so a drain ends
 inside the launcher's 39-minute wall) or `refs/fleet/rolled`, read through
 git from its records directory, has moved, so a roll still takes effect at
 the next boundary; a serve past its time claims nothing more. The fires that
@@ -374,7 +385,7 @@ a CUDA device, `testdb` for a node whose `test_database` is true, and `rust`
 or `cxx` for each toolchain the node declares a version of) and the
 queue's `required_tags <@ tags` containment returns
 only jobs the node satisfies. A job's `required_tags` should be the
-project's from `fleet.json`, but what a job NEEDS is its project's
+project's from its registry file, but what a job NEEDS is its project's
 declaration: every claim names the projects the runner fits, each assessed
 against that declaration and the runner's tags, so the job's own tags only
 route it. The runner refuses `PROJECT_TAGS_MISMATCH` on claim only when a job
@@ -507,7 +518,7 @@ Removing `%USERPROFILE%\.rustup` and `%USERPROFILE%\.cargo` reverses it.
 
 **`cxx` is the same contract for node-gyp's C++ toolchain** (MCPs board task
 3f19c136). Every MCPs TypeScript project installs with a root `npm ci`, which
-rebuilds `hnswlib-node` under node-gyp, so every project in `fleet.json`
+rebuilds `hnswlib-node` under node-gyp, so every project in the registry
 whose install runs a plain `npm ci` requires `cxx` (`MCPs/execution`, which
 installs with `--ignore-scripts`, does not). A node's `cxx` is the VC tools
 component's `installationVersion` from vswhere on Windows, or
@@ -561,10 +572,10 @@ pdftotext from `runners.json`'s base `apt_packages` and Chrome from its
 `test_runner_contracts.py` fails if a tagged tool apt can supply is missing
 from that list or Chrome's path from those assets. Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
-disappears takes its tag with it. Each difference from `fleet.json` is logged
+disappears takes its tag with it. Each difference from `registry/nodes.json` is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its
 probe reports cxx '17.14.37710.0', so it claims with the cxx tag; set cxx to
-'17.14.37710.0' in fleet.json`, because the hub's own planning (`fleet-run`,
+'17.14.37710.0' in registry/nodes.json`, because the hub's own planning (`fleet-run`,
 preflight) still reads the declaration without asking the node. Until this
 change a node whose answer differed from its declaration claimed nothing at
 all, for every job. Measured 2026-10-02, every dispatchable node's answer
@@ -601,7 +612,7 @@ task (MCPs board task 2fecad69).
 queue's `fleet_dispatch_jobs_sha_pin` CHECK refuses a node-lane row without
 one) and the runner exports THAT commit:
 
-1. the project's `source` in `fleet.json` names its `remote`, the `path`
+1. the project's `source` in its registry file names its `remote`, the `path`
    inside the repository the recipe runs in, and the `install` steps a clean
    export needs before `make check` (argv lists under a grammar that admits
    no shell syntax, rendered into the node's script as spelled);
@@ -697,7 +708,7 @@ stays local.
 integration:
 
 ```
-Monitor({command: "fleet-watch --config fleet.json", description: "fleet events"})
+Monitor({command: "fleet-watch --config registry", description: "fleet events"})
 ```
 
 There is deliberately no `--follow`. A polling loop belongs in the shell where
@@ -763,7 +774,7 @@ with no capped container reads the same `MemAvailable` it always did.
 939ec5c7). Every node used to declare `max_concurrent_runs`, and every node
 declared 1: on 2026-10-02 thirteen jobs queued behind four running while the
 probes showed memory a second run could have used. The field is gone from
-`NodeBudget`, `fleet.json` and every reader. `capacity.assess` now charges a
+`NodeBudget`, the registry and every reader. `capacity.assess` now charges a
 node's live runs first, from the ledger (`records.live_load`): the workers each
 was granted come off the node's cores and `workers x worker_ram_gb` comes off
 its free memory, whether or not those workers have spawned yet, and what is left
@@ -791,7 +802,7 @@ slice, and both still bound every grant.
 
 ## `enabled`, and why the fleet is written down twice
 
-Every node in `fleet.json` declares `enabled`, and the decoder refuses a node
+Every node in `registry/nodes.json` declares `enabled`, and the decoder refuses a node
 that leaves it out. Neither default is safe: defaulting it to `true` is the
 defect this field was added for, and defaulting it to `false` would silently
 shrink the fleet with nothing to notice the missing capacity.
@@ -801,7 +812,7 @@ three different next actions:
 
 | state | what happened | what to do |
 |---|---|---|
-| `NODE_DISABLED` | deliberately off; not probed at all | edit `fleet.json` |
+| `NODE_DISABLED` | deliberately off; not probed at all | edit `registry/nodes.json` |
 | `NODE_UNREACHABLE` | should have answered, did not | check the tailnet |
 | `NODE_MEMORY_EXHAUSTED` | answered, no room | wait |
 
@@ -817,7 +828,7 @@ The fleet is described in two repositories and the columns barely overlap:
 | file | carries |
 |---|---|
 | `MCPs/fleet-mcp/fleet-nodes.json` | name, role, user, **platform**, tailnet address, **enabled**, tunnel, notes — every machine on the tailnet, including ones nothing dispatches to |
-| `API/tools/fleet/fleet.json` | host, **platform**, stage root, cores, RAM, GPU, budget, **enabled**, test database — what a dispatch may take |
+| `API/tools/fleet/registry/nodes.json` | host, **platform**, stage root, cores, RAM, GPU, budget, **enabled**, test database — what a dispatch may take |
 
 Merging them would put a Cloudflare tunnel id beside a worker-RAM budget and
 make this repo depend on a checkout of the other one, which dispatch must work
@@ -840,7 +851,7 @@ operator**; if it goes the other way, moving it is cheaper than the fork was.
 So they are made **checkable** against each other:
 
 ```bash
-fleet-nodes --config fleet.json --registry ../../../MCPs/fleet-mcp/fleet-nodes.json
+fleet-nodes --config registry --registry ../../../MCPs/fleet-mcp/fleet-nodes.json
 ```
 
 One line per disagreement — each saying which way it runs and what it costs,
@@ -867,7 +878,7 @@ with the registry's measured column: a CUDA device iff its `probe` is
 `nvidia-smi`; `null`, or an adapter the Win32 video-controller probe found,
 is none.
 
-**The last one is why `fleet.json` has `not_dispatchable`.** A machine that is
+**The last one is why `registry/nodes.json` has `not_dispatchable`.** A machine that is
 merely *absent* from `nodes` is indistinguishable from one nobody has got round
 to adding — and `austinpc`, the hub this dispatcher runs on, sat in exactly
 that gap for weeks: enabled in the registry, 24 logical cores, invisible to the
@@ -887,7 +898,7 @@ using: lavender's Windows lane was retired that way on 2026-09-29 (MCPs board
 task 7e467416). It stays declared because lavender-wsl names it as its
 `wsl_host`, and stays enabled in the registry because the audit and the
 session observer still visit it. A runner whose scheduled task outlived the
-retirement logs `lavender is disabled in fleet.json; claiming nothing` and
+retirement logs `lavender is disabled in registry/nodes.json; claiming nothing` and
 asks the node nothing.
 
 **The path is passed, never searched for.** Omitting the flag claims no
@@ -951,7 +962,7 @@ the project, its transitive **path dependencies read out of the manifests that
 declare them**, and the shared paths the monorepo asserts about its own layout.
 
 The path dependencies are read from `pyproject.toml` rather than declared
-beside each project in `fleet.json`, because poetry already reads the
+beside each project in the registry, because poetry already reads the
 authoritative list every time anybody builds and a second copy drifts silently
 in the direction of staging too little — which surfaces as a lockfile error on
 a node and reads as the project's fault.

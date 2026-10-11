@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Register one Task Scheduler entry per ENABLED node of fleet.json, each
+    Register one Task Scheduler entry per ENABLED node of registry/nodes.json, each
     running that node's fleet-node-agent tick every 3 minutes, and retire
     the entry of any node no longer enabled.
 
@@ -24,10 +24,12 @@
     deadline. Forty minutes, as the hub's: a node tick's longest command is
     a ten-minute fetch, then staging and the ssh calls at 120 s each.
 
-    THE LIST IS READ FROM fleet.json, NOT WRITTEN HERE. A node enabled in the
-    registry gets a task; a task whose node is no longer enabled (or no
-    longer declared) is removed; re-running is the refresh. The two-file
-    roster (fleet.json here, fleet-nodes.json in MCPs) is reconciled by
+    THE LIST IS READ FROM registry/nodes.json, NOT WRITTEN HERE. A node
+    enabled in the registry gets a task; a task whose node is no longer
+    enabled (or no longer declared) is removed; re-running is the refresh.
+    The two-file roster (registry/nodes.json here, fleet-nodes.json in MCPs;
+    the registry was one fleet.json until MCPs board task 4a78c916) is
+    reconciled by
     ``fleet-nodes`` on the ``enabled`` flag and the platform and gpu the
     tags derive from, so the set registered here is the set the queue can
     match.
@@ -50,8 +52,8 @@
     Unregister every node's task with: register-node-agents.ps1 -UnregisterAll
 
 .PARAMETER Workspace
-    The fleet.json to read the nodes from; empty means the one beside this
-    package.
+    The registry's nodes.json to read the nodes from; empty means the one in
+    this package's registry.
 
 .PARAMETER UnregisterAll
     Remove every API-FleetNode-*-3min task and register none.
@@ -99,7 +101,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'FleetSchedule.ps1')
 
 if ($Workspace -eq '') {
-    $Workspace = "$PSScriptRoot\..\fleet.json"
+    $Workspace = "$PSScriptRoot\..\registry\nodes.json"
 }
 if ($ApiRoot -eq '') {
     $ApiRoot = "$PSScriptRoot\..\..\.."
@@ -112,11 +114,11 @@ $taskSuffix = '-3min'
 function Get-FleetNodeRunner {
     <#
     .SYNOPSIS
-        One runner per node fleet.json enables, and a second, elevated one for
-        each enabled node that declares ``elevated`` (MCPs board task
-        a98d7083), in the file's order.
+        One runner per node registry/nodes.json enables, and a second,
+        elevated one for each enabled node that declares ``elevated`` (MCPs
+        board task a98d7083), in the file's order.
     .PARAMETER Path
-        fleet.json.
+        registry/nodes.json.
     .OUTPUTS
         PSCustomObject[] with Node (the alias), Runner (the name inside the
         task name: the alias, or ``<alias>-elevated``) and Elevated.
@@ -152,10 +154,10 @@ if ($UnregisterAll) {
 
 $runners = @(Get-FleetNodeRunner $Workspace)
 if ($runners.Count -eq 0) {
-    throw "FLEET_NODES_NONE_ENABLED: fleet.json at $Workspace enables no node; nothing to register"
+    throw "FLEET_NODES_NONE_ENABLED: $Workspace enables no node; nothing to register"
 }
 
-# Tasks naming no runner fleet.json asks for (a node no longer enabled or
+# Tasks naming no runner the registry asks for (a node no longer enabled or
 # declared, or an elevated runner its node no longer declares) are removed
 # first, so the set of tasks after this script equals the set of runners.
 # The comparison is by whole task name: an elevated runner's name reads as
@@ -164,7 +166,7 @@ $expected = @($runners | ForEach-Object { "$TaskPrefix$($_.Runner)$taskSuffix" }
 foreach ($task in $registered) {
     if ($expected -notcontains $task.TaskName) {
         [void](Unregister-FleetTick $task.TaskName)
-        Write-Information "Unregistered $($task.TaskName): fleet.json asks for no such runner." -InformationAction Continue
+        Write-Information "Unregistered $($task.TaskName): the registry asks for no such runner." -InformationAction Continue
     }
 }
 

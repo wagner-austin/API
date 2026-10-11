@@ -13,12 +13,13 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.json_utils import JSONObject, dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_dict
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.lease import Lease
 from fleet.contracts.resources import encode_names
 from fleet.core import _test_hooks, leases
+from fleet.core.workspace_files import read_workspace_document
 from tests._node_agent_fixtures import (
     NOTHING_LAUNCHED,
     PROBED,
@@ -28,12 +29,13 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue, tick_body
+from tests._registry import write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_NOW, DEMO_PROJECT, FakeRun, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
-#: The container each testdb node runs for itself, as fleet.json declares it.
+#: The container each testdb node runs for itself, as the registry declares it.
 TESTDB = "corvis-fleet-testdb"
 
 #: A second registered project, declaring nothing exclusive.
@@ -47,7 +49,7 @@ def _declare(config_path: pathlib.Path, *, demo_exclusive: tuple[str, ...]) -> N
         config_path: The sourced workspace document, rewritten in place.
         demo_exclusive: What the demo project declares exclusive.
     """
-    document: JSONObject = narrow_json_to_dict(load_json_str(config_path.read_text("utf-8")))
+    document: JSONObject = read_workspace_document(config_path)
     projects = narrow_json_to_dict(document["projects"])
     demo = narrow_json_to_dict(projects[DEMO_PROJECT])
     demo["exclusive_resources"] = encode_names(demo_exclusive)
@@ -56,7 +58,7 @@ def _declare(config_path: pathlib.Path, *, demo_exclusive: tuple[str, ...]) -> N
     document["node_local_resources"] = encode_names(
         tuple(name for name in demo_exclusive if name == TESTDB)
     )
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
+    write_registry(config_path, document)
 
 
 def _hold(
@@ -177,10 +179,10 @@ class TestWhatALeaseOnTheNodeHolds:
         (``RESOURCE_HELD``). The node has room and says why it claims
         nothing anyway."""
         _declare(sourced_config, demo_exclusive=())
-        document = narrow_json_to_dict(load_json_str(sourced_config.read_text("utf-8")))
+        document = read_workspace_document(sourced_config)
         projects = narrow_json_to_dict(document["projects"])
         narrow_json_to_dict(projects[FREE_PROJECT])["exclusive_resources"] = ["corvis_test"]
-        sourced_config.write_text(dump_json_str(document), encoding="utf-8")
+        write_registry(sourced_config, document)
         _hold(sourced_config, node="lavender", project=DEMO_PROJECT, resources=())
         _hold(sourced_config, node="diphtheria", project="libs/db", resources=("corvis_test",))
         _test_hooks.run = FakeRun(PROBED)

@@ -10,12 +10,11 @@ from __future__ import annotations
 import pathlib
 from collections.abc import Callable, Sequence
 
-from platform_core.json_utils import dump_json_str
-
 from fleet.cli import _config, node_watch
 from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, sourced_document
+from tests._registry import write_registry
 from tests.conftest import DEMO_NOW, FakeRun, ok
 
 #: One read of a run's result that finds none: the collect script sent, then
@@ -37,7 +36,7 @@ def poll_every_second(config_path: pathlib.Path) -> _config.LoadedWorkspace:
     """
     document = sourced_document((NPM_CI,))
     document["node_poll_seconds"] = 1
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
+    write_registry(config_path, document)
     return _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
 
 

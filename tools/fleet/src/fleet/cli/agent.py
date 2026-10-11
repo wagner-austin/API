@@ -2,7 +2,7 @@
 hub lane.
 
 Usage:
-    fleet-agent --config fleet.json --repo-root C:/Users/Test/PROJECTS/API \\
+    fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
         --agent fleet-runner-austinpc --session <uuid> [--announce]
 
 THIS IS THE OTHER HALF OF QUEUE INVERSION. ``fleet-mcp``'s ``dispatch_*``
@@ -394,7 +394,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         [token for token in tokens if token != queue.ANNOUNCE_FLAG], _FLAGS
     )
     # The workspace is still read, and refused when malformed, although the
-    # hub lane dispatches nothing to a node: a runner whose fleet.json does
+    # hub lane dispatches nothing to a node: a runner whose registry does
     # not decode has no business claiming anything, and the node runners
     # beside it read the same file.
     _config.load_workspace(parsed)

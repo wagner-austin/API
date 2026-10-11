@@ -138,8 +138,8 @@ def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectCo
         if project is None:
             raise AppError(
                 FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN,
-                f"live run {row['run_id']} on {node} is of {row['project']}, which fleet.json no "
-                "longer registers, so what its workers hold is unknown; register the project "
+                f"live run {row['run_id']} on {node} is of {row['project']}, which the registry "
+                "no longer registers, so what its workers hold is unknown; register the project "
                 "again or let the run end before this node takes more work",
             )
         ram_gb += row["workers"] * project["worker_ram_gb"]

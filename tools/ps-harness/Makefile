@@ -8,7 +8,7 @@
 # and API's powershell workflow runs that.
 #
 # WHY A DIRECTORY OF ITS OWN. A fleet project names one directory whose
-# `make check` a node runs (tools/fleet/fleet.json), and API's root has no
+# `make check` a node runs (tools/fleet/registry/projects/), and API's root has no
 # check. Without one the harness ran only on the hub and in CI, and on
 # 2026-10-03 the review of task 939ec5c7 had only a hub run to read, which
 # failed in rendered-provision-windows.Tests.ps1's teardown. The project

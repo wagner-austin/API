@@ -9,7 +9,7 @@ OVERLAP:
                                      tailnet including ones nothing dispatches
                                      to (a phone, two boxes offline since
                                      August).
-  API   tools/fleet/fleet.json       host, PLATFORM, stage_root,
+  API   tools/fleet/registry/        host, PLATFORM, stage_root,
                                      logical_cores, ram_gb, gpu, budget --
                                      what a dispatch may take from a machine.
 

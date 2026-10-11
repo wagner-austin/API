@@ -1,5 +1,5 @@
 """The registry's MCPs npm projects prepare through MCPs' fleet-prepare
-(MCPs board task 74b13c20), decoded from the real fleet.json.
+(MCPs board task 74b13c20), decoded from the real registry.
 
 Every MCPs project that installs the npm workspace runs its install,
 workspace build and (when it needs the test database) its database as three
@@ -13,21 +13,17 @@ failing inside make.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from platform_core.json_utils import load_json_str
-
 from fleet.contracts.source import InstallStep
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import export
+from tests._registry import shipped_document
 
 PREPARE = ("make", "-s", "-C", "scripts/fleet-prepare")
 
 
 def _steps() -> dict[str, tuple[InstallStep, ...]]:
     """Every sourced project's install steps, from the real registry."""
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     return {
         name: project["source"]["install"]
         for name, project in workspace["projects"].items()
@@ -89,8 +85,7 @@ def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
     task b1089284). It must run after install and workspace-build, which store
     the tree's untracked files, and its row must declare the three, or the
     phase refuses FLEET_COMPANION_MISSING on the node."""
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     placing = {
         name: project["source"]
         for name, project in workspace["projects"].items()

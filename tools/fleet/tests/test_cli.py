@@ -28,6 +28,7 @@ from fleet.cli import _config, nodes, preflight, watch
 from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.core import _test_hooks, records
+from tests._registry import write_registry
 from tests.conftest import FakeClock, FakeRun, failed, ok
 
 _NOW = 1_757_000_000
@@ -112,12 +113,10 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         tmp_path: pytest's per-test temporary directory.
 
     Returns:
-        Path to the written document.
+        The written registry directory.
     """
     _test_hooks.now = FakeClock(_NOW)
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(_workspace_document()), encoding="utf-8")
-    return path
+    return write_registry(tmp_path / "registry", _workspace_document())
 
 
 class TestLoadWorkspace:

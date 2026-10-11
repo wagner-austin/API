@@ -14,7 +14,7 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
+from platform_core.json_utils import JSONObject, JSONTypeError
 
 from fleet.cli import _config, run
 from fleet.contracts.lease import Lease
@@ -31,6 +31,7 @@ from fleet.contracts.workspace import (
     require_project,
 )
 from fleet.core import _test_hooks, leases, run_lease
+from tests._registry import write_registry
 from tests.conftest import DEMO_NOW, DEMO_PROJECT, FakeClock, workspace_document
 
 #: The real node-local resource.
@@ -206,9 +207,8 @@ class TestTheEarlyCheck:
     def test_another_node_s_copy_held_does_not_refuse_before_a_node_is_chosen(
         self, tmp_path: pathlib.Path
     ) -> None:
-        config = tmp_path / "fleet.json"
         document = _document(node_local=(TESTDB,), exclusive=(TESTDB,))
-        config.write_text(dump_json_str(document), encoding="utf-8")
+        config = write_registry(tmp_path / "registry", document)
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config)})
         held = scoped((TESTDB,), node="diphtheria", node_local=(TESTDB,))
         holder = _lease(node="diphtheria", resources=held, run_id="a")

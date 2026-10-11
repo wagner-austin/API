@@ -30,6 +30,12 @@ import pytest
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import NodeConfig, NodePlatform, encode_node_config
 from fleet.contracts.project import ProjectConfig, encode_project_config
+from fleet.core.workspace_files import (
+    NODES_FILE,
+    PROJECT_SUFFIX,
+    PROJECTS_DIRECTORY,
+    SETTINGS_FILE,
+)
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
@@ -79,7 +85,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             board posts against.
 
     Returns:
-        Path to the written document.
+        Path to the written registry directory.
     """
     document: JSONObject = {
         "nodes": {
@@ -110,6 +116,8 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             )
         },
         "not_dispatchable": {},
+    }
+    settings: JSONObject = {
         # Required by the workspace contract since board task 140e7042. Empty
         # here because nothing this package does reads it: the field scopes a
         # dispatch's ARCHIVE, and fleet-wake reads the workspace to find nodes
@@ -119,32 +127,38 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
         # data_paths: it scopes which exclusive resources each node runs its
         # own copy of, which only a dispatch reads.
         "node_local_resources": [],
-        "projects": {
-            project: encode_project_config(
-                ProjectConfig(
-                    worker_ram_gb=1.1,
-                    minimum_workers=2,
-                    expected_minutes=5,
-                    exclusive_resources=(),
-                    external_paths=(),
-                    required_tags=(),
-                    # NULL, SPELLED OUT: this bridge announces dispatch
-                    # outcomes and never checks anything out, so the
-                    # fixture states the contract's "no remote" rather
-                    # than implying a remote nothing here would fetch.
-                    source=None,
-                )
-            )
-        },
         "node_serve_seconds": 1200,
         "node_poll_seconds": 5,
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
     }
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(document), encoding="utf-8")
-    return path
+    entry = encode_project_config(
+        ProjectConfig(
+            worker_ram_gb=1.1,
+            minimum_workers=2,
+            expected_minutes=5,
+            exclusive_resources=(),
+            external_paths=(),
+            required_tags=(),
+            # NULL, SPELLED OUT: this bridge announces dispatch outcomes and
+            # never checks anything out, so the fixture states the contract's
+            # "no remote" rather than implying a remote nothing here would
+            # fetch.
+            source=None,
+        )
+    )
+    # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board
+    # task 4a78c916), so the bridge reads it through fleet's own reader.
+    # A project key is a repository path, so its file can sit in a
+    # subdirectory of projects/ (tools/fleet is projects/tools/fleet.json).
+    registry = tmp_path / "registry"
+    project_file = registry / PROJECTS_DIRECTORY / f"{project}{PROJECT_SUFFIX}"
+    project_file.parent.mkdir(parents=True)
+    (registry / NODES_FILE).write_text(dump_json_str(document), encoding="utf-8")
+    (registry / SETTINGS_FILE).write_text(dump_json_str(settings), encoding="utf-8")
+    project_file.write_text(dump_json_str(entry), encoding="utf-8")
+    return registry
 
 
 @pytest.fixture(autouse=True)

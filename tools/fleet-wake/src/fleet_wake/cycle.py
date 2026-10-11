@@ -28,8 +28,8 @@ from board_watch.config import load_credentials
 from fleet.cli._config import LoadedWorkspace
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import records
+from fleet.core.workspace_files import read_workspace_document
 from platform_core.board import post_to_task
-from platform_core.json_utils import load_json_str
 
 from fleet_wake import _test_hooks
 from fleet_wake.announce import announcements, terminal_unannounced
@@ -101,17 +101,19 @@ def load_workspace(config_path: pathlib.Path) -> LoadedWorkspace:
     what makes that impossible rather than merely unlikely.
 
     Args:
-        config_path: Path to the workspace document.
+        config_path: The registry directory
+            (:mod:`fleet.core.workspace_files`, MCPs board task 4a78c916).
 
     Returns:
-        The decoded workspace and its resolved record paths.
+        The decoded workspace and its record paths, resolved against the
+        directory holding the registry as fleet's own loader resolves them.
 
     Raises:
-        JSONTypeError: If the document is not a valid fleet workspace.
-        OSError: If it cannot be read.
+        JSONTypeError: If the registry is not a valid fleet workspace.
+        OSError: If a registry file cannot be read.
     """
     resolved = config_path.resolve()
-    document = load_json_str(_test_hooks.read_text(resolved))
+    document = read_workspace_document(resolved)
     return LoadedWorkspace(decode_fleet_workspace(document), resolved.parent)
 
 

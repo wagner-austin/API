@@ -1,0 +1,15 @@
+{
+  "worker_ram_gb": 1.1,
+  "minimum_workers": 6,
+  "expected_minutes": 4,
+  "required_tags": [
+    "gpu",
+    "windows"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "services/Model-Trainer",
+    "install": [],
+    "companions": []
+  }
+}

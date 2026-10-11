@@ -1,9 +1,9 @@
 """CLI: one serve of a node's runner on the queue's node lane.
 
 Usage:
-    fleet-node-agent --config fleet.json --node sedona
-    fleet-node-agent --config fleet.json --node sedona --announce
-    fleet-node-agent --config fleet.json --node serendipity --elevated
+    fleet-node-agent --config registry --node sedona
+    fleet-node-agent --config registry --node sedona --announce
+    fleet-node-agent --config registry --node serendipity --elevated
 
 A run without ``--announce`` SERVES the node until it hands over before a
 fire boundary (:mod:`fleet.cli.node_serve`, MCPs board task 8993c306),
@@ -15,7 +15,7 @@ ONE RUNNER PER ENABLED NODE, ALL OF THEM ON THE HUB (MCPs board task
 fd5cabfa, A1 and A5). Until this command the queue had one runner, the hub's
 ``fleet-agent``, claiming the oldest job once per tick whatever it was, so
 nine nodes behaved as one slow node and a revive waited behind a queue of
-kills. Now each enabled node in ``fleet.json`` has a scheduled task of its own
+kills. Now each enabled node in ``registry/nodes.json`` has a scheduled task of its own
 (``scripts/register-node-agents.ps1``) running this command with ``--node``
 set to it, claiming from the queue's NODE lane the jobs that name it or name
 no node, and only those whose required tags the node carries

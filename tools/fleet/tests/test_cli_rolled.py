@@ -41,7 +41,8 @@ STAND_IN_FILES: dict[str, str] = {
     "libs/platform_core/src/platform_core/__init__.py": "",
     "libs/monorepo_guards/src/monorepo_guards/__init__.py": "",
     "tools/board-watch/src/board_watch/__init__.py": "",
-    "tools/fleet/fleet.json": "{}\n",
+    "tools/fleet/registry/nodes.json": "{}\n",
+    "tools/fleet/registry/settings.json": "{}\n",
 }
 
 
@@ -125,7 +126,7 @@ class TestLaunch:
             "-m",
             "fleet.cli.agent",
             "--config",
-            str(destination / "tools" / "fleet" / "fleet.json"),
+            str(destination / "tools" / "fleet" / "registry"),
             "--records-dir",
             str(tmp_path / "tools" / "fleet"),
             "--session",
@@ -150,7 +151,7 @@ class TestLaunch:
         commit = committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         launch = tmp_path / "scratch" / "fleet-rolled" / commit / f"pid-{os.getpid()}"
-        config = launch / "tools" / "fleet" / "fleet.json"
+        config = launch / "tools" / "fleet" / "registry"
 
         with caplog.at_level("INFO"):
             status = rolled_cli.main(

@@ -224,7 +224,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
     Raises:
         AppError: ``COMPANION_REF_NOT_ON_REMOTE`` when the remote does not
             serve the ref (one of :data:`NOT_ON_REMOTE_MARKERS` in git's
-            words), which is a fleet.json line to correct rather than a
+            words), which is a registry line to correct rather than a
             commit to push; ``EXPORT_FAILED`` for any other non-zero fetch
             or for a fetched ref that does not resolve to a commit, git's
             words verbatim.
@@ -249,7 +249,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
             raise AppError(
                 code=FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE,
                 message=(
-                    f"{remote} does not serve {ref!r}, which fleet.json declares as a "
+                    f"{remote} does not serve {ref!r}, which the registry declares as a "
                     f"companion ref; every job of the project carrying it fails here until "
                     f"that line names a ref the remote has. git said: {stderr.strip()[:300]}"
                 ),
@@ -378,7 +378,7 @@ def require_source(project: str, source: ProjectSource | None) -> ProjectSource:
         raise AppError(
             code=FleetErrorCode.PROJECT_REMOTE_MISSING,
             message=(
-                f"project {project!r} declares no source in fleet.json, so there is no remote "
+                f"project {project!r} declares no source in the registry, so there is no remote "
                 "to fetch a commit from; give it a source (remote, path, install) or dispatch "
                 "it from a working tree with fleet-run"
             ),
@@ -461,7 +461,7 @@ def require_install_paths(mirror: pathlib.Path, sha: str, install: tuple[Install
                     code=FleetErrorCode.INSTALL_PATH_NOT_IN_COMMIT,
                     message=(
                         f"the install step {command!r} names {path}, which commit {sha} "
-                        "does not contain: the step was declared in fleet.json after this "
+                        "does not contain: the step was declared in the registry after this "
                         "commit, so today's registry cannot build it. Check a commit that "
                         f"carries {path}, or run this one from a working tree with fleet-run"
                     ),

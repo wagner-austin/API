@@ -1,7 +1,7 @@
 """A node's CI cap, reservation and smallest job fit its memory (MCPs board task 5d6e57e7).
 
 On 2026-09-29 lavender's runners.slice was allowed 18 GB of the VM that
-lavender-wsl runs in while fleet.json reserved 12 GB of it, on a node
+lavender-wsl runs in while the registry reserved 12 GB of it, on a node
 declaring 25.4 GB, so the testdb lane could never dispatch while CI held its
 cap. The first case reads the two real declarations, so a later edit to
 either file that breaks the sum fails here; the others pin the rule on that
@@ -12,23 +12,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.json_utils import load_json_str
-
 from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runners import RunnerSpec
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace, require_node
 from fleet.core.memory_budget import budget_gaps, slice_cap_gb, smallest_job_gb
+from tests._registry import shipped_document
 
 PACKAGE = Path(__file__).resolve().parents[1]
 
 
 def _workspace() -> FleetWorkspace:
-    """The real fleet.json.
+    """The real registry.
 
     Returns:
         The decoded workspace.
     """
-    return decode_fleet_workspace(load_json_str((PACKAGE / "fleet.json").read_text("utf-8")))
+    return decode_fleet_workspace(shipped_document())
 
 
 def _runners() -> RunnerSpec:
@@ -81,7 +80,7 @@ def test_the_measured_split_of_the_afternoon_is_refused_naming_all_four_numbers(
     assert budget_gaps(workspace, _runners()) == (
         "lavender-wsl: CI slice 18 GB + reservation 12.0 GB + smallest job 0.25 GB is 30.25 "
         "GB, past its 25.4 GB, so while CI holds its cap the node can never dispatch; lower "
-        "the reservation in fleet.json or the slice in runners.json",
+        "the reservation in registry/nodes.json or the slice in runners.json",
     )
 
 

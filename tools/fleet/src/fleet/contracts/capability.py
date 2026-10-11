@@ -55,7 +55,7 @@ declaration claimed nothing at all, which idled it for every job, not only the
 ones needing that toolchain. The declaration stays, as the version the hub's
 own planning (:func:`fleet.contracts.tags.node_tags`) reads without asking the
 node, and every tick compares it with the answer and logs the difference
-(:func:`version_drift`) so fleet.json can be corrected.
+(:func:`version_drift`) so registry/nodes.json can be corrected.
 """
 
 from __future__ import annotations
@@ -218,7 +218,7 @@ def version_drift(
     said = "none" if declared is None else repr(declared)
     return (
         f"declares {capability} {said} but its probe reports {reported}, so it claims {claims} "
-        f"the {capability} tag; set {capability} to {fix} in fleet.json"
+        f"the {capability} tag; set {capability} to {fix} in registry/nodes.json"
     )
 
 

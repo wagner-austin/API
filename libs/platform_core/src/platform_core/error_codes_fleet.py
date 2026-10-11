@@ -121,7 +121,7 @@ class FleetErrorCode(ErrorCodeBase):
     # Exporting one commit of a project for the queue's node lane (MCPs board
     # task fd5cabfa, A2). Five codes, split where the reader's next action
     # splits: a project the registry declares without a remote is a
-    # fleet.json line to write; a sha the remote does not have is a push the
+    # registry line to write; a sha the remote does not have is a push the
     # submitter has not made; a fetch or archive that failed for any other
     # reason is git's own words, a network or credential question on the
     # hub; and a job whose tags disagree with the registry's declaration for
@@ -137,11 +137,11 @@ class FleetErrorCode(ErrorCodeBase):
     # and the split is the same one the four above are split on. A sha the remote lacks is
     # the SUBMITTER's unpushed commit, one `git push` from checkable by the
     # session that submitted it; a ref the remote lacks was written into
-    # fleet.json and is wrong for every job of that project until somebody
+    # the registry and is wrong for every job of that project until somebody
     # edits that line. Sending the second reader to look for their own
     # unpushed work would waste the one fact the refusal has.
     COMPANION_REF_NOT_ON_REMOTE = "COMPANION_REF_NOT_ON_REMOTE"
-    # The sixth (MCPs board task 8454b6a9): an install step fleet.json
+    # The sixth (MCPs board task 8454b6a9): an install step the registry
     # declares today names a path the exported commit does not contain,
     # because the step was declared after the commit was made. Measured
     # 2026-09-26: packages/db at a 2026-09-21 commit ran 'bash
@@ -173,7 +173,7 @@ class FleetErrorCode(ErrorCodeBase):
     # Two codes, split where a reader's next action splits: a malformed
     # ANSWER means the tool's contract moved and the fix is in the MCP
     # package, while a queue job naming something this workspace does not
-    # declare means the fleet.json here is behind and the fix is a config
+    # declare means the registry here is behind and the fix is a config
     # line. One code would send half its readers to the wrong repository.
     QUEUE_ANSWER_MALFORMED = "QUEUE_ANSWER_MALFORMED"
     QUEUE_CREDENTIALS_MISSING = "QUEUE_CREDENTIALS_MISSING"

@@ -1,0 +1,15 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 2,
+  "expected_minutes": 16,
+  "required_tags": [
+    "windows",
+    "rust"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "libs/cleargbm_rs",
+    "install": [],
+    "companions": []
+  }
+}

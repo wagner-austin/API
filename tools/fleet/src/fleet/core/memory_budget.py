@@ -2,14 +2,14 @@
 
 MCPs board task 5d6e57e7. On 2026-09-29 lavender's runners.slice (45a4f22b)
 was allowed 18 GB (``MemoryMax``, 16 GB ``MemoryHigh``) of the WSL VM that
-lavender-wsl runs in, while fleet.json reserved 12 GB of that same VM before
+lavender-wsl runs in, while the registry reserved 12 GB of that same VM before
 any fleet worker. The node declares 25.4 GB, so while CI held its budget the
 lane could never dispatch: 18 + 12 is past the machine before a single
 worker. Every tick answered ``NODE_OWNER_RESERVED`` from 17:15Z, and the
 testdb queue stood still with twelve rows, by declaration rather than by
 load.
 
-The two numbers live in two files (``runners.json`` and ``fleet.json``) and
+The two numbers live in two files (``runners.json`` and ``registry/nodes.json``) and
 were each reasonable alone. This is the check that reads both: for every
 node, the CI slice its host may run inside the node (none unless the node's
 ``wsl_host`` is a runners.json host with a slice), plus the node's
@@ -88,7 +88,7 @@ def budget_gaps(workspace: FleetWorkspace, runners: RunnerSpec) -> tuple[str, ..
                 f"{name}: CI slice {cap} GB + reservation {reserved:.1f} GB + smallest job "
                 f"{job:.2f} GB is {cap + reserved + job:.2f} GB, past its {node['ram_gb']:.1f} "
                 "GB, so while CI holds its cap the node can never dispatch; lower the "
-                "reservation in fleet.json or the slice in runners.json"
+                "reservation in registry/nodes.json or the slice in runners.json"
             )
     return tuple(gaps)
 

@@ -1,12 +1,12 @@
 """CLI: the event stream a session subscribes to.
 
 Usage:
-    fleet-watch --config fleet.json
-    fleet-watch --config fleet.json --run <run-id>
+    fleet-watch --config registry
+    fleet-watch --config registry --run <run-id>
 
 One line per event, oldest first, on standard output. That shape is the whole
 design: a Claude session subscribes with
-``Monitor({command: "fleet-watch --config fleet.json"})`` and every line
+``Monitor({command: "fleet-watch --config registry"})`` and every line
 becomes a notification, with no broker, no port, and no process that has to
 outlive the session.
 

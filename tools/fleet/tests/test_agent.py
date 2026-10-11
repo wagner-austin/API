@@ -33,7 +33,8 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 from fleet.cli import agent
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
-from tests.conftest import FakeRun, agent_argv, failed, ok
+from tests._registry import write_registry
+from tests.conftest import FakeRun, agent_argv, failed, ok, workspace_document
 
 #: The board's variables for the observe pass, with the url overridden so
 #: no test reads the MCPs checkout's endpoint declaration.
@@ -98,10 +99,11 @@ class TestCredentialsAndEntryPoint:
         self, tmp_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         """The hub lane dispatches nothing to a node, and the workspace is
-        still read: a runner whose fleet.json does not decode has no business
-        claiming, and the node runners beside it read the same file."""
-        broken = tmp_path / "fleet.json"
-        broken.write_text(dump_json_str({"nodes": {}}), encoding="utf-8")
+        still read: a runner whose registry does not decode has no business
+        claiming, and the node runners beside it read the same registry."""
+        document = workspace_document()
+        document["nodes"] = {}
+        broken = write_registry(tmp_path / "registry", document)
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 

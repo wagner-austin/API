@@ -1,8 +1,8 @@
 """CLI: what every node has free right now.
 
 Usage:
-    fleet-nodes --config fleet.json
-    fleet-nodes --config fleet.json --registry ../MCPs/fleet-mcp/fleet-nodes.json
+    fleet-nodes --config registry
+    fleet-nodes --config registry --registry ../MCPs/fleet-mcp/fleet-nodes.json
 
 The ``sinfo`` of this package, and the command to run before wondering why a
 dispatch was refused. It probes every declared node and prints one line each,

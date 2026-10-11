@@ -25,6 +25,7 @@ from fleet.contracts.source import InstallStep
 from fleet.core import _test_hooks, export
 from tests._node_agent_fixtures import PROBED, _credentials_in_env, node_argv, sourced_document
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
+from tests._registry import write_registry
 from tests.conftest import FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env"]
@@ -106,7 +107,7 @@ class TestRequireInstallPaths:
         assert raised.value.message == (
             f"the install step 'bash scripts/testdb-setup.sh --container corvis-fleet-testdb' "
             f"names scripts/testdb-setup.sh, which commit {sha} does not contain: the step was "
-            "declared in fleet.json after this commit, so today's registry cannot build it. "
+            "declared in the registry after this commit, so today's registry cannot build it. "
             "Check a commit that carries scripts/testdb-setup.sh, or run this one from a "
             "working tree with fleet-run"
         )
@@ -126,7 +127,7 @@ class TestTheTickRefusesBeforeAnyLease:
     def test_a_missing_install_path_closes_the_job_refused_with_nothing_leased(
         self, config_path: pathlib.Path
     ) -> None:
-        config_path.write_text(dump_json_str(sourced_document((step(*STEP),))), encoding="utf-8")
+        write_registry(config_path, sourced_document((step(*STEP),)))
         runner = FakeRun(
             [
                 *PROBED,

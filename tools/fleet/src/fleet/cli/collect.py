@@ -1,8 +1,8 @@
 """CLI: ask the nodes which dispatches have finished, and close them out.
 
 Usage:
-    fleet-collect --config fleet.json
-    fleet-collect --config fleet.json --run tools-fleet-1788556688
+    fleet-collect --config registry
+    fleet-collect --config registry --run tools-fleet-1788556688
 
 THE COMMAND THAT MAKES A RESULT ARRIVE. ``fleet-run`` returns as soon as the
 suite is running, by design -- it launches through the node's task scheduler
@@ -17,8 +17,8 @@ exactly as it was, and a run that has is closed once -- the second call finds
 no live row for it. That is what makes the subscription loop a shell loop:
 
     while true; do
-      fleet-collect --config fleet.json
-      fleet-watch   --config fleet.json
+      fleet-collect --config registry
+      fleet-watch   --config registry
       sleep 30
     done
 

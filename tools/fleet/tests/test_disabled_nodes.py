@@ -28,6 +28,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, nodes, run
 from fleet.core import _test_hooks, staging
+from tests._registry import write_registry
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -90,9 +91,7 @@ def _mixed_config(tmp_path: pathlib.Path) -> pathlib.Path:
     asleep["enabled"] = False
     declared["asleep"] = asleep
     document["nodes"] = declared
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(document), encoding="utf-8")
-    return path
+    return write_registry(tmp_path / "registry", document)
 
 
 class TestAutoSelectSkipsWithoutProbing:
@@ -144,8 +143,7 @@ class TestAutoSelectSkipsWithoutProbing:
         if not isinstance(lavender, dict):
             raise AssertionError("the fixture workspace must declare lavender")
         lavender["enabled"] = False
-        path = tmp_path / "fleet.json"
-        path.write_text(dump_json_str(document), encoding="utf-8")
+        path = write_registry(tmp_path / "registry", document)
         _test_hooks.run = FakeRun([])
 
         with pytest.raises(AppError) as excinfo:

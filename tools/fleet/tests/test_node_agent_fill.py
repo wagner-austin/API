@@ -35,6 +35,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import FakeQueue, queue_job, tick_body
+from tests._registry import write_registry
 from tests.conftest import DEMO_NOW, DEMO_PROJECT, DEMO_RUN_ID, FakeRun
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -66,8 +67,7 @@ def _two_projects(config_path: pathlib.Path) -> pathlib.Path:
             ProjectSource(remote=REMOTE, path=OTHER_PROJECT, install=(NPM_CI,), companions=())
         ),
     }
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
-    return config_path
+    return write_registry(config_path, document)
 
 
 def _other_export(config_path: pathlib.Path) -> None:

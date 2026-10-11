@@ -1,0 +1,24 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 1,
+  "expected_minutes": 5,
+  "required_tags": [
+    "windows"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "clients/TankpitBot/web",
+    "install": [
+      {
+        "phase": "install",
+        "argv": [
+          "npm",
+          "ci",
+          "--prefix",
+          "clients/TankpitBot/web"
+        ]
+      }
+    ],
+    "companions": []
+  }
+}

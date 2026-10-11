@@ -11,7 +11,7 @@ script for a new one.
 
 THIS IS THE THIRD MACHINE DOCUMENT, NOT A COPY OF THE OTHER TWO. The fleet is
 already written down twice -- ``fleet-mcp/fleet-nodes.json`` (MCPs) owns which
-machines exist and whether one should answer; ``fleet.json`` here owns what a
+machines exist and whether one should answer; ``registry/`` here owns what a
 machine can run for DISPATCH. This roster owns what a machine serves to
 GITHUB ACTIONS: runner installs, their labels, and the host assets their job
 classes require. The columns barely overlap, and merging them was already
@@ -134,7 +134,7 @@ class HostRunnerSpec(TypedDict):
     """One machine serving GitHub Actions, and everything it must hold.
 
     Attributes:
-        name: The host's fleet name, matching ``fleet.json`` and
+        name: The host's fleet name, matching ``registry/nodes.json`` and
             ``fleet-nodes.json`` so the three documents can be joined.
         host: SSH destination -- an alias from ``~/.ssh/config``, the same
             rule as :class:`fleet.contracts.node.NodeConfig`.
@@ -157,7 +157,7 @@ class HostRunnerSpec(TypedDict):
             the Windows default grants half the machine.
         scratch_dir: Absolute Windows directory on the host for transient
             audit scripts, the same role ``stage_root`` plays for dispatch.
-            Declared here rather than joined from ``fleet.json`` at runtime:
+            Declared here rather than joined from the registry at runtime:
             an audit that needed a second document to locate a writable
             directory would fail on exactly the machine the second document
             forgot.

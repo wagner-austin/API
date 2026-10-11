@@ -2,7 +2,7 @@
 
 MCPs board task 939ec5c7, the operator on 2026-10-02: "capable pcs are tagged
 and take jobs tagged for their abikities". Until then a node's tags were the
-fields of its fleet.json entry, so a tool installed on a node did nothing
+fields of its registry entry, so a tool installed on a node did nothing
 until somebody edited the file in the API repo, and a declaration that no
 longer matched idled the node for every job. Now the toolchain probe the
 runner already pays for each tick answers every capability a tag stands for,
@@ -27,8 +27,8 @@ that runner re-reads its token every tick (:mod:`fleet.contracts.elevation`).
 
 The declaration is still compared every tick (:func:`tag_drift`), because the
 hub's own planning reads it without asking the node
-(:func:`fleet.contracts.tags.node_tags`), and a difference means fleet.json
-should change.
+(:func:`fleet.contracts.tags.node_tags`), and a difference means
+registry/nodes.json should change.
 """
 
 from __future__ import annotations
@@ -112,20 +112,22 @@ def tag_drift(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[str, .
         claims = "without" if found_gpu is None else "with"
         lines.append(
             f"declares gpu {said} but nvidia-smi reports {reported}, so it claims {claims} the "
-            "gpu tag; correct gpu in fleet.json"
+            "gpu tag; correct gpu in registry/nodes.json"
         )
     found_testdb = _answer(TESTDB_PROBE, reports)
     if node["test_database"] != (found_testdb is not None):
         if found_testdb is None:
             lines.append(
                 f"declares test_database true but no {TESTDB_CONTAINER} container exists, so it "
-                "claims without the testdb tag; set test_database to false in fleet.json, or "
+                "claims without the testdb tag; set test_database to false in "
+                "registry/nodes.json, or "
                 "provision the container"
             )
         else:
             lines.append(
                 f"declares test_database false but {TESTDB_CONTAINER} exists ({found_testdb}), "
-                "so it claims with the testdb tag; set test_database to true in fleet.json"
+                "so it claims with the testdb tag; set test_database to true in "
+                "registry/nodes.json"
             )
     lines.extend(
         drift

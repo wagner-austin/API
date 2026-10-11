@@ -22,7 +22,7 @@ from concurrent.futures import Future
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from fleet.cli import node_agent, node_serve, node_serve_claim
 from fleet.contracts.workspace import (
@@ -40,6 +40,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
+from tests._registry import shipped_document, write_registry
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, ok, pin_clock
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -430,7 +431,7 @@ class TestAServingRunner:
     ) -> None:
         document = sourced_document((NPM_CI,))
         document["node_serve_seconds"] = 60
-        sourced_config.write_text(dump_json_str(document), encoding="utf-8")
+        write_registry(sourced_config, document)
         node = FakeRun([ok(f"{DEFAULT_SHA}\n"), *PROBED])
         _test_hooks.run = node
         endpoint = FakeQueue(
@@ -467,9 +468,8 @@ class TestAServingRunner:
 
 
 class TestTheDeclarations:
-    def test_fleet_json_serves_twenty_minutes_and_polls_every_five_seconds(self) -> None:
-        document = pathlib.Path(__file__).parent.parent / "fleet.json"
-        workspace = decode_fleet_workspace(load_json_str(document.read_text(encoding="utf-8")))
+    def test_the_registry_serves_twenty_minutes_and_polls_every_five_seconds(self) -> None:
+        workspace = decode_fleet_workspace(shipped_document())
         assert workspace["node_serve_seconds"] == 1200
         assert workspace["node_poll_seconds"] == 5
 

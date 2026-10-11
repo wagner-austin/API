@@ -1,0 +1,23 @@
+{
+  "worker_ram_gb": 0.8,
+  "minimum_workers": 2,
+  "expected_minutes": 5,
+  "required_tags": [],
+  "source": {
+    "remote": "https://github.com/wagner-austin/MCPs.git",
+    "path": "phone-companion",
+    "install": [
+      {
+        "phase": "install",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "phone-companion",
+          "fetch"
+        ]
+      }
+    ],
+    "companions": []
+  }
+}

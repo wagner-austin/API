@@ -25,7 +25,7 @@ from fleet.contracts.tags import (
 )
 from fleet.contracts.toolchain import ToolReport
 
-#: sedona's card as fleet.json declares it.
+#: sedona's card as the registry declares it.
 RTX_3070_TI = NodeGpu(
     model="NVIDIA GeForce RTX 3070 Ti Laptop GPU",
     vram_mib=8192,

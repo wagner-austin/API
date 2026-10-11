@@ -1,0 +1,23 @@
+{
+  "worker_ram_gb": 2.0,
+  "minimum_workers": 1,
+  "expected_minutes": 15,
+  "required_tags": [
+    "linux",
+    "docker"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/slime.git",
+    "path": "execution",
+    "install": [
+      {
+        "phase": "install",
+        "argv": [
+          "npm",
+          "ci"
+        ]
+      }
+    ],
+    "companions": []
+  }
+}

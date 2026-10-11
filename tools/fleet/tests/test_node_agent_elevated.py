@@ -27,6 +27,7 @@ from tests._node_agent_fixtures import (
     sourced_document,
 )
 from tests._queue_fakes import FakeQueue
+from tests._registry import write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, ok
 
@@ -56,8 +57,7 @@ def _elevated_config(config_path: pathlib.Path) -> pathlib.Path:
     lavender = nodes["lavender"]
     assert isinstance(lavender, dict)
     lavender["elevated"] = True
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
-    return config_path
+    return write_registry(config_path, document)
 
 
 def _tick(
@@ -194,7 +194,7 @@ class TestRefusalsAndAnnounce:
     def test_an_elevated_runner_for_a_node_that_declares_none_is_refused_before_any_call(
         self, config_path: pathlib.Path
     ) -> None:
-        config_path.write_text(dump_json_str(sourced_document((NPM_CI,))), encoding="utf-8")
+        write_registry(config_path, sourced_document((NPM_CI,)))
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 

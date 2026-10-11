@@ -1,9 +1,9 @@
 """CLI: run one bridge cycle and exit.
 
 Usage:
-    fleet-wake --config /path/to/fleet.json
+    fleet-wake --config /path/to/tools/fleet/registry
 
-Reads the same workspace document every ``fleet-*`` command reads, so the
+Reads the same workspace registry every ``fleet-*`` command reads, so the
 bridge cannot disagree with ``fleet-run`` about where the ledger is. One
 cycle, then exit; the interval belongs to the scheduler that calls this, where
 it is visible, for the same reason ``fleet-watch`` has no ``--follow``.

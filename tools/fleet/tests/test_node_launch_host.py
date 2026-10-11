@@ -24,12 +24,13 @@ import pathlib
 import threading
 
 import pytest
-from platform_core.json_utils import JSONObject, dump_json_str, load_json_str
+from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_agent
 from fleet.cli.node_launch import Launcher
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.core import _test_hooks, host_claims, leases, queue, records, staging
+from fleet.core.workspace_files import read_workspace_document
 from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
 from tests._node_agent_fixtures import (
     PROBED,
@@ -40,6 +41,7 @@ from tests._node_agent_fixtures import (
     prebuilt_export,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
+from tests._registry import write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_RUN_ID, PROBE_OK, FakeRun, ok
 
@@ -67,7 +69,7 @@ def _one_check_at_once(config_path: pathlib.Path) -> None:
     Args:
         config_path: The sourced workspace document, rewritten in place.
     """
-    document = load_json_str(config_path.read_text(encoding="utf-8"))
+    document = read_workspace_document(config_path)
     assert isinstance(document, dict)
     nodes = document["nodes"]
     assert isinstance(nodes, dict)
@@ -77,7 +79,7 @@ def _one_check_at_once(config_path: pathlib.Path) -> None:
     assert isinstance(budget, dict)
     lavender["elevated"] = True
     budget["checks_at_once"] = 1
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
+    write_registry(config_path, document)
 
 
 def _runner(

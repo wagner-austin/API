@@ -54,7 +54,7 @@ def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
         return None
     return (
         f"{FleetErrorCode.PROJECT_TAGS_MISMATCH.value}: the job requires "
-        f"[{', '.join(extra)}], which fleet.json does not declare for {job['project']} "
+        f"[{', '.join(extra)}], which registry/projects/{job['project']}.json does not declare "
         f"(it declares [{', '.join(declared)}]); resubmit with the registry's tags"
     )
 

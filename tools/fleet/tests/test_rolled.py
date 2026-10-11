@@ -63,7 +63,7 @@ def scripted_calls(api: pathlib.Path, scratch: pathlib.Path) -> list[tuple[str, 
             "libs/platform_core/src",
             "libs/monorepo_guards/src",
             "tools/board-watch/src",
-            "tools/fleet/fleet.json",
+            "tools/fleet/registry",
         ),
         ("tar", "-x", "-f", str(tarball), "-C", str(destination)),
     ]
@@ -121,7 +121,7 @@ class TestScriptedExtraction:
                     str(destination / "tools" / "board-watch" / "src"),
                 )
             ),
-            config=str(destination / "tools" / "fleet" / "fleet.json"),
+            config=str(destination / "tools" / "fleet" / "registry"),
         )
         assert runner.calls == scripted_calls(api, scratch)
         assert runner.timeouts == [commit_tree.TREE_STEP_TIMEOUT_SECONDS] * 3 == [120] * 3
@@ -187,7 +187,8 @@ class TestScriptedExtraction:
             "lacks tools/fleet/src/fleet/cli/agent.py, tools/fleet/src/fleet/cli/node_agent.py, "
             "libs/platform_core/src/platform_core/__init__.py, "
             "libs/monorepo_guards/src/monorepo_guards/__init__.py, "
-            "tools/board-watch/src/board_watch/__init__.py, tools/fleet/fleet.json; nothing ran"
+            "tools/board-watch/src/board_watch/__init__.py, tools/fleet/registry/nodes.json, "
+            "tools/fleet/registry/settings.json; nothing ran"
         )
         assert not destination_of(scratch).exists()
 
@@ -200,7 +201,8 @@ ROLLED_FILES: dict[str, str] = {
     "libs/platform_core/src/platform_core/__init__.py": "",
     "libs/monorepo_guards/src/monorepo_guards/__init__.py": "",
     "tools/board-watch/src/board_watch/__init__.py": "",
-    "tools/fleet/fleet.json": '{"rolled": true}\n',
+    "tools/fleet/registry/nodes.json": '{"rolled": true}\n',
+    "tools/fleet/registry/settings.json": "{}\n",
 }
 
 
@@ -212,7 +214,9 @@ class TestRealExtraction:
         commit = committed_repository(api, ROLLED_FILES, rolled.ROLLED_REF)
         agent_source = api / "tools/fleet/src/fleet/cli/agent.py"
         agent_source.write_text("ROLLED = False\n", encoding="utf-8")
-        (api / "tools/fleet/fleet.json").write_text('{"rolled": false}\n', encoding="utf-8")
+        (api / "tools/fleet/registry/nodes.json").write_text(
+            '{"rolled": false}\n', encoding="utf-8"
+        )
         git(api, "commit", "--quiet", "--all", "-m", "committed after the roll")
         scratch = tmp_path / "scratch"
         _test_hooks.temp_root = FakeTempRoot(scratch)
@@ -226,7 +230,8 @@ class TestRealExtraction:
         assert tree["directory"] == str(destination)
         agent = destination / "tools/fleet/src/fleet/cli/agent.py"
         assert agent.read_text(encoding="utf-8") == "ROLLED = True\n"
-        assert pathlib.Path(tree["config"]).read_text(encoding="utf-8") == '{"rolled": true}\n'
+        nodes = pathlib.Path(tree["config"]) / "nodes.json"
+        assert nodes.read_text(encoding="utf-8") == '{"rolled": true}\n'
         assert not (destination / "tools/fleet/pyproject.toml").exists()
 
     def test_the_state_a_serve_compares_is_read_from_its_records_directory_for_real(
@@ -241,7 +246,9 @@ class TestRealExtraction:
 
         assert rolled.rolled_state(records) == first
 
-        (api / "tools/fleet/fleet.json").write_text('{"rolled": "again"}\n', encoding="utf-8")
+        (api / "tools/fleet/registry/nodes.json").write_text(
+            '{"rolled": "again"}\n', encoding="utf-8"
+        )
         git(api, "commit", "--quiet", "--all", "-m", "the next roll")
         second = git(api, "rev-parse", "HEAD")
         git(api, "update-ref", rolled.ROLLED_REF, second)

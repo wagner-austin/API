@@ -23,6 +23,7 @@ from fleet.contracts.dispatch import DispatchJob, decode_job
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, node_argv, sourced_document
 from tests._queue_fakes import FakeQueue, queue_job
+from tests._registry import write_registry
 from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, ok
 from tests.test_node_agent_elevated import ADMINISTRATOR_TOKEN
 
@@ -67,8 +68,7 @@ def _untagged_config(config_path: pathlib.Path) -> pathlib.Path:
         "required_tags": ["windows", "elevated"],
         "source": None,
     }
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
-    return config_path
+    return write_registry(config_path, document)
 
 
 def _tick(config_path: pathlib.Path, *, elevated: bool, replies: list[str]) -> FakeQueue:

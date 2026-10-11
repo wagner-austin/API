@@ -109,7 +109,7 @@ def ready_state(
         the runner claims with what the probe found.
     """
     if not node["enabled"]:
-        return closed(alias, elevated, None, "is disabled in fleet.json; claiming nothing")
+        return closed(alias, elevated, None, "is disabled in registry/nodes.json; claiming nothing")
     recorded = records.live_load(loaded.ledger, node=alias, projects=loaded.workspace["projects"])
     live = LiveLoad(
         runs=recorded["runs"] + launching["runs"],

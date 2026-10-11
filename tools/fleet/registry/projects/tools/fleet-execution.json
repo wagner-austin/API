@@ -1,0 +1,14 @@
+{
+  "worker_ram_gb": 0.25,
+  "minimum_workers": 1,
+  "expected_minutes": 5,
+  "required_tags": [
+    "windows"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "tools/fleet-execution",
+    "install": [],
+    "companions": []
+  }
+}

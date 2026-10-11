@@ -26,20 +26,17 @@ import tarfile
 from typing import Final
 
 import pytest
-from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core.archive_scope import EXCLUDE, WHOLE_TREE, archive_pathspec, owns
 from fleet.core.stage_repository import EXPORT_AUTHOR_EMAIL
+from tests._registry import shipped_document
 
 API: Final[str] = "https://github.com/wagner-austin/API.git"
 MCPS: Final[str] = "https://github.com/wagner-austin/MCPs.git"
 
 #: This repository, four hops up from ``tools/fleet/tests/test_*.py``.
 REPO_ROOT: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parents[3]
-
-#: The registry this package ships, which is the one the hub dispatches with.
-REGISTRY: Final[pathlib.Path] = REPO_ROOT / "tools" / "fleet" / "fleet.json"
 
 #: A deadline for every git command here. Generous because the unscoped
 #: archive of this repository takes 43 seconds on the hub and a cold cache
@@ -86,7 +83,7 @@ def _declared() -> tuple[str, ...]:
     Returns:
         The paths, in declaration order.
     """
-    workspace = decode_fleet_workspace(load_json_str(REGISTRY.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     return workspace["data_paths"][API]
 
 
@@ -364,7 +361,7 @@ class TestAgainstThisRepository:
         assert scoped < 40_000_000, (
             f"the scoped payload is {scoped:,} bytes, over the 40,000,000 ceiling. "
             f"The heaviest undeclared directories are:\n{report}\n"
-            "Declare the data one in fleet.json's data_paths, or raise the ceiling "
+            "Declare the data one in registry/settings.json's data_paths, or raise the ceiling "
             "here and say why."
         )
 

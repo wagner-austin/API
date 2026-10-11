@@ -1,0 +1,12 @@
+{
+  "worker_ram_gb": 0.25,
+  "minimum_workers": 2,
+  "expected_minutes": 5,
+  "required_tags": [],
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "tools/hpc-wake",
+    "install": [],
+    "companions": []
+  }
+}

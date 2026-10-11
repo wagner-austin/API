@@ -377,7 +377,7 @@ class TestLedgerRecords:
 
         assert excinfo.value.code is FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN
         assert excinfo.value.message.startswith(
-            "live run a on lavender is of services/Model-Trainer, which fleet.json no longer"
+            "live run a on lavender is of services/Model-Trainer, which the registry no longer"
         )
 
 

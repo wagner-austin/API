@@ -26,14 +26,12 @@ repositories as companions under the directory names they have there.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-from platform_core.json_utils import load_json_str
 
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
+from tests._registry import shipped_document
 
 #: The install step of every npm repository's root check.
 NPM_CI = InstallStep(phase="install", argv=("npm", "ci"))
@@ -70,8 +68,7 @@ def test_each_repository_s_root_check_is_declared_with_what_it_reads(
     install: tuple[InstallStep, ...],
     companions: tuple[ProjectCompanion, ...],
 ) -> None:
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, name)
     assert project["required_tags"] == tags
     assert project["source"] == ProjectSource(
@@ -83,8 +80,7 @@ def test_each_repository_s_root_check_is_declared_with_what_it_reads(
 
 
 def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "Dashboards/rabbit")
     assert project["required_tags"] == (NodeTag.WINDOWS,)
     assert project["source"] == ProjectSource(
@@ -96,8 +92,7 @@ def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
 
 
 def test_the_dashboards_root_carries_the_validator_and_the_wikis_it_reads() -> None:
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "Dashboards")
     assert project["required_tags"] == (NodeTag.WINDOWS,)
     assert project["source"] == ProjectSource(

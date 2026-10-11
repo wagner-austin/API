@@ -5,7 +5,7 @@ pendragon claimed nothing on every tick of 2026-10-02 until 02:48Z, logging
 files through ffmpeg``, while tools/fleet, libs/platform_core and
 tools/maketools waited in the queue with no tag between them and that node.
 This replays that tick: pendragon and those four projects exactly as the real
-``fleet.json`` declares them, a toolchain answer with every build tool and no
+registry declares them, a toolchain answer with every build tool and no
 ffmpeg, and room for a run. One pass of the runner must ask the queue for
 every project but grandma-api, with tags that keep grandma-api's job away
 from it, and must say which tool it lacks without closing the node.
@@ -16,7 +16,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.json_utils import dump_json_str, load_json_str
+from platform_core.json_utils import dump_json_str
 
 from fleet.cli import node_agent
 from fleet.contracts.node import encode_node_config
@@ -25,14 +25,11 @@ from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, sourced_document
 from tests._queue_fakes import FakeQueue
+from tests._registry import shipped_document, write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, FakeRun, ok
 
 __all__ = ["_credentials_in_env"]
-
-#: The workspace this package ships, read for pendragon and the projects
-#: that waited for it.
-REAL_WORKSPACE = pathlib.Path(__file__).resolve().parents[1] / "fleet.json"
 
 #: The project that needs ffmpeg, and the tag-free ones that queued behind it,
 #: in the name order a claim lists the projects it fits.
@@ -54,7 +51,7 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    real = decode_fleet_workspace(load_json_str(REAL_WORKSPACE.read_text("utf-8")))
+    real = decode_fleet_workspace(shipped_document())
     document = sourced_document((NPM_CI,))
     document["nodes"] = {"pendragon": encode_node_config(real["nodes"]["pendragon"])}
     projects = document["projects"]
@@ -63,8 +60,7 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
         project = encode_project_config(real["projects"][name])
         project["source"] = None
         projects[name] = project
-    config_path.write_text(dump_json_str(document), encoding="utf-8")
-    return config_path
+    return write_registry(config_path, document)
 
 
 def test_pendragon_without_ffmpeg_asks_the_queue_for_every_project_but_grandma_api(

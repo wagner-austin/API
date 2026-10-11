@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import pathlib
 
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject
 
 from fleet.cli import _config, nodes
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.core import _test_hooks, records
+from tests._registry import write_registry
 from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok, workspace_document
 
 #: sedona's reading at 10:51Z scaled to the fixture: under the reservation.
@@ -36,11 +37,9 @@ def _config_with(tmp_path: pathlib.Path, document: JSONObject) -> pathlib.Path:
         document: The document.
 
     Returns:
-        Its path.
+        The written registry directory.
     """
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(document), encoding="utf-8")
-    return path
+    return write_registry(tmp_path / "registry", document)
 
 
 def _nodes(document: JSONObject) -> JSONObject:

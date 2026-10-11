@@ -26,12 +26,13 @@ from collections.abc import Generator, Sequence
 import pytest
 from board_watch import _test_hooks as board_watch_hooks
 from platform_core.config import config_test_hooks
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject
 
 from fleet.cli import _config
 from fleet.cli import agent as agent_cli
 from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, manifest, staging
+from tests._registry import write_registry
 
 #: The host-case markers and the execution run (board task 465689f5), and
 #: pytester, which test_host_execution runs that plugin's own sessions with.
@@ -498,13 +499,11 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         tmp_path: pytest's per-test temporary directory.
 
     Returns:
-        Path to the written document.
+        The written registry directory, which ``--config`` names.
     """
     pin_clock(DEMO_NOW)
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(workspace_document()), encoding="utf-8")
-    return path
+    return write_registry(tmp_path / "registry", workspace_document())
 
 
 def prebuilt_archive(config_path: pathlib.Path, repo: pathlib.Path) -> bytes:

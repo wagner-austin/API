@@ -1,0 +1,38 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 1,
+  "expected_minutes": 10,
+  "required_tags": [
+    "linux"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/MCPs.git",
+    "path": "execution",
+    "install": [
+      {
+        "phase": "install",
+        "argv": [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ]
+      },
+      {
+        "phase": "workspace-build",
+        "argv": [
+          "node",
+          "scripts/ci-build-consumed-workspaces.mjs"
+        ]
+      },
+      {
+        "phase": "workspace-build",
+        "argv": [
+          "npm",
+          "rebuild",
+          "mcp-shared"
+        ]
+      }
+    ],
+    "companions": []
+  }
+}

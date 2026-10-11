@@ -2,11 +2,12 @@
 
 Shared by all five entry points, which is the point: they cannot disagree
 about where the nodes are or which ledger records them, because they read the
-same file through the same function.
+same registry through the same function (the registry is a directory since
+MCPs board task 4a78c916; :mod:`fleet.core.workspace_files` assembles it).
 
-The document is located relative to the process and the paths inside it
-relative to the document, so a workspace can live beside the records it
-describes and be used from any working directory. That resolution happens here
+The registry is located relative to the process and the paths inside it
+relative to the directory holding it, so a workspace can live beside the
+records it describes and be used from any working directory. That resolution happens here
 rather than in the contract, because a contract that resolved paths could not
 be decoded from a string in a test without inventing a directory for it.
 """
@@ -16,10 +17,10 @@ from __future__ import annotations
 import pathlib
 
 from platform_core import cli_args
-from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core import _test_hooks, export, host_claims, retire_owed
+from fleet.core.workspace_files import read_workspace_document
 
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
@@ -28,7 +29,7 @@ RECORDS_FLAG = "--records-dir"
 """The directory the records resolve against, for a document read elsewhere.
 
 Given by :mod:`fleet.cli.rolled` and by nothing else (board task 465689f5).
-A tick runs the agents against the rolled commit's own ``fleet.json``,
+A tick runs the agents against the rolled commit's own registry,
 extracted to a scratch directory per commit, while the ledger, the feed and
 the leases are this machine's running state and stay beside the checkout's
 document: resolved against the extraction, every roll would start the fleet
@@ -175,24 +176,27 @@ class LoadedWorkspace:
 
 
 def load_workspace(parsed: dict[str, str]) -> LoadedWorkspace:
-    """Read and validate the workspace named on the command line.
+    """Read and validate the registry directory named on the command line.
 
     Args:
-        parsed: Flags already read from the command line.
+        parsed: Flags already read from the command line; ``--config`` names
+            the registry directory (:mod:`fleet.core.workspace_files`).
 
     Returns:
         The validated workspace, its record paths resolved against
-        ``--records-dir`` when given and the document's directory otherwise.
+        ``--records-dir`` when given and otherwise against the directory
+        holding the registry, ``tools/fleet``, where they resolved when the
+        registry was one file beside them.
 
     Raises:
         ValueError: If ``--config`` was not given.
-        JSONTypeError: If the document is not a valid workspace.
-        OSError: If the document cannot be read. Propagated rather than
+        JSONTypeError: If the registry is not a valid workspace.
+        OSError: If a registry file cannot be read. Propagated rather than
             translated: the message names the path and the reason, which is
             the whole diagnostic.
     """
     path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG)).resolve()
-    value = load_json_str(_test_hooks.read_text(path))
+    value = read_workspace_document(path)
     records = parsed.get(RECORDS_FLAG)
     directory = path.parent if records is None else pathlib.Path(records).resolve()
     return LoadedWorkspace(decode_fleet_workspace(value), directory)

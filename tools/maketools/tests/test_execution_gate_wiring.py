@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 from typing import Final
 
-from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_dict, require_int
+from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_int
 
 from tests.test_service_entry import SERVICES
 
@@ -123,8 +123,9 @@ def test_the_deploy_project_asks_the_fleet_for_one_worker_per_case() -> None:
     puts every case in one round, and a node that cannot give that many
     refuses the job rather than running it into the budget.
     """
-    workspace = narrow_json_to_dict(
-        load_json_str((ROOT / "tools" / "fleet" / "fleet.json").read_text(encoding="utf-8"))
+    # The project's own file in the registry (MCPs board task 4a78c916).
+    declared = ROOT / "tools" / "fleet" / "registry" / "projects" / "tools"
+    project = narrow_json_to_dict(
+        load_json_str((declared / "maketools-execution.json").read_text(encoding="utf-8"))
     )
-    project = require_dict(require_dict(workspace, "projects"), "tools/maketools-execution")
     assert require_int(project, "minimum_workers") == len(SERVICES)

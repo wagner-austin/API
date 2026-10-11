@@ -21,14 +21,12 @@ clone the hub sent beside the export (MCPs board task 93d7d7f4).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-from platform_core.json_utils import load_json_str
 
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
+from tests._registry import shipped_document
 
 
 @pytest.mark.parametrize(
@@ -41,8 +39,7 @@ from fleet.contracts.workspace import decode_fleet_workspace, require_project
 def test_each_half_runs_the_execution_directory_on_its_platform(
     name: str, tags: tuple[NodeTag, ...]
 ) -> None:
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, name)
     assert project["required_tags"] == tags
     assert project["source"] == ProjectSource(
@@ -61,8 +58,7 @@ def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:
     requires ``docker``, which makes the runner isolate it, and ``linux``,
     the only platform that tag is carried on.
     """
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "tools/maketools-execution")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
     assert project["source"] == ProjectSource(
@@ -82,8 +78,7 @@ def test_each_games_suite_runs_isolated_on_a_rootless_daemon(game: str) -> None:
     the runner isolate it (dispatch.recipe_for), and each game's own script
     refuses any other daemon besides (MCPs board task a8ee9b21).
     """
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, f"{game}/execution")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
     assert project["source"] == ProjectSource(
@@ -106,8 +101,7 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     (MCPs board task 93d7d7f4). The lane holds the shared test database
     exclusively, since the replayed suite runs against ``corvis_test``.
     """
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "MCPs/execution-testdb")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX)
     assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
@@ -139,8 +133,7 @@ def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
     without the ``ffmpeg`` tag could only fail it; ``windows`` is the
     platform the package's own check is registered for.
     """
-    path = Path(__file__).resolve().parents[1] / "fleet.json"
-    workspace = decode_fleet_workspace(load_json_str(path.read_text(encoding="utf-8")))
+    workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "clients/TankpitBot-execution")
     assert project["required_tags"] == (NodeTag.WINDOWS, NodeTag.FFMPEG)
     assert project["source"] == ProjectSource(

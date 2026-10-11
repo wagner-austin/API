@@ -32,6 +32,7 @@ from fleet.contracts.toolchain import (
     version_number,
 )
 from fleet.core import _test_hooks, dialect_linux, toolchain, windows_toolchain_probe
+from tests._registry import write_registry
 from tests._toolchain_fixtures import (
     CHROME_APT,
     CHROME_NO_INSTALL,
@@ -117,11 +118,9 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         tmp_path: pytest's per-test temporary directory.
 
     Returns:
-        Path to the written document.
+        The written registry directory.
     """
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(_workspace_document()), encoding="utf-8")
-    return path
+    return write_registry(tmp_path / "registry", _workspace_document())
 
 
 class TestParseProbe:

@@ -23,7 +23,7 @@ computes it.
 
 WHY THE PATH DEPENDENCIES ARE READ FROM ``pyproject.toml`` RATHER THAN
 DECLARED IN THE WORKSPACE. A ``depends`` field beside each project in
-``fleet.json`` would be simpler to write and would be wrong within a month:
+the registry would be simpler to write and would be wrong within a month:
 poetry already reads the authoritative list every time anybody builds, and a
 second copy drifts silently in the direction of staging too little -- which
 surfaces as a lockfile error on a node and reads as the project's fault.

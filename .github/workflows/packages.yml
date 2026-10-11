@@ -161,7 +161,7 @@ jobs:
           # tools/maketools-execution) or the ssh route to HPC3
           # (tools/hpc3-execution), so here they failed every run that
           # selected them from 2026-10-02 on (runs 36945025538, 37152534277,
-          # 37210373935); fleet.json's tags send them to a node that has it.
+          # 37210373935); the fleet registry's tags send them to a node that has it.
           # clients/TankpitBot-execution is the fleet's too (MCPs board task
           # 46934cd6): its case presses the public demo's spawn button and
           # reads a served segment with ffprobe on a Windows node, and on this

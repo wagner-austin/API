@@ -26,11 +26,12 @@ from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import _credentials_in_env, node_argv
 from tests._queue_fakes import FakeQueue, tick_body
+from tests._registry import write_registry
 from tests.conftest import FakeRun, workspace_document
 
 __all__ = ["_credentials_in_env"]
 
-#: The reason fleet.json gives, shortened.
+#: The reason registry/nodes.json gives, shortened.
 REASON: Final[str] = "its WSL VM holds the memory the Windows lane measures"
 
 
@@ -64,8 +65,7 @@ def test_the_reconciliation_reads_the_retirement_as_agreement(
 ) -> None:
     """The registry keeps lavender enabled; fleet-nodes still exits 0 and
     says how much it compared, without an ssh call to anything."""
-    config = tmp_path / "fleet.json"
-    config.write_text(dump_json_str(_retired()), encoding="utf-8")
+    config = write_registry(tmp_path / "registry", _retired())
     registry_path = tmp_path / "fleet-nodes.json"
     entry: JSONObject = {
         "name": "lavender",
@@ -95,7 +95,7 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
     """register-node-agents removes the task, but a tick can run first from
     a rolled checkout; it collects (the held listing) and then stops before
     the probe, so the node is never asked and the queue never claimed from."""
-    config_path.write_text(dump_json_str(_retired()), encoding="utf-8")
+    write_registry(config_path, _retired())
     runner = FakeRun([])
     _test_hooks.run = runner
     endpoint = FakeQueue([dump_json_str({"jobs": []})])
@@ -105,7 +105,7 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
         assert node_agent.main(node_argv(config_path)) == 0
 
     assert (runner.calls, endpoint.tools) == ([], ["dispatch_list"])
-    assert "lavender is disabled in fleet.json; claiming nothing" in caplog.text
+    assert "lavender is disabled in registry/nodes.json; claiming nothing" in caplog.text
     assert [tick_body(tick) for tick in endpoint.ticks] == [
         {
             "node": "lavender",
@@ -113,6 +113,6 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
             "tags": [],
             "fits": [],
             "claiming": False,
-            "verdict": "is disabled in fleet.json; claiming nothing",
+            "verdict": "is disabled in registry/nodes.json; claiming nothing",
         }
     ]

@@ -27,7 +27,7 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import dump_json_str, narrow_json_to_dict
+from platform_core.json_utils import narrow_json_to_dict
 
 from fleet.cli import _config, run
 from fleet.contracts.budget import NodeBudget
@@ -35,6 +35,7 @@ from fleet.contracts.node import LiveLoad, NodeConfig, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
 from fleet.core.capacity import Unassessed, first_fit
+from tests._registry import write_registry
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -189,7 +190,7 @@ class TestFirstFitWeighsWhatAnswered:
         """NOTHING FAILED HERE. Every node is switched off in the workspace,
         so no ssh was sent and no machine declined to answer. Calling that
         NODE_UNREACHABLE sends the reader to the tailnet to debug a network
-        that is fine, when the fix is one boolean in fleet.json."""
+        that is fine, when the fix is one boolean in registry/nodes.json."""
         with pytest.raises(AppError) as excinfo:
             first_fit(
                 (),
@@ -294,9 +295,7 @@ class TestAnAsleepNodeDoesNotBlockADispatch:
         asleep["host"] = "asleep"
         nodes["asleep"] = asleep
         document["nodes"] = nodes
-        path = tmp_path / "fleet.json"
-        path.write_text(dump_json_str(document), encoding="utf-8")
-        return path
+        return write_registry(tmp_path / "registry", document)
 
     def test_the_dispatch_lands_on_the_node_that_is_awake(
         self, two_node_config: pathlib.Path, repo: pathlib.Path
