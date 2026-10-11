@@ -13,6 +13,7 @@ from maketools.cli import COMMANDS, dispatch, main, repository_root, require_int
 from maketools.guard_run import GUARD_ARGV
 from maketools.makefile_grammar import SHELL_INCLUDE
 from maketools.venv_check import PROBE_ARGV
+from maketools.venvs import EMBED_PROBE
 from tests.conftest import World, ok, row
 from tests.test_makefile_grammar import PORTABLE
 
@@ -47,6 +48,7 @@ def test_every_command_is_registered() -> None:
         "test",
         "uv-venv-check",
         "venv-check",
+        "venv-embed",
         "venv-exec",
     ]
 
@@ -144,6 +146,11 @@ def test_uv_venv_exec_native_wheel_and_poetry_build_reach_their_modules(
     (cwd / ".venv" / "bin" / "ruff").write_bytes(b"")
     assert dispatch(["venv-exec", "ruff", "format", "."]) == 0
     assert world.inheriting_calls[-1]["argv"][1:] == ("format", ".")
+    (cwd / ".venv" / "bin" / "python").write_bytes(b"")
+    python = str(cwd / ".venv" / "bin" / "python")
+    world.capturing_answers[(python, "-c", EMBED_PROBE)] = ok("/site\n/base\n")
+    assert dispatch(["venv-embed", "cargo", "test"]) == 0
+    assert list(world.inheriting_calls[-1]["argv"]) == ["cargo", "test"]
     assert dispatch(["native-wheel", "--crate", "../crate", "--package", "cleargbm_rs"]) == 0
     assert world.lines[-1].startswith("native-wheel: no cleargbm_rs wheel built")
     with pytest.raises(AppError, match=r"native-wheel takes --crate DIR --package NAME"):

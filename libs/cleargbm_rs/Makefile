@@ -9,20 +9,32 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 setup:
 	$(MAKETOOLS) uv-venv-check
 
+# Every cargo step that compiles or runs the crate goes through
+# ``venv-embed``: the Rust tests embed Python through pyo3 and import numpy
+# there, and an embedded interpreter is whatever installation pyo3 linked,
+# never the venv, so a node whose system Python lacked numpy failed 94 of
+# 1680 tests (fleet job 7722e5fa, MCPs board task 6dd73ada). ``venv-embed``
+# links pyo3 against the venv's interpreter and puts its site-packages on
+# PYTHONPATH. Clippy goes through it too, so all three steps share one pyo3
+# configuration and none of them rebuilds the crate for another.
+
 # Rust linting: fmt + clippy
 rust-lint:
+	$(MAKETOOLS) uv-venv-check
 	cargo fmt
-	cargo clippy --all-targets --all-features -- -D warnings
+	$(MAKETOOLS) venv-embed cargo clippy --all-targets --all-features -- -D warnings
 
 # Rust tests
 rust-test:
-	cargo test --all-features
+	$(MAKETOOLS) uv-venv-check
+	$(MAKETOOLS) venv-embed cargo test --all-features
 
 # Rust coverage (requires cargo-llvm-cov) - 100% segment coverage
 # Uses segment-based check to avoid false negatives from generic instantiations
 rust-cov:
-	cargo llvm-cov --all-features --json --output-path coverage.json
-	cargo run --bin check_segment_coverage -- --threshold 100
+	$(MAKETOOLS) uv-venv-check
+	$(MAKETOOLS) venv-embed cargo llvm-cov --all-features --json --output-path coverage.json
+	$(MAKETOOLS) venv-embed cargo run --bin check_segment_coverage -- --threshold 100
 
 # Python linting: ruff + mypy + guard, through the uv venv's own executables
 # (``venv-exec`` resolves .venv/Scripts on Windows and .venv/bin elsewhere).

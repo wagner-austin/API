@@ -29,7 +29,7 @@ from maketools.ps_harness import run_pinned_harness
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
 from maketools.test_run import Runner, run_tests
 from maketools.venv_check import check_venv
-from maketools.venvs import native_wheel, poetry_build, uv_venv_check, venv_exec
+from maketools.venvs import native_wheel, poetry_build, uv_venv_check, venv_embed, venv_exec
 
 #: The flag that skips the pre-run sweep; for debugging only.
 NO_SWEEP_FLAG: Final[str] = "--no-sweep"
@@ -400,6 +400,18 @@ def command_venv_exec(arguments: Sequence[str]) -> int:
     return venv_exec(Path.cwd(), arguments)
 
 
+def command_venv_embed(arguments: Sequence[str]) -> int:
+    """``venv-embed CMD ARGS...``: run a Python-embedding command against ``.venv``.
+
+    Args:
+        arguments: The command and its arguments.
+
+    Returns:
+        Its status.
+    """
+    return venv_embed(Path.cwd(), arguments)
+
+
 def command_native_wheel(arguments: Sequence[str]) -> int:
     """``native-wheel --crate DIR --package NAME``: see :func:`maketools.venvs.native_wheel`.
 
@@ -494,6 +506,7 @@ COMMANDS: Final[Mapping[str, Callable[[Sequence[str]], int]]] = {
     "require-tool": command_require_tool,
     "uv-venv-check": command_uv_venv_check,
     "venv-exec": command_venv_exec,
+    "venv-embed": command_venv_embed,
     "native-wheel": command_native_wheel,
     "poetry-build": command_poetry_build,
 }
@@ -571,6 +584,7 @@ __all__ = [
     "command_test",
     "command_uv_venv_check",
     "command_venv_check",
+    "command_venv_embed",
     "command_venv_exec",
     "dispatch",
     "main",

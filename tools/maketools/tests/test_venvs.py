@@ -10,13 +10,16 @@ import pytest
 from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
 
+from maketools.commands import CommandResult
 from maketools.venvs import (
+    EMBED_PROBE,
     UV_INSTALL_ARGV,
     installed_dist_info,
     native_wheel,
     newest_wheel,
     poetry_build,
     uv_venv_check,
+    venv_embed,
     venv_exec,
     venv_executable,
 )
@@ -55,6 +58,49 @@ def test_venv_exec_runs_the_resolved_executable(world: World, tmp_path: Path) ->
     assert call["cwd"] == tmp_path
     with pytest.raises(AppError, match=r"venv-exec needs an executable name"):
         venv_exec(tmp_path, [])
+
+
+def test_venv_embed_points_the_command_at_the_venv(world: World, tmp_path: Path) -> None:
+    make_venv(tmp_path, "bin", "python")
+    python = str(tmp_path / ".venv" / "bin" / "python")
+    site = "/v/lib/python3.11/site-packages"
+    world.capturing_answers[(python, "-c", EMBED_PROBE)] = ok(f"{site}\n/opt/py311\n")
+    world.inheriting_code = 4
+    assert venv_embed(tmp_path, ["cargo", "test", "--all-features"]) == 4
+    call = world.inheriting_calls[0]
+    assert call["argv"] == ("cargo", "test", "--all-features")
+    assert call["cwd"] == tmp_path
+    assert call["env"]["PYO3_PYTHON"] == python
+    assert call["env"]["PYTHONPATH"] == site
+    assert call["env"]["PATH"] == f"/opt/py311{os.pathsep}/bin"
+    assert world.lines == [f"venv-embed: cargo test --all-features against {site}"]
+
+
+def test_venv_embed_refuses_an_empty_command(world: World, tmp_path: Path) -> None:
+    with pytest.raises(AppError, match=r"venv-embed needs a command") as caught:
+        venv_embed(tmp_path, [])
+    assert caught.value.code is MaketoolsErrorCode.USAGE
+    assert world.inheriting_calls == []
+
+
+@pytest.mark.parametrize(
+    ("answer", "shown"),
+    [
+        (failed(1, "boom"), "exit 1, printed ''"),
+        (ok("/only/one/line\n"), "exit 0, printed '/only/one/line\\n'"),
+    ],
+)
+def test_venv_embed_refuses_a_venv_that_cannot_report_its_paths(
+    world: World, tmp_path: Path, answer: CommandResult, shown: str
+) -> None:
+    make_venv(tmp_path, "bin", "python")
+    python = str(tmp_path / ".venv" / "bin" / "python")
+    world.capturing_answers[(python, "-c", EMBED_PROBE)] = answer
+    with pytest.raises(AppError) as caught:
+        venv_embed(tmp_path, ["cargo", "test"])
+    assert caught.value.code is MaketoolsErrorCode.ARTIFACT_MISSING
+    assert f"({shown}); run uv-venv-check" in caught.value.message
+    assert world.inheriting_calls == []
 
 
 def test_uv_venv_check_creates_a_missing_venv(world: World, tmp_path: Path) -> None:

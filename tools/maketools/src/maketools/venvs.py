@@ -6,7 +6,12 @@ Three packages step outside the poetry template:
   ``uv`` venv; its recipes ran ``.venv\\Scripts\\ruff`` by Windows path.
   ``venv-exec`` resolves the executable for whichever layout the venv has
   (``Scripts`` on Windows, ``bin`` elsewhere) and ``uv-venv-check``
-  recreates the venv when it is missing or cannot answer.
+  recreates the venv when it is missing or cannot answer. Its Rust tests
+  embed Python through pyo3 and import numpy there, and an embedded
+  interpreter is the installation pyo3 linked, never the venv: on
+  serendipity, whose system Python had no numpy, 94 of 1680 failed with
+  "No module named 'numpy'" (fleet job 7722e5fa, MCPs board task
+  6dd73ada). ``venv-embed`` runs cargo against the venv instead.
 * ``services/covenant-radar-api`` depends on that crate WITHOUT
   ``develop = true`` and with its version frozen, so ``poetry install``
   considers it satisfied forever and rebuilding the crate leaves the venv
@@ -23,6 +28,7 @@ Three packages step outside the poetry template:
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
@@ -98,6 +104,62 @@ def venv_exec(project: Path, argv: Sequence[str]) -> int:
         [str(executable), *argv[1:]],
         cwd=project,
         env=_test_hooks.environ(),
+        new_session=False,
+        timeout_seconds=INSTALL_WALL_SECONDS,
+    )
+
+
+#: What the venv's interpreter is asked before an embedding command runs:
+#: its site-packages, then the installation it was made from, one a line.
+EMBED_PROBE: Final[str] = (
+    "import sys, sysconfig; print(sysconfig.get_paths()['purelib']); print(sys.base_prefix)"
+)
+
+
+def venv_embed(project: Path, argv: Sequence[str]) -> int:
+    """Run a command that embeds Python so it embeds the project's venv.
+
+    Three variables, each read from the venv's own interpreter rather than
+    assumed: ``PYO3_PYTHON`` is that interpreter, so pyo3 builds against the
+    Python version the venv's packages were installed for; ``PYTHONPATH`` is
+    its site-packages and nothing else, so the embedded interpreter imports
+    the venv's numpy and never the node's; and its base installation leads
+    ``PATH``, where Windows looks for the ``python3XX.dll`` an embedding
+    binary loads, so the library is the one the venv was made from.
+
+    Args:
+        project: The package directory.
+        argv: The command and its arguments, e.g. ``cargo test``.
+
+    Returns:
+        Its exit status.
+
+    Raises:
+        AppError: ``MAKETOOLS_USAGE`` when no command was named, or
+            ``MAKETOOLS_ARTIFACT_MISSING`` when the venv has no interpreter
+            or it cannot report its paths.
+    """
+    if not argv:
+        raise AppError(MaketoolsErrorCode.USAGE, "venv-embed needs a command")
+    python = venv_executable(project, "python")
+    probe = _test_hooks.run_capturing([str(python), "-c", EMBED_PROBE], cwd=project)
+    paths = probe["stdout"].splitlines()
+    if probe["returncode"] != 0 or len(paths) != 2:
+        raise AppError(
+            MaketoolsErrorCode.ARTIFACT_MISSING,
+            f"{python} could not report its site-packages and base installation "
+            f"(exit {probe['returncode']}, printed {probe['stdout']!r}); run uv-venv-check",
+        )
+    site_packages, base = paths
+    environment = _test_hooks.environ()
+    environment["PYO3_PYTHON"] = str(python)
+    environment["PYTHONPATH"] = site_packages
+    environment["PATH"] = os.pathsep.join([base, environment.get("PATH", "")])
+    _test_hooks.write_line(f"venv-embed: {' '.join(argv)} against {site_packages}")
+    return _test_hooks.run_inheriting(
+        list(argv),
+        cwd=project,
+        env=environment,
         new_session=False,
         timeout_seconds=INSTALL_WALL_SECONDS,
     )
@@ -246,6 +308,7 @@ def poetry_build(project: Path, packages: Sequence[Path]) -> int:
 
 
 __all__ = [
+    "EMBED_PROBE",
     "EXECUTABLE_DIRECTORIES",
     "UV_INSTALL_ARGV",
     "installed_dist_info",
@@ -254,6 +317,7 @@ __all__ = [
     "newest_wheel",
     "poetry_build",
     "uv_venv_check",
+    "venv_embed",
     "venv_exec",
     "venv_executable",
 ]
