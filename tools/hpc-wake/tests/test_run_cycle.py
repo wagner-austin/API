@@ -58,55 +58,21 @@ class TestMain:
 
         assert code == 0
         content = (root / "runs" / "cycle.log").read_text(encoding="utf-8")
-        (
-            header,
-            mark1,
-            out1,
-            err1,
-            mark2,
-            out2,
-            err2,
-            mark3,
-            out3,
-            err3,
-            mark4,
-            out4,
-            err4,
-            mark5,
-            out5,
-            err5,
-            mark6,
-            out6,
-            err6,
-            mark7,
-            out7,
-            err7,
-            mark8,
-            out8,
-            err8,
-            mark9,
-            out9,
-            err9,
-        ) = content.splitlines()
+        header, *sections = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
-        assert mark1 == "-- hpc-wake"
-        assert (out1, err1) == ("hpc-out", "hpc-err")
-        assert mark2 == "-- ci-wake"
-        assert (out2, err2) == ("ci-out", "ci-err")
-        assert mark3 == "-- lock-wake"
-        assert (out3, err3) == ("lock-out", "lock-err")
-        assert mark4 == "-- fleet-health-wake"
-        assert (out4, err4) == ("health-out", "health-err")
-        assert mark5 == "-- hub-tunnel-wake"
-        assert (out5, err5) == ("tunnel-out", "tunnel-err")
-        assert mark6 == "-- lock-wake-diphtheria"
-        assert (out6, err6) == ("diphtheria-out", "diphtheria-err")
-        assert mark7 == "-- lock-wake-diphtheria-actions"
-        assert (out7, err7) == ("actions-out", "actions-err")
-        assert mark8 == "-- rcs-pair-watch"
-        assert (out8, err8) == ("rcs-out", "rcs-err")
-        assert mark9 == "-- login-probe"
-        assert (out9, err9) == ("login-out", "login-err")
+        # Each row's marker, then its stdout, then its stderr, in table order.
+        assert [tuple(sections[i : i + 3]) for i in range(0, len(sections), 3)] == [
+            ("-- hpc-wake", "hpc-out", "hpc-err"),
+            ("-- ci-wake", "ci-out", "ci-err"),
+            ("-- lock-wake", "lock-out", "lock-err"),
+            ("-- fleet-health-wake", "health-out", "health-err"),
+            ("-- hub-tunnel-wake", "tunnel-out", "tunnel-err"),
+            ("-- lock-wake-diphtheria", "diphtheria-out", "diphtheria-err"),
+            ("-- lock-wake-diphtheria-actions", "actions-out", "actions-err"),
+            ("-- rcs-pair-watch", "rcs-out", "rcs-err"),
+            ("-- login-probe", "login-out", "login-err"),
+            ("-- search-probe", "search-out", "search-err"),
+        ]
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
@@ -218,6 +184,17 @@ class TestMain:
         ]
         assert login_cwd == (root / "C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
         assert login_env == env
+        search_args, search_cwd, search_env = runner.calls[9]
+        assert list(search_args) == [
+            "C:\\Users\\Test\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "-B",
+            "packages\\maketools\\scripts\\run.py",
+            "search-probe",
+            "--workspace",
+            "C:\\Users\\Test\\PROJECTS\\MCPs",
+        ]
+        assert search_cwd == (root / "C:\\Users\\Test\\PROJECTS\\MCPs").resolve()
+        assert search_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
         assert ci_env == env
@@ -236,7 +213,7 @@ class TestMain:
         root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 9
+        assert len(runner.calls) == len(run_cycle.PUBLISHERS) == 10
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
@@ -275,7 +252,7 @@ class TestMain:
 
 
 class TestPublishers:
-    def test_the_inventory_is_the_nine_rows_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_ten_rows_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
         become sibling scheduled tasks -- has a diff to point at."""
@@ -289,7 +266,11 @@ class TestPublishers:
             "lock-wake-diphtheria-actions",
             "rcs-pair-watch",
             "login-probe",
+            "search-probe",
         ]
+        # The public search's probe (MCPs board task d84d37e3) is last, so a
+        # slow site delays no other row's post.
+        assert run_cycle.PUBLISHERS[-1]["cwd"] == "C:\\Users\\Test\\PROJECTS\\MCPs"
         assert run_cycle.PUBLISHERS[0]["cwd"] == "."
         assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
         assert run_cycle.PUBLISHERS[1]["args"][2:] == (

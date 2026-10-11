@@ -65,6 +65,7 @@ def make_runner() -> Generator[RecordingRunner, None, None]:
             Completed("actions-out\n", "actions-err\n", 0),
             Completed("rcs-out\n", "rcs-err\n", 0),
             Completed("login-out\n", "login-err\n", 0),
+            Completed("search-out\n", "search-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake

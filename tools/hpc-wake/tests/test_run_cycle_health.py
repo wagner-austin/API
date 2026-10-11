@@ -51,6 +51,7 @@ class TestHealthRecord:
             "lock-wake-diphtheria-actions",
             "rcs-pair-watch",
             "login-probe",
+            "search-probe",
         }
         assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
         assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
