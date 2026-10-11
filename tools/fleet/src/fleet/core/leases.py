@@ -17,12 +17,25 @@ deliberately so: a package whose correctness depends on a background process
 having run is a package that is wrong whenever that process is not running.
 An expired lease is simply not returned by :func:`held_leases`, so the
 resource frees itself at the moment anybody looks.
+
+EVERY READ AND EVERY REWRITE TAKES THE FILE'S TURN (:func:`_turn`, MCPs
+board task b1089284). Every node runner is its own process on the hub and
+they all share this one file, and it is rewritten in place: on 2026-10-11 at
+17:00:10Z serendipity's runner read it while another process was writing it,
+got half a JSON document, and its serving loop ended on ``InvalidJsonError``
+(its runner log on the hub). Reading without the turn was a deliberate
+choice while one process used the file; with eight, a reader has the reason
+to hold one that the choice said it lacked, and a rewrite from what it read
+needs one for the same lost-update reason :data:`REWRITING` gives in-process.
 """
 
 from __future__ import annotations
 
+import contextlib
+import os
 import pathlib
 import threading
+from collections.abc import Generator
 from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
@@ -38,7 +51,21 @@ from fleet.contracts.lease import (
     encode_lease,
     is_expired,
 )
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, file_turn
+
+#: The lease file's turn as :mod:`fleet.core.file_turn` holds it. Inside it a
+#: process reads or rewrites one small local file and nothing else, so a lock
+#: half a minute old was left by a process that died holding it.
+LEASE_TURN: Final = file_turn.TurnBounds(
+    what="lease turn",
+    waited_for="another process reading or rewriting the lease file",
+    stale_seconds=30,
+    poll_seconds=1,
+)
+
+#: The lease files this process holds the turn of, guarded by
+#: :data:`REWRITING`, so a call inside another's turn does not wait on itself.
+_HOLDING: Final[set[pathlib.Path]] = set()
 
 #: Held while the file is read and rewritten. A node runner settles a run on
 #: its watch thread while its fill pass takes a lease on the main thread
@@ -47,6 +74,46 @@ from fleet.core import _test_hooks
 #: a release lost brings a finished run's lease back to hold its project.
 #: Reentrant because :func:`release_if_held` reads before it releases.
 REWRITING: Final = threading.RLock()
+
+
+def lock_path(path: pathlib.Path) -> pathlib.Path:
+    """Where a lease file's turn is held.
+
+    Args:
+        path: The lease file.
+
+    Returns:
+        The lock file beside it.
+    """
+    return path.with_name(f"{path.name}.lock")
+
+
+@contextlib.contextmanager
+def _turn(path: pathlib.Path) -> Generator[None, None, None]:
+    """Hold the lease file's turn, across processes, for the ``with`` block.
+
+    Reentrant within the process: :data:`REWRITING` is held for the whole
+    block, so a nested call is this thread's own and finds its file in
+    :data:`_HOLDING` instead of waiting on the lock it created.
+
+    Args:
+        path: The lease file.
+
+    Yields:
+        Nothing; the turn is held while the block runs.
+    """
+    with REWRITING:
+        if path in _HOLDING:
+            yield
+            return
+        with file_turn.held(
+            lock_path(path), holder=f"fleet process {os.getpid()}", bounds=LEASE_TURN
+        ):
+            _HOLDING.add(path)
+            try:
+                yield
+            finally:
+                _HOLDING.discard(path)
 
 
 def read_leases(path: pathlib.Path) -> tuple[Lease, ...]:
@@ -67,9 +134,10 @@ def read_leases(path: pathlib.Path) -> tuple[Lease, ...]:
             be read is a file whose claims cannot be honoured, and treating
             it as empty would hand out a resource somebody holds.
     """
-    if not _test_hooks.file_exists(path):
-        return ()
-    raw = load_json_str(_test_hooks.read_text(path))
+    with _turn(path):
+        if not _test_hooks.file_exists(path):
+            return ()
+        raw = load_json_str(_test_hooks.read_text(path))
     if not isinstance(raw, list):
         raise AppError(
             FleetErrorCode.LEASE_NOT_HELD,
@@ -182,8 +250,8 @@ def acquire(
 
     Expired leases are dropped as a side effect of writing, which is the only
     place they are ever removed. That is deliberate: the read path must not
-    write, or two concurrent readers would race to rewrite the file and a
-    reader would need a lock it has no reason to hold.
+    write, or two concurrent readers would race to rewrite the file. The
+    read, the checks and the write are one turn of the file (:func:`_turn`).
 
     Args:
         path: The lease file.
@@ -204,7 +272,7 @@ def acquire(
             on the message, and a queue inside a command-line tool is a
             background process by another name.
     """
-    with REWRITING:
+    with _turn(path):
         node, project = lease["node"], lease["project"]
         holder = find_holder(path, node=node, project=project, now_unix=now_unix)
         if holder is not None:
@@ -240,7 +308,7 @@ def release(path: pathlib.Path, *, run_id: str, now_unix: int) -> None:
             expired means the run outlived the window it declared and another
             dispatch may already be inside the environment.
     """
-    with REWRITING:
+    with _turn(path):
         surviving = held_leases(path, now_unix=now_unix)
         remaining = tuple(entry for entry in surviving if entry["run_id"] != run_id)
         if len(remaining) == len(surviving):
@@ -274,7 +342,7 @@ def release_if_held(path: pathlib.Path, *, run_id: str, now_unix: int) -> str:
     Returns:
         What happened, as a sentence for a log line.
     """
-    with REWRITING:
+    with _turn(path):
         if find_by_run(path, run_id=run_id, now_unix=now_unix) is None:
             return "its lease had already expired, so nothing was held to give back"
         release(path, run_id=run_id, now_unix=now_unix)
@@ -282,12 +350,14 @@ def release_if_held(path: pathlib.Path, *, run_id: str, now_unix: int) -> str:
 
 
 __all__ = [
+    "LEASE_TURN",
     "REWRITING",
     "acquire",
     "contended_by",
     "find_by_run",
     "find_holder",
     "held_leases",
+    "lock_path",
     "read_leases",
     "release",
     "release_if_held",

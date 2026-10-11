@@ -27,15 +27,14 @@ room. So a claim pass runs inside :func:`claim_turn`, which holds
 ``<records>/host-claims/<node>.lock``: the file's exclusive creation is the
 lock, its text names the turn so only its holder removes it, and a lock
 older than :data:`TURN_STALE_SECONDS` was left by a runner that died inside
-its turn and is taken away. Claims are read and written inside a turn.
+its turn and is taken away. Claims are read and written inside a turn. The
+lock itself is :mod:`fleet.core.file_turn`, which the lease file shares.
 """
 
 from __future__ import annotations
 
 import contextlib
-import os
 import pathlib
-import uuid
 from collections.abc import Generator
 from typing import Final
 
@@ -44,7 +43,7 @@ from platform_core.logging import get_logger
 
 from fleet.contracts.host_claim import HostClaim, decode_host_claim, encode_host_claim
 from fleet.contracts.node import LiveLoad
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, file_turn
 from fleet.core.remote import SSH_TIMEOUT_SECONDS
 
 _log = get_logger(__name__)
@@ -61,6 +60,14 @@ TURN_STALE_SECONDS: Final = 5 * SSH_TIMEOUT_SECONDS
 
 #: How long a runner waits between looks at a lock another turn holds.
 TURN_POLL_SECONDS: Final = 1
+
+#: The claim turn as :mod:`fleet.core.file_turn` holds it.
+CLAIM_TURN: Final = file_turn.TurnBounds(
+    what="claim turn",
+    waited_for="its host's other runner",
+    stale_seconds=TURN_STALE_SECONDS,
+    poll_seconds=TURN_POLL_SECONDS,
+)
 
 
 def claims_directory(directory: pathlib.Path, *, alias: str) -> pathlib.Path:
@@ -110,108 +117,8 @@ def claim_turn(directory: pathlib.Path, *, alias: str, runner: str) -> Generator
         OSError: When the lock can be neither created nor read for a reason
             other than another turn holding it.
     """
-    lock = lock_path(directory, alias=alias)
-    token = _take(lock, runner=runner)
-    try:
+    with file_turn.held(lock_path(directory, alias=alias), holder=runner, bounds=CLAIM_TURN):
         yield
-    finally:
-        _give_back(lock, token=token)
-
-
-def _take(lock: pathlib.Path, *, runner: str) -> str:
-    """Create the lock, waiting out or taking away the turn that holds it.
-
-    Args:
-        lock: The lock file.
-        runner: The label of the runner taking the turn.
-
-    Returns:
-        The text written into the lock, which only this turn's release
-        matches.
-    """
-    _test_hooks.make_directory(lock.parent)
-    token = f"{runner} pid {os.getpid()} turn {uuid.uuid4().hex}"
-    asked = _test_hooks.now()
-    while not _created(lock, token=token):
-        age = _age(lock)
-        if age is not None and age >= TURN_STALE_SECONDS:
-            _log.info(
-                "%s took away a claim turn held for %d s, past the %d s a live runner's turn "
-                "can last, so its holder died inside it",
-                runner,
-                age,
-                TURN_STALE_SECONDS,
-            )
-            lock.unlink(missing_ok=True)
-            continue
-        _test_hooks.sleep(TURN_POLL_SECONDS)
-    waited = _test_hooks.now() - asked
-    if waited > 0:
-        _log.info(
-            "%s took its claim turn after waiting %d s for its host's other runner", runner, waited
-        )
-    return token
-
-
-def _created(lock: pathlib.Path, *, token: str) -> bool:
-    """Create the lock exclusively and write the turn's text into it.
-
-    Args:
-        lock: The lock file.
-        token: The turn's text.
-
-    Returns:
-        True when this call created it; False when it already exists, which
-        is another turn holding it.
-    """
-    try:
-        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        return False
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(token)
-    return True
-
-
-def _age(lock: pathlib.Path) -> int | None:
-    """How long ago a held lock was created.
-
-    Args:
-        lock: The lock file.
-
-    Returns:
-        Its age in whole seconds, or None when it has been given back since
-        the create that found it.
-    """
-    now = _test_hooks.now()
-    try:
-        modified = os.stat(lock).st_mtime
-    except FileNotFoundError:
-        return None
-    return now - int(modified)
-
-
-def _give_back(lock: pathlib.Path, *, token: str) -> None:
-    """Remove the lock if this turn still holds it.
-
-    A turn that ran past :data:`TURN_STALE_SECONDS` may have been taken away
-    and the lock created again by another, so the lock is removed only when
-    its text is this turn's.
-
-    Args:
-        lock: The lock file.
-        token: This turn's text.
-    """
-    held = _test_hooks.read_text(lock) if _test_hooks.file_exists(lock) else None
-    if held != token:
-        _log.info(
-            "a claim turn outlived the %d s bound and was taken away; the lock now reads %r "
-            "and is left to its holder",
-            TURN_STALE_SECONDS,
-            held,
-        )
-        return
-    lock.unlink()
 
 
 def live_claims(directory: pathlib.Path, *, alias: str) -> tuple[HostClaim, ...]:
