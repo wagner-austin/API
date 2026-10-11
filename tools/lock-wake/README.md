@@ -78,7 +78,12 @@ carrying ssh's stderr; output that does not open with the size is
 The cursor stays on the hub: `<cursor-dir>/.fleet-events.jsonl.lock-wake-diphtheria-offset.json`,
 ignored by the MCPs root's `/.fleet-events.jsonl.*`. It was seeded at the
 journal's size (596416 bytes) before the row went live, so the first tick did
-not announce the journal's history. A new remote row needs the same seed.
+not announce the journal's history. A new remote row needs the same seed
+whenever reading from byte 0 would post something: a fleet journal always
+would, since every boundary in its history is announced, and an action
+journal would only if its history holds a failed or refused action.
+diphtheria's held none when its action row went live (42 lines, all a
+deploy's prebuild steps, measured 2026-10-11), so that row has no seed.
 The post's heading and mention line name the host (`FLEET-LOCK on
 diphtheria: ...`), and the hub's say `on hub`.
 
@@ -101,7 +106,10 @@ session an `@`, because that is the result nobody watching a terminal saw.
 A finished action closes with a `step` and is silent, as a hold's progress
 is. A host's action journal is read by its own row with
 `--remote-action-journal host:/path`, the same ssh window as
-`--remote-journal`.
+`--remote-journal`: the pump's `lock-wake-diphtheria-actions` row reads
+diphtheria's `/home/corvis/PROJECTS/MCPs/.action-events.jsonl`, its cursor
+at `<cursor-dir>/.action-events.jsonl.lock-wake-diphtheria-offset.json`
+under the MCPs root's `/.action-events.jsonl.*` ignore.
 
 ## Running
 
