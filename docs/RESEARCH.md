@@ -1527,7 +1527,13 @@ positive seven-trade simulation remained statistically inconclusive. Native
 settlement-source wording changes and explicitly documented forecast-archive
 gaps limit interpretation. The linked contract records all amended protocols,
 results and byte-identical replays; these are historical research, not live
-execution or an untouched prospective holdout.
+execution or an untouched prospective holdout. The October 12 prospective
+acquisition pilot now records both frozen forecast cycles before October 13
+outcomes: 34 book/forecast rows over 17 unique contracts in three cities, with
+four probabilities per row and two explicit missing-book-side exclusions.
+All six reports and sidecars replay byte-for-byte, with actual receipt times
+and visible sizes retained. This proves pre-outcome recording, not profit;
+outcomes are pending, no orders were placed, and no recurring collector is installed.
 
 ### `floor` — cloze floor scoring
 
