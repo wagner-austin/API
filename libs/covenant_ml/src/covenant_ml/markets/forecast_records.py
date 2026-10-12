@@ -28,21 +28,65 @@ class ComparisonPlan(TypedDict):
     forecast_hour: ReadOnly[int]
 
 
-class ForecastRow(TypedDict):
+class ForecastFeatures(TypedDict):
+    """Outcome-free inputs shared by retrospective and prospective predictions."""
+
+    series: ReadOnly[str]
+    bid: ReadOnly[int]
+    ask: ReadOnly[int]
+    weather_p: ReadOnly[float]
+
+
+def encode_forecast_features(row: ForecastFeatures) -> JSONObject:
+    """Encode only information used by the frozen predictor.
+
+    Args:
+        row: Validated outcome-free inputs.
+
+    Returns:
+        JSON feature object.
+    """
+    return {
+        "series": row["series"],
+        "bid": row["bid"],
+        "ask": row["ask"],
+        "weather_p": row["weather_p"],
+    }
+
+
+def decode_forecast_features(document: JSONObject) -> ForecastFeatures:
+    """Validate city identity, noncrossed prices and forecast probability.
+
+    Args:
+        document: Decoded feature object.
+
+    Returns:
+        Immutable outcome-free inputs.
+
+    Raises:
+        ValueError: FORECAST-002 for invalid features; MARKET-001 for price bounds.
+        TypeError: Missing or malformed fields.
+    """
+    series = require_nonempty(document, "series")
+    bid = require_bounded_int(document, "bid", 0, 10000)
+    ask = require_bounded_int(document, "ask", 0, 10000)
+    probability = require_float(document, "weather_p")
+    if series not in CITY_COORDINATES or bid > ask or not 0 <= probability <= 1:
+        raise ValueError("[FORECAST-002] invalid city, crossed quote or probability")
+    return ForecastFeatures(series=series, bid=bid, ask=ask, weather_p=probability)
+
+
+class ForecastRow(ForecastFeatures):
     """An auditable binary contract observation, prior quote and forecast feature."""
 
     ticker: ReadOnly[str]
-    series: ReadOnly[str]
     event_day: ReadOnly[str]
     decision_ms: ReadOnly[int]
     settled_ms: ReadOnly[int]
     quote_ms: ReadOnly[int]
     forecast_init_ms: ReadOnly[int]
     yes: ReadOnly[int]
-    bid: ReadOnly[int]
-    ask: ReadOnly[int]
     forecast_f: ReadOnly[float]
-    weather_p: ReadOnly[float]
     settlement_rule: ReadOnly[str]
 
 
@@ -117,17 +161,14 @@ def encode_forecast_row(row: ForecastRow) -> JSONObject:
     """
     return {
         "ticker": row["ticker"],
-        "series": row["series"],
+        **encode_forecast_features(row),
         "event_day": row["event_day"],
         "decision_ms": row["decision_ms"],
         "settled_ms": row["settled_ms"],
         "quote_ms": row["quote_ms"],
         "forecast_init_ms": row["forecast_init_ms"],
         "yes": row["yes"],
-        "bid": row["bid"],
-        "ask": row["ask"],
         "forecast_f": row["forecast_f"],
-        "weather_p": row["weather_p"],
         "settlement_rule": row["settlement_rule"],
     }
 
@@ -145,23 +186,21 @@ def decode_forecast_row(document: JSONObject) -> ForecastRow:
         ValueError: FORECAST-002 for inconsistent identity, chronology or features.
         TypeError: A required field is malformed.
     """
-    series = require_nonempty(document, "series")
+    inputs = decode_forecast_features(document)
+    series = inputs["series"]
     ticker = require_nonempty(document, "ticker")
     decision = require_bounded_int(document, "decision_ms", 0, 2**63 - 1)
     settled = require_bounded_int(document, "settled_ms", 0, 2**63 - 1)
     quote = require_bounded_int(document, "quote_ms", 0, 2**63 - 1)
     initialized = require_bounded_int(document, "forecast_init_ms", 0, 2**63 - 1)
-    bid = require_bounded_int(document, "bid", 0, 10000)
-    ask = require_bounded_int(document, "ask", 0, 10000)
-    probability = require_float(document, "weather_p")
     forecast = require_float(document, "forecast_f")
-    if series not in CITY_COORDINATES or not ticker.startswith(series + "-"):
+    if not ticker.startswith(series + "-"):
         raise ValueError("[FORECAST-002] contract does not match a declared city")
     if not 0 <= decision - quote <= 3600000 or initialized + 21600000 > decision:
         raise ValueError("[FORECAST-002] stale quote or forecast unavailable at decision")
-    if settled <= decision or bid > ask:
+    if settled <= decision:
         raise ValueError("[FORECAST-002] crossed quote or invalid settlement chronology")
-    if not math.isfinite(forecast) or not 0 <= probability <= 1:
+    if not math.isfinite(forecast):
         raise ValueError("[FORECAST-002] forecast and probability must be finite and valid")
     return ForecastRow(
         ticker=ticker,
@@ -172,10 +211,10 @@ def decode_forecast_row(document: JSONObject) -> ForecastRow:
         quote_ms=quote,
         forecast_init_ms=initialized,
         yes=require_bounded_int(document, "yes", 0, 1),
-        bid=bid,
-        ask=ask,
+        bid=inputs["bid"],
+        ask=inputs["ask"],
         forecast_f=forecast,
-        weather_p=probability,
+        weather_p=inputs["weather_p"],
         settlement_rule=require_nonempty(document, "settlement_rule"),
     )
 
@@ -183,9 +222,12 @@ def decode_forecast_row(document: JSONObject) -> ForecastRow:
 __all__ = [
     "CITY_COORDINATES",
     "ComparisonPlan",
+    "ForecastFeatures",
     "ForecastRow",
     "decode_comparison_plan",
+    "decode_forecast_features",
     "decode_forecast_row",
     "encode_comparison_plan",
+    "encode_forecast_features",
     "encode_forecast_row",
 ]

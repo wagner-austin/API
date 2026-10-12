@@ -178,12 +178,29 @@ class ResponseArchive:
             ValueError: MARKET-017 for a changed request identity, or invalid hash.
             OSError: Required evidence cannot be read.
         """
+        capture = self.load_capture(path, params)
+        return narrow_json_to_dict(load_json_str(capture["body"]))
+
+    def load_capture(self, path: str, params: dict[str, str | int]) -> Capture:
+        """Read verified response bytes and their actual acquisition timestamp.
+
+        Args:
+            path: API path suffix.
+            params: Canonical query arguments.
+
+        Returns:
+            Immutable envelope including receipt time and payload digest.
+
+        Raises:
+            ValueError: MARKET-017 for changed identity, MARKET-015 for changed bytes.
+            OSError: Evidence cannot be read.
+        """
         url = self.request_url(path, params)
         document = narrow_json_to_dict(load_json_str(self.file_for(url).read_text("utf-8")))
         capture = decode_capture(document)
         if capture["url"] != url:
             raise ValueError("[MARKET-017] archived request identity mismatch")
-        return narrow_json_to_dict(load_json_str(capture["body"]))
+        return capture
 
     def resume_capture(self, path: str, params: dict[str, str | int]) -> JSONObject:
         """Continue an explicitly requested capture using verified checkpoints.

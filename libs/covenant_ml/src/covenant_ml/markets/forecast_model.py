@@ -11,7 +11,7 @@ from platform_core.json_utils import JSONObject, JSONValue, require_float, requi
 from typing_extensions import ReadOnly, TypedDict
 
 from ..backends.logreg.backend import _create_logreg_model
-from .forecast_records import ComparisonPlan, ForecastRow
+from .forecast_records import ComparisonPlan, ForecastFeatures, ForecastRow
 from .validation import require_bounded_int
 
 MARKET_FEATURES = ("market_logit", "boston", "philadelphia")
@@ -91,7 +91,7 @@ def logit(probability: float) -> float:
     return math.log(clipped / (1 - clipped))
 
 
-def features(row: ForecastRow, weather: bool) -> tuple[float, ...]:
+def features(row: ForecastFeatures, weather: bool) -> tuple[float, ...]:
     """Build the fixed nested baseline or forecast-augmented feature vector.
 
     Args:
@@ -220,7 +220,7 @@ def float_values(values: NDArray[np.float64]) -> tuple[float, ...]:
     return tuple(result)
 
 
-def predict_logit(model: FittedLogit, rows: Sequence[ForecastRow]) -> tuple[float, ...]:
+def predict_logit(model: FittedLogit, rows: Sequence[ForecastFeatures]) -> tuple[float, ...]:
     """Evaluate saved coefficients without access to outcomes or sklearn state.
 
     Args:
