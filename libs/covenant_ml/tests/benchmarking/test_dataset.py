@@ -71,6 +71,7 @@ def test_identifier_columns_are_excluded_from_features(tmp_path: Path) -> None:
     # X1 and X2 only; company_name, status_label and year are identifiers.
     assert dataset.info["n_features"] == 2
     assert dataset.features.shape == (4, 2)
+    assert dataset.feature_names == ("X1", "X2")
 
 
 def test_failed_rows_become_the_positive_class(tmp_path: Path) -> None:

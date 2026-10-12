@@ -6,7 +6,12 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from covenant_ml.benchmarking.splitting import company_disjoint_split
+from covenant_ml.benchmarking.splitting import (
+    SplitMasks,
+    apply_split_masks,
+    company_disjoint_masks,
+    company_disjoint_split,
+)
 from covenant_ml.benchmarking.types import ERR_EMPTY_SPLIT, ERR_LENGTH_MISMATCH
 
 
@@ -93,3 +98,46 @@ def test_too_few_companies_to_fill_every_fold_raises() -> None:
     features, labels, codes = build_dataset(n_companies=2, rows_per_company=2)
     with pytest.raises(ValueError, match=ERR_EMPTY_SPLIT):
         company_disjoint_split(features, labels, codes, seed=0)
+
+
+def test_masks_cover_every_row_exactly_once() -> None:
+    _, _, codes = build_dataset()
+    masks = company_disjoint_masks(len(codes), codes, seed=5)
+    sizes = int(np.sum(masks.train)) + int(np.sum(masks.val)) + int(np.sum(masks.test))
+    train_or_val: NDArray[np.bool_] = np.logical_or(masks.train, masks.val)
+    covered: NDArray[np.bool_] = np.logical_or(train_or_val, masks.test)
+    assert sizes == len(codes)
+    assert bool(np.all(covered))
+
+
+def test_masks_keep_each_company_in_one_fold() -> None:
+    _, _, codes = build_dataset()
+    masks = company_disjoint_masks(len(codes), codes, seed=5)
+    train_codes: NDArray[np.int64] = codes[masks.train]
+    val_codes: NDArray[np.int64] = codes[masks.val]
+    test_codes: NDArray[np.int64] = codes[masks.test]
+    assert not bool(np.any(np.isin(train_codes, val_codes)))
+    assert not bool(np.any(np.isin(train_codes, test_codes)))
+    assert not bool(np.any(np.isin(val_codes, test_codes)))
+
+
+def test_split_is_the_masks_applied() -> None:
+    features, labels, codes = build_dataset()
+    masks = company_disjoint_masks(len(codes), codes, seed=9)
+    split = company_disjoint_split(features, labels, codes, seed=9)
+    assert np.array_equal(split.x_test, features[masks.test])
+    assert np.array_equal(split.y_val, labels[masks.val])
+
+
+def test_masks_refuse_codes_that_do_not_cover_the_rows() -> None:
+    _, _, codes = build_dataset()
+    with pytest.raises(ValueError, match=ERR_LENGTH_MISMATCH):
+        company_disjoint_masks(len(codes) + 1, codes, seed=0)
+
+
+def test_apply_refuses_masks_that_do_not_cover_the_rows() -> None:
+    features, labels, codes = build_dataset()
+    masks = company_disjoint_masks(len(codes), codes, seed=0)
+    short = SplitMasks(train=masks.train[:-1], val=masks.val, test=masks.test)
+    with pytest.raises(ValueError, match=ERR_LENGTH_MISMATCH):
+        apply_split_masks(features, labels, short)

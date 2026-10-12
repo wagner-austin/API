@@ -21,8 +21,10 @@ a typo costs nothing.
 from __future__ import annotations
 
 from covenant_ml.benchmarking.declarations import (
+    FEATURE_ABLATION,
     GOSS,
     MULTICLASS,
+    PAIRED_EVALUATION,
     QUANTIZED,
     RANKING,
     REGRESSION,
@@ -43,6 +45,8 @@ from covenant_ml.benchmarking.regression_quality import (
     RegressionArmResult,
     RegressionQuality,
 )
+from covenant_ml.benchmarking.types import QualityMetrics
+from covenant_ml.evaluation.types import ArmResult
 
 #: Every declared family, so a new one cannot be added without being checked.
 ALL_DECLARATIONS: tuple[BenchmarkDeclaration, ...] = (
@@ -52,6 +56,8 @@ ALL_DECLARATIONS: tuple[BenchmarkDeclaration, ...] = (
     RANKING,
     REGRESSION,
     VS_LIGHTGBM,
+    PAIRED_EVALUATION,
+    FEATURE_ABLATION,
 )
 
 #: Each quality family beside the types its manifest actually carries.
@@ -80,6 +86,16 @@ QUALITY_FAMILIES: tuple[tuple[BenchmarkDeclaration, frozenset[str], frozenset[st
         REGRESSION,
         frozenset(RegressionQuality.__annotations__),
         frozenset(RegressionArmResult.__annotations__),
+    ),
+    (
+        PAIRED_EVALUATION,
+        frozenset(QualityMetrics.__annotations__),
+        frozenset(ArmResult.__annotations__),
+    ),
+    (
+        FEATURE_ABLATION,
+        frozenset(QualityMetrics.__annotations__),
+        frozenset(ArmResult.__annotations__),
     ),
 )
 

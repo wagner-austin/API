@@ -28,15 +28,18 @@ from pathlib import Path
 #:
 #: Globbed so a new family is covered the day it is written, instead of the day
 #: someone remembers to add it here -- which is the failure mode this whole
-#: task is about.
+#: task is about. The pattern was ``benchmark_cleargbm_*`` until the paired
+#: evaluation families arrived (board task 80b6e6ea): their scripts are named
+#: for what they measure, not for ClearGBM, and the narrower glob would have
+#: let them write files unchecked while this test stayed green.
 ENTRY_POINTS: tuple[Path, ...] = tuple(
-    sorted((Path(__file__).parents[2] / "scripts").glob("benchmark_cleargbm_*.py"))
+    sorted((Path(__file__).parents[2] / "scripts").glob("benchmark_*.py"))
 )
 
 
 def test_the_entry_points_were_actually_found() -> None:
     """A glob that matches nothing would make every test below vacuous."""
-    assert len(ENTRY_POINTS) == 6, [path.name for path in ENTRY_POINTS]
+    assert len(ENTRY_POINTS) == 8, [path.name for path in ENTRY_POINTS]
 
 
 def test_every_entry_point_reaches_the_shared_write_path() -> None:
