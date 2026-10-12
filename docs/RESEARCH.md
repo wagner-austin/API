@@ -1398,9 +1398,23 @@ name appeared nowhere here — was mine, and another session bridged it.
 
 - **Repo:** this one — `libs/cleargbm`, `libs/cleargbm_rs`, `libs/covenant_ml`,
   `services/covenant-radar-api`
-- **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`
+- **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`, and
+  (since 2026-10-12, board task `80b6e6ea`) `libs/covenant_ml`'s
+  `scripts.benchmark_paired_evaluation` and `scripts.benchmark_feature_ablation`
 - **Produces:** `libs/cleargbm/docs/BENCHMARK_MANIFEST_*.json` (41 of them) and
-  `services/covenant-radar-api/models/optimization_history.jsonl`
+  `services/covenant-radar-api/models/optimization_history.jsonl`; the two
+  paired families write a manifest and `RunRecord` wherever `--out` names
+- **The paired instrument the Power bullet below asks for exists.**
+  `covenant_ml.evaluation` scores every arm on the SAME held-out rows and puts
+  an interval on each difference: DeLong for AUC where rows are independent, a
+  company- or time-block bootstrap where they are not, cluster-robust or
+  Newey-West errors for log loss, Brier and the realised value of the alerting
+  decisions, and a Nadeau-Bengio corrected t across seeds with a floor at the
+  mean within-seed error. Its first real run (US corpus, two seeds, 50 trees)
+  showed why the correction is needed: the naive t over seeds read p = 0.0097
+  for an XGBoost-over-LightGBM AUC lead that each seed's own interval put at
+  p of about 0.4; corrected, p = 0.62. No standing claim has been re-run
+  through it yet.
 - **Provenance:** partial, in two different ways.
   - The six `benchmark_cleargbm_*` entry points pin BLAS threads and build a
     `RunFingerprint` as of 2026-08-27. **This entry said until 2026-09-03
