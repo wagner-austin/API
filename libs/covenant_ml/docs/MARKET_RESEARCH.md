@@ -183,6 +183,143 @@ cannot establish forecast superiority with three observations. Open-Meteo's
 explicitly distinguishes model initialization from public availability;
 retrospective initialization timestamps alone cannot prove tradability.
 
+## Forecast versus market comparison: 2026-10-12
+
+`scripts.forecast_research` joins explicit GFS initialization runs to the same
+archived native market contracts and prior quotes. The plan requires `name`,
+`start`, `train_end`, `end`, `excluded_days`, `forecast_hour` and
+`protocol_digest`. The hour is an explicit prior-day GFS cycle (0, 6 or 12 UTC);
+there is no automatic substitution. The protocol file must match its SHA-256.
+Missing target hours, conflicting metadata, a missing required city, and
+nonconvergent fitting fail the run. An exclusion requires an explicit plan.
+
+The feature is the maximum of exactly 24 hourly temperatures over the event
+date's 05:00 UTC to next-day 05:00 UTC window. Integer Fahrenheit brackets use
+half-degree continuity corrections and a fixed normal standard deviation of
+3 F. This is a simple forecast feature, not a fitted weather-error model or a
+claim of exact settlement-measurement equivalence. Six hours after model
+initialization is an assumed availability bound, not a historical receipt log.
+
+The two nested L2 logistic models share market log odds, Boston/Philadelphia
+indicators and an intercept; one adds forecast log odds. Parameters are fixed:
+`C=1`, `lbfgs`, `max_iter=2000`, `tol=1e-10`, seed zero. Only earlier rows whose
+final settlements precede the first evaluation decision enter fitting. The
+report retains fitted coefficients, every training/evaluation row, predictions,
+Brier/log losses, paired event-date clustered intervals and seven-observed-date
+lag Newey-West diagnostics. The latter gives equal weight to represented dates;
+the primary paired comparison weights contracts. Neither treats correlated
+brackets or cities on the same date as independent events.
+
+Each arm's quoted taker policy chooses YES, NO or pass with a 2-cent expected
+value hurdle after the upward-cent quadratic fee, one contract per trade.
+Integer cash accounting excludes the hurdle from realized P&L: it is a
+selection threshold, not an expense. Additional friction is 1 cent per trade.
+Zero/one boundary prices are unavailable for execution. Current fee metadata
+does not establish historical fees, and quotes do not establish depth or fills.
+
+The original April 3–October 10 protocol failed before fitting: all three
+June 11 00 UTC responses contained 72 null temperatures. A separately frozen
+amendment excluded June 12 for all cities before performance was calculated.
+The original protocol and failure remain part of the evidence; no values were
+imputed. Of 3,438 selected contracts, 18 were protocol exclusions and 14 had
+stale quotes. The 3,406 usable rows yielded 2,672 training rows, 18 unavailable
+training labels, and 716 held-out contracts across September 1–October 10.
+
+| Arm | Held-out Brier (lower is better) | Trades | After-fee P&L | With extra 1 cent per trade |
+|---|---:|---:|---:|---:|
+| Raw market midpoint | 0.109710 | 0 | $0.00 | $0.00 |
+| Raw 00 UTC forecast | 0.146226 | 514 | −$12.28 | −$17.42 |
+| Calibrated market | 0.109912 | 37 | $0.91 | $0.54 |
+| Market plus 00 UTC forecast | 0.109981 | 54 | −$1.21 | −$1.75 |
+
+**Adding this forecast did not pass the primary candidate gate.** The paired
+Brier difference is +0.0000690, with a date-clustered 95% interval of
+[−0.0002785, +0.0004165]. Newey-West sensitivity also includes zero. These
+are chronological historical results, not a pristine holdout: the same market
+dates appeared in the earlier execution study.
+
+### Source-era and forecast-freshness diagnostic
+
+Inspection of native `rules_primary` found that the settlement-source wording
+changes on August 14: 2,368 training rows name NWS and 304 name The Weather
+Company, while all 716 evaluation rows name The Weather Company. This is a
+documented wording difference, not independent proof of a change in the actual
+measurement process. The general [Kalshi weather guide](https://help.kalshi.com/en/articles/13823837-weather-markets)
+describes NWS for daily markets and The Weather Company for hourly markets;
+that general description does not resolve the discrepancy with these native
+daily-contract rules. The comparison uses exchange outcomes and preserves the
+native terms rather than replacing labels with another weather source.
+
+A follow-up diagnostic was specified after the first results: fit August
+14–September 20 and evaluate September 21–October 10, comparing explicit 00
+and 12 UTC runs with otherwise identical models and policy. The later run is
+consistent with the provider's typical 4–6 hour global-model delay before the
+20 UTC decision, but actual historical receipt remains unverified. All of
+these outcomes had already been analyzed, so this is exploratory.
+
+The 12 UTC acquisition failed on September 14's run, explicitly reported
+unavailable by the provider. A second documented amendment excluded September
+15 from **both** training panels before any 12 UTC model fitting. The original
+00 UTC diagnostic is retained separately. The matched amended comparison has
+643 training rows, 18 unavailable training labels, and 359 evaluation contracts
+over 20 dates. Contract IDs, quotes and outcomes match between run times.
+
+| Matched diagnostic arm | Brier | Trades | After-fee P&L | Extra-friction P&L |
+|---|---:|---:|---:|---:|
+| Raw market | 0.106782 | 0 | $0.00 | $0.00 |
+| Calibrated market | 0.106781 | 10 | $0.00 | −$0.10 |
+| Raw 00 UTC forecast | 0.141816 | 267 | −$6.94 | −$9.61 |
+| Raw 12 UTC forecast | 0.139765 | 259 | −$10.33 | −$12.92 |
+| Market plus 00 UTC forecast | 0.106839 | 11 | −$0.48 | −$0.59 |
+| Market plus 12 UTC forecast | 0.106612 | 7 | $0.97 | $0.90 |
+
+The newer combined forecast's paired Brier difference versus calibrated market
+is −0.0001695, with a 95% interval [−0.0006542, +0.0003152]; its candidate
+gate also fails. Its positive seven-trade P&L is not evidence of a dependable
+edge. The date-clustered economic interval includes zero. Selecting the
+best-looking variant after these comparisons would not turn it into a
+confirmatory result, and greater forecast accuracy alone did not guarantee
+better raw-forecast trading returns.
+
+### Reproduction and implications
+
+From `libs/covenant_ml`, replay a frozen plan with:
+
+```powershell
+poetry run python -m scripts.forecast_research `
+  --plan <plan.json> --protocol <protocol.json> `
+  --markets-archive <integrated-raw> --forecast-archive <forecast-raw> `
+  --forecast-mode replay --out <new-report.json>
+```
+
+`capture` and `resume` explicitly acquire forecasts; market inputs always
+replay the verified market archive. `resume` reuses saved responses and does
+not retry failed requests inside core logic. Reports and sidecars refuse
+overwrite. Plans are copied into reports and all archive inputs are hashed.
+The original amended plan is retained; `forecast-comparison-typed-plan.json`
+only makes its existing 00 UTC choice explicit in the final typed schema.
+
+Machine-local evidence remains under `market-edge-20261012/`. The primary
+forecast protocol, both amendments, freshness protocol, all plans, 573 older
+and 171 newer native forecast responses, development failures, and completed
+reports are retained. Final reports and independent replays are byte-identical,
+as are their RunRecord sidecars. Every referenced source hash was checked;
+cash payouts, fees, aggregate P&L, Brier losses and label chronology were
+independently recomputed. `forecast-verification.json` records those checks.
+
+| Final report | SHA-256 |
+|---|---|
+| `forecast-verified.json` | `47870aafdebc6484bc24b33f76395fa9d3d08dceea37b834daff3597cbf51c65` |
+| `forecast-freshness-00-verified.json` | `ac2789e53d80be1cd4aec3fe4cdd8b665de5e18f543e7b53c9f043669ddb5de1` |
+| `forecast-freshness-12-verified.json` | `07962971debfbb7e6696cd003aabd62d604c0378bdb8ed193a5c14f9b275ff27` |
+
+This tests a particular source, feature and policy; it does not establish that
+software cannot produce a market edge. The useful next evidence is a frozen
+prospective comparison with actual forecast receipt and book timestamps,
+verified settlement-source alignment and execution costs. Repeatedly tuning
+these same historical outcomes cannot supply that missing evidence. No orders
+were placed, and no recurring collector was installed.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
@@ -195,6 +332,13 @@ real archive files, real codecs, replay, estimators, CLI, and RunRecord writer.
 They cover complete capture/replay equivalence, corrupt evidence, schema and
 identity failures, cutoff-crossing reconciliation, fee refusal, latency,
 fractional volume, block trades, quote lookahead, and accounting identities.
+The forecast tests additionally fit the real logistic learner, force actual
+nonconvergence, flip all held-out labels without changing fitted parameters or
+predictions, reconcile optional native strike bounds, reject missing cities,
+and run full HTTP capture through byte-identical offline CLI replay.
+The completed forecast change passes `make check`: 3,013 tests, strict mypy,
+all repository guards, and 100% statement and branch coverage for source and
+scripts. The local run took 142 seconds against the existing 300-second budget.
 
 API contracts: [historical tiers](https://docs.kalshi.com/getting_started/historical_data),
 [live candles](https://docs.kalshi.com/api-reference/market/get-market-candlesticks),
