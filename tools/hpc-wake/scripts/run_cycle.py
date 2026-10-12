@@ -196,9 +196,12 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
     # RCS_BRIDGE_LOGGED_OUT from the last ten minutes, MCPs' maketools runs
     # `make rcs-pair` as a child at most once an hour and states an operator
     # ask in room coordination only when that run fails, naming the failed
-    # step. A tick with no loss returns at once. An attempt is bounded at
-    # 900 s inside the command, under PUBLISHER_WALL_SECONDS, so the pump
-    # never kills a run before it puts the Pixel back to sleep. It runs the
+    # step. Each attempt's whole output is also kept in
+    # rcs-pair-watch-<YYYYMMDDTHHMMSSZ>.log beside bridge.log, since this
+    # cycle log is truncated past 1 MB. A tick with no loss returns at once.
+    # An attempt is bounded at 900 s inside the command, under
+    # PUBLISHER_WALL_SECONDS, so the pump never kills a run before it puts
+    # the Pixel back to sleep. It runs the
     # hub checkout's maketools with the interpreter MCPs' other scheduled
     # maketools tasks use, as they do.
     {
