@@ -18,7 +18,7 @@ from platform_core.json_utils import (
 from .codecs import decode_history, encode_quote, encode_trade
 from .kalshi import MarketSpec, decode_candle, decode_market, decode_public_trade
 from .replay import replay_maker
-from .types import MakerRule, MarketHistory, ReplayStatus, Trade
+from .types import MakerRule, MarketHistory, Quote, ReplayStatus, Trade
 from .validation import parse_timestamp
 
 
@@ -66,6 +66,24 @@ class MarketCollector:
                 raise ValueError("[MARKET-021] repeated pagination cursor")
             seen.add(cursor)
 
+    def market_documents(self, series: str) -> Generator[JSONObject, None, None]:
+        """Yield both settled inventory tiers through the shared pagination contract.
+
+        Args:
+            series: Requested exchange series.
+
+        Yields:
+            Native documents, retaining cross-tier overlap for caller reconciliation.
+
+        Raises:
+            ValueError: Invalid pagination or native response schema.
+        """
+        for path in ("/markets", "/historical/markets"):
+            params: dict[str, str | int] = {"series_ticker": series}
+            if path == "/markets":
+                params["status"] = "settled"
+            yield from self.pages(path, params, "markets")
+
     def inventory(
         self, series: str, timezone: str, start: date, end: date
     ) -> tuple[MarketSpec, ...]:
@@ -84,18 +102,12 @@ class MarketCollector:
             ValueError: MARKET-022 for conflicting or absent selected contracts.
         """
         selected: dict[str, MarketSpec] = {}
-        for path in ("/markets", "/historical/markets"):
-            params: dict[str, str | int] = {"series_ticker": series}
-            if path == "/markets":
-                params["status"] = "settled"
-            for document in self.pages(path, params, "markets"):
-                market = decode_market(document, series, timezone)
-                if start.isoformat() <= market["day"] <= end.isoformat():
-                    if market["ticker"] in selected and selected[market["ticker"]] != market:
-                        raise ValueError(
-                            "[MARKET-022] conflicting inventory; reconcile the capture"
-                        )
-                    selected[market["ticker"]] = market
+        for document in self.market_documents(series):
+            market = decode_market(document, series, timezone)
+            if start.isoformat() <= market["day"] <= end.isoformat():
+                if market["ticker"] in selected and selected[market["ticker"]] != market:
+                    raise ValueError("[MARKET-022] conflicting inventory; reconcile the capture")
+                selected[market["ticker"]] = market
         if not selected:
             raise ValueError("[MARKET-022] no contracts in the requested date window")
         return tuple(selected[ticker] for ticker in sorted(selected))
@@ -117,6 +129,40 @@ class MarketCollector:
         ):
             raise ValueError("[MARKET-023] experiment requires quadratic fees with multiplier one")
 
+    def quotes(self, market: MarketSpec, cutoff: JSONObject) -> tuple[Quote, ...]:
+        """Read the six-hour placement window through the correct native schema.
+
+        Args:
+            market: Validated settled contract.
+            cutoff: Native historical cutoff response.
+
+        Returns:
+            Timestamped quotes, including explicitly missing sides.
+
+        Raises:
+            ValueError: MARKET-024 if the response names another contract.
+            TypeError: A required native field is malformed.
+        """
+        historical = market["settled_ms"] < parse_timestamp(
+            require_str(cutoff, "market_settled_ts")
+        )
+        prefix = "/historical" if historical else "/series/" + market["series"]
+        decision = market["decision_ms"]
+        candles = self.read(
+            prefix + "/markets/" + market["ticker"] + "/candlesticks",
+            {
+                "start_ts": decision // 1000 - 21600,
+                "end_ts": decision // 1000,
+                "period_interval": 60,
+            },
+        )
+        if require_str(candles, "ticker") != market["ticker"]:
+            raise ValueError("[MARKET-024] candle response contract mismatch")
+        return tuple(
+            decode_candle(narrow_json_to_dict(row), historical)
+            for row in require_list(candles, "candlesticks")
+        )
+
     def history(self, market: MarketSpec, cutoff: JSONObject, rule: MakerRule) -> MarketHistory:
         """Collect prior quotes and subsequent trades for orders the frozen rule permits.
 
@@ -135,27 +181,10 @@ class MarketCollector:
             ValueError: MARKET-024 for a candle response naming another contract.
             TypeError: Required native schema changed or is missing.
         """
-        market_cutoff = parse_timestamp(require_str(cutoff, "market_settled_ts"))
         trade_cutoff = parse_timestamp(require_str(cutoff, "trades_created_ts"))
         ticker, series = market["ticker"], market["series"]
-        prefix = "/historical" if market["settled_ms"] < market_cutoff else "/series/" + series
         decision, close = market["decision_ms"], market["close_ms"]
-        candles = self.read(
-            prefix + "/markets/" + ticker + "/candlesticks",
-            {
-                "start_ts": decision // 1000 - 21600,
-                "end_ts": decision // 1000,
-                "period_interval": 60,
-            },
-        )
-        if require_str(candles, "ticker") != ticker:
-            raise ValueError("[MARKET-024] candle response contract mismatch")
-        quotes: list[JSONValue] = [
-            encode_quote(
-                decode_candle(narrow_json_to_dict(row), market["settled_ms"] < market_cutoff)
-            )
-            for row in require_list(candles, "candlesticks")
-        ]
+        quotes: list[JSONValue] = [encode_quote(quote) for quote in self.quotes(market, cutoff)]
         document: JSONObject = {
             "ticker": ticker,
             "series": series,

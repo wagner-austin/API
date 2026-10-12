@@ -34,7 +34,7 @@ def market_fingerprint(
         get_env,
         capture_host_record(_test_hooks.host_probe),
         capture_package_versions(
-            ("covenant-ml", "platform-core", "numpy", "scipy", "httpx"),
+            ("covenant-ml", "platform-core", "numpy", "scipy", "httpx", "scikit-learn"),
             _test_hooks.installed_version,
         ),
     )
@@ -56,7 +56,13 @@ def implementation_digest() -> str:
         for p in (package / "src").rglob("*.py")
     }
     files.update({"platform_core/" + p.relative_to(core).as_posix(): p for p in core.rglob("*.py")})
-    for name in ("scripts/market_research.py", "pyproject.toml", "poetry.lock"):
+    files.update(
+        {
+            "scripts/" + p.relative_to(package / "scripts").as_posix(): p
+            for p in (package / "scripts").rglob("*.py")
+        }
+    )
+    for name in ("pyproject.toml", "poetry.lock"):
         files[name] = package / name
     digest = sha256()
     for name in sorted(files):

@@ -8,7 +8,7 @@ from datetime import date
 from hashlib import sha256
 from pathlib import Path
 
-from platform_core.comparability import RunFingerprint, encode_run_fingerprint
+from platform_core.comparability import RunFingerprint
 from platform_core.json_utils import (
     JSONObject,
     JSONValue,
@@ -17,12 +17,13 @@ from platform_core.json_utils import (
     require_dict,
     require_list,
 )
-from platform_core.run_record import Observation, encode_run_record, run_record, run_record_sidecar
+from platform_core.run_record import Observation
 from typing_extensions import ReadOnly, TypedDict
 
 from .codecs import decode_rule, encode_rule
 from .replay import replay_markets
 from .replay_codecs import encode_result
+from .reporting import write_market_report
 from .statistics import encode_summary, summarize_replay
 from .types import DOLLAR, SCHEMA_VERSION, MakerRule, MarketHistory
 from .validation import require_bounded_int, require_day, require_nonempty
@@ -186,17 +187,6 @@ def write_report(
         FileExistsError: Report or sidecar already exists.
         OSError: A source cannot be read or output cannot be persisted.
     """
-    sidecar = run_record_sidecar(output)
-    if output.exists() or sidecar.exists():
-        raise FileExistsError("[MARKET-027] report already exists; choose a new run path")
-    sources: list[JSONValue] = [
-        {"path": str(path), "sha256": sha256(path.read_bytes()).hexdigest()}
-        for path in sorted(archive_paths)
-    ]
-    payload: JSONObject = dict(
-        report, sources=sources, fingerprint=encode_run_fingerprint(fingerprint)
-    )
-    text = dump_json_str(payload, indent=2)
     observations: list[Observation] = []
     for item in require_list(report, "results"):
         arm = narrow_json_to_dict(item)
@@ -208,19 +198,15 @@ def write_report(
                 value=require_bounded_int(summary, "pnl", -(2**63), 2**63 - 1) / DOLLAR,
             )
         )
-    record = run_record(
+    return write_market_report(
+        report,
+        fingerprint,
+        output,
+        archive_paths,
         plan["name"],
         sha256(dump_json_str(encode_plan(plan)).encode()).hexdigest(),
-        fingerprint,
         tuple(observations),
-        sha256(text.encode()).hexdigest(),
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("x", encoding="utf-8", newline="\n") as destination:
-        destination.write(text)
-    with sidecar.open("x", encoding="utf-8", newline="\n") as destination:
-        destination.write(dump_json_str(encode_run_record(record), indent=2))
-    return sidecar
 
 
 __all__ = ["ExperimentPlan", "decode_plan", "encode_plan", "evaluate_panel", "write_report"]
