@@ -131,12 +131,16 @@ class LoadedDataset(NamedTuple):
         labels: Binary labels (1 where the company failed), shape (n_rows,).
         company_codes: Integer company identifier per row, shape (n_rows,).
         info: Identity of the source file and the loaded shape.
+        feature_names: The CSV column behind each feature column, in order.
+            A feature ablation names what it removes by these, so a result
+            reads "without X7" rather than "without column 6".
     """
 
     features: NDArray[np.float64]
     labels: NDArray[np.int64]
     company_codes: NDArray[np.int64]
     info: DatasetInfo
+    feature_names: tuple[str, ...]
 
 
 def file_sha256(path: Path) -> str:
@@ -224,6 +228,7 @@ def load_bankruptcy_dataset(csv_path: Path) -> LoadedDataset:
         labels=labels,
         company_codes=company_codes,
         info=info,
+        feature_names=tuple(feature_columns),
     )
 
 

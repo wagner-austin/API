@@ -55,6 +55,10 @@ _SAMPLES = BenchmarkArgument(
 _FEATURES = BenchmarkArgument(
     flag="--features", kind=ArgumentKind.INT, help="Features in the synthetic corpus."
 )
+_CSV = BenchmarkArgument(flag="--csv", kind=ArgumentKind.PATH, help="Bankruptcy corpus CSV.")
+_NUM_LEAVES = BenchmarkArgument(
+    flag="--num-leaves", kind=ArgumentKind.INT, help="Leaf budget for leaf-wise growth."
+)
 
 
 GOSS = BenchmarkDeclaration(
@@ -155,9 +159,7 @@ REGRESSION = BenchmarkDeclaration(
         ),
         _TREES,
         _MAX_DEPTH,
-        BenchmarkArgument(
-            flag="--num-leaves", kind=ArgumentKind.INT, help="Leaf budget for leaf-wise growth."
-        ),
+        _NUM_LEAVES,
         _LEARNING_RATE,
         _MAX_BINS,
         _MIN_SAMPLES_LEAF,
@@ -175,13 +177,11 @@ VS_LIGHTGBM = BenchmarkDeclaration(
     experiment="cleargbm-vs-lightgbm-fit-time",
     description="Benchmark ClearGBM fit time against LightGBM on a real corpus.",
     arguments=(
-        BenchmarkArgument(flag="--csv", kind=ArgumentKind.PATH, help="Bankruptcy corpus CSV."),
+        _CSV,
         _TREES,
         _MAX_DEPTH,
         _MAX_BINS,
-        BenchmarkArgument(
-            flag="--num-leaves", kind=ArgumentKind.INT, help="Leaf budget for leaf-wise growth."
-        ),
+        _NUM_LEAVES,
         BenchmarkArgument(
             flag="--repeats", kind=ArgumentKind.INT, help="Timed repeats per arm per seed."
         ),
@@ -206,9 +206,107 @@ VS_LIGHTGBM = BenchmarkDeclaration(
 )
 
 
+#: Flags shared by the two paired-evaluation families: how every interval
+#: treats dependence between held-out rows.
+_UNIT = BenchmarkArgument(
+    flag="--unit",
+    kind=ArgumentKind.STRING,
+    help="Independent unit of the held-out rows: row, cluster (company) or block.",
+)
+_BLOCK_LENGTH = BenchmarkArgument(
+    flag="--block-length", kind=ArgumentKind.INT, help="Rows per block for --unit block, else 1."
+)
+_N_RESAMPLES = BenchmarkArgument(
+    flag="--n-resamples", kind=ArgumentKind.INT, help="Bootstrap resamples off the row unit."
+)
+_RESAMPLE_SEED = BenchmarkArgument(
+    flag="--resample-seed", kind=ArgumentKind.INT, help="Seed of the bootstrap draws."
+)
+_CONFIDENCE = BenchmarkArgument(
+    flag="--confidence", kind=ArgumentKind.FLOAT, help="Coverage of every interval, e.g. 0.95."
+)
+
+PAIRED_EVALUATION = BenchmarkDeclaration(
+    experiment="covenant-paired-evaluation",
+    description=(
+        "Compare every arm with a reference on the same held-out rows: AUC, log loss, "
+        "Brier and the value of its alerting decisions, with intervals per seed and pooled."
+    ),
+    arguments=(
+        _CSV,
+        _TREES,
+        _MAX_DEPTH,
+        _MAX_BINS,
+        _NUM_LEAVES,
+        BenchmarkArgument(
+            flag="--reference", kind=ArgumentKind.STRING, help="Arm every other arm is compared to."
+        ),
+        _UNIT,
+        _BLOCK_LENGTH,
+        _N_RESAMPLES,
+        _RESAMPLE_SEED,
+        _CONFIDENCE,
+        BenchmarkArgument(
+            flag="--true-alert-value",
+            kind=ArgumentKind.FLOAT,
+            help="Gain from alerting on a row that turns positive.",
+        ),
+        BenchmarkArgument(
+            flag="--false-alert-cost",
+            kind=ArgumentKind.FLOAT,
+            help="Cost of alerting on a row that stays negative.",
+        ),
+        BenchmarkArgument(
+            flag="--missed-cost",
+            kind=ArgumentKind.FLOAT,
+            help="Cost of not alerting on a row that turns positive.",
+        ),
+    ),
+    arm_axes=("arm",),
+    quality_metrics=("auc_roc", "log_loss", "brier"),
+    result_metrics=(),
+)
+
+FEATURE_ABLATION = BenchmarkDeclaration(
+    experiment="covenant-feature-ablation",
+    description=(
+        "Retrain one learner without each feature group and compare it with the full model "
+        "on the same held-out rows; trace the full model's learning curve."
+    ),
+    arguments=(
+        _CSV,
+        _TREES,
+        _MAX_DEPTH,
+        _MAX_BINS,
+        _NUM_LEAVES,
+        BenchmarkArgument(flag="--model", kind=ArgumentKind.STRING, help="Learner to ablate."),
+        BenchmarkArgument(
+            flag="--groups",
+            kind=ArgumentKind.STRING,
+            help="Groups to remove: 'X1;liquidity=X3,X4' (';' between groups).",
+        ),
+        BenchmarkArgument(
+            flag="--fractions",
+            kind=ArgumentKind.STRING,
+            help="Learning-curve training shares, ascending: '0.1,0.25,0.5,1.0'.",
+        ),
+        _UNIT,
+        _BLOCK_LENGTH,
+        _N_RESAMPLES,
+        _RESAMPLE_SEED,
+        _CONFIDENCE,
+    ),
+    arm_axes=("arm",),
+    quality_metrics=("auc_roc", "log_loss", "brier"),
+    result_metrics=(),
+)
+
+
 __all__ = [
+    "FEATURE_ABLATION",
     "GOSS",
     "MULTICLASS",
+    "PAIRED_EVALUATION",
     "QUANTIZED",
     "RANKING",
     "REGRESSION",
