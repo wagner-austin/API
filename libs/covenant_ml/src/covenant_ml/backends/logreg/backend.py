@@ -66,6 +66,11 @@ class _LogRegModelProtocol(Protocol):
     """Protocol for sklearn LogisticRegression classifier."""
 
     @property
+    def n_iter_(self) -> NDArray[np.int32]:
+        """Iterations used by each fitted class, for convergence verification."""
+        ...
+
+    @property
     def coef_(self) -> NDArray[np.float64]:
         """Coefficient weights for features."""
         ...
