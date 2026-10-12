@@ -246,9 +246,13 @@ Company, while all 716 evaluation rows name The Weather Company. This is a
 documented wording difference, not independent proof of a change in the actual
 measurement process. The general [Kalshi weather guide](https://help.kalshi.com/en/articles/13823837-weather-markets)
 describes NWS for daily markets and The Weather Company for hourly markets;
-that general description does not resolve the discrepancy with these native
-daily-contract rules. The comparison uses exchange outcomes and preserves the
-native terms rather than replacing labels with another weather source.
+the contract-specific [GLOBALTEMPERATURE terms](https://assets.kalshi.com/contract_terms/GLOBALTEMPERATURE.pdf),
+verified October 12, specify a hierarchy of The Weather Company, NWS, then the
+area's national weather service. The first official non-preliminary report
+and its full reported precision control resolution. This clarifies current
+source priority without dating an actual measurement-process change. The
+comparison uses exchange outcomes and preserves native terms rather than
+replacing labels with another weather source.
 
 A follow-up diagnostic was specified after the first results: fit August
 14–September 20 and evaluate September 21–October 10, comparing explicit 00
@@ -320,6 +324,80 @@ verified settlement-source alignment and execution costs. Repeatedly tuning
 these same historical outcomes cannot supply that missing evidence. No orders
 were placed, and no recurring collector was installed.
 
+## Prospective acquisition pilot: October 13 contracts
+
+`scripts/paper_research.py` now captures predictions before outcomes using the
+same forecast transforms and saved calibrators as the historical experiment.
+`ForecastFeatures` carries only city, prices and weather probability; settled
+training observations extend that contract, so prediction needs no fabricated
+label or settlement timestamp. `PaperPlan` and `BookTop` have strict immutable
+contracts and codecs. The existing archive, HTTP factory, pagination, fee
+validation, predictor and RunRecord writer remain the shared implementations.
+
+The collector archives native series metadata, every selected market and full
+public book depth, plus the exact explicit-run forecast response. It validates
+actual local receipt times in a frozen pre-event window, requires forecast
+receipt before each book by at most ten minutes, and seals predictions within
+one minute of the final receipt. Duplicate identities, unavailable training
+labels, changed model files, invalid chronology and malformed/crossed books
+fail explicitly. Unsupported strikes and missing sides have named exclusions.
+Capture needs a new archive directory; replay reads and verifies that directory
+without HTTP and requires the original prediction contents to match exactly.
+
+The pilot protocol was frozen before acquisition, SHA-256
+`6cabb1070c2f5e084af71a0e51d6b8182c4a34508168f58ce29011bba6c18438`.
+It retains both 00 and 12 UTC GFS cycles, both fitted calibrators and both raw
+references. The matched source-era model reports above supply the coefficients;
+nothing is refit or selected using this event. The acquisition window was
+October 12 18:42–19:42 UTC for October 13 events. This is an instrumentation
+pilot earlier than the historical 16:00 Eastern decision, not a confirmatory
+replication of that trading policy.
+
+**Executed:** six runs recorded predictions at 18:43:38–18:44:05 UTC, all before
+the target day. The 54 native response envelopes produced 34 forecast/book
+rows, each with four probabilities, over 17 unique contracts in three cities
+on one event date. Boston's `KXHIGHTBOS-26OCT13-T67` had a missing book side in
+both runs and was explicitly excluded. These are not 34 independent events.
+
+| City | 00 UTC maximum F | 12 UTC maximum F | Included contracts per cycle |
+|---|---:|---:|---:|
+| Boston | 61.88 | 61.34 | 5 |
+| Philadelphia | 79.16 | 80.06 | 6 |
+| D.C. | 82.76 | 82.58 | 6 |
+
+Every report and RunRecord sidecar reproduced byte-for-byte offline. A separate
+PowerShell calculation checked all referenced file hashes, 24-hour forecast
+maxima, best bid/opposing ask prices and sizes, fitted-model probabilities and
+forecast-before-book chronology. Machine-local evidence is under
+`market-edge-20261012/paper-pilot-20261013/`, including six frozen plans, six
+capture directories, original/replayed reports and `verification.json`.
+The protocol is `market-edge-20261012/paper-pilot-protocol.json`.
+
+| Report prefix | Prediction report SHA-256 |
+|---|---|
+| `KXHIGHTBOS-00` | `a93cd2f8c31fdba57bef0e35bc044ffc5bbe70eeb3cc9d66efa3e9bf57716b67` |
+| `KXHIGHTBOS-12` | `e9749b95f742bdf2a1f2b8497b6e11dda239d744614ad02c527369c58ca38ddb` |
+| `KXHIGHPHIL-00` | `0c957a5dccd4a08c607ad55ba5649813e770000f7383d0d451a3bcddea6dd346` |
+| `KXHIGHPHIL-12` | `98deb6cee2ebffe9ef22f41d1148de70bd08de6f0e4bbfb65fabdf3dd4363c15` |
+| `KXHIGHTDC-00` | `919b97bb7d97931be4954376192fbea3e09c56f831bbd20ff186b63e95809c18` |
+| `KXHIGHTDC-12` | `995c709cf8657a9e5be14c4f83da8b15d33368f76e91b3ddca8aee08b7ff7585` |
+
+```powershell
+poetry run python -m scripts.paper_research `
+  --plan <city-cycle-plan.json> --protocol <paper-pilot-protocol.json> `
+  --models <forecast-freshness-cycle-verified.json> `
+  --archive <city-cycle-capture> --mode replay --out <new-report.json>
+```
+
+Use `--mode capture` only with a fresh archive and a future event's frozen plan.
+No order endpoint, account credentials, recurring scheduler or money is used.
+The books are snapshots, not reserved liquidity or guaranteed fills; receipts
+are local-clock times, not exchange timestamps or independent notarization.
+Hourly grid forecasts and settlement measurements remain distinct. Outcomes
+are pending: future evaluation must join exchange payouts, retain scalar
+resolutions, and freeze any execution/fee assumptions before measuring returns.
+This pilot establishes reproducible pre-outcome recording, not an edge.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
@@ -339,8 +417,14 @@ and run full HTTP capture through byte-identical offline CLI replay.
 The completed forecast change passes `make check`: 3,013 tests, strict mypy,
 all repository guards, and 100% statement and branch coverage for source and
 scripts. The local run took 142 seconds against the existing 300-second budget.
+The prospective extension passes all 3,053 tests, strict mypy across 506 files,
+all guards, and 100% coverage of 14,534 statements and 2,704 branches. Its full
+`make check` took 134 seconds. Real socket failures, subprocess execution,
+changed evidence, exact replay and outcome-free prediction parity are tested.
 
 API contracts: [historical tiers](https://docs.kalshi.com/getting_started/historical_data),
 [live candles](https://docs.kalshi.com/api-reference/market/get-market-candlesticks),
 [historical candles](https://docs.kalshi.com/api-reference/historical/get-historical-market-candlesticks),
 [public trades](https://docs.kalshi.com/api-reference/market/get-trades).
+Prospective liquidity uses the native
+[fixed-point order book](https://docs.kalshi.com/api-reference/market/get-market-orderbook).
