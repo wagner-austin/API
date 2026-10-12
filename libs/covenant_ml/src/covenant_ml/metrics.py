@@ -14,6 +14,33 @@ from numpy.typing import NDArray
 from .types import AMEXMetricResult, EvalMetrics
 
 
+def log_loss_per_row(
+    y_true: NDArray[np.int64],
+    y_prob: NDArray[np.float64],
+    eps: float = 1e-15,
+) -> NDArray[np.float64]:
+    """Compute each row's binary cross-entropy.
+
+    The per-row form is what a paired comparison of two models needs: the
+    difference of two models' losses on the same row is the unit a paired
+    interval is built from, and a mean alone cannot be paired.
+
+    Args:
+        y_true: True binary labels (0 or 1), shape (n_samples,)
+        y_prob: Predicted probabilities for class 1, shape (n_samples,)
+        eps: Small value to avoid log(0)
+
+    Returns:
+        Per-row loss ``-(y*log(p) + (1-y)*log(1-p))``, shape (n_samples,).
+    """
+    y_prob_clipped: NDArray[np.float64] = np.clip(y_prob, eps, 1 - eps)
+    y_true_float: NDArray[np.float64] = y_true.astype(np.float64)
+    log_p: NDArray[np.float64] = np.log(y_prob_clipped)
+    log_1_minus_p: NDArray[np.float64] = np.log(1 - y_prob_clipped)
+    cross_entropy: NDArray[np.float64] = y_true_float * log_p + (1 - y_true_float) * log_1_minus_p
+    return -cross_entropy
+
+
 def compute_log_loss(
     y_true: NDArray[np.int64],
     y_prob: NDArray[np.float64],
@@ -27,21 +54,11 @@ def compute_log_loss(
         eps: Small value to avoid log(0)
 
     Returns:
-        Log loss (lower is better)
+        Log loss (lower is better), the mean of :func:`log_loss_per_row`.
     """
-    # Clip probabilities to avoid log(0)
-    y_prob_clipped: NDArray[np.float64] = np.clip(y_prob, eps, 1 - eps)
-
-    # Convert y_true to float64 for arithmetic
-    y_true_float: NDArray[np.float64] = y_true.astype(np.float64)
-
-    # Binary cross-entropy: -mean(y*log(p) + (1-y)*log(1-p))
-    log_p: NDArray[np.float64] = np.log(y_prob_clipped)
-    log_1_minus_p: NDArray[np.float64] = np.log(1 - y_prob_clipped)
-    cross_entropy: NDArray[np.float64] = y_true_float * log_p + (1 - y_true_float) * log_1_minus_p
+    per_row = log_loss_per_row(y_true, y_prob, eps)
     # np.mean returns scalar - use sum/len for clean typing
-    total = float(np.sum(cross_entropy))
-    return -total / len(cross_entropy)
+    return float(np.sum(per_row)) / len(per_row)
 
 
 def compute_multiclass_log_loss(
@@ -242,12 +259,30 @@ def compute_brier_score(
         y_prob: Predicted probabilities for class 1, shape (n_samples,)
 
     Returns:
-        Brier score in the range [0.0, 1.0], where 0.0 is a perfect forecast.
+        Brier score in the range [0.0, 1.0], where 0.0 is a perfect forecast;
+        the mean of :func:`brier_per_row`.
+    """
+    squared_error = brier_per_row(y_true, y_prob)
+    total = float(np.sum(squared_error))
+    return total / len(squared_error)
+
+
+def brier_per_row(
+    y_true: NDArray[np.int64],
+    y_prob: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Compute each row's squared probability error.
+
+    Args:
+        y_true: True binary labels (0 or 1), shape (n_samples,)
+        y_prob: Predicted probabilities for class 1, shape (n_samples,)
+
+    Returns:
+        Per-row ``(p - y)**2``, shape (n_samples,).
     """
     y_true_float: NDArray[np.float64] = y_true.astype(np.float64)
     squared_error: NDArray[np.float64] = (y_prob - y_true_float) ** 2
-    total = float(np.sum(squared_error))
-    return total / len(squared_error)
+    return squared_error
 
 
 def compute_amex_metric(
@@ -528,6 +563,7 @@ def format_metrics_str(metrics: EvalMetrics) -> str:
 
 
 __all__ = [
+    "brier_per_row",
     "compute_accuracy",
     "compute_all_metrics",
     "compute_amex_metric",
@@ -539,4 +575,5 @@ __all__ = [
     "compute_precision",
     "compute_recall",
     "format_metrics_str",
+    "log_loss_per_row",
 ]
