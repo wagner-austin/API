@@ -1505,6 +1505,18 @@ name appeared nowhere here — was mine, and another session bridged it.
   `BENCHMARK_RESULTS_2026-08-22_knob_closure.md`.
 - **Volume is not stated here**, for the reason `mi`'s entry gives.
 
+#### Market execution replication
+
+`libs/covenant_ml/scripts/market_research.py` runs a frozen daily-weather maker
+study using archived public Kalshi responses. It reuses the paired cluster and
+Newey–West estimators and emits a shared `RunRecord` whose digest covers the
+complete report, source hashes, plan and captured numeric fingerprint. It is a
+local read-only research entry point, not a cluster submission or trading
+service. [Its contract](../libs/covenant_ml/docs/MARKET_RESEARCH.md) specifies
+the integer accounting, schema boundaries, cutoff reconciliation, capture and
+offline replay commands, tests and interpretation limits. Positive simulated
+P&L cannot establish queue position, actual execution, or a deployable edge.
+
 ### `floor` — cloze floor scoring
 
 <!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 113 -->
