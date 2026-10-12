@@ -1517,6 +1517,18 @@ the integer accounting, schema boundaries, cutoff reconciliation, capture and
 offline replay commands, tests and interpretation limits. Positive simulated
 P&L cannot establish queue position, actual execution, or a deployable edge.
 
+`libs/covenant_ml/scripts/forecast_research.py` extends that same archive,
+accounting and provenance layer with a chronological forecast-versus-market
+comparison. It fits the existing logistic learner on prior available labels,
+retains every held-out prediction and cash payoff, and compares incremental
+Brier loss with event-date dependence. The October 12 investigation did not
+establish an edge: the main forecast gate failed, and a newer-run diagnostic's
+positive seven-trade simulation remained statistically inconclusive. Native
+settlement-source wording changes and explicitly documented forecast-archive
+gaps limit interpretation. The linked contract records all amended protocols,
+results and byte-identical replays; these are historical research, not live
+execution or an untouched prospective holdout.
+
 ### `floor` — cloze floor scoring
 
 <!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 113 -->
