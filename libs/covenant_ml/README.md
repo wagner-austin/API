@@ -7,6 +7,10 @@ Regression backends: XGBoost, LightGBM (2 tree-based backends in this library).
 
 PyTorch neural network backends (MLP, LSTM) for both classification and regression live in [`covenant_nn`](../covenant_nn/README.md).
 
+For frozen market execution studies, see [Market execution research](docs/MARKET_RESEARCH.md).
+This reuses the evaluation and provenance layers to test hypothetical trading
+payoffs against archived public evidence.
+
 ## Installation
 
 ```bash
