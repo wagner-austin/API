@@ -146,6 +146,43 @@ a frozen policy, followed by an execution study that measures fill rates,
 adverse selection, fees, and attainable size. This implementation supplies
 the historical evidence and replay layer; it is not that execution study.
 
+## Follow-up input audit and prospective pilot
+
+On 2026-10-12 the existing weather paths were traced before attempting a
+forecast-versus-market comparison. The service's
+`domains/weather/features.py` transforms an observed temperature. Its
+`scripts/build_weather_corpus.py` uses day t's completed daily TMAX and
+three lagged anomalies to predict t+1's anomaly. Seasonal state is fitted
+on 1950–1989; benchmark rows cover summers in 1990–2024 and split by
+station. This is a legitimate separate benchmark, but neither its group
+split nor its synthetic midnight event timestamps establishes availability
+of final day-t TMAX at a 16:00 day-t trading decision. The summer-only
+corpus also does not validate October predictions.
+
+The next source probe succeeded: three explicit GFS runs initialized at
+2026-10-12 00:00 UTC were actually received around 15:40 UTC, each with
+72 hourly temperatures. Three open-market inventories returned 12 contracts
+each and empty pagination cursors. All six responses are preserved through
+the existing hashed ResponseArchive in the machine-local evidence directory's
+`forecast-input-probe/`, beside its frozen `protocol.json`.
+
+The October 13 contracts name **The Weather Company** as settlement source.
+GHCN daily observations must therefore not be substituted as exact market
+labels. The pilot records all three next-day point forecasts before outcomes:
+Boston 61.70 F, Philadelphia 79.16 F, D.C. 82.76 F. These are maxima of
+24 hourly GFS values over the Eastern calendar day, a provisional aggregation
+whose alignment to the exchange's observation-day convention is still unverified.
+They are not calibrated bracket probabilities or trading recommendations.
+Outcomes are pending; no continuous collector or scheduled job was launched.
+
+The next model comparison must measure whether forecasts add information to
+market probabilities on future dates, with receipt timestamps and calibration
+restricted to prior outcomes. This pilot tests input alignment first and
+cannot establish forecast superiority with three observations. Open-Meteo's
+[single-run documentation](https://open-meteo.com/en/docs/single-runs-api)
+explicitly distinguishes model initialization from public availability;
+retrospective initialization timestamps alone cannot prove tradability.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
