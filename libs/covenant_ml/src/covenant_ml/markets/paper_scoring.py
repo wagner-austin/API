@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -19,12 +18,12 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
-from platform_core.run_record import decode_run_record, run_record_sidecar
 
 from ..metrics import brier_per_row, log_loss_per_row
 from .archive import ResponseArchive, decode_capture
 from .forecast_model import float_values
 from .paper_records import decode_paper_plan
+from .reporting import read_verified_market_report
 from .settlement_records import (
     ARMS,
     SavedPrediction,
@@ -52,22 +51,8 @@ def load_verified_predictions(path: Path) -> tuple[tuple[SavedPrediction, ...], 
         OSError: Required evidence is unavailable; it is never refetched.
         TypeError: Required native fields have incorrect types.
     """
-    payload = path.read_bytes()
-    report = narrow_json_to_dict(load_json_str(payload.decode("utf-8")))
-    sidecar = run_record_sidecar(path)
-    record = decode_run_record(narrow_json_to_dict(load_json_str(sidecar.read_text("utf-8"))))
-    if record["payload_digest"] != sha256(payload).hexdigest():
-        raise ValueError("[SETTLEMENT-004] prospective report differs from its RunRecord")
-    sources: list[Path] = [path, sidecar]
-    seals: list[Path] = []
-    for value in require_list(report, "sources"):
-        source = narrow_json_to_dict(value)
-        source_path = Path(require_str(source, "path"))
-        if sha256(source_path.read_bytes()).hexdigest() != require_str(source, "sha256"):
-            raise ValueError("[SETTLEMENT-004] original source evidence changed")
-        sources.append(source_path)
-        if source_path.name == "prediction.json":
-            seals.append(source_path)
+    report, sources, _ = read_verified_market_report(path, "SETTLEMENT-004")
+    seals = [source for source in sources[2:] if source.name == "prediction.json"]
     if len(seals) != 1:
         raise ValueError("[SETTLEMENT-004] require exactly one original prediction seal")
     seal = decode_capture(narrow_json_to_dict(load_json_str(seals[0].read_text("utf-8"))))

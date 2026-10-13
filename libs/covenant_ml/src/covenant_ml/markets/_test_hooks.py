@@ -17,6 +17,8 @@ from platform_core.environment_record import (
 )
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
 
+from .campaign_process import CommandRunner, run_command
+
 
 def utc_now() -> str:
     """Read the wall clock as an aware UTC ISO timestamp.
@@ -32,6 +34,15 @@ pause: Callable[[float], None] = sleep
 client_factory: Callable[[float, SyncTransport | None], HttpxClient] = build_client
 host_probe: HostProbe = stdlib_host_probe(cpu_count)
 installed_version: VersionReader = _installed_version
+campaign_runner: CommandRunner = run_command
 
 
-__all__ = ["client_factory", "clock", "host_probe", "installed_version", "pause", "utc_now"]
+__all__ = [
+    "campaign_runner",
+    "client_factory",
+    "clock",
+    "host_probe",
+    "installed_version",
+    "pause",
+    "utc_now",
+]

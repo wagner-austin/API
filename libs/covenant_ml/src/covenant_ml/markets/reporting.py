@@ -7,8 +7,57 @@ from hashlib import sha256
 from pathlib import Path
 
 from platform_core.comparability import RunFingerprint, encode_run_fingerprint
-from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
-from platform_core.run_record import Observation, encode_run_record, run_record, run_record_sidecar
+from platform_core.json_utils import (
+    JSONObject,
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_list,
+    require_str,
+)
+from platform_core.run_record import (
+    Observation,
+    decode_run_record,
+    encode_run_record,
+    run_record,
+    run_record_sidecar,
+)
+
+
+def read_verified_market_report(
+    path: Path,
+    error_code: str,
+) -> tuple[JSONObject, tuple[Path, ...], str]:
+    """Verify a report's exact bytes, RunRecord payload and every referenced source.
+
+    Args:
+        path: Report beside its required RunRecord sidecar.
+        error_code: Calling workflow's traceable evidence error code.
+
+    Returns:
+        Decoded report, all verified paths including report and sidecar, and payload digest.
+
+    Raises:
+        ValueError: A report or source differs from its recorded identity.
+        OSError: Required evidence cannot be read.
+        TypeError: Required JSON fields are malformed.
+    """
+    payload = path.read_bytes()
+    report = narrow_json_to_dict(load_json_str(payload.decode("utf-8")))
+    sidecar = run_record_sidecar(path)
+    record = decode_run_record(narrow_json_to_dict(load_json_str(sidecar.read_text("utf-8"))))
+    digest = sha256(payload).hexdigest()
+    if record["payload_digest"] != digest:
+        raise ValueError(f"[{error_code}] report differs from its RunRecord")
+    sources = [path, sidecar]
+    for value in require_list(report, "sources"):
+        source = narrow_json_to_dict(value)
+        source_path = Path(require_str(source, "path"))
+        if sha256(source_path.read_bytes()).hexdigest() != require_str(source, "sha256"):
+            raise ValueError(f"[{error_code}] original source evidence changed")
+        sources.append(source_path)
+    return report, tuple(sources), digest
 
 
 def write_market_report(
@@ -60,4 +109,4 @@ def write_market_report(
     return sidecar
 
 
-__all__ = ["write_market_report"]
+__all__ = ["read_verified_market_report", "write_market_report"]
