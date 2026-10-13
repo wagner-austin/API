@@ -398,6 +398,50 @@ are pending: future evaluation must join exchange payouts, retain scalar
 resolutions, and freeze any execution/fee assumptions before measuring returns.
 This pilot establishes reproducible pre-outcome recording, not an edge.
 
+## Prospective settlement reconciliation
+
+`scripts/paper_settlements.py` joins each saved prediction to an archived public
+market response. It verifies the original report, RunRecord payload digest,
+every source hash and the sealed prediction body before using its probabilities.
+It never refits a model or changes the original evidence. Settlement snapshots
+use fresh archives and reproduce their reports and sidecars byte-for-byte offline.
+
+Only the exchange's terminal `finalized` status supplies an outcome. Earlier
+states, including `determined`, `disputed` and `amended`, remain pending even
+when a provisional result is present; see the official
+[market lifecycle](https://docs.kalshi.com/getting_started/market_lifecycle).
+Binary and scalar payouts are distinct, including scalar payouts at zero or one.
+Changed primary rules are flagged. Brier and log-loss scores use only unchanged
+binary contracts and remain absent while any selected contract is pending.
+Counts expose every exclusion; these probability scores do not measure fills,
+fees or returns. A completed snapshot with no eligible binary outcomes has no score.
+
+The first real reconciliation of all six October 13 prediction reports captured
+34 public market responses. All 34 rows across 17 unique contracts were pending,
+with no changed primary rules, no finalized labels and `scores: null`. All six
+reports and RunRecord sidecars replayed byte-for-byte. Independent PowerShell
+checks verified every referenced source hash, pending-state fields and replay
+hashes. Evidence is under
+`market-edge-20261012/paper-settlements-20261013T0340/`; `verification.json`
+records report digests and actual receipt times. The directory suffix is a batch
+label; source receipts supply the timestamps.
+
+```powershell
+poetry run python -m scripts.paper_settlements `
+  --predictions <original-city-cycle-predictions.json> `
+  --archive <new-settlement-archive> --mode capture --out <settlements.json>
+poetry run python -m scripts.paper_settlements `
+  --predictions <original-city-cycle-predictions.json> `
+  --archive <same-settlement-archive> --mode replay --out <replayed.json>
+```
+
+Run a later capture into a new directory after settlement. Original prediction
+replay requires its capture implementation revision because the sealed body
+includes that implementation's digest. Settlement reconciliation instead verifies
+the original sealed evidence and records its own implementation digest, allowing
+the scorer to advance without altering historical predictions. No recurring
+settlement process is installed; this run submitted no orders.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
@@ -421,6 +465,11 @@ The prospective extension passes all 3,053 tests, strict mypy across 506 files,
 all guards, and 100% coverage of 14,534 statements and 2,704 branches. Its full
 `make check` took 134 seconds. Real socket failures, subprocess execution,
 changed evidence, exact replay and outcome-free prediction parity are tested.
+The settlement extension passes all 3,100 tests, strict mypy across 512 files,
+all guards, and 100% coverage of 14,731 statements and 2,756 branches. Its full
+`make check` took 128 seconds. Tests exercise real HTTP capture and replay,
+actual CLI subprocesses, manually calculated proper scores, provisional and
+scalar results, changed rules, receipt regressions and corrupted original evidence.
 
 API contracts: [historical tiers](https://docs.kalshi.com/getting_started/historical_data),
 [live candles](https://docs.kalshi.com/api-reference/market/get-market-candlesticks),
