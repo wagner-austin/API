@@ -1570,6 +1570,14 @@ files, the executable command and strict empty-account evidence requirements.
 This read-only command rejects production hosts and incomplete observations;
 it grants no order authority and is not a completed remote demo execution test.
 
+The subsequent [durable demo order trial](../libs/covenant_ml/docs/KALSHI_DEMO_ORDER.md)
+did complete a credentialed demo order/fill/account lifecycle on October 13, 2026:
+one contract at $0.30, $0.0147 fees, and $49.6853 remaining from $50 mock cash.
+It persisted risk before the single submission, retained risk during delayed
+order visibility, reconciled independent fills/position/cash using GET requests,
+and refused a restarted duplicate submission. This is execution evidence only;
+the position remains unsettled and the command has no production order endpoint.
+
 ### `floor` — cloze floor scoring
 
 <!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 113 -->
