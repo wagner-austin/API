@@ -531,6 +531,13 @@ changes between balance reads. It sends no orders and reports both execution
 and live readiness as false. Remote demo verification requires demo credentials;
 local socket and cryptography tests are not presented as exchange execution.
 
+The [durable demo order trial](KALSHI_DEMO_ORDER.md) subsequently completed an
+actual demo IOC fill: one contract at $0.30 plus $0.0147 fees, leaving $49.6853
+of the starting $50 mock cash. A brief order-list visibility delay retained the
+reservation; explicit GET-only reconciliation verified order, fills, position
+and cash without resubmission. Restarted submission was refused. This verifies
+the bounded demo execution path, not a profitable signal or production readiness.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard

@@ -81,10 +81,15 @@ The integrated `make check` passed 3,248 tests, strict typing and repository
 guards, with 100% coverage of 15,468 statements and 2,936 branches in 140 seconds.
 Forty-two tests specifically cover signing, demo preflight and its CLI.
 
-Before funding, the remaining work is account identity and journal binding,
-authenticated fill and order reconciliation, current fees/rules/quote checks,
-persisted intent before submission, ambiguous-outcome recovery without duplicate
-submission, and an actual demo order lifecycle. The
+The [single-order demo trial](KALSHI_DEMO_ORDER.md) now supplies credential binding,
+persisted intent before submission, native order/fill/position/cash reconciliation,
+fresh quote admission and GET-only ambiguous-outcome recovery. Its actual demo
+order filled and reconciled on October 13, 2026. This preflight command itself
+remains read-only and cannot admit a second trial after that account activity.
+
+Before real funding, the remaining work includes a production account identity,
+ongoing account and settlement reconciliation, current fee/rule admission and
+an explicitly authorized production execution path. The
 [local rehearsal contract](EXECUTION_REHEARSAL.md) remains the source for the
 proposed $20/$1/$3/$5 limits. Neither this command nor that rehearsal establishes
 a profitable trading edge.

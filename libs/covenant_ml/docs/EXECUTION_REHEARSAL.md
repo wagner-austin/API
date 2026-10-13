@@ -123,6 +123,9 @@ rehearsal records, policy, journal and CLI.
 The [authenticated demo preflight](KALSHI_DEMO.md) now implements request signing
 and strict primary demo account reads. Its report grants no execution authority;
 it neither submits orders nor reconciles a previously used experiment account.
+The separate [single-order demo trial](KALSHI_DEMO_ORDER.md) uses this journal's
+reservation policy and has completed an actual $0.30 demo fill plus $0.0147 fees,
+with independently reconciled order, fill, position and cash evidence.
 
 The remaining execution work is an authenticated exchange adapter with complete
 account/fill/balance reconciliation, account-bound journal identity, current
@@ -131,9 +134,10 @@ before sending and resolves ambiguous responses without resubmission. Fresh
 quotes and available quantity must be checked at submission. Admission must be
 based on the account, including activity outside this process.
 
-That path needs end-to-end tests against Kalshi's
+The single-order demo execution test is now complete against Kalshi's
 [separate demo environment](https://docs.kalshi.com/getting_started/demo_env)
-before a separately authorized live experiment. A credential-free local test
+as documented above; a production path still needs its own verification before
+a separately authorized live experiment. A credential-free local test
 does not prove demo connectivity, actual queue behavior, available liquidity or
 profitable execution. The order proposal is a measurement input, not a trading
 signal or evidence of an edge.

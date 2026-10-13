@@ -1,0 +1,118 @@
+# Durable single-order demo trial
+
+## Actual demo execution, October 13, 2026
+
+The credentialed trial completed against Kalshi's demo exchange. Starting mock
+cash was $50. One YES contract in `KXNHLSPREAD-26OCT13STLOTT-STL2` filled at $0.30,
+with $0.0147 in fees, leaving $49.6853 cash and one contract held. Native order
+`01a13626-9e58-743f-80e0-2c25e6edf733` and client UUID
+`ee2a8948-0b17-42e8-a8db-4c84ed580e19` matched the journal and independent fills.
+
+The first order-list read briefly returned no order after the fill acknowledgement.
+Submission therefore exited with an unresolved reservation. An explicit
+`reconcile` command subsequently verified the order, fill, position and cash;
+it did not resend. A restarted `submit` command was then exercised and refused
+with `DEMO-TRIAL-005` before network I/O. Another authenticated reconciliation
+still found exactly the same one order and one fill.
+
+Evidence is under
+`C:/Users/Test/PROJECTS/files/market-edge-20261012/kalshi-demo-trial-20261013/`:
+`trial.json`, `acknowledgement.json`, `execution.sqlite`,
+`reconciliation-*.json`, `verified-status.json` and
+`duplicate-submit-refused.log`. No private key is stored there. The $0.3147 cost
+remains exposure awaiting the market outcome; there is no realized profit claim.
+This is a completed demo order/fill/account lifecycle, not a production pilot.
+
+## Execution contract
+
+`scripts.kalshi_demo_trial` connects the existing $1 order reservation policy to
+Kalshi's demo Create Order V2 endpoint. A trial submits at most one one-contract
+YES immediate-or-cancel order. It never selects the production origin and never
+reports live readiness. This tests execution mechanics, not a profitable strategy.
+
+The [credential setup](KALSHI_DEMO.md) and [risk journal](EXECUTION_REHEARSAL.md)
+remain shared; signing, HTTP transport, pagination and accounting are not forked.
+
+## Commands
+
+Run from `libs/covenant_ml`. The root's parent must exist and the trial directory
+must be new. Prices are integers in 1/10000 dollars: `3000` means $0.30.
+
+```powershell
+poetry run python -m scripts.kalshi_demo_trial `
+  --key-id-file C:/Users/Test/.secrets/kalshi-demo/key-id.txt `
+  --private-key-file C:/Users/Test/.secrets/kalshi-demo/private-key.pem `
+  --root C:/evidence/demo-trial `
+  prepare --ticker DEMO-CONTRACT --limit-price 3000
+```
+
+Use the same three path arguments with `submit`, `reconcile` or `status` instead
+of `prepare`. Preparation checks the empty primary account, saves the credential
+fingerprint and initial cash, creates a fresh intent UUID and five-minute expiry,
+and initializes the existing SQLite journal. It places no order. The private key
+and API key ID are never written into trial evidence.
+
+`submit` verifies credentials, refuses a previous reservation, checks unchanged
+cash and repeats authenticated empty-account preflight. It requires a matching
+active contract, a future closing time, a two-sided order book, an executable
+ask within the limit, at least one visible contract and no more than five seconds
+between account preflight completion and the submission admission decision.
+The transport checks intent expiry again immediately before sending.
+
+The full $1 ceiling is reserved: contract limit price plus the remainder as fee
+reserve. There is no implied estimate that fees will actually consume that
+reserve. Actual fill cost and fees replace the reservation only after successful
+reconciliation. The existing policy retains filled exposure until settlement.
+
+## Write-ahead reservation and ambiguous responses
+
+The journal commits the risk reservation before the HTTP POST. Competing callers
+must pass the same transactional reservation reducer; a duplicate UUID is refused.
+After reservation, this trial can never submit again, even after an HTTP error,
+lost response, process restart, zero fill or terminal cancellation. A process
+failure between reservation and sending is intentionally indistinguishable from
+an uncertain send. It retains risk rather than assuming the exchange saw nothing.
+
+`reconcile` makes GET requests only. It reads every current account order/fill page
+using the shared cursor-cycle checks and requires exactly the manifest's terminal
+IOC order. Duplicate/foreign fills, mismatched quantities, prices, times or fees
+are refused. Summed fill acquisition costs and fees must equal native cumulative
+order totals; the primary position quantity and cash change must also agree.
+An available acknowledgement must name that same order. A missing order is an
+unresolved result, never permission to resend.
+
+Evidence files include the manifest, acknowledgement when received, cumulative
+journal and separate native reconciliation captures. `status` replays local
+accounting without network traffic. Reports distinguish a reserved attempt from
+a confirmed native order and always set `can_reserve=false` and `live_ready=false`.
+
+## Scope and limitations
+
+This intentionally permits one initial demo order, not an ongoing trading account.
+Any returned prior orders or current positions block preparation. Account activity
+outside this process can race sequential reads; there is no atomic exchange
+snapshot. Other subaccounts, archived orders, settlement and a live strategy
+admission policy are outside this trial. Once the selected market settles, an
+unsettled-position mismatch may require separate settlement evidence; the trial
+does not manufacture a payout or release exposure from a missing position.
+
+The credential fingerprint binds key material rather than independently proving
+a stable exchange user ID. Local files are not a tamper-proof security boundary:
+someone with write access can edit/copy a manifest or replace a journal. Do not
+delete or alter the trial to retry an ambiguous submission.
+
+Native account money may have six fractional digits. Values enter the existing
+1/10000-dollar journal only when exactly representable; excess precision causes
+an explicit failure and leaves risk reserved. Fill aggregation retains exact
+microdollar arithmetic. No amount is rounded to force reconciliation to pass.
+
+Tests execute real signing, HTTP sockets, SQLite, CLI files and subprocesses.
+An actual socket disconnect after POST exercises retained reservation and
+GET-only recovery. Repeated submission after restart is refused before network
+I/O. These local tests are distinct from the credentialed demo evidence.
+
+The current official contracts are
+[Create Order V2](https://docs.kalshi.com/api-reference/orders/create-order-v2),
+[Get Orders](https://docs.kalshi.com/api-reference/orders/get-orders), and
+[Get Fills](https://docs.kalshi.com/api-reference/portfolio/get-fills), checked
+October 13, 2026. Demo fills are not evidence of production liquidity or returns.
