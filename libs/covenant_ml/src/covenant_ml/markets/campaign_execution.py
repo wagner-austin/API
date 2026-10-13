@@ -6,17 +6,13 @@ import sqlite3
 import sys
 from collections.abc import Callable
 from contextlib import closing
-from datetime import UTC, date, datetime, time, timedelta
-from hashlib import sha256
 from pathlib import Path
 
 from platform_core.json_utils import (
     JSONObject,
-    dump_json_str,
-    load_json_str,
-    narrow_json_to_dict,
 )
 
+from .campaign_inputs import acquisition_window, load_campaign_inputs
 from .campaign_planning import write_new_json
 from .campaign_process import CommandRunner
 from .campaign_records import (
@@ -24,10 +20,9 @@ from .campaign_records import (
     AttemptState,
     Campaign,
     decode_attempt,
-    decode_campaign,
     encode_attempt,
 )
-from .paper_records import PaperPlan, encode_paper_plan
+from .paper_records import PaperPlan
 from .paper_scoring import load_verified_predictions
 from .provenance import implementation_digest
 from .reporting import read_verified_market_report
@@ -48,41 +43,10 @@ def load_campaign(root: Path, digest: str) -> Campaign:
         ValueError: CAMPAIGN-007 when any frozen input changed.
         OSError: A required source is absent.
     """
-    payload = (root / "campaign.json").read_bytes()
-    if sha256(payload).hexdigest() != digest:
-        raise ValueError("[CAMPAIGN-007] campaign manifest differs from scheduler identity")
-    campaign = decode_campaign(narrow_json_to_dict(load_json_str(payload.decode("utf-8"))))
+    campaign = load_campaign_inputs(root, digest)
     if campaign["implementation_digest"] != implementation_digest():
         raise ValueError("[CAMPAIGN-007] collector implementation changed after campaign freeze")
-    artifacts = [(campaign["protocol_path"], campaign["protocol_digest"])]
-    artifacts.extend((model["path"], model["digest"]) for model in campaign["models"])
-    for path, expected in artifacts:
-        if sha256(Path(path).read_bytes()).hexdigest() != expected:
-            raise ValueError("[CAMPAIGN-007] frozen protocol or model artifact changed")
-    for plan in campaign["plans"]:
-        expected_text = dump_json_str(encode_paper_plan(plan), indent=2)
-        if (root / "plans" / (plan["name"] + ".json")).read_bytes() != expected_text.encode():
-            raise ValueError("[CAMPAIGN-007] persisted acquisition plan changed")
     return campaign
-
-
-def _window(plan: PaperPlan, operation: str) -> tuple[int, int]:
-    """Return the capture window or fixed two-days-later settlement window.
-
-    Args:
-        plan: Frozen acquisition plan.
-        operation: Capture or settlement operation selected by the runner.
-
-    Returns:
-        Inclusive start and end in epoch milliseconds.
-    """
-    if operation == "capture":
-        return parse_timestamp(plan["window_start"]), parse_timestamp(plan["window_end"])
-    day = date.fromisoformat(plan["event_day"]) + timedelta(days=2)
-    start = datetime.combine(day, time(15), UTC)
-    return parse_timestamp(start.isoformat()), parse_timestamp(
-        (start + timedelta(hours=1)).isoformat()
-    )
 
 
 def _command(
@@ -300,7 +264,7 @@ def _run_attempt(
         return _existing_result(result_path, report_path, plan, operation)
     observed = clock()
     now = parse_timestamp(observed)
-    start, end = _window(plan, operation)
+    start, end = acquisition_window(plan, operation)
     marker = root / "attempts" / (name + ".started.json")
     if marker.exists():
         _record(result_path, plan, operation, AttemptState.INTERRUPTED, observed)
