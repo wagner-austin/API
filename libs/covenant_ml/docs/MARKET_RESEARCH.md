@@ -390,7 +390,7 @@ poetry run python -m scripts.paper_research `
 ```
 
 Use `--mode capture` only with a fresh archive and a future event's frozen plan.
-No order endpoint, account credentials, recurring scheduler or money is used.
+The pilot used no order endpoint, account credentials, recurring scheduler or money.
 The books are snapshots, not reserved liquidity or guaranteed fills; receipts
 are local-clock times, not exchange timestamps or independent notarization.
 Hourly grid forecasts and settlement measurements remain distinct. Outcomes
@@ -439,8 +439,80 @@ Run a later capture into a new directory after settlement. Original prediction
 replay requires its capture implementation revision because the sealed body
 includes that implementation's digest. Settlement reconciliation instead verifies
 the original sealed evidence and records its own implementation digest, allowing
-the scorer to advance without altering historical predictions. No recurring
-settlement process is installed; this run submitted no orders.
+the scorer to advance without altering historical predictions. This initial
+reconciliation submitted no orders; its scheduled follow-up is described below.
+
+## Frozen daily observation campaign
+
+`scripts/paper_campaign.py` prepares immutable plans and executes one scheduled
+tick through the existing prediction and settlement CLIs. The manifest binds
+the collector implementation, protocol, both fitted-model reports and every
+plan. Shared report verification was lifted into `reporting.py`, so settlement
+and campaign checks use one source-hash and RunRecord implementation.
+
+The frozen study covers **60 event dates, October 14 through December 12, 2026**:
+360 city/cycle prediction captures and 360 later settlement snapshots. Every
+prior day's acquisition window is **16:00-16:15 America/New_York**; the timezone
+conversion explicitly follows the November daylight-saving transition. Each
+settlement window is event date plus two days, **15:00-16:00 UTC**. A completed
+settlement acquisition can still contain pending outcomes: acquisition completion
+never means a payout was finalized. The first prediction window starts October
+13 at 20:00 UTC (13:00 Pacific). All study observations were still future when
+the schedule was installed.
+
+Both forecast cycles and all four probability arms are retained without refits.
+The declared primary comparison is the 12 UTC augmented-minus-calibrated-market
+Brier loss, averaged within event date before averaging dates. Raw references
+and the entire 00 UTC panel remain secondary comparisons. The fixed 60-date
+window is an observation plan, not a power guarantee. Autumn-to-winter drift,
+missing observations and uncertainty remain material. Probability skill alone
+does not establish executable returns; the campaign submits no orders.
+
+Launched attempts have an exclusive started marker and subprocess log; terminal
+records also cover omitted attempts. Nonzero exits are persisted and propagated. A subsequent tick records
+an interrupted start explicitly; it never repeats that attempt. Missed windows
+and settlements without successful predictions remain named omissions. Earlier
+failures do not become reconstructed observations. An exclusive SQLite transaction
+prevents concurrent ticks; process termination releases the lock automatically.
+Each CLI child has a five-minute limit. Tick start/result records also make an
+unsuccessful scheduler invocation visible.
+
+**Deployment verified:** the runtime is an isolated copy of 640 source/configuration
+files across the package and its local dependencies, with a fresh locked Poetry
+environment. Source receipts were checked against the tested checkout. The
+existing `tools/fleet/scripts/FleetSchedule.ps1` registration helper installs
+`API-MarketPaper-20261014-20261212`: Poetry runs the tick every three minutes and
+at boot under the existing limited S4U account settings, with overlapping starts
+ignored. Its action pins manifest SHA-256
+`4f350cf553c68f6f3f467b59b6f92a8a8c24cf07ddada0c0527224ace17cc077`.
+The initial actual scheduled tick exited zero and reported 720 future acquisitions,
+zero completed. The PC and network must be available during the declared windows;
+an offline period cannot be repaired by a retrospective capture.
+
+Before installing that study schedule, a separate scheduled public-data probe
+recorded five Boston predictions at October 13 04:04:58 UTC, retained one missing
+book-side exclusion and placed zero orders. The original report and sidecar
+replayed byte-for-byte, and all 13 source hashes were independently verified.
+That probe is explicitly excluded from the 60-date study; its temporary scheduled
+task was removed and removal verified. Probe report SHA-256:
+`f8916860662de1d9916772adecf47c9da0a3a3f8a436dd38073520cb8f8a6e55`.
+
+Machine-local evidence under `market-edge-20261012/`:
+
+- `campaign-protocol-20261014-20261212.json`: protocol, SHA-256
+  `bb3e6826545afc2959cc58b3cc838449210435f5e235a870258c3165bcc098c8`.
+- `campaign-20261014-20261212/`: manifest, 360 plans, attempt/tick records,
+  scheduler XML and `deployment-verification.json`; future reports/archives land here.
+- `campaign-runtime/`: isolated implementation, locked environment and source receipts.
+- `campaign-deployment-probe/`: actual scheduled acquisition, replay and verification.
+
+Run `poetry run python -m scripts.paper_campaign prepare --help` for new studies;
+`tick --root <campaign-directory> --digest <original-manifest-sha256>` executes
+the current frozen study without modifying its plans. Use the isolated runtime's
+package directory. To remove this schedule, dot-source `FleetSchedule.ps1` and
+call `Unregister-FleetTick 'API-MarketPaper-20261014-20261212'`. Removing the task
+preserves every evidence file. The scheduler continues checking evidence after
+the finite study window until removed; it does not extend the study implicitly.
 
 ## Standards and regression checks
 
@@ -470,6 +542,11 @@ all guards, and 100% coverage of 14,731 statements and 2,756 branches. Its full
 `make check` took 128 seconds. Tests exercise real HTTP capture and replay,
 actual CLI subprocesses, manually calculated proper scores, provisional and
 scalar results, changed rules, receipt regressions and corrupted original evidence.
+The campaign extension passes all 3,145 tests, strict mypy across 521 files,
+all guards, and 100% coverage of 15,026 statements and 2,828 branches. The full
+check took 135 seconds. Tests cover daylight-saving windows, real subprocess
+and HTTP failures, durable omissions, interrupted starts, actual SQLite lock
+contention, original evidence drift, CLI entry points and no-repeat behavior.
 
 API contracts: [historical tiers](https://docs.kalshi.com/getting_started/historical_data),
 [live candles](https://docs.kalshi.com/api-reference/market/get-market-candlesticks),
