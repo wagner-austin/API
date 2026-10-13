@@ -24,6 +24,7 @@ platform-ml = { path = "../platform_ml", develop = true }
 optuna = "^4.6.0"
 polars = "^1.36"
 cleargbm = { path = "../cleargbm", develop = true }
+cryptography = "^50.0.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"
