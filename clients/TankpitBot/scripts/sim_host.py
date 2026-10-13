@@ -70,6 +70,13 @@ SIM_URL: Final[str] = "http://127.0.0.1:8765"
 SMOKE_PATH: Final[str] = "/terrain/1"
 TERRAIN_BYTES: Final[int] = 65536
 
+#: What curl prints for one ask: the status and the bytes read, joined by a
+#: colon and never a space, because ssh joins its arguments with spaces for
+#: sedona's cmd.exe. With a space, 2026-10-13's first ``up`` handed curl
+#: ``%{size_download}`` as a second URL, ``-o NUL`` caught that one alone, and
+#: the terrain went to stdout behind ``000``.
+SMOKE_FORMAT: Final[str] = "%{http_code}:%{size_download}"
+
 #: How often, and how far apart, ``up`` asks before giving up.
 SMOKE_ATTEMPTS: Final[int] = 20
 SMOKE_PAUSE_SECONDS: Final[float] = 3.0
@@ -266,7 +273,7 @@ def smoke(project_root: Path) -> None:
         FleetHostError: SIM_SMOKE_FAILED naming the last answer, when
             :data:`SMOKE_ATTEMPTS` asks never read the whole field.
     """
-    expected = f"200 {TERRAIN_BYTES}"
+    expected = f"200:{TERRAIN_BYTES}"
     last = ""
     for attempt in range(SMOKE_ATTEMPTS):
         if attempt > 0:
@@ -280,7 +287,7 @@ def smoke(project_root: Path) -> None:
                 "-o",
                 "NUL",
                 "-w",
-                "%{http_code} %{size_download}",
+                SMOKE_FORMAT,
                 f"{SIM_URL}{SMOKE_PATH}",
             ],
             project_root,
@@ -389,6 +396,7 @@ __all__ = [
     "SIM_DIR",
     "SIM_URL",
     "SMOKE_ATTEMPTS",
+    "SMOKE_FORMAT",
     "SMOKE_PATH",
     "SMOKE_PAUSE_SECONDS",
     "TERRAIN_BYTES",

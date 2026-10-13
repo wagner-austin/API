@@ -39,8 +39,8 @@ from tests.scripts._recorder import Recorder, fail, ok
 
 COMPOSE = f"{SIM_DIR}/{COMPOSE_FILE}"
 SIM_ENV = f"{SIM_DIR}/sim.env"
-SMOKE = ["ssh", SEDONA_SSH, "curl.exe", "-s", "-o", "NUL", "-w", "%{http_code} %{size_download}"]
-SERVING = ok("200 65536")
+SMOKE = ["ssh", SEDONA_SSH, "curl.exe", "-s", "-o", "NUL", "-w", "%{http_code}:%{size_download}"]
+SERVING = ok("200:65536")
 
 
 class Pauses:
@@ -255,7 +255,7 @@ def test_ensure_image_refuses_a_failed_build(tmp_path: Path) -> None:
 
 def test_smoke_waits_for_the_whole_field(tmp_path: Path) -> None:
     """Smoke asks sedona's loopback until room 1's terrain arrives whole."""
-    recorder = Recorder({"curl.exe": [ok("000 0"), ok("200 512"), SERVING]})
+    recorder = Recorder({"curl.exe": [ok("000:0"), ok("200:512"), SERVING]})
     script_hooks.run_command = recorder
     pauses = Pauses()
     script_hooks.sleep_seconds = pauses
@@ -264,16 +264,24 @@ def test_smoke_waits_for_the_whole_field(tmp_path: Path) -> None:
     assert pauses.seconds == [SMOKE_PAUSE_SECONDS, SMOKE_PAUSE_SECONDS]
 
 
+def test_smoke_sends_sedona_no_argument_with_a_space(tmp_path: Path) -> None:
+    """ssh joins the remote arguments with spaces, so one holding a space splits on sedona."""
+    recorder = Recorder({"curl.exe": SERVING})
+    script_hooks.run_command = recorder
+    smoke(tmp_path)
+    assert [argument for argument in recorder.calls[0][2:] if " " in argument] == []
+
+
 def test_smoke_gives_up_naming_the_last_answer(tmp_path: Path) -> None:
     """A sim that never serves is refused after every attempt, naming what it last said."""
-    script_hooks.run_command = Recorder({"curl.exe": ok("000 0\r\n")})
+    script_hooks.run_command = Recorder({"curl.exe": ok("000:0\r\n")})
     pauses = Pauses()
     script_hooks.sleep_seconds = pauses
     with pytest.raises(FleetHostError) as raised:
         smoke(tmp_path)
     assert str(raised.value) == (
         f"SIM_SMOKE_FAILED: http://127.0.0.1:8765/terrain/1 on sedona after {SMOKE_ATTEMPTS} "
-        "attempts answered '000 0', not '200 65536'"
+        "attempts answered '000:0', not '200:65536'"
     )
     assert len(pauses.seconds) == SMOKE_ATTEMPTS - 1
 
