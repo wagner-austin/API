@@ -114,14 +114,17 @@ def test_full_roundtrip_and_empty_report() -> None:
     filled = decode_native_order(native_order(row))
     assert decode_receipt(encode_receipt(filled)) == filled
     tracked = TrackedOrder(
-        intent=row, receipt=filled, settlement=decode_settlement(settlement(row))
+        intent=row,
+        receipt=filled,
+        settlement=decode_settlement(settlement(row)),
+        account_settlement=None,
     )
     assert decode_tracked_order(encode_tracked_order(tracked)) == tracked
     state = ExecutionState(orders=(tracked,), halt_reason="finished", observed_ms=2000)
     assert decode_execution_state(encode_execution_state(state)) == state
     empty = empty_state()
     assert decode_execution_state(encode_execution_state(empty)) == empty
-    reserved = TrackedOrder(intent=row, receipt=None, settlement=None)
+    reserved = TrackedOrder(intent=row, receipt=None, settlement=None, account_settlement=None)
     assert decode_tracked_order(encode_tracked_order(reserved)) == reserved
     assert execution_report(empty) == {
         "mode": "local_rehearsal",
@@ -155,11 +158,13 @@ def test_partial_fill_cancellation_and_fractional_settlement() -> None:
         }
     )
     receipt = decode_native_order(document)
-    tracked = TrackedOrder(intent=row, receipt=receipt, settlement=None)
+    tracked = TrackedOrder(intent=row, receipt=receipt, settlement=None, account_settlement=None)
     assert order_accounting(tracked) == (10000, 0, 0)
     document.update({"status": "canceled", "remaining_count_fp": "0.00"})
     canceled = decode_native_order(document)
-    assert order_accounting(TrackedOrder(intent=row, receipt=canceled, settlement=None)) == (
+    assert order_accounting(
+        TrackedOrder(intent=row, receipt=canceled, settlement=None, account_settlement=None)
+    ) == (
         2550,
         0,
         0,
@@ -167,7 +172,12 @@ def test_partial_fill_cancellation_and_fractional_settlement() -> None:
     final = settlement(row)
     final.update({"state": "scalar", "payout": 3333})
     assert order_accounting(
-        TrackedOrder(intent=row, receipt=canceled, settlement=decode_settlement(final))
+        TrackedOrder(
+            intent=row,
+            receipt=canceled,
+            settlement=decode_settlement(final),
+            account_settlement=None,
+        )
     ) == (0, 1717, -1717)
 
 
@@ -183,7 +193,9 @@ def test_actual_cost_breach_increases_risk_and_blocks_reservations() -> None:
             "taker_fees_dollars": "0.0300",
         }
     )
-    tracked = TrackedOrder(intent=row, receipt=decode_native_order(document), settlement=None)
+    tracked = TrackedOrder(
+        intent=row, receipt=decode_native_order(document), settlement=None, account_settlement=None
+    )
     state = ExecutionState(orders=(tracked,), halt_reason=None, observed_ms=2000)
     report = execution_report(state)
     assert report["exposure"] == 10300
@@ -201,5 +213,6 @@ def test_pending_settlement_shape_does_not_release_exposure() -> None:
         intent=row,
         receipt=decode_native_order(native_order(row)),
         settlement=decode_settlement(pending),
+        account_settlement=None,
     )
     assert order_accounting(tracked) == (10000, 0, 0)

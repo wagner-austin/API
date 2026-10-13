@@ -74,6 +74,7 @@ def serve_reconciliation(server: ApiServer, root: Path) -> None:
     documents: tuple[tuple[str, JSONObject], ...] = (
         ("orders", {"orders": [receipt], "cursor": ""}),
         ("fills", fills),
+        ("settlements", {"settlements": [], "cursor": ""}),
         ("positions", positions),
         ("balance", cash),
     )
