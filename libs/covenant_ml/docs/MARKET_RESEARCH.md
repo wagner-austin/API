@@ -514,6 +514,16 @@ call `Unregister-FleetTick 'API-MarketPaper-20261014-20261212'`. Removing the ta
 preserves every evidence file. The scheduler continues checking evidence after
 the finite study window until removed; it does not extend the study implicitly.
 
+## Execution rehearsal
+
+The separate [bounded execution rehearsal](EXECUTION_REHEARSAL.md) now exercises
+the proposed $20 experiment's durable risk reservations and order reconciliation.
+Its fixed limits are $1 per order including reserved fees, $3 combined exposure,
+and $5 gross losses plus remaining exposure. It sends no exchange orders and
+does not modify the frozen study. The linked contract distinguishes tested local
+accounting from the authenticated account integration and demo verification
+still required before a live pilot.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
