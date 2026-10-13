@@ -31,6 +31,30 @@ retained $0.3147 exposure and did not submit another order. Its native capture i
 An actual exchange payout has not yet occurred; local final-outcome tests are
 not presented as a completed remote settlement.
 
+## Automatic demo observation
+
+Windows task `API-KalshiDemo-Observe-20261013` runs the existing `reconcile`
+command every 15 minutes and at boot, through October 20, 2026 at 10:20:38
+Pacific. Its action contains no `submit` command. It runs under the operator's
+account using S4U, normal priority, IgnoreNew concurrency and a two-minute
+execution limit. Each invocation either records validated native evidence or
+exits with the original failure; the scheduler exposes that exit code.
+
+The task uses its own Poetry environment and 653 hash-verified source files under
+`C:/Users/Test/PROJECTS/files/market-edge-20261012/demo-observer-runtime-20261013/`.
+The loaded project modules were verified to resolve inside that snapshot. It
+does not use the working tree or alter the frozen research campaign runtime.
+`source-receipts.json` records the deployment file hashes.
+
+An actual Task Scheduler launch completed at 17:19 UTC with exit code zero,
+one order, one fill, zero settlements and $49.6853 cash. The trial directory
+contains `observer-scheduler.xml`, `observer-verification.json` and the native
+capture `reconciliation-4e6232f7-175a-4b09-8b15-6915139d200f.json`. This verifies
+execution under the scheduled principal, not just registration. Observation
+continues to validate credited history after settlement within its time window;
+it does not select or submit another trade. Any nonzero scheduler result needs
+inspection, and the local `status` timestamp identifies the last validated pass.
+
 ## Execution contract
 
 `scripts.kalshi_demo_trial` connects the existing $1 order reservation policy to
