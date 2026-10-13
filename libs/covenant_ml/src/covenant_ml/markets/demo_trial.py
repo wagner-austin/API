@@ -10,6 +10,11 @@ from uuid import uuid4
 from platform_core.http_client import HttpxClient
 from platform_core.json_utils import JSONObject, dump_json_str, require_dict, require_str
 
+from .account_settlement import (
+    AccountSettlement,
+    decode_native_account_settlement,
+    encode_account_settlement,
+)
 from .collection import MarketCollector
 from .demo_trial_records import (
     DemoTrial,
@@ -25,6 +30,7 @@ from .execution_journal import (
 )
 from .execution_records import (
     ORDER_LIMIT,
+    OrderReceipt,
     OrderStatus,
     decode_intent,
     decode_native_order,
@@ -171,7 +177,7 @@ class DemoTrialService:
             root: Trial whose order was reserved before an attempted submission.
 
         Returns:
-            Execution report; settled outcomes and strategy profitability are not inferred.
+            Execution report with independently verified account credits when settled.
 
         Raises:
             ValueError: DEMO-TRIAL-007 for missing, foreign or inconsistent account evidence.
@@ -202,6 +208,9 @@ class DemoTrialService:
                 raise ValueError("[DEMO-TRIAL-007] acknowledgement and reconciled order disagree")
         fills = tuple(collector.pages("/portfolio/fills", {"subaccount": 0}, "fills"))
         verify_fills(fills, receipt, intent)
+        credit, market, settlements = self._read_settlement(
+            collector, receipt, state["orders"][0]["account_settlement"]
+        )
         positions = tuple(
             collector.pages(
                 "/portfolio/positions",
@@ -218,11 +227,13 @@ class DemoTrialService:
         cash = parse_fixed(require_str(balance, "balance_dollars"), 6)
         require_bounded_int(balance, "updated_ts", 0, parse_timestamp(self._clock()) // 1000)
         if (
-            quantity != receipt["filled_count"]
+            quantity != (receipt["filled_count"] if credit is None else 0)
             or len(positions) > 1
+            or (credit is not None and bool(positions))
             or cash
             != trial["initial"]["balance_microdollars"]
             - (receipt["fill_cost"] + receipt["fees"]) * 100
+            + (0 if credit is None else credit["revenue"] * 100)
         ):
             raise ValueError("[DEMO-TRIAL-007] account position or cash disagrees with order fills")
         observed = parse_timestamp(self._clock())
@@ -233,18 +244,65 @@ class DemoTrialService:
             "data": encode_receipt(receipt),
         }
         state = append_execution_event(ledger, event)
+        if credit is not None:
+            state = append_execution_event(
+                ledger,
+                {
+                    "action": "account_settlement",
+                    "observed_ms": observed,
+                    "client_order_id": intent["client_order_id"],
+                    "data": encode_account_settlement(credit),
+                },
+            )
         evidence: JSONObject = {
             "observed_ms": observed,
             "orders": list(orders),
             "fills": list(fills),
             "positions": list(positions),
             "balance": balance,
+            "settlements": list(settlements),
+            "market": market,
         }
         with (root / ("reconciliation-" + str(uuid4()) + ".json")).open(
             "x", encoding="utf-8"
         ) as stream:
             stream.write(dump_json_str(evidence))
         return self._report(state)
+
+    def _read_settlement(
+        self,
+        collector: MarketCollector,
+        receipt: OrderReceipt,
+        previous: AccountSettlement | None,
+    ) -> tuple[AccountSettlement | None, JSONObject | None, tuple[JSONObject, ...]]:
+        """Collect complete account credits and cross-check the final market outcome.
+
+        Args:
+            collector: Authenticated paginator sharing this trial's transport.
+            receipt: Independently verified order receipt.
+            previous: Previously journaled credit, if present.
+
+        Returns:
+            Validated credit, native market and complete native settlement rows.
+
+        Raises:
+            ValueError: DEMO-TRIAL-009 for extra or disappearing account settlements.
+            HTTPError: Required evidence is unavailable; no retry is attempted.
+        """
+        rows = tuple(collector.pages("/portfolio/settlements", {"subaccount": 0}, "settlements"))
+        if not rows:
+            if previous is not None:
+                raise ValueError("[DEMO-TRIAL-009] credited settlement is no longer visible")
+            return None, None, rows
+        if len(rows) != 1:
+            raise ValueError("[DEMO-TRIAL-009] require exactly one account settlement")
+        market = require_dict(
+            self._transport.get("/markets/" + quote(receipt["ticker"], safe=""), {}), "market"
+        )
+        credit = decode_native_account_settlement(
+            rows[0], market, receipt, parse_timestamp(self._clock())
+        )
+        return credit, market, rows
 
     def status(self, root: Path) -> JSONObject:
         """Read persisted trial accounting without network requests.
@@ -276,6 +334,9 @@ class DemoTrialService:
         report["mode"] = "demo_single_order"
         report["submission_attempt_reserved"] = bool(state["orders"])
         report["confirmed_orders"] = sum(order["receipt"] is not None for order in state["orders"])
+        report["confirmed_settlements"] = sum(
+            order["account_settlement"] is not None for order in state["orders"]
+        )
         report["can_reserve"] = False
         return report
 

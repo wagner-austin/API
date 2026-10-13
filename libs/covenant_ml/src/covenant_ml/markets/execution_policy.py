@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, require_dict, require_str
 
+from .account_settlement import decode_account_settlement
 from .execution_records import (
     EXPOSURE_LIMIT,
     LOSS_LIMIT,
@@ -50,7 +51,10 @@ def _reserve(
     losses = sum(row[1] for row in totals)
     if exposure > EXPOSURE_LIMIT or losses + exposure > LOSS_LIMIT:
         raise ValueError("[EXECUTION-004] reservation exceeds exposure or cumulative loss limit")
-    return (*state["orders"], TrackedOrder(intent=intent, receipt=None, settlement=None))
+    return (
+        *state["orders"],
+        TrackedOrder(intent=intent, receipt=None, settlement=None, account_settlement=None),
+    )
 
 
 def _receipt(order: TrackedOrder, receipt: OrderReceipt, observed: int) -> TrackedOrder:
@@ -88,7 +92,7 @@ def _receipt(order: TrackedOrder, receipt: OrderReceipt, observed: int) -> Track
             or receipt["fees"] < previous["fees"]
         ):
             raise ValueError("[EXECUTION-005] contradictory or regressing cumulative receipt")
-    return TrackedOrder(intent=intent, receipt=receipt, settlement=None)
+    return TrackedOrder(intent=intent, receipt=receipt, settlement=None, account_settlement=None)
 
 
 def _reconcile(
@@ -126,6 +130,23 @@ def _reconcile(
         ):
             raise ValueError("[EXECUTION-006] receipt client ID mismatch or reused exchange ID")
         updated = _receipt(order, receipt, observed)
+    elif action == "account_settlement":
+        credit = decode_account_settlement(data)
+        filled = order["receipt"]
+        previous = order["account_settlement"]
+        if (
+            filled is None
+            or filled["status"] is OrderStatus.RESTING
+            or order["settlement"] is not None
+            or (credit["ticker"], credit["quantity"], credit["cost"], credit["fees"])
+            != (filled["ticker"], filled["filled_count"], filled["fill_cost"], filled["fees"])
+            or not filled["updated_ms"] <= credit["settled_ms"] <= observed
+            or (previous is not None and previous != credit)
+        ):
+            raise ValueError("[EXECUTION-011] require matching immutable account settlement credit")
+        updated = TrackedOrder(
+            intent=order["intent"], receipt=filled, settlement=None, account_settlement=credit
+        )
     else:
         settlement = decode_settlement(data)
         settled_receipt = order["receipt"]
@@ -134,6 +155,7 @@ def _reconcile(
             or settled_receipt["status"] is OrderStatus.RESTING
             or settlement["ticker"] != order["intent"]["ticker"]
             or settlement["state"] is SettlementState.PENDING
+            or order["account_settlement"] is not None
             or settlement["settled_ms"] is None
             or settlement["settled_ms"] < settled_receipt["updated_ms"]
             or not settlement["settled_ms"] <= settlement["received_ms"] <= observed
@@ -141,7 +163,10 @@ def _reconcile(
         ):
             raise ValueError("[EXECUTION-006] require terminal order and matching final settlement")
         updated = TrackedOrder(
-            intent=order["intent"], receipt=settled_receipt, settlement=settlement
+            intent=order["intent"],
+            receipt=settled_receipt,
+            settlement=settlement,
+            account_settlement=None,
         )
     return tuple(
         updated if item["intent"]["client_order_id"] == identity else item
@@ -168,7 +193,7 @@ def apply_execution_event(state: ExecutionState, event: JSONObject) -> Execution
     orders, reason = state["orders"], state["halt_reason"]
     if action == "reserve":
         orders = _reserve(state, require_dict(event, "data"), observed)
-    elif action in ("receipt", "settlement"):
+    elif action in ("receipt", "settlement", "account_settlement"):
         orders = _reconcile(state, action, event, observed)
     elif action == "halt":
         reason = require_nonempty(event, "reason")

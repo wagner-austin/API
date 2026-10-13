@@ -5,6 +5,11 @@ from __future__ import annotations
 from platform_core.json_utils import JSONObject, narrow_json_to_dict, require_dict, require_list
 from typing_extensions import ReadOnly, TypedDict
 
+from .account_settlement import (
+    AccountSettlement,
+    decode_account_settlement,
+    encode_account_settlement,
+)
 from .execution_records import (
     CAPITAL,
     EXPOSURE_LIMIT,
@@ -28,6 +33,7 @@ class TrackedOrder(TypedDict):
     intent: ReadOnly[OrderIntent]
     receipt: ReadOnly[OrderReceipt | None]
     settlement: ReadOnly[Settlement | None]
+    account_settlement: ReadOnly[AccountSettlement | None]
 
 
 class ExecutionState(TypedDict):
@@ -52,6 +58,9 @@ def encode_tracked_order(row: TrackedOrder) -> JSONObject:
         "intent": encode_intent(row["intent"]),
         "receipt": None if receipt is None else encode_receipt(receipt),
         "settlement": None if settlement is None else encode_settlement(settlement),
+        "account_settlement": None
+        if row["account_settlement"] is None
+        else encode_account_settlement(row["account_settlement"]),
     }
 
 
@@ -77,6 +86,9 @@ def decode_tracked_order(document: JSONObject) -> TrackedOrder:
         settlement=None
         if document["settlement"] is None
         else decode_settlement(require_dict(document, "settlement")),
+        account_settlement=None
+        if document["account_settlement"] is None
+        else decode_account_settlement(require_dict(document, "account_settlement")),
     )
 
 
@@ -136,6 +148,10 @@ def order_accounting(order: TrackedOrder) -> tuple[int, int, int]:
     if receipt is None:
         return reserved, 0, 0
     spent = receipt["fill_cost"] + receipt["fees"]
+    credited = order["account_settlement"]
+    if credited is not None:
+        profit = credited["revenue"] - spent
+        return 0, max(-profit, 0), profit
     if settlement is not None and settlement["payout"] is not None:
         proceeds = settlement["payout"] * receipt["filled_count"] // 100
         profit = proceeds - spent
