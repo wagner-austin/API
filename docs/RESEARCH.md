@@ -1534,6 +1534,13 @@ four probabilities per row and two explicit missing-book-side exclusions.
 All six reports and sidecars replay byte-for-byte, with actual receipt times
 and visible sizes retained. This proves pre-outcome recording, not profit;
 outcomes are pending, no orders were placed, and no recurring collector is installed.
+Settlement reconciliation now verifies the original sealed evidence and archives
+public market outcomes without refitting. The first six snapshots retain all 34
+rows as pending with no scores; reports and sidecars replay byte-for-byte. Only
+finalized, unchanged binary contracts enter probability scores, while scalar
+payouts and changed rules remain explicit. The integrated suite passes 3,100
+tests with 100% statement and branch coverage; this adds outcome verification,
+not evidence of profitable execution.
 
 ### `floor` — cloze floor scoring
 
