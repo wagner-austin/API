@@ -4,10 +4,34 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from pathlib import Path
 
-from platform_core.json_utils import JSONObject, require_int, require_str
+from platform_core.json_utils import (
+    JSONObject,
+    load_json_str,
+    narrow_json_to_dict,
+    require_int,
+    require_str,
+)
 
 from .types import DOLLAR
+
+
+def read_document(path: Path) -> JSONObject:
+    """Read a strict JSON object from persisted evidence.
+
+    Args:
+        path: Required file.
+
+    Returns:
+        Validated JSON object.
+
+    Raises:
+        OSError: Evidence cannot be read.
+        ValueError: JSON is malformed.
+        TypeError: The root is not an object.
+    """
+    return narrow_json_to_dict(load_json_str(path.read_text("utf-8")))
 
 
 def require_bounded_int(document: JSONObject, key: str, low: int, high: int) -> int:

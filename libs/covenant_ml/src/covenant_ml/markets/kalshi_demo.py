@@ -3,23 +3,20 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 
 from platform_core.http_client import HttpxClient
 from platform_core.json_utils import (
     JSONObject,
-    load_json_str,
-    narrow_json_to_dict,
     require_list,
     require_str,
 )
 from typing_extensions import ReadOnly, TypedDict
 
 from .kalshi_auth import KalshiSigner
+from .kalshi_transport import DEMO_ORIGIN, DemoTransport
 from .validation import parse_fixed, parse_timestamp, require_bounded_int, require_nonempty
 
-DEMO_ORIGIN = "https://external-api.demo.kalshi.co"
-_PREFIX = "/trade-api/v2"
 _MAX_INT = 2**63 - 1
 
 
@@ -105,39 +102,9 @@ class DemoAccountClient:
         Raises:
             ValueError: KALSHI-DEMO-002 for every other origin, including production.
         """
-        if (
-            origin != DEMO_ORIGIN
-            and re.fullmatch(r"http://127\.0\.0\.1:[0-9]{1,5}", origin) is None
-        ):
-            raise ValueError("[KALSHI-DEMO-002] account client only accepts demo or loopback")
-        self._client = client
+        self._transport = DemoTransport(client, signer, clock, origin=origin)
         self._signer = signer
         self._clock = clock
-        self._origin = origin
-
-    def _get(self, path: str, params: Mapping[str, str | int]) -> JSONObject:
-        """Read and decode one authenticated response without redirects or retries.
-
-        Args:
-            path: Endpoint relative to the trade API prefix.
-            params: Endpoint filters; these are excluded from the signature.
-
-        Returns:
-            Parsed JSON object, immediately validated by its endpoint caller.
-
-        Raises:
-            ValueError: KALSHI-DEMO-003 for a non-200 response; body is not logged.
-            ValueError: Invalid JSON response.
-            HTTPError: Transport failed; no retry is attempted.
-        """
-        full_path = _PREFIX + path
-        headers = self._signer.headers("GET", full_path, parse_timestamp(self._clock()))
-        response = self._client.get(self._origin + full_path, headers=headers, params=params)
-        if response.status_code != 200:
-            raise ValueError(
-                f"[KALSHI-DEMO-003] {path} returned HTTP {response.status_code}; preflight failed"
-            )
-        return narrow_json_to_dict(load_json_str(response.text))
 
     def preflight(self) -> DemoPreflight:
         """Inspect an idle primary demo account before any execution integration.
@@ -157,9 +124,9 @@ class DemoAccountClient:
         """
         started = parse_timestamp(self._clock())
         first = self._balance()
-        orders = self._get("/portfolio/orders", {"subaccount": 0, "limit": 1})
+        orders = self._transport.get("/portfolio/orders", {"subaccount": 0, "limit": 1})
         self._require_empty(orders, ("orders",))
-        positions = self._get(
+        positions = self._transport.get(
             "/portfolio/positions", {"subaccount": 0, "limit": 1, "settlement_status": "unsettled"}
         )
         self._require_empty(positions, ("market_positions", "event_positions"))
@@ -189,7 +156,7 @@ class DemoAccountClient:
             ValueError: KALSHI-DEMO-006 if cents and dollar strings disagree.
             ValueError: Invalid native monetary values.
         """
-        document = self._get("/portfolio/balance", {"subaccount": 0})
+        document = self._transport.get("/portfolio/balance", {"subaccount": 0})
         cents = require_bounded_int(document, "balance", 0, _MAX_INT)
         microdollars = parse_fixed(require_str(document, "balance_dollars"), 6)
         if microdollars // 10000 != cents:

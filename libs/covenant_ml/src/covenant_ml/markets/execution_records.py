@@ -202,18 +202,37 @@ def decode_native_order(document: JSONObject) -> OrderReceipt:
             "initial_count": parse_fixed(require_str(document, "initial_count_fp"), 2),
             "filled_count": parse_fixed(require_str(document, "fill_count_fp"), 2),
             "remaining_count": parse_fixed(require_str(document, "remaining_count_fp"), 2),
-            "limit_price": parse_fixed(require_str(document, "yes_price_dollars"), 4),
+            "limit_price": require_order_money(document, "yes_price_dollars"),
             "fill_cost": (
-                parse_fixed(require_str(document, "taker_fill_cost_dollars"), 4)
-                + parse_fixed(require_str(document, "maker_fill_cost_dollars"), 4)
+                require_order_money(document, "taker_fill_cost_dollars")
+                + require_order_money(document, "maker_fill_cost_dollars")
             ),
             "fees": (
-                parse_fixed(require_str(document, "taker_fees_dollars"), 4)
-                + parse_fixed(require_str(document, "maker_fees_dollars"), 4)
+                require_order_money(document, "taker_fees_dollars")
+                + require_order_money(document, "maker_fees_dollars")
             ),
             "updated_ms": parse_timestamp(require_str(document, "last_update_time")),
         }
     )
+
+
+def require_order_money(document: JSONObject, key: str) -> int:
+    """Accept native six-decimal spelling only when the ledger can represent it exactly.
+
+    Args:
+        document: Native account record.
+        key: Required fixed-point dollar field.
+
+    Returns:
+        Exact integer amount in 1/10000 dollars, without rounding.
+
+    Raises:
+        ValueError: EXECUTION-010 for sub-ledger precision; malformed numbers propagate.
+    """
+    microdollars = parse_fixed(require_str(document, key), 6)
+    if microdollars % 100:
+        raise ValueError("[EXECUTION-010] native amount exceeds exact ledger precision")
+    return microdollars // 100
 
 
 def order_payload(intent: OrderIntent) -> JSONObject:

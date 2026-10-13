@@ -18,6 +18,7 @@ from platform_core.environment_record import (
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
 
 from .campaign_process import CommandRunner, run_command
+from .demo_trial import DemoTrialService, build_demo_trial
 from .kalshi_auth import KalshiSigner
 from .kalshi_demo import DemoAccountClient
 
@@ -40,6 +41,9 @@ campaign_runner: CommandRunner = run_command
 demo_account_factory: Callable[
     [HttpxClient, KalshiSigner, Callable[[], str]], DemoAccountClient
 ] = DemoAccountClient
+demo_trial_factory: Callable[[HttpxClient, KalshiSigner, Callable[[], str]], DemoTrialService] = (
+    build_demo_trial
+)
 
 
 __all__ = [
@@ -47,6 +51,7 @@ __all__ = [
     "client_factory",
     "clock",
     "demo_account_factory",
+    "demo_trial_factory",
     "host_probe",
     "installed_version",
     "pause",

@@ -31,24 +31,7 @@ from .paper_records import PaperPlan, encode_paper_plan
 from .paper_scoring import load_verified_predictions
 from .provenance import implementation_digest
 from .reporting import read_verified_market_report
-from .validation import parse_timestamp
-
-
-def read_document(path: Path) -> JSONObject:
-    """Read a strict JSON object from persisted evidence.
-
-    Args:
-        path: Required file.
-
-    Returns:
-        Validated JSON object.
-
-    Raises:
-        OSError: Evidence cannot be read.
-        ValueError: JSON is malformed.
-        TypeError: The root is not an object.
-    """
-    return narrow_json_to_dict(load_json_str(path.read_text("utf-8")))
+from .validation import parse_timestamp, read_document
 
 
 def load_campaign(root: Path, digest: str) -> Campaign:
