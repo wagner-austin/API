@@ -18,6 +18,8 @@ from platform_core.environment_record import (
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
 
 from .campaign_process import CommandRunner, run_command
+from .kalshi_auth import KalshiSigner
+from .kalshi_demo import DemoAccountClient
 
 
 def utc_now() -> str:
@@ -35,12 +37,16 @@ client_factory: Callable[[float, SyncTransport | None], HttpxClient] = build_cli
 host_probe: HostProbe = stdlib_host_probe(cpu_count)
 installed_version: VersionReader = _installed_version
 campaign_runner: CommandRunner = run_command
+demo_account_factory: Callable[
+    [HttpxClient, KalshiSigner, Callable[[], str]], DemoAccountClient
+] = DemoAccountClient
 
 
 __all__ = [
     "campaign_runner",
     "client_factory",
     "clock",
+    "demo_account_factory",
     "host_probe",
     "installed_version",
     "pause",
