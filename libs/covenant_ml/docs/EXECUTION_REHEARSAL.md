@@ -120,6 +120,10 @@ rehearsal records, policy, journal and CLI.
 
 ## Prerequisites for a live pilot
 
+The [authenticated demo preflight](KALSHI_DEMO.md) now implements request signing
+and strict primary demo account reads. Its report grants no execution authority;
+it neither submits orders nor reconciles a previously used experiment account.
+
 The remaining execution work is an authenticated exchange adapter with complete
 account/fill/balance reconciliation, account-bound journal identity, current
 fee and market-rule validation, and a submission path that persists intent

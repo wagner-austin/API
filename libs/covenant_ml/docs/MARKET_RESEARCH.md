@@ -524,6 +524,13 @@ does not modify the frozen study. The linked contract distinguishes tested local
 accounting from the authenticated account integration and demo verification
 still required before a live pilot.
 
+The [authenticated demo account preflight](KALSHI_DEMO.md) adds Ed25519/RSA
+signatures and strictly validated account reads, with exact microdollar balances.
+It refuses production origins, populated or incomplete account evidence and
+changes between balance reads. It sends no orders and reports both execution
+and live readiness as false. Remote demo verification requires demo credentials;
+local socket and cryptography tests are not presented as exchange execution.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
