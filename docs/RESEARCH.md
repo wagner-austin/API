@@ -1563,6 +1563,13 @@ accounting semantics, persistence tests and remaining authenticated account and
 demo prerequisites. Neither its tests nor its synthetic inputs establish a
 profitable strategy or verified exchange execution.
 
+`libs/covenant_ml/scripts/kalshi_demo_preflight.py` adds authenticated demo account
+reads using real Ed25519/RSA signing and exact microdollar balance validation.
+The [demo contract](../libs/covenant_ml/docs/KALSHI_DEMO.md) explains credential
+files, the executable command and strict empty-account evidence requirements.
+This read-only command rejects production hosts and incomplete observations;
+it grants no order authority and is not a completed remote demo execution test.
+
 ### `floor` — cloze floor scoring
 
 <!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 113 -->
