@@ -27,7 +27,6 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     """
     pin()
     from covenant_ml.markets import _test_hooks
-    from covenant_ml.markets.campaign_execution import read_document
     from covenant_ml.markets.execution_journal import (
         append_execution_event,
         initialize_execution_journal,
@@ -41,7 +40,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         order_payload,
     )
     from covenant_ml.markets.execution_state import execution_report
-    from covenant_ml.markets.validation import parse_timestamp
+    from covenant_ml.markets.validation import parse_timestamp, read_document
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", required=True, type=Path)

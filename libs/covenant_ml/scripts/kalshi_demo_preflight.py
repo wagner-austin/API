@@ -29,7 +29,8 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     pin()
     from covenant_ml.markets import _test_hooks
     from covenant_ml.markets.kalshi_auth import KalshiSigner
-    from covenant_ml.markets.kalshi_demo import DEMO_ORIGIN, encode_preflight
+    from covenant_ml.markets.kalshi_demo import encode_preflight
+    from covenant_ml.markets.kalshi_transport import DEMO_ORIGIN
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--key-id-file", type=Path, required=True)
