@@ -1533,7 +1533,7 @@ outcomes: 34 book/forecast rows over 17 unique contracts in three cities, with
 four probabilities per row and two explicit missing-book-side exclusions.
 All six reports and sidecars replay byte-for-byte, with actual receipt times
 and visible sizes retained. This proves pre-outcome recording, not profit;
-outcomes are pending, no orders were placed, and no recurring collector is installed.
+outcomes are pending and no orders were placed.
 Settlement reconciliation now verifies the original sealed evidence and archives
 public market outcomes without refitting. The first six snapshots retain all 34
 rows as pending with no scores; reports and sidecars replay byte-for-byte. Only
@@ -1541,6 +1541,17 @@ finalized, unchanged binary contracts enter probability scores, while scalar
 payouts and changed rules remain explicit. The integrated suite passes 3,100
 tests with 100% statement and branch coverage; this adds outcome verification,
 not evidence of profitable execution.
+A frozen 60-date follow-up now has an installed and verified local schedule for
+October 14 through December 12 outcomes: 360 city/cycle prediction captures and
+360 settlement snapshots. The first actual scheduled study tick reported all
+720 acquisitions as future. A separate public-data deployment probe captured
+five predictions and replayed byte-for-byte; it is excluded from the study.
+The runtime is isolated from subsequent development, both cycles and all four
+arms remain fixed, and failures or missed windows are preserved without retries
+or retrospective replacement. The integrated suite now passes 3,145 tests with
+100% statement and branch coverage. The linked contract records the manifest,
+protocol, schedule, evidence locations and removal procedure; future observations
+are not represented as completed research or profits.
 
 ### `floor` — cloze floor scoring
 
