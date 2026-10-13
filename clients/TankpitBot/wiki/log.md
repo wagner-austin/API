@@ -6677,3 +6677,18 @@ that the contract, layer, protocol-constant, state-sentinel, mine-layer and
 hook-restore rules in `scripts/` are reached only from their tests since
 `57fd5ab40`, and of those only hook-restore and layer have a test that runs
 them over the real tree. The audit then reported 0 errors.
+
+## [2026-10-13] update | The sim server moves to sedona, started by hand
+
+MCPs board task ff035b0d. The sim server and its accounts left the hub's
+API root compose (Traefik, platform-postgres) for sedona, where the game
+servers live: `sim-server.compose.json` now carries its own `sim-db`, both
+services have `restart: "no"`, and `make sim-up` / `make sim-down` run
+`scripts/sim_host.py` from the hub. The hub's three accounts and six
+sessions were loaded into `sim-db`, `make sim-up` was seen serving room 1's
+whole field, and the play page, its modules, both terrains and the key
+answered through an ssh forward of port 8765 before `make sim-down`.
+Pages updated: sim-network-server (a new "On sedona, started by hand"
+section replacing "Behind the platform's Traefik", the accounts section,
+footnotes 9 and 10, re-pinned blobs), sim-web-client (reaching the page
+through the forward; the Traefik prefix kept as the 2026-10-06 history).

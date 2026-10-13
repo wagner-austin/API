@@ -44,7 +44,8 @@ source_git_blobs:
 provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 5, 2026-10-06: tankpit-sim-serve --web-root web on 127.0.0.1:8795 with one practice room at 500 ms ticks, joined from Playwright's Chromium at device scale 2 as account 1001"
   - "2026-10-06 live hub check through Traefik: tankpit-bot:local built from clients/TankpitBot/Dockerfile and started with sim-server.compose.json (container tankpit-sim-sim-1, rooms 1 and 5, 2 s ticks); account 1006 issued with tankpit-sim-accounts in the tankpit_sim database; Playwright's Chromium at device scale 2 opened http://127.0.0.1/tankpit-sim"
-fact_checked: "2026-10-06"
+  - "MCPs board task ff035b0d, 2026-10-13T17:02Z: make sim-up on sedona at API e98e5840f, then from the hub ssh -N -L 8765:127.0.0.1:8765 austi@100.95.76.122 and curl through it: / 200 (1341 bytes, text/html), dist/play.js 200, terrain/1 and terrain/5 200 (65536 bytes each), cipher-key 200; then make sim-down"
+fact_checked: "2026-10-13"
 confidence: high
 hubs: [architecture]
 ---
@@ -63,7 +64,7 @@ static key and the field reach the browser from our server at run time.
 ## The server hands out the client
 
 `tankpit-sim-serve` answers plain HTTP `GET`s on its WebSocket port,
-so one Traefik route carries the game and its client. A request that
+so one port carries the game and its client. A request that
 asks to upgrade goes to the handshake; every other request is
 answered by `net_web.py`:[^1]
 
@@ -145,10 +146,18 @@ cd .. && poetry run tankpit-sim-serve --accounts accounts.json --web-root web --
 
 In the image, the Dockerfile's `web` stage builds `dist/` and copies it
 with `play.html` into `/app/web`. `sim-server.compose.json` passes
-`--web-root /app/web`. Traefik redirects the bare `/tankpit-sim` to
-`/tankpit-sim/` and then strips the prefix: the page loads its modules,
-key, terrain and socket relative to its own URL, which must end in a
-slash.
+`--web-root /app/web`. The page loads its modules, key, terrain and
+socket relative to its own URL, which must end in a slash.
+
+Since 2026-10-13 the image runs on sedona, started by hand with
+`make sim-up` ([[sim-network-server]], "On sedona, started by hand"),
+and answers on sedona's loopback only. A browser on the hub reaches it
+through a forward of that port:
+
+```
+ssh -N -L 8765:127.0.0.1:8765 austi@100.95.76.122
+# open http://127.0.0.1:8765/ while it runs
+```
 
 Checked live on 2026-10-06, locally on port 8795:
 - The page, `dist/play.js` and `terrain/1` (65,536 bytes) answered 200.
@@ -159,7 +168,9 @@ Checked live on 2026-10-06, locally on port 8795:
   tile (8, 8) to (10, 5).
 
 Checked live on the hub through Traefik on 2026-10-06, in the image
-`sim-server.compose.json` starts:
+`sim-server.compose.json` started there before the move, where Traefik
+redirected the bare `/tankpit-sim` to `/tankpit-sim/` and stripped the
+prefix:
 - `/tankpit-sim` answered 301 to `/tankpit-sim/`. The page, `dist/play.js`,
   `terrain/1`, `terrain/5` and `cipher-key` each answered 200.
 - Chromium opened the bare `/tankpit-sim`, joined as account 1006 (issued

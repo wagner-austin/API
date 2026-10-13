@@ -22,9 +22,13 @@ source_paths:
   - "tests/sim/test_net_room.py"
   - "sim-server.compose.json"
   - "tests/sim/test_sim_compose.py"
+  - "scripts/sim_host.py"
+  - "tests/scripts/test_sim_host.py"
 source_git_blobs:
-  "sim-server.compose.json": "e57835d5e566167d57196cf3e6ca4306ea83ceae"
-  "tests/sim/test_sim_compose.py": "481b3c714187661e4bbad771b2f99a0d85756354"
+  "sim-server.compose.json": "e69e3911b3b203e1a8f079eeb499a4aac440ea76"
+  "tests/sim/test_sim_compose.py": "76445721a43ecb28ce4849de38f64e71d2356771"
+  "scripts/sim_host.py": "cae7b1c5e0e39ec06cc66c0a145c55e00589a391"
+  "tests/scripts/test_sim_host.py": "0dc7323b7d487ef532e506563ca9144031b9b263"
   "src/tankpit_bot/sim/net_server.py": "7e6edfe71cfe6e9c06c3bd4cc85c8c17e30383ee"
   "src/tankpit_bot/sim/net_host.py": "faaa8be06944b58216788115e4cbc7192a83ad83"
   "src/tankpit_bot/sim/net_room.py": "f242a4ba888b471670e9f58f92847b12fe18c27e"
@@ -41,7 +45,8 @@ provenance:
   - "Board task b008ab91 (the multiplayer track), Phase 5, 2026-10-05: the scripts/sim_control.py comparison and the tankpit-sim-serve run quoted below, both from the committed tree"
   - "2026-10-05 live persistence check: tankpit_sim created on the local platform-postgres container (host port 55432); tankpit-sim-accounts init/add/list, then a scratch WebSocket client joining field05 room 1 as account 1001 for 5 ticks; rows read back with psql from sim_sessions and sim_accounts"
   - "2026-10-06 live Traefik check on the hub: tankpit-bot:local built from clients/TankpitBot/Dockerfile, sim-server.compose.json up beside the root compose's traefik and platform-postgres, a scratch client joining as account 1003 through ws://127.0.0.1/tankpit-sim, then docker stop with the account seated; sim_sessions rows 2 and 3 read back with psql"
-fact_checked: "2026-10-06"
+  - "MCPs board task ff035b0d, 2026-10-13: the hub's tankpit_sim dumped with pg_dump from platform-postgres, its two COPY blocks loaded into sedona's sim-db (COPY 3, COPY 6; accounts austin, traefik-probe, webclient), then make sim-up at API e98e5840f ran tankpit-sim:e98e5840f on sedona and its smoke read 200:65536 from /terrain/1, and make sim-down left both containers Exited (0) with restart policy no"
+fact_checked: "2026-10-13"
 confidence: high
 hubs: [architecture]
 ---
@@ -140,25 +145,26 @@ Two books answer the same `AccountBookProtocol`:
 
 - **A JSON file** (`--accounts PATH`), kept in memory for the life of
   the process. It is for tests and local play.
-- **The `tankpit_sim` database** (`--database-env NAME`) on the
-  platform's running `platform-postgres`: a database, not another
-  container. `sim_accounts` holds one row per account and `sim_sessions`
+- **The `tankpit_sim` database** (`--database-env NAME`), which on
+  sedona is the `sim-db` container beside the server (below). Until
+  2026-10-13 it was a database on the hub's `platform-postgres`.
+  `sim_accounts` holds one row per account and `sim_sessions`
   one row per seat that left (room, field, ticks, and the rank, kills,
   deaths and levels it left with). The account update and its session
   row commit together. The connection string is named by the variable
   that holds it, never written on a command line, and psycopg is reached
   only through the `_test_hooks.connect_database` seam.[^7]
 
+With the sim up on sedona, an account is added inside the running
+container, whose environment already names the database:
+
 ```
-docker exec platform-postgres createdb -U covenant tankpit_sim
-export TANKPIT_SIM_DATABASE_URL=postgresql://covenant:covenant@127.0.0.1:55432/tankpit_sim
-poetry run tankpit-sim-accounts init --database-env TANKPIT_SIM_DATABASE_URL
-poetry run tankpit-sim-accounts add --database-env TANKPIT_SIM_DATABASE_URL --id 1001 --name austin
-poetry run tankpit-sim-serve --database-env TANKPIT_SIM_DATABASE_URL
+docker --host ssh://austi@100.95.76.122 exec tankpit-sim-sim-1 tankpit-sim-accounts add --database-env TANKPIT_SIM_DATABASE_URL --id 1004 --name <name>
 ```
 
 `add` prints the new token once; the database keeps only its digest.
-The server also creates any missing tables when it starts.
+The server also creates any missing tables when it starts, and `init`
+does the same for a database no server has opened.
 
 ## What was checked
 
@@ -182,29 +188,57 @@ The server also creates any missing tables when it starts.
   `sim_sessions` row was written (`1001|1|field05_r.gif|5|2|0|0`), and
   the account kept rank 2.
 
-## Behind the platform's Traefik
+## On sedona, started by hand
 
-`sim-server.compose.json` runs `tankpit-sim-serve` from the package
-image on the root compose's `platform-network`. Traefik v3 routes
-`/tankpit-sim` to it, strips the prefix, and balances to port 8765. The
-accounts come from `tankpit_sim` on `platform-postgres`. The file is
-JSON, which compose reads as it reads YAML, so the package's own JSON
-decoders test it against the CLI. Its command must parse as the
-server's flags, the label's port must be the port bound, and the network
-must be the external one the service joins.[^9]
+Sedona owns the game servers, and since 2026-10-13 that includes this
+one (MCPs board task `ff035b0d`). It runs only when asked. The operator,
+2026-10-13: "make sure it doesnt auro stsrt or anything i csn maniallt
+stsrt it wheb needed". From `clients/TankpitBot` on the hub:
 
 ```
-docker build -f clients/TankpitBot/Dockerfile -t tankpit-bot:local .   # from the repo root
-docker compose -f clients/TankpitBot/sim-server.compose.json up -d --no-build
+make sim-up      # build HEAD's image on sedona if missing, start, and see it serve
+make sim-down    # stop the sim and its database; the accounts stay
 ```
 
-Checked live on the hub on 2026-10-06:
-- A client joined account 1003 through `ws://127.0.0.1/tankpit-sim`. It
-  was shown both rooms and drew the join burst with the practice
-  roster's identities, and its quit wrote a `sim_sessions` row.
-- `docker stop`, with the account still seated, closed its socket with
-  1001 (going away). The server printed `32 ticks served` and exited 0,
-  and the seat was written as a row of its own.
+`sim-server.compose.json` declares two services. `sim` runs
+`tankpit-sim-serve` from the package image, and `sim-db` runs
+`postgres:16-bookworm` with the accounts in the named volume `sim-db`,
+which outlives every `down`. The sim waits for a healthy database,
+publishes port 8765 on sedona's loopback only, and both services carry
+`restart: "no"`, so a reboot of sedona or of its Docker leaves them off.
+The file is JSON, which compose reads as it reads YAML, so the package's
+own JSON decoders test it against the CLI: its command must parse as the
+server's flags and name the rooms it opens.[^9]
+
+`scripts/sim_host.py` is what the two targets run. `up` stages the
+compose file as committed at HEAD and a `sim.env` naming the image and
+carrying the database password from `~/.tankpit-secrets/sim.env` on the
+hub, which no repository holds, into `C:/fleet/tankpit-sim` on sedona.
+It pulls the database image through the hub's docker client (Docker
+Desktop's credential helper fails in an ssh logon), builds
+`tankpit-sim:<HEAD's short sha>` on sedona from a `git archive` of HEAD
+only when sedona lacks that tag, starts compose, and asks sedona's
+loopback for room 1's terrain until the whole 65,536-byte field arrives.
+An `up` that exits 0 has been seen serving.[^10]
+
+That smoke failed twice on its first day, both times on quoting rather
+than on the sim. ssh joins its remote arguments with spaces for sedona's
+`cmd.exe`, so a curl format holding a space split into two words. The
+hub's ssh is Git's MSYS build, which brace-expands an unquoted argument
+on its own command line, so a format without the space lost its braces.
+The format now rides single-quoted inside one PowerShell command, which
+Python's command line quotes whole.
+
+Checked live on 2026-10-13: the three accounts and six sessions from the
+hub's database were loaded into `sim-db`, `make sim-up` at API
+`e98e5840f` ran `tankpit-sim:e98e5840f` and read `200:65536`, and
+`make sim-down` left both containers exited with restart policy `no`.
+
+Before the move it ran on the hub behind the API root compose's Traefik
+at `ws://127.0.0.1/tankpit-sim`, checked live on 2026-10-06: a client
+joined account 1003 there, and `docker stop` with the account seated
+closed its socket with 1001, printed `32 ticks served`, exited 0 and
+wrote the seat as a row of its own.
 
 ## The same port serves the browser client
 
@@ -226,4 +260,5 @@ bot speaking this socket directly is the next client.
 [^6]: `tests/sim/test_net_server.py`, `test_a_client_joins_and_plays_over_a_real_socket`.
 [^7]: `src/tankpit_bot/sim/net_store.py`, `PostgresAccountBook`, `SCHEMA` and `connect_store`; `src/tankpit_bot/sim/net_room.py`, `NetRoom.leave`; `src/tankpit_bot/sim/net_host.py`, `NetHost._unseat`; `tests/sim/test_net_host.py`, `test_a_seat_that_leaves_is_recorded_and_the_account_rejoins_as_it_left`; `tests/sim/test_net_store.py`, `test_a_seat_updates_the_account_and_adds_a_session_in_one_commit`.
 [^8]: `src/tankpit_bot/sim/net_server.py`, `serve_rooms` and `NetServer.tick_for`; `tests/sim/test_net_server.py`, `test_a_signal_stops_the_server_after_the_tick_in_play` and `test_closing_the_listener_records_every_seat_still_in_play`.
-[^9]: `sim-server.compose.json`, the `sim` service's `command` and `labels`; `tests/sim/test_sim_compose.py`, `test_traefik_balances_to_the_port_the_server_binds` and `test_the_command_serves_from_the_database_its_environment_names`.
+[^9]: `sim-server.compose.json`, the `sim` and `sim-db` services; `tests/sim/test_sim_compose.py`, `test_the_command_serves_from_the_database_beside_it`, `test_it_publishes_the_port_the_server_binds_on_loopback_only`, `test_neither_service_starts_on_its_own`, `test_the_accounts_live_in_a_named_volume` and `test_the_sim_waits_for_a_healthy_database`.
+[^10]: `scripts/sim_host.py`, `stage`, `pull_database`, `ensure_image`, `smoke`, `up` and `down`; `tests/scripts/test_sim_host.py`, `test_up_stages_pulls_builds_composes_and_smokes`, `test_ensure_image_keeps_a_tag_sedona_holds`, `test_smoke_quotes_the_curl_format_inside_one_command` and `test_down_stops_the_sim_and_its_database`.
