@@ -70,11 +70,17 @@ SIM_URL: Final[str] = "http://127.0.0.1:8765"
 SMOKE_PATH: Final[str] = "/terrain/1"
 TERRAIN_BYTES: Final[int] = 65536
 
-#: What curl prints for one ask: the status and the bytes read, joined by a
-#: colon and never a space, because ssh joins its arguments with spaces for
-#: sedona's cmd.exe. With a space, 2026-10-13's first ``up`` handed curl
-#: ``%{size_download}`` as a second URL, ``-o NUL`` caught that one alone, and
-#: the terrain went to stdout behind ``000``.
+#: What curl prints for one ask: the status and the bytes read.
+#:
+#: It reaches curl inside ONE PowerShell command, single-quoted, and never as
+#: an argument of its own, which failed twice on 2026-10-13. ssh joins its
+#: remote arguments with spaces for sedona's cmd.exe, so the format with a
+#: space handed curl ``%{size_download}`` as a second URL, ``-o NUL`` caught
+#: that one alone, and the terrain went to stdout behind ``000``. Without the
+#: space, the hub's ssh, which is Git's MSYS build, brace-expanded the
+#: unquoted argument on its own command line and curl printed
+#: ``%http_code:%size_download``. A command holding spaces is quoted whole by
+#: Python's command line, and MSYS expands nothing quoted.
 SMOKE_FORMAT: Final[str] = "%{http_code}:%{size_download}"
 
 #: How often, and how far apart, ``up`` asks before giving up.
@@ -279,17 +285,7 @@ def smoke(project_root: Path) -> None:
         if attempt > 0:
             script_hooks.sleep_seconds(SMOKE_PAUSE_SECONDS)
         result = script_hooks.run_command(
-            [
-                "ssh",
-                SEDONA_SSH,
-                "curl.exe",
-                "-s",
-                "-o",
-                "NUL",
-                "-w",
-                SMOKE_FORMAT,
-                f"{SIM_URL}{SMOKE_PATH}",
-            ],
+            on_sedona(f"curl.exe -s -o NUL -w '{SMOKE_FORMAT}' {SIM_URL}{SMOKE_PATH}"),
             project_root,
         )
         last = result["stdout"].strip()

@@ -14,7 +14,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from scripts.fleet_remote import SEDONA_SSH, FleetHostError
+from scripts.fleet_remote import SEDONA_SSH, FleetHostError, on_sedona
 from scripts.sim_host import (
     COMPOSE_FILE,
     SEDONA_DOCKER_HOST,
@@ -39,7 +39,9 @@ from tests.scripts._recorder import Recorder, fail, ok
 
 COMPOSE = f"{SIM_DIR}/{COMPOSE_FILE}"
 SIM_ENV = f"{SIM_DIR}/sim.env"
-SMOKE = ["ssh", SEDONA_SSH, "curl.exe", "-s", "-o", "NUL", "-w", "%{http_code}:%{size_download}"]
+SMOKE = on_sedona(
+    "curl.exe -s -o NUL -w '%{http_code}:%{size_download}' http://127.0.0.1:8765/terrain/1"
+)
 SERVING = ok("200:65536")
 
 
@@ -260,16 +262,23 @@ def test_smoke_waits_for_the_whole_field(tmp_path: Path) -> None:
     pauses = Pauses()
     script_hooks.sleep_seconds = pauses
     smoke(tmp_path)
-    assert recorder.calls == [[*SMOKE, "http://127.0.0.1:8765/terrain/1"]] * 3
+    assert recorder.calls == [SMOKE] * 3
     assert pauses.seconds == [SMOKE_PAUSE_SECONDS, SMOKE_PAUSE_SECONDS]
 
 
-def test_smoke_sends_sedona_no_argument_with_a_space(tmp_path: Path) -> None:
-    """ssh joins the remote arguments with spaces, so one holding a space splits on sedona."""
+def test_smoke_quotes_the_curl_format_inside_one_command(tmp_path: Path) -> None:
+    """The format's braces ride in an argument Python quotes, which MSYS ssh never expands.
+
+    An argument without a space goes unquoted onto ssh's command line, and
+    Git's MSYS ssh brace-expands it there; one holding a space is quoted
+    whole, and ssh hands it to sedona's shell as one command.
+    """
     recorder = Recorder({"curl.exe": SERVING})
     script_hooks.run_command = recorder
     smoke(tmp_path)
-    assert [argument for argument in recorder.calls[0][2:] if " " in argument] == []
+    braced = [argument for argument in recorder.calls[0] if "{" in argument]
+    assert braced == [SMOKE[-1]]
+    assert " " in braced[0]
 
 
 def test_smoke_gives_up_naming_the_last_answer(tmp_path: Path) -> None:
