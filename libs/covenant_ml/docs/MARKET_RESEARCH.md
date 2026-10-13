@@ -514,6 +514,11 @@ call `Unregister-FleetTick 'API-MarketPaper-20261014-20261212'`. Removing the ta
 preserves every evidence file. The scheduler continues checking evidence after
 the finite study window until removed; it does not extend the study implicitly.
 
+The [offline campaign evaluator](CAMPAIGN_EVALUATION.md) now verifies the frozen
+inputs and original reports, replays archived settlements, and computes the
+declared event-date comparison. It retains every acquisition omission and
+outcome exclusion, with separate collector and evaluator implementation hashes.
+
 ## Execution rehearsal
 
 The separate [bounded execution rehearsal](EXECUTION_REHEARSAL.md) now exercises
