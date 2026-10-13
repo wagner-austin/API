@@ -13,6 +13,10 @@ cycle supports promoting the change. The original prospective campaign stays fro
 
 ## Run and reproduce
 
+The [cross-market investigation](CROSS_MARKET_INVESTIGATION.md) compares sports,
+economic events, stocks/options and crypto using October 13 public evidence.
+It records the negative snapshot screens and the next non-weather experiment.
+
 From `libs/covenant_ml`, after `poetry sync --with dev`:
 
 ```powershell
