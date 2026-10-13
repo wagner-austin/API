@@ -111,7 +111,7 @@ def test_http_status_failures_redact_body_and_do_not_retry(
         with pytest.raises(ValueError) as raised:
             service.preflight()
     assert str(raised.value) == (
-        f"[KALSHI-DEMO-003] /portfolio/balance returned HTTP {status}; preflight failed"
+        f"[KALSHI-DEMO-003] /portfolio/balance returned HTTP {status}; request failed"
     )
     assert api_server.requests == [path + "?subaccount=0"]
 

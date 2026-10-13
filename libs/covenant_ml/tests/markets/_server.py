@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from socket import SHUT_RDWR, socket
 from threading import Thread
 from urllib.parse import urlsplit
 
 import pytest
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str, load_json_str, narrow_json_to_dict
 
 
 class ApiServer(HTTPServer):
@@ -18,6 +19,8 @@ class ApiServer(HTTPServer):
     requests: list[str]
     request_headers: list[dict[str, str]]
     statuses: dict[str, int]
+    bodies: list[JSONObject]
+    disconnect_paths: set[str]
 
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), ApiHandler)
@@ -25,6 +28,8 @@ class ApiServer(HTTPServer):
         self.requests = []
         self.request_headers = []
         self.statuses = {}
+        self.bodies = []
+        self.disconnect_paths = set()
 
     @property
     def url(self) -> str:
@@ -33,9 +38,10 @@ class ApiServer(HTTPServer):
 
 class ApiHandler(BaseHTTPRequestHandler):
     server: ApiServer
+    connection: socket
 
     def __getattr__(self, name: str) -> Callable[[], None]:
-        if name == "do_GET":
+        if name in ("do_GET", "do_POST"):
             return self.respond
         raise AttributeError(name)
 
@@ -43,6 +49,14 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.server.requests.append(self.path)
         self.server.request_headers.append(dict(self.headers.items()))
         path = urlsplit(self.path).path
+        if self.command == "POST":
+            length = int(self.headers["Content-Length"])
+            self.server.bodies.append(
+                narrow_json_to_dict(load_json_str(self.rfile.read(length).decode()))
+            )
+        if path in self.server.disconnect_paths:
+            self.connection.shutdown(SHUT_RDWR)
+            return
         if path not in self.server.documents:
             self.send_response(404)
             self.end_headers()
