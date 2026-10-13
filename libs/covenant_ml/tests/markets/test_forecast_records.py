@@ -72,7 +72,7 @@ def test_strikes_and_probability_mass_partition() -> None:
     above: JSONObject = {"strike_type": "greater", "floor_strike": 61}
     bounds = [strike_bounds(document) for document in (middle, below, above)]
     assert bounds == [(59.5, 61.5), (None, 59.5), (61.5, None)]
-    mass = [bracket_probability(60.5, bound) for bound in bounds if bound is not None]
+    mass = [bracket_probability(60.5, bound, 3.0) for bound in bounds if bound is not None]
     assert sum(mass) == pytest.approx(1.0, abs=1e-15)
     assert mass[1] == pytest.approx(mass[2], abs=1e-15)
     assert strike_bounds({"strike_type": None}) is None
