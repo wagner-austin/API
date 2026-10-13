@@ -10,7 +10,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 OUTPUT ?=
 CONFORMANCE_BASELINE := wiki/sources/conformance_baseline.json
 
-.PHONY: help lint test check _check-unbudgeted _deps _lint-prep _lint-guard _lint-mypy _test-suite execution install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release
+.PHONY: help lint test check _check-unbudgeted _deps _lint-prep _lint-guard _lint-mypy _test-suite execution install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release sim-up sim-down
 
 help:
 	@echo ""
@@ -29,6 +29,7 @@ help:
 	@echo "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
 	@echo "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
 	@echo "  make sim-field ARGS=...          two production bots on one field (ARGS=--practice, --rounds N)"
+	@echo "  make sim-up / sim-down           start / stop the sim server on sedona (by hand only)"
 	@echo "  make install                     poetry install + playwright chromium"
 	@echo ""
 	@echo "Live action probes (need browser + accounts.json):"
@@ -490,6 +491,18 @@ down:
 	@Write-Host ""
 	@Write-Host "==> down (drain every bot on sedona, then stop the container)" -ForegroundColor Cyan
 	poetry run python -m scripts.fleet_host down
+
+# The sim server on sedona (MCPs board task ff035b0d): started only by hand,
+# never on its own; scripts/sim_host.py says what it stages and why.
+sim-up:
+	@Write-Host ""
+	@Write-Host "==> sim-up (the sim server on sedona, built from HEAD, on its loopback)" -ForegroundColor Cyan
+	poetry run python -m scripts.sim_host up
+
+sim-down:
+	@Write-Host ""
+	@Write-Host "==> sim-down (stop the sim and its database on sedona; accounts are kept)" -ForegroundColor Cyan
+	poetry run python -m scripts.sim_host down
 else
 release:
 	@echo "release is Windows-only (the release ladder is C:/Users/Test/PROJECTS/tankpit-releases on the hub)"
@@ -501,5 +514,13 @@ up:
 
 down:
 	@echo "down is Windows-only (the fleet container is operated from the hub, where the release ladder lives)"
+	@exit 1
+
+sim-up:
+	@echo "sim-up is Windows-only (the sim is operated on sedona from the hub, which holds its secrets)"
+	@exit 1
+
+sim-down:
+	@echo "sim-down is Windows-only (the sim is operated on sedona from the hub, which holds its secrets)"
 	@exit 1
 endif

@@ -37,52 +37,10 @@ from scripts import _test_hooks as script_hooks
 from scripts import fleet_host
 from tankpit_bot import _test_hooks as core_hooks
 from tests.scripts._fleet_answers import passing_gate
+from tests.scripts._recorder import Recorder, fail, ok
 
 COMPOSE = f"{HOST_DIR}/docker-compose.yml"
 HOST_ENV = f"{HOST_DIR}/host.env"
-
-
-class Recorder:
-    """A command runner that answers from a script and records every argv."""
-
-    def __init__(
-        self,
-        answers: dict[str, script_hooks.CommandResult | list[script_hooks.CommandResult]],
-    ) -> None:
-        """Hold the answers.
-
-        Args:
-            answers: Keyed by a word the command line contains; the first
-                key found in the joined argv answers. A list is answered
-                in order, its last answer repeating. Unmatched commands
-                succeed with empty output.
-        """
-        self.answers = answers
-        self.calls: list[list[str]] = []
-        self.staged: dict[str, str] = {}
-
-    def __call__(self, argv: list[str], cwd: Path) -> script_hooks.CommandResult:
-        """Record one command and answer it.
-
-        Args:
-            argv: The command.
-            cwd: Ignored; every command runs from the package directory.
-
-        Returns:
-            The scripted answer.
-        """
-        self.calls.append(argv)
-        if argv[0] == "scp":
-            for source in argv[2:-1]:
-                self.staged[Path(source).name] = Path(source).read_text(encoding="utf-8")
-        line = " ".join(argv)
-        for word, answer in self.answers.items():
-            if word not in line:
-                continue
-            if not isinstance(answer, list):
-                return answer
-            return answer.pop(0) if len(answer) > 1 else answer[0]
-        return script_hooks.CommandResult(returncode=0, stdout="", stderr="")
 
 
 class Answer:
@@ -96,14 +54,6 @@ class Answer:
         """
         self.status_code = status_code
         self.content = b""
-
-
-def _ok(stdout: str) -> script_hooks.CommandResult:
-    return script_hooks.CommandResult(returncode=0, stdout=stdout, stderr="")
-
-
-def _fail(stderr: str) -> script_hooks.CommandResult:
-    return script_hooks.CommandResult(returncode=1, stdout="", stderr=stderr)
 
 
 def _release(ladder: Path, name: str, *, registry: bool) -> Path:
@@ -177,9 +127,9 @@ def test_stage_sends_committed_files_release_inputs_and_the_token(
     scratch.mkdir()
     recorder = Recorder(
         {
-            "git show HEAD:./docker-compose.yml": _ok("name: tankpitbot\n"),
-            "git show HEAD:./edge/nginx.conf": _ok("server {}\n"),
-            "Test-Path": _ok(f"{sedona_has_registry}\r\n"),
+            "git show HEAD:./docker-compose.yml": ok("name: tankpitbot\n"),
+            "git show HEAD:./edge/nginx.conf": ok("server {}\n"),
+            "Test-Path": ok(f"{sedona_has_registry}\r\n"),
         }
     )
     script_hooks.run_command = recorder
@@ -241,7 +191,7 @@ def test_stage_skips_a_registry_the_release_does_not_carry(tmp_path: Path) -> No
     release = _release(tmp_path / "ladder", "v0.1.0-dddddddd", registry=False)
     scratch = tmp_path / "scratch"
     scratch.mkdir()
-    recorder = Recorder({"Test-Path": _ok("False\r\n")})
+    recorder = Recorder({"Test-Path": ok("False\r\n")})
     script_hooks.run_command = recorder
     stage(tmp_path, release, _secrets(tmp_path), scratch)
     assert recorder.calls[-1][-1] == f"Test-Path {HOST_DIR}/data/tank_registry.json"
@@ -263,7 +213,7 @@ def test_stage_refuses_without_the_token(tmp_path: Path) -> None:
 def test_stage_refuses_a_file_head_does_not_hold(tmp_path: Path) -> None:
     """A compose file missing from HEAD is refused with git's own words."""
     script_hooks.run_command = Recorder(
-        {"git show": _fail("fatal: path 'docker-compose.yml' does not exist in 'HEAD'\n")}
+        {"git show": fail("fatal: path 'docker-compose.yml' does not exist in 'HEAD'\n")}
     )
     with pytest.raises(FleetHostError) as raised:
         stage(tmp_path, tmp_path, _secrets(tmp_path), tmp_path)
@@ -278,7 +228,7 @@ def test_stage_refuses_when_sedona_refuses_a_copy(tmp_path: Path) -> None:
     release = _release(tmp_path / "ladder", "v0.1.0-eeeeeeee", registry=False)
     scratch = tmp_path / "scratch"
     scratch.mkdir()
-    script_hooks.run_command = Recorder({"scp": _fail("scp: permission denied")})
+    script_hooks.run_command = Recorder({"scp": fail("scp: permission denied")})
     with pytest.raises(FleetHostError) as raised:
         stage(tmp_path, release, _secrets(tmp_path), scratch)
     sent = [scratch / name for name in ("docker-compose.yml", "host.env", "edge.env", ".env")]
@@ -304,7 +254,7 @@ def test_pull_edge_pulls_through_the_hubs_client(tmp_path: Path) -> None:
 
 def test_pull_edge_refuses_a_failed_pull(tmp_path: Path) -> None:
     """A pull the registry refuses is refused with the pull's error."""
-    script_hooks.run_command = Recorder({" pull ": _fail("manifest unknown")})
+    script_hooks.run_command = Recorder({" pull ": fail("manifest unknown")})
     with pytest.raises(FleetHostError) as raised:
         pull_edge(tmp_path, tmp_path)
     assert str(raised.value) == (
@@ -330,7 +280,7 @@ def test_ensure_image_builds_only_a_missing_tag(tmp_path: Path) -> None:
             "tankpit-fleet:v0.1.0-ffffffff",
         ]
     ]
-    missing = Recorder({"image inspect": _fail("No such image")})
+    missing = Recorder({"image inspect": fail("No such image")})
     script_hooks.run_command = missing
     assert ensure_image(tmp_path, release) is True
     assert missing.calls[1] == [
@@ -344,7 +294,7 @@ def test_ensure_image_builds_only_a_missing_tag(tmp_path: Path) -> None:
 def test_ensure_image_refuses_a_failed_build(tmp_path: Path) -> None:
     """A build that fails is refused with the build's error."""
     script_hooks.run_command = Recorder(
-        {"image inspect": _fail("No such image"), " build ": _fail("no space left")}
+        {"image inspect": fail("No such image"), " build ": fail("no space left")}
     )
     release = tmp_path / "v0.1.0-00000000"
     with pytest.raises(FleetHostError) as raised:
@@ -416,7 +366,7 @@ def test_up_stages_builds_composes_smokes_and_gates(tmp_path: Path) -> None:
     """Up runs the newest release with its edge on sedona, sees a bot tick, and reports it all."""
     release = _release(tmp_path / "ladder", "v0.1.0-12345678", registry=False)
     recorder = Recorder(
-        {"image inspect": _fail("No such image"), "Test-Path": _ok("True\r\n"), **passing_gate()}
+        {"image inspect": fail("No such image"), "Test-Path": ok("True\r\n"), **passing_gate()}
     )
     script_hooks.run_command = recorder
     script_hooks.http_get = _serving
@@ -478,7 +428,7 @@ def test_up_refuses_when_compose_refuses(tmp_path: Path) -> None:
     """Compose refusing on sedona is refused by name, before any smoke."""
     _release(tmp_path / "ladder", "v0.1.0-87654321", registry=False)
     script_hooks.run_command = Recorder(
-        {"docker compose": _fail("edge.env: no such file"), "Test-Path": _ok("True\r\n")}
+        {"docker compose": fail("edge.env: no such file"), "Test-Path": ok("True\r\n")}
     )
     with pytest.raises(FleetHostError) as raised:
         up(tmp_path, tmp_path / "ladder", _secrets(tmp_path))
@@ -525,7 +475,7 @@ def test_main_runs_down_and_prints_its_lines(capsys: pytest.CaptureFixture[str])
 def test_run_up_reads_the_ladder_and_secrets_it_is_given(tmp_path: Path) -> None:
     """``up`` on the command line runs the newest release of the ladder it is handed."""
     _release(tmp_path / "ladder", "v0.1.0-abcdef12", registry=False)
-    script_hooks.run_command = Recorder({"Test-Path": _ok("True\r\n"), **passing_gate()})
+    script_hooks.run_command = Recorder({"Test-Path": ok("True\r\n"), **passing_gate()})
     script_hooks.http_get = _serving
     script_hooks.sleep_seconds = Pauses()
     lines = run(["up"], tmp_path, tmp_path / "ladder", _secrets(tmp_path))
