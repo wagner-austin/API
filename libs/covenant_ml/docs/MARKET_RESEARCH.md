@@ -6,6 +6,11 @@ and the shared `platform_core.run_record` provenance contract. It has no order
 placement interface. Forecast accuracy in covenant-radar does not establish
 market profitability; this experiment measures hypothetical execution payoffs.
 
+[City weather calibration](CITY_WEATHER_CALIBRATION.md) records the separate
+October 13 exploratory bias/uncertainty experiment. It improved weather-only
+scores slightly but worsened the market-plus-weather model; neither forecast
+cycle supports promoting the change. The original prospective campaign stays frozen.
+
 ## Run and reproduce
 
 From `libs/covenant_ml`, after `poetry sync --with dev`:
