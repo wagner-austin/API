@@ -94,19 +94,27 @@ def forecast_maximum(document: JSONObject, day: date) -> float:
     return max(selected.values()) * 1.8 + 32
 
 
-def bracket_probability(mean: float, bounds: tuple[float | None, float | None]) -> float:
-    """Compute the frozen three-degree normal forecast's bracket probability.
+def bracket_probability(
+    mean: float, bounds: tuple[float | None, float | None], sigma: float
+) -> float:
+    """Compute a normal forecast's bracket probability with explicit uncertainty.
 
     Args:
         mean: Forecast maximum in Fahrenheit.
         bounds: Validated continuous lower and upper boundaries.
+        sigma: Positive finite standard deviation in Fahrenheit.
 
     Returns:
         Probability in the closed unit interval, before logit clipping.
+
+    Raises:
+        ValueError: CALIBRATION-001 for nonfinite mean or invalid uncertainty.
     """
+    if not math.isfinite(mean) or not math.isfinite(sigma) or sigma <= 0:
+        raise ValueError("[CALIBRATION-001] require finite mean and positive finite uncertainty")
     lower, upper = bounds
-    low = 0.0 if lower is None else 0.5 * (1 + math.erf((lower - mean) / (3 * math.sqrt(2))))
-    high = 1.0 if upper is None else 0.5 * (1 + math.erf((upper - mean) / (3 * math.sqrt(2))))
+    low = 0.0 if lower is None else 0.5 * (1 + math.erf((lower - mean) / (sigma * math.sqrt(2))))
+    high = 1.0 if upper is None else 0.5 * (1 + math.erf((upper - mean) / (sigma * math.sqrt(2))))
     return high - low
 
 

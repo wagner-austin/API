@@ -57,7 +57,7 @@ def select_quote(quotes: tuple[Quote, ...], decision: int) -> tuple[Quote | None
     return quote, "included"
 
 
-def _native_inventory(
+def forecast_inventory(
     plan: ComparisonPlan,
     market: MarketCollector,
     series: str,
@@ -121,7 +121,7 @@ def collect_forecast_rows(
     rows: list[ForecastRow] = []
     for series, (latitude, longitude) in CITY_COORDINATES.items():
         market.verify_fee(series)
-        native, specs = _native_inventory(plan, market, series)
+        native, specs = forecast_inventory(plan, market, series)
         maxima: dict[str, float] = {}
         for ticker in sorted(native):
             document, spec = native[ticker], specs[ticker]
@@ -170,7 +170,7 @@ def collect_forecast_rows(
                         "bid": quote["bid"],
                         "ask": quote["ask"],
                         "forecast_f": mean,
-                        "weather_p": bracket_probability(mean, bounds),
+                        "weather_p": bracket_probability(mean, bounds, 3.0),
                         "settlement_rule": require_str(document, "rules_primary"),
                     }
                 )
@@ -180,4 +180,4 @@ def collect_forecast_rows(
     return tuple(rows), dict(counts)
 
 
-__all__ = ["collect_forecast_rows", "select_quote"]
+__all__ = ["collect_forecast_rows", "forecast_inventory", "select_quote"]

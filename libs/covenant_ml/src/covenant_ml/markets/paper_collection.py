@@ -167,7 +167,7 @@ def collect_paper_predictions(
                 "series": plan["series"],
                 "bid": book["bid"],
                 "ask": book["ask"],
-                "weather_p": bracket_probability(maximum, bounds),
+                "weather_p": bracket_probability(maximum, bounds, 3.0),
             }
         )
         predictions.append(
