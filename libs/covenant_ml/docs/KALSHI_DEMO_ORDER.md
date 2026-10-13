@@ -23,6 +23,14 @@ Evidence is under
 remains exposure awaiting the market outcome; there is no realized profit claim.
 This is a completed demo order/fill/account lifecycle, not a production pilot.
 
+The settlement-aware command was subsequently run on that same trial at
+17:12 UTC. Authenticated settlement pagination returned no settled positions;
+the market remained active. The command reported `confirmed_settlements=0`,
+retained $0.3147 exposure and did not submit another order. Its native capture is
+`reconciliation-37fcfef7-f3fd-4a5a-8a20-3fc272011937.json` in the directory above.
+An actual exchange payout has not yet occurred; local final-outcome tests are
+not presented as a completed remote settlement.
+
 ## Execution contract
 
 `scripts.kalshi_demo_trial` connects the existing $1 order reservation policy to
@@ -81,6 +89,22 @@ order totals; the primary position quantity and cash change must also agree.
 An available acknowledgement must name that same order. A missing order is an
 unresolved result, never permission to resend.
 
+The same command now also reads all primary-account settlement pages. A final
+credit requires exactly one settlement matching the acquired YES quantity,
+cost basis and fees, with no NO holding. Its event, result, timing and per-contract
+payout must agree with the finalized public market. Native revenue is in cents;
+the validator converts it exactly and refuses inconsistent payout arithmetic.
+The unsettled position must be absent and cash must equal initial cash minus
+acquisition cost and fees plus the credited revenue. Only then does the existing
+journal record `account_settlement`, release exposure and report realized profit
+or loss. This account evidence is distinct from the rehearsal's public-outcome
+`settlement` record and makes no claim about changes to contract rules.
+
+Repeated reconciliation is idempotent for the credited amounts. A changed or
+disappeared settlement cannot replace history; an HTTP error, missing credit or
+cash mismatch propagates without releasing pending exposure. Reports expose
+`confirmed_settlements`, and a settled trial still cannot submit another order.
+
 Evidence files include the manifest, acknowledgement when received, cumulative
 journal and separate native reconciliation captures. `status` replays local
 accounting without network traffic. Reports distinguish a reserved attempt from
@@ -91,10 +115,10 @@ a confirmed native order and always set `can_reserve=false` and `live_ready=fals
 This intentionally permits one initial demo order, not an ongoing trading account.
 Any returned prior orders or current positions block preparation. Account activity
 outside this process can race sequential reads; there is no atomic exchange
-snapshot. Other subaccounts, archived orders, settlement and a live strategy
-admission policy are outside this trial. Once the selected market settles, an
-unsettled-position mismatch may require separate settlement evidence; the trial
-does not manufacture a payout or release exposure from a missing position.
+snapshot. Other subaccounts, archived orders/positions, external account activity
+and a live strategy admission policy are outside this trial. Settlement requires
+the native account credit to remain in the live data set; archived or temporarily
+inconsistent evidence is an explicit failure, never an inferred payout.
 
 The credential fingerprint binds key material rather than independently proving
 a stable exchange user ID. Local files are not a tamper-proof security boundary:
@@ -110,9 +134,19 @@ Tests execute real signing, HTTP sockets, SQLite, CLI files and subprocesses.
 An actual socket disconnect after POST exercises retained reservation and
 GET-only recovery. Repeated submission after restart is refused before network
 I/O. These local tests are distinct from the credentialed demo evidence.
+Final-outcome tests cover binary wins/losses, scalar payouts, exact revenue,
+cash/position mismatches, provisional markets, disappeared credits, conflicting
+journal events and restart replay through real HTTP sockets and SQLite.
+The integrated `make check` passed 3,330 tests, strict typing and guards, with
+100% coverage of 15,758 statements and 3,002 branches. Forty added tests cover
+account settlement decoding, journal transitions and the HTTP settlement lifecycle.
 
 The current official contracts are
 [Create Order V2](https://docs.kalshi.com/api-reference/orders/create-order-v2),
 [Get Orders](https://docs.kalshi.com/api-reference/orders/get-orders), and
 [Get Fills](https://docs.kalshi.com/api-reference/portfolio/get-fills), checked
 October 13, 2026. Demo fills are not evidence of production liquidity or returns.
+Account credits follow
+[Get Settlements](https://docs.kalshi.com/api-reference/portfolio/get-settlements)
+and its native schema in the [OpenAPI specification](https://docs.kalshi.com/openapi.yaml),
+checked the same day.

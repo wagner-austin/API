@@ -88,8 +88,13 @@ order filled and reconciled on October 13, 2026. This preflight command itself
 remains read-only and cannot admit a second trial after that account activity.
 
 Before real funding, the remaining work includes a production account identity,
-ongoing account and settlement reconciliation, current fee/rule admission and
+ongoing multi-order account reconciliation, current fee/rule admission and
 an explicitly authorized production execution path. The
 [local rehearsal contract](EXECUTION_REHEARSAL.md) remains the source for the
 proposed $20/$1/$3/$5 limits. Neither this command nor that rehearsal establishes
 a profitable trading edge.
+
+The one-order demo command now validates eventual account settlement credits
+against finalized market evidence, the acquired position and cash. Its actual
+trial remains pending; the final payout path has passed local integration tests
+but has not yet observed an exchange settlement.
