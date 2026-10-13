@@ -1553,6 +1553,16 @@ or retrospective replacement. The integrated suite now passes 3,145 tests with
 protocol, schedule, evidence locations and removal procedure; future observations
 are not represented as completed research or profits.
 
+`libs/covenant_ml/scripts/execution_rehearsal.py` separately exercises the proposed
+$20 execution experiment's fixed risk limits using a durable SQLite journal.
+It retains unresolved reservations, accounts for actual fill costs and fees,
+and refuses additional risk after a policy breach. This is a local rehearsal:
+it submits no orders, accepts local evidence files and reports `live_ready: false`.
+[Its contract](../libs/covenant_ml/docs/EXECUTION_REHEARSAL.md) records the CLI,
+accounting semantics, persistence tests and remaining authenticated account and
+demo prerequisites. Neither its tests nor its synthetic inputs establish a
+profitable strategy or verified exchange execution.
+
 ### `floor` — cloze floor scoring
 
 <!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 113 -->
