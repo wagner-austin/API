@@ -35,7 +35,12 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     from covenant_ml.markets.kalshi import MarketSpec
     from covenant_ml.markets.provenance import implementation_digest, market_fingerprint
     from covenant_ml.markets.reporting import write_market_report
-    from covenant_ml.markets.sports_history import historical_quote, historical_selection
+    from covenant_ml.markets.sports_history import (
+        historical_inventory,
+        historical_quote,
+        historical_selection,
+    )
+    from covenant_ml.markets.sports_ratings import evaluate_ratings, rating_predictions
     from covenant_ml.markets.sports_strategy import evaluate_sports
     from covenant_ml.markets.types import Quote
 
@@ -44,11 +49,13 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--market-url", required=True)
     parser.add_argument("--mode", choices=("capture", "replay"), required=True)
+    parser.add_argument("--model", choices=("temperature", "ratings"), required=True)
     arguments = parser.parse_args(argv)
     root: Path = arguments.archive
     output: Path = arguments.out
     origin: str = arguments.market_url
     mode: str = arguments.mode
+    model: str = arguments.model
     if output.exists() or run_record_sidecar(output).exists():
         raise FileExistsError("[STRATEGY-009] report or RunRecord exists; choose a new output")
     rows: list[tuple[MarketSpec, Quote]] = []
@@ -66,7 +73,14 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
             counts[state] = counts.get(state, 0) + 1
             if quote is not None:
                 rows.append((spec, quote))
-    report = evaluate_sports(rows)
+        if model == "ratings":
+            forecasts, rating_counts = rating_predictions(
+                historical_inventory(inventory.replay), [spec for spec, _ in rows]
+            )
+            report = evaluate_ratings(rows, forecasts)
+            report["rating_coverage"] = dict(rating_counts)
+        else:
+            report = evaluate_sports(rows)
     report["coverage"] = dict(counts)
     report["implementation_sha256"] = implementation_digest()
     evidence = sorted((root / "inventory").glob("*.json")) + sorted(
@@ -77,7 +91,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         market_fingerprint(determinism, config_test_hooks.get_env),
         output,
         evidence,
-        "sports-temperature-v1",
+        "sports-" + model + "-v1",
         "jan-feb-fit_mar-apr15-test_2026",
         (Observation(name="adjusted_brier", value=require_float(report, "adjusted_brier")),),
     )
