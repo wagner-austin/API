@@ -17,6 +17,11 @@ The [cross-market investigation](CROSS_MARKET_INVESTIGATION.md) compares sports,
 economic events, stocks/options and crypto using October 13 public evidence.
 It records the negative snapshot screens and the next non-weather experiment.
 
+The [frozen sports strategy result](SPORTS_STRATEGY_RESULT.md) evaluates a
+specific chronological probability calibration rule on 233 training and 128
+later games. Training selected the unchanged market probability; the cost-aware
+rule abstained on all later games and failed its advancement criteria.
+
 From `libs/covenant_ml`, after `poetry sync --with dev`:
 
 ```powershell
