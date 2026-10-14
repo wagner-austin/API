@@ -99,7 +99,9 @@ not extra borrowers; uncertainty must respect borrower and calendar dependence.
 Choose the minimum worthwhile improvement and sample requirement before the
 confirmatory cohort is inspected. The actual horizon, review budget and cohort
 size are deliberately not invented here; these are proposed study requirements,
-not an already frozen protocol or implemented top-k scorer.
+not an already frozen protocol. The subsequent [fixed-budget review
+instrument](COVENANT_WARNING_REVIEW.md) implements single-batch ranking and
+comparison; the integrated model study and repeated-alert evaluation remain open.
 
 ## Reproduction
 
