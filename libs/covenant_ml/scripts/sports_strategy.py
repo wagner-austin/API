@@ -32,12 +32,12 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     determinism = pin()
     from covenant_ml.markets import _test_hooks
     from covenant_ml.markets.archive import ResponseArchive
+    from covenant_ml.markets.decision_quotes import decision_quote
     from covenant_ml.markets.kalshi import MarketSpec
     from covenant_ml.markets.provenance import implementation_digest, market_fingerprint
     from covenant_ml.markets.reporting import write_market_report
     from covenant_ml.markets.sports_history import (
         historical_inventory,
-        historical_quote,
         historical_selection,
     )
     from covenant_ml.markets.sports_ratings import evaluate_ratings, rating_predictions
@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         )
         read = quotes.capture if mode == "capture" else quotes.replay
         for spec in specs:
-            quote, state = historical_quote(spec, read)
+            quote, state = decision_quote(spec, read, historical=True)
             counts[state] = counts.get(state, 0) + 1
             if quote is not None:
                 rows.append((spec, quote))

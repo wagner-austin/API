@@ -32,13 +32,13 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     determinism = pin()
     from covenant_ml.markets import _test_hooks
     from covenant_ml.markets.archive import ResponseArchive
+    from covenant_ml.markets.decision_quotes import decision_quote
     from covenant_ml.markets.kalshi import MarketSpec
     from covenant_ml.markets.provenance import implementation_digest, market_fingerprint
     from covenant_ml.markets.reporting import write_market_report
     from covenant_ml.markets.sports_history import (
         TEST_START,
         historical_inventory,
-        historical_quote,
         historical_selection,
     )
     from covenant_ml.markets.sports_strategy import score_sports_predictions
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         )
         for spec, coverage_value in zip(specs, coverage, strict=True):
             record = narrow_json_to_dict(coverage_value)
-            quote, reason = historical_quote(spec, k_quotes.replay)
+            quote, reason = decision_quote(spec, k_quotes.replay, historical=True)
             record["kalshi_quote_status"] = reason
             eligible = quote is not None and spec["ticker"] in forecasts
             record["paired_eligible"] = eligible
