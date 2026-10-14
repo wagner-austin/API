@@ -32,6 +32,7 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, queue
+from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
 from tests._registry import write_registry
 from tests.conftest import FakeRun, agent_argv, failed, ok, workspace_document
@@ -265,7 +266,7 @@ class TestObservingSessions:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
-        _test_hooks.run = FakeRun([failed(255, "ssh: serendipity is asleep")])
+        _test_hooks.run = FakeRun([UNROLLED, failed(255, "ssh: serendipity is asleep")])
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -294,6 +295,7 @@ class TestObservingSessions:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.run = FakeRun(
             [
+                UNROLLED,
                 ok(""),
                 ok(dump_json_str({"platform": "win32", "hostname": "serendipity", "records": []})),
             ]
@@ -315,17 +317,25 @@ class TestObservingSessions:
     def test_without_a_registry_the_tick_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        _test_hooks.run = FakeRun([])
+        run = FakeRun([UNROLLED])
+        _test_hooks.run = run
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
             agent.main(agent_argv(config_path, repo))
 
+        # The one command is the refuse pass's read of the rolled ref, which
+        # resolved nothing, so the queue was sent no registry.
+        assert run.calls == [unrolled_call(repo)]
         assert endpoint.tools == ["dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
         assert "session observation skipped: no --registry given" in messages
         assert "hub lane empty" in messages
+        assert any(
+            message.startswith("refused nothing undeclared: FLEET_ROLL_REF_UNRESOLVED: ")
+            for message in messages
+        )
 
     def test_the_board_key_is_required_only_once_the_queue_work_is_done(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path

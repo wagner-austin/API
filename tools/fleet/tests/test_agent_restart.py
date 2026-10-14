@@ -18,6 +18,7 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, restart, session_release
+from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests._session_release_fixtures import (
     RELEASE_ID,
@@ -144,6 +145,7 @@ class TestRestartLane:
                     "  RESTARTED  mcps-99 (opus-board-triage-0912) pane %16 "
                     "-- now pid 41324 as mcps-d4 on 2.1.270\n",
                 ),
+                UNROLLED,
             ]
         )
         _test_hooks.run = runner
@@ -163,15 +165,16 @@ class TestRestartLane:
         assert runner.calls == [
             verify_call(tmp_path),
             restart.restart_argv(release["root"], release["registry_dir"], TARGET),
+            unrolled_call(repo),
         ]
         # The child inherits neither this agent's poetry venv nor any
         # PYTHONPATH, and writes no bytecode into the sealed release.
-        assert runner.unset_env == [(), ("VIRTUAL_ENV", "PYTHONPATH")]
-        assert runner.set_env == [(), (("PYTHONDONTWRITEBYTECODE", "1"),)]
+        assert runner.unset_env[:2] == [(), ("VIRTUAL_ENV", "PYTHONPATH")]
+        assert runner.set_env[:2] == [(), (("PYTHONDONTWRITEBYTECODE", "1"),)]
         # And each carries its deadline, so a verifier or pane that stops
         # answering closes the job instead of holding the tick.
         assert (
-            runner.timeouts
+            runner.timeouts[:2]
             == [session_release.VERIFY_TIMEOUT_SECONDS, restart.SESSION_JOB_TIMEOUT_SECONDS]
             == [300, 600]
         )
@@ -207,6 +210,7 @@ class TestRestartLane:
                     "on 2.1.270 in main:6; brief typed\n"
                     "  departure  last ledger event: end (other) at 2026-09-16 10:31Z\n",
                 ),
+                UNROLLED,
             ]
         )
         _test_hooks.run = runner
@@ -218,8 +222,9 @@ class TestRestartLane:
         assert runner.calls == [
             verify_call(tmp_path),
             restart.revive_argv(release["root"], release["registry_dir"], TARGET, SUBMITTER),
+            unrolled_call(repo),
         ]
-        assert runner.unset_env[-1] == restart.SESSION_ENVIRONMENT_EXCLUDED
+        assert runner.unset_env[1] == restart.SESSION_ENVIRONMENT_EXCLUDED
         started = endpoint.arguments[1]
         assert started["runId"] == f"revive-{DEFAULT_JOB_ID}"
         closed = endpoint.arguments[2]
@@ -234,7 +239,7 @@ class TestRestartLane:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path, command: str
     ) -> None:
         plant_release(tmp_path)
-        runner = FakeRun([verify_reply(tmp_path)])
+        runner = FakeRun([verify_reply(tmp_path), UNROLLED])
         _test_hooks.run = runner
         endpoint = refused_queue(command=command, submittedBy="--hard; Not A Label")
         _test_hooks.http_post = endpoint
@@ -242,7 +247,7 @@ class TestRestartLane:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         # The release was verified; session-audit never ran.
-        assert runner.calls == [verify_call(tmp_path)]
+        assert runner.calls == [verify_call(tmp_path), unrolled_call(repo)]
         closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(closed["detail"])
@@ -267,7 +272,7 @@ class TestRestartLane:
         job path; the hard flag comes from the row's verb and nowhere else."""
         release = plant_release(tmp_path)
         line = f"KILL - {outcome.format(target=TARGET)}\n"
-        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line)])
+        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line), UNROLLED])
         _test_hooks.run = runner
         endpoint = ran_queue(command, "passed")
         _test_hooks.http_post = endpoint
@@ -279,8 +284,9 @@ class TestRestartLane:
             restart.kill_argv(
                 release["root"], release["registry_dir"], TARGET, SUBMITTER, hard=hard
             ),
+            unrolled_call(repo),
         ]
-        assert runner.set_env[-1] == restart.SESSION_ENVIRONMENT_SET
+        assert runner.set_env[1] == restart.SESSION_ENVIRONMENT_SET
         assert endpoint.arguments[1]["runId"] == f"kill-{DEFAULT_JOB_ID}"
         closed = endpoint.arguments[2]
         assert closed["status"] == "passed"
@@ -296,7 +302,7 @@ class TestRestartLane:
         the room's supervisor lifts into its digest."""
         release = plant_release(tmp_path)
         line = f"COMPACT - COMPACTED session {TARGET}: 640000 -> 90000 tokens\n"
-        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line)])
+        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line), UNROLLED])
         _test_hooks.run = runner
         endpoint = ran_queue("compact-session", "passed")
         _test_hooks.http_post = endpoint
@@ -306,6 +312,7 @@ class TestRestartLane:
         assert runner.calls == [
             verify_call(tmp_path),
             restart.compact_argv(release["root"], release["registry_dir"], TARGET, SUBMITTER),
+            unrolled_call(repo),
         ]
         assert endpoint.arguments[1]["runId"] == f"compact-{DEFAULT_JOB_ID}"
         closed = endpoint.arguments[2]
@@ -321,14 +328,14 @@ class TestRestartLane:
         exit so the job reads as the session's own ending."""
         release = plant_release(tmp_path)
         line = f"KILL - ENDED session {TARGET} (graceful): /exit typed into pane %7\n"
-        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line)])
+        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line), UNROLLED])
         _test_hooks.run = runner
         endpoint = ran_queue("exit-session", "passed")
         _test_hooks.http_post = endpoint
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls[-1] == restart.kill_argv(
+        assert runner.calls[1] == restart.kill_argv(
             release["root"], release["registry_dir"], TARGET, SUBMITTER, hard=False
         )
         assert endpoint.arguments[1]["runId"] == f"exit-{DEFAULT_JOB_ID}"
@@ -341,7 +348,7 @@ class TestRestartLane:
     ) -> None:
         plant_release(tmp_path)
         refused = f"KILL - REFUSED session {TARGET} (graceful): nothing typed: busy right now\n"
-        _test_hooks.run = FakeRun([verify_reply(tmp_path), verb_reply(1, refused)])
+        _test_hooks.run = FakeRun([verify_reply(tmp_path), verb_reply(1, refused), UNROLLED])
         endpoint = ran_queue("kill-session", "failed")
         _test_hooks.http_post = endpoint
 
@@ -368,6 +375,7 @@ class TestRestartLane:
                     "  SKIPPED    mcps-6e (fable-dm-versionsplit-0912) pane %32 "
                     "-- was busy at apply time, not idle; untouched\n",
                 ),
+                UNROLLED,
             ]
         )
         endpoint = ran_queue("restart-session", "failed")
@@ -391,14 +399,14 @@ class TestReleaseRefusals:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         point_environment(tmp_path)
-        runner = FakeRun([])
+        runner = FakeRun([UNROLLED])
         _test_hooks.run = runner
         endpoint = refused_queue(command="kill-session")
         _test_hooks.http_post = endpoint
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls == []
+        assert runner.calls == [unrolled_call(repo)]
         assert endpoint.tools == ["dispatch_claim", "dispatch_report"]
         closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
@@ -411,14 +419,14 @@ class TestReleaseRefusals:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         plant_release(tmp_path)
-        runner = FakeRun([failed(1, "RELEASE_DIGEST_MISMATCH: the payload changed")])
+        runner = FakeRun([failed(1, "RELEASE_DIGEST_MISMATCH: the payload changed"), UNROLLED])
         _test_hooks.run = runner
         endpoint = refused_queue(command="exit-session")
         _test_hooks.http_post = endpoint
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls == [verify_call(tmp_path)]
+        assert runner.calls == [verify_call(tmp_path), unrolled_call(repo)]
         closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         detail = narrow_json_to_str(closed["detail"])
@@ -429,14 +437,14 @@ class TestReleaseRefusals:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         plant_release(tmp_path)
-        runner = FakeRun([])
+        runner = FakeRun([UNROLLED])
         _test_hooks.run = runner
         endpoint = refused_queue(sessionTarget="mcps-99; rm -rf /")
         _test_hooks.http_post = endpoint
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls == []
+        assert runner.calls == [unrolled_call(repo)]
         closed = endpoint.arguments[1]
         assert "RESTART_TARGET_INVALID" in narrow_json_to_str(closed["detail"])
 
@@ -444,12 +452,12 @@ class TestReleaseRefusals:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         plant_release(tmp_path)
-        runner = FakeRun([])
+        runner = FakeRun([UNROLLED])
         _test_hooks.run = runner
         endpoint = refused_queue(sessionTarget=None)
         _test_hooks.http_post = endpoint
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls == []
+        assert runner.calls == [unrolled_call(repo)]
         assert "RESTART_TARGET_MISSING" in narrow_json_to_str(endpoint.arguments[1]["detail"])

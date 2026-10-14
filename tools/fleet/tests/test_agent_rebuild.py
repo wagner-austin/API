@@ -16,6 +16,7 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, rebuild
+from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests.conftest import FakeRun, agent_argv
 
@@ -50,7 +51,8 @@ class TestRebuildLane:
             [
                 _test_hooks.CommandResult(
                     returncode=0, stdout="Base images rebuilt.\n", stderr="", timed_out=False
-                )
+                ),
+                UNROLLED,
             ]
         )
         _test_hooks.run = runner
@@ -83,11 +85,12 @@ class TestRebuildLane:
                 str(mcps),
                 "build-bases",
                 "BOARD_AGENT_LABEL=opus-phone-0911",
-            )
+            ),
+            unrolled_call(repo),
         ]
         # A bake that wedges under the fleet lock ends at the lane's own
         # deadline rather than holding the tick to the scheduler's ceiling.
-        assert runner.timeouts == [rebuild.BUILD_BASES_TIMEOUT_SECONDS] == [1800]
+        assert runner.timeouts[0] == rebuild.BUILD_BASES_TIMEOUT_SECONDS == 1800
         started = endpoint.arguments[1]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
@@ -110,7 +113,8 @@ class TestRebuildLane:
                     stdout="",
                     stderr="make: *** [Makefile:73: build-bases] Error 2",
                     timed_out=False,
-                )
+                ),
+                UNROLLED,
             ]
         )
         endpoint = FakeQueue(
@@ -134,7 +138,7 @@ class TestRebuildLane:
     def test_without_the_mcps_root_flag_the_job_is_refused_and_nothing_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
-        runner = FakeRun([])
+        runner = FakeRun([UNROLLED])
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -148,7 +152,7 @@ class TestRebuildLane:
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls == []
+        assert runner.calls == [unrolled_call(repo)]
         closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         assert "exitCode" not in closed
@@ -159,7 +163,7 @@ class TestRebuildLane:
     ) -> None:
         mcps = tmp_path / "mcps-checkout"
         mcps.mkdir()
-        runner = FakeRun([])
+        runner = FakeRun([UNROLLED])
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -180,6 +184,6 @@ class TestRebuildLane:
 
         assert agent.main(rebuild_argv(config_path, repo, mcps)) == 0
 
-        assert runner.calls == []
+        assert runner.calls == [unrolled_call(repo)]
         closed = endpoint.arguments[1]
         assert "REBUILD_LABEL_INVALID" in narrow_json_to_str(closed["detail"])
