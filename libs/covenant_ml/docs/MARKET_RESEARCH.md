@@ -27,6 +27,9 @@ later trades and also failed advancement; these reused dates are exploratory.
 
 The later studies and active observations are written up separately:
 
+- [Covenant warning evidence](COVENANT_WARNING_EVIDENCE.md): strict dated-input
+  selection, future labels, censoring and chronological borrower exclusion;
+  proposed cross-validation and review-budget metrics, with native-data gaps.
 - [Evidence requirements audit](EVIDENCE_REQUIREMENTS_AUDIT_20261014.md): live
   prospective status, sample planning and execution gaps, Radar target leakage,
   provenance portability limits and the pending WRDS request.
