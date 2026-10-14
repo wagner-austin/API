@@ -46,7 +46,9 @@ a positive paper outcome.
 
 ## Actual execution
 
-Run from `libs/covenant_ml`:
+Original invocation from `libs/covenant_ml`, before the deployment digest
+requirement was added. Current commands must also pass the verified
+`--implementation-sha256` described in `EQUITY_SCHEDULE.md`:
 
 ```powershell
 poetry run python -m scripts.equity_outcomes --snapshot C:/Users/Test/PROJECTS/files/stock-panel-20261014/pilot-first.json --calendar docs/equity_pilot_calendar_20261014.json --archive C:/Users/Test/PROJECTS/files/stock-panel-20261014/cli-pending-20261014 --out C:/Users/Test/PROJECTS/files/stock-panel-20261014/cli-pending-first.json --mode capture
