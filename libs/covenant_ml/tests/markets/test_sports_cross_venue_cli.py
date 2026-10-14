@@ -16,7 +16,8 @@ from scripts.sports_cross_venue import main
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.archive import ResponseArchive
-from covenant_ml.markets.sports_history import historical_quote, historical_selection
+from covenant_ml.markets.decision_quotes import decision_quote
+from covenant_ml.markets.sports_history import historical_selection
 from covenant_ml.markets.validation import read_document
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
@@ -54,7 +55,7 @@ def test_real_capture_replay_and_failure(api_server: ApiServer, tmp_path: Path) 
         )
         specs, _ = historical_selection(inventory.capture)
         for spec in specs:
-            historical_quote(spec, candles.capture)
+            decision_quote(spec, candles.capture, historical=True)
     api_server.documents["/v1/markets"] = [
         {"markets": [us_game(day) for day in days if day != "2026-03-03"]},
         {"markets": []},

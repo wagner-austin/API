@@ -17,7 +17,8 @@ from platform_core.json_utils import (
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.archive import ResponseArchive
-from covenant_ml.markets.sports_history import event_day, historical_quote, historical_selection
+from covenant_ml.markets.decision_quotes import decision_quote
+from covenant_ml.markets.sports_history import event_day, historical_selection
 
 from ._server import ApiServer, api_server
 from ._strategy_fixtures import candle_payload, native_market, observation
@@ -145,11 +146,11 @@ def test_candle_validation(api_server: ApiServer, tmp_path: Path, kind: str, exp
         )
         if expected == "error":
             with pytest.raises(ValueError, match="STRATEGY-003"):
-                historical_quote(spec, store.capture)
+                decision_quote(spec, store.capture, historical=True)
         else:
-            actual = historical_quote(spec, store.capture)
+            actual = decision_quote(spec, store.capture, historical=True)
             assert actual == (quote if expected == "eligible" else None, expected)
-            assert historical_quote(spec, store.replay) == actual
+            assert decision_quote(spec, store.replay, historical=True) == actual
     assert len(api_server.requests) == 1
 
 
