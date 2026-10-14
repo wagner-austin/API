@@ -88,7 +88,13 @@ def comparison_rows() -> tuple[ForecastRow, ...]:
     return tuple(forecast_row(date(2026, 4, day), yes) for day in range(3, 19) for yes in (0, 1))
 
 
-def serve_comparison(server: ApiServer) -> None:
+COMPARISON_DAYS = tuple(date(2026, 4, number) for number in range(3, 19))
+
+
+def serve_comparison(
+    server: ApiServer,
+    days: tuple[date, ...] = COMPARISON_DAYS,
+) -> None:
     server.documents["/historical/cutoff"] = [{"market_settled_ts": "2027-01-01T00:00:00Z"}]
     server.documents["/markets"] = []
     server.documents["/historical/markets"] = []
@@ -104,8 +110,7 @@ def serve_comparison(server: ApiServer) -> None:
             }
         ]
         native: list[JSONValue] = []
-        for number in range(3, 19):
-            day = date(2026, 4, number)
+        for day in days:
             server.documents["/v1/forecast"].append(forecast_document(day))
             for yes in (0, 1):
                 document = native_market(day, series, yes)

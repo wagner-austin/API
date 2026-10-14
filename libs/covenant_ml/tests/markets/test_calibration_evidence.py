@@ -6,6 +6,7 @@ import runpy
 import subprocess
 import sys
 from contextlib import closing
+from datetime import date, timedelta
 from hashlib import sha256
 from pathlib import Path
 
@@ -54,10 +55,17 @@ def _write(report: JSONObject, paths: tuple[Path, ...], output: Path) -> None:
     )
 
 
-def _capture(server: ApiServer, root: Path) -> Path:
-    serve_comparison(server)
+def _capture(
+    server: ApiServer,
+    root: Path,
+    last_day: date = date(2026, 4, 18),
+    train_end: str = "2026-04-14",
+) -> Path:
+    first_day = date(2026, 4, 3)
+    days = tuple(first_day + timedelta(days=i) for i in range((last_day - first_day).days + 1))
+    serve_comparison(server, days)
     document = encode_comparison_plan(comparison_plan())
-    document["train_end"] = "2026-04-14"
+    document["train_end"], document["end"] = train_end, last_day.isoformat()
     plan = decode_comparison_plan(document)
     pauses: list[float] = []
     initial_requests = len(server.requests)
@@ -71,7 +79,7 @@ def _capture(server: ApiServer, root: Path) -> Path:
         rows, counts = collect_forecast_rows(
             plan, MarketCollector(market.capture), forecast.capture, print
         )
-    assert counts == {"selected_contracts": 96, "included": 96}
+    assert counts == {"selected_contracts": 6 * len(days), "included": 6 * len(days)}
     assert pauses == [0.3] * (len(server.requests) - initial_requests)
     output = root / "original.json"
     sources = (*market.root.glob("*.json"), *forecast.root.glob("*.json"))
