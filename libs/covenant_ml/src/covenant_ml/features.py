@@ -8,25 +8,11 @@ Provides functions to create derived features from raw financial ratios:
 
 from __future__ import annotations
 
-import math
 from enum import StrEnum
 from typing import Final, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-
-
-def _int_sqrt(value: int) -> int:
-    """Return integer square root (floor)."""
-    return int(math.sqrt(value))
-
-
-def _get_index_value(arr: NDArray[np.intp], idx: int) -> int:
-    """Get integer value from index array."""
-    for i, val in enumerate(arr.flat):
-        if i == idx:
-            return int(val)
-    raise IndexError(f"Index {idx} out of bounds for array of size {arr.size}")
 
 
 class FeatureEngineeringConfig(TypedDict):
@@ -69,7 +55,11 @@ def compute_pairwise_ratios(
     feature_names: list[str],
     max_features: int = 0,
 ) -> tuple[NDArray[np.float64], list[str]]:
-    """Compute pairwise ratios Xi/Xj for all feature pairs.
+    """Compute pairwise ratios in declared column order without fitting to rows.
+
+    A positive cap retains the first pairs in column order. Selection never
+    uses variance or other dataset statistics, so held-out rows cannot change
+    the feature definition. Column order is part of the model input contract.
 
     Args:
         x: Feature matrix (n_samples, n_features)
@@ -82,35 +72,18 @@ def compute_pairwise_ratios(
     n_samples: int = int(x.shape[0])
     n_features: int = int(x.shape[1])
 
-    # Calculate number of possible pairs
-    n_pairs: int = n_features * (n_features - 1)  # Xi/Xj and Xj/Xi are different
-
-    if max_features > 0 and n_pairs > max_features:
-        # Select top pairs based on variance of original features
-        variances: NDArray[np.float64] = np.var(x, axis=0)
-        limit: int = _int_sqrt(max_features * 2)
-        top_indices: NDArray[np.intp] = np.argsort(variances)[::-1][:limit]
-        selected_features: int = len(top_indices)
-    else:
-        top_indices = np.arange(n_features)
-        selected_features = n_features
-
-    # Compute ratios only for selected features
     ratio_list: list[NDArray[np.float64]] = []
     ratio_names: list[str] = []
 
-    for i in range(selected_features):
-        for j in range(selected_features):
+    for i in range(n_features):
+        for j in range(n_features):
             if i != j:
-                idx_i: int = _get_index_value(top_indices, i)
-                idx_j: int = _get_index_value(top_indices, j)
-
                 # Safe division with small epsilon to avoid division by zero
-                denominator: NDArray[np.float64] = x[:, idx_j].copy()
+                denominator: NDArray[np.float64] = x[:, j].copy()
                 abs_denom: NDArray[np.float64] = np.abs(denominator)
                 small_mask: NDArray[np.bool_] = abs_denom < 1e-10
                 denominator[small_mask] = 1e-10
-                ratio: NDArray[np.float64] = x[:, idx_i] / denominator
+                ratio: NDArray[np.float64] = x[:, i] / denominator
 
                 # Clip extreme values
                 ratio = np.clip(ratio, -1e6, 1e6)
@@ -119,7 +92,7 @@ def compute_pairwise_ratios(
                 ratio = np.nan_to_num(ratio, nan=0.0, posinf=1e6, neginf=-1e6)
 
                 ratio_list.append(ratio.reshape(-1, 1))
-                ratio_names.append(f"{feature_names[idx_i]}/{feature_names[idx_j]}")
+                ratio_names.append(f"{feature_names[i]}/{feature_names[j]}")
 
                 if max_features > 0 and len(ratio_list) >= max_features:
                     break
@@ -138,7 +111,10 @@ def compute_pairwise_products(
     feature_names: list[str],
     max_features: int = 0,
 ) -> tuple[NDArray[np.float64], list[str]]:
-    """Compute pairwise products Xi*Xj for feature pairs.
+    """Compute pairwise products in declared column order without fitting to rows.
+
+    A positive cap retains the first pairs in column order, independently of
+    every row's values. Column order is part of the model input contract.
 
     Args:
         x: Feature matrix (n_samples, n_features)
@@ -151,35 +127,19 @@ def compute_pairwise_products(
     n_samples: int = int(x.shape[0])
     n_features: int = int(x.shape[1])
 
-    # Calculate number of possible pairs (Xi*Xj = Xj*Xi, so n*(n-1)/2)
-    n_pairs: int = n_features * (n_features - 1) // 2
-
-    if max_features > 0 and n_pairs > max_features:
-        # Select top features based on variance
-        variances: NDArray[np.float64] = np.var(x, axis=0)
-        limit: int = _int_sqrt(max_features * 2)
-        top_indices: NDArray[np.intp] = np.argsort(variances)[::-1][:limit]
-        selected_features: int = len(top_indices)
-    else:
-        top_indices = np.arange(n_features)
-        selected_features = n_features
-
     product_list: list[NDArray[np.float64]] = []
     product_names: list[str] = []
 
-    for i in range(selected_features):
-        for j in range(i + 1, selected_features):
-            idx_i: int = _get_index_value(top_indices, i)
-            idx_j: int = _get_index_value(top_indices, j)
-
-            product: NDArray[np.float64] = x[:, idx_i] * x[:, idx_j]
+    for i in range(n_features):
+        for j in range(i + 1, n_features):
+            product: NDArray[np.float64] = x[:, i] * x[:, j]
 
             # Clip extreme values
             product = np.clip(product, -1e12, 1e12)
             product = np.nan_to_num(product, nan=0.0, posinf=1e12, neginf=-1e12)
 
             product_list.append(product.reshape(-1, 1))
-            product_names.append(f"{feature_names[idx_i]}*{feature_names[idx_j]}")
+            product_names.append(f"{feature_names[i]}*{feature_names[j]}")
 
             if max_features > 0 and len(product_list) >= max_features:
                 break
