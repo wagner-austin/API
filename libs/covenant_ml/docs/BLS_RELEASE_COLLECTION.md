@@ -91,4 +91,6 @@ The prospective scorer must still join an observed September release to all 21
 frozen contracts, verify native final settlement and unchanged rules, and score
 the six original two-sided books while reporting the 15 missing sides. One
 release remains one dependent event. This command does not infer settlements,
-change forecasts or authorize trading. No release schedule is installed by it.
+change forecasts or authorize trading. The separate
+[scheduled deployment](BLS_RELEASE_SCHEDULE.md) records the subsequently installed
+September acquisition and its real scheduled diagnostic.

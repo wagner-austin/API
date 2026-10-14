@@ -25,6 +25,26 @@ The subsequent [team-rating result](SPORTS_RATINGS_RESULT.md) adds information
 from earlier settled games. Its fitted blend lost a hypothetical $3.16 on nine
 later trades and also failed advancement; these reused dates are exploratory.
 
+The later studies and active observations are written up separately:
+
+- [Second-venue sports result](SPORTS_CROSS_VENUE_RESULT.md): the frozen
+  disagreement strategy produced no trades after costs and did not advance.
+- [Historical inflation result](INFLATION_EXPERIMENT_RESULT.md): the declared
+  experiment failed its advancement criteria; hypothetical profit is not an edge.
+- [Frozen September inflation observation](INFLATION_PROSPECTIVE_2026_09.md):
+  the original probabilities and book receipts remain separate from the historical
+  experiment. Outcome scoring requires the official release and final settlements.
+- [Official release capture](BLS_RELEASE_COLLECTION.md): successful public
+  acquisition and byte-identical replay, including source hashes and full checks.
+  The [scheduled September observation](BLS_RELEASE_SCHEDULE.md) records its
+  isolated runtime, actual scheduler diagnostic and verified future trigger.
+- [Stock pilot snapshot](EQUITY_PILOT_SNAPSHOT.md) and
+  [scheduled stock outcome collection](EQUITY_SCHEDULE.md): the declared portfolio
+  and independently installed future collector; no mature return is claimed.
+
+These reports preserve rejected candidates as well as active measurements.
+None establishes a reliable profitable edge or authorizes funded trading.
+
 From `libs/covenant_ml`, after `poetry sync --with dev`:
 
 ```powershell
