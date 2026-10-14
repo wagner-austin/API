@@ -23,13 +23,16 @@ from .test_calibration_evidence import _capture
 __all__ = ["api_server"]
 
 
+@pytest.mark.parametrize("study", ["fixed", "selection"])
 def test_actual_cli_and_replay_preserve_scores_and_models(
-    api_server: ApiServer, tmp_path: Path
+    api_server: ApiServer, tmp_path: Path, study: str
 ) -> None:
-    source = _capture(api_server, tmp_path, date(2026, 5, 12), "2026-04-22")
+    source = _capture(api_server, tmp_path, date(2026, 5, 14), "2026-04-24")
     protocol = tmp_path / "protocol.md"
     protocol.write_bytes(b"Frozen real-model integration experiment.\n")
     args = [
+        "--study",
+        study,
         "--report",
         str(source),
         "--markets-archive",
@@ -43,7 +46,7 @@ def test_actual_cli_and_replay_preserve_scores_and_models(
         "--protocol-sha256",
         sha256(protocol.read_bytes()).hexdigest(),
         "--first-fold-end",
-        "2026-05-02",
+        "2026-05-04",
     ]
     requests = len(api_server.requests)
     first, second, third = (tmp_path / name for name in ("first.json", "second.json", "third.json"))

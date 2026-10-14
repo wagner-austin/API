@@ -1,6 +1,7 @@
 """Actual expanding-window models obey label availability and future-data isolation."""
 
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from platform_core.json_utils import (
@@ -24,12 +25,17 @@ from .test_boosting_model import training_rows
 
 
 @pytest.mark.parametrize("mutation", ["labels", "features"])
-def test_future_changes_preserve_past_models_and_predictions(tmp_path: Path, mutation: str) -> None:
+@pytest.mark.parametrize("study", ["fixed", "selection"])
+def test_future_changes_preserve_past_models_and_predictions(
+    tmp_path: Path, mutation: str, study: Literal["fixed", "selection"]
+) -> None:
     document = encode_comparison_plan(comparison_plan())
     document.update(start="2026-01-01", train_end="2026-03-01", end="2026-03-21")
     plan = decode_comparison_plan(document)
     rows = training_rows()
-    original = evaluate_boosting(rows, plan, ("2026-03-11", "2026-03-21"), tmp_path / "first")
+    original = evaluate_boosting(
+        rows, plan, ("2026-03-11", "2026-03-21"), tmp_path / "first", study
+    )
     documents = [encode_forecast_row(row) for row in rows]
     for row, raw in zip(rows, documents, strict=True):
         if row["event_day"] > "2026-03-11":
@@ -38,7 +44,9 @@ def test_future_changes_preserve_past_models_and_predictions(tmp_path: Path, mut
             else:
                 raw["weather_p"] = 1 - row["weather_p"]
     mutated = tuple(decode_forecast_row(raw) for raw in documents)
-    second = evaluate_boosting(mutated, plan, ("2026-03-11", "2026-03-21"), tmp_path / "second")
+    second = evaluate_boosting(
+        mutated, plan, ("2026-03-11", "2026-03-21"), tmp_path / "second", study
+    )
     first_folds, second_folds = require_list(original, "folds"), require_list(second, "folds")
     assert first_folds[0] == second_folds[0]
     assert (tmp_path / "first/fold-1.txt").read_bytes() == (
@@ -50,6 +58,7 @@ def test_future_changes_preserve_past_models_and_predictions(tmp_path: Path, mut
     last = narrow_json_to_dict(first_folds[1])
     changed = narrow_json_to_dict(second_folds[1])
     assert last["logistic_model"] == changed["logistic_model"]
+    assert last["selection"] == changed["selection"]
     assert last["scores"] != changed["scores"]
     old_arms = require_dict(require_dict(last, "scores"), "arms")
     new_arms = require_dict(require_dict(changed, "scores"), "arms")
@@ -78,7 +87,7 @@ def test_future_changes_preserve_past_models_and_predictions(tmp_path: Path, mut
         row["ticker"] for row in rows if row["event_day"] > plan["train_end"]
     }
     with pytest.raises(FileExistsError):
-        evaluate_boosting(rows, plan, ("2026-03-11", "2026-03-21"), tmp_path / "first")
+        evaluate_boosting(rows, plan, ("2026-03-11", "2026-03-21"), tmp_path / "first", study)
 
 
 @pytest.mark.parametrize("ends", [("2026-02-01", "2026-03-21"), ("2026-03-11", "2026-03-20")])
@@ -88,5 +97,7 @@ def test_invalid_folds_fail_before_creating_artifacts(
     document = encode_comparison_plan(comparison_plan())
     document.update(start="2026-01-01", train_end="2026-03-01", end="2026-03-21")
     with pytest.raises(ValueError, match="BOOST-004"):
-        evaluate_boosting(training_rows(), decode_comparison_plan(document), ends, tmp_path / "bad")
+        evaluate_boosting(
+            training_rows(), decode_comparison_plan(document), ends, tmp_path / "bad", "fixed"
+        )
     assert not (tmp_path / "bad").exists()
