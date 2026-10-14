@@ -21,6 +21,7 @@ class ApiServer(HTTPServer):
     statuses: dict[str, int]
     bodies: list[JSONObject]
     disconnect_paths: set[str]
+    text_documents: dict[str, list[str]]
 
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), ApiHandler)
@@ -30,6 +31,7 @@ class ApiServer(HTTPServer):
         self.statuses = {}
         self.bodies = []
         self.disconnect_paths = set()
+        self.text_documents = {}
 
     @property
     def url(self) -> str:
@@ -57,14 +59,19 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path in self.server.disconnect_paths:
             self.connection.shutdown(SHUT_RDWR)
             return
-        if path not in self.server.documents:
+        if path in self.server.text_documents:
+            payload = self.server.text_documents[path].pop(0).encode("utf-8")
+            media_type = "text/html; charset=utf-8"
+        elif path in self.server.documents:
+            document = self.server.documents[path].pop(0)
+            payload = dump_json_str(document).encode("utf-8")
+            media_type = "application/json"
+        else:
             self.send_response(404)
             self.end_headers()
             return
-        document = self.server.documents[path].pop(0)
-        payload = dump_json_str(document).encode("utf-8")
         self.send_response(self.server.statuses.get(path, 200))
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", media_type)
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
