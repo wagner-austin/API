@@ -16,6 +16,7 @@ from scripts.sports_strategy import main
 from covenant_ml.markets.validation import read_document
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
+from ._rating_fixtures import game, warmup
 from ._server import ApiServer, api_server
 from ._strategy_fixtures import candle_payload, native_market, observation
 
@@ -35,7 +36,7 @@ def test_real_capture_replay_and_process_failure(api_server: ApiServer, tmp_path
             "/historical/markets/" + observation(day)[0]["ticker"] + "/candlesticks"
         ] = [payload]
     archive = tmp_path / "archive"
-    args = ["--archive", str(archive), "--market-url", api_server.url]
+    args = ["--archive", str(archive), "--market-url", api_server.url, "--model", "temperature"]
     first, second = tmp_path / "first.json", tmp_path / "second.json"
     assert main([*args, "--mode", "capture", "--out", str(first)], stand_in_pin) == 0
     assert main([*args, "--mode", "replay", "--out", str(second)], stand_in_pin) == 0
@@ -84,3 +85,37 @@ def test_real_capture_replay_and_process_failure(api_server: ApiServer, tmp_path
 def test_entry_requires_early_pinning() -> None:
     with pytest.raises(NativeLibrariesAlreadyLoadedError):
         runpy.run_module("scripts.sports_strategy", run_name="__main__")
+
+
+def test_real_rating_capture_and_replay(api_server: ApiServer, tmp_path: Path) -> None:
+    stamps = ("26JAN01", "26MAR01", "26MAR02")
+    records = [*warmup(), *(native for day in stamps for native in game(day))]
+    api_server.documents["/historical/markets"] = [{"markets": list(records), "cursor": ""}]
+    for day in stamps:
+        api_server.documents[
+            "/historical/markets/" + observation(day)[0]["ticker"] + "/candlesticks"
+        ] = [candle_payload(day)]
+    args = [
+        "--archive",
+        str(tmp_path / "archive"),
+        "--market-url",
+        api_server.url,
+        "--model",
+        "ratings",
+    ]
+    first, second = tmp_path / "ratings.json", tmp_path / "replay.json"
+    assert main([*args, "--mode", "capture", "--out", str(first)], stand_in_pin) == 0
+    assert main([*args, "--mode", "replay", "--out", str(second)], stand_in_pin) == 0
+    assert first.read_bytes() == second.read_bytes()
+    report = read_document(first)
+    assert report["weight"] == 1.0
+    assert report["trades"] == 0
+    assert require_dict(report, "rating_coverage") == {
+        "inventory_games": 13,
+        "incomplete_pairs": 0,
+        "nonbinary_games": 0,
+        "unavailable_target": 0,
+        "insufficient_history": 0,
+        "eligible_forecasts": 3,
+    }
+    assert len(api_server.requests) == 4
