@@ -14,12 +14,29 @@ are what a capacity check subtracts from a node's free memory, so a line
 skipped is a running dispatch made invisible, and the next dispatch is admitted
 onto a node that is already full -- the exact failure the package exists to
 prevent. The reader raises and names the line number.
+
+AN APPEND IS MADE IN A TURN (MCPs board task 8d96f89a). Every node runner is
+its own process on the hub and they all append to one ledger, one feed and
+one retire record, ticking in the same second. Appending mode on Windows
+seeks to the end and then writes, two calls, so two processes appending at
+once can both write at the same offset, the longer row's tail surviving
+after the shorter row's newline. On 2026-10-14 at 09:48:30Z the finish rows
+of MCPs-packages-maketools-lavender-wsl-1791971182 and
+MCPs-mcp-shared-py-lavender-wsl-1791971191 landed together: the ledger kept
+the second whole and fifteen bytes of the first, every node runner then
+raised ``InvalidJsonError`` on every tick, and the fleet claimed nothing for
+36 minutes. So each append holds :data:`APPEND_TURN` on a lock beside its
+file (:mod:`fleet.core.file_turn`, the turn the lease file has held since the
+same failure on 2026-10-11), and one append's line is whole before the next
+begins.
 """
 
 from __future__ import annotations
 
+import os
 import pathlib
 from collections.abc import Mapping
+from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
@@ -29,7 +46,42 @@ from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledg
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.retire_record import RetireRecord, decode_retire_record, encode_retire_record
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, file_turn
+
+#: The turn one append to a record file is made in. Inside it a process
+#: appends one line to one local file and nothing else, so a lock half a
+#: minute old was left by a process that died holding it.
+APPEND_TURN: Final = file_turn.TurnBounds(
+    what="append turn",
+    waited_for="another process appending to the same record",
+    stale_seconds=30,
+    poll_seconds=1,
+)
+
+
+def append_lock_path(path: pathlib.Path) -> pathlib.Path:
+    """Where a record file's append turn is held.
+
+    Args:
+        path: The record file.
+
+    Returns:
+        The lock file beside it.
+    """
+    return path.with_name(f"{path.name}.lock")
+
+
+def _append_line(path: pathlib.Path, line: str) -> None:
+    """Append one line to a record file in its append turn.
+
+    Args:
+        path: The record file.
+        line: The line, without its newline.
+    """
+    with file_turn.held(
+        append_lock_path(path), holder=f"fleet process {os.getpid()}", bounds=APPEND_TURN
+    ):
+        _test_hooks.append_text(path, line)
 
 
 def _read_lines(path: pathlib.Path) -> tuple[tuple[int, JSONValue], ...]:
@@ -153,7 +205,7 @@ def append_ledger(path: pathlib.Path, entry: LedgerEntry) -> None:
         path: The ledger file.
         entry: The row to record.
     """
-    _test_hooks.append_text(path, dump_json_str(encode_ledger_entry(entry)))
+    _append_line(path, dump_json_str(encode_ledger_entry(entry)))
 
 
 def read_feed(path: pathlib.Path) -> tuple[FeedEvent, ...]:
@@ -187,7 +239,7 @@ def append_feed(path: pathlib.Path, event: FeedEvent) -> None:
         path: The feed file.
         event: The event to emit.
     """
-    _test_hooks.append_text(path, dump_json_str(encode_feed_event(event)))
+    _append_line(path, dump_json_str(encode_feed_event(event)))
 
 
 def read_retires(path: pathlib.Path) -> tuple[RetireRecord, ...]:
@@ -214,7 +266,7 @@ def append_retire(path: pathlib.Path, record: RetireRecord) -> None:
         path: The retire record file.
         record: The line to record.
     """
-    _test_hooks.append_text(path, dump_json_str(encode_retire_record(record)))
+    _append_line(path, dump_json_str(encode_retire_record(record)))
 
 
 __all__ = [
