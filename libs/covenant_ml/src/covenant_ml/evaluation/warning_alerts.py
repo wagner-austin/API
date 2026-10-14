@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from platform_core.json_utils import JSONObject, narrow_json_to_int, require_int, require_list
 from typing_extensions import ReadOnly, TypedDict
 
+from .warning_history import require_warning_history
 from .warning_panel import WarningRow, warning_label
 from .warning_records import require_warning_time
 from .warning_review import require_warning_batch, select_warning_reviews
@@ -134,27 +135,16 @@ def _exposure_and_events(rows: Sequence[WarningRow]) -> tuple[int, dict[str, int
     Raises:
         ValueError: WARN-024 for conflicting or contradictory breach evidence.
     """
-    incidents: dict[str, int] = {}
+    incidents = require_warning_history(rows)
     histories: dict[str, list[WarningRow]] = {}
     for row in rows:
         borrower = row["disclosure"]["borrower"]
         histories.setdefault(borrower, []).append(row)
-        breach = row["followup"]["first_breach_ms"]
-        if breach is not None:
-            if borrower in incidents and incidents[borrower] != breach:
-                raise ValueError("[WARN-024] a borrower has conflicting first-breach dates")
-            incidents[borrower] = breach
     exposure = 0
     for borrower, history in histories.items():
         breach = incidents.get(borrower)
         windows: list[tuple[int, int]] = []
         for row in history:
-            if (
-                breach is not None
-                and row["followup"]["first_breach_ms"] is None
-                and row["followup"]["observed_through_ms"] >= breach
-            ):
-                raise ValueError("[WARN-024] event-free surveillance contradicts a known breach")
             end = (
                 min(row["horizon_end_ms"], breach) if breach is not None else row["horizon_end_ms"]
             )

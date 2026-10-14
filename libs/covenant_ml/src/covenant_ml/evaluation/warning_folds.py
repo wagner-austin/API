@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from platform_core.json_utils import JSONObject, narrow_json_to_dict, require_list
 from typing_extensions import ReadOnly, TypedDict
 
+from .warning_history import require_warning_history
 from .warning_panel import (
     WarningRow,
     decode_warning_row,
@@ -77,10 +78,12 @@ def require_warning_fold(fold: WarningFold, as_of_ms: int) -> None:
         None: All stages satisfy chronological and borrower exclusion constraints.
 
     Raises:
-        ValueError: Existing WARN-008/009 partition validation errors propagate.
+        ValueError: Existing WARN-008/009 partition validation errors propagate;
+            WARN-024 rejects inconsistent first-breach evidence before fitting.
     """
     require_warning_split(fold["fitting"], fold["calibration"], as_of_ms)
     require_warning_split((*fold["fitting"], *fold["calibration"]), fold["validation"], as_of_ms)
+    require_warning_history((*fold["fitting"], *fold["calibration"], *fold["validation"]))
 
 
 def require_warning_study(folds: Sequence[WarningFold], final: WarningFold, as_of_ms: int) -> None:
@@ -112,6 +115,14 @@ def require_warning_study(folds: Sequence[WarningFold], final: WarningFold, as_o
         if start <= previous_end:
             raise ValueError("[WARN-015] validation windows must be strictly ordered")
         previous_end = max(row["cutoff_ms"] for row in fold["validation"])
+    require_warning_history(
+        tuple(
+            row
+            for fold in (*folds, final)
+            for rows in (fold["fitting"], fold["calibration"], fold["validation"])
+            for row in rows
+        )
+    )
 
 
 __all__ = [
