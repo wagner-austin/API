@@ -45,7 +45,12 @@ def select_warning_reviews(scores: Mapping[str, float], budget: int) -> tuple[st
     if not scores:
         raise ValueError("[WARN-011] a review batch must contain borrowers")
     for borrower, score in scores.items():
-        if not borrower or borrower != borrower.strip() or not math.isfinite(score):
+        if (
+            not borrower
+            or borrower != borrower.strip()
+            or isinstance(score, bool)
+            or not math.isfinite(score)
+        ):
             raise ValueError("[WARN-011] borrower identifiers and finite risk scores are required")
     ordered = sorted((-score, borrower) for borrower, score in scores.items())
     return tuple(borrower for _, borrower in ordered[:budget])
@@ -126,6 +131,38 @@ def warning_review_rates(result: WarningReview) -> tuple[float, float | None, in
     )
 
 
+def require_warning_batch(rows: Sequence[WarningRow], as_of_ms: int) -> dict[str, WarningRow]:
+    """Require a complete common decision batch for batch or longitudinal scoring.
+
+    Args:
+        rows: Decoder-validated at-risk evidence, one row per borrower at one cutoff
+            and common horizon. Eligibility must have been frozen without outcomes.
+        as_of_ms: Analysis time by which horizons and label evidence must be known.
+
+    Returns:
+        dict[str, WarningRow]: Unique borrower-indexed evidence for one decision window.
+
+    Raises:
+        ValueError: WARN-013 for mismatched batches; WARN-014 for immature or
+            censored evidence.
+    """
+    if not rows:
+        raise ValueError("[WARN-013] a nonempty borrower batch is required")
+    borrowers = {row["disclosure"]["borrower"]: row for row in rows}
+    windows = {(row["cutoff_ms"], row["horizon_end_ms"]) for row in rows}
+    if len(borrowers) != len(rows) or len(windows) != 1:
+        raise ValueError("[WARN-013] require unique borrowers and one common prediction window")
+    for row in borrowers.values():
+        label = warning_label(row)
+        if (
+            label is None
+            or row["horizon_end_ms"] > as_of_ms
+            or row["followup"]["available_ms"] > as_of_ms
+        ):
+            raise ValueError("[WARN-014] every horizon and outcome must be mature and known")
+    return borrowers
+
+
 def compare_warning_reviews(
     rows: Sequence[WarningRow],
     model_scores: Mapping[str, Mapping[str, float]],
@@ -135,36 +172,22 @@ def compare_warning_reviews(
     """Score models on exactly the same mature batch and fixed review budget.
 
     Args:
-        rows: Decoder-validated at-risk evidence, one row per borrower at one cutoff
-            and common horizon. Eligibility must have been frozen without outcomes.
-        model_scores: At least two named models with identical borrower key sets.
-            Scores must have been recorded at prediction time by the caller.
-        budget: Positive integer slots shared by all models; never selected here.
-        as_of_ms: Analysis time by which horizons and label evidence must be known.
+        rows: Decoder-validated at-risk evidence with outcome-independent eligibility.
+        model_scores: Named models scoring exactly the same borrowers at the cutoff.
+        budget: Positive fixed integer number of review slots.
+        as_of_ms: Analysis cutoff for all labels and horizons.
 
     Returns:
-        dict[str, WarningReview]: Per-model counts, alerts and detected lead times.
+        dict[str, WarningReview]: Counts and lead times for each model.
 
     Raises:
-        ValueError: WARN-013 for mismatched batches or models; WARN-014 for
-            immature or censored evidence. Selection preserves WARN-010/011.
+        ValueError: WARN-013 for mismatched models; batch WARN-013/014 and selection
+            WARN-010/011 errors propagate.
     """
-    if not rows or len(model_scores) < 2:
-        raise ValueError("[WARN-013] a nonempty batch and at least two models are required")
-    borrowers = {row["disclosure"]["borrower"]: row for row in rows}
-    windows = {(row["cutoff_ms"], row["horizon_end_ms"]) for row in rows}
-    if len(borrowers) != len(rows) or len(windows) != 1:
-        raise ValueError("[WARN-013] require unique borrowers and one common prediction window")
-    labels: dict[str, int] = {}
-    for borrower, row in borrowers.items():
-        label = warning_label(row)
-        if (
-            label is None
-            or row["horizon_end_ms"] > as_of_ms
-            or row["followup"]["available_ms"] > as_of_ms
-        ):
-            raise ValueError("[WARN-014] every horizon and outcome must be mature and known")
-        labels[borrower] = label
+    borrowers = require_warning_batch(rows, as_of_ms)
+    if len(model_scores) < 2:
+        raise ValueError("[WARN-013] at least two models are required")
+    labels = {borrower: warning_label(row) for borrower, row in borrowers.items()}
     results: dict[str, WarningReview] = {}
     for model, scores in model_scores.items():
         if not model or model != model.strip() or set(scores) != set(borrowers):
@@ -178,7 +201,7 @@ def compare_warning_reviews(
         results[model] = WarningReview(
             eligible=len(rows),
             budget=budget,
-            breaches=sum(labels.values()),
+            breaches=sum(label == 1 for label in labels.values()),
             selected=selected,
             lead_times_ms=tuple(leads),
         )
@@ -190,6 +213,7 @@ __all__ = [
     "compare_warning_reviews",
     "decode_warning_review",
     "encode_warning_review",
+    "require_warning_batch",
     "select_warning_reviews",
     "warning_review_rates",
 ]
