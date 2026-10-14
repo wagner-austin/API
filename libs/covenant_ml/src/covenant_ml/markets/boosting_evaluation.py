@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
 
 from platform_core.json_utils import (
     JSONObject,
@@ -16,6 +17,7 @@ from platform_core.json_utils import (
 
 from .boosting_model import boosting_parameters, feature_matrix, fit_boosting
 from .boosting_scores import score_predictions
+from .boosting_selection import select_boosting
 from .forecast_model import (
     chronological_split,
     encode_fitted_logit,
@@ -38,6 +40,7 @@ def evaluate_boosting(
     plan: ComparisonPlan,
     fold_ends: tuple[str, str],
     artifacts: Path,
+    study: Literal["fixed", "selection"],
 ) -> JSONObject:
     """Fit fixed models on earlier available labels and score two later periods.
 
@@ -46,6 +49,7 @@ def evaluate_boosting(
         plan: Original experiment's date window and initial training boundary.
         fold_ends: Two ordered evaluation endpoints, ending at the source plan end.
         artifacts: New experiment directory, reserved exclusively by this call.
+        study: Fixed candidate or earlier-only capacity selection experiment.
 
     Returns:
         Fold identities, fitted logistic models, native booster names and pooled scores.
@@ -79,8 +83,13 @@ def evaluate_boosting(
         )
         baseline = fit_logit(train, True)
         model_name = f"fold-{index + 1}.txt"
-        boosted = fit_boosting(train, artifacts / model_name)
-        probabilities = boosted.booster_.predict(feature_matrix(test))
+        selection: JSONObject = {}
+        weather = True
+        if study == "selection":
+            boosted, weather, selection = select_boosting(train, artifacts / model_name)
+        else:
+            boosted = fit_boosting(train, artifacts / model_name, 20, 4, True)
+        probabilities = boosted.booster_.predict(feature_matrix(test, weather))
         predictions = {
             "raw_market": tuple((r["bid"] + r["ask"]) / 20000 for r in test),
             "logistic": predict_logit(baseline, test),
@@ -102,6 +111,7 @@ def evaluate_boosting(
                 "evaluation_rows": [encode_forecast_row(row) for row in test],
                 "logistic_model": encode_fitted_logit(baseline),
                 "boosting_model": model_name,
+                "selection": selection,
                 "scores": scores,
             }
         )
@@ -119,7 +129,8 @@ def evaluate_boosting(
     }
     return {
         "schema_version": 1,
-        "hyperparameters": boosting_parameters(),
+        "study": study,
+        "hyperparameters": boosting_parameters(20, 4) if study == "fixed" else {},
         "folds": folds,
         "scores": scores,
         "criteria": dict(criteria),

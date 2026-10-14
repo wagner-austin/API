@@ -10,21 +10,25 @@ from numpy.typing import NDArray
 from platform_core.json_utils import JSONObject, require_float, require_int
 
 from ..backends.lightgbm.backend import _get_lightgbm_imports, _LGBModelProtocol
-from .forecast_model import WEATHER_FEATURES, features
+from .forecast_model import MARKET_FEATURES, WEATHER_FEATURES, features
 from .forecast_records import ForecastFeatures, ForecastRow
 
 
-def boosting_parameters() -> JSONObject:
+def boosting_parameters(rounds: int, leaves: int) -> JSONObject:
     """Return the single declared configuration, with no data-dependent selection.
+
+    Args:
+        rounds: Declared number of boosting iterations.
+        leaves: Declared maximum leaves per tree.
 
     Returns:
         JSON settings used by both fitting and the recorded report.
     """
     return {
-        "n_estimators": 20,
+        "n_estimators": rounds,
         "learning_rate": 0.05,
-        "num_leaves": 4,
-        "max_depth": 2,
+        "num_leaves": leaves,
+        "max_depth": leaves.bit_length() - 1,
         "min_child_samples": 50,
         "reg_alpha": 0.0,
         "reg_lambda": 10.0,
@@ -41,31 +45,38 @@ def boosting_parameters() -> JSONObject:
     }
 
 
-def feature_matrix(rows: Sequence[ForecastFeatures]) -> NDArray[np.float64]:
+def feature_matrix(rows: Sequence[ForecastFeatures], weather: bool) -> NDArray[np.float64]:
     """Materialize the existing fixed forecast features in their declared order.
 
     Args:
         rows: Outcome-free feature records.
+        weather: Include the additional forecast feature.
 
     Returns:
-        Float64 matrix with four columns.
+        Float64 matrix with the declared feature columns.
     """
-    values: list[tuple[float, ...]] = [features(row, True) for row in rows]
+    values: list[tuple[float, ...]] = [features(row, weather) for row in rows]
     return np.asarray(values, dtype=np.float64)
 
 
-def fit_boosting(rows: Sequence[ForecastRow], artifact: Path) -> _LGBModelProtocol:
+def fit_boosting(
+    rows: Sequence[ForecastRow], artifact: Path, rounds: int, leaves: int, weather: bool
+) -> _LGBModelProtocol:
     """Fit and save one native model without evaluation data or early stopping.
 
     Args:
         rows: Earlier observations whose labels are available before prediction.
         artifact: New native model path in the experiment's reserved directory.
+        rounds: Explicit training iterations from the declared experiment.
+        leaves: Explicit leaf limit, either four or eight.
+        weather: Whether the forecast is included.
 
     Returns:
         Actual fitted LightGBM model.
 
     Raises:
         ValueError: BOOST-001 if both training classes are not present.
+            BOOST-007 if the declared model capacity is unsupported.
         FileExistsError: BOOST-002 if a model would overwrite existing evidence.
         OSError: Native model persistence fails.
     """
@@ -73,7 +84,9 @@ def fit_boosting(rows: Sequence[ForecastRow], artifact: Path) -> _LGBModelProtoc
         raise ValueError("[BOOST-001] training requires both binary classes")
     if artifact.exists():
         raise FileExistsError("[BOOST-002] native model artifact already exists")
-    parameters = boosting_parameters()
+    if rounds not in (20, 100, 400) or leaves not in (4, 8):
+        raise ValueError("[BOOST-007] require declared rounds and leaf capacity")
+    parameters = boosting_parameters(rounds, leaves)
     constructor, _ = _get_lightgbm_imports()
     model = constructor(
         boosting_type="gbdt",
@@ -96,6 +109,7 @@ def fit_boosting(rows: Sequence[ForecastRow], artifact: Path) -> _LGBModelProtoc
     )
     labels: list[int] = [row["yes"] for row in rows]
     y: NDArray[np.int64] = np.asarray(labels, dtype=np.int64)
-    model.fit(feature_matrix(rows), y, eval_set=[], feature_name=list(WEATHER_FEATURES))
+    names = WEATHER_FEATURES if weather else MARKET_FEATURES
+    model.fit(feature_matrix(rows, weather), y, eval_set=[], feature_name=list(names))
     model.booster_.save_model(str(artifact))
     return model
