@@ -29,10 +29,18 @@ behaved as one slow node; two lanes and per-node
 runners are the fix, and nothing here collects a suite any more because
 nothing here starts one.
 
-A TICK IS TWO PASSES, IN THIS ORDER:
+A TICK IS THREE PASSES, IN THIS ORDER:
 
     1. CLAIM. Take at most one hub-lane job and run it to its close.
-    2. OBSERVE. Read every enabled worker's Claude Code session records over
+    2. REFUSE. List every project the registry declares at the commit
+       ``refs/fleet/rolled`` names now and hand them to the queue, which
+       refuses each queued make-target job queued before the read whose
+       project is not among them (MCPs board task 1915b042,
+       :mod:`fleet.core.declared`). No node runner would ever claim such a
+       job, since each claims only the registry projects it fits, so before
+       this pass a mistyped key waited until its submitter noticed. Here,
+       once a tick for the whole fleet, rather than in every node runner.
+    3. OBSERVE. Read every enabled worker's Claude Code session records over
        ssh and hand them to the board's session ledger (MCPs board task
        5a3865bf; :mod:`fleet.core.observe` carries the why). Last, because
        it is the pass that touches every node, and a node asleep costs a
@@ -75,7 +83,16 @@ from fleet.contracts.dispatch import (
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import _test_hooks, observe, queue, rebuild, registry, restart, session_release
+from fleet.core import (
+    _test_hooks,
+    declared,
+    observe,
+    queue,
+    rebuild,
+    registry,
+    restart,
+    session_release,
+)
 
 _log = get_logger(__name__)
 
@@ -337,6 +354,37 @@ def claim_pass(
     return session_job(credentials, job, identity)
 
 
+def refuse_pass(
+    credentials: McpCredentials, identity: JSONObject, *, repo_root: pathlib.Path
+) -> None:
+    """Refuse the queued jobs whose project the rolled registry does not declare.
+
+    Args:
+        credentials: The queue's endpoint and headers.
+        identity: This runner's identity arguments; the refusals are its.
+        repo_root: The API checkout whose object store holds
+            ``refs/fleet/rolled``.
+
+    Raises:
+        AppError: From the queue call. A read that could not list the
+            registry sends nothing and is logged with its code, every tick
+            it happens, since refusing on a registry not read would refuse
+            declared work.
+    """
+    read = declared.read_declared(repo_root)
+    if isinstance(read, str):
+        _log.warning("refused nothing undeclared: %s", read)
+        return
+    refused = declared.refuse_undeclared(credentials, read, identity=identity)
+    _log.info(
+        "refused %d queued job(s) naming a project the registry at %s does not declare "
+        "(%d declared)",
+        refused,
+        read["commit"],
+        len(read["declared"]),
+    )
+
+
 def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
     """Record every enabled worker's Claude Code sessions in the board's ledger.
 
@@ -364,7 +412,7 @@ def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick: claim at most one hub-lane job and run it, then observe.
+    """Run one tick: claim and run at most one hub-lane job, refuse undeclared work, observe.
 
     With ``--announce`` the tick instead posts the check-in that registers
     this runner's session on the board's ledger and claims nothing. The
@@ -424,6 +472,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if claim_pass(credentials, identity, node=parsed.get(NODE_FLAG), mcps_root=mcps_root) is None:
         _log.info("hub lane empty")
+    refuse_pass(credentials, identity, repo_root=project_root)
 
     raw_registry = parsed.get(REGISTRY_FLAG)
     if raw_registry is None:
