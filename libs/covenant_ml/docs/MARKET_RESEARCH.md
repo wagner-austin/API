@@ -30,7 +30,9 @@ The later studies and active observations are written up separately:
 - [Evidence recheck](MARKET_RECHECK_20261014.md): independent check passed;
   protocol checkout byte drift repaired and historical results reproduced again.
 - [Fixed boosting comparison](FORECAST_BOOSTING_PROTOCOL.md): declared model,
-  chronological folds and evaluation limits for the next development experiment.
+  chronological folds and evaluation limits frozen before the development run.
+- [Completed boosting result](FORECAST_BOOSTING_RESULTS.md): the fixed challenger
+  had worse predictive loss in both folds and lost $6.94 after assumed taker fees.
 - [Validity audit](MARKET_VALIDITY_AUDIT.md): reproduced shared splitter and
   feature-selection leakage defects, their repairs, model inventory and limits
   on historical holdout claims.

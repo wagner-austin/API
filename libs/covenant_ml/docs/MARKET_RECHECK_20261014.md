@@ -72,3 +72,7 @@ equal-date primary scoring and unchanged fee/friction diagnostics. No boosting
 result is claimed by this document. These dates have already been examined;
 the comparison is exploratory development and cannot become a fresh holdout
 merely because the new model has not previously been fitted.
+
+The operator subsequently requested execution during this same pass. The
+[completed comparison](FORECAST_BOOSTING_RESULTS.md) records the actual runs,
+independent replay, native model evidence and failed development criteria.
