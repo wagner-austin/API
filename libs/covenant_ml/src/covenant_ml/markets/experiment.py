@@ -21,6 +21,7 @@ from platform_core.run_record import Observation
 from typing_extensions import ReadOnly, TypedDict
 
 from .codecs import decode_rule, encode_rule
+from .regimes import pre_entry_regime, regime_manifest, summarize_regimes
 from .replay import replay_markets
 from .replay_codecs import encode_result
 from .reporting import write_market_report
@@ -121,6 +122,7 @@ def evaluate_panel(histories: Sequence[MarketHistory], plan: ExperimentPlan) -> 
         )
     start, end = date.fromisoformat(plan["start"]), date.fromisoformat(plan["end"])
     arms: list[JSONValue] = []
+    regimes = {history["ticker"]: pre_entry_regime(history) for history in histories}
     for through in (200, 100, 0):
         rule = encode_rule(plan["rule"])
         rule["through"] = through
@@ -152,6 +154,7 @@ def evaluate_panel(histories: Sequence[MarketHistory], plan: ExperimentPlan) -> 
                 "summary": encode_summary(summary),
                 "by_city": by_city,
                 "monthly": monthly,
+                "by_regime": summarize_regimes(results, regimes, start, end, plan["friction"]),
                 "exclusions": counts,
                 "orders": encoded_results,
             }
@@ -160,6 +163,7 @@ def evaluate_panel(histories: Sequence[MarketHistory], plan: ExperimentPlan) -> 
         "plan": encode_plan(plan),
         "schema_version": SCHEMA_VERSION,
         "results": arms,
+        "pre_entry_regimes": regime_manifest(regimes),
         "interpretation": "Historical replication with hypothetical fills; not executable profit.",
     }
 
