@@ -23,7 +23,8 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         Zero after report and RunRecord persistence, including explicit pending.
 
     Raises:
-        ValueError: Invalid snapshot, calendar, receipt or native price evidence.
+        ValueError: EQUITY-021 for unexpected implementation bytes, or invalid
+            snapshot, calendar, receipt or native price evidence.
         FileExistsError: EQUITY-020 for an existing output; capture also refuses
             an existing observation directory.
         HTTPStatusError: Required public GET failed.
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     for name in ("snapshot", "calendar", "archive", "out"):
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--mode", required=True, choices=("capture", "replay"))
+    parser.add_argument("--implementation-sha256", required=True)
     parser.add_argument("--price-url", default="https://query1.finance.yahoo.com")
     arguments = parser.parse_args(argv)
     snapshot: Path = arguments.snapshot
@@ -50,13 +52,17 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     output: Path = arguments.out
     mode: str = arguments.mode
     url: str = arguments.price_url
+    expected_digest: str = arguments.implementation_sha256
+    actual_digest = implementation_digest()
+    if actual_digest != expected_digest:
+        raise ValueError("[EQUITY-021] implementation differs from the declared deployment")
     if output.exists() or run_record_sidecar(output).exists():
         raise FileExistsError("[EQUITY-020] report or RunRecord already exists")
     study, sources = load_equity_study(snapshot, read_document(calendar))
     with closing(_test_hooks.client_factory(60.0, None)) as client:
         archive = ResponseArchive(root, url, client, _test_hooks.clock, _test_hooks.pause)
         report, captures = collect_equity_outcomes(study, archive, mode == "capture")
-    report["implementation_sha256"] = implementation_digest()
+    report["implementation_sha256"] = actual_digest
     sidecar = write_market_report(
         report,
         market_fingerprint(determinism, config_test_hooks.get_env),
