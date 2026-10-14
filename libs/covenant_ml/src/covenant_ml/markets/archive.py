@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
@@ -141,6 +141,28 @@ class ResponseArchive:
             ValueError: Response JSON is malformed.
             OSError: Persistence failed.
         """
+        capture = self.capture_response(path, params, headers={"Accept": "application/json"})
+        return narrow_json_to_dict(load_json_str(capture["body"]))
+
+    def capture_response(
+        self, path: str, params: dict[str, str | int], *, headers: Mapping[str, str]
+    ) -> Capture:
+        """Persist a native response before format-specific validation.
+
+        Args:
+            path: Public API or document path suffix.
+            params: Canonical query arguments.
+            headers: Explicit media type and source-required client identification.
+
+        Returns:
+            Verified envelope of decoded text and actual receipt time.
+
+        Raises:
+            FileExistsError: MARKET-016 when this request is already captured.
+            HTTPStatusError: The public GET failed; no envelope is persisted.
+            ValueError: The receipt timestamp is invalid.
+            OSError: Exclusive persistence failed.
+        """
         url = self.request_url(path, params)
         target = self.file_for(url)
         if target.exists():
@@ -148,7 +170,7 @@ class ResponseArchive:
         # All workers share one start-rate limit, not one limit per worker.
         with self._request_lock:
             self.pause(0.3)
-        response = self.client.get(url, headers={"Accept": "application/json"})
+        response = self.client.get(url, headers=headers)
         response.raise_for_status()
         body = response.text
         capture = decode_capture(
@@ -162,7 +184,7 @@ class ResponseArchive:
         self.root.mkdir(parents=True, exist_ok=True)
         with target.open("x", encoding="utf-8") as output:
             output.write(dump_json_str(encode_capture(capture)))
-        return narrow_json_to_dict(load_json_str(body))
+        return capture
 
     def replay(self, path: str, params: dict[str, str | int]) -> JSONObject:
         """Read verified evidence without a network request.
