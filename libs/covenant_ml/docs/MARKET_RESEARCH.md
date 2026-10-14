@@ -33,6 +33,10 @@ The later studies and active observations are written up separately:
   chronological folds and evaluation limits frozen before the development run.
 - [Completed boosting result](FORECAST_BOOSTING_RESULTS.md): the fixed challenger
   had worse predictive loss in both folds and lost $6.94 after assumed taker fees.
+- [Earlier-only capacity selection](FORECAST_SELECTION_RESULTS.md): 24 candidates
+  and two selected refits still fail; all inner fits and native models are retained.
+- [Cross-market data expansion](MARKET_DATA_EXPANSION_20261014.md): current evidence
+  across domains and a new 1,017-day BTC/ETH archive, with explicit input gaps.
 - [Validity audit](MARKET_VALIDITY_AUDIT.md): reproduced shared splitter and
   feature-selection leakage defects, their repairs, model inventory and limits
   on historical holdout claims.
