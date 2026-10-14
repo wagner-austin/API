@@ -67,6 +67,14 @@ statement, accession `0001193125-09-214859`, accepted at
 `2009-10-28T00:18:29.000Z`. Later revisions cannot replace it at that cutoff.
 Apple's known issuer mapping is an explicit development assumption here.
 
+This historical join uses acceptance as a development timing proxy. The
+[SEC's timestamp explanation](https://www.sec.gov/files/about/webmaster-faq.htm)
+distinguishes acceptance from later public dissemination and supplies no
+first-publication timestamp. Even next-session execution does not prove the
+historical structured feed was available then. Prospective experiments must
+record actual receipts and calculate signals before their decision timestamp.
+No historical receipt or dissemination time is invented by this integration.
+
 | Development accounting case | Entry close | Exit close | Adjusted return |
 | --- | --- | --- | ---: |
 | Original filing, 20 observed bars | 2009-10-28 | 2009-11-25 | 0.06127839557173709 |

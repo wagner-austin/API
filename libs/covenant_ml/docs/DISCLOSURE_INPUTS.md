@@ -41,8 +41,19 @@ Duplicate accession/period facts, duplicate filing identities, mixed concepts
 or units, and tied eligible acceptance timestamps fail explicitly. Valid
 observations for other periods and observations accepted at or after the
 cutoff are ineligible. The result is the latest eligible fact paired with its
-disclosure, or an explicit None when none was available. It never chooses a
+disclosure, or an explicit None when none was accepted before the cutoff. It never chooses a
 nearby period, invents an acceptance time or replaces missing evidence.
+
+Acceptance is not a public-availability timestamp. The
+[SEC webmaster documentation](https://www.sec.gov/files/about/webmaster-faq.htm)
+states that dissemination lags acceptance, with no guaranteed maximum delay
+or field recording the first public availability. This selector enforces
+accession and acceptance chronology only. Historical acceptance-based
+experiments must label their dissemination assumptions; prospective decisions
+must occur after the captured source receipt and completed feature calculation.
+Today's company-facts response also does not establish when that structured
+representation first became available. The one-second boundary examples below
+test selection arithmetic, not an executable one-second filing strategy.
 
 | Code | Failure |
 | --- | --- |
