@@ -1,0 +1,531 @@
+{
+  "purpose": "prospective forecast observation; no trading advancement",
+  "target_month": "2026-09",
+  "event": "KXCPIYOY-26SEP",
+  "forecast_cutoff": "2026-10-14T00:00:00Z",
+  "forecast": {
+    "day": "2026-10-13",
+    "value": 3.60066057218129
+  },
+  "prior_error_count": 60,
+  "prior_errors": [
+    -0.13308467973400973,
+    -0.0066301190252398,
+    0.45732220151813063,
+    0.21326593494483959,
+    0.09477108231987064,
+    0.21755023337772972,
+    0.0577461202756,
+    0.13450447471548088,
+    0.11721212669488956,
+    0.3509409928177405,
+    0.39440986614491,
+    -0.29417568253847115,
+    0.018012396055409496,
+    0.006665189394229998,
+    -0.34274162173440015,
+    -0.37646421916560957,
+    -0.18223308159947926,
+    -0.06699118994773023,
+    -0.17619626805761968,
+    -0.2366009244245495,
+    -0.2603222900678901,
+    -0.07797828813248042,
+    -0.2531268767268702,
+    -0.24284474224938002,
+    -0.1595859419591097,
+    0.00806272907321004,
+    -0.037309631416039934,
+    0.10083621137310983,
+    0.029159955348540212,
+    0.1540509220786901,
+    0.029555286194569597,
+    0.06255874572956,
+    -0.14147012607209009,
+    -0.09150872205314986,
+    -0.1531384623458103,
+    -0.11392648776610992,
+    -0.03231551462743987,
+    0.19532960864578985,
+    0.04248800056977986,
+    0.047786493057540014,
+    0.028811474983259977,
+    0.14883963901066988,
+    -0.004028970407569776,
+    -0.09695201748160986,
+    -0.030762920855619935,
+    -0.04656654009076977,
+    0.028088659547670147,
+    -0.020084404572910053,
+    0.07553953234513999,
+    0.024177329746169818,
+    -0.25989437853113007,
+    0.10360482103686008,
+    0.022682731754229746,
+    0.008326344700090083,
+    0.004078933833670195,
+    0.24605942015829996,
+    0.06900940040743997,
+    -0.38975592422342986,
+    -0.05382987071714007,
+    0.0207079442989202
+  ],
+  "predictions": [
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.2",
+      "strike": 3.2,
+      "probability": 0.9590163934426229,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:12:59.077123+00:00",
+      "book_body_sha256": "5abb0dad80c90a75746f6668953af99448e633894e6ab77600927cc53c10e985",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.2% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.1",
+      "strike": 3.1,
+      "probability": 0.9918032786885246,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:12:59.461180+00:00",
+      "book_body_sha256": "55d2fa8c50a592f422052575f684744b99511355b3b90f1fc2d219daf3ff90df",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.1% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.6",
+      "strike": 4.6,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:12:59.841541+00:00",
+      "book_body_sha256": "48a11bcf720926df53d7362805d458ad657211e54de6323bf3e18dea6060b51e",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.6% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.8",
+      "strike": 4.8,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:00.221473+00:00",
+      "book_body_sha256": "6f414b34a8ce8d6b3a213c5e786ca198ac4d21118ba4399ed4278fe27bf8a065",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.8% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.5",
+      "strike": 4.5,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:00.601707+00:00",
+      "book_body_sha256": "2c0d933703e2c96b71412e50a88791349e1596e41fa9e7c7d167d80ca7dfe559",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.5% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.2",
+      "strike": 4.2,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:00.981652+00:00",
+      "book_body_sha256": "b55a4a65bdb0910a60c1e632eb7c8feadee253f0a576c89147e2aeb339449033",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.2% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T5.0",
+      "strike": 5.0,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:01.366331+00:00",
+      "book_body_sha256": "ca734baa825825383fa65fff74313b88a6c5061d312efecf2e158e09ce43d23d",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 5.0% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.4",
+      "strike": 4.4,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:01.744871+00:00",
+      "book_body_sha256": "20bf65992b3271c957c49fba6ae26d40f07fad002961766eb7013389ab02e128",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.4% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.9",
+      "strike": 3.9,
+      "probability": 0.05737704918032787,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:02.127285+00:00",
+      "book_body_sha256": "b09df2d605ed2915a1359ace7b4145577929f4539ee25f777eeea836b9850686",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.9% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.1",
+      "strike": 4.1,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:02.509280+00:00",
+      "book_body_sha256": "d79fb4bbc3ab9fd4a80944903252a4a6440cda3c0763848db2faeed04309b819",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.1% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.0",
+      "strike": 3.0,
+      "probability": 0.9918032786885246,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:02.889895+00:00",
+      "book_body_sha256": "01434d47e2dffbb27ac08eb78cca6cf8d976e7ec97ec610f5121ce6e134eaff6",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.0% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.3",
+      "strike": 4.3,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:03.271248+00:00",
+      "book_body_sha256": "40bc63871d8645f3f1c34907d8297822f4ef95678e9e12dd432bc0e6799e5ba2",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.3% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.0",
+      "strike": 4.0,
+      "probability": 0.02459016393442623,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:03.652943+00:00",
+      "book_body_sha256": "08776daca74ee6a49cf828b61c475f2c31724df2637ea78aec664bc548a957e3",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.0% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.9",
+      "strike": 4.9,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:05.040903+00:00",
+      "book_body_sha256": "f1fb2b00be47c1f2475d2c5703bd5ce215a6be7b7057af95e7f731569411a54d",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.9% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T4.7",
+      "strike": 4.7,
+      "probability": 0.00819672131147541,
+      "book": null,
+      "market_midpoint": null,
+      "quote_status": "missing_side",
+      "book_received_at": "2026-10-14T05:13:05.421326+00:00",
+      "book_body_sha256": "37efa9cd1b81027d9f338a5130331cafc2b169c3693d9bcd5633cae8d3328293",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 4.7% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.7",
+      "strike": 3.7,
+      "probability": 0.13934426229508196,
+      "book": {
+        "bid": 900,
+        "ask": 1000,
+        "bid_size": 213268,
+        "ask_size": 242237
+      },
+      "market_midpoint": 0.095,
+      "quote_status": "two_sided",
+      "book_received_at": "2026-10-14T05:13:05.801438+00:00",
+      "book_body_sha256": "e7c4220d023af2d0ae59fa2c6987e896f8e4da5b253e8b3088b6a1b3d097f30c",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.7% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.3",
+      "strike": 3.3,
+      "probability": 0.8770491803278688,
+      "book": {
+        "bid": 9800,
+        "ask": 9900,
+        "bid_size": 673065,
+        "ask_size": 95100
+      },
+      "market_midpoint": 0.985,
+      "quote_status": "two_sided",
+      "book_received_at": "2026-10-14T05:13:06.182367+00:00",
+      "book_body_sha256": "8f3b132e2f01b467c72f1797acb9ada4074acb8a4355c8c46dcbe23cfa031399",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.3% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.5",
+      "strike": 3.5,
+      "probability": 0.6475409836065574,
+      "book": {
+        "bid": 8900,
+        "ask": 9000,
+        "bid_size": 100,
+        "ask_size": 34484
+      },
+      "market_midpoint": 0.895,
+      "quote_status": "two_sided",
+      "book_received_at": "2026-10-14T05:13:06.563599+00:00",
+      "book_body_sha256": "8e877654c830243ca6197a3a8634bae15246986e4454847149218a1f03290580",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.5% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.4",
+      "strike": 3.4,
+      "probability": 0.7786885245901639,
+      "book": {
+        "bid": 9800,
+        "ask": 9900,
+        "bid_size": 432400,
+        "ask_size": 206000
+      },
+      "market_midpoint": 0.985,
+      "quote_status": "two_sided",
+      "book_received_at": "2026-10-14T05:13:06.943719+00:00",
+      "book_body_sha256": "ea368fc62232b525067d89f5d7cc00932c5ab818f706a1f084b8de5261bef724",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.4% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.6",
+      "strike": 3.6,
+      "probability": 0.30327868852459017,
+      "book": {
+        "bid": 4300,
+        "ask": 4800,
+        "bid_size": 2100,
+        "ask_size": 7700
+      },
+      "market_midpoint": 0.455,
+      "quote_status": "two_sided",
+      "book_received_at": "2026-10-14T05:13:07.322063+00:00",
+      "book_body_sha256": "98e54606362ca2cf74f56ef1cf3977adcee043c6e8efc88b4957b58e6788b140",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.6% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    },
+    {
+      "ticker": "KXCPIYOY-26SEP-T3.8",
+      "strike": 3.8,
+      "probability": 0.05737704918032787,
+      "book": {
+        "bid": 100,
+        "ask": 200,
+        "bid_size": 10000,
+        "ask_size": 508105
+      },
+      "market_midpoint": 0.015,
+      "quote_status": "two_sided",
+      "book_received_at": "2026-10-14T05:13:07.706633+00:00",
+      "book_body_sha256": "33a668351caf9773f5ced33fff953a170cc778d66234ba7a45ed5aad3382f7a7",
+      "close_time": "2026-10-14T12:29:00Z",
+      "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.8% in the twelve months ending September 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes."
+    }
+  ],
+  "outcome": null,
+  "orders_submitted": 0,
+  "advance_to_prospective_demo": false,
+  "model": "unchanged last sixty earlier errors, one-decimal rounding, half-count smoothing",
+  "timing_limitation": "Books were captured at their recorded receipt times, not at the retrospective midnight decision time. This observation must not be pooled as another identical historical decision.",
+  "scoring_rule": "After official first-release September CPI and native final settlement, verify agreement for every strike. Score frozen probabilities and contemporaneous midpoint by Brier loss on all two-sided books; report all missing sides. One release is one dependent event, not 21 independent trials. Do not infer fills or profit.",
+  "receipts": {
+    "nowcast": {
+      "url": "https://www.clevelandfed.org/-/media/files/webcharts/inflationnowcasting/nowcast_year.json?sc_lang=en",
+      "started_at": "2026-10-14T05:12:14.8048107+00:00",
+      "received_at": "2026-10-14T05:12:19.4914762+00:00",
+      "sha256": "bf0edf1132e22c7ba05729efe6ddcd3701cd1912d50ee36f546e13ce9bcf8c46",
+      "bytes": 7602467
+    },
+    "markets": {
+      "url": "https://api.elections.kalshi.com/trade-api/v2/markets?event_ticker=KXCPIYOY-26SEP&limit=1000",
+      "started_at": "2026-10-14T05:12:19.6476154+00:00",
+      "received_at": "2026-10-14T05:12:19.7796387+00:00",
+      "sha256": "07c9dcf13c8f5af1185b71bb2ebca471453e5b1564c8aab670f113d9b1515208",
+      "bytes": 39109
+    }
+  },
+  "implementation_sha256": "f4eab6b2c671cabde071ca16194767a53559e7096ce55f93d4ed3462c01b0c66",
+  "sources": [
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\1fee1d044b43d1dd8e8446c24adc574e40ff137b6273f95ff57ae8dc676c25d5.json",
+      "sha256": "442f108b200afb46db70c4d2cd38750c0e144dd4bdbd39510c4e18ac39276311"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\200fe43f5e8d40e275b09ae4f823ae2808d8bfdc5d1aa5678fc08239dea0e3f2.json",
+      "sha256": "ad358322ecb85927e238eebac50a0cf30fdbf4a2b788d2af708a4212e27aec4b"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\20d9840373ac8d5b93ffd1cf18942894a7c433f6d716a6dc14a6fc2e7943df01.json",
+      "sha256": "c71a788c5320d4f3a6201af77b17cf3289b7e5c69ce33130fc27d545ba1fd924"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\47eb16b5ec395dd7c3d22d98aa9f97cd5d88b5bccb331300abf91910ffa0b571.json",
+      "sha256": "78bea4c70347ea2438b6f6d93607ef06edfc4b1ce4133c48cb4a3eccc24b96e7"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\5b99e123d439dde2eb4479340d6cf1280c4b28a27e0d7b16f249da8faec9205d.json",
+      "sha256": "51720ec897d1fb33a62f58478fb86b440adf1b11bfb22052cd301af3245ae533"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\5db86eba539db052178e73c184de4a05833e62b4035d334c3fbc0c2ba22bb1d5.json",
+      "sha256": "4ce23a2f2cf058c7fd67606ec9f76270944b28cf12644558e05cd7ccf37f1bd7"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\6e445866985ae44543c312c4aa178b2547ed1f7878c973e5ac5ac79ecbdcf4c2.json",
+      "sha256": "6454efb6927ecb15e5cc2785cf872cbf4ab7db92036005dbabab438e316e2e3e"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\9a5c975782b0c5746ca02d8f5c39923abb61d81d9ceb55b28a5bdf97e1b21f9d.json",
+      "sha256": "21638f55618baa6bb2e7e2b0ba84ce597dbc1d078d014c6315fa8563b09e93bd"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\af4756dac2e727e1572cd0a43a49714a3ccccdffc0df08c7e9b453b231d33ee9.json",
+      "sha256": "f570b85cd42065c162aa86b17b065ccf7fe52f426f93084e76df77efac8c2c5e"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\b44522c2ce95f0fb0a3d3780bbe0f27a9559276212ec2118168623a003925293.json",
+      "sha256": "f0ce5eef496e547e2d2079a6828195ae2999b84a47a10d9ac9560454c95d856a"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\b4e846763929a3971765f948876a359d8d87756c9986c0ec47c4f65a3ecf2dc3.json",
+      "sha256": "aa47175d3778ffeb13a5e0ddc0a42a0bc3243197b971768a9e4a3ae5b12b5171"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\b6e0acf713476ec5aba534e58947ef8fa9a1854a6ad758fcbd02912b04c1525d.json",
+      "sha256": "84fd6304aa7b22418dba43be3941cc9d3c6530f6c4fdc544d8769c0b2b5d229a"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\c292c24ee8db5a2b92ac371f1aa20dcfc0fbf280949d6da3b3ec787475de295a.json",
+      "sha256": "6e5c9f51fceaa6b910f65c5aeab317eafbc55901a2c9fbb69e56fc9aeae89633"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\c7f72c4ef2e583775d4bd294b0eb864da6c3244412c5d854564726712a8393f1.json",
+      "sha256": "af5c1bf764368c251c6ad5bef18d7599529654f223bbd537146f657a4124c87a"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\ca43c8764733613a8f4f4773fa78d181c1e5e13d172aaa7537064060a0745408.json",
+      "sha256": "ef1ad817aca708e185e11dfca6867d6e4086cde9c2087c28d5a7780568c2911b"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\cb6fc06bc7297d5393aad1ee873c37329b84ee39b418d0fb00d0d46a75ae90bb.json",
+      "sha256": "794fdf8adfd2cfa84ec2c1b6bb2577678c0271a64cd0c4c512f53799e4bec182"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\d24559ad0ca1a504cc27366409974806db910138e1e6d0dbfbbfc4eb7811f36b.json",
+      "sha256": "ca1e1846eb78d0dbaebbe202efc03c5e23db2c522ea7dea7b5ba175cc04f487a"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\d35504e42441e304e5c24106c362082fc3876765bcc5ba2ac3d78b4e5649a2c4.json",
+      "sha256": "54af366afd5ab5475086ec16f660411fdcd17b2f530757cfae15da80beffbb86"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\e103aacc8bbfddde4d3fbe3cce431fbae0d2027df7ff38a20f2d4799f15c9e26.json",
+      "sha256": "f6d63845d9a9c90ab3d11a52be1b808d73799e282f185851abf530b68dbc70c2"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\e37b2a169139eaab5017b3381d792079550ec541dc8a1bac2fe50a2c72c673ea.json",
+      "sha256": "14f47a8d12a6bbb4801633409647408ab1fc2ccd6264104d47551966f4b0e47d"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\books\\fb1ff476e1028c4c9c448c2e1f4a99a229fbad9cd8c496d2fb4513f2148f85bd.json",
+      "sha256": "2b5b197486404cf92150318fb63df3c93ccf40877570a5d923f89e69c4974a84"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\markets.json",
+      "sha256": "07c9dcf13c8f5af1185b71bb2ebca471453e5b1564c8aab670f113d9b1515208"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\markets.receipt.json",
+      "sha256": "e79e045bdcf5449281b2327bb1cf063f6c3b055f911434ae652c279fbededb56"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\nowcast.json",
+      "sha256": "bf0edf1132e22c7ba05729efe6ddcd3701cd1912d50ee36f546e13ce9bcf8c46"
+    },
+    {
+      "path": "C:\\Users\\Test\\PROJECTS\\files\\inflation-prospective-20261014\\nowcast.receipt.json",
+      "sha256": "675fadbd593eb5cae7984ca7313ff27810ffb53479116c112e09f55296ec18b4"
+    },
+    {
+      "path": "docs\\INFLATION_EXPERIMENT_PROTOCOL.md",
+      "sha256": "62190df371c629a296216ba6d49c0b267e7f3ec684a0b9316515345e2de280e9"
+    }
+  ],
+  "fingerprint": {
+    "image_digest": "",
+    "gpu_model": "",
+    "driver_version": "",
+    "determinism": {
+      "stack": "cpu",
+      "settings": {
+        "MKL_NUM_THREADS": "1",
+        "NUMEXPR_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      }
+    },
+    "host": {
+      "platform": "Windows-10-10.0.26200-SP0",
+      "machine": "AMD64",
+      "logical_cores": 24
+    },
+    "packages": [
+      {
+        "name": "covenant-ml",
+        "version": "0.1.0"
+      },
+      {
+        "name": "httpx",
+        "version": "0.28.1"
+      },
+      {
+        "name": "numpy",
+        "version": "2.3.5"
+      },
+      {
+        "name": "platform-core",
+        "version": "0.1.0"
+      },
+      {
+        "name": "scikit-learn",
+        "version": "1.7.2"
+      },
+      {
+        "name": "scipy",
+        "version": "1.16.3"
+      }
+    ]
+  }
+}
