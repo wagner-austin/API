@@ -27,6 +27,9 @@ later trades and also failed advancement; these reused dates are exploratory.
 
 The later studies and active observations are written up separately:
 
+- [Evidence requirements audit](EVIDENCE_REQUIREMENTS_AUDIT_20261014.md): live
+  prospective status, sample planning and execution gaps, Radar target leakage,
+  provenance portability limits and the pending WRDS request.
 - [Evidence recheck](MARKET_RECHECK_20261014.md): independent check passed;
   protocol checkout byte drift repaired and historical results reproduced again.
 - [Fixed boosting comparison](FORECAST_BOOSTING_PROTOCOL.md): declared model,
