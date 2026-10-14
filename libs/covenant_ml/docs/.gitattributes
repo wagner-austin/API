@@ -1,0 +1,2 @@
+# Research protocols are hashed as exact bytes before experiments run.
+*_PROTOCOL.md text eol=lf
