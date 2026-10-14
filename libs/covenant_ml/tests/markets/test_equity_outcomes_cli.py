@@ -12,6 +12,7 @@ from platform_core.determinism_cpu import NativeLibrariesAlreadyLoadedError
 from platform_core.json_utils import dump_json_str
 from scripts.equity_outcomes import main
 
+from covenant_ml.markets.provenance import implementation_digest
 from covenant_ml.markets.reporting import read_verified_market_report
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
@@ -38,6 +39,8 @@ def arguments(root: Path, url: str) -> list[str]:
         str(root / "capture"),
         "--price-url",
         url,
+        "--implementation-sha256",
+        implementation_digest(),
     ]
 
 
@@ -117,3 +120,37 @@ def test_real_cli_http_failure_exits_nonzero(api_server: ApiServer, tmp_path: Pa
 def test_entry_rejects_late_arithmetic_pin() -> None:
     with pytest.raises(NativeLibrariesAlreadyLoadedError):
         runpy.run_module("scripts.equity_outcomes", run_name="__main__")
+
+
+def test_unexpected_implementation_fails_before_any_effect(
+    api_server: ApiServer,
+    tmp_path: Path,
+) -> None:
+    args = arguments(tmp_path, api_server.url)
+    args[-1] = "0" * 64
+    output = tmp_path / "rejected.json"
+    with pytest.raises(ValueError, match="EQUITY-021"):
+        main([*args, "--mode", "capture", "--out", str(output)], stand_in_pin)
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "scripts.equity_outcomes",
+            *args,
+            "--mode",
+            "capture",
+            "--out",
+            str(output),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert process.returncode == 1
+    assert process.stderr.splitlines()[-1] == (
+        "ValueError: [EQUITY-021] implementation differs from the declared deployment"
+    )
+    assert api_server.requests == []
+    assert output.exists() is False
+    assert (tmp_path / "capture").exists() is False
