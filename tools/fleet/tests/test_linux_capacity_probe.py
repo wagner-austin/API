@@ -31,7 +31,7 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CGROUPS_LINE == "cgroups=/sys/fs/cgroup/system.slice\n"
 
 
-def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None) -> None:
+def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None, shmem: int = 0) -> None:
     """Write one fake container cgroup.
 
     Args:
@@ -40,13 +40,16 @@ def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None) -> None:
         limit: What its ``memory.max`` reads.
         anon: Its ``memory.stat`` ``anon`` line, or None for a scope whose
             ``memory.stat`` is already gone.
+        shmem: Its ``memory.stat`` ``shmem`` line, which the kernel also
+            counts in ``file``.
     """
     scope = root / name
     scope.mkdir()
     (scope / "memory.max").write_text(f"{limit}\n", encoding="utf-8")
     if anon is not None:
         (scope / "memory.stat").write_text(
-            f"anon {anon}\nfile 734003200\nkernel 1048576\n", encoding="utf-8"
+            f"anon {anon}\nfile {734003200 + shmem}\nkernel 1048576\nshmem {shmem}\n",
+            encoding="utf-8",
         )
 
 
@@ -108,6 +111,36 @@ class TestTheProbeUnderSh:
         assert fields["free_ram_gb"] == "4.972"
         first = ["free_ram_gb", "promised_ram_gb", "free_disk_gb", "logical_cores"]
         assert list(fields)[: len(first)] == first
+
+    def test_shared_memory_is_resident_and_is_not_charged_again(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """colossus, 2026-10-14 04:33Z: the search copy's shared buffers under its 8 GiB cap."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+        anon, shmem = 96_636_928, 2_190_381_056
+        _scope(cgroups, "docker-postgres-search.scope", str(8 * GIB), anon, shmem)
+        _scope(cgroups, "docker-exited.scope", str(CAP), None)
+
+        fields = _run(tmp_path, cgroups)
+
+        promised = 8 * GIB - anon - shmem
+        assert promised == 6_302_916_608
+        assert fields["promised_ram_gb"] == f"{promised / GIB:.3f}"
+        assert fields["promised_ram_gb"] == "5.870"
+
+    def test_a_stat_with_no_anonymous_line_promises_nothing(self, tmp_path: pathlib.Path) -> None:
+        """A cap whose ``memory.stat`` carries no ``anon`` line is not charged."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+        scope = cgroups / "docker-tearing.scope"
+        scope.mkdir()
+        (scope / "memory.max").write_text(f"{CAP}\n", encoding="utf-8")
+        (scope / "memory.stat").write_text("shmem 1048576\n", encoding="utf-8")
+
+        fields = _run(tmp_path, cgroups)
+
+        assert fields["promised_ram_gb"] == "0.000"
 
     def test_a_node_with_no_capped_container_reads_its_whole_memavailable(
         self, tmp_path: pathlib.Path

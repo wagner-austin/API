@@ -19,12 +19,20 @@ caps. What stays put is the memory the caps have not yet been given, which is
 what this probe subtracts.
 
 WHAT A CAPPED CONTAINER IS STILL PROMISED is ``memory.max`` minus the
-``anon`` line of its ``memory.stat``, not minus ``memory.current``:
-``current`` includes the container's page cache, which ``MemAvailable``
-already counts as reclaimable, so growing its anonymous memory to the cap
-takes exactly ``max - anon`` out of what is available. A container whose
-``memory.max`` reads ``max`` promises nothing; neither does one that exits
-between the listing and the read, whose files are gone by then.
+``anon`` and ``shmem`` lines of its ``memory.stat``, not minus
+``memory.current``: ``current`` includes the container's page cache, which
+``MemAvailable`` already counts as reclaimable, so growing what it cannot
+give back to the cap takes exactly ``max - anon - shmem`` out of what is
+available. Shared memory is subtracted with the anonymous memory because it
+is resident and swap-backed, so ``MemAvailable`` already leaves it out, and
+charging it again counted it twice. Measured on colossus on 2026-10-14
+04:33Z (MCPs board task 4c33062e): the public search's copy, capped at
+8 GiB, held 0.09 GB anonymous and 2.04 GB of shared buffers, and the old
+``max - anon`` charged it 7.9 GB, which with the other caps left the node
+3.2 GB against its 6 GB reservation, so it claimed no job. A container
+whose ``memory.max`` reads ``max`` promises nothing; neither does one that
+exits between the listing and the read, whose files are gone by then, nor
+one whose ``memory.stat`` has no ``anon`` line.
 
 ONLY THE ROOTFUL DAEMON'S CONTAINERS COUNT, those under
 ``system.slice/docker-*.scope``. A node's execdocker user runs its rootless
@@ -55,9 +63,10 @@ CAPACITY_PROBE_BODY = (
     "promised=0\n"
     'for cgroup in "$cgroups"/docker-*.scope; do\n'
     '  if limit=$(cat "$cgroup/memory.max" 2>/dev/null) &&'
-    ' anon=$(awk \'$1 == "anon" { print $2 }\' "$cgroup/memory.stat" 2>/dev/null); then\n'
-    '    if [ "$limit" != max ] && [ -n "$anon" ]; then\n'
-    "      promised=$((promised + limit - anon))\n"
+    ' resident=$(awk \'$1 == "anon" { anon = $2; seen = 1 } $1 == "shmem" { shmem = $2 }'
+    ' END { if (seen) printf "%.0f", anon + shmem }\' "$cgroup/memory.stat" 2>/dev/null); then\n'
+    '    if [ "$limit" != max ] && [ -n "$resident" ]; then\n'
+    "      promised=$((promised + limit - resident))\n"
     "    fi\n"
     "  fi\n"
     "done\n"
