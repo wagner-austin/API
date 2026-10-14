@@ -144,6 +144,9 @@ evaluation and accounting work are also reusable. None supplies an edge by itsel
 
 ## Next experiment and funding gate
 
+The [repeated sports capture workflow](SPORTS_CAPTURE.md) now implements the
+public-data acquisition and exact offline replay stage of this experiment.
+
 Next: a read-only prospective NHL venue-disagreement study. Start with full-game
 winner markets, not player props or parlays. Declare the game universe before
 quotes, reconcile teams and all settlement cases, archive both book sides and
