@@ -7,6 +7,7 @@ import sys
 from contextlib import closing
 from hashlib import sha256
 from pathlib import Path
+from typing import Literal
 
 from platform_core.comparability import RunFingerprint
 from platform_core.config import config_test_hooks
@@ -40,6 +41,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     from covenant_ml.markets.reporting import write_market_report
 
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--study", required=True, choices=("fixed", "selection"))
     for name in ("report", "markets-archive", "protocol", "out"):
         parser.add_argument("--" + name, required=True, type=Path)
     for name in ("market-url", "source-sha256", "protocol-sha256", "first-fold-end"):
@@ -54,6 +56,8 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     expected_source: str = arguments.source_sha256
     expected_protocol: str = arguments.protocol_sha256
     first_fold: str = arguments.first_fold_end
+    selected: str = arguments.study
+    study: Literal["fixed", "selection"] = "selection" if selected == "selection" else "fixed"
     if output.exists() or run_record_sidecar(output).exists():
         raise FileExistsError("[BOOST-006] output evidence already exists")
     protocol_bytes = protocol.read_bytes()
@@ -65,7 +69,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     if digest != expected_source:
         raise ValueError("[BOOST-005] source report differs from frozen digest")
     artifacts = output.with_suffix(".models")
-    report = evaluate_boosting(rows, plan, (first_fold, plan["end"]), artifacts)
+    report = evaluate_boosting(rows, plan, (first_fold, plan["end"]), artifacts, study)
     protocol_copy = artifacts / "protocol.md"
     with protocol_copy.open("xb") as destination:
         destination.write(protocol_bytes)
@@ -94,7 +98,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         fingerprint,
         output,
         tuple(path.resolve() for path in paths),
-        "fixed-forecast-boosting-v1",
+        study + "-forecast-boosting-v1",
         expected_protocol,
         observations,
     )
