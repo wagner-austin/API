@@ -27,6 +27,12 @@ later trades and also failed advancement; these reused dates are exploratory.
 
 The later studies and active observations are written up separately:
 
+- [Validity audit](MARKET_VALIDITY_AUDIT.md): reproduced shared splitter and
+  feature-selection leakage defects, their repairs, model inventory and limits
+  on historical holdout claims.
+- [2025 Philadelphia temporal transfer](MAKER_TEMPORAL_TRANSFER_RESULT.md):
+  the frozen high-variation/falling-price group lost $5.61 before additional
+  execution friction and failed its declared checks.
 - [Causal maker regime diagnostic](MAKER_REGIME_RESULTS.md): stronger future-data
   mutation tests, exact preservation of original backtest results, and pre-entry
   probability-movement groups; no group establishes advancement.
