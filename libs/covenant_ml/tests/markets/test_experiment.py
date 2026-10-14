@@ -118,7 +118,13 @@ def test_complete_cli_capture_resume_and_replay_match_actual_http_evidence(
     api_server.documents["/markets"] = [{"markets": [market_document(), second], "cursor": ""}]
     api_server.documents["/historical/markets"] = [{"markets": [], "cursor": ""}]
     api_server.documents["/series/" + SERIES + "/markets/" + TICKER + "/candlesticks"] = [
-        {"ticker": TICKER, "candlesticks": [candle_document()]}
+        {
+            "ticker": TICKER,
+            "candlesticks": [
+                dict(candle_document(), end_period_ts=1767301200 - offset * 3600)
+                for offset in range(6)
+            ],
+        }
     ]
     api_server.documents["/series/" + SERIES + "/markets/" + other_ticker + "/candlesticks"] = [
         {"ticker": other_ticker, "candlesticks": []}
@@ -153,6 +159,15 @@ def test_complete_cli_capture_resume_and_replay_match_actual_http_evidence(
         assert main(arguments, stand_in_pin) == 0
         report = narrow_json_to_dict(load_json_str(output.read_text("utf-8")))
         assert report["implementation_sha256"] == implementation_digest()
+        entries = require_list(require_dict(report, "pre_entry_regimes"), "contracts")
+        assert [narrow_json_to_dict(row)["regime"] for row in entries] == [
+            "low_flat",
+            "unclassified",
+        ]
+        for value in require_list(report, "results"):
+            groups = require_dict(narrow_json_to_dict(value), "by_regime")
+            assert require_dict(groups, "low_flat")["markets"] == 1
+            assert require_dict(groups, "unclassified")["markets"] == 1
         results.append(report["results"])
         assert len(require_list(report, "sources")) == 9
     assert results[0] == results[1] == results[2]
