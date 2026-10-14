@@ -12,7 +12,7 @@ Two partitions are provided:
   each held-out row's company as its code.
 * :class:`ChronologicalGroupedSplits` -- past trains, future tests, for data
   that arrives in time: market days, contract resolutions. An ``embargo`` of
-  rows is dropped at each boundary, because a label that looks ahead (a
+  distinct time keys is dropped at each boundary, because a label that looks ahead (a
   five-day return, a contract resolving next week) computed on the last
   training rows overlaps the first test rows. Rows come back in time order,
   and each held-out row's code is its time key, so rows sharing a date can be
@@ -160,7 +160,7 @@ def chronological_masks(
 
 
 class ChronologicalGroupedSplits:
-    """Past-trains, future-tests partitions with an embargo at each boundary."""
+    """Partition whole time groups with an embargo measured in distinct time keys."""
 
     def __init__(
         self,
@@ -178,9 +178,10 @@ class ChronologicalGroupedSplits:
             labels: Binary labels, shape (n_rows,).
             time_keys: Sortable time per row (a date as YYYYMMDD, an epoch
                 second). Rows sharing a key keep their input order.
-            train_fraction: Share of rows, earliest first, for training.
-            val_fraction: Share of rows after training for validation.
-            embargo: Rows dropped at each boundary.
+            train_fraction: Share of distinct time keys, earliest first, for training.
+            val_fraction: Share of distinct time keys after training for validation.
+            embargo: Whole time keys dropped at each boundary. Callers must choose
+                keys and embargo to cover label availability; this is not a duration.
 
         Raises:
             ValueError: If the arrays differ in length.
@@ -215,8 +216,14 @@ class ChronologicalGroupedSplits:
             ValueError: If the fractions or embargo are invalid or leave a
                 fold empty.
         """
-        masks = chronological_masks(
-            len(self._features), self._train_fraction, self._val_fraction, self._embargo
+        keys: NDArray[np.int64] = np.unique(self._time_keys)
+        group_masks = chronological_masks(
+            len(keys), self._train_fraction, self._val_fraction, self._embargo
+        )
+        masks = SplitMasks(
+            train=np.isin(self._time_keys, keys[group_masks.train]),
+            val=np.isin(self._time_keys, keys[group_masks.val]),
+            test=np.isin(self._time_keys, keys[group_masks.test]),
         )
         return GroupedSplit(
             split=apply_split_masks(self._features, self._labels, masks),
