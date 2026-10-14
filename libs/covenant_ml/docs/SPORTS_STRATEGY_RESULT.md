@@ -65,6 +65,12 @@ processes and match byte for byte, SHA-256
 Both have RunRecord sidecars. This proves deterministic replay of the captured
 evidence, not completeness of the exchange's historical data.
 
+The subsequent [team-rating experiment](SPORTS_RATINGS_RESULT.md) lifted the
+shared evaluator. A replay after that change preserved every original report
+field except `implementation_sha256`; exact full-report hashes are comparable
+only within the same implementation. The CLI now requires `--model temperature`
+to select this original experiment explicitly.
+
 Local `make check` passed 3,460 tests, strict typing and guards, with 100%
 coverage of 16,447 statements and 3,190 branches. The full check took 206 of
 300 budgeted seconds; its log is `make-check.log` in the evidence root.
@@ -76,7 +82,7 @@ runtime failures remain separate and are not repaired by this local pass.
 From `libs/covenant_ml`:
 
 ```powershell
-poetry run python -m scripts.sports_strategy --archive C:/Users/Test/PROJECTS/files/sports-strategy-20261013 --market-url https://api.elections.kalshi.com/trade-api/v2 --mode replay --out C:/Users/Test/PROJECTS/files/sports-strategy-20261013/reproduced.json
+poetry run python -m scripts.sports_strategy --model temperature --archive C:/Users/Test/PROJECTS/files/sports-strategy-20261013 --market-url https://api.elections.kalshi.com/trade-api/v2 --mode replay --out C:/Users/Test/PROJECTS/files/sports-strategy-20261013/reproduced.json
 ```
 
 For fresh acquisition, use `--mode capture` and a new archive directory. Existing

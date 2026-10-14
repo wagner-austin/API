@@ -21,6 +21,9 @@ The [frozen sports strategy result](SPORTS_STRATEGY_RESULT.md) evaluates a
 specific chronological probability calibration rule on 233 training and 128
 later games. Training selected the unchanged market probability; the cost-aware
 rule abstained on all later games and failed its advancement criteria.
+The subsequent [team-rating result](SPORTS_RATINGS_RESULT.md) adds information
+from earlier settled games. Its fitted blend lost a hypothetical $3.16 on nine
+later trades and also failed advancement; these reused dates are exploratory.
 
 From `libs/covenant_ml`, after `poetry sync --with dev`:
 
