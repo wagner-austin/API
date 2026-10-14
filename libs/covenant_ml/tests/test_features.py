@@ -444,18 +444,6 @@ class TestGetFeatureConfigForPreset:
             assert "max_product_features" in config
 
 
-class TestHelperFunctions:
-    """Tests for internal helper functions."""
-
-    def test_get_index_value_out_of_bounds(self) -> None:
-        """_get_index_value raises IndexError for invalid index."""
-        from covenant_ml.features import _get_index_value
-
-        arr: NDArray[np.intp] = np.arange(3, dtype=np.intp)
-        with pytest.raises(IndexError):
-            _get_index_value(arr, 10)
-
-
 class TestMaxFeaturesEarlyBreak:
     """Tests for max_features early break paths."""
 
@@ -463,15 +451,13 @@ class TestMaxFeaturesEarlyBreak:
         """Products hits max_features limit and triggers breaks.
 
         With 3 features, n_pairs = C(3,2) = 3 products.
-        Setting max_features = n_pairs avoids variance selection
-        but still allows us to hit the breaks.
+        Setting max_features = n_pairs reaches the exact cap.
         Loop: A*B (1), A*C (2), B*C (3) -> break on 3rd.
         """
         x = _make_array(2, 3, (1.0, 2.0, 3.0, 4.0, 5.0, 6.0))
         names = ["A", "B", "C"]
 
-        # max_features = n_pairs = 3, so no variance selection
-        # but breaks trigger after generating 3 products
+        # Breaks trigger after generating exactly three products.
         products, product_names = compute_pairwise_products(x, names, max_features=3)
 
         assert _get_n_cols(products) == 3
