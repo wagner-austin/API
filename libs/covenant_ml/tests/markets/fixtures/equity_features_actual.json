@@ -1,0 +1,202 @@
+{
+  "rows": [
+    {
+      "symbol": "AAPL",
+      "cik": 320193,
+      "name": "Apple Inc.",
+      "current_filing": {
+        "cik": 320193,
+        "accession": "0000320193-26-000020",
+        "form": "10-Q",
+        "filed": "2026-07-31",
+        "accepted_at": "2026-07-31T14:01:02.000Z"
+      },
+      "annual_filing": {
+        "cik": 320193,
+        "accession": "0000320193-25-000079",
+        "form": "10-K",
+        "filed": "2025-10-31",
+        "accepted_at": "2025-10-31T14:01:26.000Z"
+      },
+      "measures": {
+        "AssetsCurrent": {
+          "status": "matched",
+          "period": "2026-06-27",
+          "accession": "0000320193-26-000020",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 320193,
+              "accession": "0000320193-26-000020",
+              "form": "10-Q",
+              "filed": "2026-07-31",
+              "tag": "us-gaap:AssetsCurrent",
+              "unit": "USD",
+              "start": null,
+              "end": "2026-06-27",
+              "value": 149818000000.0
+            }
+          ]
+        },
+        "LiabilitiesCurrent": {
+          "status": "matched",
+          "period": "2026-06-27",
+          "accession": "0000320193-26-000020",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 320193,
+              "accession": "0000320193-26-000020",
+              "form": "10-Q",
+              "filed": "2026-07-31",
+              "tag": "us-gaap:LiabilitiesCurrent",
+              "unit": "USD",
+              "start": null,
+              "end": "2026-06-27",
+              "value": 149326000000.0
+            }
+          ]
+        },
+        "Assets": {
+          "status": "matched",
+          "period": "2025-09-27",
+          "accession": "0000320193-25-000079",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 320193,
+              "accession": "0000320193-25-000079",
+              "form": "10-K",
+              "filed": "2025-10-31",
+              "tag": "us-gaap:Assets",
+              "unit": "USD",
+              "start": null,
+              "end": "2025-09-27",
+              "value": 359241000000.0
+            }
+          ]
+        },
+        "NetIncomeLoss": {
+          "status": "matched",
+          "period": "2025-09-27",
+          "accession": "0000320193-25-000079",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 320193,
+              "accession": "0000320193-25-000079",
+              "form": "10-K",
+              "filed": "2025-10-31",
+              "tag": "us-gaap:NetIncomeLoss",
+              "unit": "USD",
+              "start": "2024-09-29",
+              "end": "2025-09-27",
+              "value": 112010000000.0
+            }
+          ]
+        }
+      },
+      "submissions_received_at": "2026-10-14T05:52:10.562433+00:00",
+      "facts_received_at": "2026-10-14T05:52:10.891944+00:00"
+    },
+    {
+      "symbol": "MSFT",
+      "cik": 789019,
+      "name": "MICROSOFT CORP",
+      "current_filing": {
+        "cik": 789019,
+        "accession": "0001193125-26-323660",
+        "form": "10-K",
+        "filed": "2026-07-29",
+        "accepted_at": "2026-07-29T20:08:01.000Z"
+      },
+      "annual_filing": {
+        "cik": 789019,
+        "accession": "0001193125-26-323660",
+        "form": "10-K",
+        "filed": "2026-07-29",
+        "accepted_at": "2026-07-29T20:08:01.000Z"
+      },
+      "measures": {
+        "AssetsCurrent": {
+          "status": "matched",
+          "period": "2026-06-30",
+          "accession": "0001193125-26-323660",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 789019,
+              "accession": "0001193125-26-323660",
+              "form": "10-K",
+              "filed": "2026-07-29",
+              "tag": "us-gaap:AssetsCurrent",
+              "unit": "USD",
+              "start": null,
+              "end": "2026-06-30",
+              "value": 207710000000.0
+            }
+          ]
+        },
+        "LiabilitiesCurrent": {
+          "status": "matched",
+          "period": "2026-06-30",
+          "accession": "0001193125-26-323660",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 789019,
+              "accession": "0001193125-26-323660",
+              "form": "10-K",
+              "filed": "2026-07-29",
+              "tag": "us-gaap:LiabilitiesCurrent",
+              "unit": "USD",
+              "start": null,
+              "end": "2026-06-30",
+              "value": 168825000000.0
+            }
+          ]
+        },
+        "Assets": {
+          "status": "matched",
+          "period": "2026-06-30",
+          "accession": "0001193125-26-323660",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 789019,
+              "accession": "0001193125-26-323660",
+              "form": "10-K",
+              "filed": "2026-07-29",
+              "tag": "us-gaap:Assets",
+              "unit": "USD",
+              "start": null,
+              "end": "2026-06-30",
+              "value": 758376000000.0
+            }
+          ]
+        },
+        "NetIncomeLoss": {
+          "status": "matched",
+          "period": "2026-06-30",
+          "accession": "0001193125-26-323660",
+          "count": 1,
+          "facts": [
+            {
+              "cik": 789019,
+              "accession": "0001193125-26-323660",
+              "form": "10-K",
+              "filed": "2026-07-29",
+              "tag": "us-gaap:NetIncomeLoss",
+              "unit": "USD",
+              "start": "2025-07-01",
+              "end": "2026-06-30",
+              "value": 133749000000.0
+            }
+          ]
+        }
+      },
+      "submissions_received_at": "2026-10-14T05:52:11.135180+00:00",
+      "facts_received_at": "2026-10-14T05:52:11.432447+00:00"
+    }
+  ]
+}
