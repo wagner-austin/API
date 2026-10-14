@@ -94,3 +94,24 @@ def test_chronological_split_refuses_misaligned_arrays() -> None:
     features: NDArray[np.float64] = keys.astype(np.float64).reshape(-1, 1)
     with pytest.raises(ValueError, match=ERR_LENGTH_MISMATCH):
         ChronologicalGroupedSplits(features, ints([0, 1]), keys, 0.5, 0.2, 0)
+
+
+@pytest.mark.parametrize("embargo", [0, 1])
+def test_chronological_boundaries_keep_entire_time_groups_together(embargo: int) -> None:
+    keys = ints([9, 0, 0, 0, 1, 2, 3, 4, 4, 4, 5, 6, 7, 8, 9])
+    features: NDArray[np.float64] = keys.astype(np.float64).reshape(-1, 1)
+    labels = ints([0] * len(keys))
+    result = ChronologicalGroupedSplits(features, labels, keys, 0.5, 0.3, embargo)(0)
+    assert np.array_equal(result.split.x_train[:, 0], floats([0, 0, 0, 1, 2, 3, 4, 4, 4]))
+    expected_val = [5, 6, 7] if embargo == 0 else [6, 7]
+    expected_test = [8, 9, 9] if embargo == 0 else [9, 9]
+    assert np.array_equal(result.split.x_val[:, 0], floats([float(v) for v in expected_val]))
+    assert np.array_equal(result.split.x_test[:, 0], floats([float(v) for v in expected_test]))
+    assert np.array_equal(result.test_groups, ints(expected_test))
+
+
+def test_chronological_split_requires_enough_distinct_times() -> None:
+    keys = ints([1] * 20)
+    features: NDArray[np.float64] = keys.astype(np.float64).reshape(-1, 1)
+    with pytest.raises(ValueError, match=ERR_TOO_FEW_UNITS):
+        ChronologicalGroupedSplits(features, ints([0] * 20), keys, 0.5, 0.2, 0)(0)
