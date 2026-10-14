@@ -13,8 +13,8 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from .kalshi import MarketSpec, decode_candle, decode_spec
-from .types import DOLLAR, Quote
+from .kalshi import MarketSpec, decode_spec
+from .types import DOLLAR
 from .validation import parse_fixed, parse_timestamp
 
 SERIES = "KXNHLGAME"
@@ -168,43 +168,3 @@ def _eligible_specs(
                 )
             )
     return tuple(sorted(specs, key=_spec_key)), counts
-
-
-def historical_quote(
-    spec: MarketSpec,
-    read: Callable[[str, dict[str, str | int]], JSONObject],
-) -> tuple[Quote | None, str]:
-    """Request one exact decision candle without manufacturing an executable fill.
-
-    Args:
-        spec: Validated selected game contract.
-        read: Explicit archive capture or replay method.
-
-    Returns:
-        Eligible quote and status, or an explicit exclusion reason.
-
-    Raises:
-        ValueError: STRATEGY-003 for wrong ticker, duplicate or off-cutoff candles.
-        HTTPStatusError: Acquisition failed.
-    """
-    cutoff = spec["decision_ms"] // 1000
-    document = read(
-        "/historical/markets/" + spec["ticker"] + "/candlesticks",
-        {"start_ts": cutoff, "end_ts": cutoff, "period_interval": 1},
-    )
-    candles = require_list(document, "candlesticks")
-    if require_str(document, "ticker") != spec["ticker"] or len(candles) > 1:
-        raise ValueError("[STRATEGY-003] candle identity or count mismatch")
-    if not candles:
-        return None, "missing_candle"
-    quote = decode_candle(narrow_json_to_dict(candles[0]), historical=True)
-    if quote["timestamp_ms"] != spec["decision_ms"]:
-        raise ValueError("[STRATEGY-003] candle does not end at the declared cutoff")
-    bid, ask = quote["bid"], quote["ask"]
-    if bid is not None and ask is not None and bid > ask:
-        raise ValueError("[STRATEGY-003] crossed historical quote")
-    if bid is None or ask is None or bid == 0 or ask == DOLLAR:
-        return None, "unavailable_quote"
-    if ask - bid > 500:
-        return None, "wide_spread"
-    return quote, "eligible"
