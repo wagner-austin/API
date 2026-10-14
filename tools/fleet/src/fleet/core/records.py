@@ -39,7 +39,7 @@ from collections.abc import Mapping
 from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.json_utils import InvalidJsonError, JSONValue, dump_json_str, load_json_str
 
 from fleet.contracts.feed import FeedEvent, decode_feed_event, encode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledger_entry, is_live
@@ -97,9 +97,12 @@ def _read_lines(path: pathlib.Path) -> tuple[tuple[int, JSONValue], ...]:
         would make the package impossible to start using.
 
     Raises:
-        JSONTypeError: If a line is not valid JSON, naming the line number.
-            Blank lines are skipped because a trailing newline is normal;
-            nothing else is.
+        InvalidJsonError: If a line is not valid JSON, naming the file, the
+            line number and the line's start, its cause the parser's own
+            error. Blank lines are skipped because a trailing newline is
+            normal; nothing else is. Until 2026-10-14 this said only
+            "Invalid JSON payload", and a torn ledger line took every node
+            runner down with nothing in its log saying which file or line.
     """
     if not _test_hooks.file_exists(path):
         return ()
@@ -107,7 +110,11 @@ def _read_lines(path: pathlib.Path) -> tuple[tuple[int, JSONValue], ...]:
     for index, line in enumerate(_test_hooks.read_text(path).splitlines(), start=1):
         if not line.strip():
             continue
-        numbered.append((index, load_json_str(line)))
+        try:
+            value = load_json_str(line)
+        except InvalidJsonError as fault:
+            raise InvalidJsonError(f"{path} line {index} is not JSON: {line[:120]!r}") from fault
+        numbered.append((index, value))
     return tuple(numbered)
 
 

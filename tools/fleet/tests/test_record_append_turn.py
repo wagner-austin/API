@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 
 import pytest
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import InvalidJsonError, load_json_str
 
 from fleet.contracts.feed import decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
@@ -235,6 +235,21 @@ def test_appender_processes_running_at_once_leave_every_row_whole(tmp_path: path
     assert {"exits": exits, "rows": sorted(_run_ids(record))} == {
         "exits": [0] * _PROCESSES,
         "rows": sorted(f"{name}-{index}" for name in names for index in range(_ROWS)),
+    }
+
+
+def test_a_torn_line_is_refused_naming_its_file_and_line(tmp_path: pathlib.Path) -> None:
+    path = tmp_path / "ledger.jsonl"
+    records.append_ledger(path, _row("run-whole"))
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write('91971182.log"}\n')
+
+    with pytest.raises(InvalidJsonError) as refused:
+        records.read_ledger(path)
+
+    assert {"message": str(refused.value), "cause": type(refused.value.__cause__)} == {
+        "message": f"{path} line 2 is not JSON: '91971182.log\"}}'",
+        "cause": InvalidJsonError,
     }
 
 
