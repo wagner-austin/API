@@ -8,6 +8,7 @@ save-and-restore DI.
 
 from __future__ import annotations
 
+import logging
 import runpy
 import sys
 from collections.abc import Callable, Generator
@@ -48,6 +49,7 @@ from covenant_ml.types import (
     TrainOutcome,
     TrainProgress,
 )
+from covenant_ml.validation.types import CVSplitInfo
 from numpy.typing import NDArray
 from scripts.cv_external import (
     EXIT_BAD_USAGE,
@@ -359,8 +361,35 @@ def _int64_array(values: tuple[int, ...]) -> NDArray[np.int64]:
     return result
 
 
+def _assert_complete_grouped_folds(splits: CVSplitInfo, groups: NDArray[np.int64]) -> None:
+    """Verify each row is held out once and whole groups remain disjoint."""
+    assert splits["n_folds"] == 3
+    assert splits["n_samples"] == 12
+    assert tuple(fold["fold_number"] for fold in splits["folds"]) == (0, 1, 2)
+    held_out: list[int] = []
+    for fold in splits["folds"]:
+        train_indices = fold["train_indices"]
+        validation_indices = fold["val_indices"]
+        train = tuple(int(train_indices.item(index)) for index in range(len(train_indices)))
+        validation = tuple(
+            int(validation_indices.item(index)) for index in range(len(validation_indices))
+        )
+        assert len(train) == len(set(train)) == 8
+        assert len(validation) == len(set(validation)) == 4
+        assert set(train).isdisjoint(validation)
+        assert sorted((*train, *validation)) == list(range(12))
+        train_groups = {int(groups.item(index)) for index in train}
+        validation_groups = {int(groups.item(index)) for index in validation}
+        assert len(train_groups) == 4
+        assert len(validation_groups) == 2
+        assert train_groups.isdisjoint(validation_groups)
+        held_out.extend(validation)
+    assert sorted(held_out) == list(range(12))
+
+
 def test_mixed_label_groups_use_plain_grouped_kfold(
     capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Groups holding both labels switch to the plain grouped instrument,
     and the switch is announced — stratification's any-positive group
@@ -369,8 +398,11 @@ def test_mixed_label_groups_use_plain_grouped_kfold(
     groups = _int64_array((0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
     assert _has_mixed_label_groups(y, groups)
 
-    splits = _split_for(y, groups, 3, 42)
-    assert splits["n_folds"] == 3
+    # Assert the CLI diagnostic independently of a previously configured
+    # console handler. The real splitter still computes every fold.
+    with caplog.at_level(logging.WARNING, logger="covenant_ml.validation.splitter"):
+        splits = _split_for(y, groups, 3, 42)
+    _assert_complete_grouped_folds(splits, groups)
     assert capsys.readouterr().out == (
         "groups carry mixed labels; label stratification is undefined -- "
         "using plain grouped k-fold\n"
@@ -379,6 +411,7 @@ def test_mixed_label_groups_use_plain_grouped_kfold(
 
 def test_uniform_label_groups_keep_the_stratified_protocol(
     capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Label-uniform groups run the stratified splitter silently — the
     protocol every standing number ran under, unchanged."""
@@ -386,8 +419,11 @@ def test_uniform_label_groups_keep_the_stratified_protocol(
     groups = _int64_array((0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
     assert not _has_mixed_label_groups(y, groups)
 
-    splits = _split_for(y, groups, 3, 42)
-    assert splits["n_folds"] == 3
+    with caplog.at_level(logging.WARNING, logger="covenant_ml.validation.splitter"):
+        splits = _split_for(y, groups, 3, 42)
+    _assert_complete_grouped_folds(splits, groups)
+    for fold in splits["folds"]:
+        assert int(np.sum(y[fold["val_indices"]])) == 2
     assert capsys.readouterr().out == ""
 
 
