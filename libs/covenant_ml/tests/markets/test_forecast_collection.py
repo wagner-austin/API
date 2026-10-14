@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import runpy
+from collections.abc import Callable
 from contextlib import closing
 from hashlib import sha256
 from pathlib import Path
@@ -39,15 +40,11 @@ __all__ = ["api_server"]
 
 
 def _capture(
-    server: ApiServer, root: Path, plan: ComparisonPlan
+    server: ApiServer, root: Path, plan: ComparisonPlan, pause: Callable[[float], None]
 ) -> tuple[tuple[str, ...], dict[str, int]]:
     with closing(_test_hooks.client_factory(10.0, None)) as client:
-        market = ResponseArchive(
-            root / "markets", server.url, client, _test_hooks.clock, _test_hooks.pause
-        )
-        forecast = ResponseArchive(
-            root / "forecasts", server.url, client, _test_hooks.clock, _test_hooks.pause
-        )
+        market = ResponseArchive(root / "markets", server.url, client, _test_hooks.clock, pause)
+        forecast = ResponseArchive(root / "forecasts", server.url, client, _test_hooks.clock, pause)
         rows, counts = collect_forecast_rows(
             plan,
             MarketCollector(market.resume_capture),
@@ -59,7 +56,7 @@ def _capture(
 
 def test_real_cli_capture_replay_and_hashes(api_server: ApiServer, tmp_path: Path) -> None:
     serve_comparison(api_server)
-    tickers, counts = _capture(api_server, tmp_path, comparison_plan())
+    tickers, counts = _capture(api_server, tmp_path, comparison_plan(), _test_hooks.pause)
     assert len(tickers) == len(set(tickers)) == 96
     assert counts == {"selected_contracts": 96, "included": 96}
     protocol = tmp_path / "protocol.json"
@@ -115,7 +112,7 @@ def test_required_city_cannot_silently_disappear(api_server: ApiServer, tmp_path
     api_server.documents["/markets"][0]["markets"] = []
     api_server.documents["/historical/markets"][0]["markets"] = []
     with pytest.raises(ValueError, match=r"FORECAST-011.*KXHIGHTBOS"):
-        _capture(api_server, tmp_path, comparison_plan())
+        _capture(api_server, tmp_path, comparison_plan(), _test_hooks.pause)
     assert not any("/v1/forecast" in request for request in api_server.requests)
 
 
@@ -138,7 +135,7 @@ def test_native_cross_tier_conflicts_fail(
     replacement[0] = changed
     historical["markets"] = replacement
     with pytest.raises(ValueError, match="FORECAST-005"):
-        _capture(api_server, tmp_path, comparison_plan())
+        _capture(api_server, tmp_path, comparison_plan(), _test_hooks.pause)
 
 
 def test_collection_accounts_for_all_exclusions(api_server: ApiServer, tmp_path: Path) -> None:
@@ -174,7 +171,11 @@ def test_collection_accounts_for_all_exclusions(api_server: ApiServer, tmp_path:
         for index, document in enumerate(api_server.documents["/v1/forecast"])
         if index % 16 != 15
     ]
-    tickers, counts = _capture(api_server, tmp_path, decode_comparison_plan(plan_document))
+    pauses: list[float] = []
+    tickers, counts = _capture(
+        api_server, tmp_path, decode_comparison_plan(plan_document), pauses.append
+    )
+    assert pauses == [0.3] * len(api_server.requests)
     assert len(tickers) == 87
     assert all("26APR18" not in ticker for ticker in tickers)
     forecast_requests = [url for url in api_server.requests if "/v1/forecast?" in url]

@@ -59,17 +59,20 @@ def _capture(server: ApiServer, root: Path) -> Path:
     document = encode_comparison_plan(comparison_plan())
     document["train_end"] = "2026-04-14"
     plan = decode_comparison_plan(document)
+    pauses: list[float] = []
+    initial_requests = len(server.requests)
     with closing(_test_hooks.client_factory(10.0, None)) as client:
         market = ResponseArchive(
-            root / "markets", server.url, client, _test_hooks.clock, _test_hooks.pause
+            root / "markets", server.url, client, _test_hooks.clock, pauses.append
         )
         forecast = ResponseArchive(
-            root / "forecasts", server.url, client, _test_hooks.clock, _test_hooks.pause
+            root / "forecasts", server.url, client, _test_hooks.clock, pauses.append
         )
         rows, counts = collect_forecast_rows(
             plan, MarketCollector(market.capture), forecast.capture, print
         )
     assert counts == {"selected_contracts": 96, "included": 96}
+    assert pauses == [0.3] * (len(server.requests) - initial_requests)
     output = root / "original.json"
     sources = (*market.root.glob("*.json"), *forecast.root.glob("*.json"))
     _write(evaluate_forecasts(rows, plan), sources, output)

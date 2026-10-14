@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from time import perf_counter
 
 import pytest
 from platform_core.json_utils import (
@@ -86,7 +87,9 @@ def test_real_http_archive_replays_after_server_payload_is_consumed(
 ) -> None:
     api_server.documents["/evidence"] = [{"answer": 42}]
     store = archive(tmp_path, api_server)
+    started = perf_counter()
     assert store.capture("/evidence", {"z": 2, "a": "yes"}) == {"answer": 42}
+    assert perf_counter() - started >= 0.3
     assert store.replay("/evidence", {"a": "yes", "z": 2}) == {"answer": 42}
     assert api_server.requests == ["/evidence?a=yes&z=2"]
     with pytest.raises(FileExistsError, match="MARKET-016"):
