@@ -42,16 +42,16 @@ def event_day(event: str) -> str:
     return date(2000 + int(match[1]), months.index(match[2]) + 1, int(match[3])).isoformat()
 
 
-def historical_selection(
+def historical_inventory(
     read: Callable[[str, dict[str, str | int]], JSONObject],
-) -> tuple[tuple[MarketSpec, ...], dict[str, int]]:
-    """Page the complete archive and choose one native contract per game.
+) -> tuple[JSONObject, ...]:
+    """Page the complete archive with unique identities and validated event dates.
 
     Args:
         read: Explicit capture or offline replay method from ResponseArchive.
 
     Returns:
-        Chronologically ordered validated specifications and exclusion counts.
+        Complete native records, without price or outcome selection.
 
     Raises:
         ValueError: STRATEGY-002 for repeated cursors or tickers; invalid metadata.
@@ -60,7 +60,7 @@ def historical_selection(
     cursor = ""
     cursors: set[str] = set()
     tickers: set[str] = set()
-    selected: dict[str, JSONObject] = {}
+    records: list[JSONObject] = []
     while True:
         if cursor in cursors:
             raise ValueError("[STRATEGY-002] historical pagination cursor repeated")
@@ -74,14 +74,37 @@ def historical_selection(
             if ticker in tickers or not ticker.startswith(event + "-"):
                 raise ValueError("[STRATEGY-002] duplicate or mismatched market ticker")
             tickers.add(ticker)
-            day = event_day(event)
-            if TRAIN_START <= day <= TEST_END and (
-                event not in selected or ticker < require_str(selected[event], "ticker")
-            ):
-                selected[event] = native
+            event_day(event)
+            records.append(native)
         cursor = require_str(document, "cursor")
         if not cursor:
             break
+    return tuple(records)
+
+
+def historical_selection(
+    read: Callable[[str, dict[str, str | int]], JSONObject],
+) -> tuple[tuple[MarketSpec, ...], dict[str, int]]:
+    """Choose one contract per game before inspecting outcomes and quote eligibility.
+
+    Args:
+        read: Explicit archive capture or replay method.
+
+    Returns:
+        Ordered specifications and exclusions for the frozen experiment dates.
+
+    Raises:
+        ValueError: Invalid native identities, pagination or chronology.
+        HTTPStatusError: Acquisition failed.
+    """
+    selected: dict[str, JSONObject] = {}
+    for native in historical_inventory(read):
+        ticker, event = require_str(native, "ticker"), require_str(native, "event_ticker")
+        day = event_day(event)
+        if TRAIN_START <= day <= TEST_END and (
+            event not in selected or ticker < require_str(selected[event], "ticker")
+        ):
+            selected[event] = native
     return _eligible_specs(selected)
 
 

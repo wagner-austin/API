@@ -135,21 +135,21 @@ def _observation_key(row: tuple[MarketSpec, Quote]) -> tuple[str, str]:
     return row[0]["day"], row[0]["ticker"]
 
 
-def evaluate_sports(rows: Sequence[tuple[MarketSpec, Quote]]) -> JSONObject:
-    """Fit earlier games once and report later-game forecast and cost screens.
+def split_sports(
+    rows: Sequence[tuple[MarketSpec, Quote]],
+) -> tuple[tuple[tuple[MarketSpec, Quote], ...], tuple[tuple[MarketSpec, Quote], ...]]:
+    """Validate observations and separate the fixed chronological partitions.
 
     Args:
         rows: Verified one-per-event observations from the frozen date range.
 
     Returns:
-        Full candidate training scores, evaluation decisions, daily interval and gate.
+        Earlier training and later evaluation observations.
 
     Raises:
         ValueError: STRATEGY-007 for duplicate games, invalid time ordering or partition;
             STRATEGY-008 for empty partitions or fewer than two evaluation dates.
     """
-    from platform_core.json_utils import require_int, require_str
-
     seen: set[str] = set()
     train: list[tuple[MarketSpec, Quote]] = []
     test: list[tuple[MarketSpec, Quote]] = []
@@ -174,13 +174,61 @@ def evaluate_sports(rows: Sequence[tuple[MarketSpec, Quote]]) -> JSONObject:
             test.append((spec, quote))
     if not train or len({spec["day"] for spec, _ in test}) < 2:
         raise ValueError("[STRATEGY-008] require training games and two evaluation dates")
+    return tuple(train), tuple(test)
+
+
+def evaluate_sports(rows: Sequence[tuple[MarketSpec, Quote]]) -> JSONObject:
+    """Fit the frozen exponent and reuse the shared cost-aware forecast evaluator.
+
+    Args:
+        rows: One verified observation per game.
+
+    Returns:
+        Training scores, selected exponent and complete evaluation report.
+
+    Raises:
+        ValueError: Invalid or insufficient chronological evidence.
+    """
+    train, test = split_sports(rows)
     scores = {str(exponent): _brier(train, exponent) for exponent in EXPONENTS}
     _, _, exponent = min((scores[str(value)], abs(value - 1), value) for value in EXPONENTS)
+    predictions = {
+        spec["ticker"]: adjusted_probability(sum(_prices(quote)) / (2 * DOLLAR), exponent)
+        for spec, quote in test
+    }
+    report = score_sports_predictions(rows, predictions)
+    report["training_brier"] = dict(scores)
+    report["exponent"] = exponent
+    return report
+
+
+def score_sports_predictions(
+    rows: Sequence[tuple[MarketSpec, Quote]],
+    predictions: dict[str, float],
+) -> JSONObject:
+    """Evaluate declared forecasts with the original quote policy and advancement gates.
+
+    Args:
+        rows: Chronologically valid training and evaluation observations.
+        predictions: Exactly one probability per evaluation ticker, fitted elsewhere.
+
+    Returns:
+        Forecast scores, every hypothetical action and daily accounting interval.
+
+    Raises:
+        ValueError: STRATEGY-010 for mismatched predictions; invalid probabilities,
+            quotes or chronology propagate their existing error codes.
+    """
+    from platform_core.json_utils import require_int, require_str
+
+    train, test = split_sports(rows)
+    if set(predictions) != {spec["ticker"] for spec, _ in test}:
+        raise ValueError("[STRATEGY-010] predictions must exactly cover evaluation tickers")
     decisions: list[JSONValue] = []
     daily: dict[str, int] = {}
     total, stress, trades = 0, 0, 0
     for spec, quote in sorted(test, key=_observation_key):
-        probability = adjusted_probability(sum(_prices(quote)) / (2 * DOLLAR), exponent)
+        probability = predictions[spec["ticker"]]
         decision = quote_decision(quote, probability, spec["settlement"])
         profit = require_int(decision, "profit_units")
         daily[spec["day"]] = daily.get(spec["day"], 0) + profit
@@ -204,7 +252,10 @@ def evaluate_sports(rows: Sequence[tuple[MarketSpec, Quote]]) -> JSONObject:
     interval = paired_mean_difference(
         values, build_resampling(ResamplingUnit.ROW, len(values), groups, 1), 0.95
     )
-    baseline, adjusted = _brier(test, 1.0), _brier(test, exponent)
+    baseline = _brier(test, 1.0)
+    adjusted = fsum(
+        (predictions[spec["ticker"]] - spec["settlement"] / DOLLAR) ** 2 for spec, _ in test
+    ) / len(test)
     gates = {
         "training_games": len(train) >= 100,
         "evaluation_games": len(test) >= 100,
@@ -218,8 +269,6 @@ def evaluate_sports(rows: Sequence[tuple[MarketSpec, Quote]]) -> JSONObject:
         "evaluation_games": len(test),
         "training_dates": len({spec["day"] for spec, _ in train}),
         "evaluation_dates": len(daily),
-        "training_brier": dict(scores),
-        "exponent": exponent,
         "market_brier": baseline,
         "adjusted_brier": adjusted,
         "trades": trades,
