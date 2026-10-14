@@ -27,6 +27,9 @@ later trades and also failed advancement; these reused dates are exploratory.
 
 The later studies and active observations are written up separately:
 
+- [Causal maker regime diagnostic](MAKER_REGIME_RESULTS.md): stronger future-data
+  mutation tests, exact preservation of original backtest results, and pre-entry
+  probability-movement groups; no group establishes advancement.
 - [Second-venue sports result](SPORTS_CROSS_VENUE_RESULT.md): the frozen
   disagreement strategy produced no trades after costs and did not advance.
 - [Historical inflation result](INFLATION_EXPERIMENT_RESULT.md): the declared
