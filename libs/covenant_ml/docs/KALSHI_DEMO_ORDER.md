@@ -183,3 +183,13 @@ Account credits follow
 [Get Settlements](https://docs.kalshi.com/api-reference/portfolio/get-settlements)
 and its native schema in the [OpenAPI specification](https://docs.kalshi.com/openapi.yaml),
 checked the same day.
+
+## October 15 batch follow-up
+
+The single-order trial remains the settled baseline. A separate bounded batch
+now reconciles all known account orders and shares the durable submission path.
+Four new demo fills are recorded in [the batch validation report](DEMO_BATCH_VALIDATION_20261015.md).
+The old single-order observer is disabled; its one-order account assumption no
+longer holds. The replacement task is registered, but its first invocation
+failed during a local DNS outage. The report distinguishes that monitoring
+limitation from the successful authenticated reconciliation and local checks.
