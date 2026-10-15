@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from hashlib import sha256
+from os import fsync
 from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
 
 from platform_core.http_client import HttpxClient
-from platform_core.json_utils import JSONObject, dump_json_str, require_dict, require_str
+from platform_core.json_utils import (
+    JSONObject,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_dict,
+    require_str,
+)
 
 from .account_settlement import (
     AccountSettlement,
@@ -41,7 +50,12 @@ from .execution_state import ExecutionState, execution_report
 from .kalshi_auth import KalshiSigner
 from .kalshi_demo import DemoAccountClient
 from .kalshi_transport import DEMO_ORIGIN, DemoTransport
-from .paper_records import decode_native_book
+from .submission_evidence import (
+    decode_submission_capture,
+    decode_submission_timing,
+    encode_submission_capture,
+    encode_submission_timing,
+)
 from .validation import parse_fixed, parse_timestamp, read_document, require_bounded_int
 
 
@@ -149,25 +163,58 @@ class DemoTrialService:
         intent = trial["intent"]
         ticker = quote(intent["ticker"], safe="")
         market = require_dict(self._transport.get("/markets/" + ticker, {}), "market")
-        book = decode_native_book(self._transport.get("/markets/" + ticker + "/orderbook", {}))
+        market_received = parse_timestamp(self._clock())
+        book = self._transport.get("/markets/" + ticker + "/orderbook", {})
+        book_received = parse_timestamp(self._clock())
         observed = parse_timestamp(self._clock())
-        if (
-            require_str(market, "ticker") != intent["ticker"]
-            or require_str(market, "status") != "active"
-            or parse_timestamp(require_str(market, "close_time")) <= observed
-            or not 0 <= observed - current["completed_ms"] <= 5000
-            or book is None
-            or book["ask"] > intent["limit_price"]
-            or book["ask_size"] < 100
-        ):
-            raise ValueError("[DEMO-TRIAL-006] require active market and fresh executable depth")
+        capture = decode_submission_capture(
+            {
+                "intent": encode_intent(intent),
+                "market": market,
+                "book": book,
+                "preflight_completed_ms": current["completed_ms"],
+                "market_received_ms": market_received,
+                "book_received_ms": book_received,
+                "decision_ms": observed,
+                "started_ms": parse_timestamp(self._clock()),
+            }
+        )
         append_execution_event(
             ledger, {"action": "reserve", "observed_ms": observed, "data": encode_intent(intent)}
         )
-        acknowledgement = self._transport.submit(intent)
-        validate_acknowledgement(acknowledgement, intent, parse_timestamp(self._clock()))
+        capture_text = dump_json_str(encode_submission_capture(capture))
+        with (root / "submission-capture.json").open("x", encoding="utf-8") as stream:
+            stream.write(capture_text)
+            stream.flush()
+            fsync(stream.fileno())
+        acknowledgement = self._transport.submit(
+            intent,
+            valid_from_ms=capture["started_ms"],
+            valid_until_ms=min(
+                current["completed_ms"] + 5001,
+                parse_timestamp(require_str(market, "close_time")),
+            ),
+        )
+        returned = parse_timestamp(self._clock())
+        acknowledgement_text = dump_json_str(acknowledgement)
         with (root / "acknowledgement.json").open("x", encoding="utf-8") as stream:
-            stream.write(dump_json_str(acknowledgement))
+            stream.write(acknowledgement_text)
+            stream.flush()
+            fsync(stream.fileno())
+        timing = decode_submission_timing(
+            {
+                "client_order_id": intent["client_order_id"],
+                "started_ms": capture["started_ms"],
+                "returned_ms": returned,
+                "capture_sha256": sha256(capture_text.encode("utf-8")).hexdigest(),
+                "acknowledgement_sha256": sha256(acknowledgement_text.encode("utf-8")).hexdigest(),
+            }
+        )
+        with (root / "submission-timing.json").open("x", encoding="utf-8") as stream:
+            stream.write(dump_json_str(encode_submission_timing(timing)))
+            stream.flush()
+            fsync(stream.fileno())
+        validate_acknowledgement(acknowledgement, intent, returned)
         return self.reconcile(root)
 
     def reconcile(self, root: Path) -> JSONObject:
@@ -318,6 +365,47 @@ class DemoTrialService:
         """
         self._load(root)
         return self._report(read_execution_journal(root / "execution.sqlite"))
+
+    def evidence(self, root: Path) -> JSONObject:
+        """Verify a completed submission capture without contacting the exchange.
+
+        Args:
+            root: Trial with capture, native acknowledgement and local timing files.
+
+        Returns:
+            Verified evidence and local workflow duration in milliseconds. This
+            includes persistence, signing and response parsing, not just network time.
+
+        Raises:
+            ValueError: DEMO-EVIDENCE-004 for mismatched records; endpoint validators
+                propagate malformed evidence failures without inferring missing data.
+            OSError: A required evidence file is absent or unreadable.
+        """
+        trial = self._load(root)
+        captured_bytes = (root / "submission-capture.json").read_bytes()
+        capture = decode_submission_capture(
+            narrow_json_to_dict(load_json_str(captured_bytes.decode("utf-8")))
+        )
+        timing = decode_submission_timing(read_document(root / "submission-timing.json"))
+        payload = (root / "acknowledgement.json").read_bytes()
+        if (
+            capture["intent"] != trial["intent"]
+            or timing["client_order_id"] != trial["intent"]["client_order_id"]
+            or timing["started_ms"] != capture["started_ms"]
+            or timing["capture_sha256"] != sha256(captured_bytes).hexdigest()
+            or timing["acknowledgement_sha256"] != sha256(payload).hexdigest()
+        ):
+            raise ValueError("[DEMO-EVIDENCE-004] capture, timing and acknowledgement disagree")
+        acknowledgement = narrow_json_to_dict(load_json_str(payload.decode("utf-8")))
+        validate_acknowledgement(acknowledgement, trial["intent"], timing["returned_ms"])
+        return {
+            "mode": "demo_submission_evidence",
+            "live_ready": False,
+            "capture": encode_submission_capture(capture),
+            "timing": encode_submission_timing(timing),
+            "acknowledgement": acknowledgement,
+            "local_workflow_duration_ms": timing["returned_ms"] - timing["started_ms"],
+        }
 
     @staticmethod
     def _report(state: ExecutionState) -> JSONObject:

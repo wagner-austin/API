@@ -87,11 +87,13 @@ class DemoTransport:
             self._client.get(self._origin + full_path, headers=headers, params=params), path, 200
         )
 
-    def submit(self, intent: OrderIntent) -> JSONObject:
+    def submit(self, intent: OrderIntent, *, valid_from_ms: int, valid_until_ms: int) -> JSONObject:
         """Send one IOC demo order after the orchestration layer has reserved risk.
 
         Args:
             intent: Validated and durably reserved one-order intent.
+            valid_from_ms: Inclusive local start recorded before evidence persistence.
+            valid_until_ms: Exclusive quote/preflight validity deadline.
 
         Returns:
             Native acknowledgement; it is not cumulative execution evidence.
@@ -104,6 +106,8 @@ class DemoTransport:
         observed = parse_timestamp(self._clock())
         if not intent["created_ms"] <= observed < intent["expires_ms"]:
             raise ValueError("[DEMO-TRIAL-008] intent expired before HTTP submission")
+        if not valid_from_ms <= observed < valid_until_ms:
+            raise ValueError("[DEMO-EVIDENCE-003] quote validity or clock order failed before send")
         headers = self._signer.headers("POST", _PREFIX + path, observed)
         payload = order_payload(intent)
         payload["subaccount"] = 0
