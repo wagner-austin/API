@@ -85,27 +85,7 @@ def score_predictions(
             a - b for a, b in zip(losses["boosting"], losses[reference], strict=True)
         )
         daily = daily_means(differences, rows)
-        array: NDArray[np.float64] = np.asarray(daily, dtype=np.float64)
-        groups: NDArray[np.int64] = np.arange(len(daily), dtype=np.int64)
-        cluster = encode_interval(
-            paired_mean_difference(
-                array, build_resampling(ResamplingUnit.CLUSTER, len(daily), groups, 1), 0.95
-            )
-        )
-        serial = encode_interval(
-            paired_mean_difference(
-                array, build_resampling(ResamplingUnit.BLOCK, len(daily), groups, 8), 0.95
-            )
-        )
-        comparisons[reference] = {
-            "daily_differences": list(daily),
-            "mean": sum(daily) / len(daily),
-            "date_clustered": cluster,
-            "daily_newey_west": serial,
-            "both_upper_bounds_negative": (
-                require_float(cluster, "ci_high") < 0 and require_float(serial, "ci_high") < 0
-            ),
-        }
+        comparisons[reference] = paired_daily_contrast(daily)
     ordered_dates = sorted({row["event_day"] for row in rows})
     event_dates: list[JSONValue] = list(ordered_dates)
     return {
@@ -113,4 +93,39 @@ def score_predictions(
         "comparisons": comparisons,
         "event_dates": event_dates,
         "primary_reference": "logistic",
+    }
+
+
+def paired_daily_contrast(daily: tuple[float, ...]) -> JSONObject:
+    """Compare paired daily means under independence and seven-lag dependence.
+
+    Args:
+        daily: Chronologically ordered equal-date differences, at least nine dates.
+
+    Returns:
+        Identical paired estimators used by the frozen historical comparison.
+
+    Raises:
+        ValueError: Invalid or insufficient resampling units.
+    """
+    array: NDArray[np.float64] = np.asarray(daily, dtype=np.float64)
+    groups: NDArray[np.int64] = np.arange(len(daily), dtype=np.int64)
+    cluster = encode_interval(
+        paired_mean_difference(
+            array, build_resampling(ResamplingUnit.CLUSTER, len(daily), groups, 1), 0.95
+        )
+    )
+    serial = encode_interval(
+        paired_mean_difference(
+            array, build_resampling(ResamplingUnit.BLOCK, len(daily), groups, 8), 0.95
+        )
+    )
+    return {
+        "daily_differences": list(daily),
+        "mean": sum(daily) / len(daily),
+        "date_clustered": cluster,
+        "daily_newey_west": serial,
+        "both_upper_bounds_negative": (
+            require_float(cluster, "ci_high") < 0 and require_float(serial, "ci_high") < 0
+        ),
     }
