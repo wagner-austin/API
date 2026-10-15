@@ -29,7 +29,7 @@ def test_expiration_checked_at_http_boundary(api_server: ApiServer) -> None:
     with closing(build_client(5)) as client:
         transport = DemoTransport(client, signer, account_clock, origin=api_server.url)
         with pytest.raises(ValueError, match="DEMO-TRIAL-008"):
-            transport.submit(intent(created=200000))
+            transport.submit(intent(created=200000), valid_from_ms=200000, valid_until_ms=300000)
     assert api_server.requests == []
 
 

@@ -16,6 +16,8 @@ from scripts.kalshi_demo_trial import main
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.demo_trial import build_demo_trial
+from covenant_ml.markets.submission_evidence import decode_submission_timing
+from covenant_ml.markets.validation import read_document
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
 from ._demo_trial_fixtures import serve_reconciliation, serve_submission
@@ -55,6 +57,11 @@ def test_cli_end_to_end_and_real_restart(
     assert report["confirmed_orders"] == 1
     assert main([*base, "status"], stand_in_pin) == 0
     assert narrow_json_to_dict(load_json_str(capsys.readouterr().out)) == report
+    assert main([*base, "evidence"], stand_in_pin) == 0
+    evidence = narrow_json_to_dict(load_json_str(capsys.readouterr().out))
+    assert evidence["mode"] == "demo_submission_evidence"
+    timing = decode_submission_timing(read_document(root / "submission-timing.json"))
+    assert evidence["local_workflow_duration_ms"] == timing["returned_ms"] - timing["started_ms"]
     serve_reconciliation(demo_cli, root)
     assert main([*base, "reconcile"], stand_in_pin) == 0
     reconciled = narrow_json_to_dict(load_json_str(capsys.readouterr().out))
@@ -69,6 +76,14 @@ def test_cli_end_to_end_and_real_restart(
         timeout=30,
     )
     assert narrow_json_to_dict(load_json_str(result.stdout)) == reconciled
+    replay = subprocess.run(
+        [sys.executable, "-m", "scripts.kalshi_demo_trial", *base, "evidence"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    assert narrow_json_to_dict(load_json_str(replay.stdout)) == evidence
     refused = subprocess.run(
         [sys.executable, "-m", "scripts.kalshi_demo_trial", *base, "submit"],
         capture_output=True,
