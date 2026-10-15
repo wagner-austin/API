@@ -71,13 +71,22 @@ is computed. These omissions must be resolved before a trading evaluation.
 
 ## Validation
 
+Pure native validators check malformed trade fields and invalid payouts.
 Real socket tests exercise pagination, both trade tiers, cross-tier overlap,
 exact subsecond boundaries, metadata batching, shared event IDs, unresolved
-and scalar results, invalid payouts, missing metadata and HTTP 503 failures.
+and scalar results, missing metadata and HTTP 503 failures.
 The CLI is exercised through capture, explicit resume and child-process offline
 replay; output refusal and changed-source verification are tested. The shared
 archive tests additionally cover integrity failures and cursor cycles.
 The package's existing `make check` enforces strict typing over source, tests
 and scripts, guards, and 100 percent statement and branch coverage.
+
+The first independent fleet check passed all 4281 tests and coverage but took
+301 seconds against its 300-second budget. Its log is retained as
+`files/public-tape-fleet-failure-20261015.log`. Native-field validation was
+then separated from HTTP collection: unit tests exercise the same production
+validators without paying network pacing delays for every malformed field.
+Real transport and failure tests remain in place; neither the check budget
+nor production pacing was relaxed.
 
 Board task: 9617e2fe-dbde-43f8-af39-9f049cfef8a2.
