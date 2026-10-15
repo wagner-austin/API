@@ -20,12 +20,8 @@ True``.
 
 THREE PIECES, each idempotent:
 
-1. Each WSL runner unit gets a drop-in naming the cache. A unit takes an
-   environment only when it starts, so one whose running process lacks the
-   variable is restarted, and only while none of its processes is a
-   ``Runner.Worker``: a restart ends a running job (the unit's ``KillMode``
-   is ``control-group``), so a busy unit is named and left for the next
-   provision run.
+1. Each WSL runner unit gets a drop-in naming the cache, and is restarted
+   to read it the first minute it is idle (:mod:`fleet.core.runner_cache_adopt`).
 2. Each Windows runner service gets the same variable in its service
    environment (:mod:`fleet.core.runner_windows_provision`).
 3. A root timer in the distro, ``fleet-action-cache-fill``, reads the
@@ -57,7 +53,7 @@ wrote 480,054 bytes under one directory.
 
 from __future__ import annotations
 
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
+from fleet.contracts.runners import HostRunnerSpec
 from fleet.core.runner_distro import windows_to_wsl_path
 from fleet.core.script_values import scriptable
 
@@ -371,55 +367,6 @@ def render_fill_lines(spec: HostRunnerSpec) -> list[str]:
     ]
 
 
-def render_cache_environment_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that give a runner unit the cache variable, restarting it only while idle.
-
-    Run after the unit has been started. The drop-in is written, and systemd
-    reloaded, only when the file does not already hold exactly
-    :data:`CACHE_DROP_IN`; the unit is restarted only when its running main
-    process lacks the variable and none of its processes is a
-    ``Runner.Worker``.
-
-    Args:
-        install: A wsl-side install; its ``service`` is the unit's name.
-
-    Returns:
-        The lines.
-
-    Raises:
-        ValueError: When the unit name cannot be embedded verbatim.
-    """
-    unit = scriptable(install["service"], label="service")
-    directory = f"/etc/systemd/system/{unit}.d"
-    path = f"{directory}/{CACHE_DROP_IN_NAME}"
-    body = CACHE_DROP_IN.replace("\n", "\\n")
-    setting = f"{CACHE_VARIABLE}={WSL_CACHE_DIR}"
-    return [
-        f'if [ "$(cat {path} 2>/dev/null)" != "$(printf \'{body}\')" ]; then',
-        f"    mkdir -p {directory}",
-        f"    printf '{body}' > {path}",
-        "    systemctl daemon-reload",
-        "fi",
-        f"main=$(systemctl show -p MainPID --value {unit})",
-        f'if ! tr "\\0" "\\n" < "/proc/$main/environ" 2>/dev/null | grep -qxF "{setting}"; then',
-        "    busy=no",
-        f'    for pid in $(cat "/sys/fs/cgroup$(systemctl show -p ControlGroup --value {unit})'
-        '/cgroup.procs" 2>/dev/null); do',
-        '        if grep -qs Runner.Worker "/proc/$pid/cmdline"; then',
-        "            busy=yes",
-        "        fi",
-        "    done",
-        '    if [ "$busy" = no ]; then',
-        f"        systemctl restart {unit}",
-        f"        echo 'action cache set for {unit}: restarted while idle'",
-        "    else",
-        f"        echo 'action cache set for {unit} at its next restart: it is running a job;"
-        " run provision again to restart it'",
-        "    fi",
-        "fi",
-    ]
-
-
 def render_windows_cache_environment_lines() -> list[str]:
     """Windows provision lines that give a runner service the cache variable while idle.
 
@@ -477,7 +424,6 @@ __all__ = [
     "PRUNE_DAYS",
     "WINDOWS_CACHE_DIR",
     "WSL_CACHE_DIR",
-    "render_cache_environment_lines",
     "render_fill_lines",
     "render_fill_service",
     "render_windows_cache_environment_lines",
