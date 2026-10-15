@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
@@ -71,14 +72,47 @@ def candle_document() -> JSONObject:
     }
 
 
-def archive(root: Path, server: ApiServer) -> ResponseArchive:
+def require_test_pause(seconds: float) -> None:
+    """Validate the transport's pacing request without delaying data assertions.
+
+    Args:
+        seconds: Delay requested by the actual archive implementation.
+
+    Raises:
+        AssertionError: The archive changed its required request pacing.
+    """
+    assert seconds == 0.3, "archive request pacing changed"
+
+
+def archive(
+    root: Path, server: ApiServer, pause: Callable[[float], None] = require_test_pause
+) -> ResponseArchive:
+    """Bind real HTTP and disk with explicit pacing for the tested concern.
+
+    The elapsed-time test passes the production sleep implementation. Other
+    callers validate the same requested delay without repeating wall-clock
+    waits while testing native data, selection, replay or transport failures.
+
+    Args:
+        root: Immutable response archive directory.
+        server: Actual local HTTP origin.
+        pause: Delay contract validator or the production sleeper.
+
+    Returns:
+        Production archive with its real client and timestamp reader.
+    """
     return ResponseArchive(
         root,
         server.url,
         _test_hooks.client_factory(5.0, None),
         _test_hooks.clock,
-        _test_hooks.pause,
+        pause,
     )
+
+
+def test_transport_fixture_refuses_changed_request_pacing() -> None:
+    with pytest.raises(AssertionError, match="archive request pacing changed"):
+        require_test_pause(0.0)
 
 
 def test_real_http_archive_replays_after_server_payload_is_consumed(
@@ -86,7 +120,7 @@ def test_real_http_archive_replays_after_server_payload_is_consumed(
     api_server: ApiServer,
 ) -> None:
     api_server.documents["/evidence"] = [{"answer": 42}]
-    store = archive(tmp_path, api_server)
+    store = archive(tmp_path, api_server, _test_hooks.pause)
     started = perf_counter()
     assert store.capture("/evidence", {"z": 2, "a": "yes"}) == {"answer": 42}
     assert perf_counter() - started >= 0.3
