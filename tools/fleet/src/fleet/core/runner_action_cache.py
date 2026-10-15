@@ -35,13 +35,24 @@ THREE PIECES, each idempotent:
    of actions/checkout read 3d3c42e5aac5 both ways; an annotated tag is
    asked for as ``<tag>^{}``, because ls-remote prints the peeled commit for
    a pattern only when that ref is named, measured on git's v2.40.0), and
-   fetches each
-   commit's archive once, the WSL installs' as ``.tar.gz`` into
+   builds each commit's archive once, the WSL installs' as ``.tar.gz`` into
    :data:`WSL_CACHE_DIR` and the Windows installs' as ``.zip`` into
-   :data:`WINDOWS_CACHE_DIR` through ``/mnt``. codeload then sees one
-   download per action version, not one per job. An archive no workflow has
+   :data:`WINDOWS_CACHE_DIR` through ``/mnt``. An archive no workflow has
    named for :data:`PRUNE_DAYS` days is removed, so a window in which the
    checkouts are gone never empties the cache.
+
+THE ARCHIVE IS BUILT WITH GIT, NOT DOWNLOADED FROM CODELOAD. The fill first
+fetched codeload's own archive, and on lavender at 12:41Z and again at
+12:53Z on 2026-10-15 codeload answered 429 for exactly the URL the
+uncached runners were still asking for, ``actions/checkout/tar.gz/3d3c42e``,
+while the same commit's zip came at 12:53Z. So the fill fetches the one
+commit from github.com over git, the transport ``ls-remote`` already uses,
+and writes it with ``git archive`` under one top directory, which is all
+the runner asks of an archive: it unwraps whatever single directory it
+finds (``ActionManager.cs``: "repository archive from github always
+contains a nested folder"). Measured on the hub: ``git fetch --depth 1``
+of actions/checkout at 3d3c42e then ``git archive --format=tar.gz``
+wrote 480,054 bytes under one directory.
 """
 
 from __future__ import annotations
@@ -77,8 +88,8 @@ PRUNE_DAYS = 30
 
 #: The fill. Each pass, separated from the next by ``--``, names a FORMAT,
 #: the archive the runners on that side read (tar.gz on Linux, zip on
-#: Windows, and also the codeload path segment that serves it), a CACHE and
-#: the WORKDIRs whose checkouts it reads. Every pass runs whatever an earlier
+#: Windows, each a ``git archive --format``), a CACHE and the WORKDIRs whose
+#: checkouts it reads. Every pass runs whatever an earlier
 #: one did: on lavender's first run, 2026-10-15T12:41Z, codeload answered 429
 #: for actions/checkout@v7, the WSL pass exited 1, and a second ExecStart
 #: for the Windows pass never ran.
@@ -91,7 +102,6 @@ FILL_SCRIPT = (
 # Usage: fleet-action-cache-fill tar.gz|zip CACHE WORKDIR... [-- tar.gz|zip CACHE WORKDIR...]...
 set -euo pipefail
 github=https://github.com
-codeload=https://codeload.github.com
 """
     + f"prune_days={PRUNE_DAYS}\n"
     + r"""
@@ -138,8 +148,28 @@ resolve() {
     return 1
 }
 
+# Writes owner/repo at SHA as a FORMAT archive to OUT, under one top
+# directory, from a shallow fetch of that one commit into a scratch
+# repository, named with --git-dir so OUT is read from where the fill runs.
+# The bytes are the commit's own: core.autocrlf is off for the archive, as a
+# host's own setting would convert line endings codeload never does.
+build() {
+    local scratch status
+    scratch=$(mktemp -d)
+    if git init -q --bare "$scratch" \
+        && git --git-dir="$scratch" fetch -q --depth 1 "$github/$1" "$2" \
+        && git --git-dir="$scratch" -c core.autocrlf=false archive --format="$3" \
+            --prefix="${1/\//-}-${2:0:12}/" -o "$4" "$2"; then
+        status=0
+    else
+        status=1
+    fi
+    rm -rf "$scratch"
+    return "$status"
+}
+
 # One pass: FORMAT CACHE WORKDIR... Its last line counts what it did, and it
-# fails when any reference resolved to nothing or any archive was not fetched.
+# fails when any reference resolved to nothing or any archive was not built.
 fill() {
     local format=$1 cache=$2
     shift 2
@@ -164,13 +194,13 @@ fill() {
             continue
         fi
         mkdir -p "${archive%/*}"
-        if curl -fsSL -o "$archive.part" "$codeload/$repo/$format/$sha"; then
+        if build "$repo" "$sha" "$format" "$archive.part"; then
             mv "$archive.part" "$archive"
             echo "fleet-action-cache-fill: cached $repo@$ref at $sha"
             cached=$((cached + 1))
         else
             rm -f "$archive.part"
-            echo "fleet-action-cache-fill: could not fetch $repo@$ref at $sha from $codeload"
+            echo "fleet-action-cache-fill: could not fetch $repo@$ref at $sha from $github/$repo"
             failed=$((failed + 1))
         fi
     done
@@ -227,8 +257,8 @@ exit "$status"
 
 #: How often the fill runs, and how soon after boot. Fifteen minutes, not an
 #: hour: a pass that holds every archive asks ls-remote once per action and
-#: downloads nothing, and an archive codeload refused is asked for again
-#: before most of an hour's jobs have fetched it themselves.
+#: fetches nothing, and an archive a pass could not build is built again
+#: before most of an hour's jobs have fetched the action themselves.
 FILL_TIMER = """[Unit]
 Description=Run fleet-action-cache-fill every 15 minutes
 
