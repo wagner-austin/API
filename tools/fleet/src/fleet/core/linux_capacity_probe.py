@@ -69,8 +69,10 @@ CGROUPS_LINE = "cgroups=/sys/fs/cgroup/system.slice\n"
 #: Where the probe reads the node's reservations from; the test replaces it.
 RESERVATIONS_LINE = f'reservations="$HOME/{reservations.DIRECTORY}"\n'
 
-#: The reservations' sum, after every other field, so an unreadable file
-#: ends the probe with every field before it already printed.
+#: The reservations' sum, after the body's other fields, so an unreadable
+#: file ends the probe with them already printed; the dialect's CI-slice
+#: lines come after the body and are not printed then, which costs nothing,
+#: since the node's reading is refused.
 RESERVATIONS_PART = (
     RESERVATIONS_LINE
     + "now=$(date +%s)\n"
