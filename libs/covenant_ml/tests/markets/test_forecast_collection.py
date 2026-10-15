@@ -56,7 +56,11 @@ def _capture(
 
 def test_real_cli_capture_replay_and_hashes(api_server: ApiServer, tmp_path: Path) -> None:
     serve_comparison(api_server)
-    tickers, counts = _capture(api_server, tmp_path, comparison_plan(), _test_hooks.pause)
+    # Real HTTP and archive I/O remain here. The archive tests separately verify
+    # elapsed pacing and HTTP failure with the production sleep implementation.
+    pauses: list[float] = []
+    tickers, counts = _capture(api_server, tmp_path, comparison_plan(), pauses.append)
+    assert pauses == [0.3] * len(api_server.requests)
     assert len(tickers) == len(set(tickers)) == 96
     assert counts == {"selected_contracts": 96, "included": 96}
     protocol = tmp_path / "protocol.json"
