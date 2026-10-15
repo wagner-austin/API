@@ -2,11 +2,45 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from urllib.parse import urlencode
+
 from platform_core.json_utils import JSONObject, JSONValue, require_str
 
 from .collection import MarketCollector
 from .kalshi import decode_public_trade
 from .validation import parse_fixed, parse_timestamp, require_nonempty
+
+
+def _ticker_batches(tickers: tuple[str, ...]) -> Generator[tuple[str, ...], None, None]:
+    """Pack identities within a fixed encoded-query budget without truncation.
+
+    Args:
+        tickers: Sorted unique native identifiers.
+
+    Yields:
+        Nonempty batches with at most 6000 encoded query characters.
+
+    Raises:
+        ValueError: TAPE-007 if a single identifier exceeds the request budget.
+    """
+    batch: list[str] = []
+    size = len(urlencode({"limit": 1000, "tickers": ""}))
+    base_size = size
+    for ticker in tickers:
+        encoded_size = len(urlencode({"": ticker})) - 1
+        if base_size + encoded_size > 6000:
+            raise ValueError("[TAPE-007] contract identifier exceeds query size budget")
+        if batch and size + encoded_size + 3 > 6000:
+            yield tuple(batch)
+            batch = []
+            size = base_size
+        if batch:
+            size += 3
+        batch.append(ticker)
+        size += encoded_size
+    if batch:
+        yield tuple(batch)
 
 
 def _market_documents(
@@ -27,8 +61,7 @@ def _market_documents(
         TypeError: Required metadata has the wrong native type.
     """
     records: dict[str, JSONObject] = {}
-    for offset in range(0, len(tickers), 20):
-        batch = tickers[offset : offset + 20]
+    for batch in _ticker_batches(tickers):
         for path in ("/markets", "/historical/markets"):
             seen: set[str] = set()
             for row in collector.pages(path, {"tickers": ",".join(batch)}, "markets"):
