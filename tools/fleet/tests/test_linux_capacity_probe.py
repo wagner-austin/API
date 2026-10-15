@@ -9,10 +9,13 @@ between the listing and the read.
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 
 import pytest
 
+from fleet.contracts.action_cache import PROBE_FIELDS
+from fleet.core import probe
 from fleet.core.dialect_linux import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION, LinuxDialect
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
@@ -38,6 +41,37 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_BODY.endswith(RESERVATIONS_PART)
     assert RESERVATIONS_PART.startswith(RESERVATIONS_LINE)
     assert RESERVATIONS_LINE == 'reservations="$HOME/.fleet/reservations"\n'
+
+
+@pytest.mark.host_linux
+def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path) -> None:
+    """The script as the fleet sends it, against this machine's own roots."""
+    script = tmp_path / "probe.sh"
+    script.write_text(CAPACITY_PROBE_SCRIPT, encoding="utf-8")
+    completed = subprocess.run(
+        [*SH_INVOCATION, str(script)], capture_output=True, text=True, check=False, timeout=120
+    )
+    assert completed.returncode == 0, completed.stderr
+    fields = fields_of(completed.stdout)
+    sliced = {"ci_slice_current_gb", "ci_slice_high_gb"} <= set(fields)
+    # A runner host whose root timer counted its runners in the last five
+    # minutes prints all four counts, lavender-wsl since 2026-10-15 (MCPs
+    # board task ce2b92e0); every other node prints none.
+    counted = set(PROBE_FIELDS) & set(fields)
+    assert counted in (set(), set(PROBE_FIELDS))
+
+    reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores"}
+    assert set(fields) == reported | counted | (
+        {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
+    )
+    # Any sign: on the stack host it is MemAvailable net of what capped
+    # containers may still grow into (fleet.core.linux_capacity_probe),
+    # which diphtheria read as -1.513 at 10:24Z on 2026-10-05.
+    assert re.fullmatch(r"-?\d+\.\d{3}", fields["free_ram_gb"])
+    assert float(fields["free_disk_gb"]) > 0.0
+    assert int(fields["logical_cores"]) >= 1
+    # None on a CI runner, a VM smoke's cores on diphtheria (84a2b690).
+    assert fields["reserved_cores"].isdigit()
 
 
 def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None, shmem: int = 0) -> None:

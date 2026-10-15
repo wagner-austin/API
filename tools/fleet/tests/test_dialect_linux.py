@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
-import re
 import socket
 import subprocess
 import sys
@@ -23,9 +22,8 @@ import pytest
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
-from fleet.contracts.action_cache import PROBE_FIELDS
 from fleet.contracts.source import InstallStep
-from fleet.core import names, probe
+from fleet.core import names
 from fleet.core.dialect_linux import (
     OBSERVE_SESSIONS_PYTHON,
     OBSERVE_SESSIONS_SCRIPT,
@@ -500,28 +498,6 @@ class TestForRealUnderSh:
         )
         assert completed.returncode == 0, completed.stderr
         return completed.stdout
-
-    def test_the_capacity_probe_reports_the_three_numbers(self, tmp_path: pathlib.Path) -> None:
-        fields = fields_of(self.run_script(tmp_path, DIALECT.capacity_probe_script()))
-        sliced = {"ci_slice_current_gb", "ci_slice_high_gb"} <= set(fields)
-        # A runner host whose root timer counted its runners in the last five
-        # minutes prints all four counts, lavender-wsl since 2026-10-15
-        # (MCPs board task ce2b92e0); every other node prints none.
-        counted = set(PROBE_FIELDS) & set(fields)
-        assert counted in (set(), set(PROBE_FIELDS))
-
-        reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores"}
-        assert set(fields) == reported | counted | (
-            {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
-        )
-        # Any sign: on the stack host it is MemAvailable net of what capped
-        # containers may still grow into (fleet.core.linux_capacity_probe),
-        # which diphtheria read as -1.513 at 10:24Z on 2026-10-05.
-        assert re.fullmatch(r"-?\d+\.\d{3}", fields["free_ram_gb"])
-        assert float(fields["free_disk_gb"]) > 0.0
-        assert int(fields["logical_cores"]) >= 1
-        # None on a CI runner, a VM smoke's cores on diphtheria (84a2b690).
-        assert fields["reserved_cores"].isdigit()
 
     def test_the_toolchain_probe_reports_every_tool(self, tmp_path: pathlib.Path) -> None:
         fields = fields_of(self.run_script(tmp_path, DIALECT.toolchain_probe_script()))
