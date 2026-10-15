@@ -8,8 +8,8 @@ from urllib.parse import urlencode
 from platform_core.json_utils import JSONObject, JSONValue, require_str
 
 from .collection import MarketCollector
-from .kalshi import decode_public_trade
-from .validation import parse_fixed, parse_timestamp, require_nonempty
+from .public_tape_records import decode_tape_trade, require_market_snapshot
+from .validation import parse_timestamp, require_nonempty
 
 
 def _ticker_batches(tickers: tuple[str, ...]) -> Generator[tuple[str, ...], None, None]:
@@ -65,23 +65,10 @@ def _market_documents(
         for path in ("/markets", "/historical/markets"):
             seen: set[str] = set()
             for row in collector.pages(path, {"tickers": ",".join(batch)}, "markets"):
-                ticker = require_nonempty(row, "ticker")
+                ticker = require_market_snapshot(row)
                 if ticker not in batch or ticker in seen:
                     raise ValueError("[TAPE-003] unexpected or duplicate metadata identity")
                 seen.add(ticker)
-                require_nonempty(row, "event_ticker")
-                require_nonempty(row, "status")
-                result = require_str(row, "result")
-                if result not in ("", "yes", "no", "scalar"):
-                    raise ValueError("[TAPE-005] unsupported native market result")
-                if result:
-                    payout = parse_fixed(require_str(row, "settlement_value_dollars"), 4)
-                    if (
-                        not 0 <= payout <= 10000
-                        or (result == "yes" and payout != 10000)
-                        or (result == "no" and payout != 0)
-                    ):
-                        raise ValueError("[TAPE-005] result disagrees with cash settlement")
                 if ticker in records and records[ticker] != row:
                     raise ValueError("[TAPE-003] conflicting metadata across tiers")
                 records[ticker] = row
@@ -132,14 +119,7 @@ def collect_public_tape(collector: MarketCollector, start_ts: int, end_ts: int) 
     boundary_rows = 0
     for row in rows:
         ticker = require_nonempty(row, "ticker")
-        trade = decode_public_trade(row, ticker)
-        if not query_start * 1000 <= trade["timestamp_ms"] <= end_ts * 1000 or require_str(
-            row, "taker_book_side"
-        ) not in ("bid", "ask"):
-            raise ValueError("[TAPE-002] trade outside requested window or invalid book side")
-        no_price = parse_fixed(require_str(row, "no_price_dollars"), 4)
-        if trade["price"] + no_price != 10000:
-            raise ValueError("[TAPE-002] YES and NO trade prices are not complementary")
+        trade = decode_tape_trade(row, query_start, end_ts)
         if not start_ts * 1000 <= trade["timestamp_ms"] < end_ts * 1000:
             boundary_rows += 1
             continue
