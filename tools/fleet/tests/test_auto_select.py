@@ -97,7 +97,12 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         The state.
     """
     return NodeState(
-        host=host, free_ram_gb=free_ram_gb, free_disk_gb=860.0, live=IDLE, ci_slice=None
+        host=host,
+        free_ram_gb=free_ram_gb,
+        free_disk_gb=860.0,
+        live=IDLE,
+        ci_slice=None,
+        reserved_cores=0,
     )
 
 

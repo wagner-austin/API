@@ -278,7 +278,7 @@ DEMO_DEPENDENCY = "libs/base"
 DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 
 #: What a healthy capacity probe answers.
-PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\n"
+PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n"
 
 #: A node holding no live fleet run.
 IDLE = LiveLoad(runs=0, workers=0, ram_gb=0.0)

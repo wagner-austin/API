@@ -95,6 +95,7 @@ def _state(
     free_disk_gb: float = 800.0,
     live: LiveLoad = IDLE,
     ci_slice: SliceMemory | None = None,
+    reserved_cores: int = 0,
 ) -> NodeState:
     """Build a probed state.
 
@@ -104,6 +105,7 @@ def _state(
         free_disk_gb: Disk free.
         live: What the node's live fleet runs hold.
         ci_slice: Its runners.slice reading, or None for a node with none.
+        reserved_cores: The cores its reservations hold.
 
     Returns:
         The state.
@@ -114,6 +116,7 @@ def _state(
         free_disk_gb=free_disk_gb,
         live=live,
         ci_slice=ci_slice,
+        reserved_cores=reserved_cores,
     )
 
 

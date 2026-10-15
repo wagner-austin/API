@@ -33,8 +33,8 @@ from tests.conftest import FakeClock, FakeRun, failed, ok
 
 _NOW = 1_757_000_000
 
-_PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\n"
-_PROBE_SMALL = "free_ram_gb=5.0\nfree_disk_gb=860.0\n"
+_PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n"
+_PROBE_SMALL = "free_ram_gb=5.0\nfree_disk_gb=860.0\nreserved_cores=0\n"
 
 
 def _workspace_document() -> JSONObject:
@@ -249,7 +249,9 @@ class TestPreflight:
 
     def test_a_named_node_that_refuses_says_why(self, config_path: pathlib.Path) -> None:
         """5 GB free against a 4 GB reservation affords no workers."""
-        _test_hooks.run = FakeRun([ok(""), ok("free_ram_gb=4.5\nfree_disk_gb=860.0\n")])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("free_ram_gb=4.5\nfree_disk_gb=860.0\nreserved_cores=0\n")]
+        )
 
         with pytest.raises(AppError) as excinfo:
             preflight.main(

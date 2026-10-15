@@ -26,7 +26,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue, tick_body
 from tests._toolchain_fixtures import LAVENDER_2026_09_23, LAVENDER_STORE_STUB
-from tests.conftest import DEMO_PROJECT, FakeRun, failed, ok
+from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -80,7 +80,7 @@ class TestATickThatClaimsNothing:
     ) -> None:
         _, tick = _ticked(
             sourced_config,
-            [ok(""), ok("free_ram_gb=27.0\nfree_disk_gb=860.0\n"), ok(""), ok("banner\n")],
+            [ok(""), ok(PROBE_OK), ok(""), ok("banner\n")],
             [dump_json_str({"jobs": []})],
         )
 
@@ -94,7 +94,7 @@ class TestATickThatClaimsNothing:
     def test_a_node_that_cannot_build_records_why(self, sourced_config: pathlib.Path) -> None:
         _, tick = _ticked(
             sourced_config,
-            [ok(""), ok("free_ram_gb=27.0\nfree_disk_gb=860.0\n"), ok(""), ok(LAVENDER_STORE_STUB)],
+            [ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_STORE_STUB)],
             [dump_json_str({"jobs": []})],
         )
 
@@ -125,7 +125,7 @@ class TestATickThatClaimsNothing:
             sourced_config,
             [
                 ok(""),
-                ok(f"free_ram_gb={free}\nfree_disk_gb=860.0\n"),
+                ok(f"free_ram_gb={free}\nfree_disk_gb=860.0\nreserved_cores=0\n"),
                 ok(""),
                 ok(LAVENDER_2026_09_23),
             ],

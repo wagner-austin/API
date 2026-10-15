@@ -108,7 +108,12 @@ def test_a_node_with_room_for_one_worker_but_no_project_s_minimum_claims_nothing
     two. It used to claim that project and refuse it; now it asks the queue
     for nothing."""
     _test_hooks.run = FakeRun(
-        [ok(""), ok("free_ram_gb=6.0\nfree_disk_gb=860.0\n"), ok(""), ok(LAVENDER_2026_09_23)]
+        [
+            ok(""),
+            ok("free_ram_gb=6.0\nfree_disk_gb=860.0\nreserved_cores=0\n"),
+            ok(""),
+            ok(LAVENDER_2026_09_23),
+        ]
     )
     endpoint = FakeQueue([dump_json_str({"jobs": []})])
     _test_hooks.http_post = endpoint

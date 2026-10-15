@@ -22,12 +22,66 @@ BeforeAll {
 }
 
 Describe 'The capacity probe' {
-    It 'reports free memory, free disk and logical cores, each as one key=value line' {
-        $said = @(Invoke-Rendered 'dialect-capacity-probe' @{})
-        $said.Count | Should -Be 3
+    BeforeAll {
+        # The reservations live under the node account's profile (MCPs board
+        # task 84a2b690, fleet.core.reservations), so each case points
+        # USERPROFILE at a profile under $TestDrive and puts it back.
+        function Invoke-ProbeWithReservations {
+            param([string]$ProfileDirectory, [hashtable]$Files)
+            $held = Join-Path $ProfileDirectory '.fleet\reservations'
+            [void][System.IO.Directory]::CreateDirectory($held)
+            foreach ($name in $Files.Keys) {
+                [System.IO.File]::WriteAllText((Join-Path $held $name), $Files[$name])
+            }
+            $saved = $env:USERPROFILE
+            try {
+                $env:USERPROFILE = $ProfileDirectory
+                return @(Invoke-Rendered 'dialect-capacity-probe' @{})
+            } finally {
+                $env:USERPROFILE = $saved
+            }
+        }
+    }
+    It 'reports free memory, free disk, logical cores and reserved cores, each as one key=value line' {
+        $said = @(Invoke-ProbeWithReservations (Join-Path $TestDrive 'none') @{})
+        $said.Count | Should -Be 4
         $said[0] | Should -Match '^free_ram_gb=[0-9,]+\.[0-9]{3}$'
         $said[1] | Should -Match '^free_disk_gb=[0-9,]+\.[0-9]{3}$'
         $said[2] | Should -BeExactly "logical_cores=$([Environment]::ProcessorCount)"
+        $said[3] | Should -BeExactly 'reserved_cores=0'
+    }
+    It 'reads no reservations for a profile that has no reservations directory' {
+        $userProfile = Join-Path $TestDrive 'bare'
+        [void][System.IO.Directory]::CreateDirectory($userProfile)
+        $saved = $env:USERPROFILE
+        try {
+            $env:USERPROFILE = $userProfile
+            $said = @(Invoke-Rendered 'dialect-capacity-probe' @{})
+        } finally {
+            $env:USERPROFILE = $saved
+        }
+        $said[-1] | Should -BeExactly 'reserved_cores=0'
+    }
+    It 'sums the cores of every live reservation and charges an expired one nothing' {
+        $said = @(Invoke-ProbeWithReservations (Join-Path $TestDrive 'held') @{
+            'vm.reservation'    = "holder=vm smoke`ncores=4`n`nuntil_unix=99999999999`n"
+            'build.reservation' = "holder=build`r`ncores=3`r`nuntil_unix=99999999999`r`n"
+            'old.reservation'   = "holder=old`ncores=2`nuntil_unix=1`n"
+            'notes.txt'         = "cores=9`nuntil_unix=99999999999`n"
+        })
+        $said[-1] | Should -BeExactly 'reserved_cores=7'
+    }
+    It 'names a reservation it cannot read and ends the probe' -TestCases @(
+        @{ Text = "holder=vm`ncores=four`nuntil_unix=99999999999`n" }
+        @{ Text = "holder=vm`nuntil_unix=99999999999`n" }
+        @{ Text = "holder=vm`ncores=4`n" }
+        @{ Text = "holder=vm`ncores=4`nuntil_unix=-1`n" }
+    ) {
+        param([string]$Text)
+        $userProfile = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $said = @(Invoke-ProbeWithReservations $userProfile @{ 'bad.reservation' = $Text })
+        $said[-1] | Should -BeExactly "reservation_unreadable=$(Join-Path $userProfile '.fleet\reservations\bad.reservation')"
+        ($said -match '^reserved_cores=').Count | Should -Be 0
     }
 }
 

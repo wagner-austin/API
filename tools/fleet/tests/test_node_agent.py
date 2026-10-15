@@ -438,7 +438,12 @@ class TestClaimingNothing:
         The toolchain is asked first, since the tags it finds decide which
         projects the room is sized for."""
         _test_hooks.run = FakeRun(
-            [ok(""), ok("free_ram_gb=2.2\nfree_disk_gb=243.0\n"), ok(""), ok(LAVENDER_2026_09_23)]
+            [
+                ok(""),
+                ok("free_ram_gb=2.2\nfree_disk_gb=243.0\nreserved_cores=0\n"),
+                ok(""),
+                ok(LAVENDER_2026_09_23),
+            ]
         )
         endpoint = FakeQueue([dump_json_str({"jobs": []})])
         _test_hooks.http_post = endpoint

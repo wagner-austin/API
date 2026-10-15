@@ -38,7 +38,7 @@ WAITING = ("libs/platform_core", "tools/fleet", "tools/maketools")
 
 #: pendragon with room for a run: 9.0 GB free of its 11.7 against its 2.5 GB
 #: owner reservation.
-PENDRAGON_ROOM = "free_ram_gb=9.0\nfree_disk_gb=400.0\n"
+PENDRAGON_ROOM = "free_ram_gb=9.0\nfree_disk_gb=400.0\nreserved_cores=0\n"
 
 
 @pytest.fixture(name="pendragon_config")

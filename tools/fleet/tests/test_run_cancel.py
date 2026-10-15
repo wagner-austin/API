@@ -220,7 +220,9 @@ class TestRun:
     def test_a_node_that_refuses_stops_the_dispatch(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
-        _test_hooks.run = FakeRun([ok(""), ok("free_ram_gb=4.5\nfree_disk_gb=860.0\n")])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("free_ram_gb=4.5\nfree_disk_gb=860.0\nreserved_cores=0\n")]
+        )
 
         with pytest.raises(AppError) as excinfo:
             run.main(

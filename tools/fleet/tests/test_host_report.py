@@ -57,7 +57,7 @@ LAVENDER_LIST = _wsl_bytes(
 WRITER = names.runner_name("lavender-wsl", elevated=False)
 
 #: What the Windows capacity probe prints for lavender at 0.3 GB free.
-LAVENDER_STARVED = "free_ram_gb=0.3\nfree_disk_gb=612.4\n"
+LAVENDER_STARVED = "free_ram_gb=0.3\nfree_disk_gb=612.4\nreserved_cores=0\n"
 
 
 def _host() -> NodeConfig:

@@ -21,7 +21,7 @@ from tests._registry import write_registry
 from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok, workspace_document
 
 #: sedona's reading at 10:51Z scaled to the fixture: under the reservation.
-STARVED = "free_ram_gb=2.9\nfree_disk_gb=860.0\n"
+STARVED = "free_ram_gb=2.9\nfree_disk_gb=860.0\nreserved_cores=0\n"
 
 #: lavender's listing, UTF-16LE as wsl.exe prints it (test_host_report.py).
 LAVENDER_LIST = "  NAME      STATE           VERSION\r\n* Ubuntu    Running         2\r\n".encode(
@@ -170,7 +170,7 @@ def test_an_unreachable_wsl_node_adds_what_its_host_reports(tmp_path: pathlib.Pa
             ok(PROBE_OK),
             failed(255, "Connection timed out during banner exchange"),
             ok(""),
-            ok("free_ram_gb=0.3\nfree_disk_gb=612.4\n"),
+            ok("free_ram_gb=0.3\nfree_disk_gb=612.4\nreserved_cores=0\n"),
             ok(LAVENDER_LIST),
         ]
     )

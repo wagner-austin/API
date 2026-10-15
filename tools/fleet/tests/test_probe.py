@@ -58,7 +58,7 @@ def _node() -> NodeConfig:
 
 class TestProbe:
     def test_it_reads_the_fields_the_script_emits(self) -> None:
-        output = "free_ram_gb=27.395\nfree_disk_gb=860.123\nlogical_cores=16\n"
+        output = "free_ram_gb=27.395\nfree_disk_gb=860.123\nlogical_cores=16\nreserved_cores=4\n"
 
         held = LiveLoad(runs=2, workers=4, ram_gb=4.4)
 
@@ -70,13 +70,14 @@ class TestProbe:
             "free_disk_gb": 860.123,
             "live": held,
             "ci_slice": None,
+            "reserved_cores": 4,
         }
 
     def test_a_node_with_a_ci_slice_reports_its_current_and_high(self) -> None:
         """lavender-wsl's answer to the new probe, 2026-09-29 (MCPs 5d6e57e7)."""
         output = (
             "free_ram_gb=8.161\nfree_disk_gb=824.306\nlogical_cores=16\n"
-            "ci_slice_current_gb=16.000\nci_slice_high_gb=16.000\n"
+            "ci_slice_current_gb=16.000\nci_slice_high_gb=16.000\nreserved_cores=0\n"
         )
 
         state = probe.parse_probe("lavender-wsl", output, live=IDLE)
@@ -92,7 +93,7 @@ class TestProbe:
         ],
     )
     def test_half_a_slice_reading_is_unreadable_not_ignored(self, extra: str, named: str) -> None:
-        output = "free_ram_gb=8.1\nfree_disk_gb=9.0\n" + extra
+        output = "free_ram_gb=8.1\nfree_disk_gb=9.0\nreserved_cores=0\n" + extra
 
         with pytest.raises(AppError) as excinfo:
             probe.parse_probe("lavender-wsl", output, live=IDLE)
@@ -102,13 +103,13 @@ class TestProbe:
 
     def test_a_thousands_separator_is_read(self) -> None:
         """PowerShell's N3 format writes them; the value is still a number."""
-        output = "free_ram_gb=1,027.395\nfree_disk_gb=860.000\n"
+        output = "free_ram_gb=1,027.395\nfree_disk_gb=860.000\nreserved_cores=0\n"
 
         assert probe.parse_probe("lavender", output, live=IDLE)["free_ram_gb"] == 1027.395
 
     def test_a_line_without_an_equals_is_ignored(self) -> None:
         """PowerShell writes warnings to the same stream."""
-        output = "WARNING: something\nfree_ram_gb=1.0\nfree_disk_gb=2.0\n"
+        output = "WARNING: something\nfree_ram_gb=1.0\nfree_disk_gb=2.0\nreserved_cores=0\n"
 
         assert probe.parse_probe("lavender", output, live=IDLE)["free_ram_gb"] == 1.0
 
@@ -134,17 +135,56 @@ class TestProbe:
             probe.parse_probe("lavender", "free_ram_gb=1.2.3\nfree_disk_gb=1.0\n", live=IDLE)
 
     def test_a_signed_value_is_a_number(self) -> None:
-        state = probe.parse_probe("lavender", "free_ram_gb=-1.0\nfree_disk_gb=+2.0\n", live=IDLE)
+        state = probe.parse_probe(
+            "lavender", "free_ram_gb=-1.0\nfree_disk_gb=+2.0\nreserved_cores=0\n", live=IDLE
+        )
 
         assert state["free_ram_gb"] == -1.0
         assert state["free_disk_gb"] == 2.0
+
+    def test_a_node_without_its_reservations_line_is_unreadable(self) -> None:
+        """MCPs board task 84a2b690: a probe that sums no reservations has not run as written."""
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("diphtheria", "free_ram_gb=1.0\nfree_disk_gb=2.0\n", live=IDLE)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert "without a 'reserved_cores' field" in excinfo.value.message
+
+    def test_a_reservation_file_it_cannot_read_refuses_the_node_by_name(self) -> None:
+        output = (
+            "free_ram_gb=1.0\nfree_disk_gb=2.0\nlogical_cores=8\n"
+            "reservation_unreadable=/home/corvis/.fleet/reservations/vm.reservation\n"
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("diphtheria", output, live=IDLE)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert excinfo.value.message == (
+            "diphtheria holds a reservation file its probe cannot read, "
+            "/home/corvis/.fleet/reservations/vm.reservation: it needs whole-number cores= and "
+            "until_unix= lines (fleet.core.reservations), and a reservation read as nothing "
+            "would let a suite onto the cores it holds"
+        )
+
+    @pytest.mark.parametrize("held", ["1.5", "-1"])
+    def test_reserved_cores_must_be_a_whole_number_of_cores(self, held: str) -> None:
+        output = f"free_ram_gb=1.0\nfree_disk_gb=2.0\nreserved_cores={held}\n"
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("diphtheria", output, live=IDLE)
+
+        assert excinfo.value.message == (
+            f"diphtheria reported reserved_cores={float(held)!r}, "
+            "which is not a whole number of cores"
+        )
 
     def test_a_bare_sign_is_not_a_number(self) -> None:
         with pytest.raises(AppError, match="not a number"):
             probe.parse_probe("lavender", "free_ram_gb=-\nfree_disk_gb=1.0\n", live=IDLE)
 
     def test_probing_a_node_sends_the_script_and_parses_the_answer(self) -> None:
-        runner = FakeRun([ok(""), ok("free_ram_gb=27.0\nfree_disk_gb=860.0\n")])
+        runner = FakeRun([ok(""), ok("free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n")])
         _test_hooks.run = runner
 
         held = LiveLoad(runs=1, workers=2, ram_gb=2.2)
@@ -167,7 +207,7 @@ class TestProbe:
         side -- Python never touches them, which is exactly what this
         equality proves.
         """
-        runner = FakeRun([ok(""), ok("free_ram_gb=1.0\nfree_disk_gb=1.0\n")])
+        runner = FakeRun([ok(""), ok("free_ram_gb=1.0\nfree_disk_gb=1.0\nreserved_cores=0\n")])
         _test_hooks.run = runner
 
         probe.probe_node(_node(), live=IDLE, writer="fleet-run")
@@ -176,7 +216,9 @@ class TestProbe:
         assert "{0:N3}" in dialect_windows.CAPACITY_PROBE_SCRIPT
 
     def test_a_linux_node_is_probed_with_the_sh_constant(self) -> None:
-        runner = FakeRun([ok(""), ok("free_ram_gb=26.394\nfree_disk_gb=687.729\n")])
+        runner = FakeRun(
+            [ok(""), ok("free_ram_gb=26.394\nfree_disk_gb=687.729\nreserved_cores=4\n")]
+        )
         _test_hooks.run = runner
         node = _node()
         node["platform"] = NodePlatform.LINUX
@@ -185,6 +227,7 @@ class TestProbe:
         state = probe.probe_node(node, live=IDLE, writer="lavender-wsl")
 
         assert state["free_disk_gb"] == 687.729
+        assert state["reserved_cores"] == 4
         assert runner.stdin[0] == dialect_linux.CAPACITY_PROBE_SCRIPT.encode("utf-8")
         script = "/home/corvis/fleet/stage/fleet-capacity-lavender-wsl.sh"
         assert runner.calls[0][-1].endswith(f"cat > '{script}'")
@@ -200,6 +243,7 @@ class TestDescribeNode:
         free_disk_gb=860.0,
         ci_slice=None,
         live=LiveLoad(runs=1, workers=6, ram_gb=6.6),
+        reserved_cores=0,
     )
 
     def test_it_names_the_architecture_and_what_live_runs_hold(self) -> None:
