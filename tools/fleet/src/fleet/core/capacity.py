@@ -126,6 +126,11 @@ def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str
     )
     if state["live"]["runs"] > 0 and unloaded > 0:
         return "its own fleet runs hold the rest, so it takes the next job when one of them ends"
+    if state["reserved_cores"] > 0 and unloaded > 0:
+        return (
+            "its reservations hold the rest (work the fleet does not run, declared in "
+            "~/.fleet/reservations), so it takes the next job when they end"
+        )
     return "somebody is on this machine"
 
 
@@ -211,10 +216,13 @@ def assess(
             ),
         )
     budget = _project_budget(node, project)
+    # A reservation's cores come off beside the live runs' workers (MCPs board
+    # task 84a2b690): a clean-VM smoke on diphtheria held 4 of its 8 cores
+    # while two checks placed beside it ran 334 s and 411 s of their 300.
     workers = min(
         admissible_workers(
             budget,
-            logical_cores=node["logical_cores"] - live["workers"],
+            logical_cores=node["logical_cores"] - live["workers"] - state["reserved_cores"],
             free_ram_gb=state["free_ram_gb"] - live["ram_gb"],
         ),
         job_ceiling(node, project),
@@ -268,22 +276,32 @@ def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
 
 
 def _live_clause(state: NodeState) -> str:
-    """Name what a node's live runs hold, for a capacity refusal.
+    """Name what a node's live runs and reservations hold, for a capacity refusal.
 
     Args:
         state: What the node reported.
 
     Returns:
-        An empty string when no fleet run is live on the node; otherwise
-        ``, and its N live fleet run(s) hold W worker(s) and X GB``.
+        An empty string when no fleet run is live on the node and no
+        reservation holds a core; otherwise ``, and its N live fleet run(s)
+        hold W worker(s) and X GB`` and ``, and its reservations hold C
+        core(s)``, each only when it holds something.
     """
     live = state["live"]
-    if live["runs"] == 0:
-        return ""
-    return (
-        f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) and "
-        f"{live['ram_gb']:.1f} GB"
+    runs = (
+        ""
+        if live["runs"] == 0
+        else (
+            f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) and "
+            f"{live['ram_gb']:.1f} GB"
+        )
     )
+    held = (
+        ""
+        if state["reserved_cores"] == 0
+        else f", and its reservations hold {state['reserved_cores']} core(s)"
+    )
+    return runs + held
 
 
 def room_for_any(

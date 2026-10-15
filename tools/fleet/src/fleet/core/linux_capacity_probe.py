@@ -47,13 +47,47 @@ substituted into it in production. Arithmetic is shell integer arithmetic on
 bytes, which ``dash`` carries in 64 bits, and the division to gibibytes with
 three decimals happens once in ``awk``, so the parser sees the shape the
 Windows dialect prints.
+
+THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
+:mod:`fleet.core.reservations` for the file and why). Each live
+``.reservation`` file's ``cores`` are summed into ``reserved_cores``, which
+the capacity check takes off the node's cores; an expired one counts
+nothing. A file the probe cannot read prints ``reservation_unreadable=`` with
+its path and ends the probe, so the node's reading is refused by name rather
+than read as holding nothing. A carriage return a Windows-written file
+carries is stripped before the fields are read.
 """
 
 from __future__ import annotations
 
+from fleet.core import reservations
+
 #: Where the probe reads memory from; the test replaces these two lines.
 MEMINFO_LINE = "meminfo=/proc/meminfo\n"
 CGROUPS_LINE = "cgroups=/sys/fs/cgroup/system.slice\n"
+
+#: Where the probe reads the node's reservations from; the test replaces it.
+RESERVATIONS_LINE = f'reservations="$HOME/{reservations.DIRECTORY}"\n'
+
+#: The reservations' sum, after every other field, so an unreadable file
+#: ends the probe with every field before it already printed.
+RESERVATIONS_PART = (
+    RESERVATIONS_LINE
+    + "now=$(date +%s)\n"
+    + "reserved=0\n"
+    + f'for reservation in "$reservations"/*{reservations.SUFFIX}; do\n'
+    + '  [ -e "$reservation" ] || continue\n'
+    + '  if ! held=$(awk -F= -v now="$now" \'{ sub(/\\r$/, "") }'
+    + ' $1 == "cores" { cores = $2 } $1 == "until_unix" { ends = $2 }'
+    + " END { if (cores !~ /^[0-9]+$/ || ends !~ /^[0-9]+$/) exit 1;"
+    + ' if (ends + 0 > now + 0) print cores + 0; else print 0 }\' "$reservation"); then\n'
+    + f"    printf '{reservations.UNREADABLE_FIELD}=%s\\n' \"$reservation\"\n"
+    + "    exit 0\n"
+    + "  fi\n"
+    + "  reserved=$((reserved + held))\n"
+    + "done\n"
+    + f"printf '{reservations.RESERVED_CORES_FIELD}=%s\\n' \"$reserved\"\n"
+)
 
 #: The probe after the dialect's prologue, verbatim.
 CAPACITY_PROBE_BODY = (
@@ -74,7 +108,13 @@ CAPACITY_PROBE_BODY = (
     ' printf "free_ram_gb=%.3f\\npromised_ram_gb=%.3f\\n",'
     " (available - promised) / 1073741824, promised / 1073741824 }'\n"
     "df -kP / | awk 'NR == 2 { printf \"free_disk_gb=%.3f\\n\", $4 / 1048576 }'\n"
-    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n"
+    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n" + RESERVATIONS_PART
 )
 
-__all__ = ["CAPACITY_PROBE_BODY", "CGROUPS_LINE", "MEMINFO_LINE"]
+__all__ = [
+    "CAPACITY_PROBE_BODY",
+    "CGROUPS_LINE",
+    "MEMINFO_LINE",
+    "RESERVATIONS_LINE",
+    "RESERVATIONS_PART",
+]

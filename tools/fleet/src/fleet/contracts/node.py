@@ -247,6 +247,12 @@ class NodeState(TypedDict):
             node that hosts no CI runners). Read so a refusal can say CI
             holds the lane rather than that somebody is on the machine
             (MCPs board task 5d6e57e7).
+        reserved_cores: The cores the node's live reservations hold: work
+            the fleet does not run, such as a clean-VM smoke on diphtheria,
+            declared by its own ``.reservation`` file
+            (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
+            84a2b690). Charged against the node's cores beside its live
+            fleet runs.
     """
 
     host: str
@@ -254,6 +260,7 @@ class NodeState(TypedDict):
     free_disk_gb: float
     live: LiveLoad
     ci_slice: SliceMemory | None
+    reserved_cores: int
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:

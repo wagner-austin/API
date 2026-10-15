@@ -13,7 +13,10 @@ about processes. It would be easy to count the node's ``python.exe`` instances
 and call that its load; that number is unattributable -- some are the owner's
 editor, some are another tool's -- and acting on it would make the fleet's
 behaviour depend on software it does not manage. Live fleet runs come from the
-ledger, where they are ours by construction because we wrote them.
+ledger, where they are ours by construction because we wrote them. Work the
+fleet does not run is charged only when it declares itself in a reservation
+file, which names its holder (:mod:`fleet.core.reservations`, MCPs board task
+84a2b690), so what the probe reports is still attributable.
 
 THE OUTPUT FORMAT IS KEY=VALUE LINES, one per field, parsed strictly, and it is
 the same shape from both dialects so this module parses one thing. Not JSON,
@@ -35,10 +38,12 @@ from typing import TypedDict
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState, SliceMemory
-from fleet.core import dialect, names, remote
+from fleet.core import dialect, names, remote, reservations
 
-#: The numeric fields a node must report before anything can be decided about it.
-REQUIRED_FIELDS = ("free_ram_gb", "free_disk_gb")
+#: The numeric fields a node must report before anything can be decided about
+#: it; ``reserved_cores`` since MCPs board task 84a2b690, the cores its
+#: reservations hold (:mod:`fleet.core.reservations`).
+REQUIRED_FIELDS = ("free_ram_gb", "free_disk_gb", reservations.RESERVED_CORES_FIELD)
 
 #: The pair a node reports only when it runs a ``runners.slice`` (MCPs board
 #: task 5d6e57e7): both or neither, since one script line prints both.
@@ -79,6 +84,17 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         What the node reported, or the reason its answer could not be read.
     """
     fields = _read_fields(output)
+    unreadable_file = fields.get(reservations.UNREADABLE_FIELD)
+    if unreadable_file is not None:
+        return ProbeOutcome(
+            state=None,
+            reason=(
+                f"{host} holds a reservation file its probe cannot read, {unreadable_file}: "
+                "it needs whole-number cores= and until_unix= lines "
+                "(fleet.core.reservations), and a reservation read as nothing would let a "
+                "suite onto the cores it holds"
+            ),
+        )
     readings: dict[str, float] = {}
     sliced = any(key in fields for key in SLICE_FIELDS)
     for key in REQUIRED_FIELDS + (SLICE_FIELDS if sliced else ()):
@@ -86,6 +102,15 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         if value is None:
             return ProbeOutcome(state=None, reason=_unreadable(host, fields, key, output))
         readings[key] = value
+    reserved_cores = readings[reservations.RESERVED_CORES_FIELD]
+    if not reserved_cores.is_integer() or reserved_cores < 0:
+        return ProbeOutcome(
+            state=None,
+            reason=(
+                f"{host} reported {reservations.RESERVED_CORES_FIELD}={reserved_cores!r}, "
+                "which is not a whole number of cores"
+            ),
+        )
     ci_slice = (
         SliceMemory(
             current_gb=readings["ci_slice_current_gb"], high_gb=readings["ci_slice_high_gb"]
@@ -100,6 +125,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             free_disk_gb=readings["free_disk_gb"],
             live=live,
             ci_slice=ci_slice,
+            reserved_cores=int(reserved_cores),
         ),
         reason="",
     )

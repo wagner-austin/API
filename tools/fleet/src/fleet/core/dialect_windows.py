@@ -20,7 +20,14 @@ registration interpolates one path and no code.
 from __future__ import annotations
 
 from fleet.contracts.source import InstallStep
-from fleet.core import names, windows_build, windows_result, windows_retire, windows_task
+from fleet.core import (
+    names,
+    reservations,
+    windows_build,
+    windows_result,
+    windows_retire,
+    windows_task,
+)
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
 from fleet.core.windows_log_tail import windows_log_tail_script
@@ -68,7 +75,8 @@ WRITE_COMMAND = (
 #: malformed number would produce malformed JSON that fails with a parser
 #: message instead of a field name. Not positional, because a reordered
 #: script would silently swap two numbers.
-CAPACITY_PROBE_SCRIPT = """\
+CAPACITY_PROBE_SCRIPT = (
+    """\
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $os = Get-CimInstance Win32_OperatingSystem
@@ -77,6 +85,33 @@ $drive = Get-PSDrive C
 "free_disk_gb={0:N3}" -f ($drive.Free / 1GB)
 "logical_cores={0}" -f (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 """
+    + (
+        # The node's reservations, last, as the Linux probe reads them
+        # (:mod:`fleet.core.reservations`, MCPs board task 84a2b690): a live
+        # file's cores are summed, an expired one counts nothing, and one that
+        # cannot be read is named and ends the probe.
+        f"$reservations = Join-Path $env:USERPROFILE '{reservations.DIRECTORY}'\n"
+        "$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()\n"
+        "$reserved = 0\n"
+        "if (Test-Path -LiteralPath $reservations) {\n"
+        "  foreach ($file in Get-ChildItem -LiteralPath $reservations"
+        f" -Filter '*{reservations.SUFFIX}') {{\n"
+        "    $fields = @{}\n"
+        "    foreach ($line in Get-Content -LiteralPath $file.FullName) {\n"
+        "      $pair = $line -split '=', 2\n"
+        "      if ($pair.Count -eq 2) { $fields[$pair[0]] = $pair[1] }\n"
+        "    }\n"
+        "    if ($fields['cores'] -notmatch '^[0-9]+$' -or"
+        " $fields['until_unix'] -notmatch '^[0-9]+$') {\n"
+        f"      '{reservations.UNREADABLE_FIELD}={{0}}' -f $file.FullName\n"
+        "      exit 0\n"
+        "    }\n"
+        "    if ([int64]$fields['until_unix'] -gt $now) { $reserved += [int]$fields['cores'] }\n"
+        "  }\n"
+        "}\n"
+        f"'{reservations.RESERVED_CORES_FIELD}={{0}}' -f $reserved\n"
+    )
+)
 
 
 #: The session-observer script, verbatim. Nothing is substituted into it.
