@@ -87,18 +87,36 @@ def test_historical_routing_reconciles_overlap(
 ) -> None:
     serve_tape(api_server)
     api_server.documents["/historical/cutoff"] = [{"trades_created_ts": cutoff}]
-    api_server.documents["/historical/trades"] = [{"trades": [tape_trade()], "cursor": ""}]
+    historical_only = dict(tape_trade(), trade_id="historical-only", count_fp="2.00")
+    live_only = dict(
+        tape_trade(), trade_id="live-only", count_fp="3.00", created_time="2026-01-01T21:00:45Z"
+    )
+    api_server.documents["/historical/trades"] = [
+        {"trades": [historical_only, tape_trade()], "cursor": ""}
+    ]
+    api_server.documents["/markets/trades"] = [{"trades": [tape_trade(), live_only], "cursor": ""}]
     api_server.documents["/historical/markets"] = [{"markets": [tape_market()], "cursor": ""}]
     store = archive(tmp_path, api_server)
     with closing(store.client):
         report = collect_public_tape(MarketCollector(store.capture), START, END)
-    assert report["trade_count"] == 1
-    assert report["quantity_centi_contracts"] == 100
     assert report["markets"] == [tape_market()]
     expected = ["/historical/trades"]
+    expected_rows = [historical_only, tape_trade()]
+    expected_quantity = 300
     if cutoff.endswith("21:00:30Z"):
         expected.append("/markets/trades")
+        expected_rows.append(live_only)
+        expected_quantity = 600
     assert report["trade_tiers"] == expected
+    assert report["trades"] == expected_rows
+    assert report["trade_count"] == len(expected_rows)
+    assert report["quantity_centi_contracts"] == expected_quantity
+    assert api_server.requests == [
+        "/historical/cutoff?",
+        *(f"{path}?limit=1000&max_ts={END}&min_ts={START - 1}" for path in expected),
+        f"/markets?limit=1000&tickers={TICKER}",
+        f"/historical/markets?limit=1000&tickers={TICKER}",
+    ]
 
 
 @pytest.mark.parametrize("start,end", [(-1, 1), (2, 2), (3, 2), (0, 86401)])
