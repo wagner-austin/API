@@ -148,9 +148,14 @@ class TestARoomyNode:
         ticks = [tick_body(tick) for tick in endpoint.ticks]
         assert [tick["claiming"] for tick in ticks] == [True, True, False]
         assert [tick["load"] for tick in ticks] == [
-            {"runs": 0, "workers": 0, "freeRamGb": 27.0, "freeDiskGb": 860.0},
-            {"runs": 1, "workers": 7, "freeRamGb": 27.0, "freeDiskGb": 860.0},
-            {"runs": 2, "workers": 14, "freeRamGb": 27.0, "freeDiskGb": 860.0},
+            {
+                "runs": runs,
+                "workers": workers,
+                "freeRamGb": 27.0,
+                "freeDiskGb": 860.0,
+                "actionCache": None,
+            }
+            for runs, workers in ((0, 0), (1, 7), (2, 14))
         ]
         assert narrow_json_to_str(ticks[2]["verdict"]).startswith(
             "has room for nothing; claiming nothing: NODE_OWNER_RESERVED: "

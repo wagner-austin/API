@@ -117,6 +117,7 @@ def _state(
         live=live,
         ci_slice=ci_slice,
         reserved_cores=reserved_cores,
+        action_cache=None,
     )
 
 

@@ -2,263 +2,20 @@
 
 The fill's service is held to the passes it hands the script, one per side
 the host runs installs on. The adopt script and each install's drop-in lines
-run under a real bash with ``systemctl`` a stand-in and the absolute roots
-they read, ``/etc/systemd/system``, ``/proc`` and ``/sys/fs/cgroup``,
-rewritten to the test's own directories. The stand-in keeps each unit's
-state the way systemd does: ``daemon-reload`` loads a unit's environment
-from the drop-in file the lines wrote, and ``restart`` gives the running
-process whatever environment is loaded. The fill itself runs in
-test_runner_action_cache.
+run under a real bash over a host laid out as files (tests/_cache_host.py
+says how). The fill itself runs in test_runner_action_cache, the report in
+test_runner_cache_report.
 """
 
 from __future__ import annotations
 
 import pathlib
-import subprocess
 
 import pytest
 
 from fleet.core import runner_action_cache, runner_cache_adopt, runner_render
 from tests._action_cache_fixtures import UNIT, a_host, an_install
-from tests._host_bash import host_bash
-
-#: The setting a unit reads the cache by.
-SETTING = f"{runner_action_cache.CACHE_VARIABLE}={runner_action_cache.WSL_CACHE_DIR}"
-
-#: A second unit, for the cases that run the script over more than one.
-OTHER = "actions.runner.wagner-austin-API.lavender-wsl.service"
-
-#: ``systemctl`` over ``state/<unit>/``: ``main`` is the unit's main pid (0
-#: when stopped) and ``loaded`` the environment systemd holds for it. And
-#: ``sleep``, which passes no time: it records each call, and on the first
-#: one after a case writes ``arrives`` (``<cgroup.procs path> <pid>``) puts
-#: that pid in that cgroup, the way a job arrives inside a settle window.
-SYSTEMCTL = (
-    "sleep() {\n"
-    '    echo "$*" >> sleeps.log\n'
-    "    local procs pid\n"
-    "    if [ -f arrives ]; then\n"
-    "        read -r procs pid < arrives\n"
-    '        echo "$pid" >> "$procs"\n'
-    "        rm arrives\n"
-    "    fi\n"
-    "}\n"
-    "systemctl() {\n"
-    '    echo "$*" >> calls.log\n'
-    "    local unit=${!#} u\n"
-    '    case "$1 ${3:-}" in\n'
-    '        "show MainPID") cat "state/$unit/main" ;;\n'
-    '        "show ControlGroup") echo "/system.slice/$unit" ;;\n'
-    '        "show Environment") cat "state/$unit/loaded" ;;\n'
-    "    esac\n"
-    '    case "$1" in\n'
-    "        daemon-reload)\n"
-    "            for u in $(ls state); do\n"
-    f'                if [ -f "units/$u.d/{runner_action_cache.CACHE_DROP_IN_NAME}" ]; then\n'
-    f'                    echo "LANG=C.UTF-8 {SETTING}" > "state/$u/loaded"\n'
-    "                fi\n"
-    "            done ;;\n"
-    "        restart)\n"
-    '            u=$(cat "state/$unit/main")\n'
-    '            printf "HOME=/home/gharunner\\0" > "proc/$u/environ"\n'
-    f'            if grep -q "{SETTING}" "state/$unit/loaded"; then\n'
-    f'                printf "{SETTING}\\0" >> "proc/$u/environ"\n'
-    "            fi ;;\n"
-    "    esac\n"
-    "}\n"
-)
-
-
-def _laid_out(script: str) -> str:
-    """A rendered script with its absolute roots moved into the test's directory.
-
-    Args:
-        script: The script as rendered.
-
-    Returns:
-        It, reading ``units``, ``proc`` and ``cgroup`` under its working
-        directory and running the adopt script from there.
-    """
-    for real, laid_out in (
-        ("/etc/systemd/system", "units"),
-        ("/proc/", "proc/"),
-        ("/sys/fs/cgroup", "cgroup"),
-        (runner_cache_adopt.ADOPT_PATH, '"$BASH" adopt.sh'),
-    ):
-        script = script.replace(real, laid_out)
-    return script
-
-
-class Host:
-    """Runner units laid out as files: drop-ins, running processes, cgroups, loaded state."""
-
-    def __init__(self, root: pathlib.Path) -> None:
-        """Write the adopt script, with the stand-in, where the lines call it.
-
-        Args:
-            root: The test's directory.
-        """
-        self.root = root
-        (root / "state").mkdir()
-        (root / "adopt.sh").write_bytes(
-            (SYSTEMCTL + _laid_out(runner_cache_adopt.ADOPT_SCRIPT)).encode()
-        )
-
-    def unit(
-        self,
-        name: str,
-        pid: int,
-        *,
-        running: bool = True,
-        loaded: bool = True,
-        adopted: bool = False,
-        busy: bool = False,
-        cgroup_readable: bool = True,
-    ) -> None:
-        """Lay out one unit.
-
-        Args:
-            name: The unit.
-            pid: Its main process; a job's Worker, when busy, is ``pid + 1``.
-            running: False for a stopped unit, whose main pid reads 0.
-            loaded: Whether systemd holds the setting for it.
-            adopted: Whether its running process already has the setting.
-            busy: Whether a Worker runs in its cgroup.
-            cgroup_readable: False for a cgroup whose process list is missing.
-        """
-        state = self.root / "state" / name
-        state.mkdir()
-        (state / "main").write_text(f"{pid if running else 0}\n", encoding="utf-8")
-        configured = f"LANG=C.UTF-8 {SETTING}" if loaded else "LANG=C.UTF-8"
-        (state / "loaded").write_text(configured + "\n", encoding="utf-8")
-        process = self.root / "proc" / str(pid)
-        process.mkdir(parents=True)
-        environ = b"HOME=/home/gharunner\0LANG=C.UTF-8\0"
-        (process / "environ").write_bytes(environ + (f"{SETTING}\0".encode() if adopted else b""))
-        (process / "cmdline").write_bytes(b"/bin/bash\0runsvc.sh\0")
-        cgroup = self.root / "cgroup" / "system.slice" / name
-        cgroup.mkdir(parents=True)
-        procs = [pid]
-        if busy:
-            worker = self.root / "proc" / str(pid + 1)
-            worker.mkdir()
-            (worker / "cmdline").write_bytes(b"/home/gharunner/bin/Runner.Worker\0spawnclient\0")
-            procs.append(pid + 1)
-        if cgroup_readable:
-            (cgroup / "cgroup.procs").write_text("".join(f"{p}\n" for p in procs), encoding="utf-8")
-
-    def idle(self, name: str, pid: int) -> None:
-        """End the job running in a unit.
-
-        Args:
-            name: The unit.
-            pid: Its main process.
-        """
-        procs = self.root / "cgroup" / "system.slice" / name / "cgroup.procs"
-        procs.write_text(f"{pid}\n", encoding="utf-8")
-
-    def job_arrives(self, name: str, pid: int) -> None:
-        """Start a job in a unit at the first second of its settle window.
-
-        Args:
-            name: The unit.
-            pid: Its main process; the job's Worker is ``pid + 1``.
-        """
-        worker = self.root / "proc" / str(pid + 1)
-        worker.mkdir()
-        (worker / "cmdline").write_bytes(b"/home/gharunner/bin/Runner.Worker\0spawnclient\0")
-        procs = f"cgroup/system.slice/{name}/cgroup.procs"
-        (self.root / "arrives").write_text(f"{procs} {pid + 1}\n", encoding="utf-8")
-
-    def sleeps(self) -> int:
-        """How many one-second samples the scripts waited between.
-
-        Returns:
-            The number of sleep calls, each asserted to be one second.
-        """
-        log = self.root / "sleeps.log"
-        lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
-        assert set(lines) <= {"1"}
-        return len(lines)
-
-    def _run(self, script: str) -> subprocess.CompletedProcess[str]:
-        """Run a script in the test's directory.
-
-        Args:
-            script: The script's name there.
-
-        Returns:
-            The finished process.
-        """
-        return subprocess.run(
-            [host_bash(), script], cwd=self.root, capture_output=True, text=True, check=False
-        )
-
-    def provision(self, name: str) -> subprocess.CompletedProcess[str]:
-        """Run one install's drop-in lines, as provision does after it starts the unit.
-
-        Args:
-            name: The unit.
-
-        Returns:
-            The finished process.
-        """
-        lines = runner_cache_adopt.render_cache_environment_lines(an_install(name))
-        body = "set -euo pipefail\n" + _laid_out("\n".join(lines)) + "\n"
-        (self.root / "provision.sh").write_bytes((SYSTEMCTL + body).encode())
-        return self._run("provision.sh")
-
-    def adopt(self, *arguments: str) -> subprocess.CompletedProcess[str]:
-        """Run the adopt script with exactly these arguments.
-
-        Args:
-            arguments: Its arguments.
-
-        Returns:
-            The finished process.
-        """
-        return subprocess.run(
-            [host_bash(), "adopt.sh", *arguments],
-            cwd=self.root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-    def calls(self) -> list[str]:
-        """Every systemctl call, in order.
-
-        Returns:
-            The calls' arguments, none when it was never called.
-        """
-        log = self.root / "calls.log"
-        return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
-
-    def environ(self, pid: int) -> bytes:
-        """A process's environment.
-
-        Args:
-            pid: The process.
-
-        Returns:
-            Its bytes.
-        """
-        return (self.root / "proc" / str(pid) / "environ").read_bytes()
-
-    def timer(self, *names: str) -> subprocess.CompletedProcess[str]:
-        """Run the adopt script as its timer does, with the rendered settle window.
-
-        Args:
-            names: The units it is given.
-
-        Returns:
-            The finished process.
-        """
-        return self.adopt(str(SETTLE), *names)
-
-
-#: The settle window every rendered call passes.
-SETTLE = runner_cache_adopt.ADOPT_SETTLE_SECONDS
+from tests._cache_host import OTHER, SETTING, SETTLE, Host
 
 
 def _restarted(unit: str) -> str:
@@ -358,16 +115,22 @@ class TestTheAdoptUnits:
                 ]
             )
         )
-        assert lines[:4] == [
+        assert lines[:8] == [
             "cat > /usr/local/sbin/fleet-action-cache-adopt <<'ADOPT_EOF'",
             runner_cache_adopt.ADOPT_SCRIPT.rstrip("\n"),
             "ADOPT_EOF",
             "chmod +x /usr/local/sbin/fleet-action-cache-adopt",
+            "cat > /usr/local/sbin/fleet-action-cache-report <<'REPORT_EOF'",
+            runner_cache_adopt.REPORT_SCRIPT.rstrip("\n"),
+            "REPORT_EOF",
+            "chmod +x /usr/local/sbin/fleet-action-cache-report",
         ]
-        assert (
-            f"ExecStart=/usr/local/sbin/fleet-action-cache-adopt {SETTLE} {UNIT} {OTHER}"
-            in lines[5]
-        )
+        # The report runs after the adopt, over the same units, so the counts
+        # it publishes follow any restart the adopt made.
+        assert [line for line in lines[9].splitlines() if line.startswith("ExecStart=")] == [
+            f"ExecStart=/usr/local/sbin/fleet-action-cache-adopt {SETTLE} {UNIT} {OTHER}",
+            f"ExecStart=/usr/local/sbin/fleet-action-cache-report {UNIT} {OTHER}",
+        ]
         assert lines[-2:] == [
             "systemctl daemon-reload",
             "systemctl enable --now fleet-action-cache-adopt.timer",

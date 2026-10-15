@@ -33,6 +33,7 @@ def test_diphtheria_waits_for_the_whole_check_to_end() -> None:
         live=LiveLoad(runs=0, workers=0, ram_gb=0.0),
         ci_slice=None,
         reserved_cores=0,
+        action_cache=None,
     )
     assert assess(node, state, project, node_tags(node)) == {
         "workers": 2,

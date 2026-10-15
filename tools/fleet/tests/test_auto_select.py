@@ -103,6 +103,7 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         live=IDLE,
         ci_slice=None,
         reserved_cores=0,
+        action_cache=None,
     )
 
 

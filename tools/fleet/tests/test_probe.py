@@ -71,7 +71,48 @@ class TestProbe:
             "live": held,
             "ci_slice": None,
             "reserved_cores": 4,
+            "action_cache": None,
         }
+
+    def test_a_runner_host_reports_its_action_cache_counts(self) -> None:
+        """lavender-wsl's runners on 2026-10-15, as its root timer counts them (MCPs ce2b92e0)."""
+        output = (
+            "free_ram_gb=8.161\nfree_disk_gb=824.306\nreserved_cores=0\n"
+            "action_cache_runners=8\naction_cache_reading=8\n"
+            "action_cache_served=7\naction_cache_missed=1\n"
+        )
+
+        state = probe.parse_probe("lavender-wsl", output, live=IDLE)
+
+        assert state["action_cache"] == {"runners": 8, "reading": 8, "served": 7, "missed": 1}
+
+    @pytest.mark.parametrize(
+        ("extra", "named"),
+        [
+            ("action_cache_runners=8\n", "without a 'action_cache_reading' field"),
+            (
+                "action_cache_runners=8\naction_cache_reading=7.5\n"
+                "action_cache_served=0\naction_cache_missed=0\n",
+                "action_cache_reading=7.5, which is not a whole number of runners",
+            ),
+            (
+                "action_cache_runners=8\naction_cache_reading=9\n"
+                "action_cache_served=0\naction_cache_missed=0\n",
+                "8 runner(s), 9 reading, 0 served, 0 missed",
+            ),
+        ],
+        ids=["three counts missing", "a fractional count", "more reading than counted"],
+    )
+    def test_a_partial_or_inconsistent_cache_reading_is_unreadable_not_ignored(
+        self, extra: str, named: str
+    ) -> None:
+        output = "free_ram_gb=8.1\nfree_disk_gb=9.0\nreserved_cores=0\n" + extra
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("lavender-wsl", output, live=IDLE)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert named in excinfo.value.message
 
     def test_a_node_with_a_ci_slice_reports_its_current_and_high(self) -> None:
         """lavender-wsl's answer to the new probe, 2026-09-29 (MCPs 5d6e57e7)."""
@@ -244,6 +285,7 @@ class TestDescribeNode:
         ci_slice=None,
         live=LiveLoad(runs=1, workers=6, ram_gb=6.6),
         reserved_cores=0,
+        action_cache=None,
     )
 
     def test_it_names_the_architecture_and_what_live_runs_hold(self) -> None:

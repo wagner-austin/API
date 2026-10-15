@@ -18,7 +18,8 @@ def test_the_capacity_probe_reads_runners_slice_only_where_it_has_a_numeric_high
     lines = body.splitlines()
     start = lines.index("s=/sys/fs/cgroup/runners.slice")
 
-    assert lines[start:] == [
+    # The action cache lines follow (tests/test_dialect_linux_action_cache.py).
+    assert lines[start : start + 8] == [
         "s=/sys/fs/cgroup/runners.slice",
         'if [ -r "$s/memory.current" ] && [ -r "$s/memory.high" ]; then',
         '  h="$(cat "$s/memory.high")"',
