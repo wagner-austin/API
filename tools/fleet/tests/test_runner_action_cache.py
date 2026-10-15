@@ -1,181 +1,162 @@
-"""The action archive cache (MCPs board task ce2b92e0): both pieces run for real.
+"""The action archive cache's fill runs for real (MCPs board task ce2b92e0).
 
 The fill script runs under a real bash over checkouts laid out as the runners
-leave them, ``<workdir>/<repo>/<repo>/.github/...``, with ``git`` and ``curl``
-defined as stand-ins that answer from a table and record what was fetched, so
-nothing reaches GitHub. The drop-in lines run the same way with ``systemctl``
-a recording stand-in and the three absolute roots they read, ``/etc/systemd/
-system``, ``/proc`` and ``/sys/fs/cgroup``, rewritten to the test's own
-directories: the write, the reload, the read of the running process's
-environment and the busy check all run as rendered.
+leave them, ``<workdir>/<repo>/<repo>/.github/...``, against real git
+repositories standing in for github.com: ``git`` is a function that rewrites
+``https://github.com/`` to their ``file://`` root, records each fetch, and
+otherwise runs the real git, so ``ls-remote``, the shallow fetch and ``git
+archive`` all run as rendered and nothing reaches GitHub. Each archive is
+opened and held to what the runner asks of it: one top directory holding the
+action at that commit. The units and the runner drop-in run in
+test_runner_action_cache_units.
 """
 
 from __future__ import annotations
 
+import io
 import os
 import pathlib
 import subprocess
+import tarfile
 import time
-from typing import Literal
+import zipfile
 
 import pytest
 
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_action_cache
 from tests._host_bash import host_bash
-from tests._runner_fixtures import a_base, a_ci_slice
 
-#: The unit the drop-in cases run.
-UNIT = "actions.runner.wagner-austin-MCPs.lavender-wsl-4.service"
-
-#: What actions/checkout's v7 resolved to in run 38709479412.
-CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
-
-#: An annotated tag: the tag object, then the commit it peels to.
-NODE_TAG = "a" * 40
-NODE_SHA = "b" * 40
-
-#: A branch ref.
-CODEQL_SHA = "c" * 40
-
-#: A ref pinned by its full sha.
-CACHE_SHA = "d" * 40
-
-#: ``git`` answers ``ls-remote`` with the repository's whole table, as the
-#: script picks exact names out of it; ``curl`` writes the URL it was asked
-#: for as the archive's bytes, or fails as curl -f does on an HTTP error.
+#: ``git`` with every github.com URL pointed at the test's repositories; a
+#: fetch is recorded as ``<owner>/<repo> <sha>``, and refused while the
+#: case's ``refuse`` marker exists, as a fetch the network drops would be.
 FILL_STAND_INS = """
 git() {
-    [ "$1" = ls-remote ] || return 9
-    local repo=${2#https://github.com/}
-    cat "$TABLE/refs/${repo/\\//_}" 2>/dev/null || return 128
-}
-curl() {
-    local out url
-    while [ $# -gt 0 ]; do
-        case $1 in
-            -o) out=$2; shift 2 ;;
-            -*) shift ;;
-            *) url=$1; shift ;;
-        esac
+    local arguments=() argument
+    for argument in "$@"; do
+        arguments+=("${argument/https:\\/\\/github.com\\//$REMOTES/}")
     done
-    echo "$url" >> "$TABLE/fetched"
-    if [ -e "$TABLE/refuse" ]; then
-        printf 'partial' > "$out"
-        return 22
+    if [ "${2:-}" = fetch ]; then
+        local url=${@: -2:1}
+        echo "${url#https://github.com/} ${@: -1}" >> "$TABLE/fetched"
+        if [ -e "$TABLE/refuse" ]; then
+            return 128
+        fi
     fi
-    printf '%s' "$url" > "$out"
+    command git "${arguments[@]}"
 }
 """
 
-#: The workflow a checkout holds: a lightweight tag, a quoted annotated tag
-#: in a list item, a subpath action on a branch, a pinned sha, a local
-#: composite action, a docker image and a comment, the last three never
-#: fetched.
-WORKFLOW = f"""name: Check
-jobs:
-  test:
-    steps:
-      - uses: actions/checkout@v7
-      - uses: "actions/setup-node@v7"
-      - uses: github/codeql-action/init@v3  # a subpath, on a branch
-      - uses: actions/cache@{CACHE_SHA}
-      - uses: ./.github/actions/setup-workspace
-      - uses: docker://alpine:3
-      # uses: actions/never@v1 is a comment and is not read
-"""
 
-#: A composite action naming one action the workflow also names.
-COMPOSITE = """runs:
-  using: composite
-  steps:
-    - uses: actions/checkout@v7
-"""
-
-
-def _install(
-    service: str,
-    side: Literal["wsl", "windows"] = "wsl",
-    workdir: str = "/home/gharunner/r/_work",
-) -> RunnerInstall:
-    """One install.
+def _git(cwd: pathlib.Path, *arguments: str) -> str:
+    """Run git in a test repository.
 
     Args:
-        service: The unit or service name.
-        side: ``wsl`` or ``windows``.
-        workdir: Its work tree.
+        cwd: The repository.
+        arguments: Git's arguments.
 
     Returns:
-        The install.
+        Its standard output, stripped.
     """
-    return RunnerInstall(
-        repo="wagner-austin/MCPs",
-        runner_name="lavender-wsl-4",
-        side=side,
-        service=service,
-        workdir=workdir,
-        labels=["lavender-wsl"],
-        python_toolcache=[],
+    ran = subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=fleet-test",
+            "-c",
+            "user.email=fleet-test@example.com",
+            *arguments,
+        ],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
     )
-
-
-def _host(installs: list[RunnerInstall]) -> HostRunnerSpec:
-    """lavender with the given installs.
-
-    Args:
-        installs: Its installs.
-
-    Returns:
-        The roster entry.
-    """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task="wsl-keepalive",
-        wslconfig_min_memory_gb=26,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=True,
-        systemd_timers=["ci-clean.timer"],
-        job_timeout_minutes=360,
-        installs=installs,
-        assets=[],
-        base=a_base(),
-        ci_slice=a_ci_slice(),
-    )
+    return ran.stdout.strip()
 
 
 class Fill:
-    """A laid-out host: a table of refs, checkouts under workdirs, a cache."""
+    """A laid-out host: repositories standing in for GitHub, checkouts under workdirs, a cache.
+
+    The repositories: actions/checkout with a lightweight tag v7, actions/
+    setup-node with an annotated tag v7, github/codeql-action with a branch
+    v3, and actions/cache, which a workflow names by its full sha. Each
+    holds one commit whose action.yml names the repository.
+    """
 
     def __init__(self, root: pathlib.Path) -> None:
-        """Lay out the table and an empty cache.
+        """Lay out the repositories and an empty cache.
 
         Args:
             root: The test's directory.
         """
         self.root = root
         self.table = root / "table"
-        (self.table / "refs").mkdir(parents=True)
+        self.table.mkdir()
         self.cache = root / "cache"
-        self.refs("actions/checkout", f"{CHECKOUT_SHA}\trefs/tags/v7\n")
-        self.refs(
-            "actions/setup-node", f"{NODE_TAG}\trefs/tags/v7\n{NODE_SHA}\trefs/tags/v7^{{}}\n"
-        )
-        self.refs("github/codeql-action", f"{CODEQL_SHA}\trefs/heads/v3\n")
+        remotes = root / "remotes"
+        self.sha = {
+            "actions/checkout": self._repository(remotes, "actions/checkout", "tag", "v7"),
+            "actions/setup-node": self._repository(remotes, "actions/setup-node", "tag -a", "v7"),
+            "github/codeql-action": self._repository(
+                remotes, "github/codeql-action", "branch", "v3"
+            ),
+            "actions/cache": self._repository(remotes, "actions/cache", "", ""),
+        }
         script = (
-            f"TABLE='{self.table.as_posix()}'\n" + FILL_STAND_INS + runner_action_cache.FILL_SCRIPT
+            f"TABLE='{self.table.as_posix()}'\nREMOTES='{remotes.as_uri()}'\n"
+            + FILL_STAND_INS
+            + runner_action_cache.FILL_SCRIPT
         )
         (root / "fill.sh").write_bytes(script.encode())
 
-    def refs(self, repo: str, listing: str) -> None:
-        """What ``git ls-remote`` answers for one repository.
+    @staticmethod
+    def _repository(remotes: pathlib.Path, name: str, ref_kind: str, ref: str) -> str:
+        """One repository with one commit, and the ref the workflows name.
 
         Args:
-            repo: ``owner/repo``.
-            listing: The lines, ``<sha>\\t<ref>``.
+            remotes: Where the repositories live.
+            name: ``owner/repo``.
+            ref_kind: ``tag``, ``tag -a``, ``branch``, or empty for none.
+            ref: The ref's name.
+
+        Returns:
+            The commit's sha.
         """
-        (self.table / "refs" / repo.replace("/", "_")).write_text(listing, encoding="utf-8")
+        path = remotes / name
+        path.mkdir(parents=True)
+        _git(path, "init", "-q", "-b", "main")
+        (path / "action.yml").write_text(f"name: {name}\n", encoding="utf-8")
+        _git(path, "add", "action.yml")
+        _git(path, "commit", "-q", "-m", name)
+        if ref_kind == "tag -a":
+            _git(path, "tag", "-a", "-m", "release", ref)
+        elif ref_kind != "":
+            _git(path, ref_kind, ref)
+        return _git(path, "rev-parse", "HEAD")
+
+    def workflow(self) -> str:
+        """The workflow a checkout holds.
+
+        A lightweight tag, a quoted annotated tag in a list item, a subpath
+        action on a branch, a pinned sha, a local composite action, a docker
+        image and a comment, the last three never fetched.
+
+        Returns:
+            The workflow's text.
+        """
+        return (
+            "name: Check\n"
+            "jobs:\n"
+            "  test:\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v7\n"
+            '      - uses: "actions/setup-node@v7"\n'
+            "      - uses: github/codeql-action/init@v3  # a subpath, on a branch\n"
+            f"      - uses: actions/cache@{self.sha['actions/cache']}\n"
+            "      - uses: ./.github/actions/setup-workspace\n"
+            "      - uses: docker://alpine:3\n"
+            "      # uses: actions/never@v1 is a comment and is not read\n"
+        )
 
     def checkout(self, workdir: str, repo: str, workflow: str, composite: str | None) -> None:
         """A checkout the way a runner leaves it under its work tree.
@@ -213,13 +194,13 @@ class Fill:
         )
 
     def fetched(self) -> list[str]:
-        """Every URL curl was asked for, in order.
+        """Every fetch the fill made, in order.
 
         Returns:
-            The URLs, none when curl never ran.
+            ``<owner>/<repo> <sha>`` per fetch, none when it fetched nothing.
         """
         log = self.table / "fetched"
-        return log.read_text(encoding="utf-8").split() if log.exists() else []
+        return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
 
     def archives(self) -> list[str]:
         """Every file in the cache, relative to it.
@@ -230,6 +211,37 @@ class Fill:
         return sorted(
             p.relative_to(self.cache).as_posix() for p in self.cache.rglob("*") if p.is_file()
         )
+
+
+def _tar_members(archive: pathlib.Path) -> dict[str, bytes]:
+    """A tar.gz archive's files and their bytes.
+
+    Args:
+        archive: The archive.
+
+    Returns:
+        Each regular file's path to its bytes.
+    """
+    members: dict[str, bytes] = {}
+    with tarfile.open(archive, "r:gz") as opened:
+        for member in opened.getmembers():
+            extracted = opened.extractfile(member)
+            if member.isfile() and extracted is not None:
+                members[member.name] = extracted.read()
+    return members
+
+
+def _zip_members(archive: pathlib.Path) -> dict[str, bytes]:
+    """A zip archive's files and their bytes.
+
+    Args:
+        archive: The archive.
+
+    Returns:
+        Each file's path to its bytes.
+    """
+    with zipfile.ZipFile(io.BytesIO(archive.read_bytes())) as opened:
+        return {name: opened.read(name) for name in opened.namelist() if not name.endswith("/")}
 
 
 def _summary(
@@ -246,9 +258,9 @@ def _summary(
     Args:
         examined: References read.
         workdirs: Workdirs given.
-        cached: Archives fetched.
+        cached: Archives built.
         held: Archives already there.
-        failed: References that resolved to nothing or failed to fetch.
+        failed: References that resolved to nothing or were not built.
         pruned: Archives removed.
         archive_format: The pass's format.
 
@@ -263,37 +275,37 @@ def _summary(
 
 
 class TestTheFillRunsForReal:
-    """One archive per action version, fetched once, kept, and pruned only when long unnamed."""
+    """One archive per action version, built once, kept, and pruned only when long unnamed."""
 
-    def test_every_action_is_fetched_once_and_a_second_pass_fetches_nothing(
+    def test_every_action_is_built_once_as_the_runner_reads_it_and_a_second_pass_fetches_nothing(
         self, tmp_path: pathlib.Path
     ) -> None:
         host = Fill(tmp_path)
-        host.checkout("one", "MCPs", WORKFLOW, COMPOSITE)
+        composite = "runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v7\n"
+        host.checkout("one", "MCPs", host.workflow(), composite)
         host.checkout("two", "API", "steps:\n  - uses: actions/checkout@v7\n", None)
         first = host.run("tar.gz", "cache", "one", "two")
         assert first.returncode == 0, first.stderr
-        codeload = "https://codeload.github.com"
+        sha = host.sha
+        # setup-node's v7 is an annotated tag: the archive is of the commit it
+        # peels to, the sha the runner resolves, never the tag object's.
         assert host.fetched() == [
-            f"{codeload}/actions/cache/tar.gz/{CACHE_SHA}",
-            f"{codeload}/actions/checkout/tar.gz/{CHECKOUT_SHA}",
-            f"{codeload}/actions/setup-node/tar.gz/{NODE_SHA}",
-            f"{codeload}/github/codeql-action/tar.gz/{CODEQL_SHA}",
+            f"actions/cache {sha['actions/cache']}",
+            f"actions/checkout {sha['actions/checkout']}",
+            f"actions/setup-node {sha['actions/setup-node']}",
+            f"github/codeql-action {sha['github/codeql-action']}",
         ]
-        assert host.archives() == [
-            f"actions_cache/{CACHE_SHA}.tar.gz",
-            f"actions_checkout/{CHECKOUT_SHA}.tar.gz",
-            f"actions_setup-node/{NODE_SHA}.tar.gz",
-            f"github_codeql-action/{CODEQL_SHA}.tar.gz",
-        ]
-        archive = host.cache / "actions_checkout" / f"{CHECKOUT_SHA}.tar.gz"
-        assert (
-            archive.read_text(encoding="utf-8")
-            == f"{codeload}/actions/checkout/tar.gz/{CHECKOUT_SHA}"
+        assert host.archives() == sorted(
+            f"{name.replace('/', '_')}/{commit}.tar.gz" for name, commit in sha.items()
         )
-        assert (
-            first.stdout.splitlines()[1]
-            == f"fleet-action-cache-fill: cached actions/checkout@v7 at {CHECKOUT_SHA}"
+        checkout = sha["actions/checkout"]
+        archive = host.cache / "actions_checkout" / f"{checkout}.tar.gz"
+        # One top directory, which the runner unwraps, holding the action.
+        assert _tar_members(archive) == {
+            f"actions-checkout-{checkout[:12]}/action.yml": b"name: actions/checkout\n"
+        }
+        assert first.stdout.splitlines()[1] == (
+            f"fleet-action-cache-fill: cached actions/checkout@v7 at {checkout}"
         )
         assert first.stdout.endswith(_summary(4, 2, 4, 0, 0, 0))
         second = host.run("tar.gz", "cache", "one", "two")
@@ -301,17 +313,18 @@ class TestTheFillRunsForReal:
         assert len(host.fetched()) == 4
         assert second.stdout == _summary(4, 2, 0, 4, 0, 0)
 
-    def test_the_windows_side_gets_zip_archives_from_the_zip_path(
+    def test_the_windows_side_gets_zip_archives_of_one_top_directory(
         self, tmp_path: pathlib.Path
     ) -> None:
         host = Fill(tmp_path)
         host.checkout("win", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
         ran = host.run("zip", "cache", "win")
         assert ran.returncode == 0, ran.stderr
-        assert host.fetched() == [
-            f"https://codeload.github.com/actions/checkout/zip/{CHECKOUT_SHA}"
-        ]
-        assert host.archives() == [f"actions_checkout/{CHECKOUT_SHA}.zip"]
+        checkout = host.sha["actions/checkout"]
+        assert host.archives() == [f"actions_checkout/{checkout}.zip"]
+        assert _zip_members(host.cache / "actions_checkout" / f"{checkout}.zip") == {
+            f"actions-checkout-{checkout[:12]}/action.yml": b"name: actions/checkout\n"
+        }
 
     def test_a_ref_naming_nothing_fails_the_pass_after_the_others_are_cached(
         self, tmp_path: pathlib.Path
@@ -333,9 +346,9 @@ class TestTheFillRunsForReal:
             "at https://github.com/nobody/gone",
             _summary(3, 1, 1, 0, 2, 0).rstrip("\n"),
         ]
-        assert host.archives() == [f"actions_checkout/{CHECKOUT_SHA}.tar.gz"]
+        assert host.archives() == [f"actions_checkout/{host.sha['actions/checkout']}.tar.gz"]
 
-    def test_a_refused_download_leaves_no_partial_archive_and_fails_the_pass(
+    def test_a_refused_fetch_leaves_no_partial_archive_and_fails_the_pass(
         self, tmp_path: pathlib.Path
     ) -> None:
         host = Fill(tmp_path)
@@ -344,8 +357,9 @@ class TestTheFillRunsForReal:
         ran = host.run("tar.gz", "cache", "one")
         assert ran.returncode == 1
         assert ran.stdout == (
-            f"fleet-action-cache-fill: could not fetch actions/checkout@v7 at {CHECKOUT_SHA} "
-            "from https://codeload.github.com\n" + _summary(1, 1, 0, 0, 1, 0)
+            "fleet-action-cache-fill: could not fetch actions/checkout@v7 at "
+            f"{host.sha['actions/checkout']} from https://github.com/actions/checkout\n"
+            + _summary(1, 1, 0, 0, 1, 0)
         )
         assert host.archives() == []
 
@@ -354,9 +368,10 @@ class TestTheFillRunsForReal:
     ) -> None:
         host = Fill(tmp_path)
         host.checkout("one", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
+        checkout = host.sha["actions/checkout"]
         days = 86400
         old = time.time() - (runner_action_cache.PRUNE_DAYS + 10) * days
-        named = host.cache / "actions_checkout" / f"{CHECKOUT_SHA}.tar.gz"
+        named = host.cache / "actions_checkout" / f"{checkout}.tar.gz"
         stale = host.cache / "actions_checkout" / f"{'e' * 40}.tar.gz"
         recent = host.cache / "actions_setup-node" / f"{'f' * 40}.tar.gz"
         other_format = host.cache / "actions_setup-node" / f"{'f' * 40}.zip"
@@ -374,7 +389,7 @@ class TestTheFillRunsForReal:
         assert host.fetched() == []
         assert ran.stdout == _summary(1, 1, 0, 1, 0, 1)
         assert host.archives() == [
-            f"actions_checkout/{CHECKOUT_SHA}.tar.gz",
+            f"actions_checkout/{checkout}.tar.gz",
             f"actions_setup-node/{'f' * 40}.tar.gz",
             f"actions_setup-node/{'f' * 40}.zip",
         ]
@@ -386,19 +401,19 @@ class TestTheFillRunsForReal:
     ) -> None:
         host = Fill(tmp_path)
         (tmp_path / "empty").mkdir()
-        held = host.cache / "actions_checkout" / f"{CHECKOUT_SHA}.tar.gz"
+        held = host.cache / "actions_checkout" / f"{host.sha['actions/checkout']}.tar.gz"
         held.parent.mkdir(parents=True)
         held.write_text("held", encoding="utf-8")
         ran = host.run("tar.gz", "cache", "empty")
         assert ran.returncode == 0, ran.stderr
         assert ran.stdout == _summary(0, 1, 0, 0, 0, 0)
-        assert host.archives() == [f"actions_checkout/{CHECKOUT_SHA}.tar.gz"]
+        assert host.archives() == [f"actions_checkout/{host.sha['actions/checkout']}.tar.gz"]
 
     def test_a_failed_pass_does_not_stop_the_next_and_fails_the_fill(
         self, tmp_path: pathlib.Path
     ) -> None:
-        # lavender's first run, 2026-10-15T12:41Z: codeload refused one
-        # archive, and the Windows pass, a second ExecStart, never ran.
+        # lavender's first run, 2026-10-15T12:41Z: one archive was refused,
+        # and the Windows pass, a second ExecStart, never ran.
         host = Fill(tmp_path)
         host.checkout("one", "MCPs", "steps:\n  - uses: nobody/gone@v1\n", None)
         host.checkout("win", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
@@ -406,7 +421,7 @@ class TestTheFillRunsForReal:
         assert ran.returncode == 1
         assert ran.stdout.splitlines()[1] == _summary(1, 1, 0, 0, 1, 0).rstrip("\n")
         assert ran.stdout.endswith(_summary(1, 1, 1, 0, 0, 0, "zip"))
-        assert host.archives() == [f"actions_checkout/{CHECKOUT_SHA}.zip"]
+        assert host.archives() == [f"actions_checkout/{host.sha['actions/checkout']}.zip"]
 
     @pytest.mark.parametrize(
         "arguments",
@@ -428,167 +443,3 @@ class TestTheFillRunsForReal:
             "[-- tar.gz|zip CACHE WORKDIR...]...\n"
         )
         assert host.fetched() == []
-
-
-class TestTheFillUnits:
-    """The service passes each side's workdirs to its own cache."""
-
-    def test_a_host_with_both_sides_runs_one_pass_per_side(self) -> None:
-        service = runner_action_cache.render_fill_service(
-            _host(
-                [
-                    _install(UNIT),
-                    _install(
-                        "actions.runner.wagner-austin-API.lavender-wsl.service",
-                        workdir="/home/gharunner/a/_work",
-                    ),
-                    _install(
-                        "actions.runner.wagner-austin-MCPs.lavender",
-                        "windows",
-                        "C:/actions-runner/_work",
-                    ),
-                ]
-            )
-        )
-        assert [line for line in service.splitlines() if line.startswith("ExecStart=")] == [
-            "ExecStart=/usr/local/sbin/fleet-action-cache-fill tar.gz /var/cache/fleet-actions "
-            "/home/gharunner/r/_work /home/gharunner/a/_work -- "
-            "zip /mnt/c/fleet/action-cache /mnt/c/actions-runner/_work",
-        ]
-
-    def test_a_host_with_one_side_runs_one_pass(self) -> None:
-        service = runner_action_cache.render_fill_service(_host([_install(UNIT)]))
-        assert [line for line in service.splitlines() if line.startswith("ExecStart=")] == [
-            "ExecStart=/usr/local/sbin/fleet-action-cache-fill tar.gz /var/cache/fleet-actions "
-            "/home/gharunner/r/_work"
-        ]
-
-    def test_a_windows_workdir_without_a_drive_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="not a forward-slashed drive path"):
-            runner_action_cache.render_fill_service(
-                _host([_install(UNIT, "windows", "actions-runner/_work")])
-            )
-
-    def test_the_lines_install_the_script_both_units_and_both_caches_then_start_a_pass(
-        self,
-    ) -> None:
-        lines = runner_action_cache.render_fill_lines(_host([_install(UNIT)]))
-        assert lines[:3] == [
-            "cat > /usr/local/sbin/fleet-action-cache-fill <<'FILL_EOF'",
-            runner_action_cache.FILL_SCRIPT.rstrip("\n"),
-            "FILL_EOF",
-        ]
-        assert lines[-4:] == [
-            "install -d -m 0755 /var/cache/fleet-actions /mnt/c/fleet/action-cache",
-            "systemctl daemon-reload",
-            "systemctl enable --now fleet-action-cache-fill.timer",
-            "systemctl start --no-block fleet-action-cache-fill.service",
-        ]
-        assert "OnUnitActiveSec=15min" in runner_action_cache.FILL_TIMER
-
-
-class Unit:
-    """A runner unit laid out as files: its drop-ins, its main process, its cgroup."""
-
-    def __init__(self, root: pathlib.Path) -> None:
-        """Lay out a running unit whose main process lacks the variable.
-
-        Args:
-            root: The test's directory.
-        """
-        self.root = root
-        (root / "proc" / "100").mkdir(parents=True)
-        (root / "proc" / "100" / "environ").write_bytes(b"HOME=/home/gharunner\0LANG=C.UTF-8\0")
-        (root / "proc" / "100" / "cmdline").write_bytes(b"/bin/bash\0runsvc.sh\0")
-        self.cgroup = root / "cgroup" / "system.slice" / UNIT
-        self.cgroup.mkdir(parents=True)
-        (self.cgroup / "cgroup.procs").write_text("100\n", encoding="utf-8")
-        body = "\n".join(runner_action_cache.render_cache_environment_lines(_install(UNIT)))
-        for real, laid_out in (
-            ("/etc/systemd/system", "units"),
-            ("/proc/", "proc/"),
-            ("/sys/fs/cgroup", "cgroup"),
-        ):
-            body = body.replace(real, laid_out)
-        # restart gives the unit's main process the drop-in's environment, as
-        # systemd does when it starts the unit again.
-        stand_ins = (
-            "systemctl() {\n"
-            '    echo "$*" >> calls.log\n'
-            '    case "$1 $3" in\n'
-            '        "show MainPID") echo 100 ;;\n'
-            f'        "show ControlGroup") echo /system.slice/{UNIT} ;;\n'
-            "    esac\n"
-            '    if [ "$1" = restart ]; then\n'
-            "        printf 'HOME=/home/gharunner\\0"
-            f"{runner_action_cache.CACHE_VARIABLE}={runner_action_cache.WSL_CACHE_DIR}\\0' "
-            "> proc/100/environ\n"
-            "    fi\n"
-            "}\n"
-        )
-        (root / "cache.sh").write_bytes((stand_ins + body + "\n").encode())
-
-    def busy(self) -> None:
-        """Put a job's Worker in the unit's cgroup."""
-        (self.root / "proc" / "200").mkdir()
-        (self.root / "proc" / "200" / "cmdline").write_bytes(
-            b"/home/gharunner/bin/Runner.Worker\0spawnclient\0"
-        )
-        (self.cgroup / "cgroup.procs").write_text("100\n200\n", encoding="utf-8")
-
-    def run(self) -> subprocess.CompletedProcess[str]:
-        """Run the lines once.
-
-        Returns:
-            The finished process.
-        """
-        return subprocess.run(
-            [host_bash(), "cache.sh"], cwd=self.root, capture_output=True, text=True, check=False
-        )
-
-    def calls(self) -> list[str]:
-        """Every systemctl call, in order.
-
-        Returns:
-            The calls' arguments.
-        """
-        return (self.root / "calls.log").read_text(encoding="utf-8").splitlines()
-
-
-class TestTheDropInRunsForReal:
-    """The variable lands once, and reaches the unit only by a restart of an idle unit."""
-
-    def test_an_idle_unit_is_given_the_variable_and_restarted_once(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        unit = Unit(tmp_path)
-        first = unit.run()
-        assert first.returncode == 0, first.stderr
-        assert first.stdout == f"action cache set for {UNIT}: restarted while idle\n"
-        drop_in = tmp_path / "units" / f"{UNIT}.d" / runner_action_cache.CACHE_DROP_IN_NAME
-        assert drop_in.read_bytes() == runner_action_cache.CACHE_DROP_IN.encode()
-        second = unit.run()
-        assert second.returncode == 0, second.stderr
-        assert second.stdout == ""
-        assert unit.calls() == [
-            "daemon-reload",
-            f"show -p MainPID --value {UNIT}",
-            f"show -p ControlGroup --value {UNIT}",
-            f"restart {UNIT}",
-            f"show -p MainPID --value {UNIT}",
-        ]
-
-    def test_a_unit_running_a_job_is_left_for_the_next_run(self, tmp_path: pathlib.Path) -> None:
-        unit = Unit(tmp_path)
-        unit.busy()
-        ran = unit.run()
-        assert ran.returncode == 0, ran.stderr
-        assert ran.stdout == (
-            f"action cache set for {UNIT} at its next restart: it is running a job; "
-            "run provision again to restart it\n"
-        )
-        assert f"restart {UNIT}" not in unit.calls()
-
-    def test_an_unscriptable_unit_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="cannot be embedded in a rendered script verbatim"):
-            runner_action_cache.render_cache_environment_lines(_install("bad'unit"))
