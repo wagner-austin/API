@@ -122,6 +122,10 @@ class TestProvisionScript:
             "@(Get-CimInstance Win32_Service -Filter \"Name='$Name'\") },",
             "    [scriptblock]$StopService = { param([string]$Name) Stop-Service -Name $Name },",
             "    [scriptblock]$StartService = { param([string]$Name) Start-Service -Name $Name },",
+            "    [string]$ServicesKey = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services',",
+            "    [scriptblock]$GetWorkers = { param([string]$Directory) "
+            "@(Get-CimInstance Win32_Process -Filter \"Name='Runner.Worker.exe'\" | "
+            "Where-Object { [string]$_.ExecutablePath -like ($Directory + '\\*') }) },",
             '    [string]$Sc = "$env:SystemRoot\\System32\\sc.exe"',
         ]
         assert "memory=26GB" in script

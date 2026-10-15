@@ -74,16 +74,39 @@ BeforeAll {
     }
 
     # A case's service: one Win32_Service row or none, and the acts on it,
-    # recorded.
+    # recorded; its key under a scratch HKCU Services key, whose Environment
+    # value holds the action cache unless the case says otherwise (MCPs board
+    # task ce2b92e0); and its install's running job Workers, none unless Busy.
     function Initialize-Service {
-        param([string]$StartName = 'LocalSystem', [string]$State = 'Running', [switch]$Absent)
+        param(
+            [string]$StartName = 'LocalSystem', [string]$State = 'Running', [switch]$Absent,
+            [string[]]$Environment = @($script:cacheSetting), [switch]$Busy
+        )
         $service = @{ StartName = $StartName; State = $State; Present = -not $Absent }
         $acts = [System.Collections.Generic.List[string]]::new()
+        $services = 'HKCU:\Software\fleet-test-' + [guid]::NewGuid().ToString('N') + '\Services'
+        $script:registryKeys.Add((Split-Path -Parent $services))
+        [void](New-Item -Path "$services\fleet-test-service" -Force)
+        if ($Environment.Count -gt 0) {
+            [void](New-ItemProperty -LiteralPath "$services\fleet-test-service" -Name Environment -PropertyType MultiString -Value $Environment)
+        }
+        $busy = [bool]$Busy
         return [pscustomobject]@{
             Acts = $acts
+            ServicesKey = $services
             Get = { param([string]$Name) if ($service.Present) { [pscustomobject]@{ Name = $Name; StartName = $service.StartName; State = $service.State } } }.GetNewClosure()
             Stop = { param([string]$Name) $acts.Add("stop $Name"); $service.State = 'Stopped' }.GetNewClosure()
             Start = { param([string]$Name) $acts.Add("start $Name"); $service.State = 'Running' }.GetNewClosure()
+            Workers = { param([string]$Directory) if ($busy) { [pscustomobject]@{ ExecutablePath = "$Directory\bin\Runner.Worker.exe" } } }.GetNewClosure()
+        }
+    }
+
+    # Each entry the service's Environment value holds, none when it has no value.
+    function Read-ServiceEnvironment {
+        param([object]$Service)
+        $value = (Get-ItemProperty -LiteralPath "$($Service.ServicesKey)\fleet-test-service").PSObject.Properties['Environment']
+        if ($null -ne $value) {
+            [string[]]@($value.Value)
         }
     }
 
@@ -102,6 +125,7 @@ BeforeAll {
         $parameters = @{
             Installs = @($Install); Tokens = $Tokens; RunnerUrl = $RunnerUrl; PythonPackageUrl = $PythonUrl; PythonName = 'python.cmd'
             GetService = $Service.Get; StopService = $Service.Stop; StartService = $Service.Start; Sc = $Sc.Path
+            ServicesKey = $Service.ServicesKey; GetWorkers = $Service.Workers
         }
         if ($script:name -like 'provision-*') {
             $parameters.WslConfigPath = Join-Path $TestDrive ('wslconfig-' + [guid]::NewGuid().ToString('N'))
@@ -147,6 +171,8 @@ BeforeAll {
     }
 
     $script:variables = [System.Collections.Generic.List[string]]::new()
+    $script:registryKeys = [System.Collections.Generic.List[string]]::new()
+    $script:cacheSetting = 'ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=C:\fleet\action-cache'
 }
 
 AfterAll {
@@ -154,6 +180,9 @@ AfterAll {
         if (Test-Path -LiteralPath "env:$variable") {
             Remove-Item -LiteralPath "env:$variable"
         }
+    }
+    foreach ($key in $script:registryKeys) {
+        Remove-Item -LiteralPath $key -Recurse
     }
 }
 
@@ -270,6 +299,41 @@ Describe 'The Windows install loop in <_>' -ForEach @(Get-ChildItem -LiteralPath
         $said = @(Invoke-Rendered $script:name (Get-CaseParameter -Install $install -Service $service -Sc $sc))
         Select-InstallOutput $said | Should -Be @('started fleet-test-service')
         $service.Acts | Should -Be @('start fleet-test-service')
+    }
+    It 'gives an idle service lacking the action cache the variable beside its other entries, restarting it once' {
+        $install = Initialize-Install
+        $service = Initialize-Service -Environment @('KEEP=1')
+        $sc = Initialize-Batch 'sc' @('exit /b 0')
+        $said = @(Invoke-Rendered $script:name (Get-CaseParameter -Install $install -Service $service -Sc $sc))
+        Select-InstallOutput $said | Should -Be @('action cache set for fleet-test-service: restarted while idle')
+        Read-ServiceEnvironment $service | Should -Be @('KEEP=1', $script:cacheSetting)
+        $service.Acts | Should -Be @('stop fleet-test-service', 'start fleet-test-service')
+        [void](Invoke-Rendered $script:name (Get-CaseParameter -Install $install -Service $service -Sc $sc))
+        $service.Acts.Count | Should -Be 2
+    }
+    It 'replaces an older setting of the cache variable rather than adding a second' {
+        $service = Initialize-Service -Environment @('ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=D:\old-cache')
+        [void](Invoke-Rendered $script:name (Get-CaseParameter -Install (Initialize-Install) -Service $service -Sc (Initialize-Batch 'sc' @('exit /b 0'))))
+        Read-ServiceEnvironment $service | Should -Be @($script:cacheSetting)
+    }
+    It 'leaves a service running a job unwritten and unrestarted, and names it' {
+        $service = Initialize-Service -Environment @() -Busy
+        $said = @(Invoke-Rendered $script:name (Get-CaseParameter -Install (Initialize-Install) -Service $service -Sc (Initialize-Batch 'sc' @('exit /b 0'))))
+        Select-InstallOutput $said | Should -Be @('action cache not yet set for fleet-test-service: it is running a job; run provision again to set it')
+        @(Read-ServiceEnvironment $service).Count | Should -Be 0
+        $service.Acts | Should -Be @()
+    }
+    It 'reads the job Workers through Get-CimInstance by default, which finds none under a test install' {
+        $service = Initialize-Service -Environment @()
+        $parameters = Get-CaseParameter -Install (Initialize-Install) -Service $service -Sc (Initialize-Batch 'sc' @('exit /b 0'))
+        $parameters.Remove('GetWorkers')
+        [void](Invoke-Rendered $script:name $parameters)
+        Read-ServiceEnvironment $service | Should -Be @($script:cacheSetting)
+    }
+    It 'reads the services key under HKLM by default, which holds no test service' {
+        $parameters = Get-CaseParameter -Install (Initialize-Install) -Service (Initialize-Service) -Sc (Initialize-Batch 'sc' @('exit /b 0'))
+        $parameters.Remove('ServicesKey')
+        { Invoke-Rendered $script:name $parameters } | Should -Throw '*HKLM:\SYSTEM\CurrentControlSet\Services\fleet-test-service*'
     }
     It 'refuses by name a Python seed <Case>' -ForEach @(
         @{ Case = 'carrying no bundled pip wheel'; Variant = 'NoWheel'; Message = 'FLEET_PYTHON_SEED_WHEEL: expected one bundled pip wheel in seeded 3.11.9, found 0' }

@@ -13,6 +13,7 @@ import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import (
+    runner_action_cache,
     runner_install,
     runner_reaper_render,
     runner_recovery,
@@ -268,12 +269,14 @@ class TestRerunsOverAHalfBuiltHost:
         assert "./config.sh" in lines[guard + 1]
         assert lines[guard + 2] == "fi"
         # The unit exists after svc.sh install and gets its restart policy and
-        # its kill mode before it starts, and is moved into the CI slice
-        # after it starts, when its live cgroup can be read.
+        # its kill mode before it starts; after it starts, when its live
+        # process and cgroup can be read, it gets the action cache (MCPs
+        # board task ce2b92e0) and is moved into the CI slice.
         recovery = runner_recovery.render_wsl_recovery_lines(install)
         kill_mode = runner_reaper_render.render_kill_mode_lines(install)
+        cached = runner_action_cache.render_cache_environment_lines(install)
         placed = runner_slice_render.render_runner_slice_lines(install)
-        start = len(lines) - len(placed) - 1
+        start = len(lines) - len(placed) - len(cached) - 1
         before = start - len(kill_mode) - len(recovery)
         assert lines[before - 1] == (
             "[ -f /home/gharunner/actions-runner/.service ] || "
@@ -282,7 +285,8 @@ class TestRerunsOverAHalfBuiltHost:
         assert lines[before : start - len(kill_mode)] == recovery
         assert lines[start - len(kill_mode) : start] == kill_mode
         assert lines[start] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
-        assert lines[start + 1 :] == placed
+        assert lines[start + 1 : start + 1 + len(cached)] == cached
+        assert lines[start + 1 + len(cached) :] == placed
 
 
 class TestManualSteps:
