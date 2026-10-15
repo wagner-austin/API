@@ -55,8 +55,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # board task 9896d6b2); 59 since MCPs/execution-served, the execution
     # suite's served lane (MCPs board task b456a3cb); 60 since that lane is
     # one project per search host, MCPs/execution-served-diphtheria and
-    # -colossus (MCPs board task bf7a9460).
-    assert len(prepared) == 60
+    # -colossus (MCPs board task bf7a9460); 61 since session-audit's real
+    # PostgreSQL review-routing cases (MCPs board task 55189157).
+    assert len(prepared) == 61
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -77,8 +78,9 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     ]
 
     # 28 since MCPs/execution-testdb (MCPs board task c04519f9, A2); 29 since
-    # MCPs/brief-generator (MCPs board task b1089284).
-    assert len(databases) == 29
+    # MCPs/brief-generator (MCPs board task b1089284); 30 since
+    # MCPs/packages/session-audit (MCPs board task 55189157).
+    assert len(databases) == 30
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
