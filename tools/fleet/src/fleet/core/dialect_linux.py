@@ -37,6 +37,7 @@ from __future__ import annotations
 import posixpath
 import shlex
 
+from fleet.contracts.action_cache import STATUS_FRESH_MINUTES, STATUS_PATH
 from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.contracts.source import InstallStep
@@ -91,6 +92,12 @@ PROLOGUE = 'set -eu\nPATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\nexport PATH
 #: CI holds the lane. Measured on lavender-wsl, 2026-09-29 18:2xZ:
 #: memory.current 17179713536 against memory.high 17179869184, with 8.2 GB
 #: available; diphtheria has no such cgroup and prints neither.
+#:
+#: THE ``action_cache_*`` FOUR are printed only on a runner host whose root
+#: timer has written its counts within :data:`STATUS_FRESH_MINUTES` (MCPs
+#: board task ce2b92e0, :mod:`fleet.contracts.action_cache`), and only lines
+#: of that exact shape are passed on, so nothing else in the file can stand
+#: in for a reading this probe takes itself.
 CAPACITY_PROBE_SCRIPT = (
     PROLOGUE + CAPACITY_PROBE_BODY + f"s=/sys/fs/cgroup/{CI_SLICE_NAME}\n"
     'if [ -r "$s/memory.current" ] && [ -r "$s/memory.high" ]; then\n'
@@ -100,6 +107,12 @@ CAPACITY_PROBE_SCRIPT = (
     '    *) awk -v c="$(cat "$s/memory.current")" -v h="$h" \'BEGIN { printf '
     '"ci_slice_current_gb=%.3f\\nci_slice_high_gb=%.3f\\n", c / 1073741824, h / 1073741824 }\' ;;\n'
     "  esac\n"
+    "fi\n"
+    f"c={STATUS_PATH}\n"
+    f'if [ -n "$(find "$c" -mmin -{STATUS_FRESH_MINUTES} 2>/dev/null)" ]; then\n'
+    # A file holding no such line prints nothing, which the parser reads as
+    # no counts; grep's exit 1 for no match must not end the probe as failed.
+    "  grep -E '^action_cache_(runners|reading|served|missed)=[0-9]+$' \"$c\" || true\n"
     "fi\n"
 )
 

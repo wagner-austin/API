@@ -37,6 +37,7 @@ from typing import TypedDict
 
 from platform_core.errors import AppError, FleetErrorCode
 
+from fleet.contracts.action_cache import PROBE_FIELDS, ActionCacheCounts, inconsistency
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState, SliceMemory
 from fleet.core import dialect, names, remote, reservations
 
@@ -118,6 +119,9 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         if sliced
         else None
     )
+    action_cache, cache_problem = _read_action_cache(host, fields, output)
+    if cache_problem:
+        return ProbeOutcome(state=None, reason=cache_problem)
     return ProbeOutcome(
         state=NodeState(
             host=host,
@@ -126,9 +130,47 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             live=live,
             ci_slice=ci_slice,
             reserved_cores=int(reserved_cores),
+            action_cache=action_cache,
         ),
         reason="",
     )
+
+
+def _read_action_cache(
+    host: str, fields: dict[str, str], output: str
+) -> tuple[ActionCacheCounts | None, str]:
+    """Read a runner host's action cache counts, all four or none.
+
+    A node prints them only when it publishes fresh counts
+    (:data:`fleet.core.dialect_linux.CAPACITY_PROBE_SCRIPT`), and its root
+    timer writes all four in one file, so one without the others means the
+    file or the probe did not run as written.
+
+    Args:
+        host: The node, for the message.
+        fields: The parsed key=value pairs.
+        output: The whole output, for the message.
+
+    Returns:
+        The counts or None, and an empty string; or None and the reason the
+        node's answer cannot be read.
+    """
+    if not any(key in fields for key in PROBE_FIELDS):
+        return None, ""
+    counts: list[int] = []
+    for key in PROBE_FIELDS:
+        value = _read_number(fields, key)
+        if value is None:
+            return None, _unreadable(host, fields, key, output)
+        if not value.is_integer():
+            return None, f"{host} reported {key}={value!r}, which is not a whole number of runners"
+        counts.append(int(value))
+    runners, reading, served, missed = counts
+    read = ActionCacheCounts(runners=runners, reading=reading, served=served, missed=missed)
+    problem = inconsistency(read)
+    if problem is not None:
+        return None, f"{host} reported {problem}"
+    return read, ""
 
 
 def parse_probe(host: str, output: str, *, live: LiveLoad) -> NodeState:

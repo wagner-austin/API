@@ -39,6 +39,7 @@ so one sample is not enough. No such moment lasts
 
 from __future__ import annotations
 
+from fleet.contracts.action_cache import STATUS_PATH
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core.runner_action_cache import (
     CACHE_DROP_IN,
@@ -136,6 +137,78 @@ done
 """
 ).replace("$ADOPT_TIMER", ADOPT_TIMER_NAME)
 
+#: Where the report script is installed.
+REPORT_PATH = "/usr/local/sbin/fleet-action-cache-report"
+
+#: The report: after each adopt run, the four counts the node runner's probe
+#: forwards (:mod:`fleet.contracts.action_cache`), written whole to
+#: :data:`~fleet.contracts.action_cache.STATUS_PATH`. A runner is counted
+#: reading when its running process carries the setting; its newest Worker
+#: log written since that process started is read for the runner's own trace
+#: lines, ``Check if action archive`` once per action looked up and ``Found
+#: action archive`` once per action the cache held (ActionManager.cs,
+#: v2.338.0). A runner with no such log has run no job since it started.
+REPORT_SCRIPT = (
+    r"""#!/usr/bin/env bash
+# fleet-action-cache-report -- rendered by fleet-runners (MCPs board task ce2b92e0).
+# Counts the named runner units, those whose process reads the action archive
+# cache, and those whose newest job since starting found every action it
+# looked up there or missed one, into a status file every account can read.
+# Usage: fleet-action-cache-report UNIT...
+set -euo pipefail
+if [ $# -lt 1 ]; then
+    echo "fleet-action-cache-report: usage: fleet-action-cache-report UNIT..." >&2
+    exit 2
+fi
+"""
+    + f"setting={CACHE_VARIABLE}={WSL_CACHE_DIR}\n"
+    + f"status={STATUS_PATH}\n"
+    + r"""
+runners=0
+reading=0
+served=0
+missed=0
+now=$(date +%s)
+# A stopped unit's MainPID reads 0 and /proc/0 does not exist, so its
+# environment reads empty and it is counted as not reading.
+for unit in "$@"; do
+    runners=$((runners + 1))
+    main=$(systemctl show -p MainPID --value "$unit")
+    running=$(tr '\0' '\n' < "/proc/$main/environ" 2>/dev/null || true)
+    if ! grep -qxF "$setting" <<<"$running"; then
+        continue
+    fi
+    reading=$((reading + 1))
+    elapsed=$(ps -o etimes= -p "$main" || true)
+    if [ -z "$elapsed" ]; then
+        continue
+    fi
+    directory=$(systemctl show -p WorkingDirectory --value "$unit")
+    log=$(find "$directory/_diag" -maxdepth 1 -name 'Worker_*.log' \
+        -newermt "@$((now - elapsed))" 2>/dev/null | sort | tail -n 1)
+    if [ -z "$log" ]; then
+        continue
+    fi
+    lookups=$(grep -c "Check if action archive" "$log" || true)
+    hits=$(grep -c "Found action archive" "$log" || true)
+    if [ "$hits" -lt "$lookups" ]; then
+        missed=$((missed + 1))
+    elif [ "$lookups" -gt 0 ]; then
+        served=$((served + 1))
+    fi
+done
+mkdir -p "${status%/*}"
+{
+    printf 'action_cache_runners=%s\n' "$runners"
+    printf 'action_cache_reading=%s\n' "$reading"
+    printf 'action_cache_served=%s\n' "$served"
+    printf 'action_cache_missed=%s\n' "$missed"
+} > "$status.part"
+chmod 0644 "$status.part"
+mv "$status.part" "$status"
+"""
+)
+
 #: Every minute, so a runner that goes idle is restarted within about a minute
 #: and its settle window.
 ADOPT_TIMER = """[Unit]
@@ -171,14 +244,18 @@ def wsl_units(spec: HostRunnerSpec) -> list[str]:
 
 
 def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
-    """Bash lines that install the adopt script and its units and start its timer.
+    """Bash lines that install the adopt and report scripts and their units, and start its timer.
+
+    One timer fires both, through one service.
 
     Args:
         spec: The host's roster entry.
 
     Returns:
         The lines, written whole on every run as the fill's are; none when
-        the host has no WSL installs, since there is nothing to adopt.
+        the host has no WSL installs, since there is nothing to adopt. The
+        service runs the adopt script, then the report over the same units,
+        so the counts it publishes follow any restart it made.
 
     Raises:
         ValueError: When a unit name cannot be embedded verbatim.
@@ -186,6 +263,7 @@ def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
     units = wsl_units(spec)
     if not units:
         return []
+    named = " ".join(units)
     service = "\n".join(
         [
             "[Unit]",
@@ -193,7 +271,8 @@ def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
             "",
             "[Service]",
             "Type=oneshot",
-            f"ExecStart={ADOPT_PATH} {ADOPT_SETTLE_SECONDS} " + " ".join(units),
+            f"ExecStart={ADOPT_PATH} {ADOPT_SETTLE_SECONDS} {named}",
+            f"ExecStart={REPORT_PATH} {named}",
         ]
     )
     return [
@@ -201,6 +280,10 @@ def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
         ADOPT_SCRIPT.rstrip("\n"),
         "ADOPT_EOF",
         f"chmod +x {ADOPT_PATH}",
+        f"cat > {REPORT_PATH} <<'REPORT_EOF'",
+        REPORT_SCRIPT.rstrip("\n"),
+        "REPORT_EOF",
+        f"chmod +x {REPORT_PATH}",
         f"cat > /etc/systemd/system/{ADOPT_SERVICE_NAME} <<'UNIT_EOF'",
         service,
         "UNIT_EOF",

@@ -7,7 +7,8 @@ out why each node took nothing meant reading seven logs. The runner now
 sends this record through MCPs ``dispatch_tick`` at the end of every tick,
 which keeps one row per runner (MCPs mig 640), and ``fleet_status`` renders
 them node by node: the tags its probe detected, the runs and workers it
-holds, its free memory and free disk (MCPs board task b109a596), the
+holds, its free memory and free disk (MCPs board task b109a596), its CI
+runners' use of the action archive cache (MCPs board task ce2b92e0), the
 projects it could launch and why it is or is not claiming.
 """
 
@@ -27,6 +28,11 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.action_cache import (
+    ActionCacheCounts,
+    decode_action_cache,
+    encode_action_cache,
+)
 from fleet.contracts.tags import NodeTag, decode_required_tags, encode_tags
 
 
@@ -40,12 +46,16 @@ class TickLoad(TypedDict):
         free_disk_gb: The space its capacity probe read free on the node's
             staging drive (MCPs board task b109a596, A1): the operator, by
             text on 2026-10-03, "howcome you can't see the pcs?".
+        action_cache: The node's CI runners and the action archive cache
+            (:mod:`fleet.contracts.action_cache`, MCPs board task ce2b92e0),
+            or None when the node publishes no counts.
     """
 
     runs: int
     workers: int
     free_ram_gb: float
     free_disk_gb: float
+    action_cache: ActionCacheCounts | None
 
 
 class RunnerTick(TypedDict):
@@ -97,6 +107,7 @@ def encode_runner_tick(tick: RunnerTick) -> JSONObject:
             "workers": load["workers"],
             "freeRamGb": load["free_ram_gb"],
             "freeDiskGb": load["free_disk_gb"],
+            "actionCache": encode_action_cache(load["action_cache"]),
         }
     return encoded
 
@@ -121,11 +132,17 @@ def decode_runner_tick(value: JSONValue) -> RunnerTick:
     if raw_load is not None:
         if not isinstance(raw_load, dict):
             raise JSONTypeError(f"load must be a JSON object, got {type(raw_load).__name__}")
+        if "actionCache" not in raw_load:
+            raise JSONTypeError(
+                "load.actionCache is missing; a tick carries the node's action cache counts "
+                "or null when it publishes none"
+            )
         load = TickLoad(
             runs=require_int(raw_load, "runs"),
             workers=require_int(raw_load, "workers"),
             free_ram_gb=require_float(raw_load, "freeRamGb"),
             free_disk_gb=require_float(raw_load, "freeDiskGb"),
+            action_cache=decode_action_cache(raw_load["actionCache"]),
         )
     return RunnerTick(
         node=require_str(value, "node"),

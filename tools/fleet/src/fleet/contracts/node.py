@@ -30,6 +30,7 @@ from platform_core.json_utils import (
 from platform_core.members import find_member
 from typing_extensions import TypedDict
 
+from fleet.contracts.action_cache import ActionCacheCounts
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
 from fleet.contracts.capability import Capability, decode_capability
 
@@ -253,6 +254,10 @@ class NodeState(TypedDict):
             (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
             84a2b690). Charged against the node's cores beside its live
             fleet runs.
+        action_cache: The host's CI runners and the action archive cache
+            (:mod:`fleet.contracts.action_cache`, MCPs board task
+            ce2b92e0), or None where the node publishes no fresh counts.
+            Carried to the tick, never weighed.
     """
 
     host: str
@@ -261,6 +266,7 @@ class NodeState(TypedDict):
     live: LiveLoad
     ci_slice: SliceMemory | None
     reserved_cores: int
+    action_cache: ActionCacheCounts | None
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:
