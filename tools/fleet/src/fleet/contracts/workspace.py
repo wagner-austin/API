@@ -39,6 +39,7 @@ from fleet.contracts.node import (
     decode_node_config,
     encode_node_config,
 )
+from fleet.contracts.pins import check_pinned_nodes
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import decode_path, decode_remote
@@ -531,7 +532,8 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, the node or project mapping is empty, a machine is both
             declared and excluded, a node-local resource is declared by no
-            project, a node's ``wsl_host`` is not another Windows node, the
+            project, a node's ``wsl_host`` is not another Windows node, a
+            project is pinned to a node it cannot match, the
             node serve or poll lies outside its bounds, or a node or project fails
             its own decoder.
     """
@@ -540,10 +542,13 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
     nodes = _check_wsl_hosts(
         {name: decode_node_config(node) for name, node in _decode_named(value, "nodes").items()}
     )
-    projects = {
-        path: decode_project_config(project)
-        for path, project in _decode_named(value, "projects").items()
-    }
+    projects = check_pinned_nodes(
+        {
+            path: decode_project_config(project)
+            for path, project in _decode_named(value, "projects").items()
+        },
+        nodes,
+    )
     return FleetWorkspace(
         nodes=nodes,
         not_dispatchable=_decode_not_dispatchable(value, nodes),

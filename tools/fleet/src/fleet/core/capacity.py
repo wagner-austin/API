@@ -175,9 +175,26 @@ def assess(
             tags, plus on a node runner the tool tags this tick's toolchain
             probe found (:func:`fleet.contracts.tags.tool_tags`).
 
+    A PROJECT THAT NAMES ITS NODE IS REFUSED BY EVERY OTHER ONE, first,
+    because no tag, disk or memory on another node changes that it reads
+    what only the named host holds (MCPs board task bf7a9460). The workspace
+    refuses a pin naming a node it does not declare, and every node's host
+    is its registry name, so the node is matched by its host.
+
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
+    pinned = project["node"]
+    if pinned is not None and pinned != node["host"]:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_NOT_PINNED,
+            reason=(
+                f"{node['host']} is not {pinned}: the project runs on {pinned} alone, because "
+                "it reads what only that host holds, so the answer is that node and never "
+                "this one."
+            ),
+        )
     missing = missing_tags(carried, project["required_tags"])
     if missing:
         return DispatchVerdict(
@@ -364,6 +381,7 @@ def room_for_any(
         external_paths=(),
         required_tags=(),
         source=None,
+        node=None,
     )
     verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:
@@ -460,7 +478,10 @@ def _nothing_fits_code(
         return FleetErrorCode.NODE_UNREACHABLE
     if not candidates and unassessed:
         return FleetErrorCode.NODE_DISABLED
-    if candidates and all(code is FleetErrorCode.NODE_LACKS_TAG for code in refused_with):
+    if candidates and all(code is FleetErrorCode.NODE_NOT_PINNED for code in refused_with):
+        return FleetErrorCode.NODE_NOT_PINNED
+    wrong_node = {FleetErrorCode.NODE_LACKS_TAG, FleetErrorCode.NODE_NOT_PINNED}
+    if candidates and all(code in wrong_node for code in refused_with):
         return FleetErrorCode.NODE_LACKS_TAG
     return FleetErrorCode.NODE_MEMORY_EXHAUSTED
 
@@ -507,7 +528,7 @@ def first_fit(
         The chosen node's name and its worker count.
 
     Raises:
-        AppError: With one of four codes, chosen by
+        AppError: With one of five codes, chosen by
             :func:`_nothing_fits_code` and all carrying EVERY node's own
             refusal rather than the first:
 
@@ -519,16 +540,21 @@ def first_fit(
             ``registry/nodes.json``.
 
             ``NODE_LACKS_TAG`` -- nodes answered and every one of them is
-            the wrong kind for this project's ``required_tags``. Nothing is
-            full; the fleet has no node of that kind, or the declaration
-            asks for one it does not have.
+            the wrong kind for this project's ``required_tags``, or the
+            named node lacks them and every other one is not that node.
+            Nothing is full; the fleet has no node of that kind, or the
+            declaration asks for one it does not have.
+
+            ``NODE_NOT_PINNED`` -- nodes answered and every one of them is
+            not the node the project names, which did not answer. Look at
+            that node.
 
             ``NODE_MEMORY_EXHAUSTED`` -- nodes answered and all refused, at
             least one of them on capacity, or the workspace declares no
             nodes at all, which is a configuration fault rather than a
             fleet that is down.
 
-            The four are the point, not a detail. A single code would send
+            The five are the point, not a detail. A single code would send
             most of its readers to the wrong file. It is the same
             distinction ``refused`` draws against ``failed`` one layer up.
     """

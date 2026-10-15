@@ -96,6 +96,16 @@ class ProjectConfig(TypedDict):
             REQUIRED, null spelled out: an absent key on a project the queue
             is asked to check would read as "no remote" and refuse a job
             whose registry line was merely incomplete.
+        node: The one node this project runs on, by its registry name, or
+            None for a project any node carrying its tags may run. Every
+            other node refuses it with ``NODE_NOT_PINNED``
+            (:func:`fleet.core.capacity.assess`), so a runner is never
+            offered it and no submitter has to name the node. For a suite
+            that reads something only that host holds: MCPs board task
+            bf7a9460's served cases read the host's own search container on
+            127.0.0.1, which no other node can reach, and no tag singles out
+            one host. Optional, because it is the exception: absent reads as
+            None, and the workspace refuses a name it does not declare.
     """
 
     worker_ram_gb: float
@@ -105,6 +115,7 @@ class ProjectConfig(TypedDict):
     external_paths: tuple[str, ...]
     required_tags: tuple[NodeTag, ...]
     source: ProjectSource | None
+    node: str | None
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -155,7 +166,32 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "external_paths": encode_names(project["external_paths"]),
         "required_tags": encode_tags(project["required_tags"]),
         "source": encode_project_source(project["source"]),
+        "node": project["node"],
     }
+
+
+def decode_pinned_node(value: JSONValue) -> str | None:
+    """Decode a project's optional ``node``.
+
+    Args:
+        value: The key's value, or None when the key is absent.
+
+    Returns:
+        The node's registry name, or None for a project any node may run.
+
+    Raises:
+        JSONTypeError: When the value is not a string or is empty: a
+            project pinned to no name is a misspelt declaration, not an
+            unpinned one.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or value == "":
+        raise JSONTypeError(
+            f"project.node must be a node's registry name or absent, got {value!r}; an empty "
+            "or non-string pin would run the project nowhere"
+        )
+    return value
 
 
 def decode_project_config(value: JSONValue) -> ProjectConfig:
@@ -219,12 +255,14 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
             value.get("required_tags"), field="project.required_tags"
         ),
         source=decode_project_source(value["source"], field="project.source"),
+        node=decode_pinned_node(value.get("node")),
     )
 
 
 __all__ = [
     "MAKE_TARGET",
     "ProjectConfig",
+    "decode_pinned_node",
     "decode_project_config",
     "encode_project_config",
     "lease_seconds",
