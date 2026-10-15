@@ -44,6 +44,7 @@ first thing sent to a node is a probe, and it has to be written somehow.
 
 from __future__ import annotations
 
+import math
 import pathlib
 from typing import TypedDict
 
@@ -163,8 +164,38 @@ SSH_OPTIONS = (
 #: is short by construction -- a probe, a file write, a script that lists a
 #: directory or launches a detached run and returns -- so two minutes is
 #: generous for the work and still forty times shorter than the scheduled
-#: tick's old 72-hour ceiling.
+#: tick's old 72-hour ceiling. The one exception is :func:`send_file`,
+#: whose work grows with the file: its deadline is
+#: :func:`send_deadline_seconds`.
 SSH_TIMEOUT_SECONDS = 120
+
+#: The slowest rate a copy to a node is allowed before it is called stuck,
+#: in bytes a second.
+#:
+#: Measured 2026-10-14 (MCPs board task bfe2b3da): scp of 52,428,800 bytes
+#: from the hub took loki 25,188 ms and sedona 21,592 ms, about 2.0 and 2.3
+#: MB/s, and the archives the hub copies reach 239,780,392 bytes (the API
+#: companion bundle). Under the flat :data:`SSH_TIMEOUT_SECONDS` those copies
+#: were cut at 120 s and read as ``NODE_UNREACHABLE`` (fleet job 851300a6 on
+#: loki). Half a MiB a second is a quarter of loki's rate, so a link has to
+#: slow fourfold before a live copy is cut; a dead one still ends on the
+#: keepalive in a minute.
+SEND_FLOOR_BYTES_PER_SECOND = 524_288
+
+
+def send_deadline_seconds(size_bytes: int) -> int:
+    """The deadline for copying a file of this size to a node.
+
+    Args:
+        size_bytes: The file's length in bytes.
+
+    Returns:
+        :data:`SSH_TIMEOUT_SECONDS` for the connection and the remote side,
+        plus the whole seconds the bytes take at
+        :data:`SEND_FLOOR_BYTES_PER_SECOND`.
+    """
+    return SSH_TIMEOUT_SECONDS + math.ceil(size_bytes / SEND_FLOOR_BYTES_PER_SECOND)
+
 
 #: ssh's own exit status when it cannot reach the host or the connection dies.
 #:
@@ -300,7 +331,7 @@ def stream_to_command(host: str, command: str, body: str, *, what: str) -> None:
     _raise_on(_attempt_stream(host, command, body, what=what))
 
 
-def send_file(host: str, source: pathlib.Path, remote_path: str) -> None:
+def send_file(host: str, source: pathlib.Path, remote_path: str, *, size_bytes: int) -> None:
     """Copy a local file's bytes to a path on a node, over scp.
 
     For an ARCHIVE, where :func:`send_script` is the wrong transport: that
@@ -322,15 +353,17 @@ def send_file(host: str, source: pathlib.Path, remote_path: str) -> None:
         source: The local file.
         remote_path: Absolute path on the node to write, replacing any file
             there. Its directory must exist.
+        size_bytes: The file's length, which sets the copy's deadline
+            (:func:`send_deadline_seconds`).
 
     Raises:
         AppError: With ``NODE_UNREACHABLE`` when the node cannot be reached or
-            stops answering before :data:`SSH_TIMEOUT_SECONDS`, or
+            the copy outlasts :func:`send_deadline_seconds`, or
             ``DISPATCH_FAILED`` when it refuses the write.
     """
     result = _test_hooks.run(
         ["scp", "-q", *SSH_OPTIONS, str(source), f"{host}:{remote_path}"],
-        timeout_seconds=SSH_TIMEOUT_SECONDS,
+        timeout_seconds=send_deadline_seconds(size_bytes),
     )
     _raise_on(_failure_for(host, f"copying {source.name} to {remote_path}", result))
 

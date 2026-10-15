@@ -190,7 +190,7 @@ def send_verified(
             retry loop turns a diagnosable fault into an intermittent one.
     """
     spoken = dialect.for_platform(platform)
-    remote.send_file(host, source, f"{into}/{names.ARCHIVE_NAME}")
+    remote.send_file(host, source, f"{into}/{names.ARCHIVE_NAME}", size_bytes=len(payload))
     received = remote.run_script(
         host,
         spoken.script_path(into, names.DIGEST_STEM),
