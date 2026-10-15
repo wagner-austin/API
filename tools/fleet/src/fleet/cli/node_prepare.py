@@ -169,7 +169,12 @@ def prepare(
     source = export.require_source(job["project"], plan["source"])
     mirror = export.prepare_mirror(loaded.mirrors, remote=source["remote"], sha=sha)
     export.require_install_paths(mirror, sha, source["install"])
-    companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
+    # One directory per claimed job (MCPs board task f9ee56aa): every runner
+    # on the hub writes here, git bundle create never writes one ref's bytes
+    # twice alike, and two runners bundling one companion tip into one file
+    # swapped each other's bytes, which the node's digest then refused.
+    bundles = loaded.archives / job["job_id"]
+    companions = export.export_companions(loaded.mirrors, bundles, source["companions"])
     run_cli.require_resources_free(loaded, plan)
     workers = admitted["workers"]
     return Prepared(

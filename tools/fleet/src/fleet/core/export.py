@@ -486,10 +486,10 @@ class PreparedCompanion(TypedDict):
 class CompanionExport(TypedDict):
     """One companion's bundle, ready to be staged beside an export.
 
-    Bytes and not a builder, unlike a project's payload: a companion's
-    bundle is named by its own commit rather than by the run, and it is
-    built where the ref is resolved -- before any lease is taken, so a ref
-    the remote does not serve refuses with nothing held.
+    Bytes and not a builder, unlike a project's payload: it is built where
+    the ref is resolved -- before any lease is taken, so a ref the remote
+    does not serve refuses with nothing held -- in the directory its caller
+    gives the claimed job alone (MCPs board task f9ee56aa).
 
     Attributes:
         directory: The declared directory it lands in on the node.

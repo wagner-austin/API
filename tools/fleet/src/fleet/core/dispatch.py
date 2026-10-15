@@ -453,6 +453,12 @@ def launch(
             ),
             now_unix=_test_hooks.now(),
         )
+        # Verified on the node, so like the archive above it has no reader
+        # left; kept, the hub held 169 bundles in 14 GB on 2026-10-15 (MCPs
+        # board task f9ee56aa). Its directory is the claimed job's alone.
+        companion["path"].unlink()
+    for bundles in {companion["path"].parent for companion in companions}:
+        bundles.rmdir()
 
     spoken = dialect.for_platform(node["platform"])
     remote.send_script(
