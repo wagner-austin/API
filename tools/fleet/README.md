@@ -1089,6 +1089,29 @@ passes, 6c81f413 among them, ran on diphtheria, whose linux toolchain builds
 it. The tag says so rather than letting a Windows node claim a check it
 cannot install.
 
+## A project that names its node: `node`
+
+A tag says what KIND of node a suite needs; a few suites need one particular
+host, because they read what only that host holds, and no tag singles a host
+out. The first were MCPs' served lanes (MCPs board task bf7a9460,
+2026-10-15): `MCPs/execution-served-diphtheria` and
+`MCPs/execution-served-colossus` each compare the files that host's own
+search container serves on `127.0.0.1:8090` with the commit's, and a run on
+any other node would read nothing. So a project may name its node:
+
+```json
+"MCPs/execution-served-colossus": {
+  "required_tags": ["linux", "cxx"], "node": "colossus", ...
+}
+```
+
+The key is optional and absent for every other project. The workspace
+refuses a name it does not declare, and a node whose `host` is another name,
+because `capacity.assess` matches the pin against the weighing node's host.
+Every other node refuses the project with `NODE_NOT_PINNED`, first, before
+its tags or capacity are weighed, so a runner is never offered it
+(`fitting_projects`) and nobody who submits the check has to name the node.
+
 ## The staged tree is made a git repository, and that is not decoration
 
 Ruff honours `.gitignore` and applies it **only inside a git repository**. A
