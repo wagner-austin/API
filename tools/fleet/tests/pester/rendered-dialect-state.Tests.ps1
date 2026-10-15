@@ -26,7 +26,7 @@ Describe 'The capacity probe' {
         # The reservations live under the node account's profile (MCPs board
         # task 84a2b690, fleet.core.reservations), so each case points
         # USERPROFILE at a profile under $TestDrive and puts it back.
-        function Invoke-ProbeWithReservations {
+        function Invoke-ReservedProbe {
             param([string]$ProfileDirectory, [hashtable]$Files)
             $held = Join-Path $ProfileDirectory '.fleet\reservations'
             [void][System.IO.Directory]::CreateDirectory($held)
@@ -43,7 +43,7 @@ Describe 'The capacity probe' {
         }
     }
     It 'reports free memory, free disk, logical cores and reserved cores, each as one key=value line' {
-        $said = @(Invoke-ProbeWithReservations (Join-Path $TestDrive 'none') @{})
+        $said = @(Invoke-ReservedProbe (Join-Path $TestDrive 'none') @{})
         $said.Count | Should -Be 4
         $said[0] | Should -Match '^free_ram_gb=[0-9,]+\.[0-9]{3}$'
         $said[1] | Should -Match '^free_disk_gb=[0-9,]+\.[0-9]{3}$'
@@ -63,7 +63,7 @@ Describe 'The capacity probe' {
         $said[-1] | Should -BeExactly 'reserved_cores=0'
     }
     It 'sums the cores of every live reservation and charges an expired one nothing' {
-        $said = @(Invoke-ProbeWithReservations (Join-Path $TestDrive 'held') @{
+        $said = @(Invoke-ReservedProbe (Join-Path $TestDrive 'held') @{
             'vm.reservation'    = "holder=vm smoke`ncores=4`n`nuntil_unix=99999999999`n"
             'build.reservation' = "holder=build`r`ncores=3`r`nuntil_unix=99999999999`r`n"
             'old.reservation'   = "holder=old`ncores=2`nuntil_unix=1`n"
@@ -79,7 +79,7 @@ Describe 'The capacity probe' {
     ) {
         param([string]$Text)
         $userProfile = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
-        $said = @(Invoke-ProbeWithReservations $userProfile @{ 'bad.reservation' = $Text })
+        $said = @(Invoke-ReservedProbe $userProfile @{ 'bad.reservation' = $Text })
         $said[-1] | Should -BeExactly "reservation_unreadable=$(Join-Path $userProfile '.fleet\reservations\bad.reservation')"
         ($said -match '^reserved_cores=').Count | Should -Be 0
     }

@@ -504,7 +504,13 @@ class TestForRealUnderSh:
         fields = fields_of(self.run_script(tmp_path, DIALECT.capacity_probe_script()))
         sliced = {"ci_slice_current_gb", "ci_slice_high_gb"} <= set(fields)
 
-        reported = {"free_ram_gb", "promised_ram_gb", "free_disk_gb", "logical_cores"}
+        reported = {
+            "free_ram_gb",
+            "promised_ram_gb",
+            "free_disk_gb",
+            "logical_cores",
+            "reserved_cores",
+        }
         assert set(fields) == reported | (
             {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
         )
@@ -514,6 +520,9 @@ class TestForRealUnderSh:
         assert re.fullmatch(r"-?\d+\.\d{3}", fields["free_ram_gb"])
         assert float(fields["free_disk_gb"]) > 0.0
         assert int(fields["logical_cores"]) >= 1
+        # Whatever the account's live reservations hold (MCPs board task
+        # 84a2b690): none on a CI runner, a VM smoke's cores on diphtheria.
+        assert fields["reserved_cores"].isdigit()
 
     def test_the_toolchain_probe_reports_every_tool(self, tmp_path: pathlib.Path) -> None:
         fields = fields_of(self.run_script(tmp_path, DIALECT.toolchain_probe_script()))
