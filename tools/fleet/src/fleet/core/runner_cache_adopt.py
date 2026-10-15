@@ -14,7 +14,7 @@ for all four at each), while the API, corvis-stick and tree-bot units, idle,
 took the cache at the first. So the restart is now the job of
 ``fleet-action-cache-adopt``, a root timer firing every minute: a unit whose
 configured environment holds the setting and whose running main process
-lacks it is restarted the first minute it is idle. Provision runs the same
+lacks it is restarted once it has been idle a while. Provision runs the same
 script once per unit right after it writes the drop-in, so an idle unit
 still takes the cache within the provision run.
 
@@ -24,8 +24,17 @@ never starts one), systemd's configured environment for it holds the
 setting (so a timer that runs before the drop-in exists, or after it is
 removed, restarts nothing, rather than restarting an idle unit every
 minute), its running main process lacks the setting, and no process in its
-cgroup is a ``Runner.Worker``. Once every unit reads the cache, each firing
-is two ``systemctl show`` calls and one read of ``/proc`` per unit.
+cgroup has been a ``Runner.Worker`` at any of the once-a-second samples
+across :data:`ADOPT_SETTLE_SECONDS`. Once every unit reads the cache, each
+firing is two ``systemctl show`` calls and one read of ``/proc`` per unit.
+
+IDLE MEANS IDLE FOR A WHILE, NOT AT ONE INSTANT. Between two jobs a busy
+runner holds no Worker for a moment while its listener takes the next job:
+on lavender-wsl-2, run 38741872057's audit job ended at 13:41:12Z and its
+packages/db-python job started at 13:41:14Z, with 54 jobs still queued. A
+restart in that moment would end the listener holding a job it had taken,
+so one sample is not enough. No such moment lasts
+:data:`ADOPT_SETTLE_SECONDS`, and an idle runner's always does.
 """
 
 from __future__ import annotations
@@ -46,21 +55,51 @@ ADOPT_PATH = "/usr/local/sbin/fleet-action-cache-adopt"
 ADOPT_SERVICE_NAME = "fleet-action-cache-adopt.service"
 ADOPT_TIMER_NAME = "fleet-action-cache-adopt.timer"
 
-#: The script. Its arguments are the units it may restart.
+#: Seconds a unit must hold no ``Runner.Worker``, sampled each second, before
+#: it is restarted: far longer than the 2 s between two jobs measured on
+#: lavender-wsl-2, and short enough that a provision run waits little.
+ADOPT_SETTLE_SECONDS = 15
+
+#: The script. Its arguments are the settle window and the units it may restart.
 ADOPT_SCRIPT = (
     r"""#!/usr/bin/env bash
 # fleet-action-cache-adopt -- rendered by fleet-runners (MCPs board task ce2b92e0).
 # Restarts each named runner unit that is configured with the action archive
-# cache but running without it, and only while no job runs in it.
-# Usage: fleet-action-cache-adopt UNIT...
+# cache but running without it, and only once no job has run in it for
+# SETTLE_SECONDS.
+# Usage: fleet-action-cache-adopt SETTLE_SECONDS UNIT...
 set -euo pipefail
-if [ $# -lt 1 ]; then
-    echo "fleet-action-cache-adopt: usage: fleet-action-cache-adopt UNIT..." >&2
+if [ $# -lt 2 ] || [[ ! $1 =~ ^[0-9]+$ ]]; then
+    echo "fleet-action-cache-adopt: usage: fleet-action-cache-adopt SETTLE_SECONDS UNIT..." >&2
     exit 2
 fi
+settle=$1
+shift
 """
     + f"setting={CACHE_VARIABLE}={WSL_CACHE_DIR}\n"
     + r"""
+# Whether the cgroup at CGROUP held no Runner.Worker at every sample, one a
+# second for $settle seconds: prints idle, busy or unreadable.
+settled() {
+    local procs pid second
+    for ((second = 0; second <= settle; second++)); do
+        if [ "$second" -gt 0 ]; then
+            sleep 1
+        fi
+        if ! procs=$(cat "/sys/fs/cgroup$1/cgroup.procs" 2>/dev/null); then
+            echo unreadable
+            return 0
+        fi
+        for pid in $procs; do
+            if grep -qs Runner.Worker "/proc/$pid/cmdline"; then
+                echo busy
+                return 0
+            fi
+        done
+    done
+    echo idle
+}
+
 # Each read is captured whole before it is matched: under pipefail, a grep -q
 # that stops at its first match can kill the writer feeding it, and the
 # pipeline would then read as no match.
@@ -78,29 +117,27 @@ for unit in "$@"; do
         continue
     fi
     cgroup=$(systemctl show -p ControlGroup --value "$unit")
-    if ! procs=$(cat "/sys/fs/cgroup$cgroup/cgroup.procs" 2>/dev/null); then
-        echo "fleet-action-cache-adopt: $unit left running: its cgroup" \
-            "/sys/fs/cgroup$cgroup cannot be read, so no job can be ruled out"
-        continue
-    fi
-    busy=no
-    for pid in $procs; do
-        if grep -qs Runner.Worker "/proc/$pid/cmdline"; then
-            busy=yes
-        fi
-    done
-    if [ "$busy" = no ]; then
-        systemctl restart "$unit"
-        echo "fleet-action-cache-adopt: $unit restarted while idle, to read the action cache"
-    else
-        echo "fleet-action-cache-adopt: $unit is running a job;" \
-            "$ADOPT_TIMER restarts it the first minute it is idle"
-    fi
+    case $(settled "$cgroup") in
+        idle)
+            systemctl restart "$unit"
+            echo "fleet-action-cache-adopt: $unit restarted after $settle s idle," \
+                "to read the action cache"
+            ;;
+        busy)
+            echo "fleet-action-cache-adopt: $unit is running a job;" \
+                "$ADOPT_TIMER restarts it once it is idle for $settle s"
+            ;;
+        unreadable)
+            echo "fleet-action-cache-adopt: $unit left running: its cgroup" \
+                "/sys/fs/cgroup$cgroup cannot be read, so no job can be ruled out"
+            ;;
+    esac
 done
 """
 ).replace("$ADOPT_TIMER", ADOPT_TIMER_NAME)
 
-#: Every minute, so a runner between two jobs of a busy hour is caught.
+#: Every minute, so a runner that goes idle is restarted within about a minute
+#: and its settle window.
 ADOPT_TIMER = """[Unit]
 Description=Restart a runner unit to read the action cache once it is idle
 
@@ -156,7 +193,7 @@ def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
             "",
             "[Service]",
             "Type=oneshot",
-            f"ExecStart={ADOPT_PATH} " + " ".join(units),
+            f"ExecStart={ADOPT_PATH} {ADOPT_SETTLE_SECONDS} " + " ".join(units),
         ]
     )
     return [
@@ -202,5 +239,5 @@ def render_cache_environment_lines(install: RunnerInstall) -> list[str]:
         f"    printf '{body}' > {path}",
         "    systemctl daemon-reload",
         "fi",
-        f"{ADOPT_PATH} {unit}",
+        f"{ADOPT_PATH} {ADOPT_SETTLE_SECONDS} {unit}",
     ]
