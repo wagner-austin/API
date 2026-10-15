@@ -18,11 +18,12 @@ from covenant_ml.markets.reporting import read_verified_market_report, write_mar
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
 from .test_baseline_audit import fitted_report
+from .test_boosting_model import training_rows
 
 
 def test_real_cli_replay_and_failing_process(tmp_path: Path) -> None:
     source = tmp_path / "source.json"
-    document = fitted_report(tmp_path)
+    document = fitted_report(tmp_path, training_rows())
     write_market_report(
         document,
         market_fingerprint(stand_in_pin(), config_test_hooks.get_env),
