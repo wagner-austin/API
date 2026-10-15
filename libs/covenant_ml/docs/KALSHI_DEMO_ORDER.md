@@ -62,6 +62,10 @@ inspection, and the local `status` timestamp identifies the last validated pass.
 
 ## Execution contract
 
+Future submissions also retain [validated quote and timing evidence](DEMO_SUBMISSION_EVIDENCE.md).
+The `evidence` action verifies those files locally. The completed October 13
+trial predates this recorder; its missing quote cannot be backfilled.
+
 `scripts.kalshi_demo_trial` connects the existing $1 order reservation policy to
 Kalshi's demo Create Order V2 endpoint. A trial submits at most one one-contract
 YES immediate-or-cancel order. It never selects the production origin and never
