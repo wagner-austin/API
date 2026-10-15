@@ -27,7 +27,14 @@ from fleet.contracts.source import (
     encode_project_source,
 )
 from fleet.core import _test_hooks, staging
-from tests._queue_fakes import DEFAULT_SHA, FakeEnv, FakeQueue, queue_env, queue_job
+from tests._queue_fakes import (
+    DEFAULT_JOB_ID,
+    DEFAULT_SHA,
+    FakeEnv,
+    FakeQueue,
+    queue_env,
+    queue_job,
+)
 from tests._registry import write_registry
 from tests._thread_fakes import in_order_executor
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
@@ -188,8 +195,9 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
     """Write the bundle a companion's ``git bundle create`` would have, where
     the tick reads it.
 
-    Named by the companion's own commit rather than by the run, which is the
-    name :func:`fleet.core.export.export_companions` writes.
+    Named by the companion's own commit, in the claimed job's own directory,
+    which is where :func:`fleet.cli.node_prepare.prepare` has
+    :func:`fleet.core.export.export_companions` write it.
 
     Args:
         config_path: The workspace document.
@@ -198,7 +206,9 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
         The bundle bytes.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    destination = loaded.archives / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
+    destination = (
+        loaded.archives / DEFAULT_JOB_ID / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
+    )
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = b"# v2 git bundle\n" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
     destination.write_bytes(payload)

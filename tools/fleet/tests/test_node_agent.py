@@ -42,7 +42,7 @@ from tests._node_agent_fixtures import (
     prebuilt_export,
     sourced_document,
 )
-from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
+from tests._queue_fakes import DEFAULT_JOB_ID, DEFAULT_SHA, FakeQueue, queue_job
 from tests._registry import write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok, stage_replies
@@ -209,6 +209,12 @@ class TestCompanions:
         assert runner.calls[base + 2][3] == "rev-parse"
         assert runner.calls[base + 3][3:5] == ("bundle", "create")
         assert runner.calls[base + 3][-1] == "refs/fleet/companion"
+        # Written in the claimed job's own directory, so no other runner's
+        # export of the same tip can replace it, and gone once staged.
+        bundles = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
+        bundle = bundles / DEFAULT_JOB_ID / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
+        assert runner.calls[base + 3][-2] == str(bundle)
+        assert not bundle.parent.exists()
         sent = [body or b"" for body in runner.stdin]
         assert _companion_commit_script().encode() in sent
 
