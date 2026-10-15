@@ -146,6 +146,10 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             # "no remote" rather than implying a remote nothing here would
             # fetch.
             source=None,
+            # NO PIN, SPELLED OUT: the project may run on any node; a pin
+            # names the one node a project reads something only it holds
+            # (MCPs board task bf7a9460).
+            node=None,
         )
     )
     # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board
