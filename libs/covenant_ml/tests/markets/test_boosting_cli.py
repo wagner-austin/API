@@ -23,11 +23,32 @@ from .test_calibration_evidence import _capture
 __all__ = ["api_server"]
 
 
-@pytest.mark.parametrize("study", ["fixed", "selection"])
 def test_actual_cli_and_replay_preserve_scores_and_models(
-    api_server: ApiServer, tmp_path: Path, study: str
+    api_server: ApiServer, tmp_path: Path
 ) -> None:
+    # Both studies consume the same immutable captured input. Exercise real HTTP
+    # acquisition once, while retaining every fit, replay and failure per study.
     source = _capture(api_server, tmp_path, date(2026, 5, 14), "2026-04-24")
+    original = source.read_bytes()
+    for study in ("fixed", "selection"):
+        destination = tmp_path / study
+        destination.mkdir()
+        _verify_study(api_server, source, destination, study)
+        assert source.read_bytes() == original
+
+
+def _verify_study(api_server: ApiServer, source: Path, tmp_path: Path, study: str) -> None:
+    """Exercise every CLI assertion for one study against shared real acquisition.
+
+    Args:
+        api_server: Real local HTTP origin and request ledger.
+        source: Immutable source report captured once for both studies.
+        tmp_path: Separate output directory for this study's artifacts.
+        study: Fixed fitting or chronological selection mode.
+
+    Raises:
+        AssertionError: Scores, model bytes, source integrity or refusals differ.
+    """
     protocol = tmp_path / "protocol.md"
     protocol.write_bytes(b"Frozen real-model integration experiment.\n")
     args = [
@@ -36,7 +57,7 @@ def test_actual_cli_and_replay_preserve_scores_and_models(
         "--report",
         str(source),
         "--markets-archive",
-        str(tmp_path / "markets"),
+        str(source.parent / "markets"),
         "--protocol",
         str(protocol),
         "--market-url",

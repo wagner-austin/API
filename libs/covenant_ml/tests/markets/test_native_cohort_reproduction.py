@@ -11,6 +11,7 @@ from datetime import datetime
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import urlencode
 from zipfile import ZipFile
 
 import pytest
@@ -119,9 +120,23 @@ def test_published_native_cohort_and_quotes_reproduce(tmp_path: Path) -> None:
         row = narrow_json_to_dict(value)
         assert large[require_str(row, "ticker")] == row
     verify_published_comparison(cohort, panels[0])
-    # Real corrupted evidence must fail, even with a valid published report beside it.
-    envelope_path = sorted((root / "raw").glob("*.json"))[0]
+    # Corrupt the first required response, not an arbitrary hash-sorted late page.
+    # The full valid replay above already verifies every response. Reconstructing
+    # whole families twice before reaching a failure adds no failure evidence.
+    query = urlencode(
+        sorted(
+            {
+                "series_ticker": min(series),
+                "min_close_ts": start - 1,
+                "max_close_ts": end,
+                "limit": 1000,
+            }.items()
+        )
+    )
+    request = ORIGIN + "/markets?" + query
+    envelope_path = root / "raw" / (sha256(request.encode("utf-8")).hexdigest() + ".json")
     envelope = read_document(envelope_path)
+    assert envelope["url"] == request
     envelope["body"] = "{}"
     envelope_path.write_text(dump_json_str(envelope), encoding="utf-8")
     reader, client = build_collector(root / "raw", ORIGIN, AcquisitionMode.REPLAY)
@@ -129,5 +144,6 @@ def test_published_native_cohort_and_quotes_reproduce(tmp_path: Path) -> None:
         collect_event_cohort(reader, series, start, end)
     envelope_path.unlink()
     reader, client = build_collector(root / "raw", ORIGIN, AcquisitionMode.REPLAY)
-    with closing(client), pytest.raises(FileNotFoundError):
+    with closing(client), pytest.raises(FileNotFoundError) as missing:
         collect_event_cohort(reader, series, start, end)
+    assert str(missing.value) == f"[Errno 2] No such file or directory: {str(envelope_path)!r}"
