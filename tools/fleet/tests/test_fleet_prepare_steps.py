@@ -51,8 +51,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # check (MCPs board task 2ce5fc24); 55 since MCPs/dx-mod was archived
     # (MCPs board task 5d8b114b); 57 since MCPs/packages/wiki-check and
     # MCPs/brief-generator, which end with the peer-wikis phase (MCPs board
-    # task b1089284).
-    assert len(prepared) == 57
+    # task b1089284); 58 since MCPs/print-mcp, the hub's print tools (MCPs
+    # board task 9896d6b2).
+    assert len(prepared) == 58
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
