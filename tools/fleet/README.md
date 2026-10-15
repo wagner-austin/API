@@ -770,6 +770,23 @@ diphtheria's `reserved_ram_gb` is 2.0: 15.3 GB available, 10.3 promised and
 2.0 reserved left 3.0 GB, enough for `idle/execution`'s 2.0 GB worker. A node
 with no capped container reads the same `MemAvailable` it always did.
 
+**What a stack host's compose caps leave is summed in MCPs, not discovered
+here** (MCPs board task 8d3e4b16). The probe is live, so a cap or a replica
+a compose change adds shows up only as a node that quietly claims nothing:
+on 2026-10-15 a fifth doc-extract replica took diphtheria to -0.47 GB free
+and 214 jobs had gone unclaimed and been cancelled by hand in two weeks.
+MCPs' `host-memory-budget.test.ts` now predicts this probe's reading for the
+caps its compose files declare, from `scripts/fleet/host-memory.json`
+(`make host-memory-measure API_ROOT=<this repo>` there), and fails when a
+stack host would leave less than its `reserved_ram_gb` plus the smallest
+project pinned to it. colossus's `reserved_ram_gb` is 1.5 since that day: its
+6.0 held memory for `glimmer.service` and a desktop session, the operator
+stopped glimmer and ruled colossus a server, and 2.1 GB free beside the OCR
+service's 13 GB cap then fits 1.5 plus `MCPs/execution-served-colossus`'s
+0.5. Its `reserved_cores` fell from 8 to 4 the same day for the same reason:
+four were glimmer's and the desktop's (aa8a6d0e1), four the OCR service's two
+torch processes at `OMP_NUM_THREADS=4` (3f384639a), which stay.
+
 **How many runs a node holds is live, not declared** (MCPs board task
 939ec5c7). Every node used to declare `max_concurrent_runs`, and every node
 declared 1: on 2026-10-02 thirteen jobs queued behind four running while the
