@@ -16,6 +16,7 @@ from __future__ import annotations
 from ci_wake.enrolment import PushAttempt
 from ci_wake.runs import WorkflowRun
 from ci_wake.verdicts import (
+    COVER_SECONDS,
     CREATION_SETTLE_SECONDS,
     NO_RUN_SECONDS,
     STALL_SECONDS,
@@ -174,8 +175,18 @@ class TestSuperseded:
 
 
 class TestAwaitingCover:
-    def test_inside_the_stall_horizon_it_waits(self) -> None:
-        assert awaits_cover(_attempt(), PUSHED_AT + STALL_SECONDS - 1) is True
+    def test_inside_the_cover_horizon_it_waits(self) -> None:
+        assert awaits_cover(_attempt(), PUSHED_AT + COVER_SECONDS - 1) is True
 
-    def test_at_the_stall_horizon_it_is_announced_as_its_own_runs(self) -> None:
-        assert awaits_cover(_attempt(), PUSHED_AT + STALL_SECONDS) is False
+    def test_past_the_stall_horizon_it_still_waits(self) -> None:
+        """Its cover is created up to one running run after it and then runs
+        itself, so the wait is two runs; at three hours a push measured on
+        2026-10-15 would have been called NOT RUN with its cover executing."""
+        assert awaits_cover(_attempt(), PUSHED_AT + STALL_SECONDS) is True
+
+    def test_at_the_cover_horizon_it_is_announced_as_its_own_runs(self) -> None:
+        assert awaits_cover(_attempt(), PUSHED_AT + COVER_SECONDS) is False
+
+    def test_the_cover_horizon_spans_two_of_the_slowest_measured_runs(self) -> None:
+        """140 minutes was the slowest of 60 completed MCPs Check runs."""
+        assert COVER_SECONDS >= 2 * 140 * 60

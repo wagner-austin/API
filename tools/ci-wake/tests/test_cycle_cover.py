@@ -22,7 +22,7 @@ from ci_wake.cycle import run_cycle
 from ci_wake.enrolment import PushAttempt, append_attempt
 from ci_wake.position import position_path
 from ci_wake.runs import jobs_argv, runs_argv
-from ci_wake.verdicts import STALL_SECONDS
+from ci_wake.verdicts import COVER_SECONDS
 from tests.conftest import (
     AGENT,
     CONFIGURED_ENV,
@@ -233,7 +233,7 @@ class TestASupersededPushWithNoCoverYet:
     ) -> None:
         pin_env(CONFIGURED_ENV)
         enrolment = tmp_path / "pushes.jsonl"
-        ago = STALL_SECONDS + 60
+        ago = COVER_SECONDS + 60
         _enrol(enrolment, ago=ago)
         _test_hooks.run_process = FakeGh(
             {

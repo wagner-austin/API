@@ -26,7 +26,7 @@ silent as a bridge that is switched off:
              (:mod:`ci_wake.coverage`, MCPs board task 5af9e749). Decided by
              the cycle, which alone can ask for job counts and ancestry; a
              superseded push with no covering run yet stays ``holding`` until
-             :data:`STALL_SECONDS`, then is announced ripe and NOT RUN.
+             :data:`COVER_SECONDS`, then is announced ripe and NOT RUN.
 
 THE SETTLE WINDOW IS ABOUT RUN CREATION, NOT RUN COMPLETION. A repository
 with several workflows creates them within seconds of a push, but not in the
@@ -79,6 +79,17 @@ NO_RUN_SECONDS: Final = 900
 #: that ended by exhausting the host's memory, 2026-09-09 -- so the horizon
 #: is well clear of a slow run and well inside a wedged one.
 STALL_SECONDS: Final = 10800
+
+#: How long a push whose own runs were all cancelled before any job waits for
+#: the later run that covers it (:mod:`ci_wake.coverage`) before it is
+#: announced NOT RUN. Six hours, because the wait is two runs, not one: the
+#: covering run is created by a push at most one running run after this one,
+#: and then runs itself. Measured on MCPs main 2026-10-15 (board task
+#: 5af9e749), the slowest of the last 60 completed Check runs took 140
+#: minutes from creation to finish, so the worst wait is about 280 minutes;
+#: :data:`STALL_SECONDS` would have announced a push NOT RUN while its cover
+#: was still executing.
+COVER_SECONDS: Final = 21600
 
 
 class PushVerdict(TypedDict):
@@ -151,10 +162,10 @@ def awaits_cover(attempt: PushAttempt, now_epoch: int) -> bool:
         now_epoch: Unix seconds, supplied by the caller.
 
     Returns:
-        True inside :data:`STALL_SECONDS` of the push; after it, the push is
+        True inside :data:`COVER_SECONDS` of the push; after it, the push is
         announced as not run, which is what a push no later run reached is.
     """
-    return now_epoch - attempt["attempted_unix"] < STALL_SECONDS
+    return now_epoch - attempt["attempted_unix"] < COVER_SECONDS
 
 
 def is_announceable(verdict: PushVerdict) -> bool:
@@ -174,6 +185,7 @@ def is_announceable(verdict: PushVerdict) -> bool:
 
 
 __all__ = [
+    "COVER_SECONDS",
     "CREATION_SETTLE_SECONDS",
     "NO_RUN_SECONDS",
     "STALL_SECONDS",

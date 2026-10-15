@@ -96,7 +96,7 @@ conclusion, jobs and URL, naming the run and the head it checked. Over 15
 hours on 2026-10-14 to 15, 50 of 60 runs on MCPs main were such
 cancellations, and every one was announced NOT RUN to its pusher while the
 run that checked it was announced to nobody. Only a push no covering run
-reaches within :data:`STALL_SECONDS` is still announced NOT RUN.
+reaches within :data:`ci_wake.verdicts.COVER_SECONDS` is still announced NOT RUN.
 
 FAILURES ARE NOT SOFTENED AND ARE NAMED. A post that said "failure" without
 saying which jobs would send its reader to the run page to learn the thing

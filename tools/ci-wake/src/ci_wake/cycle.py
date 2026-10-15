@@ -125,7 +125,7 @@ def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushR
 
     A push whose every own run was cancelled before any job waits for the
     later run that checked it (:mod:`ci_wake.coverage`) and is announced
-    with that run's verdict; only past :data:`STALL_SECONDS` with none is it
+    with that run's verdict; only past :data:`COVER_SECONDS` with none is it
     announced as its own cancelled runs.
 
     Args:
