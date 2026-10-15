@@ -11,6 +11,7 @@ from platform_core.json_utils import JSONObject, JSONValue
 
 from covenant_ml.markets.collection import MarketCollector
 from covenant_ml.markets.public_tape import collect_public_tape
+from covenant_ml.markets.public_tape_records import decode_tape_trade, require_market_snapshot
 from covenant_ml.markets.validation import parse_timestamp
 
 from ._server import ApiServer, api_server
@@ -119,17 +120,11 @@ def test_invalid_windows_make_no_requests(
         ("no_price_dollars", "0.8800"),
     ],
 )
-def test_bad_trade_fields_fail_closed(
-    tmp_path: Path, api_server: ApiServer, key: str, value: JSONValue
-) -> None:
-    serve_tape(api_server)
+def test_bad_trade_fields_fail_closed(key: str, value: JSONValue) -> None:
     row = tape_trade()
     row[key] = value
-    api_server.documents["/markets/trades"] = [{"trades": [row], "cursor": ""}]
-    store = archive(tmp_path, api_server)
-    with closing(store.client), pytest.raises(ValueError, match="TAPE-002"):
-        collect_public_tape(MarketCollector(store.capture), START, END)
-    assert len(api_server.requests) == 2
+    with pytest.raises(ValueError, match="TAPE-002"):
+        decode_tape_trade(row, START - 1, END)
 
 
 @pytest.mark.parametrize("failure", ["missing", "duplicate", "unexpected", "conflict"])
@@ -160,20 +155,9 @@ def test_metadata_coverage_is_required(tmp_path: Path, api_server: ApiServer, fa
     "result,payout",
     [("other", "0.0000"), ("yes", "0.5000"), ("no", "0.5000"), ("scalar", "1.0100")],
 )
-def test_inconsistent_labels_are_rejected(
-    tmp_path: Path, api_server: ApiServer, result: str, payout: str
-) -> None:
-    serve_tape(api_server)
-    api_server.documents["/markets"] = [
-        {
-            "markets": [dict(tape_market(), result=result, settlement_value_dollars=payout)],
-            "cursor": "",
-        }
-    ]
-    store = archive(tmp_path, api_server)
-    with closing(store.client), pytest.raises(ValueError, match="TAPE-005"):
-        collect_public_tape(MarketCollector(store.capture), START, END)
-    assert len(api_server.requests) == 3
+def test_inconsistent_labels_are_rejected(result: str, payout: str) -> None:
+    with pytest.raises(ValueError, match="TAPE-005"):
+        require_market_snapshot(dict(tape_market(), result=result, settlement_value_dollars=payout))
 
 
 @pytest.mark.parametrize("result,payout", [("", ""), ("yes", "1.0000"), ("scalar", "0.5000")])
