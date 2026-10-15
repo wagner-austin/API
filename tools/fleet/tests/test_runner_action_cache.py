@@ -232,8 +232,16 @@ class Fill:
         )
 
 
-def _summary(examined: int, workdirs: int, cached: int, held: int, failed: int, pruned: int) -> str:
-    """The fill's last line.
+def _summary(
+    examined: int,
+    workdirs: int,
+    cached: int,
+    held: int,
+    failed: int,
+    pruned: int,
+    archive_format: str = "tar.gz",
+) -> str:
+    """One pass's last line, into the cases' ``cache``.
 
     Args:
         examined: References read.
@@ -242,14 +250,15 @@ def _summary(examined: int, workdirs: int, cached: int, held: int, failed: int, 
         held: Archives already there.
         failed: References that resolved to nothing or failed to fetch.
         pruned: Archives removed.
+        archive_format: The pass's format.
 
     Returns:
         The line, with its newline.
     """
     return (
-        f"fleet-action-cache-fill: {examined} action reference(s) in the checkouts of "
-        f"{workdirs} workdir(s): {cached} cached now, {held} already held, {failed} failed; "
-        f"{pruned} unnamed for {runner_action_cache.PRUNE_DAYS} days removed\n"
+        f"fleet-action-cache-fill: {archive_format} into cache: {examined} action reference(s) "
+        f"in the checkouts of {workdirs} workdir(s): {cached} cached now, {held} already held, "
+        f"{failed} failed; {pruned} unnamed for {runner_action_cache.PRUNE_DAYS} days removed\n"
     )
 
 
@@ -385,15 +394,40 @@ class TestTheFillRunsForReal:
         assert ran.stdout == _summary(0, 1, 0, 0, 0, 0)
         assert host.archives() == [f"actions_checkout/{CHECKOUT_SHA}.tar.gz"]
 
-    @pytest.mark.parametrize("arguments", [("tar.gz", "cache"), ("tar", "cache", "one")])
-    def test_a_short_or_unknown_call_is_refused_with_its_usage(
+    def test_a_failed_pass_does_not_stop_the_next_and_fails_the_fill(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # lavender's first run, 2026-10-15T12:41Z: codeload refused one
+        # archive, and the Windows pass, a second ExecStart, never ran.
+        host = Fill(tmp_path)
+        host.checkout("one", "MCPs", "steps:\n  - uses: nobody/gone@v1\n", None)
+        host.checkout("win", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
+        ran = host.run("tar.gz", "cache", "one", "--", "zip", "cache", "win")
+        assert ran.returncode == 1
+        assert ran.stdout.splitlines()[1] == _summary(1, 1, 0, 0, 1, 0).rstrip("\n")
+        assert ran.stdout.endswith(_summary(1, 1, 1, 0, 0, 0, "zip"))
+        assert host.archives() == [f"actions_checkout/{CHECKOUT_SHA}.zip"]
+
+    @pytest.mark.parametrize(
+        "arguments",
+        [
+            ("tar.gz", "cache"),
+            ("tar", "cache", "one"),
+            ("tar.gz", "cache", "one", "--", "zip", "cache"),
+        ],
+    )
+    def test_a_short_or_unknown_pass_is_refused_with_its_usage_before_any_runs(
         self, tmp_path: pathlib.Path, arguments: tuple[str, ...]
     ) -> None:
-        ran = Fill(tmp_path).run(*arguments)
+        host = Fill(tmp_path)
+        host.checkout("one", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
+        ran = host.run(*arguments)
         assert ran.returncode == 2
         assert ran.stderr == (
-            "fleet-action-cache-fill: usage: fleet-action-cache-fill tar.gz|zip CACHE WORKDIR...\n"
+            "fleet-action-cache-fill: usage: fleet-action-cache-fill tar.gz|zip CACHE WORKDIR... "
+            "[-- tar.gz|zip CACHE WORKDIR...]...\n"
         )
+        assert host.fetched() == []
 
 
 class TestTheFillUnits:
@@ -416,11 +450,10 @@ class TestTheFillUnits:
                 ]
             )
         )
-        assert service.splitlines()[-2:] == [
+        assert [line for line in service.splitlines() if line.startswith("ExecStart=")] == [
             "ExecStart=/usr/local/sbin/fleet-action-cache-fill tar.gz /var/cache/fleet-actions "
-            "/home/gharunner/r/_work /home/gharunner/a/_work",
-            "ExecStart=/usr/local/sbin/fleet-action-cache-fill zip /mnt/c/fleet/action-cache "
-            "/mnt/c/actions-runner/_work",
+            "/home/gharunner/r/_work /home/gharunner/a/_work -- "
+            "zip /mnt/c/fleet/action-cache /mnt/c/actions-runner/_work",
         ]
 
     def test_a_host_with_one_side_runs_one_pass(self) -> None:
@@ -451,7 +484,7 @@ class TestTheFillUnits:
             "systemctl enable --now fleet-action-cache-fill.timer",
             "systemctl start --no-block fleet-action-cache-fill.service",
         ]
-        assert "OnUnitActiveSec=1h" in runner_action_cache.FILL_TIMER
+        assert "OnUnitActiveSec=15min" in runner_action_cache.FILL_TIMER
 
 
 class Unit:
