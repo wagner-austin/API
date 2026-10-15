@@ -10,8 +10,9 @@
 .PARAMETER ProjectRoot
     services\grandma-api, relative to the current location, where make runs
     this. Not a default naming $PSScriptRoot, which is empty in an advanced
-    script's param default under -File in Windows PowerShell 5.1 (API
-    tools/fleet/scripts/register-agent-schedule.ps1 carries the incident).
+    script's param default under -File in Windows PowerShell 5.1: every
+    scheduled API fleet tick failed on it on 2026-09-27 (MCPs board task
+    d69786fa).
 .PARAMETER ApiPort
     The API's port when PORT is set neither in .env nor in the caller's
     environment, as stop.ps1 takes it. A parameter so the suite reads that
