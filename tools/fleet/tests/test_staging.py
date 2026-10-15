@@ -226,6 +226,8 @@ class TestStage:
         # scripts read.
         assert runner.calls[4] == _scp("lavender", f"{staged}/{names.ARCHIVE_NAME}")
         assert runner.stdin[4] is None
+        # Its deadline is the payload's, not the short commands' flat 120 s.
+        assert runner.timeouts[4] == remote.send_deadline_seconds(len(payload)) == 121
         assert runner.stdin[5] == dialect_windows.WindowsDialect().digest_script(staged).encode(
             "utf-8"
         )

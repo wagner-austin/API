@@ -437,6 +437,23 @@ class TestRemote:
             assert options["ConnectTimeout"] == "10"
         assert runner.timeouts == [remote.SSH_TIMEOUT_SECONDS] * 2 == [120, 120]
 
+    def test_a_copy_has_the_deadline_its_size_takes_at_the_floor_rate(self) -> None:
+        """A flat two minutes cut the hub's 240 MB companion bundle on loki,
+        which copies at about 2 MB/s (fleet job 851300a6, MCPs board task
+        bfe2b3da), so a copy's deadline grows with the file."""
+        runner = FakeRun([ok(""), ok("")])
+        _test_hooks.run = runner
+
+        remote.send_file("loki", pathlib.Path("/hub/a.tgz"), "/stage/a.tgz", size_bytes=13)
+        remote.send_file(
+            "loki", pathlib.Path("/hub/b.bundle"), "/stage/b.bundle", size_bytes=239_780_392
+        )
+
+        # 13 bytes take one second at the floor rate, the bundle 458 (457.3);
+        # at loki's measured rate the bundle copies in about 115 s of its 578.
+        assert runner.timeouts == [121, 578]
+        assert remote.send_deadline_seconds(0) == remote.SSH_TIMEOUT_SECONDS
+
     def test_a_peer_that_stops_answering_is_unreachable_with_the_elapsed_seconds(self) -> None:
         _test_hooks.run = FakeRun([timed_out(120)])
 
