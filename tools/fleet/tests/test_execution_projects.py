@@ -125,6 +125,33 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     )
 
 
+def test_the_served_lane_marks_its_export_and_holds_nothing_exclusive() -> None:
+    """MCPs/execution-served reads what https://search.austinwagner.org serves.
+
+    Its last install step writes the marker that makes the execution
+    workspace collect tests/served alone (MCPs board task b456a3cb), the case
+    an audit criterion about the public site is checked by. It holds no test
+    database and no companion: it reads the export's own search files and the
+    public site, which any Linux node reaches, so it takes the npm workspace
+    build's tags and nothing more.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "MCPs/execution-served")
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.CXX)
+    assert project["exclusive_resources"] == ()
+    prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=(
+            InstallStep(phase="install", argv=(*prepare, "install")),
+            InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(phase="served-lane", argv=(*prepare, "served-lane")),
+        ),
+        companions=(),
+    )
+
+
 def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
     """clients/TankpitBot's live demo case lands on a Windows node with ffmpeg.
 

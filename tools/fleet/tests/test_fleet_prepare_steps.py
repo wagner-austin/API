@@ -52,8 +52,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # (MCPs board task 5d8b114b); 57 since MCPs/packages/wiki-check and
     # MCPs/brief-generator, which end with the peer-wikis phase (MCPs board
     # task b1089284); 58 since MCPs/print-mcp, the hub's print tools (MCPs
-    # board task 9896d6b2).
-    assert len(prepared) == 58
+    # board task 9896d6b2); 59 since MCPs/execution-served, the execution
+    # suite's served lane (MCPs board task b456a3cb).
+    assert len(prepared) == 59
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -100,6 +101,26 @@ def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
         assert {"irvine-civic-wiki", "bookshelf", "chau"} <= {
             companion["directory"] for companion in source["companions"]
         }
+
+
+def test_a_served_lane_step_runs_last_and_only_for_the_served_project() -> None:
+    """MCPs fleet-prepare's served-lane phase writes the marker that makes the
+    execution workspace collect tests/served alone (MCPs board task b456a3cb).
+    Those cases read the public site, so no project a deploy waits on may
+    carry the step, and it must follow install and workspace-build, which
+    store the tree's untracked files for the node's next row."""
+    marking = {
+        name: steps
+        for name, steps in _steps().items()
+        if any(step["argv"][4:] == ("served-lane",) for step in steps)
+    }
+
+    assert sorted(marking) == ["MCPs/execution-served"]
+    assert [step["phase"] for step in marking["MCPs/execution-served"]] == [
+        "install",
+        "workspace-build",
+        "served-lane",
+    ]
 
 
 def test_each_prepare_step_names_the_directory_an_older_commit_lacks() -> None:
