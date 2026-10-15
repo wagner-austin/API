@@ -79,7 +79,7 @@ def require_warning_fold(fold: WarningFold, as_of_ms: int) -> None:
 
     Raises:
         ValueError: Existing WARN-008/009 partition validation errors propagate;
-            WARN-024 rejects inconsistent first-breach evidence before fitting.
+            WARN-024 rejects inconsistent evidence; WARN-030 rejects borrower re-entry.
     """
     require_warning_split(fold["fitting"], fold["calibration"], as_of_ms)
     require_warning_split((*fold["fitting"], *fold["calibration"]), fold["validation"], as_of_ms)

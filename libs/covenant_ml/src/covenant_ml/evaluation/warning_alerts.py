@@ -133,7 +133,7 @@ def _exposure_and_events(rows: Sequence[WarningRow]) -> tuple[int, dict[str, int
         tuple[int, dict[str, int]]: At-risk borrower milliseconds and incident times.
 
     Raises:
-        ValueError: WARN-024 for conflicting or contradictory breach evidence.
+        ValueError: WARN-024 for conflicting evidence; WARN-030 for borrower re-entry.
     """
     incidents = require_warning_history(rows)
     histories: dict[str, list[WarningRow]] = {}

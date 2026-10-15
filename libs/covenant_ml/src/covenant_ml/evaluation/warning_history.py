@@ -20,22 +20,26 @@ def require_warning_history(rows: Sequence[WarningRow]) -> dict[str, int]:
 
     Raises:
         ValueError: WARN-024 for conflicting first-breach dates or event-free
-            surveillance extending through a known breach. Conflicting revisions
-            require source adjudication before fitting, not automatic selection.
+            surveillance covering a known breach; WARN-030 for observation restarting
+            after a known breach, outside this first-incident study. Conflicting
+            revisions require source adjudication, not automatic selection.
     """
     incidents: dict[str, int] = {}
     for row in rows:
         borrower = row["disclosure"]["borrower"]
         breach = row["followup"]["first_breach_ms"]
         if breach is not None:
-            if borrower in incidents and incidents[borrower] != breach:
-                raise ValueError("[WARN-024] a borrower has conflicting first-breach dates")
-            incidents[borrower] = breach
+            incidents[borrower] = min(incidents.get(borrower, breach), breach)
     for row in rows:
         breach = incidents.get(row["disclosure"]["borrower"])
+        reported = row["followup"]["first_breach_ms"]
+        if breach is not None and row["followup"]["coverage_start_ms"] > breach:
+            raise ValueError("[WARN-030] borrower re-entry after a known breach is unsupported")
+        if reported is not None and reported != breach:
+            raise ValueError("[WARN-024] a borrower has conflicting first-breach dates")
         if (
             breach is not None
-            and row["followup"]["first_breach_ms"] is None
+            and reported is None
             and row["followup"]["observed_through_ms"] >= breach
         ):
             raise ValueError("[WARN-024] event-free surveillance contradicts a known breach")
