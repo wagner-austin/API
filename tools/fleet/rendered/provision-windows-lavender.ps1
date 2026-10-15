@@ -19,6 +19,8 @@ param(
     [scriptblock]$GetService = { param([string]$Name) @(Get-CimInstance Win32_Service -Filter "Name='$Name'") },
     [scriptblock]$StopService = { param([string]$Name) Stop-Service -Name $Name },
     [scriptblock]$StartService = { param([string]$Name) Start-Service -Name $Name },
+    [string]$ServicesKey = 'HKLM:\SYSTEM\CurrentControlSet\Services',
+    [scriptblock]$GetWorkers = { param([string]$Directory) @(Get-CimInstance Win32_Process -Filter "Name='Runner.Worker.exe'" | Where-Object { [string]$_.ExecutablePath -like ($Directory + '\*') }) },
     [string]$Sc = "$env:SystemRoot\System32\sc.exe"
 )
 Set-StrictMode -Version Latest
@@ -92,6 +94,23 @@ foreach ($Install in $Installs) {
     if ($State -ne 'Running') {
         & $StartService $ServiceName
         Write-Output ('started ' + $ServiceName)
+    }
+    $ServiceKey = Join-Path $ServicesKey $ServiceName
+    $Held = @()
+    $Value = (Get-ItemProperty -LiteralPath $ServiceKey).PSObject.Properties['Environment']
+    if ($null -ne $Value) {
+        $Held = @($Value.Value)
+    }
+    if ($Held -notcontains 'ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=C:\fleet\action-cache') {
+        if (@(& $GetWorkers $Directory).Count -eq 0) {
+            $Kept = @($Held | Where-Object { $_ -notlike 'ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=*' })
+            New-ItemProperty -LiteralPath $ServiceKey -Name Environment -PropertyType MultiString -Value ([string[]]($Kept + 'ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=C:\fleet\action-cache')) -Force | Out-Null
+            & $StopService $ServiceName
+            & $StartService $ServiceName
+            Write-Output ('action cache set for ' + $ServiceName + ': restarted while idle')
+        } else {
+            Write-Output ('action cache not yet set for ' + $ServiceName + ': it is running a job; run provision again to set it')
+        }
     }
     $ToolDir = Join-Path $Workdir '_tool'
     foreach ($Version in @($Install.Python)) {

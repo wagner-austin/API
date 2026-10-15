@@ -39,6 +39,7 @@ from fleet.core.runner_account import (
     render_service_account_lines,
     render_service_running_lines,
 )
+from fleet.core.runner_action_cache import render_windows_cache_environment_lines
 from fleet.core.runner_install import RUNNER_VERSION, install_root_for, token_variable
 from fleet.core.runner_keepalive import render_keepalive_lines, render_keepalive_parameters
 from fleet.core.runner_recovery import render_windows_recovery_lines
@@ -166,6 +167,12 @@ def _install_parameters(installs: list[RunnerInstall], tokens: Mapping[str, str]
         "@(Get-CimInstance Win32_Service -Filter \"Name='$Name'\") },",
         "    [scriptblock]$StopService = { param([string]$Name) Stop-Service -Name $Name },",
         "    [scriptblock]$StartService = { param([string]$Name) Start-Service -Name $Name },",
+        # Where each service's Environment value lives, and the install's
+        # running job Workers (MCPs board task ce2b92e0, runner_action_cache).
+        "    [string]$ServicesKey = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services',",
+        "    [scriptblock]$GetWorkers = { param([string]$Directory) "
+        "@(Get-CimInstance Win32_Process -Filter \"Name='Runner.Worker.exe'\" | "
+        "Where-Object { [string]$_.ExecutablePath -like ($Directory + '\\*') }) },",
         "    " + system32_parameter("Sc", "sc.exe"),
     ]
 
@@ -227,6 +234,7 @@ def render_windows_install_lines() -> list[str]:
         *(f"    {line}" for line in render_service_account_lines()),
         *(f"    {line}" for line in render_windows_recovery_lines()),
         *(f"    {line}" for line in render_service_running_lines()),
+        *(f"    {line}" for line in render_windows_cache_environment_lines()),
         *(f"    {line}" for line in _python_toolcache_lines()),
         "}",
     ]
