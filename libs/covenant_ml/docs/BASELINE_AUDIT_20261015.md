@@ -70,3 +70,24 @@ zero profit is not a competing executable strategy's measured return.
 The earlier reports' arithmetic survives this audit. The claim that their
 small positive logistic return establishes an edge does not. The frozen
 prospective study remains unchanged and requires its planned outcomes.
+
+## Independent test correction
+
+The first arithmetic test had the same contract count on every date, so its
+row mean could not distinguish equal-date weighting from contract weighting.
+The independent audit correctly identified that test gap. A new regression
+uses 35 synthetic held-out observations across 20 dates: five dates have one
+contract and fifteen have two. Its equal-date and per-contract mean differences
+differ by more than 0.01. The test independently computes each daily difference,
+its standard error and its Student-t interval, and checks the preserved policy
+accounting for every arm. These are test inputs, not additional market results.
+
+The new test passed with the real implementation. Temporarily replacing daily
+aggregation with per-contract input made that same test fail, reporting 35
+values where 20 date means were required. The implementation was restored;
+no scoring or model code change remains. Negative-control output is preserved
+in `files/baseline-unequal-weight-mutation-20261015.log`. The complete final
+check is recorded in `files/baseline-unequal-weight-check-20261015.log`.
+That check passed 4,193 tests, strict typing and all guards, with 100% statement
+and branch coverage. The earlier historical scores and source artifacts remain
+unchanged; this correction strengthens verification, not measured model skill.
