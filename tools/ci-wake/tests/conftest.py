@@ -37,7 +37,8 @@ from platform_core.config import config_test_hooks
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from ci_wake import _test_hooks
-from ci_wake.announce import PushReport, RunReport, announcements
+from ci_wake.announce import CoverReport, PushReport, RunReport, announcements
+from ci_wake.coverage import BranchRun
 from ci_wake.enrolment import PushAttempt
 from ci_wake.identity import TASK_ID_VARIABLE
 from ci_wake.runs import JobOutcome, JobTally, WorkflowRun
@@ -320,8 +321,9 @@ def make_tally(
 def make_report(
     *,
     attempt: PushAttempt | None = None,
-    state: Literal["holding", "ripe", "abandoned", "stalled"] = "ripe",
+    state: Literal["holding", "ripe", "abandoned", "stalled", "covered"] = "ripe",
     runs: tuple[tuple[WorkflowRun, JobTally], ...] = (),
+    covers: tuple[tuple[BranchRun, JobTally], ...] = (),
 ) -> PushReport:
     """Build one decided push.
 
@@ -329,6 +331,7 @@ def make_report(
         attempt: The enrolment row; a default one when omitted.
         state: The state this cycle put it in.
         runs: Each run paired with its job tally.
+        covers: For a ``covered`` push, each covering run with its tally.
 
     Returns:
         The report.
@@ -337,6 +340,7 @@ def make_report(
     return PushReport(
         verdict=PushVerdict(attempt=row, runs=tuple(run for run, _ in runs), state=state),
         reports=tuple(RunReport(run=run, tally=tally) for run, tally in runs),
+        covers=tuple(CoverReport(cover=cover, tally=tally) for cover, tally in covers),
     )
 
 

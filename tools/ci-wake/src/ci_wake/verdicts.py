@@ -1,6 +1,6 @@
 """When an enrolled push has an answer worth waking somebody for.
 
-FOUR STATES, AND THREE OF THEM ARE ANNOUNCED. The obvious one -- every run
+FIVE STATES, AND FOUR OF THEM ARE ANNOUNCED. The obvious one -- every run
 finished -- is the least interesting to get right, because it announces
 itself. The other two announced states exist because this bridge's failure
 mode is silence, and a push that never produces a verdict is exactly as
@@ -21,6 +21,12 @@ silent as a bridge that is switched off:
   stalled    runs exist, some have not finished, and far too long has
              passed. A wedged runner, a job the host ran out of memory
              under, a queue nobody is draining.
+  covered    every run of its own was cancelled before any job, and a later
+             completed run whose head descends from it gave the verdict
+             (:mod:`ci_wake.coverage`, MCPs board task 5af9e749). Decided by
+             the cycle, which alone can ask for job counts and ancestry; a
+             superseded push with no covering run yet stays ``holding`` until
+             :data:`STALL_SECONDS`, then is announced ripe and NOT RUN.
 
 THE SETTLE WINDOW IS ABOUT RUN CREATION, NOT RUN COMPLETION. A repository
 with several workflows creates them within seconds of a push, but not in the
@@ -54,7 +60,7 @@ from typing import Final, Literal
 from typing_extensions import TypedDict
 
 from ci_wake.enrolment import PushAttempt
-from ci_wake.runs import WorkflowRun, is_terminal
+from ci_wake.runs import CANCELLED, WorkflowRun, is_terminal
 
 #: How long after a push every workflow it triggers has certainly been
 #: created. Two minutes against an observed creation latency of seconds --
@@ -82,12 +88,15 @@ class PushVerdict(TypedDict):
         attempt: The enrolment row.
         runs: Every run GitHub listed for the sha, in its order. Empty for
             ``abandoned``, and possibly empty for ``holding``.
-        state: ``holding``, ``ripe``, ``abandoned`` or ``stalled``.
+        state: ``holding``, ``ripe``, ``abandoned``, ``stalled``, or
+            ``covered``: every run of its own was cancelled before any job
+            and a later completed run whose head descends from it gave the
+            verdict instead (:mod:`ci_wake.coverage`).
     """
 
     attempt: PushAttempt
     runs: tuple[WorkflowRun, ...]
-    state: Literal["holding", "ripe", "abandoned", "stalled"]
+    state: Literal["holding", "ripe", "abandoned", "stalled", "covered"]
 
 
 def classify(
@@ -112,6 +121,42 @@ def classify(
     return "ripe" if waited >= CREATION_SETTLE_SECONDS else "holding"
 
 
+def is_superseded(runs: Sequence[WorkflowRun], job_totals: Sequence[int]) -> bool:
+    """Was every run of a push cancelled before it created a job?
+
+    The shape a shared pending slot gives every push of a burst but the
+    newest (:mod:`ci_wake.coverage`): its verdict, if any, is a later run's.
+    Only the job count says so; the payload names no cause, and none is
+    assumed here.
+
+    Args:
+        runs: The push's own runs, every one terminal.
+        job_totals: Each run's job count, in the same order.
+
+    Returns:
+        True when it had at least one run and every run ended cancelled
+        with no job.
+    """
+    return len(runs) > 0 and all(
+        run["conclusion"] == CANCELLED and total == 0
+        for run, total in zip(runs, job_totals, strict=True)
+    )
+
+
+def awaits_cover(attempt: PushAttempt, now_epoch: int) -> bool:
+    """Should a superseded push still wait for the run that will cover it?
+
+    Args:
+        attempt: The enrolment row.
+        now_epoch: Unix seconds, supplied by the caller.
+
+    Returns:
+        True inside :data:`STALL_SECONDS` of the push; after it, the push is
+        announced as not run, which is what a push no later run reached is.
+    """
+    return now_epoch - attempt["attempted_unix"] < STALL_SECONDS
+
+
 def is_announceable(verdict: PushVerdict) -> bool:
     """Report whether a verdict is one somebody should be woken for.
 
@@ -133,6 +178,8 @@ __all__ = [
     "NO_RUN_SECONDS",
     "STALL_SECONDS",
     "PushVerdict",
+    "awaits_cover",
     "classify",
     "is_announceable",
+    "is_superseded",
 ]

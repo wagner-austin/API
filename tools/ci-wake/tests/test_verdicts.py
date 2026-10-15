@@ -20,8 +20,10 @@ from ci_wake.verdicts import (
     NO_RUN_SECONDS,
     STALL_SECONDS,
     PushVerdict,
+    awaits_cover,
     classify,
     is_announceable,
+    is_superseded,
 )
 from tests.conftest import AGENT, REPO, SHA
 
@@ -147,3 +149,33 @@ class TestIsAnnounceable:
         of it so a state added later is announced by default -- wrong in a
         way somebody notices, rather than dropped in a way nobody does."""
         assert is_announceable(PushVerdict(attempt=_attempt(), runs=(), state="holding")) is False
+
+    def test_covered_is_announced(self) -> None:
+        assert is_announceable(PushVerdict(attempt=_attempt(), runs=(), state="covered")) is True
+
+
+class TestSuperseded:
+    """MCPs board task 5af9e749: the shape a shared pending slot gives every
+    push of a burst but the newest, said by job counts alone."""
+
+    def test_every_run_cancelled_before_any_job_is_superseded(self) -> None:
+        cancelled = _run(conclusion="cancelled")
+        assert is_superseded((cancelled, cancelled), (0, 0)) is True
+
+    def test_a_cancelled_run_that_created_jobs_is_not(self) -> None:
+        assert is_superseded((_run(conclusion="cancelled"),), (3,)) is False
+
+    def test_a_run_that_reached_a_verdict_is_not(self) -> None:
+        cancelled = _run(conclusion="cancelled")
+        assert is_superseded((cancelled, _run(conclusion="failure")), (0, 0)) is False
+
+    def test_a_push_with_no_run_is_not(self) -> None:
+        assert is_superseded((), ()) is False
+
+
+class TestAwaitingCover:
+    def test_inside_the_stall_horizon_it_waits(self) -> None:
+        assert awaits_cover(_attempt(), PUSHED_AT + STALL_SECONDS - 1) is True
+
+    def test_at_the_stall_horizon_it_is_announced_as_its_own_runs(self) -> None:
+        assert awaits_cover(_attempt(), PUSHED_AT + STALL_SECONDS) is False

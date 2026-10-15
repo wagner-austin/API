@@ -242,12 +242,12 @@ def decode_runs(payload: JSONValue) -> tuple[WorkflowRun, ...]:
     """
     listing = narrow_json_to_dict(payload)
     return tuple(
-        _decode_run(narrow_json_to_dict(entry)) for entry in require_list(listing, "workflow_runs")
+        decode_run(narrow_json_to_dict(entry)) for entry in require_list(listing, "workflow_runs")
     )
 
 
-def _decode_run(entry: dict[str, JSONValue]) -> WorkflowRun:
-    """Decode one run object.
+def decode_run(entry: dict[str, JSONValue]) -> WorkflowRun:
+    """Decode one run object, from a sha's listing or a branch's (:mod:`ci_wake.coverage`).
 
     Args:
         entry: One element of ``workflow_runs``.
@@ -367,11 +367,13 @@ def is_terminal(run: WorkflowRun) -> bool:
 
 
 __all__ = [
+    "CANCELLED",
     "COMPLETED",
     "GH_TIMEOUT_SECONDS",
     "JobTally",
     "WorkflowRun",
     "decode_jobs",
+    "decode_run",
     "decode_runs",
     "gh_json",
     "is_terminal",

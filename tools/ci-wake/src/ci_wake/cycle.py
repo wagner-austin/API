@@ -31,25 +31,107 @@ with the reason it was marked.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Sequence
 
 from board_watch.config import load_credentials
 from platform_core.board import post_to_task, register_service_session
 
 from ci_wake import _test_hooks
-from ci_wake.announce import PushReport, RunReport, announcements
+from ci_wake.announce import CoverReport, PushReport, RunReport, announcements
+from ci_wake.coverage import BranchRun, branch_of, branch_runs, find_cover
 from ci_wake.enrolment import PushAttempt, attempt_key, latest_attempts, read_attempts
 from ci_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
 from ci_wake.position import AnnouncedPush, append_announced, position_path, read_announced
 from ci_wake.runs import decode_jobs, decode_runs, gh_json, jobs_argv, runs_argv
-from ci_wake.verdicts import PushVerdict, classify, is_announceable
+from ci_wake.verdicts import (
+    PushVerdict,
+    awaits_cover,
+    classify,
+    is_announceable,
+    is_superseded,
+)
 
 
-def _report(attempt: PushAttempt, now_epoch: int) -> PushReport | None:
+class BranchRuns:
+    """A branch's completed runs, read once per cycle and shared by its pushes.
+
+    One cycle may hold several superseded pushes to one branch; asking
+    GitHub for the branch's runs once per push would multiply the one call
+    that pages. The window starts at the earliest outstanding push, so every
+    push's covering run is inside it.
+    """
+
+    def __init__(self, since_unix: int) -> None:
+        """Start an empty cache.
+
+        Args:
+            since_unix: The earliest outstanding push's time.
+        """
+        self._since = since_unix
+        self._runs: dict[tuple[str, str], tuple[BranchRun, ...]] = {}
+
+    def of(self, repo: str, branch: str) -> tuple[BranchRun, ...]:
+        """The branch's completed runs since the window opened.
+
+        Args:
+            repo: ``owner/name``.
+            branch: The branch.
+
+        Returns:
+            Every completed run, read from GitHub on first use.
+        """
+        key = (repo, branch)
+        if key not in self._runs:
+            self._runs[key] = branch_runs(repo, branch, self._since)
+        return self._runs[key]
+
+
+def _covers(
+    attempt: PushAttempt, own: Sequence[RunReport], branches: BranchRuns
+) -> tuple[CoverReport, ...] | None:
+    """Find the run that checked a superseded push, in each of its workflows.
+
+    Args:
+        attempt: The enrolment row.
+        own: Its own runs, each cancelled before any job.
+        branches: This cycle's branch runs.
+
+    Returns:
+        One covering run per own run, or None while any workflow has none
+        yet, or when the pushed ref is not a branch.
+    """
+    branch = branch_of(attempt["ref"])
+    if branch == "":
+        return None
+    runs = branches.of(attempt["repo"], branch)
+    covers: list[CoverReport] = []
+    for entry in own:
+        cover = find_cover(
+            attempt["repo"],
+            attempt["sha"],
+            entry["run"]["workflow"],
+            attempt["attempted_unix"],
+            runs,
+        )
+        if cover is None:
+            return None
+        tally = decode_jobs(gh_json(jobs_argv(attempt["repo"], cover["run"]["run_id"])))
+        covers.append(CoverReport(cover=cover, tally=tally))
+    return tuple(covers)
+
+
+def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushReport | None:
     """Ask GitHub about one outstanding push and decide what to say.
+
+    A push whose every own run was cancelled before any job waits for the
+    later run that checked it (:mod:`ci_wake.coverage`) and is announced
+    with that run's verdict; only past :data:`STALL_SECONDS` with none is it
+    announced as its own cancelled runs.
 
     Args:
         attempt: The enrolment row.
         now_epoch: Unix seconds, shared by the whole cycle.
+        branches: This cycle's branch runs, for a superseded push.
 
     Returns:
         The push and its runs when it is announceable, or None when it is
@@ -64,16 +146,26 @@ def _report(attempt: PushAttempt, now_epoch: int) -> PushReport | None:
     verdict = PushVerdict(attempt=attempt, runs=runs, state=classify(attempt, runs, now_epoch))
     if not is_announceable(verdict):
         return None
-    return PushReport(
-        verdict=verdict,
-        reports=tuple(
-            RunReport(
-                run=run,
-                tally=decode_jobs(gh_json(jobs_argv(attempt["repo"], run["run_id"]))),
-            )
-            for run in runs
-        ),
+    reports = tuple(
+        RunReport(
+            run=run,
+            tally=decode_jobs(gh_json(jobs_argv(attempt["repo"], run["run_id"]))),
+        )
+        for run in runs
     )
+    if verdict["state"] == "ripe" and is_superseded(
+        runs, tuple(entry["tally"]["total"] for entry in reports)
+    ):
+        covers = _covers(attempt, reports, branches)
+        if covers is not None:
+            return PushReport(
+                verdict=PushVerdict(attempt=attempt, runs=runs, state="covered"),
+                reports=reports,
+                covers=covers,
+            )
+        if awaits_cover(attempt, now_epoch):
+            return None
+    return PushReport(verdict=verdict, reports=reports, covers=())
 
 
 def run_cycle(enrolment: pathlib.Path) -> None:
@@ -110,9 +202,10 @@ def run_cycle(enrolment: pathlib.Path) -> None:
         return
 
     now_epoch = _test_hooks.now()
+    branches = BranchRuns(min(attempt["attempted_unix"] for attempt in outstanding))
     reports = [
         report
-        for report in (_report(attempt, now_epoch) for attempt in outstanding)
+        for report in (_report(attempt, now_epoch, branches) for attempt in outstanding)
         if report is not None
     ]
     if len(reports) == 0:
@@ -165,4 +258,4 @@ def run_cycle(enrolment: pathlib.Path) -> None:
     )
 
 
-__all__ = ["run_cycle"]
+__all__ = ["BranchRuns", "run_cycle"]
