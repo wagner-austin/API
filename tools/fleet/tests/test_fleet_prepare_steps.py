@@ -53,8 +53,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # MCPs/brief-generator, which end with the peer-wikis phase (MCPs board
     # task b1089284); 58 since MCPs/print-mcp, the hub's print tools (MCPs
     # board task 9896d6b2); 59 since MCPs/execution-served, the execution
-    # suite's served lane (MCPs board task b456a3cb).
-    assert len(prepared) == 59
+    # suite's served lane (MCPs board task b456a3cb); 60 since that lane is
+    # one project per search host, MCPs/execution-served-diphtheria and
+    # -colossus (MCPs board task bf7a9460).
+    assert len(prepared) == 60
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -103,24 +105,22 @@ def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
         }
 
 
-def test_a_served_lane_step_runs_last_and_only_for_the_served_project() -> None:
+def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None:
     """MCPs fleet-prepare's served-lane phase writes the marker that makes the
-    execution workspace collect tests/served alone (MCPs board task b456a3cb).
-    Those cases read the public site, so no project a deploy waits on may
-    carry the step, and it must follow install and workspace-build, which
-    store the tree's untracked files for the node's next row."""
+    execution workspace collect tests/served alone (MCPs board tasks b456a3cb
+    and bf7a9460). Those cases read the host's own search container, so no
+    project a deploy waits on may carry the step, and it must follow install
+    and workspace-build, which store the tree's untracked files for the
+    node's next row."""
     marking = {
         name: steps
         for name, steps in _steps().items()
         if any(step["argv"][4:] == ("served-lane",) for step in steps)
     }
 
-    assert sorted(marking) == ["MCPs/execution-served"]
-    assert [step["phase"] for step in marking["MCPs/execution-served"]] == [
-        "install",
-        "workspace-build",
-        "served-lane",
-    ]
+    assert sorted(marking) == ["MCPs/execution-served-colossus", "MCPs/execution-served-diphtheria"]
+    for steps in marking.values():
+        assert [step["phase"] for step in steps] == ["install", "workspace-build", "served-lane"]
 
 
 def test_each_prepare_step_names_the_directory_an_older_commit_lacks() -> None:

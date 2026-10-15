@@ -62,6 +62,7 @@ def test_the_recipe_is_elevated_exactly_when_the_project_requires_it(
         external_paths=(),
         required_tags=tags,
         source=None,
+        node=None,
     )
 
     assert dispatch.recipe_for(plan, path="execution/elevated", install=())["elevated"] is elevated

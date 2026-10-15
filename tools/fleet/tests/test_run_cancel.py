@@ -63,6 +63,7 @@ def _plan() -> ProjectConfig:
         external_paths=(),
         required_tags=(),
         source=None,
+        node=None,
     )
 
 

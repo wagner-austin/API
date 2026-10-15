@@ -75,6 +75,7 @@ def _plan(required_tags: tuple[NodeTag, ...]) -> ProjectConfig:
         external_paths=(),
         required_tags=required_tags,
         source=None,
+        node=None,
     )
 
 

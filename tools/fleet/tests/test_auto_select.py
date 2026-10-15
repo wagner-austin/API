@@ -121,6 +121,7 @@ def _project() -> ProjectConfig:
         external_paths=(),
         required_tags=(),
         source=None,
+        node=None,
     )
 
 

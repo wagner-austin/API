@@ -126,6 +126,7 @@ def _project(
     minimum_workers: int = 4,
     worker_ram_gb: float = 1.1,
     required_tags: tuple[NodeTag, ...] = (),
+    node: str | None = None,
 ) -> ProjectConfig:
     """Build a project declaration.
 
@@ -133,6 +134,7 @@ def _project(
         minimum_workers: Fewest workers worth dispatching with.
         worker_ram_gb: Memory one worker of this suite holds.
         required_tags: What the suite requires of a node.
+        node: The one node the project runs on, or None for any.
 
     Returns:
         The project.
@@ -145,6 +147,7 @@ def _project(
         external_paths=(),
         required_tags=required_tags,
         source=None,
+        node=node,
     )
 
 

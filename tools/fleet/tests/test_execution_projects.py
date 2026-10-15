@@ -125,18 +125,22 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     )
 
 
-def test_the_served_lane_marks_its_export_and_holds_nothing_exclusive() -> None:
-    """MCPs/execution-served reads what https://search.austinwagner.org serves.
+@pytest.mark.parametrize("host", ["diphtheria", "colossus"])
+def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
+    """MCPs/execution-served-<host> reads what that host's search container serves.
 
     Its last install step writes the marker that makes the execution
-    workspace collect tests/served alone (MCPs board task b456a3cb), the case
-    an audit criterion about the public site is checked by. It holds no test
-    database and no companion: it reads the export's own search files and the
-    public site, which any Linux node reaches, so it takes the npm workspace
+    workspace collect tests/served alone (MCPs board tasks b456a3cb and
+    bf7a9460), and its case reads 127.0.0.1:8090, which only that host's
+    build reaches: a run on any other node would read nothing, and one run
+    through the public tunnel reads whichever origin its node's route
+    reaches. So each project names its host, and every other node refuses it.
+    It holds no test database and no companion, so it takes the npm workspace
     build's tags and nothing more.
     """
     workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, "MCPs/execution-served")
+    project = require_project(workspace, f"MCPs/execution-served-{host}")
+    assert project["node"] == host
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.CXX)
     assert project["exclusive_resources"] == ()
     prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
