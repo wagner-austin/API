@@ -13,7 +13,7 @@ import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import (
-    runner_action_cache,
+    runner_cache_adopt,
     runner_install,
     runner_reaper_render,
     runner_recovery,
@@ -274,7 +274,7 @@ class TestRerunsOverAHalfBuiltHost:
         # board task ce2b92e0) and is moved into the CI slice.
         recovery = runner_recovery.render_wsl_recovery_lines(install)
         kill_mode = runner_reaper_render.render_kill_mode_lines(install)
-        cached = runner_action_cache.render_cache_environment_lines(install)
+        cached = runner_cache_adopt.render_cache_environment_lines(install)
         placed = runner_slice_render.render_runner_slice_lines(install)
         start = len(lines) - len(placed) - len(cached) - 1
         before = start - len(kill_mode) - len(recovery)
