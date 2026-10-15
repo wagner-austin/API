@@ -50,8 +50,10 @@ From `libs/covenant_ml`:
 ```
 
 The targeted run passed 100 tests in 50.17 seconds on the local machine.
+Full `make check` passed 4,192 tests, strict typing across 679 files and all
+guards, with 100% coverage of 18,874 statements and 3,924 branches in 106 seconds.
 The package-level check log is
-`C:/Users/Test/PROJECTS/files/demo-execution-matrix-final-check-20261015.log`.
+`C:/Users/Test/PROJECTS/files/demo-execution-matrix-rebased-check-20261015.log`.
 
 ## What a larger exchange demonstration still requires
 
