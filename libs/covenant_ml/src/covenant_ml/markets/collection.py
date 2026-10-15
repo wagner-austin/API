@@ -18,7 +18,7 @@ from platform_core.json_utils import (
 from .codecs import decode_history, encode_quote, encode_trade
 from .kalshi import MarketSpec, decode_candle, decode_market, decode_public_trade
 from .replay import replay_maker
-from .types import MakerRule, MarketHistory, Quote, ReplayStatus, Trade
+from .types import MakerRule, MarketHistory, Quote, ReplayStatus
 from .validation import parse_timestamp
 
 
@@ -204,44 +204,42 @@ class MarketCollector:
         if close >= trade_cutoff:
             paths.append("/markets/trades")
         trades: list[JSONValue] = [
-            encode_trade(trade)
-            for trade in self._trades(
+            encode_trade(decode_public_trade(row, ticker))
+            for row in self.trade_documents(
                 paths,
                 {"ticker": ticker, "min_ts": decision // 1000, "max_ts": close // 1000},
-                ticker,
             )
         ]
         document["trades"] = trades
         return decode_history(document)
 
-    def _trades(
-        self, paths: list[str], params: dict[str, str | int], ticker: str
-    ) -> tuple[Trade, ...]:
+    def trade_documents(
+        self, paths: list[str], params: dict[str, str | int]
+    ) -> tuple[JSONObject, ...]:
         """Reconcile identical cross-tier overlap; reject conflicts and page duplicates.
 
         Args:
             paths: Trade tiers intersecting the requested time window.
             params: Fixed query parameters.
-            ticker: Expected contract identity.
 
         Returns:
-            Unique normalized trades in first-observed order.
+            Unique native trades in first-observed order. Reconciliation compares
+            every native field, including submillisecond time and book side.
 
         Raises:
             ValueError: MARKET-029 for a page duplicate, MARKET-030 for a conflict.
         """
-        records: dict[str, Trade] = {}
+        records: dict[str, JSONObject] = {}
         for path in paths:
             tier_ids: set[str] = set()
             for row in self.pages(path, params, "trades"):
-                trade = decode_public_trade(row, ticker)
-                identity = trade["trade_id"]
+                identity = require_str(row, "trade_id")
                 if identity in tier_ids:
                     raise ValueError("[MARKET-029] duplicate trade within one endpoint's pages")
                 tier_ids.add(identity)
-                if identity in records and records[identity] != trade:
+                if identity in records and records[identity] != row:
                     raise ValueError("[MARKET-030] conflicting trade evidence across archive tiers")
-                records[identity] = trade
+                records[identity] = row
         return tuple(records.values())
 
 
