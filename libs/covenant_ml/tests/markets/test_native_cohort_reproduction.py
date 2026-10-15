@@ -29,6 +29,8 @@ from covenant_ml.markets.interval_quotes import collect_interval_quotes
 from covenant_ml.markets.runner import AcquisitionMode, build_collector
 from covenant_ml.markets.validation import read_document
 
+from ._interval_comparison_evidence import verify_published_comparison
+
 BUNDLE_SHA = "f6eeba269313689cc4bf5ea5cb7f8e0147f9ff30f43b286da6f69ab841dbe622"
 COHORT_SHA = "b1d92dbebaef11f2ab95dc3ba75281eab1c7ab5f36aff2de2c4638e83b6c7cd8"
 QUOTE_SHA = "de068968848b800a391d5e7670cd65c95c611511aab2751ceb4ba9273132d87f"
@@ -116,6 +118,7 @@ def test_published_native_cohort_and_quotes_reproduce(tmp_path: Path) -> None:
     for value in require_list(panels[1], "contracts"):
         row = narrow_json_to_dict(value)
         assert large[require_str(row, "ticker")] == row
+    verify_published_comparison(cohort, panels[0])
     # Real corrupted evidence must fail, even with a valid published report beside it.
     envelope_path = sorted((root / "raw").glob("*.json"))[0]
     envelope = read_document(envelope_path)
