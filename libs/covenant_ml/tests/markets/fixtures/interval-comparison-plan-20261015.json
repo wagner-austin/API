@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "declared_at": "2026-10-15T22:00:07Z",
+  "study_kind": "exploratory_chronological_development",
+  "train_end_ts": 1789430400,
+  "fee_coefficient": 700,
+  "edge_hurdle": 200,
+  "extra_friction": [0, 100, 200],
+  "serial_lags": 7,
+  "inverse_regularization": 1.0,
+  "cohort_sha256": "b1d92dbebaef11f2ab95dc3ba75281eab1c7ab5f36aff2de2c4638e83b6c7cd8",
+  "quotes_sha256": "de068968848b800a391d5e7670cd65c95c611511aab2751ceb4ba9273132d87f",
+  "primary_comparison": "logistic minus raw-market daily mean Brier loss",
+  "models": ["raw_market", "earlier_asset_base_rate", "logistic_recalibration"],
+  "features": ["prior_market_logit", "ether_indicator"],
+  "interpretation": "One fixed development comparison with no hyperparameter search. The previously inspected sixty-day inventory is not an untouched holdout. Both assets share daily clusters; serial uncertainty uses seven calendar-day lags. Quoted one-contract taker payoffs assume a 0.07 quadratic coefficient with per-order cent rounding and zero, one or two extra cents of friction, not verified historical fees or executable fills. Training labels must settle strictly before the first evaluation decision. Models and action rules are unchanged across all evaluation opportunities. No prospective study is activated by this plan."
+}

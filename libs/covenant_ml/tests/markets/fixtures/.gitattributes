@@ -1,0 +1,2 @@
+# Hash-pinned evidence must retain its original bytes on every platform.
+interval-comparison-*-20261015.json -text
