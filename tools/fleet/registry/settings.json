@@ -7,6 +7,7 @@
       "services/covenant-radar-api/data/external",
       "libs/instrument_io/tests/fixtures",
       "libs/covenant_ml/tests/data",
+      "libs/covenant_ml/tests/markets/fixtures",
       "libs/covenant_nn/tests/data",
       "tools/hpc3/artifacts",
       "services/covenant-radar-api/mckinnon_sources",
