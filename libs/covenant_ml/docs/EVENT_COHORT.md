@@ -137,3 +137,24 @@ counts, missing intervals, receipt bounds and both report digests. The raw
 responses remain required for full offline replay; a summary alone is not
 a portable copy of the archive. Prior quotes, predictor availability and
 execution evidence remain to be attached before scoring a forecasting study.
+
+## Executable verification of the published datasets
+
+`tests/markets/test_native_cohort_reproduction.py` runs during `make check`.
+Its committed `fixtures/kalshi-native-20261015.zip` is the unchanged 637-file
+portable archive, SHA-256
+`f6eeba269313689cc4bf5ea5cb7f8e0147f9ff30f43b286da6f69ab841dbe622`.
+It needs no workstation evidence paths, credentials or network requests.
+
+The test verifies the bundle and original report digests, extracts the archive
+into a fresh directory, and invokes the real production collectors in replay
+mode. Every reconstructed native field must equal the original report; only
+the separately recorded persistence metadata is excluded from this comparison.
+It recomputes cohort totals and crypto calendar omissions with stdlib datetime
+and Decimal, then reconstructs both quote panels, checks their missing slots
+and quote ages, and compares every overlapping quote record. Finally it corrupts
+and deletes an actual native response, requiring both failures to propagate.
+
+This replaces text-only audit checks that merely found a claimed count or a
+`byte_identical_replay` flag. The test never reads that flag to decide success.
+It verifies these historical measurements, not independent predictive skill.
