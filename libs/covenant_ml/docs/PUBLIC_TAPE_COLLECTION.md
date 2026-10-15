@@ -31,7 +31,9 @@ every native field, including book side and submillisecond timestamps.
 Duplicates within an endpoint or conflicting evidence across tiers fail.
 
 The captured historical cutoff routes trades by trade time. Both market
-metadata tiers are queried for every selected ticker in batches of twenty.
+metadata tiers are queried for every selected ticker in batches bounded by
+6000 encoded query characters. This avoids both oversized URLs and thousands
+of unnecessarily small requests when a window spans many contracts.
 Missing, unexpected, duplicate or conflicting metadata fails explicitly.
 Declared binary payouts must agree with results; unresolved and scalar
 contracts remain present. Cursor pagination runs to termination, with cursor
