@@ -237,7 +237,7 @@ def test_metadata_batches_count_contracts_separately_from_events(
     rows: list[JSONValue] = []
     markets: list[JSONValue] = []
     for index in range(21):
-        ticker = f"KXSERIES-EVENT-C{index:02d}"
+        ticker = f"KXSERIES-{'E' * 280}-C{index:02d}"
         rows.append(dict(tape_trade(), trade_id=str(index), ticker=ticker))
         markets.append(dict(tape_market(), ticker=ticker, event_ticker="KXSERIES-EVENT"))
     api_server.documents["/markets/trades"] = [{"trades": rows, "cursor": ""}]
@@ -255,3 +255,14 @@ def test_metadata_batches_count_contracts_separately_from_events(
     assert report["markets"] == markets
     assert (report["trade_count"], report["contract_count"], report["event_count"]) == (21, 21, 1)
     assert len(api_server.requests) == 6
+
+
+def test_oversized_identifier_is_not_sent(tmp_path: Path, api_server: ApiServer) -> None:
+    serve_tape(api_server)
+    api_server.documents["/markets/trades"] = [
+        {"trades": [dict(tape_trade(), ticker="X" * 6000)], "cursor": ""}
+    ]
+    store = archive(tmp_path, api_server)
+    with closing(store.client), pytest.raises(ValueError, match="TAPE-007"):
+        collect_public_tape(MarketCollector(store.capture), START, END)
+    assert len(api_server.requests) == 2
