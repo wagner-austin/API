@@ -325,7 +325,7 @@ class TestObservingSessions:
         with caplog.at_level("INFO"):
             agent.main(agent_argv(config_path, repo))
 
-        # The one command is the refuse pass's read of the rolled ref, which
+        # The one command is the publish pass's read of the rolled ref, which
         # resolved nothing, so the queue was sent no registry.
         assert run.calls == [unrolled_call(repo)]
         assert endpoint.tools == ["dispatch_claim"]
@@ -333,7 +333,7 @@ class TestObservingSessions:
         assert "session observation skipped: no --registry given" in messages
         assert "hub lane empty" in messages
         assert any(
-            message.startswith("refused nothing undeclared: FLEET_ROLL_REF_UNRESOLVED: ")
+            message.startswith("published nothing: FLEET_ROLL_REF_UNRESOLVED: ")
             for message in messages
         )
 

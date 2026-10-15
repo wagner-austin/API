@@ -32,14 +32,16 @@ nothing here starts one.
 A TICK IS THREE PASSES, IN THIS ORDER:
 
     1. CLAIM. Take at most one hub-lane job and run it to its close.
-    2. REFUSE. List every project the registry declares at the commit
-       ``refs/fleet/rolled`` names now and hand them to the queue, which
-       refuses each queued make-target job queued before the read whose
-       project is not among them (MCPs board task 1915b042,
-       :mod:`fleet.core.declared`). No node runner would ever claim such a
-       job, since each claims only the registry projects it fits, so before
-       this pass a mistyped key waited until its submitter noticed. Here,
-       once a tick for the whole fleet, rather than in every node runner.
+    2. PUBLISH. Read every project the registry declares at the commit
+       ``refs/fleet/rolled`` names now, with the tags each requires, and
+       hand them to the queue (MCPs board tasks 1915b042 and 0be88a36,
+       :mod:`fleet.core.declared`). The queue keeps them, so a submitter
+       with no API checkout can have it supply a project's tags, and in the
+       same transaction refuses each queued make-target job queued before
+       the read whose project is not among them: no node runner would ever
+       claim such a job, since each claims only the registry projects it
+       fits. Here, once a tick for the whole fleet, rather than in every
+       node runner.
     3. OBSERVE. Read every enabled worker's Claude Code session records over
        ssh and hand them to the board's session ledger (MCPs board task
        5a3865bf; :mod:`fleet.core.observe` carries the why). Last, because
@@ -354,34 +356,37 @@ def claim_pass(
     return session_job(credentials, job, identity)
 
 
-def refuse_pass(
+def publish_pass(
     credentials: McpCredentials, identity: JSONObject, *, repo_root: pathlib.Path
 ) -> None:
-    """Refuse the queued jobs whose project the rolled registry does not declare.
+    """Publish the rolled registry to the queue, which refuses undeclared work.
 
     Args:
         credentials: The queue's endpoint and headers.
-        identity: This runner's identity arguments; the refusals are its.
+        identity: This runner's identity arguments; the publication is its.
         repo_root: The API checkout whose object store holds
             ``refs/fleet/rolled``.
 
     Raises:
-        AppError: From the queue call. A read that could not list the
-            registry sends nothing and is logged with its code, every tick
-            it happens, since refusing on a registry not read would refuse
-            declared work.
+        AppError: From the queue call. A read that could not list or read
+            the registry sends nothing and is logged with its code, every
+            tick it happens, since publishing a registry not read would
+            refuse declared work.
+        InvalidJsonError: From the read, when a project file is not JSON.
+        JSONTypeError: From the read, when a project file does not decode.
     """
     read = declared.read_declared(repo_root)
     if isinstance(read, str):
-        _log.warning("refused nothing undeclared: %s", read)
+        _log.warning("published nothing: %s", read)
         return
-    refused = declared.refuse_undeclared(credentials, read, identity=identity)
+    publication = declared.publish_registry(credentials, read, identity=identity)
     _log.info(
-        "refused %d queued job(s) naming a project the registry at %s does not declare "
-        "(%d declared)",
-        refused,
+        "published %d project(s) from the registry at %s (%d dropped since the last "
+        "publication) and refused %d queued job(s) naming a project it does not declare",
+        publication["published"],
         read["commit"],
-        len(read["declared"]),
+        publication["removed"],
+        publication["refused"],
     )
 
 
@@ -412,7 +417,7 @@ def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick: claim and run at most one hub-lane job, refuse undeclared work, observe.
+    """Run one tick: claim and run at most one hub-lane job, publish the registry, observe.
 
     With ``--announce`` the tick instead posts the check-in that registers
     this runner's session on the board's ledger and claims nothing. The
@@ -472,7 +477,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if claim_pass(credentials, identity, node=parsed.get(NODE_FLAG), mcps_root=mcps_root) is None:
         _log.info("hub lane empty")
-    refuse_pass(credentials, identity, repo_root=project_root)
+    publish_pass(credentials, identity, repo_root=project_root)
 
     raw_registry = parsed.get(REGISTRY_FLAG)
     if raw_registry is None:
