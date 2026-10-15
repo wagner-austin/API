@@ -496,11 +496,8 @@ class TestTheDeclarations:
             decode_fleet_workspace(document)
 
     def test_the_boundaries_are_the_schedules_three_minutes(self) -> None:
-        """The serve's boundaries are the scheduled task's fires, registered
-        at local midnight repeating every 3 minutes."""
-        schedule = pathlib.Path(__file__).parent.parent / "scripts" / "FleetSchedule.ps1"
-        text = schedule.read_text(encoding="utf-8")
-        assert "-At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes 3)" in text
+        """The serve's boundaries are the MCPs hub runner's fires, on the
+        multiples of 180 s since the epoch (MCPs board task b27bd34a)."""
         assert node_serve.TICK_SECONDS == 3 * 60
         assert node_serve.next_fire(DEMO_NOW) == FIRST_FIRE
         assert node_serve.next_fire(FIRST_FIRE) == SECOND_FIRE

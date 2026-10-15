@@ -160,8 +160,8 @@ class NodeConfig(TypedDict):
         elevated: Whether the node runs a second, ELEVATED runner, whose
             builds launch at RunLevel Highest for suites that register what
             only an administrator may (MCPs board task a98d7083). True gives
-            the ``elevated`` tag and a second hub task for the node
-            (``scripts/register-node-agents.ps1``); that runner re-reads its
+            the ``elevated`` tag and a second hub runner job for the node
+            (MCPs ``scripts/fleet/hub-jobs.json``); that runner re-reads its
             ssh session's token every tick and claims nothing unless the
             token is an administrator's (:mod:`fleet.contracts.elevation`).
             REQUIRED like ``test_database``, and refused on a linux node,

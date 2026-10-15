@@ -1,8 +1,9 @@
 """A node runner SERVES across its scheduled starts instead of ticking once.
 
-WHY (MCPs board task 8993c306). Each node's runner is a scheduled task that
-starts every 3 minutes under IgnoreNew (``scripts/FleetSchedule.ps1``). Run
-once per start, it claimed a job only on a start and closed a finished one
+WHY (MCPs board task 8993c306). Each node's runner is started every 3
+minutes, one run at a time: a job of the MCPs hub runner since MCPs board
+task b27bd34a (``scripts/fleet/hub-jobs.json``), a scheduled task under
+IgnoreNew before it. Run once per start, it claimed a job only on a start and closed a finished one
 only on a start, so a row's wall time carried up to two waits of 3 minutes
 beside its work. Measured on 2026-10-04 (board task 74b13c20, lavender-wsl):
 job 3308c976 did 20 s of work in a 182 s row, closed 148 s after its check
@@ -59,12 +60,14 @@ the 11:57 fire, 105 s after its check. A call nothing answered now raises
 run ending in an outage closes, and a job queued in one is claimed, within
 a poll of the queue answering again.
 
-THE BOUNDARIES ARE THE SCHEDULE'S. FleetSchedule.ps1 registers each
-runner's task once at local midnight, repeating every 3 minutes; local
-midnight is a whole multiple of 180 s since the epoch wherever the UTC
-offset is a whole number of 3-minute steps, which every offset in use is,
-so a fire boundary is a multiple of :data:`TICK_SECONDS` since the epoch.
-The hub's logs of 2026-10-05 show each start 2 to 4 s after one.
+THE BOUNDARIES ARE THE SCHEDULE'S. The MCPs hub runner fires each fleet
+tick on the whole multiples of its ``everySeconds``, 180, since the epoch
+(``session_audit.hub_runner.loop.boundary``), where the scheduled tasks it
+replaced fired: registered at local midnight, repeating every 3 minutes, and
+every UTC offset in use is a whole number of 3-minute steps. So a fire
+boundary is a multiple of :data:`TICK_SECONDS` since the epoch; the hub's
+logs of 2026-10-05 show each start 2 to 4 s after one, and the runner polls
+every 5 s.
 """
 
 from __future__ import annotations
@@ -86,7 +89,9 @@ _log = get_logger(__name__)
 #: The prefix of the serving loop's thread's name; the executor appends ``_0``.
 LOOP_PREFIX: Final = "fleet-serve"
 
-#: The scheduled tasks' repetition, in seconds (``scripts/FleetSchedule.ps1``).
+#: The ticks' repetition, in seconds: the fleet rows' ``everySeconds`` in
+#: MCPs ``scripts/fleet/hub-jobs.json``, which MCPs session-audit's table
+#: suite holds at 180, naming this constant.
 TICK_SECONDS: Final[int] = 180
 
 #: How long before a fire boundary a serve decides to hand over: enough for

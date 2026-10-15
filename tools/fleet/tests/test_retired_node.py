@@ -92,9 +92,10 @@ def test_the_reconciliation_reads_the_retirement_as_agreement(
 def test_a_stale_runner_for_the_retired_node_claims_nothing(
     config_path: pathlib.Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """register-node-agents removes the task, but a tick can run first from
-    a rolled checkout; it collects (the held listing) and then stops before
-    the probe, so the node is never asked and the queue never claimed from."""
+    """The hub runner drops a retired node's job at its next start, but a
+    tick can run first from a rolled checkout; it collects (the held
+    listing) and then stops before the probe, so the node is never asked and
+    the queue never claimed from."""
     write_registry(config_path, _retired())
     runner = FakeRun([])
     _test_hooks.run = runner

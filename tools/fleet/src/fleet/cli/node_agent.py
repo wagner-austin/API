@@ -15,9 +15,10 @@ ONE RUNNER PER ENABLED NODE, ALL OF THEM ON THE HUB (MCPs board task
 fd5cabfa, A1 and A5). Until this command the queue had one runner, the hub's
 ``fleet-agent``, claiming the oldest job once per tick whatever it was, so
 nine nodes behaved as one slow node and a revive waited behind a queue of
-kills. Now each enabled node in ``registry/nodes.json`` has a scheduled task of its own
-(``scripts/register-node-agents.ps1``) running this command with ``--node``
-set to it, claiming from the queue's NODE lane the jobs that name it or name
+kills. Now each enabled node in ``registry/nodes.json`` has a runner of its own
+(a job of the MCPs hub runner, ``scripts/fleet/hub-jobs.json``, since MCPs
+board task b27bd34a; a scheduled task each before) running this command with
+``--node`` set to it, claiming from the queue's NODE lane the jobs that name it or name
 no node, and only those whose required tags the node carries
 (:func:`fleet.contracts.tags.node_tags`, plus the tag of every tool its
 toolchain probe found this tick, :mod:`fleet.cli.node_ready`). The hub's

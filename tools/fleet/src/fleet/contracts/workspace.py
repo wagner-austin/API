@@ -52,8 +52,8 @@ from fleet.contracts.source import decode_path, decode_remote
 #: and loki's longest launch measured on 2026-10-04 took 155 s.
 NODE_SERVE_CEILING_SECONDS = 1800
 
-#: The slowest poll a workspace may declare: one scheduled start's
-#: repetition (``scripts/FleetSchedule.ps1``), since the collect pass at
+#: The slowest poll a workspace may declare: one start's repetition
+#: (:data:`fleet.cli.node_serve.TICK_SECONDS`), since the collect pass at
 #: every fire boundary already reads every held run at that rate.
 NODE_POLL_CEILING_SECONDS = 180
 

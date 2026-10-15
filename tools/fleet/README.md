@@ -283,14 +283,21 @@ queues behind a check because no runner ever asks for both at once
 
 **Every enabled node has a runner of its own, on the hub.** `fleet-node-agent
 --config fleet.json --node <alias>` is one tick for one node
-(`fleet.cli.node_agent`; `scripts/register-node-agents.ps1` registers one
-`API-FleetNode-<alias>-3min` scheduled task per node `registry/nodes.json` enables,
-with exactly the hub task's registration: `poetry.exe` running
-`python -m fleet.cli.tick` as the action, never `powershell.exe`, which can
-stall before its engine loads under S4U on the hub (MCPs board task
-94ac1c4f); the operator's account, S4U at RunLevel Limited, boot plus a
-3-minute repetition, priority 4, `IgnoreNew`, a 40-minute
-`ExecutionTimeLimit`, one log per node per day under `%LOCALAPPDATA%\Temp\claude`).
+(`fleet.cli.node_agent`). Every tick is a job of the MCPs hub runner (MCPs
+board task b27bd34a): one resident loop, `session_audit.hub_runner`, kept
+alive by the `corvis-hub-runner` task, runs every row of MCPs
+`scripts/fleet/hub-jobs.json`, and its fleet rows expand to one job per node
+`registry/nodes.json` enables, a second for one declaring `elevated`, and the
+hub's own. Each job runs `poetry.exe` running `python -m fleet.cli.tick`,
+never `powershell.exe`, which can stall before its engine loads under S4U on
+the hub (MCPs board task 94ac1c4f), under the operator's account at RunLevel
+Limited and priority 4, fires on the multiples of 180 s since the epoch, runs
+one at a time, and is ended with its whole process tree at 40 minutes; each
+writes one log per node per day under `%LOCALAPPDATA%\Temp\claude`, and the
+runner journals every tick's start, end and exit under
+`%LOCALAPPDATA%\MCPs\hub-runner`. `make install-hub-runner` in MCPs installs
+it and unregisters the `API-FleetAgent-3min` and `API-FleetNode-<alias>-3min`
+tasks that ran the ticks until then, whose registration scripts are gone.
 The runners live on the hub and not on the nodes because the hub holds the
 git credentials and the ssh keys, and the tailnet policy lets a
 `tag:corvis-node` open no socket to it. Two checks submitted in one breath
@@ -328,8 +335,8 @@ when a job naming this node or no node has arrived since its last fill, or
 the watch has settled a run since then: the same fill pass, so a claim still
 goes through the probe, the tags, the leases, the owner reservation and the
 elevated yield. At each fire boundary, a multiple of 180 s since the epoch
-because `FleetSchedule.ps1` registers each task at local midnight repeating
-every 3 minutes, it runs the collect pass again, which renews every running
+because the MCPs hub runner fires each tick there, as the scheduled tasks it
+replaced did from local midnight every 3 minutes, it runs the collect pass again, which renews every running
 job's queue lease as each start did. It hands over only 10 s before a
 boundary and only while no settle is under way, once it has served
 `node_serve_seconds` (1200 in `registry/settings.json`, at most 1800 so a drain ends
@@ -598,11 +605,11 @@ each node's stage root until removed by hand; nothing writes or runs them.
 **The identity is derived, never configured.** The label is
 `fleet-node-<alias>` and the session id is the version-5 UUID of
 `fleet-node-agent/<alias>`, so every tick of one node's runner is one session
-on the board's ledger and `held_by` finds its own claims across ticks. The
-registration script runs the tick once with `--announce`, which posts the
-check-in that registers that session (MCPs mig 530) and claims nothing. The
-hub runner does the same through the tick's `hub-announce` lane, run by
-`register-agent-schedule.ps1`: the queue's close posts a task-naming job's
+on the board's ledger and `held_by` finds its own claims across ticks. Each
+node job's boot command runs the tick once in its `announce` lane before its
+first tick, which posts the check-in that registers that session (MCPs mig
+530) and claims nothing. The hub's job does the same through the tick's
+`hub-announce` lane: the queue's close posts a task-naming job's
 outcome under the closer's label, and an exit-session job names the finished
 task (MCPs board task 2fecad69).
 

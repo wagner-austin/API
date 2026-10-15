@@ -4,9 +4,11 @@ $ErrorActionPreference = 'Stop'
 # A registered task's definition, read the way the fleet's scripts read the
 # scheduler: through Task Scheduler's COM service. The scheduled-task cmdlets
 # read every task's definition and fail while another process deletes one
-# (scripts/FleetSchedule.ps1 carries the measurement), so a suite asserting a
-# task's shape through them fails on tasks it never touched. MCPs board task
-# d69786fa.
+# (measured on the hub 2026-09-27: 3 of 150 Get-ScheduledTask listings and
+# 172 of 178 Unregister-ScheduledTask calls failed beside a process
+# registering and deleting tasks, 0 of 1,873 COM listings did), so a suite
+# asserting a task's shape through them fails on tasks it never touched. MCPs
+# board task d69786fa.
 
 function Get-RootTask {
     <#

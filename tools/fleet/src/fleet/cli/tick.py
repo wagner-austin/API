@@ -1,4 +1,4 @@
-"""CLI: one scheduled fleet tick, run by Task Scheduler as a native process.
+"""CLI: one fleet tick, run by the MCPs hub runner as a native process.
 
 Usage:
     poetry run -- python -m fleet.cli.tick --api-root C:/Users/Test/PROJECTS/API \\
@@ -12,16 +12,18 @@ Usage:
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane hub-announce
 
-The action behind every fleet task on the hub: ``API-FleetAgent-3min`` runs
-the hub lane and each ``API-FleetNode-<alias>-3min`` one node's lane
-(``tools/fleet/scripts/register-*.ps1``). ``announce`` is the node lane's
-one-time check-in, run by the registration, and ``hub-announce`` the hub
-runner's, which the board needs since the queue's close posts a task-naming
-job's outcome under the closing runner's label (MCPs board task 2fecad69).
-A node declaring ``elevated`` also has
-``API-FleetNode-<alias>-elevated-3min``, whose ``elevated`` lane (and its
-``elevated-announce``) runs that node's second, elevated runner under its
-own identity and log (MCPs board task a98d7083).
+The command behind every fleet job of the MCPs hub runner (MCPs board task
+b27bd34a, ``scripts/fleet/hub-jobs.json``): its ``fleet-hub`` job runs the
+hub lane and each ``fleet-node-<alias>`` one node's lane, every 3 minutes,
+one run at a time. ``announce`` is the node lane's one-time check-in, each
+node job's boot command, and ``hub-announce`` the hub's, which the board
+needs since the queue's close posts a task-naming job's outcome under the
+closing runner's label (MCPs board task 2fecad69). A node declaring
+``elevated`` also has ``fleet-node-<alias>-elevated``, whose ``elevated``
+lane (and its ``elevated-announce``) runs that node's second, elevated
+runner under its own identity and log (MCPs board task a98d7083). Until the
+hub runner, each of these was a scheduled task of its own,
+``API-FleetAgent-3min`` and ``API-FleetNode-<alias>[-elevated]-3min``.
 
 WHY PYTHON AND NOT POWERSHELL (MCPs board task 94ac1c4f). The ticks ran
 ``powershell.exe`` over a script until 2026-09-29. On the hub,
@@ -84,7 +86,7 @@ _FLAGS: Final = (API_ROOT_FLAG, LOG_DIRECTORY_FLAG, LANE_FLAG, NODE_FLAG)
 
 
 class Lane(StrEnum):
-    """The tick a scheduled task runs; each value is its ``--lane`` word."""
+    """The tick an MCPs hub runner job runs; each value is its ``--lane`` word."""
 
     HUB = "hub"
     HUB_ANNOUNCE = "hub-announce"
