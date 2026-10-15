@@ -56,6 +56,13 @@ class FleetErrorCode(ErrorCodeBase):
     # the node is on and fine -- it is the wrong kind of machine for this
     # suite, and the answer is another node, never this one later.
     NODE_LACKS_TAG = "NODE_LACKS_TAG"
+    # The project names the one node it runs on, and this is another (MCPs
+    # board task bf7a9460): MCPs/execution-served-diphtheria reads that
+    # host's own search container on 127.0.0.1, which no other node can
+    # reach, and no tag singles a host out. Distinct from NODE_LACKS_TAG
+    # because the node is the right kind and still never the answer: only
+    # the named node is.
+    NODE_NOT_PINNED = "NODE_NOT_PINNED"
     # The identity registry named by `fleet-nodes --registry` could not be
     # read. Drift itself has NO code, deliberately: it is reported as one
     # printed line per disagreement plus a non-zero exit, the same shape as an
