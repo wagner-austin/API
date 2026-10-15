@@ -46,6 +46,12 @@ resolution before completing its preflight; that failure is not evidence of a
 successful exchange-connected risk-gate run. The controlled integration tests
 exercise that refusal through the actual production service.
 
+After DNS recovered, the scheduled advance action completed successfully at
+2026-10-15T07:04:04Z. It saved a fresh authenticated account snapshot, retained
+exactly four attempt directories and five total account orders including the
+baseline, and submitted no fifth batch order. This verifies the risk-gate refusal
+through the scheduled exchange-connected path as well.
+
 ## Controlled validation
 
 The full package make check passed 4,254 tests, strict typing across 694 files,
@@ -109,8 +115,13 @@ expires after 24 hours, so subsequent invocations can only reconcile. The task
 definition is saved in kalshi-demo-batch-20261015/scheduled-task.xml.
 
 The first scheduler invocation exited 1 while local DNS resolution was failing.
-Registration alone does not establish working unattended observation. Future
-successful task exits and durable account snapshots must verify that separately.
+After recovery, an explicit Task Scheduler launch exited 0 and produced native
+snapshot account-4154fac5-83bd-4e81-bffb-cf29c7429672.json, SHA256
+07e9d290040ae489d0fcf773c7509df397768f3b23575dab737c2f67614c7a6e.
+Its completion timestamp is 1792047845285 and cash remains $48.5054. The saved
+scheduler-verification.json ties the task result, snapshot, order count and
+attempt count together. This verifies the scheduled action; future timed ticks
+and settlement observations remain prospective.
 
 ## Interpretation
 
