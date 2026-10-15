@@ -76,7 +76,7 @@ def node(
 
     Args:
         name: The node name.
-        role: hub, worker, vpn-jump or client.
+        role: hub, worker, vpn-jump, session-host or client.
         enabled: Whether the registry says it should answer.
         user: The provisioned account, or None.
         platform: What the registry says it runs.
@@ -461,6 +461,23 @@ def test_observe_pass_visits_enabled_workers_and_jump_hosts_in_name_order() -> N
     assert [o["node"] for o in outcomes] == ["loki", "serendipity", "viper"]
     assert [o["recorded"] for o in outcomes] == [False, True, True]
     assert [a["machine"] for a in board.arguments] == ["win32:serendipity", "win32:viper"]
+
+
+def test_observe_pass_visits_a_session_host() -> None:
+    # MCPs board task 701151b4: the node the operator's sessions run on.
+    _test_hooks.run = FakeRun([ok(""), ok(document(hostname="ziggurat"))])
+    board = FakeQueue(["observed 0 session(s) for win32:ziggurat (0 new row(s)) at t"])
+    _test_hooks.http_post = board
+
+    registry = {
+        "ziggurat": node("ziggurat", "session-host", user="corvis"),
+        "austinpc": node("austinpc", "hub"),
+    }
+
+    outcomes = observe.observe_pass(BOARD, registry, IDENTITY)
+
+    assert [(o["node"], o["recorded"]) for o in outcomes] == [("ziggurat", True)]
+    assert [a["machine"] for a in board.arguments] == ["win32:ziggurat"]
 
 
 def test_render_outcome_distinguishes_a_quiet_node_from_a_recorded_one() -> None:

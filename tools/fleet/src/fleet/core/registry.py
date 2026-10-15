@@ -72,7 +72,7 @@ class RegistryNode(TypedDict):
         name: The machine's registry name, which is also the workspace key
             and the hub's ssh alias for it.
         enabled: Whether it is expected to answer.
-        role: ``hub``, ``vpn-jump``, ``worker`` or ``client``.
+        role: ``hub``, ``vpn-jump``, ``worker``, ``session-host`` or ``client``.
         user: The account the fleet provisioned on it, or None for a client.
         platform: ``windows`` or ``linux``, decoded into the closed set at
             the edge (board task cd5010c4): the session observer renders its

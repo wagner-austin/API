@@ -61,8 +61,10 @@ OBSERVE_STEM: Final = "observe-sessions"
 
 #: Roles whose sessions this pass records. The hub is observed by
 #: ``pcsession-mcp`` on its own mount; a client (the phone) is never
-#: provisioned and has no account of ours to ssh in as.
-OBSERVABLE_ROLES: Final = frozenset({"worker", "vpn-jump"})
+#: provisioned and has no account of ours to ssh in as. A session host is
+#: where the operator's Claude Code sessions run (MCPs board task 701151b4),
+#: so it is the node this pass most has to see.
+OBSERVABLE_ROLES: Final = frozenset({"worker", "vpn-jump", "session-host"})
 
 
 class NodeSessions(TypedDict):
