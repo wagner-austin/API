@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     commands.add_parser("submit")
     commands.add_parser("reconcile")
     commands.add_parser("status")
+    commands.add_parser("evidence")
     args = parser.parse_args(argv)
     key_path: Path = args.key_id_file
     private_path: Path = args.private_key_file
@@ -57,6 +58,8 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
             report = service.submit(root)
         elif action == "reconcile":
             report = service.reconcile(root)
+        elif action == "evidence":
+            report = service.evidence(root)
         else:
             report = service.status(root)
     sys.stdout.write(dump_json_str(report) + "\n")
