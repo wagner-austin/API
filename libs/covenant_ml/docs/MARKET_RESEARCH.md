@@ -571,8 +571,10 @@ Machine-local evidence under `market-edge-20261012/`:
 Run `poetry run python -m scripts.paper_campaign prepare --help` for new studies;
 `tick --root <campaign-directory> --digest <original-manifest-sha256>` executes
 the current frozen study without modifying its plans. Use the isolated runtime's
-package directory. To remove this schedule, dot-source `FleetSchedule.ps1` and
-call `Unregister-FleetTick 'API-MarketPaper-20261014-20261212'`. Removing the task
+package directory. To remove this schedule, run
+`Unregister-ScheduledTask -TaskName 'API-MarketPaper-20261014-20261212' -Confirm:$false`
+(the `FleetSchedule.ps1` helper that registered it was deleted with the fleet
+tick registrations in MCPs board task b27bd34a). Removing the task
 preserves every evidence file. The scheduler continues checking evidence after
 the finite study window until removed; it does not extend the study implicitly.
 
