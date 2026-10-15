@@ -19,17 +19,22 @@ Evidence is under
 `C:/Users/Test/PROJECTS/files/market-edge-20261012/kalshi-demo-trial-20261013/`:
 `trial.json`, `acknowledgement.json`, `execution.sqlite`,
 `reconciliation-*.json`, `verified-status.json` and
-`duplicate-submit-refused.log`. No private key is stored there. The $0.3147 cost
-remains exposure awaiting the market outcome; there is no realized profit claim.
+`duplicate-submit-refused.log`. No private key is stored there. At this October 13
+observation, the $0.3147 cost remained exposure awaiting the market outcome.
 This is a completed demo order/fill/account lifecycle, not a production pilot.
+
+Later observation: the [October 15 evidence refresh](MARKET_PROGRESS_20261015.md)
+confirms the same order settled, paid $1 and realized $0.6853 in mock profit
+after its $0.0147 fee. Exposure is zero. The pending-settlement observations
+below describe the earlier October 13 checks, not the latest account state.
 
 The settlement-aware command was subsequently run on that same trial at
 17:12 UTC. Authenticated settlement pagination returned no settled positions;
 the market remained active. The command reported `confirmed_settlements=0`,
 retained $0.3147 exposure and did not submit another order. Its native capture is
 `reconciliation-37fcfef7-f3fd-4a5a-8a20-3fc272011937.json` in the directory above.
-An actual exchange payout has not yet occurred; local final-outcome tests are
-not presented as a completed remote settlement.
+At that October 13 check, an actual exchange payout had not yet occurred; local
+final-outcome tests did not represent a completed remote settlement.
 
 ## Automatic demo observation
 
