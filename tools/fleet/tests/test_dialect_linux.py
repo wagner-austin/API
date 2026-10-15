@@ -23,6 +23,7 @@ import pytest
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
+from fleet.contracts.action_cache import PROBE_FIELDS
 from fleet.contracts.source import InstallStep
 from fleet.core import names, probe
 from fleet.core.dialect_linux import (
@@ -503,9 +504,14 @@ class TestForRealUnderSh:
     def test_the_capacity_probe_reports_the_three_numbers(self, tmp_path: pathlib.Path) -> None:
         fields = fields_of(self.run_script(tmp_path, DIALECT.capacity_probe_script()))
         sliced = {"ci_slice_current_gb", "ci_slice_high_gb"} <= set(fields)
+        # A runner host whose root timer counted its runners in the last five
+        # minutes prints all four counts, lavender-wsl since 2026-10-15
+        # (MCPs board task ce2b92e0); every other node prints none.
+        counted = set(PROBE_FIELDS) & set(fields)
+        assert counted in (set(), set(PROBE_FIELDS))
 
         reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores"}
-        assert set(fields) == reported | (
+        assert set(fields) == reported | counted | (
             {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
         )
         # Any sign: on the stack host it is MemAvailable net of what capped
