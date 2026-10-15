@@ -204,7 +204,10 @@ class TestTheReservationsUnderSh:
         fields = _run(tmp_path, cgroups, held)
 
         assert fields["reserved_cores"] == "7"
-        assert list(fields)[-1] == "reserved_cores"
+        # Read after the body's other fields; the dialect's CI-slice lines,
+        # printed only on a node with a runners.slice, follow it.
+        keys = list(fields)
+        assert keys.index("reserved_cores") == keys.index("logical_cores") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
         cgroups = tmp_path / "system.slice"
