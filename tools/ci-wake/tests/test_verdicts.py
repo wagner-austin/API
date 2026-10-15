@@ -24,7 +24,7 @@ from ci_wake.verdicts import (
     awaits_cover,
     classify,
     is_announceable,
-    is_superseded,
+    is_evicted,
 )
 from tests.conftest import AGENT, REPO, SHA
 
@@ -155,23 +155,18 @@ class TestIsAnnounceable:
         assert is_announceable(PushVerdict(attempt=_attempt(), runs=(), state="covered")) is True
 
 
-class TestSuperseded:
+class TestEvicted:
     """MCPs board task 5af9e749: the shape a shared pending slot gives every
-    push of a burst but the newest, said by job counts alone."""
+    push of a burst but the newest, said per run by its job count alone."""
 
-    def test_every_run_cancelled_before_any_job_is_superseded(self) -> None:
-        cancelled = _run(conclusion="cancelled")
-        assert is_superseded((cancelled, cancelled), (0, 0)) is True
+    def test_a_run_cancelled_before_any_job_is_evicted(self) -> None:
+        assert is_evicted(_run(conclusion="cancelled"), 0) is True
 
     def test_a_cancelled_run_that_created_jobs_is_not(self) -> None:
-        assert is_superseded((_run(conclusion="cancelled"),), (3,)) is False
+        assert is_evicted(_run(conclusion="cancelled"), 3) is False
 
     def test_a_run_that_reached_a_verdict_is_not(self) -> None:
-        cancelled = _run(conclusion="cancelled")
-        assert is_superseded((cancelled, _run(conclusion="failure")), (0, 0)) is False
-
-    def test_a_push_with_no_run_is_not(self) -> None:
-        assert is_superseded((), ()) is False
+        assert is_evicted(_run(conclusion="failure"), 0) is False
 
 
 class TestAwaitingCover:

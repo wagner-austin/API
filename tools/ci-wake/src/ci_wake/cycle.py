@@ -48,7 +48,7 @@ from ci_wake.verdicts import (
     awaits_cover,
     classify,
     is_announceable,
-    is_superseded,
+    is_evicted,
 )
 
 
@@ -93,7 +93,7 @@ def _covers(
 
     Args:
         attempt: The enrolment row.
-        own: Its own runs, each cancelled before any job.
+        own: Its own runs that were cancelled before any job.
         branches: This cycle's branch runs.
 
     Returns:
@@ -123,10 +123,10 @@ def _covers(
 def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushReport | None:
     """Ask GitHub about one outstanding push and decide what to say.
 
-    A push whose every own run was cancelled before any job waits for the
-    later run that checked it (:mod:`ci_wake.coverage`) and is announced
-    with that run's verdict; only past :data:`COVER_SECONDS` with none is it
-    announced as its own cancelled runs.
+    A push with an own run cancelled before any job waits for the later run
+    of that workflow that checked it (:mod:`ci_wake.coverage`) and is
+    announced with that run's verdict beside its runs that executed; only
+    past :data:`COVER_SECONDS` without one is it announced as its own runs.
 
     Args:
         attempt: The enrolment row.
@@ -153,10 +153,9 @@ def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushR
         )
         for run in runs
     )
-    if verdict["state"] == "ripe" and is_superseded(
-        runs, tuple(entry["tally"]["total"] for entry in reports)
-    ):
-        covers = _covers(attempt, reports, branches)
+    evicted = tuple(entry for entry in reports if is_evicted(entry["run"], entry["tally"]["total"]))
+    if verdict["state"] == "ripe" and len(evicted) > 0:
+        covers = _covers(attempt, evicted, branches)
         if covers is not None:
             return PushReport(
                 verdict=PushVerdict(attempt=attempt, runs=runs, state="covered"),

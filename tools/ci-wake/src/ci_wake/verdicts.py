@@ -21,12 +21,14 @@ silent as a bridge that is switched off:
   stalled    runs exist, some have not finished, and far too long has
              passed. A wedged runner, a job the host ran out of memory
              under, a queue nobody is draining.
-  covered    every run of its own was cancelled before any job, and a later
-             completed run whose head descends from it gave the verdict
-             (:mod:`ci_wake.coverage`, MCPs board task 5af9e749). Decided by
-             the cycle, which alone can ask for job counts and ancestry; a
-             superseded push with no covering run yet stays ``holding`` until
-             :data:`COVER_SECONDS`, then is announced ripe and NOT RUN.
+  covered    at least one run of its own was cancelled before any job, and
+             for each such run a later completed run of that workflow whose
+             head descends from it gave the verdict (:mod:`ci_wake.coverage`,
+             MCPs board task 5af9e749); its runs that executed report
+             themselves. Decided by the cycle, which alone can ask for job
+             counts and ancestry; a push with an evicted run and no cover for
+             it yet stays ``holding`` until :data:`COVER_SECONDS`, then is
+             announced ripe and NOT RUN.
 
 THE SETTLE WINDOW IS ABOUT RUN CREATION, NOT RUN COMPLETION. A repository
 with several workflows creates them within seconds of a push, but not in the
@@ -100,9 +102,9 @@ class PushVerdict(TypedDict):
         runs: Every run GitHub listed for the sha, in its order. Empty for
             ``abandoned``, and possibly empty for ``holding``.
         state: ``holding``, ``ripe``, ``abandoned``, ``stalled``, or
-            ``covered``: every run of its own was cancelled before any job
-            and a later completed run whose head descends from it gave the
-            verdict instead (:mod:`ci_wake.coverage`).
+            ``covered``: each of its own runs cancelled before any job has a
+            later completed run of that workflow, whose head descends from
+            it, giving the verdict instead (:mod:`ci_wake.coverage`).
     """
 
     attempt: PushAttempt
@@ -132,26 +134,25 @@ def classify(
     return "ripe" if waited >= CREATION_SETTLE_SECONDS else "holding"
 
 
-def is_superseded(runs: Sequence[WorkflowRun], job_totals: Sequence[int]) -> bool:
-    """Was every run of a push cancelled before it created a job?
+def is_evicted(run: WorkflowRun, job_total: int) -> bool:
+    """Was this run of a push cancelled before it created a job?
 
     The shape a shared pending slot gives every push of a burst but the
-    newest (:mod:`ci_wake.coverage`): its verdict, if any, is a later run's.
-    Only the job count says so; the payload names no cause, and none is
-    assumed here.
+    newest (:mod:`ci_wake.coverage`): that workflow's verdict, if any, is a
+    later run's. Decided PER RUN, not per push: measured 2026-10-15,
+    MCPs f007ca7d2 had a Check run evicted with 0 jobs and a ``Check (live
+    upstreams)`` run that succeeded, and a per-push test announced its Check
+    NOT RUN though run 38741872057 had checked it. Only the job count says a
+    run was evicted; the payload names no cause, and none is assumed here.
 
     Args:
-        runs: The push's own runs, every one terminal.
-        job_totals: Each run's job count, in the same order.
+        run: One of the push's own runs, terminal.
+        job_total: Its job count.
 
     Returns:
-        True when it had at least one run and every run ended cancelled
-        with no job.
+        True when it ended cancelled with no job.
     """
-    return len(runs) > 0 and all(
-        run["conclusion"] == CANCELLED and total == 0
-        for run, total in zip(runs, job_totals, strict=True)
-    )
+    return run["conclusion"] == CANCELLED and job_total == 0
 
 
 def awaits_cover(attempt: PushAttempt, now_epoch: int) -> bool:
@@ -193,5 +194,5 @@ __all__ = [
     "awaits_cover",
     "classify",
     "is_announceable",
-    "is_superseded",
+    "is_evicted",
 ]

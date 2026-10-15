@@ -156,6 +156,119 @@ class TestASupersededPushIsAnnouncedWithItsCover:
         assert body.endswith(f"@{AGENT} your push has its CI verdict")
         assert '"state":"covered"' in position_path(enrolment).read_text(encoding="utf-8")
 
+    def test_an_evicted_run_is_covered_beside_a_sibling_workflow_that_ran(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        """MCPs f007ca7d2, 2026-10-15: its Check run 38737965715 was cancelled
+        with 0 jobs and its Check (live upstreams) run 38737965781 succeeded
+        with 1, and a per-push rule announced its Check NOT RUN though run
+        38741872057 had checked it. Each evicted run is covered on its own."""
+        pin_env(CONFIGURED_ENV)
+        enrolment = tmp_path / "pushes.jsonl"
+        _enrol(enrolment)
+        live = OTHER_OWN_RUN
+        _test_hooks.run_process = FakeGh(
+            {
+                runs_argv(REPO, SHA): _reply(
+                    {
+                        "total_count": 2,
+                        "workflow_runs": [
+                            {
+                                "id": live,
+                                "name": "Check (live upstreams)",
+                                "status": "completed",
+                                "conclusion": "success",
+                                "html_url": f"https://github.com/{REPO}/actions/runs/{live}",
+                            },
+                            {
+                                "id": OWN_RUN,
+                                "name": "Check",
+                                "status": "completed",
+                                "conclusion": "cancelled",
+                                "html_url": f"https://github.com/{REPO}/actions/runs/{OWN_RUN}",
+                            },
+                        ],
+                    }
+                ),
+                jobs_argv(REPO, live): _jobs(1),
+                jobs_argv(REPO, OWN_RUN): _jobs(0),
+                branch_runs_argv(REPO, "main", FROZEN_NOW - 3600, 1): _branch(
+                    (RED_RUN, RED, 1600, "failure")
+                ),
+                compare_argv(REPO, SHA, RED): _status("ahead"),
+                jobs_argv(REPO, RED_RUN): _jobs(67, ("cloudflared",)),
+            }
+        )
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        run_cycle(enrolment)
+
+        (note,) = notes_sent(poster)
+        body = str(note["body"])
+        assert body.splitlines()[0] == (
+            f"CI-TERMINAL {REPO}: 1 push(es), 2 run(s) (failure by a later run x1, success x1)"
+        )
+        assert "  Check (live upstreams) success -- 1 jobs" in body
+        assert f"checked by run {RED_RUN} at c91c08f, failure -- 67 jobs" in body
+        assert "NOT RUN" not in body
+        assert body.endswith(f"@{AGENT} your push has its CI verdict")
+
+    def test_a_sibling_cancelled_after_its_jobs_began_is_still_not_run(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        """Only a run evicted before any job is covered; one stopped mid-run
+        checked part of the push and says so, as it always did."""
+        pin_env(CONFIGURED_ENV)
+        enrolment = tmp_path / "pushes.jsonl"
+        _enrol(enrolment)
+        partial = OTHER_OWN_RUN
+        _test_hooks.run_process = FakeGh(
+            {
+                runs_argv(REPO, SHA): _reply(
+                    {
+                        "total_count": 2,
+                        "workflow_runs": [
+                            {
+                                "id": partial,
+                                "name": "Check (live upstreams)",
+                                "status": "completed",
+                                "conclusion": "cancelled",
+                                "html_url": f"https://github.com/{REPO}/actions/runs/{partial}",
+                            },
+                            {
+                                "id": OWN_RUN,
+                                "name": "Check",
+                                "status": "completed",
+                                "conclusion": "cancelled",
+                                "html_url": f"https://github.com/{REPO}/actions/runs/{OWN_RUN}",
+                            },
+                        ],
+                    }
+                ),
+                jobs_argv(REPO, partial): _jobs(2),
+                jobs_argv(REPO, OWN_RUN): _jobs(0),
+                branch_runs_argv(REPO, "main", FROZEN_NOW - 3600, 1): _branch(
+                    (RED_RUN, RED, 1600, "failure")
+                ),
+                compare_argv(REPO, SHA, RED): _status("ahead"),
+                jobs_argv(REPO, RED_RUN): _jobs(67, ("cloudflared",)),
+            }
+        )
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        run_cycle(enrolment)
+
+        body = str(notes_sent(poster)[0]["body"])
+        assert f"checked by run {RED_RUN} at c91c08f" in body
+        assert "  Check (live upstreams) cancelled -- 2 of 2 jobs completed, 0 NOT RUN" in body
+        assert f"NOT RUN: CI cancelled work for {SHA}" in body
+        assert body.endswith(
+            f"@{AGENT} 1 of your pushed sha(s) were not run by CI in full (NOT RUN), "
+            "so they have no CI verdict"
+        )
+
     def test_two_pushes_to_one_branch_read_its_runs_once(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
     ) -> None:

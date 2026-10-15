@@ -88,11 +88,13 @@ tells the pusher how many of their pushes were not run instead of that they
 have a verdict. Still no cause: the count and the words are facts, the reason
 is not in the payload.
 
-UNLESS A LATER RUN CHECKED IT (MCPs board task 5af9e749). A push whose every
-own run was cancelled before any job is held until the first later completed
-run of the same workflow on the same branch whose head descends from it
-(:mod:`ci_wake.coverage`), and is then announced ``covered`` with THAT run's
-conclusion, jobs and URL, naming the run and the head it checked. Over 15
+UNLESS A LATER RUN CHECKED IT (MCPs board task 5af9e749). A push with an own
+run cancelled before any job is held until, for each such run, the first
+later completed run of that workflow on the same branch whose head descends
+from it (:mod:`ci_wake.coverage`) has finished, and is then announced
+``covered``: each such run is reported as THAT run's conclusion, jobs and
+URL, naming the run and the head it checked, and its runs that executed are
+reported as they always were. Over 15
 hours on 2026-10-14 to 15, 50 of 60 runs on MCPs main were such
 cancellations, and every one was announced NOT RUN to its pusher while the
 run that checked it was announced to nobody. Only a push no covering run
@@ -112,7 +114,7 @@ from typing_extensions import TypedDict
 
 from ci_wake.coverage import BranchRun
 from ci_wake.runs import JobTally, WorkflowRun, is_terminal
-from ci_wake.verdicts import NO_RUN_SECONDS, STALL_SECONDS, PushVerdict
+from ci_wake.verdicts import NO_RUN_SECONDS, STALL_SECONDS, PushVerdict, is_evicted
 
 #: First token of every announcement body; the machine-searchable marker.
 #: Deliberately the same shape as ``JOB-TERMINAL`` and ``DISPATCH-TERMINAL``,
@@ -228,14 +230,31 @@ def _is_not_run(report: PushReport) -> bool:
 
     Returns:
         True when one of its runs ended ``cancelled``: some or all of the
-        push was never checked, whatever the rest of its runs said. False
-        for a ``covered`` push: a later run did check it.
+        push was never checked, whatever the rest of its runs said. A run a
+        later run covered is not counted: that later run did check it.
     """
-    if report["verdict"]["state"] == "covered":
-        return False
     return any(
         is_terminal(entry["run"]) and entry["run"]["conclusion"] == "cancelled"
+        for entry in _executed(report)
+    )
+
+
+def _executed(report: PushReport) -> tuple[RunReport, ...]:
+    """The push's own runs that report themselves.
+
+    Args:
+        report: The decided push and its runs.
+
+    Returns:
+        Every own run, except, for a ``covered`` push, the runs evicted
+        before any job: each of those is reported by its cover instead.
+    """
+    if report["verdict"]["state"] != "covered":
+        return report["reports"]
+    return tuple(
+        entry
         for entry in report["reports"]
+        if not is_evicted(entry["run"], entry["tally"]["total"])
     )
 
 
@@ -312,19 +331,17 @@ def _push_lines(report: PushReport) -> list[str]:
     """
     attempt = report["verdict"]["attempt"]
     lines = [f"{attempt['sha'][:_SHORT_SHA]} {attempt['ref']}"]
-    if report["verdict"]["state"] == "covered":
-        # The covering run's verdict IS this push's: its tree contains the
-        # push. Said as the run and head that checked it, never as a cause
-        # for why the push's own run was cancelled.
-        for covered in report["covers"]:
-            checker = covered["cover"]["run"]
-            lines.append(
-                f"  {checker['workflow']}: its own run was cancelled before any job; checked by "
-                f"run {checker['run_id']} at {covered['cover']['head_sha'][:_SHORT_SHA]}, "
-                f"{checker['conclusion']} -- {_jobs_phrase(covered['tally'])}"
-            )
-            lines.append(f"  {checker['html_url']}")
-        return lines
+    # The covering run's verdict IS this workflow's for the push: its tree
+    # contains the push. Said as the run and head that checked it, never as a
+    # cause for why the push's own run was cancelled. Empty unless covered.
+    for covered in report["covers"]:
+        checker = covered["cover"]["run"]
+        lines.append(
+            f"  {checker['workflow']}: its own run was cancelled before any job; checked by "
+            f"run {checker['run_id']} at {covered['cover']['head_sha'][:_SHORT_SHA]}, "
+            f"{checker['conclusion']} -- {_jobs_phrase(covered['tally'])}"
+        )
+        lines.append(f"  {checker['html_url']}")
     if report["verdict"]["state"] == "abandoned":
         lines.append(
             f"  NO RUN EVER APPEARED -- {NO_RUN_SECONDS // 60}m after the push, GitHub "
@@ -337,7 +354,7 @@ def _push_lines(report: PushReport) -> list[str]:
             f"  NO VERDICT AFTER {STALL_SECONDS // 3600}h -- this row is now closed and "
             "will not be announced again. Watch the runs below yourself."
         )
-    for entry in report["reports"]:
+    for entry in _executed(report):
         run = entry["run"]
         outcome = _outcome_phrase(entry)
         lines.append(f"  {run['workflow']} {outcome} -- {_jobs_phrase(entry['tally'])}")
@@ -369,14 +386,12 @@ def _tally_phrase(reports: Sequence[PushReport]) -> str:
     """
     counts: dict[str, int] = {}
     for report in reports:
-        if report["verdict"]["state"] == "covered":
-            for covered in report["covers"]:
-                later = f"{covered['cover']['run']['conclusion']} by a later run"
-                counts[later] = counts.get(later, 0) + 1
-            continue
+        for covered in report["covers"]:
+            later = f"{covered['cover']['run']['conclusion']} by a later run"
+            counts[later] = counts.get(later, 0) + 1
         if len(report["reports"]) == 0:
             counts["no-run"] = counts.get("no-run", 0) + 1
-        for entry in report["reports"]:
+        for entry in _executed(report):
             run = entry["run"]
             outcome = run["conclusion"] if is_terminal(run) else f"still-{run['status']}"
             counts[outcome] = counts.get(outcome, 0) + 1
@@ -420,10 +435,7 @@ def _body(repo: str, agent: str, reports: Sequence[PushReport]) -> str:
     Returns:
         The post text.
     """
-    total_runs = sum(
-        len(report["covers"] if report["verdict"]["state"] == "covered" else report["reports"])
-        for report in reports
-    )
+    total_runs = sum(len(_executed(report)) + len(report["covers"]) for report in reports)
     lines = [
         f"{MARKER} {repo}: {len(reports)} push(es), {total_runs} run(s) ({_tally_phrase(reports)})"
     ]
