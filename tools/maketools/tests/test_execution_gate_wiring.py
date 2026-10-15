@@ -66,13 +66,10 @@ def test_a_fleet_roll_moves_the_ref_only_after_both_suites_passed_at_head() -> N
 
 
 def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
-    # Every fleet task's action is poetry running fleet.cli.tick (MCPs board
-    # task 94ac1c4f), and the tick runs its agent only through the rolled
-    # launcher, for both the hub's agent and a node's.
-    schedule = (ROOT / "tools" / "fleet" / "scripts" / "FleetSchedule.ps1").read_text(
-        encoding="utf-8"
-    )
-    assert '$line = "run -- python -m fleet.cli.tick --api-root ' in schedule
+    # Every fleet tick is poetry running fleet.cli.tick (MCPs board task
+    # 94ac1c4f; the MCPs hub runner's fleet rows run that, held by its table
+    # suite since MCPs board task b27bd34a), and the tick runs its agent only
+    # through the rolled launcher, for both the hub's agent and a node's.
     tick = (ROOT / "tools" / "fleet" / "src" / "fleet" / "cli" / "tick.py").read_text(
         encoding="utf-8"
     )
