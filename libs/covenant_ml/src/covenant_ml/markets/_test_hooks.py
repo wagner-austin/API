@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 from os import cpu_count
+from pathlib import Path
 from time import sleep
 
 from platform_core.environment_record import (
@@ -18,6 +19,7 @@ from platform_core.environment_record import (
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
 
 from .campaign_process import CommandRunner, run_command
+from .demo_batch import DemoBatchService, build_demo_batch
 from .demo_trial import DemoTrialService, build_demo_trial
 from .kalshi_auth import KalshiSigner
 from .kalshi_demo import DemoAccountClient
@@ -44,6 +46,9 @@ demo_account_factory: Callable[
 demo_trial_factory: Callable[[HttpxClient, KalshiSigner, Callable[[], str]], DemoTrialService] = (
     build_demo_trial
 )
+demo_batch_factory: Callable[
+    [HttpxClient, KalshiSigner, Callable[[], str], Path], DemoBatchService
+] = build_demo_batch
 
 
 __all__ = [
@@ -51,6 +56,7 @@ __all__ = [
     "client_factory",
     "clock",
     "demo_account_factory",
+    "demo_batch_factory",
     "demo_trial_factory",
     "host_probe",
     "installed_version",

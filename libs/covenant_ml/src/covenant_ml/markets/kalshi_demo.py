@@ -80,6 +80,30 @@ def decode_preflight(document: JSONObject) -> DemoPreflight:
     )
 
 
+def decode_native_balance(document: JSONObject) -> tuple[int, int, int]:
+    """Validate primary-account balance across exchange shards in exact units.
+
+    Args:
+        document: Native balance response requiring cent and dollar representations.
+
+    Returns:
+        Cash microdollars, portfolio cents and last-update epoch seconds.
+
+    Raises:
+        ValueError: KALSHI-DEMO-006 if native monetary representations disagree.
+        TypeError: A required native balance field is missing or malformed.
+    """
+    cents = require_bounded_int(document, "balance", 0, _MAX_INT)
+    microdollars = parse_fixed(require_str(document, "balance_dollars"), 6)
+    if microdollars // 10000 != cents:
+        raise ValueError("[KALSHI-DEMO-006] native cent and dollar balances disagree")
+    return (
+        microdollars,
+        require_bounded_int(document, "portfolio_value", 0, _MAX_INT),
+        require_bounded_int(document, "updated_ts", 0, _MAX_INT),
+    )
+
+
 class DemoAccountClient:
     """Read demo primary-account evidence using a supplied HTTP client and clock."""
 
@@ -123,14 +147,14 @@ class DemoAccountClient:
             HTTPError: An authenticated request fails at the transport boundary.
         """
         started = parse_timestamp(self._clock())
-        first = self._balance()
+        first = decode_native_balance(self._transport.get("/portfolio/balance", {"subaccount": 0}))
         orders = self._transport.get("/portfolio/orders", {"subaccount": 0, "limit": 1})
         self._require_empty(orders, ("orders",))
         positions = self._transport.get(
             "/portfolio/positions", {"subaccount": 0, "limit": 1, "settlement_status": "unsettled"}
         )
         self._require_empty(positions, ("market_positions", "event_positions"))
-        last = self._balance()
+        last = decode_native_balance(self._transport.get("/portfolio/balance", {"subaccount": 0}))
         completed = parse_timestamp(self._clock())
         if first != last:
             raise ValueError("[KALSHI-DEMO-005] account balance changed during preflight")
@@ -144,27 +168,6 @@ class DemoAccountClient:
                 "started_ms": started,
                 "completed_ms": completed,
             }
-        )
-
-    def _balance(self) -> tuple[int, int, int]:
-        """Validate primary-account aggregate balance across all exchange shards.
-
-        Returns:
-            Exact microdollars, portfolio cents and last-update epoch seconds.
-
-        Raises:
-            ValueError: KALSHI-DEMO-006 if cents and dollar strings disagree.
-            ValueError: Invalid native monetary values.
-        """
-        document = self._transport.get("/portfolio/balance", {"subaccount": 0})
-        cents = require_bounded_int(document, "balance", 0, _MAX_INT)
-        microdollars = parse_fixed(require_str(document, "balance_dollars"), 6)
-        if microdollars // 10000 != cents:
-            raise ValueError("[KALSHI-DEMO-006] native cent and dollar balances disagree")
-        return (
-            microdollars,
-            require_bounded_int(document, "portfolio_value", 0, _MAX_INT),
-            require_bounded_int(document, "updated_ts", 0, _MAX_INT),
         )
 
     @staticmethod

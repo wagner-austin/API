@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from platform_core.json_utils import JSONObject, require_dict, require_str
+from platform_core.json_utils import (
+    JSONObject,
+    narrow_json_to_dict,
+    require_dict,
+    require_int,
+    require_list,
+    require_str,
+)
 
 from .account_settlement import decode_account_settlement
 from .execution_records import (
@@ -191,6 +198,20 @@ def apply_execution_event(state: ExecutionState, event: JSONObject) -> Execution
     action = require_str(event, "action")
     observed = require_bounded_int(event, "observed_ms", state["observed_ms"], 2**63 - 1)
     orders, reason = state["orders"], state["halt_reason"]
+    if action == "account_snapshot":
+        events = require_list(event, "events")
+        if not events:
+            raise ValueError("[EXECUTION-012] account snapshot requires reconciliation events")
+        candidate = state
+        for value in events:
+            item = narrow_json_to_dict(value)
+            if (
+                require_str(item, "action") not in ("receipt", "account_settlement")
+                or require_int(item, "observed_ms") != observed
+            ):
+                raise ValueError("[EXECUTION-012] snapshot requires same-time account evidence")
+            candidate = apply_execution_event(candidate, item)
+        return candidate
     if action == "reserve":
         orders = _reserve(state, require_dict(event, "data"), observed)
     elif action in ("receipt", "settlement", "account_settlement"):
