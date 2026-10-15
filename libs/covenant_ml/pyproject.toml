@@ -99,7 +99,9 @@ fail_under = 100
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-v -n auto --dist loadscope --durations=25"
+addopts = "-v -n auto --dist worksteal --durations=25"
+# Native archive replays and short validation cases have very different costs.
+# Keep idle workers useful instead of leaving a long replay at the loadscope tail.
 # ``--durations=25`` prints the 25 slowest setups, calls and teardowns at the
 # end of every run, so a check that drifts toward its 300 s budget (board
 # task 2e880b79) names the tests that moved it in its own output, rather than
