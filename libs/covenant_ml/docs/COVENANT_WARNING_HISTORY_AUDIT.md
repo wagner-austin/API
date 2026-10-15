@@ -48,3 +48,25 @@ alert, calibration and replay tests remain in the full suite. Coverage measures
 executed paths, not all scientifically necessary assumptions. Historical
 cohort acquisition, frozen model comparison and dependence-aware uncertainty
 remain separate evidence requirements; this correction establishes no edge.
+
+## Coverage boundary double-check
+
+The follow-up record defines the first breach within its coverage interval,
+not necessarily the borrower's first lifetime breach. A later observation
+starting after a known earlier breach can therefore be internally consistent,
+while remaining outside this first-incident study. The previous validator
+rejected these rows but incorrectly called them contradictory evidence.
+
+Twenty boundary tests now cover surveillance ending before, exactly at and
+after a breach, reversed row order, and later observation periods with and
+without another breach. Sixteen passed before the change; four failed because
+the error classification was wrong. Re-entry now propagates WARN-030 with an
+explicit unsupported message. Overlapping conflicting evidence still propagates
+WARN-024. No previously rejected re-entry is admitted, and no scoring rule changes.
+
+The updated `make check` passed 4,057 tests, 18,715 statements and 3,892 branches,
+zero missed, 100% coverage, strict typing, guards and lint in 103 seconds.
+Log: `PROJECTS/files/warning-boundaries-check-20261014.log`. The preceding
+4,037-test published commit also passed independently on serendipity at
+2026-10-15T00:04:27Z and its board audit was verified. These are implementation
+checks, not evidence that the model predicts breaches or profitable trades.
