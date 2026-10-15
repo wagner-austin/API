@@ -29,8 +29,20 @@ SETTING = f"{runner_action_cache.CACHE_VARIABLE}={runner_action_cache.WSL_CACHE_
 OTHER = "actions.runner.wagner-austin-API.lavender-wsl.service"
 
 #: ``systemctl`` over ``state/<unit>/``: ``main`` is the unit's main pid (0
-#: when stopped) and ``loaded`` the environment systemd holds for it.
+#: when stopped) and ``loaded`` the environment systemd holds for it. And
+#: ``sleep``, which passes no time: it records each call, and on the first
+#: one after a case writes ``arrives`` (``<cgroup.procs path> <pid>``) puts
+#: that pid in that cgroup, the way a job arrives inside a settle window.
 SYSTEMCTL = (
+    "sleep() {\n"
+    '    echo "$*" >> sleeps.log\n'
+    "    local procs pid\n"
+    "    if [ -f arrives ]; then\n"
+    "        read -r procs pid < arrives\n"
+    '        echo "$pid" >> "$procs"\n'
+    "        rm arrives\n"
+    "    fi\n"
+    "}\n"
     "systemctl() {\n"
     '    echo "$*" >> calls.log\n'
     "    local unit=${!#} u\n"
@@ -145,6 +157,30 @@ class Host:
         procs = self.root / "cgroup" / "system.slice" / name / "cgroup.procs"
         procs.write_text(f"{pid}\n", encoding="utf-8")
 
+    def job_arrives(self, name: str, pid: int) -> None:
+        """Start a job in a unit at the first second of its settle window.
+
+        Args:
+            name: The unit.
+            pid: Its main process; the job's Worker is ``pid + 1``.
+        """
+        worker = self.root / "proc" / str(pid + 1)
+        worker.mkdir()
+        (worker / "cmdline").write_bytes(b"/home/gharunner/bin/Runner.Worker\0spawnclient\0")
+        procs = f"cgroup/system.slice/{name}/cgroup.procs"
+        (self.root / "arrives").write_text(f"{procs} {pid + 1}\n", encoding="utf-8")
+
+    def sleeps(self) -> int:
+        """How many one-second samples the scripts waited between.
+
+        Returns:
+            The number of sleep calls, each asserted to be one second.
+        """
+        log = self.root / "sleeps.log"
+        lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+        assert set(lines) <= {"1"}
+        return len(lines)
+
     def _run(self, script: str) -> subprocess.CompletedProcess[str]:
         """Run a script in the test's directory.
 
@@ -172,17 +208,17 @@ class Host:
         (self.root / "provision.sh").write_bytes((SYSTEMCTL + body).encode())
         return self._run("provision.sh")
 
-    def adopt(self, *names: str) -> subprocess.CompletedProcess[str]:
-        """Run the adopt script, as its timer does.
+    def adopt(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+        """Run the adopt script with exactly these arguments.
 
         Args:
-            names: The units it is given.
+            arguments: Its arguments.
 
         Returns:
             The finished process.
         """
         return subprocess.run(
-            [host_bash(), "adopt.sh", *names],
+            [host_bash(), "adopt.sh", *arguments],
             cwd=self.root,
             capture_output=True,
             text=True,
@@ -209,6 +245,21 @@ class Host:
         """
         return (self.root / "proc" / str(pid) / "environ").read_bytes()
 
+    def timer(self, *names: str) -> subprocess.CompletedProcess[str]:
+        """Run the adopt script as its timer does, with the rendered settle window.
+
+        Args:
+            names: The units it is given.
+
+        Returns:
+            The finished process.
+        """
+        return self.adopt(str(SETTLE), *names)
+
+
+#: The settle window every rendered call passes.
+SETTLE = runner_cache_adopt.ADOPT_SETTLE_SECONDS
+
 
 def _restarted(unit: str) -> str:
     """The adopt script's line for a unit it restarted.
@@ -219,7 +270,10 @@ def _restarted(unit: str) -> str:
     Returns:
         The line, with its newline.
     """
-    return f"fleet-action-cache-adopt: {unit} restarted while idle, to read the action cache\n"
+    return (
+        f"fleet-action-cache-adopt: {unit} restarted after {SETTLE} s idle, "
+        "to read the action cache\n"
+    )
 
 
 def _left_busy(unit: str) -> str:
@@ -233,7 +287,7 @@ def _left_busy(unit: str) -> str:
     """
     return (
         f"fleet-action-cache-adopt: {unit} is running a job; "
-        "fleet-action-cache-adopt.timer restarts it the first minute it is idle\n"
+        f"fleet-action-cache-adopt.timer restarts it once it is idle for {SETTLE} s\n"
     )
 
 
@@ -310,7 +364,10 @@ class TestTheAdoptUnits:
             "ADOPT_EOF",
             "chmod +x /usr/local/sbin/fleet-action-cache-adopt",
         ]
-        assert f"ExecStart=/usr/local/sbin/fleet-action-cache-adopt {UNIT} {OTHER}" in lines[5]
+        assert (
+            f"ExecStart=/usr/local/sbin/fleet-action-cache-adopt {SETTLE} {UNIT} {OTHER}"
+            in lines[5]
+        )
         assert lines[-2:] == [
             "systemctl daemon-reload",
             "systemctl enable --now fleet-action-cache-adopt.timer",
@@ -324,7 +381,7 @@ class TestTheAdoptUnits:
     def test_provision_installs_the_script_before_the_installs_that_call_it(self) -> None:
         script = runner_render.render_provision(a_host([an_install(UNIT)]))["linux_script"]
         installed = script.index(f"cat > {runner_cache_adopt.ADOPT_PATH} <<'ADOPT_EOF'")
-        called = script.index(f"\n{runner_cache_adopt.ADOPT_PATH} {UNIT}\n")
+        called = script.index(f"\n{runner_cache_adopt.ADOPT_PATH} {SETTLE} {UNIT}\n")
         assert installed < script.index("# --- runner installs ---") < called
 
 
@@ -339,6 +396,8 @@ class TestProvisionGivesAUnitTheCache:
         first = host.provision(UNIT)
         assert first.returncode == 0, first.stderr
         assert first.stdout == _restarted(UNIT)
+        # Idle at every one of SETTLE + 1 samples, a second apart.
+        assert host.sleeps() == SETTLE
         drop_in = tmp_path / "units" / f"{UNIT}.d" / runner_action_cache.CACHE_DROP_IN_NAME
         assert drop_in.read_bytes() == runner_action_cache.CACHE_DROP_IN.encode()
         assert SETTING.encode() in host.environ(100)
@@ -358,22 +417,36 @@ class TestProvisionGivesAUnitTheCache:
     def test_a_unit_running_a_job_is_left_then_adopted_by_the_timer_once_idle(
         self, tmp_path: pathlib.Path
     ) -> None:
-        # lavender, 2026-10-15: three provision runs found the four MCPs
-        # WSL runners busy; the timer is what catches each between jobs.
+        # lavender, 2026-10-15: four provision runs found the four MCPs
+        # WSL runners busy; the timer is what restarts each once idle.
         host = Host(tmp_path)
         host.unit(UNIT, 100, loaded=False, busy=True)
         provisioned = host.provision(UNIT)
         assert provisioned.returncode == 0, provisioned.stderr
         assert provisioned.stdout == _left_busy(UNIT)
         assert f"restart {UNIT}" not in host.calls()
-        still_busy = host.adopt(UNIT)
+        still_busy = host.timer(UNIT)
         assert still_busy.stdout == _left_busy(UNIT)
         host.idle(UNIT, 100)
-        adopted = host.adopt(UNIT)
+        adopted = host.timer(UNIT)
         assert adopted.returncode == 0, adopted.stderr
         assert adopted.stdout == _restarted(UNIT)
         assert SETTING.encode() in host.environ(100)
-        assert host.adopt(UNIT).stdout == ""
+        assert host.timer(UNIT).stdout == ""
+
+    def test_a_job_taken_inside_the_settle_window_stops_the_restart(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # lavender-wsl-2, 2026-10-15: no Worker from 13:41:12Z, when one job
+        # ended, to 13:41:14Z, when the listener's next job started.
+        host = Host(tmp_path)
+        host.unit(UNIT, 100)
+        host.job_arrives(UNIT, 100)
+        ran = host.timer(UNIT)
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout == _left_busy(UNIT)
+        assert f"restart {UNIT}" not in host.calls()
+        assert host.sleeps() == 1
 
     def test_an_unscriptable_unit_is_refused(self) -> None:
         with pytest.raises(ValueError, match="cannot be embedded in a rendered script verbatim"):
@@ -389,7 +462,7 @@ class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:
         host = Host(tmp_path)
         host.unit(UNIT, 100, running=False)
         host.unit(OTHER, 200)
-        ran = host.adopt(UNIT, OTHER)
+        ran = host.timer(UNIT, OTHER)
         assert ran.returncode == 0, ran.stderr
         assert ran.stdout == _restarted(OTHER)
         assert f"restart {UNIT}" not in host.calls()
@@ -402,7 +475,7 @@ class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:
         host = Host(tmp_path)
         host.unit(UNIT, 100, loaded=False)
         host.unit(OTHER, 200)
-        ran = host.adopt(UNIT, OTHER)
+        ran = host.timer(UNIT, OTHER)
         assert ran.returncode == 0, ran.stderr
         assert ran.stdout == _restarted(OTHER)
         assert f"restart {UNIT}" not in host.calls()
@@ -413,7 +486,7 @@ class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:
         host = Host(tmp_path)
         host.unit(UNIT, 100, adopted=True)
         host.unit(OTHER, 200)
-        ran = host.adopt(UNIT, OTHER)
+        ran = host.timer(UNIT, OTHER)
         assert ran.returncode == 0, ran.stderr
         assert ran.stdout == _restarted(OTHER)
         assert f"restart {UNIT}" not in host.calls()
@@ -424,7 +497,7 @@ class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:
         host = Host(tmp_path)
         host.unit(UNIT, 100, cgroup_readable=False)
         host.unit(OTHER, 200)
-        ran = host.adopt(UNIT, OTHER)
+        ran = host.timer(UNIT, OTHER)
         assert ran.returncode == 0, ran.stderr
         # The harness moves /sys/fs/cgroup to its own cgroup directory.
         assert ran.stdout == (
@@ -434,7 +507,15 @@ class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:
         )
         assert f"restart {UNIT}" not in host.calls()
 
-    def test_a_call_naming_no_unit_is_refused_with_its_usage(self, tmp_path: pathlib.Path) -> None:
-        ran = Host(tmp_path).adopt()
+    @pytest.mark.parametrize("arguments", [(), ("15",), (UNIT,), ("15s", UNIT)])
+    def test_a_call_without_a_settle_window_and_a_unit_is_refused_with_its_usage(
+        self, tmp_path: pathlib.Path, arguments: tuple[str, ...]
+    ) -> None:
+        host = Host(tmp_path)
+        host.unit(UNIT, 100)
+        ran = host.adopt(*arguments)
         assert ran.returncode == 2
-        assert ran.stderr == "fleet-action-cache-adopt: usage: fleet-action-cache-adopt UNIT...\n"
+        assert ran.stderr == (
+            "fleet-action-cache-adopt: usage: fleet-action-cache-adopt SETTLE_SECONDS UNIT...\n"
+        )
+        assert host.calls() == []
