@@ -3,7 +3,8 @@
   "minimum_workers": 2,
   "expected_minutes": 8,
   "required_tags": [
-    "windows"
+    "windows",
+    "testdb"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
