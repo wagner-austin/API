@@ -26,6 +26,7 @@ from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.chain import submit_chain
+from hpc3.core.drift import describe_drift
 
 _FLAGS = (_config.CONFIG_FLAG, "--run")
 
@@ -82,6 +83,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         submitter=_config.submitter_label(),
         cluster=cluster,
         charge_account=budget["charge_account"],
+        repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
     )
 
     for position, (member, stage) in enumerate(zip(submitted, stages, strict=True)):
@@ -90,6 +92,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"submitted {member.job_id} {member.name} "
             f"[{describe_gpu_request(stage['gpu'])}, {stage['minutes']} min] {waits}"
         )
+        # Per stage, because stages may pin different images.
+        for line in describe_drift(member.image_drift):
+            _test_hooks.emit(line)
     _test_hooks.emit(f"{len(submitted)} stage(s) on {stages[0]['partition']} (free)")
     # Stated rather than left implied: a stage whose predecessor fails is
     # cancelled, not left pending, and someone reading a chain that stopped

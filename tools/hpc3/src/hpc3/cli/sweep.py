@@ -25,6 +25,7 @@ from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
+from hpc3.core.drift import describe_drift, merge_drifts
 from hpc3.core.sweep import submit_sweep
 
 _FLAGS = (_config.CONFIG_FLAG, "--run")
@@ -84,10 +85,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         submitter=_config.submitter_label(),
         cluster=cluster,
         charge_account=budget["charge_account"],
+        repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
     )
 
     for member in submitted:
         _test_hooks.emit(f"submitted {member.job_id} {member.name}")
+    # Once for the array, not once per member: they share one image and one
+    # comparison, and each ledger row carries its own member's share.
+    for line in describe_drift(merge_drifts([member.image_drift for member in submitted])):
+        _test_hooks.emit(line)
     _test_hooks.emit(
         f"{len(submitted)} member(s) on {base['partition']} (free), "
         f"{describe_gpu_request(base['gpu'])} each, {base['minutes']} min"

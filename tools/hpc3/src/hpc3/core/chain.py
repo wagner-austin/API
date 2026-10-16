@@ -20,14 +20,12 @@ from __future__ import annotations
 
 import pathlib
 
-from platform_core.cluster_layout import qualified_name
-
 from hpc3.contracts.chain import ChainSpec
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.dependency import AFTER_OK, Dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.core import audit, submit
-from hpc3.core.array_submit import SubmittedMember
+from hpc3.core.submit import SubmittedMember
 
 
 def _waiting_on(previous: str) -> Dependency:
@@ -55,6 +53,7 @@ def submit_chain(
     submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
+    repo: pathlib.Path,
 ) -> list[SubmittedMember]:
     """Submit every stage of a chain, in order, each waiting on the last.
 
@@ -73,6 +72,10 @@ def submit_chain(
             one submitter.
         cluster: The cluster whose measured limits each stage is validated
             against.
+        charge_account: Slurm account to bill, or empty for none.
+        repo: The chain's project's repository on this machine, which each
+            stage's image is compared against. A chain document names one
+            project, so every stage shares it.
 
     Returns:
         One record per stage, in execution order.
@@ -89,7 +92,7 @@ def submit_chain(
         waiting: JobSpec = (
             stage if previous is None else JobSpec({**stage, "depends_on": _waiting_on(previous)})
         )
-        job_id = submit.submit(
+        member = submit.submit(
             waiting,
             host=host,
             script_dir=script_dir,
@@ -99,9 +102,10 @@ def submit_chain(
             submitter=submitter,
             cluster=cluster,
             charge_account=charge_account,
+            repo=repo,
         )
-        submitted.append(SubmittedMember(qualified_name(stage["project"], stage["name"]), job_id))
-        previous = job_id
+        submitted.append(member)
+        previous = member.job_id
 
     audit.chain_submitted(
         host=host,

@@ -28,6 +28,7 @@ from hpc3.contracts.experiment import format_experiment, matches
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger
+from hpc3.core.drift import describe_drift
 
 _FLAGS = (_config.CONFIG_FLAG, "--match", "--job")
 
@@ -128,6 +129,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         _test_hooks.emit(f"{entry['job_id']} {entry['name']} submitted {entry['submitted_at']}")
         _test_hooks.emit(f"  {format_experiment(entry['experiment'])}")
         _test_hooks.emit(f"  {describe_image(entry['image_digest'])}")
+        # Which code that image held, against the submitter's HEAD at the
+        # time. A row from before the field says so in words, like the
+        # digest, rather than printing nothing a reader could take for "no
+        # drift".
+        image_drift = entry["image_drift"]
+        if image_drift is None:
+            _test_hooks.emit(
+                "  code unrecorded -- this row predates the field, do not read it as unchanged"
+            )
+        else:
+            for line in describe_drift(image_drift):
+                _test_hooks.emit(line)
         _test_hooks.emit(f"  {describe_artifact(entry['artifact'])}")
         _test_hooks.emit(f"  logs {entry['log_dir']}")
 

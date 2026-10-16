@@ -23,6 +23,7 @@ from platform_core.cluster_layout import qualified_name
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.cluster import ClusterFacts
+from hpc3.contracts.drift import ImageDrift
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit, ledger, preflight, remote
@@ -34,6 +35,33 @@ from hpc3.core.inflight import (
 from hpc3.core.squeue import account_command, parse_account_output
 
 _SUBMIT_PREFIX = "Submitted batch job "
+
+
+class SubmittedMember:
+    """One submitted job, or one task of an array, and the id the cluster knows it by.
+
+    Attributes:
+        name: The qualified job name -- what the ledger records and what an
+            operator greps their way back to.
+        job_id: The job id, or for an array task ``<array base>_<document
+            index>``.
+        image_drift: Its code compared with the submitter's, as its ledger
+            row records it, so the command that submitted it can say so.
+    """
+
+    __slots__ = ("image_drift", "job_id", "name")
+
+    def __init__(self, name: str, job_id: str, image_drift: ImageDrift) -> None:
+        """Record a submitted job.
+
+        Args:
+            name: The qualified job name.
+            job_id: The id Slurm knows it by.
+            image_drift: Its code compared with the submitter's.
+        """
+        self.name = name
+        self.job_id = job_id
+        self.image_drift = image_drift
 
 
 def parse_job_id(output: str) -> str:
@@ -82,7 +110,8 @@ def submit(
     submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
-) -> str:
+    repo: pathlib.Path,
+) -> SubmittedMember:
     """Render, upload and submit a job, recording it locally first.
 
     The ledger write happens BEFORE this function returns and before the
@@ -106,15 +135,19 @@ def submit(
             announcement can tag the party waiting for this job.
         cluster: The cluster whose measured limits preflight and the audit
             record are taken from.
+        charge_account: Slurm account to bill, or empty for none.
+        repo: The project's repository on this machine, which preflight
+            compares the image's code against.
 
     Returns:
-        The submitted job's id.
+        The submitted job's name, id and drift record.
 
     Raises:
         AppError: With ``LIVE_JOB_UNRECORDED`` if a live job carries this
             job's name and the ledger has no row for it,
             ``ARTIFACT_ALREADY_IN_FLIGHT`` if a recorded live job is writing
             its artifact, ``ENV_PATH_MISSING`` if the environment is absent,
+            any other code :func:`~hpc3.core.preflight.preflight` raises,
             ``PREFLIGHT_REJECTED`` if the scheduler would refuse the job,
             ``PREFLIGHT_UNPARSABLE`` if its verdict cannot be read, or
             ``REMOTE_COMMAND_FAILED`` if a command failed or ``sbatch``
@@ -138,13 +171,14 @@ def submit(
     # then queues that same uploaded file. Making it a prefix of submit rather
     # than a sibling command means there is no path to the cluster that
     # bypasses validation, and no second upload to drift from the first.
-    preflight.preflight(
+    admission = preflight.preflight(
         spec,
         host=host,
         script_dir=script_dir,
         log_dir=log_dir,
         cluster=cluster,
         charge_account=charge_account,
+        repo=repo,
     )
 
     output = remote.run_remote(host, f"cd {script_dir} && sbatch {label}.sbatch")
@@ -169,10 +203,11 @@ def submit(
             image_digest="" if spec["image"] is None else spec["image"]["sha256"],
             submitter=submitter,
             artifact=spec["artifact"],
+            image_drift=admission["image_drift"],
         ),
     )
     audit.job_submitted(spec, host=host, job_id=job_id, cluster=cluster)
-    return job_id
+    return SubmittedMember(label, job_id, admission["image_drift"])
 
 
-__all__ = ["parse_job_id", "submit"]
+__all__ = ["SubmittedMember", "parse_job_id", "submit"]

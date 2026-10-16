@@ -32,6 +32,7 @@ from hpc3.contracts.workspace import Workspace, require_project_config, workspac
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.certification import require_inputs_certified
+from hpc3.core.drift import describe_drift
 from hpc3.core.inputs import (
     declared_inputs,
     present_on_cluster,
@@ -122,20 +123,26 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     for spec in specs:
         project = spec["project"]
-        result = preflight(
+        admission = preflight(
             spec,
             host=workspace["host"],
             script_dir=script_dir(root, project),
             log_dir=log_dir(root, project),
             cluster=cluster,
             charge_account=budget["charge_account"],
+            repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
         )
+        result = admission["verdict"]
         _test_hooks.emit(
             f"OK {qualified_name(project, spec['name'])}: "
             f"would start {result['start_estimate']} "
             f"on {result['node_list']} ({result['processors']} cpu, "
             f"{result['partition']})"
         )
+        # Admitted is not the same as running the submitter's code: a module
+        # whose source moved since the image's commit is a WARNING line.
+        for line in describe_drift(admission["image_drift"]):
+            _test_hooks.emit(line)
     _test_hooks.emit(f"{len(specs)} spec(s) would be admitted; nothing was queued")
     # GPU-hours only, and the service-unit figure is deliberately not printed
     # beside it: it is structurally zero before submission (Slurm computes the

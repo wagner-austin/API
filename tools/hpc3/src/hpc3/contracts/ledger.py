@@ -30,6 +30,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, require_partition
+from hpc3.contracts.drift import ImageDrift, decode_image_drift, encode_image_drift
 from hpc3.contracts.experiment import encode_experiment, require_experiment
 
 
@@ -120,6 +121,17 @@ class LedgerEntry(TypedDict):
             declaration that drifts from the command points the index at a
             file nobody writes -- which is worse than no index, being a
             confident wrong answer.
+        image_drift: Which commit built the run's image, which HEAD the
+            submitter's repository was at, and per ``python -m`` module what
+            was compared between them and what changed
+            (:mod:`hpc3.contracts.drift`). ``image_digest`` says which image
+            ran; this says whether its code was the code the submitter had,
+            which is the question a number from an old image raises.
+
+            None only on rows written before the field existed, backfilled
+            to explicit null as ``submitter`` was; every writer records one.
+            A build job records an image-less one, since it runs in no
+            image.
     """
 
     job_id: str
@@ -134,6 +146,7 @@ class LedgerEntry(TypedDict):
     image_digest: str | None
     submitter: str | None
     artifact: str | None
+    image_drift: ImageDrift | None
 
 
 def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
@@ -218,6 +231,31 @@ def _require_path_or_null(obj: dict[str, JSONValue], key: str) -> str | None:
     return value
 
 
+def _require_drift_or_null(obj: dict[str, JSONValue], key: str) -> ImageDrift | None:
+    """Read a required drift record whose value may be null.
+
+    Present-and-null, never absent, for the reason
+    :func:`_require_str_or_null` gives.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The record, or None when the field is explicitly null.
+
+    Raises:
+        JSONTypeError: If the field is absent, or present and neither null
+            nor a valid drift record.
+    """
+    if key not in obj:
+        raise JSONTypeError(f"Field '{key}' is required; rows written before it existed carry null")
+    value = obj[key]
+    if value is None:
+        return None
+    return decode_image_drift(value)
+
+
 def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
     """Encode a ledger entry to a JSON object.
 
@@ -240,6 +278,9 @@ def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
         "image_digest": entry["image_digest"],
         "submitter": entry["submitter"],
         "artifact": entry["artifact"],
+        "image_drift": None
+        if entry["image_drift"] is None
+        else encode_image_drift(entry["image_drift"]),
     }
 
 
@@ -277,6 +318,7 @@ def decode_ledger_entry(value: JSONValue, cluster: ClusterFacts) -> LedgerEntry:
         image_digest=_require_str_or_null(value, "image_digest"),
         submitter=_require_str_or_null(value, "submitter"),
         artifact=_require_path_or_null(value, "artifact"),
+        image_drift=_require_drift_or_null(value, "image_drift"),
     )
 
 

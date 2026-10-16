@@ -37,6 +37,7 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts
+from hpc3.contracts.drift import ImageDrift
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit, ledger, preflight, remote
 from hpc3.core.image_layout import SBATCH_NAME
@@ -231,6 +232,9 @@ def submit_build(
             image_digest="",
             submitter=submitter,
             artifact=artifact,
+            # Image-less for the same reason, and with no module listed: a
+            # build runs a recipe, not a `python -m` entrypoint.
+            image_drift=ImageDrift(image_commit="", head="", modules=[]),
         ),
     )
     audit.image_build_submitted(

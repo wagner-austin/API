@@ -62,6 +62,7 @@ from hpc3.core.campaign import (
     plan_campaign,
     require_every_member_declares_an_artifact,
 )
+from hpc3.core.drift import describe_drift, merge_drifts
 from hpc3.core.inflight import claimed_artifacts
 from hpc3.core.remote import run_remote, run_remote_batched
 from hpc3.core.squeue import account_command, parse_account_output
@@ -161,7 +162,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for member in plan["missing"]
             )
         )
-        for member_record in submit_array(
+        submitted = submit_array(
             spec,
             missing_indices,
             host=host,
@@ -172,8 +173,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             submitter=_config.submitter_label(),
             cluster=cluster,
             charge_account=budget["charge_account"],
-        ):
+            repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
+        )
+        for member_record in submitted:
             _test_hooks.emit(f"submitted {member_record.job_id} {member_record.name}")
+        # A campaign converging weeks after its image was built is exactly
+        # where a member's module may have moved on: said once per pass.
+        for line in describe_drift(merge_drifts([record.image_drift for record in submitted])):
+            _test_hooks.emit(line)
 
     _test_hooks.emit(
         f"{len(plan['done'])} done, {len(plan['in_flight'])} in flight, "

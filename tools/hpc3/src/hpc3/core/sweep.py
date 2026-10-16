@@ -20,7 +20,8 @@ import pathlib
 
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.sweep import SweepSpec
-from hpc3.core.array_submit import SubmittedMember, submit_array
+from hpc3.core.array_submit import submit_array
+from hpc3.core.submit import SubmittedMember
 
 
 def submit_sweep(
@@ -34,6 +35,7 @@ def submit_sweep(
     submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
+    repo: pathlib.Path,
 ) -> list[SubmittedMember]:
     """Submit every member of a sweep as one job array.
 
@@ -52,10 +54,12 @@ def submit_sweep(
         cluster: The cluster whose measured limits each member is validated
             against.
         charge_account: Slurm account to bill, or empty for none.
+        repo: The project's repository on this machine, which the image's
+            code is compared against.
 
     Returns:
         One record per member, in declaration order, each carrying its array
-        task id.
+        task id and drift.
 
     Raises:
         AppError: Through :func:`~hpc3.core.array_submit.submit_array` --
@@ -74,7 +78,8 @@ def submit_sweep(
         submitter=submitter,
         cluster=cluster,
         charge_account=charge_account,
+        repo=repo,
     )
 
 
-__all__ = ["SubmittedMember", "submit_sweep"]
+__all__ = ["submit_sweep"]

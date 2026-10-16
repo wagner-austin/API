@@ -19,14 +19,25 @@ rejected job is a failure the caller must handle, and handing back a
 
 from __future__ import annotations
 
+import pathlib
+
 from platform_core.cluster_layout import qualified_name
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
-from hpc3.core import code_claim, entrypoint, env_probe, gpu_supply, image_exec, remote, sbatch
+from hpc3.contracts.preflight import Admission, PreflightResult, decode_preflight_result
+from hpc3.core import (
+    code_claim,
+    drift,
+    entrypoint,
+    env_probe,
+    gpu_supply,
+    image_exec,
+    remote,
+    sbatch,
+)
 
 _START_ANCHOR = " to start at "
 _USING_ANCHOR = " using "
@@ -212,7 +223,8 @@ def preflight(
     log_dir: str,
     cluster: ClusterFacts,
     charge_account: str,
-) -> PreflightResult:
+    repo: pathlib.Path,
+) -> Admission:
     """Validate a job against the live scheduler without running it.
 
     The rendered script is uploaded and tested by path, so the bytes the
@@ -225,6 +237,8 @@ def preflight(
         host: SSH destination.
         script_dir: Absolute cluster directory to hold the batch script.
         log_dir: Absolute cluster directory the script will name for output.
+        repo: The project's repository on this machine, whose history holds
+            the commit its image was built from; see :mod:`hpc3.core.drift`.
         charge_account: Slurm account to bill, or empty for none. Carried
             because the script the scheduler tests must be the script that
             later runs -- a preflight that omitted the directive would pass
@@ -234,7 +248,8 @@ def preflight(
             wrong machine fails here rather than after the job is queued.
 
     Returns:
-        The scheduler's verdict, including an estimated start.
+        The scheduler's verdict, including an estimated start, and the run's
+        code compared with the submitter's.
 
     Raises:
         AppError: With ``ENV_PATH_MISSING`` if the environment is absent,
@@ -244,9 +259,13 @@ def preflight(
             belongs to another installation, ``REPO_COMMIT_NOT_HEAD`` or
             ``REPO_COMMIT_PROBE_UNREADABLE`` if the run declares a commit its
             checkout is not at or cannot be read about,
-            ``ENTRYPOINT_NOT_INSTALLED`` or ``ENTRYPOINT_PROBE_UNREADABLE``
-            if the environment cannot start a ``python -m`` module the
-            command names or cannot say, ``GPU_MODEL_EXHAUSTED`` if the job
+            ``ENTRYPOINT_IMAGE_UNSTAMPED``, ``ENTRYPOINT_NOT_INSTALLED`` or
+            ``ENTRYPOINT_PROBE_UNREADABLE`` if the image cannot say which
+            commit built it, the environment cannot start a ``python -m``
+            module the command names, or cannot say,
+            ``ENTRYPOINT_IMAGE_COMMIT_UNKNOWN`` or
+            ``ENTRYPOINT_DRIFT_UNREADABLE`` if ``repo`` does not hold the
+            image's commit or git cannot compare it, ``GPU_MODEL_EXHAUSTED`` if the job
             pins a GPU model the partition has none of free while another
             model idles,
             ``PREFLIGHT_REJECTED`` if Slurm refuses the job -- carrying its
@@ -277,14 +296,17 @@ def preflight(
     # Then whether the environment can start the module the command names.
     # After the directories exist, because the job starts in script_dir and
     # `python -m` resolves from there; see `hpc3.core.entrypoint` for the
-    # registered image that predated the command a run document named.
-    entrypoint.check_entrypoints(
+    # registered image that predated the command a run document named. Then
+    # whether the module it CAN start has moved on since its image was built,
+    # which is measured and returned rather than refused (`hpc3.core.drift`).
+    reading = entrypoint.check_entrypoints(
         host,
         [spec["command"]],
         env_path=spec["env_path"],
         image=spec["image"],
         working_directory=script_dir,
     )
+    image_drift = drift.measure_drift(repo, reading)
     script = sbatch.render_sbatch(spec, log_dir=log_dir, charge_account=charge_account)
     label = qualified_name(spec["project"], spec["name"])
     script_path = f"{script_dir}/{label}.sbatch"
@@ -298,7 +320,7 @@ def preflight(
             f"Slurm would refuse {spec['name']!r}: {output.strip()}"
             + dependency_hint(spec, output),
         )
-    return parse_test_only(output, cluster)
+    return Admission(verdict=parse_test_only(output, cluster), image_drift=image_drift)
 
 
 __all__ = ["check_env_path", "dependency_hint", "parse_test_only", "preflight"]

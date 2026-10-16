@@ -27,6 +27,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, require_partition
+from hpc3.contracts.drift import ImageDrift
 
 
 class PreflightResult(TypedDict):
@@ -47,6 +48,19 @@ class PreflightResult(TypedDict):
     processors: int
     node_list: str
     partition: str
+
+
+class Admission(TypedDict):
+    """Everything a preflight established about a job it did not run.
+
+    Attributes:
+        verdict: The scheduler's answer.
+        image_drift: The run's code compared with the submitter's, which a
+            submission records in its ledger row and every command prints.
+    """
+
+    verdict: PreflightResult
+    image_drift: ImageDrift
 
 
 def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
@@ -119,6 +133,7 @@ def decode_preflight_result(value: JSONValue, cluster: ClusterFacts) -> Prefligh
 
 
 __all__ = [
+    "Admission",
     "PreflightResult",
     "decode_preflight_result",
     "encode_preflight_result",

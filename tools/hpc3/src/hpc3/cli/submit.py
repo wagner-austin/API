@@ -24,7 +24,7 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
-from platform_core.cluster_layout import log_dir, qualified_name, script_dir
+from platform_core.cluster_layout import log_dir, script_dir
 from platform_core.json_utils import load_json_str
 from platform_core.session_label import LABEL_VARIABLE
 
@@ -35,6 +35,7 @@ from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.certification import require_inputs_certified
+from hpc3.core.drift import describe_drift
 from hpc3.core.inputs import (
     declared_inputs,
     present_on_cluster,
@@ -118,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     host = workspace["host"]
     root = workspace["root"]
     submitter = _config.submitter_label()
-    job_id = submit(
+    member = submit(
         spec,
         host=host,
         script_dir=script_dir(root, project),
@@ -128,9 +129,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         submitter=submitter,
         cluster=cluster,
         charge_account=budget["charge_account"],
+        repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
     )
 
-    _test_hooks.emit(f"submitted {job_id} {qualified_name(project, spec['name'])}")
+    _test_hooks.emit(f"submitted {member.job_id} {member.name}")
     _test_hooks.emit(
         # Was the literal "(free)". That was true of everything this package
         # could submit until a declared budget admitted billed partitions, and
@@ -162,7 +164,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             "tagging anyone. A session that has posted a checkin is addressed "
             "automatically; a terminal exports it before submitting."
         )
-    _test_hooks.emit(f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job {job_id}")
+    # Which code the job will run, as its ledger row records it: a module
+    # whose source moved since the image's commit is a WARNING line, because
+    # the numbers this job produces come from that older code.
+    for line in describe_drift(member.image_drift):
+        _test_hooks.emit(line)
+    _test_hooks.emit(
+        f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job {member.job_id}"
+    )
     return 0
 
 
