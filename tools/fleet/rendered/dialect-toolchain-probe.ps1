@@ -108,8 +108,8 @@ $testdb
 'docker=no='
 $hooks = 'hooks=no='
 if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {
-    $imports = Invoke-Answer $Cmd $python '-c "import ruff, mypy, pytest, xdist, pytest_cov"'
-    if ($imports.Succeeded) {
+    $pinned = Invoke-Answer $Cmd $python '-c "import sys, importlib.metadata as m; a = sys.argv[1:]; sys.exit(any(m.version(a[i]) != a[i + 1] for i in range(0, len(a), 2)))" ruff 0.17.1 mypy 2.4.0 pytest 9.1.1 pytest-xdist 3.8.0 pytest-cov 7.1.0 coverage 7.16.2 pytest-timeout 2.4.0'
+    if ($pinned.Succeeded) {
         $hooks = "hooks=yes=$HooksRoute"
     }
 }

@@ -20,7 +20,8 @@ from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
     CHROME_LINUX_PATH,
     GO_VERSION_ARGUMENT,
-    HOOKS_CHECK_MODULES,
+    HOOKS_CHECK_ARGUMENTS,
+    HOOKS_CHECK_PROGRAM,
     HOOKS_ROUTE_FILE,
 )
 
@@ -79,9 +80,10 @@ from fleet.contracts.tagged_tools import (
 #:
 #: THE ``hooks`` LINE is the MCPs claude-hooks check's environment (MCPs
 #: board task ec895824): the route file under the account's home and one
-#: ``python3 -c`` importing every module of
-#: :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_MODULES`, one ``if``
-#: condition for the ``set -e`` reason above.
+#: ``python3 -c`` of :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_PROGRAM`
+#: finding every pin of ``HOOKS_CHECK_PACKAGES`` installed at its version
+#: (MCPs board task 09a34e03), one ``if`` condition for the ``set -e`` reason
+#: above.
 #:
 #: ``report``'s THIRD ARGUMENT is what a tool is asked its version with,
 #: ``--version`` unless given: ``go`` has no such flag and answers its usage,
@@ -188,7 +190,7 @@ TOOLCHAIN_PROBE_BODY = (
     "  printf 'testdb=no=\\n'\n"
     "fi\n"
     f'if [ -f "$HOME/{"/".join(HOOKS_ROUTE_FILE)}" ] &&'
-    f' python3 -c "import {", ".join(HOOKS_CHECK_MODULES)}" > /dev/null 2>&1; then\n'
+    f' python3 -c "{HOOKS_CHECK_PROGRAM}" {HOOKS_CHECK_ARGUMENTS} > /dev/null 2>&1; then\n'
     f"  printf 'hooks=yes=%s\\n' \"$HOME/{'/'.join(HOOKS_ROUTE_FILE)}\"\n"
     "else\n"
     "  printf 'hooks=no=\\n'\n"

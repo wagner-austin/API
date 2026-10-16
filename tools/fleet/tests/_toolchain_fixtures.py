@@ -189,10 +189,10 @@ HOOKS_REASON = (
 )
 
 #: The pip line a node with pip is offered for the hooks check's tools, at the
-#: versions the hub ran that check with on 2026-10-02.
+#: latest releases measured on 2026-10-16 (MCPs board task 09a34e03).
 HOOKS_INSTALL = (
-    "python -m pip install --user ruff==0.15.1 mypy==1.19.1 pytest==9.0.2 "
-    "pytest-xdist==3.8.0 pytest-cov==7.1.0"
+    "python -m pip install --user ruff==0.17.1 mypy==2.4.0 pytest==9.1.1 "
+    "pytest-xdist==3.8.0 pytest-cov==7.1.0 coverage==7.16.2 pytest-timeout==2.4.0"
 )
 
 #: Why a node is told about go, in the tagged gap's words (MCPs board task

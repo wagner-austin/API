@@ -16,7 +16,8 @@ from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
     CHROME_WINDOWS_RELATIVE,
     GO_VERSION_ARGUMENT,
-    HOOKS_CHECK_MODULES,
+    HOOKS_CHECK_ARGUMENTS,
+    HOOKS_CHECK_PROGRAM,
     HOOKS_ROUTE_FILE,
     PDFTOTEXT_WINDOWS_PATH,
 )
@@ -102,9 +103,10 @@ _CHROME_DEFAULT = ", ".join(
 #: ``hooks`` is the MCPs claude-hooks check's environment (MCPs board task
 #: ec895824): ``yes=<route file>`` only when the build account carries the
 #: hooks route file (``$HooksRoute``, a parameter so the suite names one) and
-#: the interpreter the tool loop reported imports every module of
-#: :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_MODULES` in one ``-c``; a
-#: node without the file is never asked to import. Measured 2026-10-02:
+#: the interpreter the tool loop reported finds, in one ``-c`` of
+#: :data:`fleet.contracts.tagged_tools.HOOKS_CHECK_PROGRAM`, every pin of
+#: ``HOOKS_CHECK_PACKAGES`` installed at its version (MCPs board task
+#: 09a34e03); a node without the file is never asked. Measured 2026-10-02:
 #: sedona carries the file, pendragon and serendipity do not.
 #: ``chrome`` is Google Chrome at the path Playwright's channel ``chrome``
 #: launches (MCPs board task 2f596185): the first of ``$Chrome``'s candidates
@@ -261,10 +263,13 @@ $testdb
 'docker=no='
 $hooks = 'hooks=no='
 if ($python -ne '' -and [System.IO.File]::Exists($HooksRoute)) {
-    $imports = Invoke-Answer $Cmd $python '-c "import """
-    + ", ".join(HOOKS_CHECK_MODULES)
-    + r""""'
-    if ($imports.Succeeded) {
+    $pinned = Invoke-Answer $Cmd $python '-c """
+    + '"'
+    + HOOKS_CHECK_PROGRAM
+    + '" '
+    + HOOKS_CHECK_ARGUMENTS
+    + r"""'
+    if ($pinned.Succeeded) {
         $hooks = "hooks=yes=$HooksRoute"
     }
 }

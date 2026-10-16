@@ -63,22 +63,41 @@ class RequiredTool(TypedDict):
 #: ``install-hooks-node.py`` writes, and what that package's live suites read.
 HOOKS_ROUTE_FILE: Final = (".claude", "corvis-hooks.json")
 
-#: The modules MCPs ``packages/claude-hooks``'s make check imports from the
-#: system interpreter it runs on: ruff, mypy, pytest, pytest-xdist and
-#: pytest-cov. The probe's ``hooks`` line answers present only when one
-#: ``import`` of all of them succeeds.
-HOOKS_CHECK_MODULES: Final = ("ruff", "mypy", "pytest", "xdist", "pytest_cov")
-
-#: The distributions that provide :data:`HOOKS_CHECK_MODULES`, at the versions
-#: the hub's interpreter ran the package's check with on 2026-10-02 (MCPs board
-#: task ec895824), so a node's check reads the same lint and type rules the
-#: hub's does.
+#: The distributions MCPs ``packages/claude-hooks``'s make check runs on the
+#: system interpreter: ruff and mypy for its lint, pytest with pytest-xdist,
+#: pytest-cov and coverage for its suites, and pytest-timeout, which its
+#: pyproject's ``timeout = 300`` needs. Each is the latest release on PyPI
+#: when measured on 2026-10-16 (MCPs board task 09a34e03), when the package's
+#: lint was clean and its 104 suites passed under them; until then these were
+#: the hub's versions of 2026-10-02 (ruff 0.15.1, mypy 1.19.1, pytest 9.0.2),
+#: and pytest-timeout was missing, so fleet job 4ef9f20f on sedona logged
+#: ``Unknown config option: timeout`` and ran with no per-test timeout. A node
+#: is ready only at these versions (:data:`HOOKS_CHECK_PROGRAM`), so every
+#: machine lints and tests a commit by the same rules.
 HOOKS_CHECK_PACKAGES: Final = (
-    "ruff==0.15.1",
-    "mypy==1.19.1",
-    "pytest==9.0.2",
+    "ruff==0.17.1",
+    "mypy==2.4.0",
+    "pytest==9.1.1",
     "pytest-xdist==3.8.0",
     "pytest-cov==7.1.0",
+    "coverage==7.16.2",
+    "pytest-timeout==2.4.0",
+)
+
+#: The probe's ``hooks`` question, a program for ``python -c``: it exits 0
+#: only when every distribution its arguments name is installed at the
+#: version beside it, and 1 otherwise, a missing one included (its
+#: ``PackageNotFoundError`` ends it). Until 2026-10-16 the probe asked only
+#: that the modules import, so a node kept whatever versions it was first
+#: given. It holds no quote character, so bash and cmd.exe pass it unchanged.
+HOOKS_CHECK_PROGRAM: Final = (
+    "import sys, importlib.metadata as m; a = sys.argv[1:]; "
+    "sys.exit(any(m.version(a[i]) != a[i + 1] for i in range(0, len(a), 2)))"
+)
+
+#: :data:`HOOKS_CHECK_PROGRAM`'s arguments: each pin's name, then its version.
+HOOKS_CHECK_ARGUMENTS: Final = " ".join(
+    part for package in HOOKS_CHECK_PACKAGES for part in package.split("==")
 )
 
 #: What the probe asks ``go`` for its version with. Go has no ``--version``
@@ -265,8 +284,9 @@ __all__ = [
     "CHROME_LINUX_PATH",
     "CHROME_WINDOWS_RELATIVE",
     "GO_VERSION_ARGUMENT",
-    "HOOKS_CHECK_MODULES",
+    "HOOKS_CHECK_ARGUMENTS",
     "HOOKS_CHECK_PACKAGES",
+    "HOOKS_CHECK_PROGRAM",
     "HOOKS_ROUTE_FILE",
     "PDFTOTEXT_WINDOWS_PATH",
     "TAGGED_TOOLS",
