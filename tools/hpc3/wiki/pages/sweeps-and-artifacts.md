@@ -8,7 +8,7 @@ source_paths:
   - "src/hpc3/core/sweep.py"
 source_git_blobs:
   "src/hpc3/contracts/sweep.py": "1a811f83a4a6ffe5dd58488535e5053bbd67b5d8"
-  "src/hpc3/core/sweep.py": "b730820ce899c2f022e3c69fd97f78844d77c6cd"
+  "src/hpc3/core/sweep.py": "6fb57817fbca9e2305f01e1a89f8e30846f7077a"
 provenance:
   - "platform_core.sweep_member (libs/platform_core, outside this workspaceRoot)"
 fact_checked: 2026-09-14

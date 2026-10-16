@@ -10,7 +10,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
   "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
-  "src/hpc3/contracts/ledger.py": "960ee5617aba5aa9ed459b082419e99e5ec6484f"
+  "src/hpc3/contracts/ledger.py": "b200073d657643908de5491eca70e1fabaeebb4c"
 provenance:
   - "measured: RTX 3090 Ti, torch 2.6.0+cu124, transformers 4.46.3"
   - "platform_core.determinism_env (libs/platform_core, outside this workspaceRoot)"
@@ -62,4 +62,4 @@ numbers. The variable's name and value are defined once, in
 submitter — a duplicated literal would drift, nothing would fail, and the
 runs would stop being comparable.
 
-[^d1]: `src/hpc3/contracts/project.py:153` lists `deterministic` among a project's required fields and `:296` decodes it with `require_bool`; `src/hpc3/contracts/job.py:359` decodes the same field on a job spec in `decode_job_spec` and `:286` encodes it in `encode_job_spec`; `src/hpc3/contracts/ledger.py:252` and `:216` carry it into and out of the ledger row. Read 2026-09-03; the `job.py` lines re-read 2026-10-01, after `require_artifact_in_command` moved to `platform_core.sweep_member`.
+[^d1]: `src/hpc3/contracts/project.py:175` lists `deterministic` among a project's required fields and `:312` decodes it with `require_bool`; `src/hpc3/contracts/job.py:360` decodes the same field on a job spec in `decode_job_spec` and `:287` encodes it in `encode_job_spec`; `src/hpc3/contracts/ledger.py:316` and `:276` carry it into and out of the ledger row. Read 2026-09-03; every line re-read 2026-10-16, when the row gained `image_drift` and the `project.py` and `job.py` citations were found to have moved since 2026-10-01.

@@ -8,7 +8,7 @@ source_paths:
   - "src/hpc3/contracts/project.py"
   - "src/hpc3/cli/_config.py"
 source_git_blobs:
-  "src/hpc3/core/preflight.py": "ed718a167420cb85ac203f43872b023c0c172765"
+  "src/hpc3/core/preflight.py": "940f3f7520a93221b6718b3310e0eaa651f96465"
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
   "src/hpc3/cli/_config.py": "5287aecbeca09b166e8932f5ea38b227fbd7e720"
 provenance:

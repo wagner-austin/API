@@ -18,11 +18,11 @@ source_git_blobs:
   "src/hpc3/cli/_config.py": "5287aecbeca09b166e8932f5ea38b227fbd7e720"
   "src/hpc3/contracts/workspace.py": "ba27d634de77b9ca57d6ccec1dd7815bc95da0fc"
   "src/hpc3/core/inflight.py": "96492a481dad7ead1916b61056585103e87443c5"
-  "src/hpc3/core/submit.py": "d2e159c723e4c762a56d8c8ed3c1faf4b36c3e27"
-  "src/hpc3/core/array_submit.py": "5391cb2c3b8505f23ed25fc0b91fdff332c06729"
+  "src/hpc3/core/submit.py": "0f9eb84b36a023b1c2c1ee7388932a60df7d903c"
+  "src/hpc3/core/array_submit.py": "205fb40432570438368f18ff26bcf9cbd8bee13a"
   "tests/test_checkout.py": "0e0aecf8997ffab178f84741756ef91c48c42495"
-  "tests/test_campaign_shared_ledger.py": "7780e8bc30969ca1ceff2b84b3ef6406bc349ee5"
-  "README.md": "c3962b94b036071c6e52e96babff021a11f1b5d8"
+  "tests/test_campaign_shared_ledger.py": "407c07d19e5eb59172780c39c71f72757802b590"
+  "README.md": "ac67efe201119ac5992ff0f63881cbe5ac01d528"
 provenance:
   - "board task 747c391e (MCPs board): ledger line counts per checkout and the duplicate array 57783755_[0-12], measured 2026-10-05T10:35Z"
 fact_checked: 2026-10-16
