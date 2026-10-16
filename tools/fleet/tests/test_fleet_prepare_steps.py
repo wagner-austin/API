@@ -56,8 +56,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # suite's served lane (MCPs board task b456a3cb); 60 since that lane is
     # one project per search host, MCPs/execution-served-diphtheria and
     # -colossus (MCPs board task bf7a9460); 61 since session-audit's real
-    # PostgreSQL review-routing cases (MCPs board task 55189157).
-    assert len(prepared) == 61
+    # PostgreSQL review-routing cases (MCPs board task 55189157); 60 since
+    # MCPs/pc, which named a directory MCPs deleted, was dropped (MCPs board
+    # task 60458a21).
+    assert len(prepared) == 60
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
