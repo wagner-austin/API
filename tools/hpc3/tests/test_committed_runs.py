@@ -69,7 +69,7 @@ def _workspaces() -> dict[str, Workspace]:
         The validated workspaces, keyed by filename.
     """
     return {
-        name: decode_workspace(document, config_dir=_RUNS)
+        name: decode_workspace(document, config_dir=_RUNS, ledger_dir=_RUNS)
         for name, document in documents()
         if "projects" in document
     }

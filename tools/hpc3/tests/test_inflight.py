@@ -21,7 +21,11 @@ from platform_core.json_utils import JSONValue, dump_json_str
 from hpc3.contracts.account import AccountJob, decode_account_job
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.core.inflight import check_artifact_is_free, claimed_artifacts
+from hpc3.core.inflight import (
+    check_artifact_is_free,
+    check_no_unrecorded_live_job,
+    claimed_artifacts,
+)
 from hpc3.core.submit import submit
 from tests.against_hpc3 import decode_job_spec, decode_ledger_entry
 from tests.conftest import (
@@ -114,6 +118,59 @@ class TestTheRefusal:
 
     def test_nothing_claimed_admits_everything(self) -> None:
         check_artifact_is_free(_UZ, {}, name="x.y")
+
+
+class TestALiveJobTheLedgerNeverRecorded:
+    """Board task 747c391e: array 57783112's members were live and recorded
+    only in another worktree's ledger, so this one read ``0 in flight``."""
+
+    _NAMES = frozenset(["cartridge-qa.qa-full-wiki-v56"])
+
+    def _check(self, entries: list[LedgerEntry], account: list[AccountJob]) -> None:
+        """Run the refusal for the v56 sweep's name against a named ledger.
+
+        Args:
+            entries: The ledger's rows.
+            account: What the cluster holds.
+        """
+        check_no_unrecorded_live_job(
+            entries, account, names=self._NAMES, ledger_path="/w2/runs/ledger.jsonl"
+        )
+
+    def test_an_unrecorded_live_job_under_the_name_is_refused(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            self._check([], [_account("57783112_[0-12]", "cartridge-qa.qa-full-wiki-v56")])
+        assert excinfo.value.code is Hpc3ErrorCode.LIVE_JOB_UNRECORDED
+
+    def test_the_refusal_names_the_job_its_state_and_the_ledger(self) -> None:
+        """Where it came from decides the remedy, so the reader needs all three."""
+        with pytest.raises(AppError) as excinfo:
+            self._check([], [_account("57783112_4", "cartridge-qa.qa-full-wiki-v56")])
+        assert "57783112_4 cartridge-qa.qa-full-wiki-v56 (PENDING)" in excinfo.value.message
+        assert "/w2/runs/ledger.jsonl" in excinfo.value.message
+
+    def test_a_recorded_live_job_is_left_to_the_artifact_check(self) -> None:
+        entries = [_entry("57783112_4", "cartridge-qa.qa-full-wiki-v56-4", None)]
+        self._check(entries, [_account("57783112_4", "cartridge-qa.qa-full-wiki-v56")])
+
+    def test_one_recorded_task_does_not_vouch_for_the_rest(self) -> None:
+        """A pending aggregate stands for every task in it."""
+        entries = [_entry("57783112_2", "cartridge-qa.qa-full-wiki-v56-2", None)]
+        with pytest.raises(AppError) as excinfo:
+            self._check(entries, [_account("57783112_[2-3%2]", "cartridge-qa.qa-full-wiki-v56")])
+        assert excinfo.value.code is Hpc3ErrorCode.LIVE_JOB_UNRECORDED
+
+    def test_a_fully_recorded_aggregate_is_admitted(self) -> None:
+        entries = [
+            _entry("57783112_2", "cartridge-qa.qa-full-wiki-v56-2", None),
+            _entry("57783112_3", "cartridge-qa.qa-full-wiki-v56-3", None),
+        ]
+        self._check(entries, [_account("57783112_[2-3%2]", "cartridge-qa.qa-full-wiki-v56")])
+
+    def test_an_unrecorded_job_under_another_name_is_not_this_submissions(self) -> None:
+        """An image build or an interactive shell is somebody else's question;
+        triage reports those, and they write nothing this run declares."""
+        self._check([], [_account("57790001", "build-mi-v57")])
 
 
 class TestSubmitEnforcesIt:
@@ -211,6 +268,20 @@ class TestSubmitEnforcesIt:
         with pytest.raises(AppError):
             self._submit(tmp_path, _UZ)
         assert not any("--test-only" in command for command in fake_run.commands())
+
+    def test_an_unrecorded_live_copy_never_reaches_the_cluster(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """The same job submitted from another ledger: its row is not here,
+        so its artifact cannot be read, and the name is what the cluster says."""
+        script_healthy_cluster(fake_run)
+        fake_run.add("squeue --me", stdout="57790123|abl.arm-b-42|RUNNING\n")
+
+        with pytest.raises(AppError) as excinfo:
+            self._submit(tmp_path, _UZ)
+        assert excinfo.value.code is Hpc3ErrorCode.LIVE_JOB_UNRECORDED
+        assert not any("--test-only" in command for command in fake_run.commands())
+        assert not any("sbatch" in command for command in fake_run.commands())
 
     def test_the_same_artifact_is_fine_once_the_holder_has_gone(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

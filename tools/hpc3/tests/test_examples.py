@@ -109,7 +109,7 @@ def _workspace() -> Workspace:
     Returns:
         The validated workspace.
     """
-    return decode_workspace(_load("hpc3.json"), config_dir=_EXAMPLES)
+    return decode_workspace(_load("hpc3.json"), config_dir=_EXAMPLES, ledger_dir=_EXAMPLES)
 
 
 class TestTheReadmeIsAnExampleToo:
@@ -143,7 +143,8 @@ class TestTheReadmeIsAnExampleToo:
 
     def test_the_documented_workspace_decodes_whole(self) -> None:
         document = load_json_str(_readme_json_blocks()[0])
-        assert decode_workspace(document, config_dir=_EXAMPLES)["host"] == "hpc3"
+        workspace = decode_workspace(document, config_dir=_EXAMPLES, ledger_dir=_EXAMPLES)
+        assert workspace["host"] == "hpc3"
 
     def test_the_readme_states_what_it_cannot_submit(self) -> None:
         """A tool that only documents its powers reads as having no limits.

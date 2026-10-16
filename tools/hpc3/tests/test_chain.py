@@ -87,6 +87,7 @@ def _workspace(**overrides: JSONValue) -> Workspace:
     return decode_workspace(
         workspace_document(projects={"abl": project_config(**overrides)}),
         config_dir=pathlib.Path("/tmp"),
+        ledger_dir=pathlib.Path("/tmp"),
     )
 
 

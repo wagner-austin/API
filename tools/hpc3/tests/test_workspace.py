@@ -36,12 +36,12 @@ def _decode(**overrides: JSONValue) -> Workspace:
     Returns:
         The decoded workspace.
     """
-    return decode_workspace(workspace_document(**overrides), config_dir=_DIR)
+    return decode_workspace(workspace_document(**overrides), config_dir=_DIR, ledger_dir=_DIR)
 
 
 class TestDecodeWorkspace:
     def test_it_reads_every_field(self) -> None:
-        workspace = decode_workspace(workspace_document(), config_dir=_DIR)
+        workspace = decode_workspace(workspace_document(), config_dir=_DIR, ledger_dir=_DIR)
         assert workspace["host"] == "hpc3"
         assert workspace["root"] == "/pub/w"
         assert workspace["quiet_seconds"] == 1800
@@ -52,23 +52,32 @@ class TestDecodeWorkspace:
         }
         assert sorted(workspace["projects"]) == ["abl"]
 
-    def test_a_relative_ledger_resolves_against_the_document(self) -> None:
-        """So a workspace can be committed beside its runs and used anywhere."""
+    def test_a_relative_ledger_resolves_against_the_ledger_directory(self) -> None:
+        """Not against the document's directory: a worktree's commands name
+        the main checkout's copy of it, so every worktree shares one ledger,
+        while each project's repo stays the worktree's own code."""
         workspace = decode_workspace(
-            workspace_document(ledger="runs/ledger.jsonl"), config_dir=pathlib.Path("/home/a/w")
+            workspace_document(ledger="runs/ledger.jsonl"),
+            config_dir=pathlib.Path("/home/a/w-tree"),
+            ledger_dir=pathlib.Path("/home/a/w"),
         )
         assert pathlib.Path(workspace["ledger"]) == pathlib.Path("/home/a/w/runs/ledger.jsonl")
+        assert pathlib.Path(workspace["projects"]["abl"]["repo"]) == pathlib.Path(
+            "/home/a/w-tree/repos/abl"
+        )
 
     def test_an_absolute_ledger_is_left_alone(self) -> None:
         workspace = decode_workspace(
-            workspace_document(ledger=str(pathlib.Path("/var/ledger.jsonl"))), config_dir=_DIR
+            workspace_document(ledger=str(pathlib.Path("/var/ledger.jsonl"))),
+            config_dir=_DIR,
+            ledger_dir=_DIR,
         )
         assert pathlib.Path(workspace["ledger"]) == pathlib.Path("/var/ledger.jsonl")
 
     def test_quiet_seconds_defaults_when_omitted(self) -> None:
         document = workspace_document()
         del document["quiet_seconds"]
-        workspace = decode_workspace(document, config_dir=_DIR)
+        workspace = decode_workspace(document, config_dir=_DIR, ledger_dir=_DIR)
         assert workspace["quiet_seconds"] == DEFAULT_QUIET_SECONDS
 
     def test_a_zero_quiet_threshold_is_refused(self) -> None:
@@ -87,7 +96,7 @@ class TestDecodeWorkspace:
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):
-            decode_workspace("hpc3", config_dir=_DIR)
+            decode_workspace("hpc3", config_dir=_DIR, ledger_dir=_DIR)
 
     def test_an_empty_host_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
@@ -110,7 +119,7 @@ class TestDecodeWorkspace:
         document = workspace_document()
         del document["projects"]
         with pytest.raises(JSONTypeError):
-            decode_workspace(document, config_dir=_DIR)
+            decode_workspace(document, config_dir=_DIR, ledger_dir=_DIR)
 
     def test_a_project_name_the_layout_rejects_is_refused(self) -> None:
         """A name unusable in squeue must not enter through the config either."""
@@ -220,22 +229,22 @@ class TestRoundTrip:
 
     def test_a_workspace_round_trips_with_the_ledger_resolved(self) -> None:
         """Encoding emits the resolved ledger, so this is equivalence not identity."""
-        workspace = decode_workspace(workspace_document(), config_dir=_DIR)
+        workspace = decode_workspace(workspace_document(), config_dir=_DIR, ledger_dir=_DIR)
         encoded = encode_workspace(workspace)
-        assert decode_workspace(encoded, config_dir=_DIR) == workspace
+        assert decode_workspace(encoded, config_dir=_DIR, ledger_dir=_DIR) == workspace
 
     def test_the_encoded_ledger_is_the_resolved_one(self) -> None:
-        workspace = decode_workspace(workspace_document(), config_dir=_DIR)
+        workspace = decode_workspace(workspace_document(), config_dir=_DIR, ledger_dir=_DIR)
         assert encode_workspace(workspace)["ledger"] == workspace["ledger"]
 
 
 class TestRequireProjectConfig:
     def test_a_declared_project_is_returned(self) -> None:
-        workspace = decode_workspace(workspace_document(), config_dir=_DIR)
+        workspace = decode_workspace(workspace_document(), config_dir=_DIR, ledger_dir=_DIR)
         assert require_project_config(workspace, "abl")["gpu"] == {"model": "A100", "count": 1}
 
     def test_an_undeclared_project_is_refused(self) -> None:
-        workspace = decode_workspace(workspace_document(), config_dir=_DIR)
+        workspace = decode_workspace(workspace_document(), config_dir=_DIR, ledger_dir=_DIR)
         with pytest.raises(AppError) as excinfo:
             require_project_config(workspace, "sirius")
         assert excinfo.value.code is Hpc3ErrorCode.WORKSPACE_PROJECT_UNKNOWN
@@ -245,6 +254,7 @@ class TestRequireProjectConfig:
         workspace = decode_workspace(
             workspace_document(projects={"abl": project_config(), "zodiac": project_config()}),
             config_dir=_DIR,
+            ledger_dir=_DIR,
         )
         with pytest.raises(AppError) as excinfo:
             require_project_config(workspace, "zodaic")
