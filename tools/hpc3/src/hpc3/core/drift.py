@@ -12,7 +12,7 @@ refuses nothing about drift itself.
 WHAT IS COMPARED. For each ``python -m`` module that resolved inside the
 image's environment, the source of its top-level package as the repository
 tracks it at HEAD: every tracked ``<top>/__init__.py`` directory, or a
-``<top>.py`` file, wherever it sits. Both the image's commit and HEAD are
+``<top>.py`` file, at a source root (see :func:`source_paths`). Both the image's commit and HEAD are
 read from the project's ``repo``, and ``git diff`` between them names what
 changed under those paths. HEAD, not the working tree: a commit is a fixed
 thing a ledger row can name, and an uncommitted edit is not.
@@ -74,22 +74,37 @@ def _git(repo: pathlib.Path, *args: str) -> str:
 def source_paths(tracked: Sequence[str], top: str) -> list[str]:
     """Find where a repository keeps a top-level package's source.
 
+    ONLY AT A SOURCE ROOT. A name ``python -m`` imports at the top level
+    sits in a directory that is not itself a package, so a candidate whose
+    parent holds an ``__init__.py`` is a submodule that merely shares the
+    name. Measured on the first real run, 2026-10-16: without this rule
+    ``model_trainer`` matched
+    ``libs/platform_core/src/platform_core/config/model_trainer.py``, a
+    module of ``platform_core.config``, and counted its edits as the
+    trainer's.
+
     Args:
         tracked: Every path the repository tracks at HEAD.
         top: The top-level package or module name.
 
     Returns:
         Each directory holding a tracked ``<top>/__init__.py`` and each
-        tracked ``<top>.py``, sorted and without repeats. Empty when the
-        repository has none, which makes it a third-party package.
+        tracked ``<top>.py`` whose parent is not a package, sorted and
+        without repeats. Empty when the repository has none, which makes it
+        a third-party package.
     """
+    files = frozenset(tracked)
     found: set[str] = set()
     for path in tracked:
         parts = path.split("/")
         if parts[-1] == "__init__.py" and len(parts) > 1 and parts[-2] == top:
-            found.add("/".join(parts[:-1]))
-        if parts[-1] == f"{top}.py":
-            found.add(path)
+            candidate, parent = parts[:-1], parts[:-2]
+        elif parts[-1] == f"{top}.py":
+            candidate, parent = parts, parts[:-1]
+        else:
+            continue
+        if "/".join([*parent, "__init__.py"]) not in files:
+            found.add("/".join(candidate))
     return sorted(found)
 
 
