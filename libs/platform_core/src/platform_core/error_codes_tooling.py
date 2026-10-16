@@ -157,6 +157,15 @@ class Hpc3ErrorCode(ErrorCodeBase):
     # a shape the check cannot read, never mistaken for either verdict.
     ENTRYPOINT_NOT_INSTALLED = "ENTRYPOINT_NOT_INSTALLED"
     ENTRYPOINT_PROBE_UNREADABLE = "ENTRYPOINT_PROBE_UNREADABLE"
+    # An image whose environment cannot say which commit built it, or names
+    # one the project's repository does not hold: either way the code a run
+    # would execute cannot be compared with the submitter's, so whether its
+    # numbers come from older code than the submitter believes is unknown
+    # (board task 7aab32ef). The third is git failing to answer the
+    # comparison once the commit is known.
+    ENTRYPOINT_IMAGE_UNSTAMPED = "ENTRYPOINT_IMAGE_UNSTAMPED"
+    ENTRYPOINT_IMAGE_COMMIT_UNKNOWN = "ENTRYPOINT_IMAGE_COMMIT_UNKNOWN"
+    ENTRYPOINT_DRIFT_UNREADABLE = "ENTRYPOINT_DRIFT_UNREADABLE"
 
     # Workspace configuration -- the one document every command reads.
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
