@@ -33,6 +33,7 @@ CALLED: Final[frozenset[str]] = frozenset(
         "dispatch_claim",
         "dispatch_get",
         "dispatch_list",
+        "dispatch_publisher_tick",
         "dispatch_registry_publish",
         "dispatch_report",
         "dispatch_tick",
@@ -42,7 +43,7 @@ CALLED: Final[frozenset[str]] = frozenset(
 )
 
 #: How many call sites the source holds, so a scan that found none cannot pass.
-CALL_SITES: Final[int] = 15
+CALL_SITES: Final[int] = 16
 
 
 def constants(tree: ast.Module) -> dict[str, str]:

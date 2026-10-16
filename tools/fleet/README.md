@@ -86,7 +86,16 @@ fleet-agent     --config registry \                 # one tick of the HUB lane's
                 --agent <label> --session <uuid> --repo-root <path> [--announce]
 poetry run python -m fleet.cli.node_agent \         # one tick of ONE node's runner
                 --config registry --node <alias> [--announce]
+poetry run python -m fleet.cli.publisher_ticks \    # the hub pump's record of its bridges
+                <publisher>=<exit code>=<directory> ...
 ```
+
+`fleet.cli.publisher_ticks` is the hpc-wake pump's last row each tick (MCPs
+board task 9f1367d5): for each wake bridge it ran, it reads the checkout the
+bridge ran from (`fleet.core.checkout`) and records the repository, HEAD,
+whether a tracked file differed and the exit code through MCPs
+`dispatch_publisher_tick`, under the hub runner's identity. That is how an
+audit's query learns which commit the hub ran.
 
 `fleet-run` returns as soon as the suite is running and does **not** wait for
 it. The build outlives the command because it is launched through the node's
