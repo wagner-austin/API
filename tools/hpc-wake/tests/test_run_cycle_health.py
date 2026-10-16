@@ -52,6 +52,7 @@ class TestHealthRecord:
             "rcs-pair-watch",
             "login-probe",
             "search-probe",
+            "publisher-ticks",
         }
         assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
         assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
@@ -97,7 +98,8 @@ class TestHealthRecord:
         runner.results = [
             green,
             Completed("", "TASK_SESSION_UNLEDGERED\n", 1),
-            *[green] * (len(run_cycle.PUBLISHERS) - 2),
+            # The rest of the publishers, then the recorder row after them.
+            *[green] * (len(run_cycle.PUBLISHERS) - 1),
         ] * 2
         root = staged_root(tmp_path, GOOD_ENV)
 

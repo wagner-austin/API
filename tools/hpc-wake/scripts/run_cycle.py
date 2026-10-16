@@ -36,8 +36,8 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
-from collections.abc import Sequence
-from typing import Final
+from collections.abc import Mapping, Sequence
+from typing import Final, TextIO
 
 from platform_core.env_assignments import parse_env_assignments
 from typing_extensions import TypedDict
@@ -265,6 +265,22 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
     },
 )
 
+#: The row run after every publisher above, each tick: fleet's record of
+#: which commit each of them ran and how it exited, through MCPs
+#: ``dispatch_publisher_tick`` (MCPs board task 9f1367d5). Which commit the
+#: hub runs was recorded only here, in files no audit check reads, so a
+#: criterion that the hub runs a fix could not be decided; the row is the
+#: database's copy. Its args gain one ``<publisher>=<exit code>=<directory>``
+#: token per publisher this tick, which is why it is not a row of the table
+#: above. It is a row like them in every other way: marked in the log and
+#: given its own line in the health record, so a record that could not be
+#: made reads as one red row and stops no publisher.
+RECORDER: Final[Publisher] = {
+    "name": "publisher-ticks",
+    "args": ("poetry", "run", "--", "python", "-m", "fleet.cli.publisher_ticks"),
+    "cwd": "..\\fleet",
+}
+
 
 def package_root_from(tokens: Sequence[str]) -> pathlib.Path:
     """Parse the one flag this entry point takes, with stdlib only.
@@ -309,6 +325,39 @@ _LOG_LIMIT_BYTES = 1_000_000
 PUBLISHER_WALL_SECONDS: Final[int] = 1200
 
 
+def _run_row(
+    handle: TextIO,
+    name: str,
+    args: Sequence[str],
+    cwd: pathlib.Path,
+    env: Mapping[str, str],
+) -> int:
+    """Run one row to completion, its output under its marker in the log.
+
+    Args:
+        handle: The cycle log, open for appending.
+        name: The row's marker.
+        args: Its command.
+        cwd: Its resolved working directory.
+        env: Its complete environment.
+
+    Returns:
+        Its exit code.
+
+    Raises:
+        OSError: When the command cannot be spawned.
+        subprocess.TimeoutExpired: When it outlasts
+            :data:`PUBLISHER_WALL_SECONDS`.
+    """
+    handle.write(f"-- {name}\n")
+    completed = _test_hooks.run_process(
+        list(args), cwd=cwd, env=env, timeout=PUBLISHER_WALL_SECONDS
+    )
+    handle.write(completed.stdout)
+    handle.write(completed.stderr)
+    return completed.returncode
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one bridge cycle and append its output to the cycle log.
 
@@ -320,9 +369,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             Defaults to the process arguments.
 
     Returns:
-        The tick's status: 0 when every publisher exited 0, otherwise the
-        FIRST nonzero exit — every publisher runs regardless, and the log's
-        per-publisher markers name which one went red.
+        The tick's status: 0 when every publisher and the :data:`RECORDER`
+        row after them exited 0, otherwise the FIRST nonzero exit — every
+        row runs regardless, and the log's per-row markers name which one
+        went red.
 
     Raises:
         ValueError: Propagated from :func:`package_root_from`.
@@ -352,23 +402,25 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     now = _test_hooks.now()
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    worst = 0
+    env = {**os.environ, **environment}
     outcomes: list[tuple[str, int]] = []
+    ran: list[str] = []
     with log.open("a", encoding="utf-8") as handle:
         handle.write(f"== {stamp}\n")
         for publisher in PUBLISHERS:
-            handle.write(f"-- {publisher['name']}\n")
-            completed = _test_hooks.run_process(
-                list(publisher["args"]),
-                cwd=(package_root / publisher["cwd"]).resolve(),
-                env={**os.environ, **environment},
-                timeout=PUBLISHER_WALL_SECONDS,
-            )
-            handle.write(completed.stdout)
-            handle.write(completed.stderr)
-            outcomes.append((publisher["name"], completed.returncode))
-            if completed.returncode != 0 and worst == 0:
-                worst = completed.returncode
+            cwd = (package_root / publisher["cwd"]).resolve()
+            code = _run_row(handle, publisher["name"], publisher["args"], cwd, env)
+            outcomes.append((publisher["name"], code))
+            ran.append(f"{publisher['name']}={code}={cwd}")
+        recorded = _run_row(
+            handle,
+            RECORDER["name"],
+            (*RECORDER["args"], *ran),
+            (package_root / RECORDER["cwd"]).resolve(),
+            env,
+        )
+        outcomes.append((RECORDER["name"], recorded))
+    worst = next((code for _, code in outcomes if code != 0), 0)
     # THE HEALTH RECORD IS WRITTEN EVERY TICK, GREEN OR RED, and it is the
     # only part of this function anything outside the machine's scheduler
     # can read. The log above is where a five-day outage hid: it is

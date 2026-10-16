@@ -51,8 +51,9 @@ class RecordingRunner:
 def make_runner() -> Generator[RecordingRunner, None, None]:
     """Install a recording runner, and put the real one back afterwards.
 
-    Scripted with one result per publisher, distinguishable by content so
-    ordering assertions mean something.
+    Scripted with one result per publisher and one for the recorder row
+    after them, distinguishable by content so ordering assertions mean
+    something.
     """
     fake = RecordingRunner(
         [
@@ -66,6 +67,7 @@ def make_runner() -> Generator[RecordingRunner, None, None]:
             Completed("rcs-out\n", "rcs-err\n", 0),
             Completed("login-out\n", "login-err\n", 0),
             Completed("search-out\n", "search-err\n", 0),
+            Completed("ticks-out\n", "ticks-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake

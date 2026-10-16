@@ -106,6 +106,18 @@ scheduled tasks — the random-task count goes down, not up.
 | login-probe | MCPs' login real-use check: every three hours a real Chromium signs in to corvis with the probe's passkey, connects and refreshes a client, calls one tool and signs out, against production (MCPs `2ce5fc24`) | a critical operator ask (texted) and a note in room corvis, only when the set of failing checks changes; every run in the hub checkout's `fleet-mcp/state/login-probe.json` | none: an ask and an unaddressed note |
 | search-probe | MCPs' public search probe: every 9 to 12 minutes the declared checks of https://search.austinwagner.org are fetched through Cloudflare and judged (MCPs `d84d37e3`) | one repair ask and a note in room civic, only when the set of failing checks changes; every run in the hub checkout's `fleet-mcp/state/search-probe.json`, which `fleet_search_probe` serves | none: an ask and an unaddressed note |
 
+After the table, every tick runs one more row, `RECORDER`
+(`publisher-ticks`, MCPs `9f1367d5`): `python -m fleet.cli.publisher_ticks`
+in the fleet package, with one `<publisher>=<exit code>=<directory>` token
+per row above. For each it reads the checkout the directory belongs to (its
+`origin` repository, HEAD and whether a tracked file differs) and records it
+through MCPs `dispatch_publisher_tick` in the `hub_publisher_ticks` table,
+one row per state a publisher ran in, so an audit's query reads which
+commit the hub ran, e.g. `SELECT count(*) FROM hub_publisher_ticks WHERE
+publisher = 'hpc-wake' AND head_sha = '<sha>' AND NOT dirty AND exit_code
+= 0`. It posts nothing. A record that could not be made is that row's red
+line in the health record; no publisher waits on it.
+
 Every publisher batches per tick (a 103-job Slurm batch or a 126-line
 lock-journal backlog is ONE post) and mentions only whoever acted — the
 noise budget is acceptance 6 of the board task, not a hope.

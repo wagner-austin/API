@@ -72,6 +72,7 @@ class TestMain:
             ("-- rcs-pair-watch", "rcs-out", "rcs-err"),
             ("-- login-probe", "login-out", "login-err"),
             ("-- search-probe", "search-out", "search-err"),
+            ("-- publisher-ticks", "ticks-out", "ticks-err"),
         ]
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
@@ -213,7 +214,7 @@ class TestMain:
         root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == len(run_cycle.PUBLISHERS) == 10
+        assert len(runner.calls) == len(run_cycle.PUBLISHERS) + 1 == 11
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
@@ -360,7 +361,7 @@ class TestMainBlock:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
         assert runner.calls[0][1] == root.resolve()
-        assert len(runner.calls) == len(run_cycle.PUBLISHERS)
+        assert len(runner.calls) == len(run_cycle.PUBLISHERS) + 1
         assert (root / "runs" / "cycle.log").read_text(encoding="utf-8").startswith("== ")
 
 
