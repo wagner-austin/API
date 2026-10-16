@@ -20,7 +20,9 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-playwright = "^1.57"
+# Wheel installs must use the live-tested driver: 1.64 fails in
+# wait_for_function after game login (2026-10-16 release gate).
+playwright = "1.63.0"
 websockets = "^15.0"
 httpx = "^0.28"
 rich = "^14.0"
