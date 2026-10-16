@@ -192,8 +192,15 @@ Preflight also asks the run's environment, inside its image, whether it can
 start every `python -m` module the command names, resolved from the directory
 the command enters; a module it cannot start is refused with
 `ENTRYPOINT_NOT_INSTALLED`, naming the commit the image was built from, so a
-command newer than its image never reaches the queue
-([image freshness](wiki/pages/image-freshness.md)).
+command newer than its image never reaches the queue. An image that cannot
+say which commit built it (no readable `GIT_COMMIT`) is refused
+`ENTRYPOINT_IMAGE_UNSTAMPED`. A module the image does carry is admitted, and
+its package's source is then compared, in the project's `repo`, between the
+image's commit and HEAD: what changed prints as a `WARNING` line under the
+verdict, every submission records it in its ledger row's `image_drift`, and
+`hpc3-trace` prints it, because that run executes the image's older code. An
+image commit the repo does not hold is refused
+`ENTRYPOINT_IMAGE_COMMIT_UNKNOWN` ([image freshness](wiki/pages/image-freshness.md)).
 
 A run that overrides project defaults — the merged result goes through the
 same decoder:
