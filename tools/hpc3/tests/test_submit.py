@@ -22,14 +22,20 @@ from hpc3.core.submit import parse_job_id, submit
 from tests.against_hpc3 import decode_job_spec, read_ledger
 from tests.conftest import FakeRun, LoggedEvent, cluster, gpus
 from tests.healthy_cluster import (
+    HEAD_COMMIT,
+    IMAGE,
+    IMAGE_COMMIT,
     PREFLIGHT_LINE,
     PROJECT_REPO,
+    moved_module_drift,
     script_healthy_cluster,
     script_healthy_environment,
+    script_moved_module,
 )
 
 _AT = "2026-08-22T16:00:00+00:00"
 _SUBMITTER = "fable-brain-audit-0903"
+_MODULE = "model_trainer.cli.known_answer_probe"
 
 
 def _spec(**overrides: JSONValue) -> JobSpec:
@@ -212,6 +218,36 @@ class TestSubmitRecordsTheJob:
             "arm": "B",
             "seed": "42",
         }
+
+    def test_an_image_run_records_which_code_it_runs_and_what_moved_since(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """The row is the durable answer to "which code produced this": an
+        image run whose module's source moved on since the image's commit
+        must record both commits and the changed file, the same record the
+        admission computed, not an empty comparison."""
+        script_moved_module(fake_run, [_MODULE])
+        script_healthy_cluster(fake_run)
+        submitted = submit(
+            _spec(env_path="/opt/env", image=IMAGE, command=f"python -m {_MODULE} --seed 42"),
+            host="hpc3",
+            script_dir="/pub/wagnera3/jobs",
+            log_dir="/pub/wagnera3/logs",
+            ledger_path=tmp_path / "ledger.jsonl",
+            submitted_at=_AT,
+            submitter=_SUBMITTER,
+            cluster=cluster(),
+            charge_account="",
+            repo=PROJECT_REPO,
+        )
+
+        expected = ImageDrift(
+            image_commit=IMAGE_COMMIT,
+            head=HEAD_COMMIT,
+            modules=[moved_module_drift("/pub/wagnera3/jobs", _MODULE)],
+        )
+        assert submitted.image_drift == expected
+        assert [row["image_drift"] for row in read_ledger(tmp_path / "ledger.jsonl")] == [expected]
 
     def test_a_failed_submission_records_nothing(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

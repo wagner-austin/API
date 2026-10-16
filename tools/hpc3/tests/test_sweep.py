@@ -8,21 +8,51 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONValue
 
+from hpc3.contracts.drift import ImageDrift
 from hpc3.contracts.sweep import SweepSpec
 from hpc3.core import audit
 from hpc3.core.sweep import submit_sweep
 from tests.against_hpc3 import decode_sweep_spec, read_ledger
 from tests.conftest import FakeRun, LoggedEvent, cluster, gpus
-from tests.healthy_cluster import PREFLIGHT_LINE, PROJECT_REPO, script_healthy_environment
+from tests.healthy_cluster import (
+    HEAD_COMMIT,
+    IMAGE,
+    IMAGE_COMMIT,
+    PREFLIGHT_LINE,
+    PROJECT_REPO,
+    moved_module_drift,
+    script_healthy_environment,
+    script_moved_module,
+)
 
 _AT = "2026-08-22T16:00:00+00:00"
 
 
 def _sweep(count: int = 3, *, throttle: int | None = None, **overrides: JSONValue) -> SweepSpec:
-    """Build a decoded sweep.
+    """Build a decoded sweep whose members run ``train.py`` under seeds.
 
     Args:
         count: How many members.
+        throttle: How many may run at once, or None for all.
+        **overrides: Template fields to replace.
+
+    Returns:
+        A validated sweep.
+    """
+    members: list[JSONValue] = [
+        {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
+        for i in range(count)
+    ]
+    return _document(members, throttle=throttle, **overrides)
+
+
+def _document(
+    members: list[JSONValue], *, throttle: int | None, **overrides: JSONValue
+) -> SweepSpec:
+    """Build a decoded sweep with the given members.
+
+    Args:
+        members: The member table.
         throttle: How many may run at once, or None for all.
         **overrides: Template fields to replace.
 
@@ -47,10 +77,6 @@ def _sweep(count: int = 3, *, throttle: int | None = None, **overrides: JSONValu
         "artifact": None,
     }
     base.update(overrides)
-    members: list[JSONValue] = [
-        {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
-        for i in range(count)
-    ]
     return decode_sweep_spec({"base": base, "members": members, "throttle": throttle})
 
 
@@ -213,6 +239,46 @@ class TestSweepLedger:
         ]
         assert {entry["project"] for entry in recorded} == {"abl"}
         assert {entry["log_dir"] for entry in recorded} == {"/l"}
+
+    def test_each_image_member_records_the_code_its_own_module_runs(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """Members share one image and one comparison, but each row names the
+        module that member starts, with both commits and what changed since,
+        exactly as the submission reported it for that member."""
+        probe, sweep = "model_trainer.cli.known_answer_probe", "model_trainer.cli.sweep"
+        script_moved_module(fake_run, [probe, sweep])
+        _healthy(fake_run)
+        fake_run.add("sbatch", stdout="Submitted batch job 101\n")
+        submitted = submit_sweep(
+            _document(
+                [
+                    {"suffix": "s0", "command": f"python -m {probe}", "artifact": None},
+                    {"suffix": "s1", "command": f"python -m {sweep}", "artifact": None},
+                ],
+                throttle=None,
+                env_path="/opt/env",
+                image=IMAGE,
+            ),
+            host="hpc3",
+            script_dir="/j",
+            log_dir="/l",
+            ledger_path=tmp_path / "ledger.jsonl",
+            submitted_at=_AT,
+            submitter="fable-brain-audit-0903",
+            cluster=cluster(),
+            charge_account="",
+            repo=PROJECT_REPO,
+        )
+
+        expected = [
+            ImageDrift(
+                image_commit=IMAGE_COMMIT, head=HEAD_COMMIT, modules=[moved_module_drift("/j", m)]
+            )
+            for m in (probe, sweep)
+        ]
+        assert [member.image_drift for member in submitted] == expected
+        assert [row["image_drift"] for row in read_ledger(tmp_path / "ledger.jsonl")] == expected
 
 
 class TestSweepAuditEvents:

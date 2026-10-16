@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import pathlib
 
+from platform_core.json_utils import JSONValue
+
+from hpc3.contracts.drift import ModuleDrift
 from tests.conftest import FakeRun
 
 PREFLIGHT_LINE = (
@@ -104,6 +107,66 @@ def script_healthy_environment(fake: FakeRun) -> None:
     fake.add("/opt/env/bin/python", stdout=IMAGE_PROBE)
 
 
+IMAGE: JSONValue = {
+    "path": "/pub/wagnera3/images/v23/abl.sif",
+    "sha256": "3bd2e694857821c383c5e90b1c23b63c706ece20069a6bf34431512ef1c041d4",
+    "binds": ["/pub/wagnera3"],
+}
+"""The image a document names for a run whose environment is ``/opt/env``."""
+
+TRAINER_SOURCE = "services/Model-Trainer/src/model_trainer"
+"""Where the tests' project repository keeps ``model_trainer``, as the real one does."""
+
+TRAINER_CHANGE = f"{TRAINER_SOURCE}/cli/known_answer_probe.py"
+"""The one file of it that changed between :data:`IMAGE_COMMIT` and :data:`HEAD_COMMIT`."""
+
+
+def script_moved_module(fake: FakeRun, modules: list[str]) -> None:
+    """Script an image that starts every module, whose source moved since.
+
+    The image says it was built from :data:`IMAGE_COMMIT` and resolves each
+    module inside its own environment; the repository at :data:`HEAD_COMMIT`
+    keeps ``model_trainer`` at :data:`TRAINER_SOURCE`, and git names
+    :data:`TRAINER_CHANGE` as changed between the two. Call BEFORE
+    :func:`script_healthy_environment`, whose stamp-only answer would
+    otherwise match the probe first.
+
+    A git command's last argument is what the runner matches: ``ls-tree``
+    ends with the HEAD it lists, ``diff`` with the path it compares.
+
+    Args:
+        fake: The runner to script.
+        modules: The ``model_trainer`` modules the run starts, in the order
+            the probe asks about them.
+    """
+    verdicts = "".join(
+        f"ENTRYPOINT|PRESENT|ENV|{module}|/opt/env/lib/python3.11/site-packages/model_trainer\n"
+        for module in modules
+    )
+    fake.add("ENTRYPOINT-COMMIT|%s", stdout=f"ENTRYPOINT-COMMIT|0|{IMAGE_COMMIT}\n{verdicts}")
+    fake.add(HEAD_COMMIT, stdout=f"README.md\0{TRAINER_SOURCE}/__init__.py\0{TRAINER_CHANGE}\0")
+    fake.add(TRAINER_SOURCE, stdout=f"{TRAINER_CHANGE}\0")
+
+
+def moved_module_drift(directory: str, module: str) -> ModuleDrift:
+    """Build what :func:`script_moved_module` makes one module's comparison.
+
+    Args:
+        directory: The directory the run starts it from.
+        module: The module.
+
+    Returns:
+        Its record: :data:`TRAINER_SOURCE` compared, :data:`TRAINER_CHANGE` changed.
+    """
+    return ModuleDrift(
+        directory=directory,
+        module=module,
+        compared=[TRAINER_SOURCE],
+        changed=[TRAINER_CHANGE],
+        not_compared="",
+    )
+
+
 def script_healthy_cluster(fake: FakeRun, *, job_id: str = "55519937") -> None:
     """Script a cluster that admits and accepts everything.
 
@@ -125,12 +188,17 @@ __all__ = [
     "ABL_PINNED_DISTRIBUTIONS",
     "HEAD_COMMIT",
     "HOST_ENV",
+    "IMAGE",
     "IMAGE_COMMIT",
     "IMAGE_INTERPRETER",
     "IMAGE_PROBE",
     "PREFLIGHT_LINE",
     "PROJECT_REPO",
+    "TRAINER_CHANGE",
+    "TRAINER_SOURCE",
     "host_interpreter",
+    "moved_module_drift",
     "script_healthy_cluster",
     "script_healthy_environment",
+    "script_moved_module",
 ]
