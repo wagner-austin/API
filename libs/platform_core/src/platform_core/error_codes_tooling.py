@@ -150,6 +150,13 @@ class Hpc3ErrorCode(ErrorCodeBase):
     # must never be mistaken for either verdict.
     REPO_COMMIT_NOT_HEAD = "REPO_COMMIT_NOT_HEAD"
     REPO_COMMIT_PROBE_UNREADABLE = "REPO_COMMIT_PROBE_UNREADABLE"
+    # A run whose command starts a Python module (``python -m``) that its
+    # environment cannot start: measured on the registered mi image v23,
+    # built from fab1d991, which predates cartridge_composition_sweep (board
+    # task 2c8161a3). The second code is the environment's answer arriving in
+    # a shape the check cannot read, never mistaken for either verdict.
+    ENTRYPOINT_NOT_INSTALLED = "ENTRYPOINT_NOT_INSTALLED"
+    ENTRYPOINT_PROBE_UNREADABLE = "ENTRYPOINT_PROBE_UNREADABLE"
 
     # Workspace configuration -- the one document every command reads.
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
