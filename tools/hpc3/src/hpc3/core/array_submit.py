@@ -35,7 +35,7 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.preflight import PreflightResult
 from hpc3.contracts.sweep import SweepSpec, expand_sweep
-from hpc3.core import audit, code_claim, env_probe, ledger, remote
+from hpc3.core import audit, code_claim, entrypoint, env_probe, ledger, remote
 from hpc3.core.array_sbatch import render_array_sbatch
 from hpc3.core.inflight import (
     check_artifact_is_free,
@@ -137,7 +137,10 @@ def array_preflight(
             ``ENV_PROBE_UNREADABLE`` / ``ENV_INTERPRETER_BORROWED`` from the
             environment checks, ``REPO_COMMIT_NOT_HEAD`` /
             ``REPO_COMMIT_PROBE_UNREADABLE`` from the code claim,
-            ``PREFLIGHT_REJECTED`` when Slurm refuses -- carrying Slurm's own
+            ``ENTRYPOINT_NOT_INSTALLED`` / ``ENTRYPOINT_PROBE_UNREADABLE``
+            when the environment cannot start a selected member's ``python
+            -m`` module or cannot say, ``PREFLIGHT_REJECTED`` when Slurm
+            refuses -- carrying Slurm's own
             reason plus the dependency hint when the base waits on a job that
             can no longer satisfy it -- or ``PREFLIGHT_UNPARSABLE`` when the
             verdict cannot be read.
@@ -153,6 +156,16 @@ def array_preflight(
 
     remote.make_directory(host, script_dir)
     remote.make_directory(host, log_dir)
+    # One probe for every selected member's command: they share the
+    # template's environment, but each member may start its own module.
+    members = expand_sweep(spec)
+    entrypoint.check_entrypoints(
+        host,
+        [members[index]["command"] for index in indices],
+        env_path=base["env_path"],
+        image=base["image"],
+        working_directory=script_dir,
+    )
     script = render_array_sbatch(spec, log_dir=log_dir, charge_account=charge_account)
     label = qualified_name(base["project"], base["name"])
     remote.put_bytes(host, f"{script_dir}/{label}.sbatch", script.encode("utf-8"))

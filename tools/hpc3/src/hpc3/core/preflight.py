@@ -26,7 +26,7 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
-from hpc3.core import code_claim, env_probe, gpu_supply, image_exec, remote, sbatch
+from hpc3.core import code_claim, entrypoint, env_probe, gpu_supply, image_exec, remote, sbatch
 
 _START_ANCHOR = " to start at "
 _USING_ANCHOR = " using "
@@ -244,8 +244,11 @@ def preflight(
             belongs to another installation, ``REPO_COMMIT_NOT_HEAD`` or
             ``REPO_COMMIT_PROBE_UNREADABLE`` if the run declares a commit its
             checkout is not at or cannot be read about,
-            ``GPU_MODEL_EXHAUSTED`` if the job pins a GPU model
-            the partition has none of free while another model idles,
+            ``ENTRYPOINT_NOT_INSTALLED`` or ``ENTRYPOINT_PROBE_UNREADABLE``
+            if the environment cannot start a ``python -m`` module the
+            command names or cannot say, ``GPU_MODEL_EXHAUSTED`` if the job
+            pins a GPU model the partition has none of free while another
+            model idles,
             ``PREFLIGHT_REJECTED`` if Slurm refuses the job -- carrying its
             own reason, which is the diagnostic -- or ``PREFLIGHT_UNPARSABLE``
             if the verdict cannot be read.
@@ -271,6 +274,17 @@ def preflight(
 
     remote.make_directory(host, script_dir)
     remote.make_directory(host, log_dir)
+    # Then whether the environment can start the module the command names.
+    # After the directories exist, because the job starts in script_dir and
+    # `python -m` resolves from there; see `hpc3.core.entrypoint` for the
+    # registered image that predated the command a run document named.
+    entrypoint.check_entrypoints(
+        host,
+        [spec["command"]],
+        env_path=spec["env_path"],
+        image=spec["image"],
+        working_directory=script_dir,
+    )
     script = sbatch.render_sbatch(spec, log_dir=log_dir, charge_account=charge_account)
     label = qualified_name(spec["project"], spec["name"])
     script_path = f"{script_dir}/{label}.sbatch"
