@@ -49,12 +49,15 @@ class AnnouncedPush(TypedDict):
             it. The only field the bridge reads; the rest exist so a person
             opening the file can see what happened without joining it to
             the enrolment record.
-        state: Which announced state closed the row -- ``ripe``,
-            ``abandoned`` or ``stalled``. Recorded because a push closed as
+        state: Which state closed the row -- ``ripe``, ``abandoned``,
+            ``stalled`` or ``covered``, each announced, or ``unlanded``, a
+            push its branch never held, closed with no post
+            (:mod:`ci_wake.landing`). Recorded because a push closed as
             ``stalled`` whose runs later finished is a real sequence, and a
             reader needs to see that the verdict they never received was
             not lost but deliberately not waited for.
-        announced_unix: When the post landed, whole seconds since the epoch.
+        announced_unix: When the row was closed (for an announced state,
+            when its post landed), whole seconds since the epoch.
     """
 
     key: str

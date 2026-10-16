@@ -41,6 +41,7 @@ from ci_wake.announce import CoverReport, PushReport, RunReport, announcements
 from ci_wake.coverage import BranchRun, branch_of, branch_runs, find_cover
 from ci_wake.enrolment import PushAttempt, attempt_key, latest_attempts, read_attempts
 from ci_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
+from ci_wake.landing import UNLANDED, UnlandedPush, holds, landing_of
 from ci_wake.position import AnnouncedPush, append_announced, position_path, read_announced
 from ci_wake.runs import decode_jobs, decode_runs, gh_json, jobs_argv, runs_argv
 from ci_wake.verdicts import (
@@ -120,13 +121,16 @@ def _covers(
     return tuple(covers)
 
 
-def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushReport | None:
+def _report(
+    attempt: PushAttempt, now_epoch: int, branches: BranchRuns
+) -> PushReport | UnlandedPush | None:
     """Ask GitHub about one outstanding push and decide what to say.
 
     A push with an own run cancelled before any job waits for the later run
     of that workflow that checked it (:mod:`ci_wake.coverage`) and is
     announced with that run's verdict beside its runs that executed; only
     past :data:`COVER_SECONDS` without one is it announced as its own runs.
+    A push with no run whose branch never held it is closed unannounced.
 
     Args:
         attempt: The enrolment row.
@@ -134,7 +138,8 @@ def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushR
         branches: This cycle's branch runs, for a superseded push.
 
     Returns:
-        The push and its runs when it is announceable, or None when it is
+        The push and its runs when it is announceable, an
+        :class:`UnlandedPush` when it never landed, or None when it is
         still worth waiting for. None rather than an empty report so the
         caller cannot accidentally post about a push that is merely quiet.
 
@@ -146,6 +151,15 @@ def _report(attempt: PushAttempt, now_epoch: int, branches: BranchRuns) -> PushR
     verdict = PushVerdict(attempt=attempt, runs=runs, state=classify(attempt, runs, now_epoch))
     if not is_announceable(verdict):
         return None
+    # A push with no run is asked whether it ever landed (MCPs board task
+    # be748588): the hooks enrol before git sends anything, so a refused push
+    # leaves a row, and its silence means nothing. A tag has no branch to
+    # ask about and keeps the announcement.
+    branch = branch_of(attempt["ref"])
+    if verdict["state"] == "abandoned" and branch != "":
+        landing = landing_of(attempt["repo"], branch, attempt["sha"])
+        if not holds(landing):
+            return UnlandedPush(attempt=attempt, branch=branch, landing=landing)
     reports = tuple(
         RunReport(
             run=run,
@@ -202,44 +216,47 @@ def run_cycle(enrolment: pathlib.Path) -> None:
 
     now_epoch = _test_hooks.now()
     branches = BranchRuns(min(attempt["attempted_unix"] for attempt in outstanding))
-    reports = [
+    decided = [
         report
         for report in (_report(attempt, now_epoch, branches) for attempt in outstanding)
         if report is not None
     ]
-    if len(reports) == 0:
+    if len(decided) == 0:
         _test_hooks.emit(f"{len(outstanding)} push(es) outstanding, none decided yet")
         return
+    unlanded = [push for push in decided if isinstance(push, UnlandedPush)]
+    reports = [report for report in decided if not isinstance(report, UnlandedPush)]
 
-    # THE LEDGER GATE COMES FIRST, and it is why this bridge went silent
-    # from 2026-09-16 to 2026-09-21: MCPs mig 514 refuses a write from a
-    # session no ledger surface knows, a service session is exactly one,
-    # and every tick since died on TASK_SESSION_UNLEDGERED with the
-    # traceback going only to runs/cycle.log, which nothing reads. Placed
-    # here rather than at the top of the cycle so a quiet tick stays
-    # quiet: by this line there is an announcement to make, and before it
-    # there was not.
-    register_service_session(
-        _test_hooks.http_post,
-        credentials,
-        IDENTITY,
-        harness=HARNESS,
-        purpose=PURPOSE,
-    )
-    for announcement in announcements(reports):
-        post_to_task(
+    if len(reports) > 0:
+        # THE LEDGER GATE COMES FIRST, and it is why this bridge went silent
+        # from 2026-09-16 to 2026-09-21: MCPs mig 514 refuses a write from a
+        # session no ledger surface knows, a service session is exactly one,
+        # and every tick since died on TASK_SESSION_UNLEDGERED with the
+        # traceback going only to runs/cycle.log, which nothing reads. Placed
+        # here rather than at the top of the cycle so a quiet tick stays
+        # quiet: by this line there is an announcement to make, and before it
+        # there was not.
+        register_service_session(
             _test_hooks.http_post,
             credentials,
             IDENTITY,
-            task_id=task_id,
-            kind="note",
-            body=announcement["body"],
+            harness=HARNESS,
+            purpose=PURPOSE,
         )
-        _test_hooks.emit(
-            f"posted {announcement['repo']}: tagged @{announcement['agent']}"
-            if announcement["agent"] != ""
-            else f"posted {announcement['repo']}: unaddressed, no BOARD_AGENT_LABEL"
-        )
+        for announcement in announcements(reports):
+            post_to_task(
+                _test_hooks.http_post,
+                credentials,
+                IDENTITY,
+                task_id=task_id,
+                kind="note",
+                body=announcement["body"],
+            )
+            _test_hooks.emit(
+                f"posted {announcement['repo']}: tagged @{announcement['agent']}"
+                if announcement["agent"] != ""
+                else f"posted {announcement['repo']}: unaddressed, no BOARD_AGENT_LABEL"
+            )
 
     for report in reports:
         attempt = report["verdict"]["attempt"]
@@ -251,9 +268,20 @@ def run_cycle(enrolment: pathlib.Path) -> None:
                 announced_unix=now_epoch,
             ),
         )
+    for push in unlanded:
+        append_announced(
+            marks,
+            AnnouncedPush(
+                key=attempt_key(push.attempt["repo"], push.attempt["sha"]),
+                state=UNLANDED,
+                announced_unix=now_epoch,
+            ),
+        )
+        _test_hooks.emit(push.line())
     _test_hooks.emit(
         f"cycle: {len(attempts)} enrolled, {len(outstanding)} outstanding, "
-        f"{len(reports)} announced, positions recorded"
+        f"{len(reports)} announced, {len(unlanded)} closed unannounced as never landed, "
+        "positions recorded"
     )
 
 

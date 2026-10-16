@@ -31,9 +31,11 @@ from platform_core.mcp_testing import (
 )
 
 from ci_wake import _test_hooks
+from ci_wake.coverage import compare_argv
 from ci_wake.cycle import run_cycle
 from ci_wake.enrolment import PushAttempt, append_attempt, attempt_key
 from ci_wake.identity import HARNESS, IDENTITY, PURPOSE
+from ci_wake.landing import object_argv
 from ci_wake.position import position_path, read_announced
 from ci_wake.runs import jobs_argv, runs_argv
 from ci_wake.verdicts import NO_RUN_SECONDS
@@ -47,6 +49,8 @@ from tests.conftest import (
     TASK_ID,
     FakeCompleted,
     FakeGh,
+    compare_reply,
+    object_reply,
     pin_env,
 )
 
@@ -235,7 +239,10 @@ class TestAVerdictIsAnnounced:
 
         assert len(notes_sent(poster)) == 1
         assert read_announced(position_path(enrolment)) == {attempt_key(REPO, SHA)}
-        assert emitted[-1] == ("cycle: 1 enrolled, 1 outstanding, 1 announced, positions recorded")
+        assert emitted[-1] == (
+            "cycle: 1 enrolled, 1 outstanding, 1 announced, 0 closed unannounced as never "
+            "landed, positions recorded"
+        )
 
     def test_the_first_post_registers_the_bridge_on_the_session_ledger(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
@@ -416,15 +423,22 @@ class TestAVerdictIsAnnounced:
 
 
 class TestSilenceIsAnnounced:
-    def test_a_push_that_never_produced_a_run_is_announced_and_closed(
+    def test_a_landed_push_that_never_produced_a_run_is_announced_and_closed(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
     ) -> None:
-        """The state that makes this a monitor rather than a nicety. No jobs
-        call is made, because there is no run to ask about."""
+        """The state that makes this a monitor rather than a nicety. Its
+        branch holds the sha, so the silence is Actions'. No jobs call is
+        made, because there is no run to ask about."""
         pin_env(CONFIGURED_ENV)
         enrolment = tmp_path / "pushes.jsonl"
         _enrol(enrolment, ago=NO_RUN_SECONDS + 1)
-        gh = FakeGh({runs_argv(REPO, SHA): _runs_reply()})
+        gh = FakeGh(
+            {
+                runs_argv(REPO, SHA): _runs_reply(),
+                object_argv(REPO, SHA): object_reply(held=True),
+                compare_argv(REPO, SHA, "main"): compare_reply("ahead"),
+            }
+        )
         _test_hooks.run_process = gh
         poster = announcing_poster()
         _test_hooks.http_post = poster
@@ -433,7 +447,11 @@ class TestSilenceIsAnnounced:
 
         assert "NO RUN EVER APPEARED" in str(notes_sent(poster)[0]["body"])
         assert read_announced(position_path(enrolment)) == {attempt_key(REPO, SHA)}
-        assert gh.calls == [runs_argv(REPO, SHA)]
+        assert gh.calls == [
+            runs_argv(REPO, SHA),
+            object_argv(REPO, SHA),
+            compare_argv(REPO, SHA, "main"),
+        ]
 
 
 class TestNothingIsCaught:
@@ -525,4 +543,7 @@ class TestReEnrolment:
 
         assert gh.calls.count(runs_argv(REPO, SHA)) == 1
         assert "@opus-second-0909" in str(notes_sent(poster)[0]["body"])
-        assert emitted[-1] == ("cycle: 1 enrolled, 1 outstanding, 1 announced, positions recorded")
+        assert emitted[-1] == (
+            "cycle: 1 enrolled, 1 outstanding, 1 announced, 0 closed unannounced as never "
+            "landed, positions recorded"
+        )

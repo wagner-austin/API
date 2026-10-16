@@ -1,6 +1,6 @@
 """When an enrolled push has an answer worth waking somebody for.
 
-FIVE STATES, AND FOUR OF THEM ARE ANNOUNCED. The obvious one -- every run
+SIX STATES, AND FOUR OF THEM ARE ANNOUNCED. The obvious one -- every run
 finished -- is the least interesting to get right, because it announces
 itself. The other two announced states exist because this bridge's failure
 mode is silence, and a push that never produces a verdict is exactly as
@@ -8,12 +8,10 @@ silent as a bridge that is switched off:
 
   holding    still worth waiting for. Nothing is posted and the row stays.
   ripe       at least one run exists and every one of them is over.
-  abandoned  no run has appeared and enough time has passed that none will.
-             The ordinary cause is a push git refused as non-fast-forward,
-             which ``pre-push`` enrolled before the transfer was attempted
-             and no later hook could retract. The other causes matter more:
-             a workflow whose path filters matched nothing, and an Actions
-             outage. This workspace has already lost hours to the last one
+  abandoned  no run has appeared and enough time has passed that none will,
+             for a sha its branch holds. The causes that matter: a workflow
+             whose path filters matched nothing, and an Actions outage.
+             This workspace has already lost hours to the last one
              -- two commits shipped a barrel importing an untracked module
              and survived because Actions had started no job in two days --
              and a bridge that stayed quiet through it would have been the
@@ -29,6 +27,16 @@ silent as a bridge that is switched off:
              counts and ancestry; a push with an evicted run and no cover for
              it yet stays ``holding`` until :data:`COVER_SECONDS`, then is
              announced ripe and NOT RUN.
+  unlanded   the one silent closing state: no run appeared because the push
+             never landed. ``pre-push`` enrols before its checks and before
+             git sends anything, so a push refused by a check or by the
+             remote leaves a row; on 2026-10-16 three NO RUN posts on MCPs
+             main were each a worktree-publish attempt whose retry landed
+             (MCPs board task be748588). Decided by the cycle, which asks
+             GitHub whether the branch holds the sha
+             (:mod:`ci_wake.landing`); the row is closed and named on the
+             cycle's output, and nothing is posted, since the pusher already
+             saw git refuse it.
 
 THE SETTLE WINDOW IS ABOUT RUN CREATION, NOT RUN COMPLETION. A repository
 with several workflows creates them within seconds of a push, but not in the
@@ -104,7 +112,9 @@ class PushVerdict(TypedDict):
         state: ``holding``, ``ripe``, ``abandoned``, ``stalled``, or
             ``covered``: each of its own runs cancelled before any job has a
             later completed run of that workflow, whose head descends from
-            it, giving the verdict instead (:mod:`ci_wake.coverage`).
+            it, giving the verdict instead (:mod:`ci_wake.coverage`). An
+            ``unlanded`` push is never a verdict: the cycle closes it as a
+            :class:`ci_wake.landing.UnlandedPush`, which nothing announces.
     """
 
     attempt: PushAttempt

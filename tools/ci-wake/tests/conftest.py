@@ -34,6 +34,7 @@ from typing import Final, Literal
 
 import pytest
 from platform_core.config import config_test_hooks
+from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from ci_wake import _test_hooks
@@ -361,6 +362,33 @@ def only_body(reports: list[PushReport]) -> str:
     posts = announcements(reports)
     assert len(posts) == 1
     return posts[0]["body"]
+
+
+def compare_reply(status: str) -> FakeCompleted:
+    """Script :func:`ci_wake.coverage.compare_argv`'s answer, as its ``--jq`` shapes it.
+
+    Args:
+        status: ``ahead``, ``identical``, ``behind`` or ``diverged``.
+
+    Returns:
+        The finished process.
+    """
+    return FakeCompleted(stdout=dump_json_str({"status": status}))
+
+
+def object_reply(*, held: bool) -> FakeCompleted:
+    """Script :func:`ci_wake.landing.object_argv`'s answer, as its ``--jq`` shapes it.
+
+    Args:
+        held: Whether GitHub holds the object.
+
+    Returns:
+        The finished process: ``{"object": {"__typename": "Commit"}}``, or
+        ``{"object": null}`` as ``gh`` printed it for a sha GitHub never
+        received (d357385da52f, measured 2026-10-16).
+    """
+    held_object: JSONValue = {"__typename": "Commit"} if held else None
+    return FakeCompleted(stdout=dump_json_str({"object": held_object}))
 
 
 @pytest.fixture(autouse=True)

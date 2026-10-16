@@ -32,6 +32,7 @@ from tests.conftest import (
     SHA,
     FakeCompleted,
     FakeGh,
+    compare_reply,
     pin_env,
 )
 
@@ -116,10 +117,6 @@ def _branch(*runs: tuple[int, str, int, str]) -> FakeCompleted:
     )
 
 
-def _status(value: str) -> FakeCompleted:
-    return _reply({"status": value})
-
-
 class TestASupersededPushIsAnnouncedWithItsCover:
     def test_the_first_run_containing_it_is_its_verdict(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
@@ -134,7 +131,7 @@ class TestASupersededPushIsAnnouncedWithItsCover:
                 branch_runs_argv(REPO, "main", FROZEN_NOW - 3600, 1): _branch(
                     (GREEN_RUN, GREEN, 3200, "success"), (RED_RUN, RED, 1600, "failure")
                 ),
-                compare_argv(REPO, SHA, RED): _status("ahead"),
+                compare_argv(REPO, SHA, RED): compare_reply("ahead"),
                 jobs_argv(REPO, RED_RUN): _jobs(61, ("coloring-book",)),
             }
         )
@@ -195,7 +192,7 @@ class TestASupersededPushIsAnnouncedWithItsCover:
                 branch_runs_argv(REPO, "main", FROZEN_NOW - 3600, 1): _branch(
                     (RED_RUN, RED, 1600, "failure")
                 ),
-                compare_argv(REPO, SHA, RED): _status("ahead"),
+                compare_argv(REPO, SHA, RED): compare_reply("ahead"),
                 jobs_argv(REPO, RED_RUN): _jobs(67, ("cloudflared",)),
             }
         )
@@ -251,7 +248,7 @@ class TestASupersededPushIsAnnouncedWithItsCover:
                 branch_runs_argv(REPO, "main", FROZEN_NOW - 3600, 1): _branch(
                     (RED_RUN, RED, 1600, "failure")
                 ),
-                compare_argv(REPO, SHA, RED): _status("ahead"),
+                compare_argv(REPO, SHA, RED): compare_reply("ahead"),
                 jobs_argv(REPO, RED_RUN): _jobs(67, ("cloudflared",)),
             }
         )
@@ -284,8 +281,8 @@ class TestASupersededPushIsAnnouncedWithItsCover:
                 jobs_argv(REPO, OWN_RUN): _jobs(0),
                 jobs_argv(REPO, OTHER_OWN_RUN): _jobs(0),
                 branch: _branch((GREEN_RUN, GREEN, 3200, "success")),
-                compare_argv(REPO, SHA, GREEN): _status("ahead"),
-                compare_argv(REPO, OTHER_SHA, GREEN): _status("ahead"),
+                compare_argv(REPO, SHA, GREEN): compare_reply("ahead"),
+                compare_argv(REPO, OTHER_SHA, GREEN): compare_reply("ahead"),
                 jobs_argv(REPO, GREEN_RUN): _jobs(5),
             }
         )
@@ -314,7 +311,7 @@ class TestASupersededPushWithNoCoverYet:
                 branch_runs_argv(REPO, "main", FROZEN_NOW - 3600, 1): _branch(
                     (GREEN_RUN, GREEN, 3200, "success")
                 ),
-                compare_argv(REPO, SHA, GREEN): _status("behind"),
+                compare_argv(REPO, SHA, GREEN): compare_reply("behind"),
             }
         )
         poster = announcing_poster()
