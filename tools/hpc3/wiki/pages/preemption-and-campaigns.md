@@ -2,18 +2,18 @@
 title: Preemption cancels, checkpoints protect, campaigns converge
 tags: [submission, preemption, campaigns]
 hubs: [cluster-facts, submission]
-related: ["[[sweeps-and-artifacts]]", "[[partitions-and-billing]]", "[[submission-rules]]"]
+related: ["[[sweeps-and-artifacts]]", "[[partitions-and-billing]]", "[[submission-rules]]", "[[one-ledger-per-repository]]"]
 source_paths:
   - "src/hpc3/contracts/job.py"
   - "src/hpc3/core/inflight.py"
   - "src/hpc3/core/campaign.py"
 source_git_blobs:
   "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
-  "src/hpc3/core/inflight.py": "03cf4ad35a0e4c2987b9d5e8ed20e440b3891c55"
+  "src/hpc3/core/inflight.py": "96492a481dad7ead1916b61056585103e87443c5"
   "src/hpc3/core/campaign.py": "c9c4428b8cd03f5f218784bbed5ed41bb705f0fa"
 provenance:
   - "scontrol show partition free-gpu (2026-08-28)"
-fact_checked: 2026-10-08
+fact_checked: 2026-10-16
 confidence: high
 ---
 
@@ -71,7 +71,10 @@ documents describing one experiment, each a transcription of a queue state
 that had already changed — and at one point two of them were live, writing the
 same `uz_best.pt`. That race is now refused at submit time by
 `hpc3.core.inflight`, for every command, and the campaign avoids provoking it
-in the first place.
+in the first place. That check reads a live job's artifact through its ledger
+row, so since 2026-10-16 every worktree shares the main checkout's ledger, and
+a live job carrying the submission's name that no row here records is refused
+with `LIVE_JOB_UNRECORDED` ([[one-ledger-per-repository]]).
 
 The older shape — a one-member run document naming the job it resumes — still
 works and still records the chain in the ledger. It is the right tool for

@@ -9,3 +9,4 @@ thing saying stop.
 [The budget is per project, because nothing else says stop](../pages/budget-model.md) -- projection and consumption caps, the three-forked-workspace lesson
 [What the cluster sees, and why the comment is live-only](../pages/job-identity-on-cluster.md) -- the ledger as the durable record
 [Two command-length ceilings, and the token count that met both](../pages/command-length-limits.md) -- a query sized by the ledger died before reaching the cluster; why the split measures width, not tokens
+[One ledger per repository, whichever worktree submits](../pages/one-ledger-per-repository.md) -- a worktree's own ledger missed 12 live members and a campaign submitted them twice; the main checkout's ledger, and the refusal for a live job no ledger here records

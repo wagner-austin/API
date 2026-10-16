@@ -17,7 +17,7 @@ source_paths:
   - "src/hpc3/core/register.py"
 source_git_blobs:
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
-  "src/hpc3/contracts/workspace.py": "852c2abe6b41fd6b033b1c97c5fdcb0cde2dc086"
+  "src/hpc3/contracts/workspace.py": "ba27d634de77b9ca57d6ccec1dd7815bc95da0fc"
   "src/hpc3/contracts/image_spec.py": "700f96a66f104da1401405b8b32bb76c02dec51d"
   "src/hpc3/contracts/image_spec_fields.py": "9487ac8838828b8a911afd7a990ae54e5b08a43b"
   "src/hpc3/cli/image.py": "596fbb22fa96cf0b4d418b62732c527d3f31bd34"
@@ -25,14 +25,14 @@ source_git_blobs:
   "src/hpc3/cli/image_capture.py": "0f69c719d6d77b7154cb84a7c21ae8f34a2495bf"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "src/hpc3/core/image_capture.py": "93694214e390085f1920ccd78d7aaa4fcb836bd5"
-  "README.md": "4441ec919e2853916b586587e36520a4c5a801e2"
-  "src/hpc3/core/register.py": "d3cfcc55d9f580ef1c7b55cfcabe25b2de733baf"
+  "README.md": "477a86c18ec7d9e5ce711eb378ec1f6567c36115"
+  "src/hpc3/core/register.py": "f99301f3312238f4721ddfc81a316fb5cbd6dd8b"
 provenance:
   - "runs/hpc3*.json -- the six committed workspace documents; every project declares an image as of 2026-09-03"
   - "runs/ledger.jsonl -- image-build rows; earliest recorded build artifact is images/v23, while floor declares images/v4"
   - "registry-1.docker.io Docker-Content-Digest for python:3.11-slim-bookworm, read 2026-09-03: sha256:528257d4..., against the sha256:0bee7276... rusted pinned"
   - "/pub/wagnera3/api/libs/cleargbm_rs/target/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl -- the built wheel on the cluster"
-fact_checked: 2026-10-08
+fact_checked: 2026-10-16
 confidence: high
 ---
 

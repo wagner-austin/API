@@ -10,14 +10,14 @@ source_paths:
 source_git_blobs:
   "src/hpc3/core/preflight.py": "84695824400bf77e8994327845bd48e55e43ea3f"
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
-  "src/hpc3/cli/_config.py": "ed1ac321669e1b9158a63f7f4f24064dc6f91516"
+  "src/hpc3/cli/_config.py": "5287aecbeca09b166e8932f5ea38b227fbd7e720"
 provenance:
   - "PROJECT_UNIMAGED observed raised from contracts/workspace.py at decode, 2026-09-02, while that file was uncommitted work in progress"
   - "decode_workspace observed reached from cli/_config.py, the shared loader, 2026-09-02"
   - "811c64cb landed the fix on 2026-09-03 by splitting the reader, not by moving the rule; this page's original prescription was superseded and is corrected in place"
   - "hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit refused with PROJECT_UNIMAGED, 2026-09-02"
   - "hpc3-preflight on the same project after its image was built: OK tankpit.tankpit-sim-smoke, 2026-09-02"
-fact_checked: 2026-10-08
+fact_checked: 2026-10-16
 confidence: high
 ---
 
@@ -161,4 +161,4 @@ somebody tries to start something.
 [^6]: Decoding each committed workspace individually on 2026-09-02: `hpc3-floor.json`, `hpc3-mi.json`, `hpc3-rusted.json`, `hpc3-tankpit.json` and `hpc3-turkic-lstm.json` all OK; `hpc3.json` alone refused. `hpc3-research-index --write` failed with the same error.
 [^7]: `tools/hpc3/src/hpc3/core/research_index.py`, regenerated 2026-09-02 by importing the generator from a `git archive` extract of HEAD, whose contract predates the rule, with `index_path` and `runs_directory` rebound to the real paths. All six rows restored and `tankpit`'s image digest picked up; one line changed.
 [^8]: Commit `811c64cb`, "Every registered project ships an image, and onboarding can still make one" — 15 files, including a new 333-line `src/hpc3/contracts/project.py` and 63 added lines in `src/hpc3/cli/_config.py`. Read 2026-09-03.
-[^9]: `src/hpc3/contracts/project.py:255` raises `Hpc3ErrorCode.PROJECT_UNIMAGED` from `_require_project_image` (`:233` and `require_image` until re-read 2026-10-08, when neither was where this footnote put it); `src/hpc3/cli/_config.py:52` (`:49` until re-taken 2026-10-08) is `load_workspace_connection`, whose docstring states it leaves "the project registry unread" for the onboarding path. `grep -rn PROJECT_UNIMAGED src/hpc3/` returned `contracts/project.py` and a docstring reference in `contracts/workspace.py`, and no longer the shared loader's decode path, measured 2026-09-03; on 2026-10-08 it also returns docstrings in `cli/bootstrap.py` and in `core/register.py`, the `hpc3-register` onboarding command, and still nothing on the loader's decode path.
+[^9]: `src/hpc3/contracts/project.py:255` raises `Hpc3ErrorCode.PROJECT_UNIMAGED` from `_require_project_image` (`:233` and `require_image` until re-read 2026-10-08, when neither was where this footnote put it); `src/hpc3/cli/_config.py:56` (`:52` until re-taken 2026-10-16, `:49` before 2026-10-08) is `load_workspace_connection`, whose docstring states it leaves "the project registry unread" for the onboarding path. `grep -rn PROJECT_UNIMAGED src/hpc3/` returned `contracts/project.py` and a docstring reference in `contracts/workspace.py`, and no longer the shared loader's decode path, measured 2026-09-03; on 2026-10-08 it also returns docstrings in `cli/bootstrap.py` and in `core/register.py`, the `hpc3-register` onboarding command, and still nothing on the loader's decode path.
