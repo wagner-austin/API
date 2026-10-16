@@ -31,7 +31,7 @@ from tankpit_bot.bot.ai.intent import (
 from tankpit_bot.bot.ai.maroon_walk import (
     walk_for_fuel_last_resort,
 )
-from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted, hunt_fuel_floor
 from tankpit_bot.bot.ai.radar_economics import (
     radar_spend_worthwhile,
 )
@@ -96,9 +96,9 @@ def exhausted_collect_outcome(
 ) -> TickDecisionDict | None:
     """Resolve a tick where every collect cascade step declined.
 
-    Healthy fuel yields to hunt (or exits ``no_productive_collect``
-    when under-stocked); critical fuel gets the walk-for-fuel last
-    resort before the ``out_of_fuel`` exit.
+    Below a full tank, try walking to known fuel before yielding to
+    hunt. Critical fuel first gets the desperation hop, then walking,
+    before the ``out_of_fuel`` exit.
 
     Args:
         ctx: Decision context.
@@ -112,6 +112,10 @@ def exhausted_collect_outcome(
         SessionExitError: When the session has no productive action.
     """
     if ctx.fuel > ctx.fuel_low_floor:
+        if ctx.fuel < hunt_fuel_floor(ctx) and not base_state["wind_down"]:
+            walk = walk_for_fuel_last_resort(ctx, base_state)
+            if walk is not None:
+                return walk
         if ctx.config["role"] is FleetRole.GATHERER:
             if ctx.ai_state["wind_down"]:
                 # Nothing to wait for: the owner ends the session

@@ -126,9 +126,9 @@ def walk_for_fuel_last_resort(
 ) -> TickDecisionDict | None:
     """Walk toward the nearest known fuel instead of exiting broke.
 
-    The final rung before the ``out_of_fuel`` exit, reached only when
-    every pickup, larder hop, forage step, and dot hop has declined at
-    critical fuel. Walking is free at any fuel level (the density
+    Reached when every pickup, larder hop, forage step, and dot hop
+    has declined and the tank still needs fuel, even above the
+    critical floor. Walking is free at any fuel level (the density
     probe's marooned-recovery law, [[walk-mechanics]]), so a tank with
     known fuel in walking range is NOT actually stuck: runs
     bot-20260728-090813/-091209 exited at fuel 98/88 in a shore corner
@@ -147,8 +147,8 @@ def walk_for_fuel_last_resort(
     Returns:
         A one-leg walk (or window pan) decision, or ``None`` when no
         known fuel exists or no leg is walkable (the exit stands).
-        The caller guarantees critical fuel -- the healthy-fuel tick
-        resolved via the hunt handoff before this rung.
+        The caller guarantees a fuel deficit; a full tank can yield
+        to hunting without walking toward more fuel.
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     candidates: list[tuple[int, int, int]] = []
