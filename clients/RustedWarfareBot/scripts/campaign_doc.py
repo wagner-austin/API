@@ -250,7 +250,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         require_flag(parsed, flag)
 
     raw = "\n".join(_test_hooks.read_text_lines(Path(parsed["--config"])))
-    workspace = decode_workspace(load_json_str(raw), config_dir=Path(parsed["--config"]).parent)
+    # The ledger is never read here, so it resolves against the document's
+    # own directory; hpc3's commands, which do read it, resolve it against
+    # the main checkout's (hpc3.core.checkout.shared_directory).
+    config_dir = Path(parsed["--config"]).parent
+    workspace = decode_workspace(load_json_str(raw), config_dir=config_dir, ledger_dir=config_dir)
     # Read for its refusal as much as for its value: a workspace with no
     # `rusted` project would otherwise emit a document that submits nothing.
     config = require_project_config(workspace, PROJECT)

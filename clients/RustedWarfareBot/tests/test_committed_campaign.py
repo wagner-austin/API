@@ -77,7 +77,9 @@ class TestTheCommittedPanel:
         document = _committed(_DOCUMENT)
         experiment = require_dict(document, "experiment")
         workspace = decode_workspace(
-            load_json_str(_WORKSPACE.read_text(encoding="utf-8")), config_dir=_WORKSPACE.parent
+            load_json_str(_WORKSPACE.read_text(encoding="utf-8")),
+            config_dir=_WORKSPACE.parent,
+            ledger_dir=_WORKSPACE.parent,
         )
         config = require_project_config(workspace, PROJECT)
         jobs = parse_jobs((_ROOT / _JOBS_FILE).read_text(encoding="utf-8").splitlines())
@@ -110,7 +112,9 @@ class TestTheCommittedPanel:
         exists in no image and on no compute node, and every member of the
         panel dies on 'no such file or directory' before the game starts."""
         workspace = decode_workspace(
-            load_json_str(_WORKSPACE.read_text(encoding="utf-8")), config_dir=_WORKSPACE.parent
+            load_json_str(_WORKSPACE.read_text(encoding="utf-8")),
+            config_dir=_WORKSPACE.parent,
+            ledger_dir=_WORKSPACE.parent,
         )
         image = require_project_config(workspace, PROJECT)["image"]
         if image is None:
