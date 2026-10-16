@@ -80,6 +80,7 @@ def _entry(job_id: str, *, submitter: str | None = "label-a-0906") -> LedgerEntr
         image_digest="",
         submitter=submitter,
         artifact=None,
+        image_drift=None,
     )
 
 

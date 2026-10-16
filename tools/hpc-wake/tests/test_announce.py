@@ -39,6 +39,7 @@ def _entry(
         image_digest="",
         submitter=submitter,
         artifact=None,
+        image_drift=None,
     )
 
 
