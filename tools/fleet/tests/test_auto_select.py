@@ -34,7 +34,7 @@ from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import LiveLoad, NodeConfig, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
-from fleet.core.capacity import Unassessed, first_fit
+from fleet.core.node_choice import Unassessed, first_fit
 from tests._registry import write_registry
 from tests.conftest import (
     DEMO_NOW,
@@ -104,6 +104,7 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         ci_slice=None,
         reserved_cores=0,
         action_cache=None,
+        cpu_pressure_pct=None,
     )
 
 

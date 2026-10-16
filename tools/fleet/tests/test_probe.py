@@ -72,7 +72,31 @@ class TestProbe:
             "ci_slice": None,
             "reserved_cores": 4,
             "action_cache": None,
+            "cpu_pressure_pct": None,
         }
+
+    def test_a_linux_node_reports_its_cpu_pressure(self) -> None:
+        """diphtheria's answer to the probe at 14:5xZ on 2026-10-16 (MCPs 2ce5dc13)."""
+        output = (
+            "free_ram_gb=4.073\npromised_ram_gb=10.895\nfree_disk_gb=206.206\n"
+            "logical_cores=8\ncpu_pressure_pct=10.20\nreserved_cores=0\n"
+        )
+
+        state = probe.parse_probe("diphtheria", output, live=IDLE)
+
+        assert state["cpu_pressure_pct"] == 10.2
+
+    def test_a_pressure_line_with_no_reading_is_unreadable_not_calm(self) -> None:
+        """A ``/proc/pressure/cpu`` with no ``some`` line prints the field empty."""
+        output = "free_ram_gb=4.0\nfree_disk_gb=206.0\ncpu_pressure_pct=\nreserved_cores=0\n"
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("diphtheria", output, live=IDLE)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert "diphtheria reported cpu_pressure_pct='', which is not a number" in (
+            excinfo.value.message
+        )
 
     def test_a_runner_host_reports_its_action_cache_counts(self) -> None:
         """lavender-wsl's runners on 2026-10-15, as its root timer counts them (MCPs ce2b92e0)."""
@@ -286,6 +310,7 @@ class TestDescribeNode:
         live=LiveLoad(runs=1, workers=6, ram_gb=6.6),
         reserved_cores=0,
         action_cache=None,
+        cpu_pressure_pct=None,
     )
 
     def test_it_names_the_architecture_and_what_live_runs_hold(self) -> None:

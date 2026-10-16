@@ -50,6 +50,11 @@ REQUIRED_FIELDS = ("free_ram_gb", "free_disk_gb", reservations.RESERVED_CORES_FI
 #: task 5d6e57e7): both or neither, since one script line prints both.
 SLICE_FIELDS = ("ci_slice_current_gb", "ci_slice_high_gb")
 
+#: The CPU pressure every linux probe prints and no Windows one does (MCPs
+#: board task 2ce5dc13): absent means the dialect keeps no such account, and
+#: present but not a number refuses the node like any other field.
+PRESSURE_FIELD = "cpu_pressure_pct"
+
 
 class ProbeOutcome(TypedDict):
     """What a node reported, or why nothing could be read from it.
@@ -98,7 +103,12 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         )
     readings: dict[str, float] = {}
     sliced = any(key in fields for key in SLICE_FIELDS)
-    for key in REQUIRED_FIELDS + (SLICE_FIELDS if sliced else ()):
+    pressured = PRESSURE_FIELD in fields
+    for key in (
+        REQUIRED_FIELDS
+        + (SLICE_FIELDS if sliced else ())
+        + ((PRESSURE_FIELD,) if pressured else ())
+    ):
         value = _read_number(fields, key)
         if value is None:
             return ProbeOutcome(state=None, reason=_unreadable(host, fields, key, output))
@@ -131,6 +141,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             ci_slice=ci_slice,
             reserved_cores=int(reserved_cores),
             action_cache=action_cache,
+            cpu_pressure_pct=readings[PRESSURE_FIELD] if pressured else None,
         ),
         reason="",
     )

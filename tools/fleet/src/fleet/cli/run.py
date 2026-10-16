@@ -46,7 +46,7 @@ from fleet.contracts.project import ProjectConfig
 from fleet.contracts.resources import fleet_wide
 from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import _test_hooks, capacity, dispatch, leases, probe, records
+from fleet.core import _test_hooks, capacity, dispatch, leases, node_choice, probe, records
 
 _log = get_logger(__name__)
 
@@ -90,7 +90,7 @@ def choose(
             off, a capacity code if the chosen node refuses, or -- when no
             node can take the work -- whichever of ``NODE_UNREACHABLE`` /
             ``NODE_DISABLED`` / ``NODE_MEMORY_EXHAUSTED``
-            :func:`capacity.first_fit` classifies the fleet-wide refusal as.
+            :func:`node_choice.first_fit` classifies the fleet-wide refusal as.
     """
     plan = require_project(loaded.workspace, project)
     require_resources_free(loaded, plan)
@@ -110,7 +110,7 @@ def choose(
         return named, node, capacity.plan_dispatch(node, state, plan, node_tags(node))
 
     candidates: list[tuple[str, NodeConfig, NodeState]] = []
-    unassessed: list[capacity.Unassessed] = []
+    unassessed: list[node_choice.Unassessed] = []
     for name, declared in sorted(loaded.workspace["nodes"].items()):
         if not declared["enabled"]:
             # NOT PROBED AT ALL, and ``asked=False`` is how the refusal knows
@@ -119,14 +119,14 @@ def choose(
             # which is what this workspace did for loki, every time, for the
             # whole of 2026-09-05.
             unassessed.append(
-                capacity.Unassessed(
+                node_choice.Unassessed(
                     name=name, reason="declared disabled in this workspace", asked=False
                 )
             )
             continue
         # The VALUE form, deliberately. A node that does not answer is one
         # fewer candidate, not the end of the search -- see
-        # ``capacity.first_fit``'s ``unassessed`` for the dispatch that was
+        # ``node_choice.first_fit``'s ``unassessed`` for the dispatch that was
         # refused because loki was asleep while lavender had room.
         outcome = probe.attempt_probe(
             declared,
@@ -135,10 +135,12 @@ def choose(
         )
         answered: NodeState | None = outcome["state"]
         if answered is None:
-            unassessed.append(capacity.Unassessed(name=name, reason=outcome["reason"], asked=True))
+            unassessed.append(
+                node_choice.Unassessed(name=name, reason=outcome["reason"], asked=True)
+            )
             continue
         candidates.append((name, declared, answered))
-    chosen, workers = capacity.first_fit(tuple(candidates), plan, unassessed=tuple(unassessed))
+    chosen, workers = node_choice.first_fit(tuple(candidates), plan, unassessed=tuple(unassessed))
     return chosen, loaded.workspace["nodes"][chosen], workers
 
 

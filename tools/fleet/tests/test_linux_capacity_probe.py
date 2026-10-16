@@ -21,6 +21,8 @@ from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
     CGROUPS_LINE,
     MEMINFO_LINE,
+    PRESSURE_LINE,
+    PRESSURE_PART,
     RESERVATIONS_LINE,
     RESERVATIONS_PART,
 )
@@ -31,6 +33,12 @@ CAP = 4 * GIB
 #: diphtheria's MemAvailable at 22:1xZ, in kB as /proc/meminfo prints it.
 AVAILABLE_KB = 16014192
 
+#: diphtheria's /proc/pressure/cpu at 14:4xZ on 2026-10-16.
+PRESSURE = (
+    "some avg10=11.17 avg60=9.33 avg300=9.33 total=343634208497\n"
+    "full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+)
+
 
 def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_SCRIPT.startswith(PROLOGUE + CAPACITY_PROBE_BODY)
@@ -38,7 +46,9 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE + CGROUPS_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
     assert CGROUPS_LINE == "cgroups=/sys/fs/cgroup/system.slice\n"
-    assert CAPACITY_PROBE_BODY.endswith(RESERVATIONS_PART)
+    assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + RESERVATIONS_PART)
+    assert PRESSURE_PART.startswith(PRESSURE_LINE)
+    assert PRESSURE_LINE == "pressure=/proc/pressure/cpu\n"
     assert RESERVATIONS_PART.startswith(RESERVATIONS_LINE)
     assert RESERVATIONS_LINE == 'reservations="$HOME/.fleet/reservations"\n'
 
@@ -60,7 +70,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     counted = set(PROBE_FIELDS) & set(fields)
     assert counted in (set(), set(PROBE_FIELDS))
 
-    reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores"}
+    reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores", probe.PRESSURE_FIELD}
     assert set(fields) == reported | counted | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
@@ -72,6 +82,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     assert int(fields["logical_cores"]) >= 1
     # None on a CI runner, a VM smoke's cores on diphtheria (84a2b690).
     assert fields["reserved_cores"].isdigit()
+    assert re.fullmatch(r"\d+\.\d{2}", fields["cpu_pressure_pct"])
 
 
 def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None, shmem: int = 0) -> None:
@@ -96,21 +107,25 @@ def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None, shmem: i
         )
 
 
-def _run(
+def _probe(
     tmp_path: pathlib.Path,
     cgroups: pathlib.Path,
-    held: pathlib.Path | None = None,
-) -> dict[str, str]:
+    held: pathlib.Path | None,
+    pressure: str | None,
+) -> subprocess.CompletedProcess[str]:
     """Run the probe with its roots pointed at fakes.
 
     Args:
-        tmp_path: Where the fake meminfo and the script go.
+        tmp_path: Where the fake meminfo, the fake pressure file and the
+            script go.
         cgroups: The fake ``system.slice``.
         held: The fake reservations directory, or None for one that does
             not exist, as on every node nothing has reserved.
+        pressure: What the fake ``/proc/pressure/cpu`` holds, or None for
+            a kernel without one.
 
     Returns:
-        The probe's key=value fields.
+        The finished probe.
     """
     reservations = held if held is not None else tmp_path / "no-reservations"
     meminfo = tmp_path / "meminfo"
@@ -119,20 +134,44 @@ def _run(
         f"MemAvailable:   {AVAILABLE_KB} kB\n",
         encoding="utf-8",
     )
+    cpu = tmp_path / "pressure-cpu"
+    if pressure is not None:
+        cpu.write_text(pressure, encoding="utf-8")
     script = tmp_path / "probe.sh"
     script.write_text(
         CAPACITY_PROBE_SCRIPT.replace(MEMINFO_LINE, f"meminfo='{meminfo.as_posix()}'\n", 1)
         .replace(CGROUPS_LINE, f"cgroups='{cgroups.as_posix()}'\n", 1)
+        .replace(PRESSURE_LINE, f"pressure='{cpu.as_posix()}'\n", 1)
         .replace(RESERVATIONS_LINE, f"reservations='{reservations.as_posix()}'\n", 1),
         encoding="utf-8",
     )
-    completed = subprocess.run(
+    return subprocess.run(
         [*SH_INVOCATION, str(script)],
         capture_output=True,
         text=True,
         check=False,
         timeout=60,
     )
+
+
+def _run(
+    tmp_path: pathlib.Path,
+    cgroups: pathlib.Path,
+    held: pathlib.Path | None = None,
+    pressure: str = PRESSURE,
+) -> dict[str, str]:
+    """Run the probe with its roots pointed at fakes, and read what it printed.
+
+    Args:
+        tmp_path: Where the fakes and the script go.
+        cgroups: The fake ``system.slice``.
+        held: The fake reservations directory, or None for none.
+        pressure: What the fake ``/proc/pressure/cpu`` holds.
+
+    Returns:
+        The probe's key=value fields.
+    """
+    completed = _probe(tmp_path, cgroups, held, pressure)
     assert completed.returncode == 0, completed.stderr
     return fields_of(completed.stdout)
 
@@ -161,6 +200,50 @@ class TestTheProbeUnderSh:
         assert fields["free_ram_gb"] == "4.972"
         first = ["free_ram_gb", "promised_ram_gb", "free_disk_gb", "logical_cores"]
         assert list(fields)[: len(first)] == first
+
+    def test_cpu_pressure_is_the_some_line_s_one_minute_average(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """diphtheria, 2026-10-16 (MCPs board task 2ce5dc13): avg60, never avg10 or full."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+
+        fields = _run(tmp_path, cgroups)
+
+        assert fields["cpu_pressure_pct"] == "9.33"
+        keys = list(fields)
+        assert keys.index("cpu_pressure_pct") == keys.index("logical_cores") + 1
+
+    def test_a_pressure_file_with_no_some_line_prints_the_field_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Which the parser refuses as not a number, so it never reads as calm."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+
+        fields = _run(
+            tmp_path, cgroups, pressure="full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+        )
+
+        assert fields["cpu_pressure_pct"] == ""
+        assert fields["reserved_cores"] == "0"
+
+    def test_a_kernel_without_the_pressure_file_ends_the_probe(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """``awk`` cannot open it, and ``set -e`` stops the script on that line."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+
+        completed = _probe(tmp_path, cgroups, None, None)
+
+        assert completed.returncode != 0
+        assert list(fields_of(completed.stdout)) == [
+            "free_ram_gb",
+            "promised_ram_gb",
+            "free_disk_gb",
+            "logical_cores",
+        ]
 
     def test_shared_memory_is_resident_and_is_not_charged_again(
         self, tmp_path: pathlib.Path
@@ -241,7 +324,7 @@ class TestTheReservationsUnderSh:
         # Read after the body's other fields; the dialect's CI-slice lines,
         # printed only on a node with a runners.slice, follow it.
         keys = list(fields)
-        assert keys.index("reserved_cores") == keys.index("logical_cores") + 1
+        assert keys.index("reserved_cores") == keys.index("cpu_pressure_pct") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
         cgroups = tmp_path / "system.slice"

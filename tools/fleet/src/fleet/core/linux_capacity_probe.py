@@ -48,6 +48,17 @@ bytes, which ``dash`` carries in 64 bits, and the division to gibibytes with
 three decimals happens once in ``awk``, so the parser sees the shape the
 Windows dialect prints.
 
+THE NODE'S CPU PRESSURE IS READ, NOT INFERRED FROM ITS LOAD (MCPs board task
+2ce5dc13). ``cpu_pressure_pct`` is the ``some avg60`` of
+``/proc/pressure/cpu``: the share of the last minute in which at least one
+runnable task waited for a CPU, which is the slowdown a suite placed there
+meets, where a load average counts tasks without saying whether they waited.
+A kernel without the file, or a file without a ``some`` line, does not read
+as a calm node: the first ends the probe under ``set -e`` with ``awk``'s own
+message, the second prints the field empty, which :mod:`fleet.core.probe`
+refuses as not a number. Measured 2026-10-16 every linux node carries it:
+diphtheria ``some avg60=9.33``, colossus ``0.01``, lavender-wsl ``2.99``.
+
 THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 :mod:`fleet.core.reservations` for the file and why). Each live
 ``.reservation`` file's ``cores`` are summed into ``reserved_cores``, which
@@ -65,6 +76,17 @@ from fleet.core import reservations
 #: Where the probe reads memory from; the test replaces these two lines.
 MEMINFO_LINE = "meminfo=/proc/meminfo\n"
 CGROUPS_LINE = "cgroups=/sys/fs/cgroup/system.slice\n"
+
+#: Where the probe reads CPU pressure from; the test replaces it.
+PRESSURE_LINE = "pressure=/proc/pressure/cpu\n"
+
+#: The ``some avg60`` reading, printed after the cores it is weighed beside.
+PRESSURE_PART = (
+    PRESSURE_LINE
+    + 'cpu_pressure=$(awk \'$1 == "some" { for (i = 2; i <= NF; i++)'
+    + ' if (sub(/^avg60=/, "", $i)) print $i }\' "$pressure")\n'
+    + "printf 'cpu_pressure_pct=%s\\n' \"$cpu_pressure\"\n"
+)
 
 #: Where the probe reads the node's reservations from; the test replaces it.
 RESERVATIONS_LINE = f'reservations="$HOME/{reservations.DIRECTORY}"\n'
@@ -110,13 +132,15 @@ CAPACITY_PROBE_BODY = (
     ' printf "free_ram_gb=%.3f\\npromised_ram_gb=%.3f\\n",'
     " (available - promised) / 1073741824, promised / 1073741824 }'\n"
     "df -kP / | awk 'NR == 2 { printf \"free_disk_gb=%.3f\\n\", $4 / 1048576 }'\n"
-    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n" + RESERVATIONS_PART
+    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n" + PRESSURE_PART + RESERVATIONS_PART
 )
 
 __all__ = [
     "CAPACITY_PROBE_BODY",
     "CGROUPS_LINE",
     "MEMINFO_LINE",
+    "PRESSURE_LINE",
+    "PRESSURE_PART",
     "RESERVATIONS_LINE",
     "RESERVATIONS_PART",
 ]

@@ -13,7 +13,8 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.tags import NodeTag
-from fleet.core.capacity import assess, first_fit, fitting_projects
+from fleet.core.capacity import assess, fitting_projects
+from fleet.core.node_choice import first_fit
 from tests.test_capacity import LINUX_TAGS, _node, _project, _state
 
 

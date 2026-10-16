@@ -71,6 +71,7 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(name: str, grant: int) 
         ci_slice=None,
         reserved_cores=0,
         action_cache=None,
+        cpu_pressure_pct=None,
     )
     assert assess(node, state, project, node_tags(node)) == {
         "workers": grant,

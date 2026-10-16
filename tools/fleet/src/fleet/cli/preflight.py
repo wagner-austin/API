@@ -30,7 +30,7 @@ from fleet.cli import _config, run
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import capacity, probe, records
+from fleet.core import capacity, node_choice, probe, records
 
 _log = get_logger(__name__)
 
@@ -95,7 +95,7 @@ def preflight_fleet(loaded: _config.LoadedWorkspace, *, project: str) -> tuple[s
         candidates.append(
             (name, declared, probe.probe_node(declared, live=live, writer=PROBE_WRITER))
         )
-    return capacity.first_fit(tuple(candidates), wanted)
+    return node_choice.first_fit(tuple(candidates), wanted)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -258,6 +258,11 @@ class NodeState(TypedDict):
             (:mod:`fleet.contracts.action_cache`, MCPs board task
             ce2b92e0), or None where the node publishes no fresh counts.
             Carried to the tick, never weighed.
+        cpu_pressure_pct: The share of the last minute some runnable task
+            waited for a CPU, ``/proc/pressure/cpu``'s ``some avg60``
+            (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
+            2ce5dc13), or None on a Windows node, whose kernel keeps no
+            such account. Every linux probe prints it or fails.
     """
 
     host: str
@@ -267,6 +272,7 @@ class NodeState(TypedDict):
     ci_slice: SliceMemory | None
     reserved_cores: int
     action_cache: ActionCacheCounts | None
+    cpu_pressure_pct: float | None
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:
