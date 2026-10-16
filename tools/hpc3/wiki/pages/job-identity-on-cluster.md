@@ -6,7 +6,7 @@ related: ["[[ledger-closures]]", "[[run-documents]]"]
 source_paths:
   - "README.md"
 source_git_blobs:
-  "README.md": "477a86c18ec7d9e5ce711eb378ec1f6567c36115"
+  "README.md": "c3962b94b036071c6e52e96babff021a11f1b5d8"
 provenance:
   - "AccountingStoreFlags = (null), measured 2026-08-23"
   - "platform_core.cluster_layout (libs/platform_core, outside this workspaceRoot)"

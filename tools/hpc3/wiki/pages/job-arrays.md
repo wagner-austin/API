@@ -9,7 +9,7 @@ source_paths:
   - "src/hpc3/contracts/array.py"
 source_git_blobs:
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
-  "src/hpc3/core/array_submit.py": "fca80f203c3ae1c441eeabc8a02d2ffbcca3004b"
+  "src/hpc3/core/array_submit.py": "5391cb2c3b8505f23ed25fc0b91fdff332c06729"
   "src/hpc3/contracts/array.py": "3ac2482e4cf1f25db5a90cbfc76de537e94c4811"
 provenance:
   - "probe job 55678543 (free, --array=0-3%2), 2026-09-01"

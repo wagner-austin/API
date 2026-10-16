@@ -2,7 +2,7 @@
 title: The submission rules, each with the failure it refuses
 tags: [submission, guards]
 hubs: [submission]
-related: ["[[budget-model]]", "[[preemption-and-campaigns]]", "[[partitions-and-billing]]"]
+related: ["[[budget-model]]", "[[preemption-and-campaigns]]", "[[partitions-and-billing]]", "[[image-freshness]]"]
 source_paths:
   - "src/hpc3/contracts/job.py"
   - "src/hpc3/contracts/preflight.py"
@@ -10,14 +10,16 @@ source_paths:
   - "src/hpc3/core/code_claim.py"
   - "src/hpc3/contracts/code_claim.py"
   - "src/hpc3/core/interpreter.py"
+  - "src/hpc3/core/entrypoint.py"
 source_git_blobs:
   "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
   "src/hpc3/contracts/preflight.py": "e72df28502ee022931ff38610f697c10fef0dbc0"
-  "src/hpc3/core/preflight.py": "84695824400bf77e8994327845bd48e55e43ea3f"
+  "src/hpc3/core/preflight.py": "ed718a167420cb85ac203f43872b023c0c172765"
   "src/hpc3/core/code_claim.py": "b7227746e7b2574728de89fc55a9bd63adc7e207"
   "src/hpc3/contracts/code_claim.py": "1de219ba95176a3e343c9c319cb59a7b8841cae7"
   "src/hpc3/core/interpreter.py": "44152c39c9674c78771a2f01288110c0438c5617"
-fact_checked: 2026-10-08
+  "src/hpc3/core/entrypoint.py": "f6646a5d62823d3eff828085a5af7d77ff166ffd"
+fact_checked: 2026-10-16
 confidence: high
 ---
 
@@ -58,6 +60,13 @@ interpreter's identity, so an environment running another environment's
 interpreter is refused `ENV_INTERPRETER_BORROWED` even when its package list
 matches ([[interpreter-availability]]).[^preflight]
 
+Since 2026-10-16 (board task `2c8161a3`) preflight and array preflight also
+ask the environment, inside its image, whether it can start every `python -m`
+module the command names, and refuse one it cannot with
+`ENTRYPOINT_NOT_INSTALLED`, naming the commit the image was built from: the
+registered `mi` image v23 predates the cartridge commands, and a run naming
+one under it would die on its first line ([[image-freshness]]).[^entrypoint]
+
 ## resumes_from_checkpoint is a declaration, not a verification
 
 The contract requires a long run on a preempting partition to carry it or
@@ -77,3 +86,4 @@ the largest one — so it asserted a schedule no payload applied. A boolean says
 what was meant.
 
 [^preflight]: `src/hpc3/core/preflight.py` § the `preflight` docstring's Raises list, naming `ENV_INTERPRETER_BORROWED`, `REPO_COMMIT_NOT_HEAD` and `REPO_COMMIT_PROBE_UNREADABLE`; `src/hpc3/core/code_claim.py`, which raises `REPO_COMMIT_NOT_HEAD` with `explain_mismatch(claim, reading)`; `src/hpc3/contracts/code_claim.py` § `REPO_TREE_KEY` and its decoder; `src/hpc3/core/interpreter.py` § `check_interpreter_home`. API commits `3b76ce978` and `f5df5fd93` (2026-10-05).
+[^entrypoint]: `src/hpc3/core/preflight.py` § the `preflight` docstring's Raises list, naming `ENTRYPOINT_NOT_INSTALLED` and `ENTRYPOINT_PROBE_UNREADABLE`, and its `entrypoint.check_entrypoints` call; `src/hpc3/core/entrypoint.py` § `check_entrypoints`.
