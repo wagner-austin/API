@@ -33,9 +33,9 @@ from tests.conftest import (
     cluster,
     gpus,
     ledger_row,
-    script_healthy_cluster,
     write_file,
 )
+from tests.healthy_cluster import PROJECT_REPO, script_healthy_cluster
 
 _UZ = "/pub/wagnera3/LSTM/checkpoints/uz_best.pt"
 _AT = "2026-08-28T21:00:00+00:00"
@@ -244,7 +244,8 @@ class TestSubmitEnforcesIt:
             submitter="",
             cluster=cluster(),
             charge_account="",
-        )
+            repo=PROJECT_REPO,
+        ).job_id
 
     def test_a_racing_submission_never_reaches_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

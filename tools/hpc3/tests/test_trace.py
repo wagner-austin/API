@@ -34,6 +34,7 @@ def _entry(
     experiment: dict[str, JSONValue],
     image_digest: JSONValue = None,
     artifact: JSONValue = None,
+    image_drift: JSONValue = None,
 ) -> dict[str, JSONValue]:
     """Build a ledger record.
 
@@ -44,6 +45,8 @@ def _entry(
         image_digest: Digest of the image, ``""`` for a directory run, or
             None for a row that does not record it.
         artifact: Where the run was told to write its result, or None.
+        image_drift: The run's code compared with its submitter's, or None
+            for a row from before the field.
 
     Returns:
         The record.
@@ -61,6 +64,7 @@ def _entry(
         "image_digest": image_digest,
         "submitter": None,
         "artifact": artifact,
+        "image_drift": image_drift,
     }
 
 
@@ -127,7 +131,7 @@ class TestTraceByJobId:
         args = _args(tmp_path, _entry("55519937", "abl.armB-s42", {"corpus": _ARM_B}))
         assert trace_cli.main([*args, "--job", "55519937"]) == 0
         assert emitted[1] == f"  corpus={_ARM_B}"
-        assert emitted[4] == "  logs /pub/w/abl/logs"
+        assert emitted[5] == "  logs /pub/w/abl/logs"
 
     def test_an_unrecorded_job_exits_non_zero(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -163,7 +167,47 @@ class TestTraceWalksTheIndex:
         )
         assert trace_cli.main([*args, "--job", "55597016"]) == 0
         assert emitted[2] == f"  image {self._DIGEST}"
-        assert emitted[3] == "  artifact /pub/wagnera3/floor/results/gpt2-floor-a100-v4.json"
+        assert emitted[4] == "  artifact /pub/wagnera3/floor/results/gpt2-floor-a100-v4.json"
+
+    def test_it_says_which_code_that_image_ran_against_head(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The question a number from an old image raises, answered from the row."""
+        drift: JSONValue = {
+            "image_commit": "fab1d991",
+            "head": "51b39a57",
+            "modules": [
+                {
+                    "directory": "/pub/w/abl/jobs",
+                    "module": "model_trainer.cli.probe",
+                    "compared": ["src/model_trainer"],
+                    "changed": ["src/model_trainer/cli/probe.py"],
+                    "not_compared": "",
+                }
+            ],
+        }
+        args = _args(
+            tmp_path,
+            _entry(
+                "101", "abl.a", {"corpus": _ARM_B}, image_digest=self._DIGEST, image_drift=drift
+            ),
+        )
+        assert trace_cli.main([*args, "--job", "101"]) == 0
+        assert emitted[3:5] == [
+            "  code: image built from fab1d991, compared with HEAD 51b39a57",
+            "  WARNING model_trainer.cli.probe: 1 file(s) under src/model_trainer changed since "
+            "the image's commit, so this run executes the image's older code, not HEAD's: "
+            "src/model_trainer/cli/probe.py",
+        ]
+
+    def test_a_row_predating_the_drift_does_not_read_as_unchanged(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        args = _args(tmp_path, _entry("101", "abl.a", {"corpus": _ARM_B}))
+        assert trace_cli.main([*args, "--job", "101"]) == 0
+        assert emitted[3] == (
+            "  code unrecorded -- this row predates the field, do not read it as unchanged"
+        )
 
     def test_a_directory_run_reports_no_image_as_a_fact(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -191,7 +235,7 @@ class TestTraceWalksTheIndex:
         as a clean record instead of an index with nothing in it."""
         args = _args(tmp_path, _entry("101", "abl.a", {"corpus": _ARM_B}, artifact=None))
         assert trace_cli.main([*args, "--job", "101"]) == 0
-        assert emitted[3] == (
+        assert emitted[4] == (
             "  artifact not declared -- this row cannot say where the result went"
         )
 

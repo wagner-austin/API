@@ -14,17 +14,16 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONValue
 
+from hpc3.contracts.drift import ImageDrift
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit
 from hpc3.core.submit import parse_job_id, submit
 from tests.against_hpc3 import decode_job_spec, read_ledger
-from tests.conftest import (
+from tests.conftest import FakeRun, LoggedEvent, cluster, gpus
+from tests.healthy_cluster import (
     PREFLIGHT_LINE,
-    FakeRun,
-    LoggedEvent,
-    cluster,
-    gpus,
+    PROJECT_REPO,
     script_healthy_cluster,
     script_healthy_environment,
 )
@@ -82,7 +81,8 @@ def _submit(tmp_path: pathlib.Path) -> str:
         submitter=_SUBMITTER,
         cluster=cluster(),
         charge_account="",
-    )
+        repo=PROJECT_REPO,
+    ).job_id
 
 
 class TestParseJobId:
@@ -196,6 +196,9 @@ class TestSubmitRecordsTheJob:
                 image_digest="",
                 submitter=_SUBMITTER,
                 artifact=None,
+                # A directory environment: no build commit, nothing compared,
+                # and that is recorded as such rather than left unrecorded.
+                image_drift=ImageDrift(image_commit="", head="", modules=[]),
             )
         ]
 

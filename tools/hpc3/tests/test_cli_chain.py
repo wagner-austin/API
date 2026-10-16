@@ -16,15 +16,14 @@ from platform_core.json_utils import JSONValue, dump_json_str
 from hpc3.cli import chain as chain_cli
 from tests.against_hpc3 import read_ledger
 from tests.conftest import (
-    PREFLIGHT_LINE,
     FakeRun,
     budget_document,
     project_config,
-    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import PREFLIGHT_LINE, script_healthy_environment
 
 
 def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -95,8 +94,11 @@ class TestChainCli:
         assert chain_cli.main(_args(tmp_path)) == 0
         assert "submitted 101 abl.pipeline-extract" in emitted[1]
         assert "starts when ready" in emitted[1]
-        assert "submitted 102 abl.pipeline-evaluate" in emitted[2]
-        assert "after 101" in emitted[2]
+        # Each stage is followed by which code it runs: two lines here, the
+        # image's commit and that the command starts no module to compare.
+        assert emitted[2].startswith("  code: image built from ")
+        assert "submitted 102 abl.pipeline-evaluate" in emitted[4]
+        assert "after 101" in emitted[4]
 
     def test_it_says_that_a_failure_cancels_the_rest(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str

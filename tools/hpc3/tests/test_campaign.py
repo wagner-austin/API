@@ -45,11 +45,11 @@ from tests.conftest import (
     gpus,
     ledger_row,
     project_config,
-    script_healthy_cluster,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import script_healthy_cluster
 
 _TR = "/pub/wagnera3/LSTM/checkpoints/tr_best.pt"
 _AZ = "/pub/wagnera3/LSTM/checkpoints/az_best.pt"
@@ -369,6 +369,7 @@ class TestTheCommand:
                 "image_digest": "",
                 "submitter": "",
                 "artifact": _AZ,
+                "image_drift": None,
             }
         )
         args = self._document(tmp_path)

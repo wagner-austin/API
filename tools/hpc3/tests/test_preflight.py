@@ -15,13 +15,8 @@ from hpc3.contracts.job import JobSpec
 from hpc3.contracts.preflight import PreflightResult, encode_preflight_result
 from hpc3.core.preflight import check_env_path, preflight
 from tests.against_hpc3 import decode_job_spec, decode_preflight_result, parse_test_only
-from tests.conftest import (
-    ABL_PINNED_DISTRIBUTIONS,
-    FakeRun,
-    cluster,
-    gpus,
-    host_interpreter,
-)
+from tests.conftest import FakeRun, cluster, gpus
+from tests.healthy_cluster import ABL_PINNED_DISTRIBUTIONS, PROJECT_REPO, host_interpreter
 
 _ABL_PINNED = "/pub/wagnera3/envs/abl-pinned"
 """The host environment :func:`_spec` names, which owns its interpreter."""
@@ -55,7 +50,8 @@ def _run_preflight(job: JobSpec) -> PreflightResult:
         log_dir="/l",
         cluster=cluster(),
         charge_account="",
-    )
+        repo=PROJECT_REPO,
+    )["verdict"]
 
 
 _REAL_LINE = (
@@ -266,14 +262,7 @@ class TestADependencyRefusalIsTranslated:
     def test_the_already_failed_wording_is_explained(self, fake_run: FakeRun) -> None:
         self._refuse(fake_run, "Requested operation is presently disabled")
         with pytest.raises(AppError) as excinfo:
-            preflight(
-                self._waiting(),
-                host="hpc3",
-                script_dir="/j",
-                log_dir="/l",
-                cluster=cluster(),
-                charge_account="",
-            )
+            _run_preflight(self._waiting())
         assert excinfo.value.code is Hpc3ErrorCode.PREFLIGHT_REJECTED
         assert "afterok 55533519" in excinfo.value.message
         assert "an earlier stage failed" in excinfo.value.message
@@ -281,14 +270,7 @@ class TestADependencyRefusalIsTranslated:
     def test_the_aged_out_wording_is_explained_too(self, fake_run: FakeRun) -> None:
         self._refuse(fake_run, "Job dependency problem")
         with pytest.raises(AppError) as excinfo:
-            preflight(
-                self._waiting(),
-                host="hpc3",
-                script_dir="/j",
-                log_dir="/l",
-                cluster=cluster(),
-                charge_account="",
-            )
+            _run_preflight(self._waiting())
         assert "afterok 55533519" in excinfo.value.message
 
     def test_slurms_own_words_are_kept_alongside_the_hint(self, fake_run: FakeRun) -> None:
@@ -296,14 +278,7 @@ class TestADependencyRefusalIsTranslated:
         and a translator that swallowed it would hide a wrong guess."""
         self._refuse(fake_run, "Job dependency problem")
         with pytest.raises(AppError) as excinfo:
-            preflight(
-                self._waiting(),
-                host="hpc3",
-                script_dir="/j",
-                log_dir="/l",
-                cluster=cluster(),
-                charge_account="",
-            )
+            _run_preflight(self._waiting())
         assert "Job dependency problem" in excinfo.value.message
 
     def test_an_unrelated_refusal_gets_no_dependency_hint(self, fake_run: FakeRun) -> None:
@@ -311,14 +286,7 @@ class TestADependencyRefusalIsTranslated:
         would send the reader after the wrong thing."""
         self._refuse(fake_run, "Invalid account")
         with pytest.raises(AppError) as excinfo:
-            preflight(
-                self._waiting(),
-                host="hpc3",
-                script_dir="/j",
-                log_dir="/l",
-                cluster=cluster(),
-                charge_account="",
-            )
+            _run_preflight(self._waiting())
         assert "waits on" not in excinfo.value.message
 
     def test_a_job_with_no_dependency_gets_no_hint(self, fake_run: FakeRun) -> None:

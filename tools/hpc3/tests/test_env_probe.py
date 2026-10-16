@@ -30,11 +30,11 @@ from hpc3.core.env_probe import (
     probe_environment,
     verify_environment,
 )
-from tests.conftest import (
+from tests.conftest import FakeRun
+from tests.healthy_cluster import (
     ABL_PINNED_DISTRIBUTIONS,
     IMAGE_INTERPRETER,
     IMAGE_PROBE,
-    FakeRun,
     host_interpreter,
 )
 

@@ -18,13 +18,12 @@ from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 from hpc3.cli import image_capture as capture_cli
 from hpc3.contracts.image_spec import decode_image_spec
 from tests.conftest import (
-    IMAGE_INTERPRETER,
     FakeRun,
-    host_interpreter,
     project_config,
     workspace_document,
     write_workspace,
 )
+from tests.healthy_cluster import IMAGE_INTERPRETER, host_interpreter
 
 _FREEZE = "\n".join(
     [

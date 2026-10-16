@@ -35,7 +35,8 @@ from tests._registry_tree import (
     runs_of,
     write_section,
 )
-from tests.conftest import IMAGE_INTERPRETER, FakeRun
+from tests.conftest import FakeRun
+from tests.healthy_cluster import IMAGE_INTERPRETER
 
 
 def _args(root: pathlib.Path, **overrides: str) -> list[str]:

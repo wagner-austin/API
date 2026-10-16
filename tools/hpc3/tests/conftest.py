@@ -295,90 +295,6 @@ def _make_argv() -> Generator[list[str], None, None]:
     sys.argv[:] = original
 
 
-PREFLIGHT_LINE = (
-    "sbatch: Job 1 to start at 2026-08-22T03:23:00 a using 4 processors "
-    "on nodes hpc3-gpu-16-02 in partition free-gpu"
-)
-
-ABL_PINNED_DISTRIBUTIONS = (
-    "torch==2.6.0+cu124\ntransformers==4.46.3\nnumpy==2.1.3\ntyping_extensions==4.12.2\n"
-)
-"""What ``/pub/wagnera3/envs/abl-pinned`` reports, as measured on the cluster.
-
-The ablation's arms were produced against exactly these versions, so a probe
-answering anything else means the run would not be comparable to them. The
-``typing_extensions`` entry is here deliberately: it is the underscore spelling
-the distribution actually reports, and normalisation has to survive it.
-"""
-
-IMAGE_INTERPRETER = "3.11\n/usr/local\nTrue\n"
-"""What ``/opt/env``'s interpreter says about itself inside a registered image.
-
-Measured 2026-10-05 inside all eight registered images: ``/opt/env`` is a venv
-over the image's own ``/usr/local`` Python, whose base sits on the container's
-root filesystem. These are the identity lines every probe now opens with.
-"""
-
-IMAGE_PROBE = IMAGE_INTERPRETER + ABL_PINNED_DISTRIBUTIONS
-"""The whole probe answer of a healthy imaged ``abl`` environment."""
-
-
-def host_interpreter(base_prefix: str) -> str:
-    """Build the identity lines a host environment's interpreter prints.
-
-    Args:
-        base_prefix: The ``sys.base_prefix`` it reports -- the environment's
-            own path when it owns its interpreter, another one when borrowed.
-
-    Returns:
-        The three identity lines. A host environment's base is on BeeGFS,
-        never on ``/``'s device, so the third line is always ``False``.
-    """
-    return f"3.11\n{base_prefix}\nFalse\n"
-
-
-HOST_ENV = "/pub/envs/abl-pinned"
-"""The host environment the hand-built job specs in these tests name."""
-
-
-def script_healthy_environment(fake: FakeRun) -> None:
-    """Script the tests' environments as present and answering the probe.
-
-    Preflight asks every environment two questions -- does it exist, and what
-    is its interpreter and what does it contain -- whether or not the project
-    pins anything. Scripting both here keeps a test about the scheduler from
-    failing on an environment it never meant to be about.
-
-    Each environment answers for ITSELF, matched by the interpreter path in
-    the probe, because the two shapes differ the way the cluster's do: the
-    host environment :data:`HOST_ENV` is its own base, and an image's
-    ``/opt/env`` is a venv over the image's ``/usr/local``.
-
-    Args:
-        fake: The runner to script.
-    """
-    fake.add("test -d", stdout="PRESENT\n")
-    fake.add(f"{HOST_ENV}/bin/python", stdout=host_interpreter(HOST_ENV) + ABL_PINNED_DISTRIBUTIONS)
-    fake.add("/opt/env/bin/python", stdout=IMAGE_PROBE)
-
-
-def script_healthy_cluster(fake: FakeRun, *, job_id: str = "55519937") -> None:
-    """Script a cluster that admits and accepts everything.
-
-    Submission now preflights unconditionally, so every submit test needs the
-    environment probe and the ``--test-only`` verdict scripted, not only the
-    ``sbatch``. Centralised here so that adding a step to the submit path
-    updates every test at once rather than one failing test at a time.
-
-    Args:
-        fake: The runner to script.
-        job_id: Id the real submission should report.
-    """
-    script_healthy_environment(fake)
-    fake.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
-    fake.add("sbatch", stdout=f"Submitted batch job {job_id}\n")
-
-
 def cluster() -> ClusterFacts:
     """The cluster nearly every test validates against.
 
@@ -469,7 +385,7 @@ def ledger_row(**overrides: JSONValue) -> dict[str, JSONValue]:
         **overrides: Fields to replace in the valid baseline.
 
     Returns:
-        A record ``decode_ledger_entry`` accepts, with both index fields
+        A record ``decode_ledger_entry`` accepts, with every index field
         explicitly null -- the state of a row that does not record them.
 
     """
@@ -486,6 +402,7 @@ def ledger_row(**overrides: JSONValue) -> dict[str, JSONValue]:
         "image_digest": None,
         "submitter": None,
         "artifact": None,
+        "image_drift": None,
     }
     row.update(overrides)
     return row

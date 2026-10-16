@@ -16,16 +16,15 @@ from platform_core.json_utils import JSONValue, dump_json_str
 from hpc3.cli import sweep as sweep_cli
 from tests.against_hpc3 import read_ledger
 from tests.conftest import (
-    PREFLIGHT_LINE,
     FakeRun,
     budget_document,
     gpus,
     project_config,
-    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import PREFLIGHT_LINE, script_healthy_environment
 
 
 def _payload(count: int = 3, **overrides: JSONValue) -> dict[str, JSONValue]:

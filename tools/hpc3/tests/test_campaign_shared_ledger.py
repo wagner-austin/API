@@ -26,11 +26,11 @@ from hpc3.cli import campaign as campaign_cli
 from tests.conftest import (
     FakeRun,
     ledger_row,
-    script_healthy_cluster,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import script_healthy_cluster
 
 _WALL_SECONDS = 60
 """Bound on each git call; every one of them answers in milliseconds."""

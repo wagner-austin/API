@@ -12,14 +12,8 @@ from hpc3.contracts.sweep import SweepSpec
 from hpc3.core import audit
 from hpc3.core.sweep import submit_sweep
 from tests.against_hpc3 import decode_sweep_spec, read_ledger
-from tests.conftest import (
-    PREFLIGHT_LINE,
-    FakeRun,
-    LoggedEvent,
-    cluster,
-    gpus,
-    script_healthy_environment,
-)
+from tests.conftest import FakeRun, LoggedEvent, cluster, gpus
+from tests.healthy_cluster import PREFLIGHT_LINE, PROJECT_REPO, script_healthy_environment
 
 _AT = "2026-08-22T16:00:00+00:00"
 
@@ -92,6 +86,7 @@ def _run(spec: SweepSpec, tmp_path: pathlib.Path) -> list[str]:
             submitter="fable-brain-audit-0903",
             cluster=cluster(),
             charge_account="",
+            repo=PROJECT_REPO,
         )
     ]
 
@@ -147,6 +142,7 @@ class TestSubmitSweep:
             submitter="fable-brain-audit-0903",
             cluster=cluster(),
             charge_account="",
+            repo=PROJECT_REPO,
         )
         assert [m.name for m in members] == ["abl.rung-s0", "abl.rung-s1", "abl.rung-s2"]
 

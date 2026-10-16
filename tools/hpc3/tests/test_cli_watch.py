@@ -25,11 +25,11 @@ from tests.conftest import (
     budget_document,
     cluster,
     project_config,
-    script_healthy_cluster,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import script_healthy_cluster
 
 _ROW = (
     "55519937|abl.verify|free-gpu32|COMPLETED|48|"

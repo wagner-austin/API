@@ -4,15 +4,15 @@ Board task 2c8161a3. The registered ``mi`` image, v23, was built from
 ``fab1d991``, which predates ``model_trainer.cli.cartridge_composition_sweep``;
 a run naming that command under it would die on its first line. The answers
 the fake cluster gives here are the ones the real one gave on 2026-10-16,
-when the probe was run on login-i17 against v23 itself:
+when the probe was run on login-i17 against v23 itself: the stamp
+``fab1d991f4d6f39e72c3b21ca5757a072c01f277``, the sweep ABSENT, and the
+command the v23 known-answer probes ran PRESENT. Board task 7aab32ef added
+where a present module resolved, and refused an image that cannot say which
+commit built it.
 
-    ENTRYPOINT-COMMIT|fab1d991f4d6f39e72c3b21ca5757a072c01f277
-    ENTRYPOINT|ABSENT|model_trainer.cli.cartridge_composition_sweep
-
-and, for the command the v23 known-answer probes ran, PRESENT. The probe's own
-program is also run for real, by a real bash and a real interpreter, against
-a tree built in the test, so its resolution rule is checked against what
-Python does rather than against this file's idea of it.
+The probe's own program is also run for real, by a real bash and a real
+interpreter, against a tree built in the test, so its resolution rule is
+checked against what Python does rather than against this file's idea of it.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from hpc3.contracts.job import JobSpec
 from hpc3.core.array_submit import submit_array
 from hpc3.core.entrypoint import (
     EntrypointReading,
+    ModuleReading,
     check_entrypoints,
     invocations,
     parse_probe,
@@ -39,11 +40,10 @@ from hpc3.core.entrypoint import (
 from hpc3.core.preflight import preflight
 from tests.against_hpc3 import decode_job_spec, decode_sweep_spec
 from tests.bash_discovery import posix_bash
-from tests.conftest import (
-    FakeRun,
-    cluster,
-    gpus,
-    image_reference,
+from tests.conftest import FakeRun, cluster, gpus, image_reference
+from tests.healthy_cluster import (
+    HEAD_COMMIT,
+    PROJECT_REPO,
     script_healthy_cluster,
     script_healthy_environment,
 )
@@ -62,21 +62,61 @@ _V23_COMMIT = "fab1d991f4d6f39e72c3b21ca5757a072c01f277"
 _SWEEP = "model_trainer.cli.cartridge_composition_sweep"
 _KNOWN_ANSWER = "model_trainer.cli.known_answer_probe"
 _SCRIPTS = "/pub/wagnera3/mi/scripts"
+_SITE = "/opt/env/lib/python3.11/site-packages/model_trainer"
+"""Where an image's installed ``model_trainer`` resolves."""
 
 
-def _answer(commit: str, *verdicts: tuple[str, str]) -> str:
+def _present(module: str, *, where: str = "ENV", location: str = _SITE) -> str:
+    """Build the verdict line a present module gets.
+
+    Args:
+        module: The module.
+        where: ``ENV`` or ``OUTSIDE``.
+        location: Where it resolved.
+
+    Returns:
+        The line.
+    """
+    return f"ENTRYPOINT|PRESENT|{where}|{module}|{location}"
+
+
+def _absent(module: str) -> str:
+    """Build the verdict line an absent module gets.
+
+    Args:
+        module: The module.
+
+    Returns:
+        The line.
+    """
+    return f"ENTRYPOINT|ABSENT|-|{module}|"
+
+
+def _answer(commit: str, *verdicts: str, status: int = 0) -> str:
     """Build a probe answer in the shape the cluster printed.
 
     Args:
-        commit: The stamp line's value.
-        *verdicts: ``(word, module)`` pairs.
+        commit: What reading the stamp printed.
+        *verdicts: Verdict lines.
+        status: The stamp read's exit status.
 
     Returns:
         The probe's standard output.
     """
-    lines = [f"ENTRYPOINT-COMMIT|{commit}"]
-    lines.extend(f"ENTRYPOINT|{word}|{module}" for word, module in verdicts)
-    return "\n".join(lines) + "\n"
+    return "\n".join([f"ENTRYPOINT-COMMIT|{status}|{commit}", *verdicts]) + "\n"
+
+
+def _reading(module: str, *, directory: str = _SCRIPTS) -> ModuleReading:
+    """Build the reading a module resolved inside the image gets.
+
+    Args:
+        module: The module.
+        directory: Where the command starts it.
+
+    Returns:
+        The reading.
+    """
+    return ModuleReading(directory=directory, module=module, location=_SITE, in_environment=True)
 
 
 def _check(commands: list[str], image: ImageReference | None = _V23) -> EntrypointReading:
@@ -181,39 +221,61 @@ class TestTheProbeRunsForReal:
             (checkout.as_posix(), "scripts.optimize"),
             (work.as_posix(), "scripts.optimize"),
             (work.as_posix(), "json.tool"),
-            (work.as_posix(), "venv"),
+            (work.as_posix(), "pytest"),
             (work.as_posix(), "json"),
             (work.as_posix(), "nope.mod"),
         ]
-        result = self._run(probe_command(env, found))
+        result = self._run(probe_command(env, found, read_stamp=True))
         assert result.returncode == 0, result.stderr
-        commit, present = parse_probe(result.stdout, found)
-        assert commit == _V23_COMMIT
+        answer = parse_probe(result.stdout, found, read_stamp=True)
+        assert (answer["stamp_status"], answer["stamp"]) == (0, _V23_COMMIT)
+        verdicts = dict(answer["modules"])
         # scripts.optimize is only there from the checkout it cds into; json
         # is a package with no __main__.py, which `python -m json` refuses.
-        assert present == {
-            "scripts.optimize": False,
-            "json.tool": True,
-            "venv": True,
-            "json": False,
-            "nope.mod": False,
-        }
+        assert [pair for pair, reading in answer["modules"] if reading is None] == [
+            (work.as_posix(), "scripts.optimize"),
+            (work.as_posix(), "json"),
+            (work.as_posix(), "nope.mod"),
+        ]
+        # The checkout's copy is the command's own code; pytest is installed
+        # under the interpreter's prefix, which is what an image's code is.
+        assert verdicts[(checkout.as_posix(), "scripts.optimize")] == ModuleReading(
+            directory=checkout.as_posix(),
+            module="scripts.optimize",
+            location=str((checkout / "scripts").resolve()),
+            in_environment=False,
+        )
+        assert verdicts[(work.as_posix(), "pytest")] == ModuleReading(
+            directory=work.as_posix(),
+            module="pytest",
+            location=str(pathlib.Path(pytest.__file__).parent.resolve()),
+            in_environment=True,
+        )
 
-    def test_an_unstamped_environment_reports_an_empty_commit(self, tmp_path: pathlib.Path) -> None:
+    def test_an_unstamped_environment_reports_why(self, tmp_path: pathlib.Path) -> None:
         env = self._environment(tmp_path, stamped=False)
+        result = self._run(probe_command(env, [], read_stamp=True))
+        answer = parse_probe(result.stdout, [], read_stamp=True)
+        assert answer["stamp_status"] != 0
+        assert "GIT_COMMIT" in answer["stamp"]
+
+    def test_a_directory_environment_is_not_asked_for_a_stamp(self, tmp_path: pathlib.Path) -> None:
+        env = self._environment(tmp_path, stamped=True)
         found = [(tmp_path.as_posix(), "json.tool")]
-        result = self._run(probe_command(env, found))
-        assert parse_probe(result.stdout, found) == ("", {"json.tool": True})
+        result = self._run(probe_command(env, found, read_stamp=False))
+        answer = parse_probe(result.stdout, found, read_stamp=False)
+        assert (answer["stamp_status"], answer["stamp"]) == (None, "")
+        assert "ENTRYPOINT-COMMIT" not in result.stdout
 
     def test_a_directory_that_is_not_there_fails_the_line(self, tmp_path: pathlib.Path) -> None:
         """The failure the cluster gave for an absent script directory: the
         cd stops the chain, the exit is non-zero, and the answer is short."""
         env = self._environment(tmp_path, stamped=True)
         found = [((tmp_path / "absent").as_posix(), "json.tool")]
-        result = self._run(probe_command(env, found))
+        result = self._run(probe_command(env, found, read_stamp=True))
         assert result.returncode != 0
         with pytest.raises(AppError) as excinfo:
-            parse_probe(result.stdout, found)
+            parse_probe(result.stdout, found, read_stamp=True)
         assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_PROBE_UNREADABLE
 
 
@@ -222,33 +284,47 @@ _ONE_MODULE = (("/w", "a"),)
 
 
 class TestReadingTheAnswer:
-    def test_an_answer_without_the_stamp_line_is_unreadable(self) -> None:
+    @pytest.mark.parametrize(
+        ("output", "read_stamp", "why"),
+        [
+            (_present("a") + "\n", True, "'ENTRYPOINT-COMMIT|' line"),
+            (_answer("c", _present("a")), False, "expected 0"),
+            ("ENTRYPOINT-COMMIT|c\n" + _present("a") + "\n", True, "no exit status"),
+            (_answer("c"), True, "expected 1 'ENTRYPOINT|'"),
+            (_answer("c", _present("b")), True, "where 'a' was asked"),
+            (_answer("c", "ENTRYPOINT|MAYBE|ENV|a|/x"), True, "'MAYBE|ENV|a|/x'"),
+            (_answer("c", "ENTRYPOINT|PRESENT|ENV|a|"), True, "is not a PRESENT"),
+            (_answer("c", "ENTRYPOINT|ABSENT|-|a|/x"), True, "is not a PRESENT"),
+            (_answer("c", "ENTRYPOINT|PRESENT|SOMEWHERE|a|/x"), True, "is not a PRESENT"),
+        ],
+    )
+    def test_an_answer_out_of_shape_is_unreadable(
+        self, output: str, read_stamp: bool, why: str
+    ) -> None:
+        """A short or garbled answer is a probe fault: read as "absent" it
+        would refuse a run, read as "present" it would admit one unchecked."""
         with pytest.raises(AppError) as excinfo:
-            parse_probe("ENTRYPOINT|PRESENT|a\n", _ONE_MODULE)
+            parse_probe(output, _ONE_MODULE, read_stamp=read_stamp)
         assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_PROBE_UNREADABLE
+        assert why in excinfo.value.message
 
-    def test_a_verdict_word_it_does_not_know_is_unreadable(self) -> None:
-        with pytest.raises(AppError) as excinfo:
-            parse_probe(_answer("c", ("MAYBE", "a")), _ONE_MODULE)
-        assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_PROBE_UNREADABLE
-        assert "'ENTRYPOINT|MAYBE|a'" in excinfo.value.message
-
-    def test_a_verdict_with_an_extra_field_is_unreadable(self) -> None:
-        with pytest.raises(AppError) as excinfo:
-            parse_probe("ENTRYPOINT-COMMIT|c\nENTRYPOINT|PRESENT|x|a\n", _ONE_MODULE)
-        assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_PROBE_UNREADABLE
-
-    def test_a_module_absent_from_any_directory_it_starts_in_is_absent(self) -> None:
+    def test_a_module_is_answered_per_directory_it_starts_in(self) -> None:
         found = [("/one", "a"), ("/two", "a")]
-        answer = _answer("c", ("PRESENT", "a"), ("ABSENT", "a"))
-        assert parse_probe(answer, found) == ("c", {"a": False})
+        answer = parse_probe(_answer("c", _present("a"), _absent("a")), found, read_stamp=True)
+        assert answer["modules"] == [
+            (
+                ("/one", "a"),
+                ModuleReading(directory="/one", module="a", location=_SITE, in_environment=True),
+            ),
+            (("/two", "a"), None),
+        ]
 
 
 class TestTheRegisteredMiImage:
     """The real current case, with the answers v23 gave on 2026-10-16."""
 
     def test_a_command_v23_predates_is_refused(self, fake_run: FakeRun) -> None:
-        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, ("ABSENT", _SWEEP)))
+        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, _absent(_SWEEP)))
         with pytest.raises(AppError) as excinfo:
             _check([f"python -m {_SWEEP} --plan gpt2-small --device cuda"])
         assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_NOT_INSTALLED
@@ -260,31 +336,63 @@ class TestTheRegisteredMiImage:
 
     def test_the_old_command_it_was_built_for_still_runs(self, fake_run: FakeRun) -> None:
         """Reproducing an old command under the old image stays legal."""
-        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, ("PRESENT", _KNOWN_ANSWER)))
-        assert _check([f"python -m {_KNOWN_ANSWER} --device cuda"]) == {
-            "image_commit": _V23_COMMIT,
-            "modules": [_KNOWN_ANSWER],
-        }
+        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, _present(_KNOWN_ANSWER)))
+        assert _check([f"python -m {_KNOWN_ANSWER} --device cuda"]) == EntrypointReading(
+            image_commit=_V23_COMMIT, modules=[_reading(_KNOWN_ANSWER)]
+        )
 
     def test_members_starting_one_module_ask_about_it_once(self, fake_run: FakeRun) -> None:
         """Every member of an array usually starts the same entry point."""
-        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, ("PRESENT", _KNOWN_ANSWER)))
+        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, _present(_KNOWN_ANSWER)))
         reading = _check([f"python -m {_KNOWN_ANSWER} --seed {seed}" for seed in (1, 2, 3)])
-        assert reading["modules"] == [_KNOWN_ANSWER]
+        assert reading["modules"] == [_reading(_KNOWN_ANSWER)]
         (command,) = fake_run.commands()
         assert command.count(_KNOWN_ANSWER) == 1
 
-    def test_an_unstamped_environment_says_so(self, fake_run: FakeRun) -> None:
-        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer("", ("ABSENT", _SWEEP)))
+    @pytest.mark.parametrize(
+        ("status", "stamp"),
+        [(1, "cat: /opt/env/GIT_COMMIT: No such file or directory"), (0, "")],
+    )
+    def test_an_image_that_cannot_say_its_commit_is_refused(
+        self, fake_run: FakeRun, status: int, stamp: str
+    ) -> None:
+        """Absent and empty alike: nothing could say which code the run executes."""
+        fake_run.add(
+            "ENTRYPOINT-COMMIT", stdout=_answer(stamp, _present(_KNOWN_ANSWER), status=status)
+        )
+        with pytest.raises(AppError) as excinfo:
+            _check([f"python -m {_KNOWN_ANSWER}"])
+        assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_IMAGE_UNSTAMPED
+        assert f"exited {status} with {stamp!r}" in excinfo.value.message
+        assert "inside /pub/wagnera3/images/v23/abl.sif" in excinfo.value.message
+
+    def test_an_image_starting_no_module_still_says_its_commit(self, fake_run: FakeRun) -> None:
+        """One round trip for the stamp alone, so the run's code is still named."""
+        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT))
+        assert _check(["python train.py --out /pub/x.pt"]) == EntrypointReading(
+            image_commit=_V23_COMMIT, modules=[]
+        )
+        (command,) = fake_run.commands()
+        assert "/opt/env/bin/python -c" not in command
+
+    def test_a_directory_environment_is_not_asked_for_a_stamp(self, fake_run: FakeRun) -> None:
+        fake_run.add("ENTRYPOINT|", stdout=_absent(_SWEEP) + "\n")
         with pytest.raises(AppError) as excinfo:
             _check([f"python -m {_SWEEP}"], image=None)
-        assert "carries no commit stamp" in excinfo.value.message
+        assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_NOT_INSTALLED
+        assert "is a directory environment" in excinfo.value.message
         assert "on hpc3" in excinfo.value.message
-        assert "apptainer" not in fake_run.commands()[0]
+        (command,) = fake_run.commands()
+        assert "apptainer" not in command
+        assert "GIT_COMMIT" not in command
 
-    def test_a_command_starting_no_module_costs_no_round_trip(self, fake_run: FakeRun) -> None:
+    def test_a_directory_environment_starting_no_module_costs_no_round_trip(
+        self, fake_run: FakeRun
+    ) -> None:
         """And the reading says it examined none, rather than passing."""
-        assert _check(["python train.py --out /pub/x.pt"]) == {"image_commit": "", "modules": []}
+        assert _check(["python train.py"], image=None) == EntrypointReading(
+            image_commit=None, modules=[]
+        )
         assert fake_run.calls == []
 
 
@@ -331,7 +439,7 @@ class TestBothSubmissionPathsAskBeforeTheScheduler:
         return decode_job_spec(self._template(command))
 
     def test_preflight_refuses_a_command_its_image_predates(self, fake_run: FakeRun) -> None:
-        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, ("ABSENT", _SWEEP)))
+        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, _absent(_SWEEP)))
         script_healthy_environment(fake_run)
         with pytest.raises(AppError) as excinfo:
             preflight(
@@ -341,6 +449,7 @@ class TestBothSubmissionPathsAskBeforeTheScheduler:
                 log_dir="/pub/wagnera3/mi/logs",
                 cluster=cluster(),
                 charge_account="",
+                repo=PROJECT_REPO,
             )
         assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_NOT_INSTALLED
         commands = fake_run.commands()
@@ -349,17 +458,26 @@ class TestBothSubmissionPathsAskBeforeTheScheduler:
         assert not any("--test-only" in command for command in commands)
 
     def test_preflight_admits_the_command_its_image_carries(self, fake_run: FakeRun) -> None:
-        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, ("PRESENT", _KNOWN_ANSWER)))
+        fake_run.add("ENTRYPOINT-COMMIT", stdout=_answer(_V23_COMMIT, _present(_KNOWN_ANSWER)))
         script_healthy_cluster(fake_run)
-        result = preflight(
+        admission = preflight(
             self._job(f"python -m {_KNOWN_ANSWER} --device cuda"),
             host="hpc3",
             script_dir=_SCRIPTS,
             log_dir="/pub/wagnera3/mi/logs",
             cluster=cluster(),
             charge_account="",
+            repo=PROJECT_REPO,
         )
-        assert result["partition"] == "free-gpu"
+        assert admission["verdict"]["partition"] == "free-gpu"
+        # Compared against the project's repository, which in this scripted
+        # one tracks no model_trainer: said, not passed over.
+        image_drift = admission["image_drift"]
+        assert (image_drift["image_commit"], image_drift["head"]) == (_V23_COMMIT, HEAD_COMMIT)
+        (module,) = image_drift["modules"]
+        assert (
+            module["not_compared"] == f"{PROJECT_REPO} tracks no source for 'model_trainer' at HEAD"
+        )
 
     def test_an_array_is_refused_for_one_members_module(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
@@ -372,7 +490,7 @@ class TestBothSubmissionPathsAskBeforeTheScheduler:
         spec = decode_sweep_spec({"base": self._template("python train.py"), "members": members})
         fake_run.add(
             "ENTRYPOINT-COMMIT",
-            stdout=_answer(_V23_COMMIT, ("PRESENT", _KNOWN_ANSWER), ("ABSENT", _SWEEP)),
+            stdout=_answer(_V23_COMMIT, _present(_KNOWN_ANSWER), _absent(_SWEEP)),
         )
         script_healthy_cluster(fake_run)
         with pytest.raises(AppError) as excinfo:
@@ -387,6 +505,7 @@ class TestBothSubmissionPathsAskBeforeTheScheduler:
                 submitter="",
                 cluster=cluster(),
                 charge_account="",
+                repo=PROJECT_REPO,
             )
         assert excinfo.value.code is Hpc3ErrorCode.ENTRYPOINT_NOT_INSTALLED
         assert _SWEEP in excinfo.value.message

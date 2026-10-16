@@ -23,14 +23,13 @@ from hpc3.core import audit
 from hpc3.core.chain import submit_chain
 from tests.against_hpc3 import read_ledger
 from tests.conftest import (
-    PREFLIGHT_LINE,
     FakeRun,
     LoggedEvent,
     cluster,
     project_config,
-    script_healthy_environment,
     workspace_document,
 )
+from tests.healthy_cluster import PREFLIGHT_LINE, PROJECT_REPO, script_healthy_environment
 
 _AT = "2026-08-23T16:00:00+00:00"
 
@@ -258,6 +257,7 @@ class TestSubmitChain:
             submitter="fable-brain-audit-0903",
             cluster=cluster(),
             charge_account="",
+            repo=PROJECT_REPO,
         )
         return [member.job_id for member in submitted]
 

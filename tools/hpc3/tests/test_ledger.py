@@ -41,6 +41,7 @@ def _entry(**overrides: str) -> LedgerEntry:
         "image_digest": None,
         "submitter": None,
         "artifact": None,
+        "image_drift": None,
     }
     base.update(overrides)
     return decode_ledger_entry(base)
@@ -119,6 +120,21 @@ class TestLedgerEntryContract:
             "image_digest": "sha256:" + "ab" * 32,
             "submitter": "fable-brain-audit-0903",
             "artifact": "/pub/wagnera3/floor/results/run.json",
+            "image_drift": {
+                "image_commit": "fab1d991",
+                "head": "51b39a57",
+                "modules": [
+                    {
+                        "directory": "/pub/wagnera3/mi/scripts",
+                        "module": "model_trainer.cli.known_answer_probe",
+                        "compared": ["services/Model-Trainer/src/model_trainer"],
+                        "changed": [
+                            "services/Model-Trainer/src/model_trainer/cli/known_answer_probe.py"
+                        ],
+                        "not_compared": "",
+                    }
+                ],
+            },
         }
         assert encode_ledger_entry(decode_ledger_entry(payload)) == payload
 
@@ -142,6 +158,7 @@ class TestLedgerEntryContract:
             "image_digest": None,
             "submitter": None,
             "artifact": None,
+            "image_drift": None,
         }
 
     def test_a_row_omitting_an_index_field_is_refused(self) -> None:
@@ -153,12 +170,19 @@ class TestLedgerEntryContract:
         as "unknown" silently. The backfill happened once and is in git; the
         tolerance would have been permanent.
         """
-        for key in ("image_digest", "submitter", "artifact"):
+        for key in ("image_digest", "submitter", "artifact", "image_drift"):
             broken = dict(self._row())
-            broken.update({"image_digest": None, "submitter": None, "artifact": None})
             del broken[key]
             with pytest.raises(JSONTypeError, match=f"Field '{key}' is required"):
                 decode_ledger_entry(broken)
+
+    def test_an_unrecorded_drift_is_null_and_a_malformed_one_is_corruption(self) -> None:
+        """Null is a row from before the field; a record that contradicts
+        itself is not history but a broken writer, and is refused."""
+        assert decode_ledger_entry(self._row())["image_drift"] is None
+        broken: dict[str, JSONValue] = {"image_commit": "c", "head": "", "modules": []}
+        with pytest.raises(JSONTypeError, match="both set"):
+            decode_ledger_entry({**self._row(), "image_drift": broken})
 
     def test_the_message_says_what_to_write_instead(self) -> None:
         """A required field nobody knows the value of needs an escape that is

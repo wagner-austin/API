@@ -48,11 +48,11 @@ from hpc3.core import _test_hooks as core_hooks
 from tests.against_hpc3 import read_ledger
 from tests.conftest import (
     FakeRun,
-    script_healthy_cluster,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import script_healthy_cluster
 
 SESSION = "4f8a2c1e-9b3d-4e7f-8a6b-1c2d3e4f5a6b"
 BOUND = "opus-rebuild-deadlock-0910"

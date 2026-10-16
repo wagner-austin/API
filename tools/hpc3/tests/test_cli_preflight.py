@@ -12,11 +12,11 @@ from hpc3.cli import preflight as preflight_cli
 from tests.conftest import (
     FakeRun,
     project_config,
-    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import HEAD_COMMIT, IMAGE_COMMIT, script_healthy_environment
 
 _LINE = (
     "sbatch: Job 1 to start at 2026-08-22T03:23:00 a using 4 processors "
@@ -90,10 +90,13 @@ class TestPreflightCli:
         _ok(fake_run)
 
         assert preflight_cli.main(_args(tmp_path, "--run")) == 0
-        assert emitted[0] == (
-            "OK abl.arm-b-42: would start 2026-08-22T03:23:00 on hpc3-gpu-16-02 (4 cpu, free-gpu)"
-        )
-        assert emitted[1] == "1 spec(s) would be admitted; nothing was queued"
+        assert emitted[:4] == [
+            "OK abl.arm-b-42: would start 2026-08-22T03:23:00 on hpc3-gpu-16-02 (4 cpu, free-gpu)",
+            # Admitted, and which code it would run: said under every verdict.
+            f"  code: image built from {IMAGE_COMMIT}, compared with HEAD {HEAD_COMMIT}",
+            "  code: the command starts no python -m module, so no source was compared",
+            "1 spec(s) would be admitted; nothing was queued",
+        ]
 
     def test_a_project_requiring_certified_inputs_refuses_before_the_scheduler(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -154,12 +157,12 @@ class TestPreflightCli:
         _ok(fake_run)
 
         assert preflight_cli.main(_args(tmp_path, "--sweep")) == 0
-        assert [line.split(":")[0] for line in emitted[:3]] == [
+        assert [line.split(":")[0] for line in emitted if line.startswith("OK ")] == [
             "OK abl.rung-s0",
             "OK abl.rung-s1",
             "OK abl.rung-s2",
         ]
-        assert emitted[3] == "3 spec(s) would be admitted; nothing was queued"
+        assert emitted[9] == "3 spec(s) would be admitted; nothing was queued"
 
     def test_an_oversized_sweep_never_contacts_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

@@ -25,7 +25,7 @@ from hpc3.core.interpreter import (
     parse_identity,
     split_identity,
 )
-from tests.conftest import IMAGE_INTERPRETER, host_interpreter
+from tests.healthy_cluster import IMAGE_INTERPRETER, host_interpreter
 
 _TANKPIT = "/pub/wagnera3/envs/tankpit"
 _CLEARGBM = "/pub/wagnera3/envs/cleargbm"

@@ -18,7 +18,8 @@ from platform_core.json_utils import JSONValue
 from hpc3.contracts.sweep import SweepSpec
 from hpc3.core.array_submit import selected_members, submit_array
 from tests.against_hpc3 import decode_sweep_spec
-from tests.conftest import FakeRun, cluster, gpus, script_healthy_environment
+from tests.conftest import FakeRun, cluster, gpus
+from tests.healthy_cluster import PROJECT_REPO, script_healthy_environment
 
 _AT = "2026-09-01T22:00:00+00:00"
 
@@ -74,6 +75,7 @@ def _submit(
             submitter="fable-brain-audit-0903",
             cluster=cluster(),
             charge_account="",
+            repo=PROJECT_REPO,
         )
     ]
 
@@ -173,7 +175,7 @@ class TestRefusals:
             '{"job_id": "500", "project": "abl", "name": "abl.older", "host": "hpc3", '
             '"partition": "free-gpu", "submitted_at": "2026-09-01T00:00:00+00:00", '
             '"log_dir": "/l", "deterministic": false, "experiment": {"rung": "774M"}, '
-            '"image_digest": "", "submitter": "", "artifact": "/pub/a0.pt"}\n',
+            '"image_digest": "", "submitter": "", "artifact": "/pub/a0.pt", "image_drift": null}\n',
             encoding="utf-8",
         )
         fake_run.add("squeue --me", stdout="500|abl.older|RUNNING\n")
@@ -223,7 +225,7 @@ class TestRefusals:
             '{"job_id": "55678543_2", "project": "abl", "name": "abl.older-s2", "host": "hpc3", '
             '"partition": "free-gpu", "submitted_at": "2026-09-01T00:00:00+00:00", '
             '"log_dir": "/l", "deterministic": false, "experiment": {"rung": "774M"}, '
-            '"image_digest": "", "submitter": "", "artifact": "/pub/a0.pt"}\n',
+            '"image_digest": "", "submitter": "", "artifact": "/pub/a0.pt", "image_drift": null}\n',
             encoding="utf-8",
         )
         fake_run.add("squeue --me", stdout="55678543_[2-3%2]|abl.older|PENDING\n")

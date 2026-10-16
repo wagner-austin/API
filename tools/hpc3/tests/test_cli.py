@@ -28,11 +28,11 @@ from tests.conftest import (
     budget_document,
     gpus,
     project_config,
-    script_healthy_cluster,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import script_healthy_cluster
 
 _PAYLOAD = b"the marker predicts extraction accuracy.\n"
 _DIGEST = hashlib.sha256(_PAYLOAD).hexdigest()

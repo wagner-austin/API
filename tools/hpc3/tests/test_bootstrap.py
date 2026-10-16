@@ -25,10 +25,10 @@ from hpc3.core.interpreter import InterpreterIdentity
 from tests.conftest import (
     FakeRun,
     LoggedEvent,
-    host_interpreter,
     workspace_document,
     write_workspace,
 )
+from tests.healthy_cluster import host_interpreter
 
 _ENV = "/pub/wagnera3/envs/newcomer"
 _PYTHON = "3.11"

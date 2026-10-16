@@ -17,15 +17,14 @@ from hpc3.cli import submit as submit_cli
 from hpc3.cli import triage as triage_cli
 from hpc3.core import _test_hooks as core_hooks
 from tests.conftest import (
-    PREFLIGHT_LINE,
     FakeRun,
     ledger_row,
     project_config,
-    script_healthy_environment,
     workspace_document,
     write_file,
     write_workspace,
 )
+from tests.healthy_cluster import PREFLIGHT_LINE, script_healthy_environment
 
 
 class TestTriageCli:
