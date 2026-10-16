@@ -80,6 +80,13 @@ class Hpc3ErrorCode(ErrorCodeBase):
 
     # Concurrency -- two jobs that would write one file.
     ARTIFACT_ALREADY_IN_FLIGHT = "ARTIFACT_ALREADY_IN_FLIGHT"
+    # A live job carries the name being submitted and this ledger has no row
+    # for it, so what it writes cannot be read from here (board task
+    # 747c391e: a worktree's ledger missed a live array and duplicated it).
+    LIVE_JOB_UNRECORDED = "LIVE_JOB_UNRECORDED"
+    # The checkout a ledger is shared through cannot be found from a
+    # worktree's .git pointer.
+    LEDGER_CHECKOUT_UNREADABLE = "LEDGER_CHECKOUT_UNREADABLE"
 
     # Campaigns -- a set of runs converging on a declared end state.
     CAMPAIGN_MEMBER_HAS_NO_ARTIFACT = "CAMPAIGN_MEMBER_HAS_NO_ARTIFACT"
