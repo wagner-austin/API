@@ -1,13 +1,13 @@
 {
   "worker_ram_gb": 0.5,
-  "minimum_workers": 2,
-  "expected_minutes": 10,
+  "minimum_workers": 1,
+  "expected_minutes": 5,
   "required_tags": [
     "cxx"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
-    "path": "pc",
+    "path": "wiki",
     "install": [
       {
         "phase": "install",
