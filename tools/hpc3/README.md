@@ -188,6 +188,13 @@ the cluster checkout it runs from; preflight refuses it with
 `REPO_COMMIT_NOT_HEAD` unless that checkout's HEAD is the declared commit
 ([run documents](wiki/pages/run-documents.md)).
 
+Preflight also asks the run's environment, inside its image, whether it can
+start every `python -m` module the command names, resolved from the directory
+the command enters; a module it cannot start is refused with
+`ENTRYPOINT_NOT_INSTALLED`, naming the commit the image was built from, so a
+command newer than its image never reaches the queue
+([image freshness](wiki/pages/image-freshness.md)).
+
 A run that overrides project defaults — the merged result goes through the
 same decoder:
 
