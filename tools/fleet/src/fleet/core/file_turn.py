@@ -65,6 +65,8 @@ def held(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> Generator[No
         Nothing; the turn is held while the block runs.
 
     Raises:
+        PermissionError: When creating the lock is refused for longer than a
+            turn may last, which no other turn's give-back takes.
         OSError: When the lock can be neither created nor read for a reason
             other than another turn holding it.
     """
@@ -90,7 +92,30 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
     _test_hooks.make_directory(lock.parent)
     token = f"{holder} pid {os.getpid()} turn {uuid.uuid4().hex}"
     asked = _test_hooks.now()
-    while not _created(lock, token=token):
+    refused_since: int | None = None
+    while True:
+        try:
+            created = _created(lock, token=token)
+        except PermissionError:
+            # Windows refuses an exclusive create with access denied, not
+            # "exists", while another turn's give-back is still removing the
+            # lock: measured on austinpc, Python 3.11.9, 2026-10-16 (MCPs
+            # board task e14815d3), six processes taking 400 turns each saw
+            # Win32 error 5 on 7 to 22 of each one's roughly 900 refused
+            # creates, every other one error 80, and the record append case
+            # died of it under a loaded suite. So a refusal is looked at
+            # again a poll apart for as long as a turn may last, as
+            # host_claims.discharge asks again a removal Windows refuses; one
+            # that outlasts that is no give-back, and raises.
+            now = _test_hooks.now()
+            refused_since = now if refused_since is None else refused_since
+            if now - refused_since >= bounds["stale_seconds"]:
+                raise
+            _test_hooks.sleep(bounds["poll_seconds"])
+            continue
+        if created:
+            break
+        refused_since = None
         age = _age(lock)
         if age is not None and age >= bounds["stale_seconds"]:
             _log.info(

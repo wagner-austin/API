@@ -11,6 +11,7 @@ another process has open.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import pathlib
 import threading
@@ -23,7 +24,7 @@ from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 from fleet.contracts.host_claim import HostClaim, decode_host_claim, encode_host_claim
 from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, host_claims
-from tests._obstruct import refused_removal
+from tests._obstruct import refused_creation, refused_removal
 from tests._thread_fakes import await_event
 
 #: The node every case claims on.
@@ -258,6 +259,76 @@ class TestTheTurn:
 
         assert held.startswith(f"{ORDINARY} pid ")
         assert clock.slept == [host_claims.TURN_POLL_SECONDS]
+
+    def test_looks_again_when_the_platform_refuses_its_create(self, tmp_path: pathlib.Path) -> None:
+        """Windows refuses the create, not as 'exists', while the other runner's
+        give-back is still removing the lock."""
+        lock = host_claims.lock_path(tmp_path, alias=HOST)
+        with refused_creation(lock) as release:
+            clock = FakeClock(at=1791449835, on_sleep=[release])
+            _test_hooks.now = clock.now
+            _test_hooks.sleep = clock.sleep
+            with host_claims.claim_turn(tmp_path, alias=HOST, runner=ORDINARY):
+                held = lock.read_text(encoding="utf-8")
+
+        assert held.startswith(f"{ORDINARY} pid ")
+        assert not lock.exists()
+        assert clock.slept == [host_claims.TURN_POLL_SECONDS]
+
+    def test_a_create_refused_past_the_turns_bound_raises(self, tmp_path: pathlib.Path) -> None:
+        lock = host_claims.lock_path(tmp_path, alias=HOST)
+        with refused_creation(lock):
+            clock = FakeClock(at=1791449835)
+            _test_hooks.now = clock.now
+            _test_hooks.sleep = clock.sleep
+            with (
+                pytest.raises(PermissionError),
+                host_claims.claim_turn(tmp_path, alias=HOST, runner=ORDINARY),
+            ):
+                pass
+
+        assert len(clock.slept) == host_claims.TURN_STALE_SECONDS // host_claims.TURN_POLL_SECONDS
+
+    def test_each_refusal_is_bounded_from_its_own_first_look(self, tmp_path: pathlib.Path) -> None:
+        """Refused, then kept waiting past the bound by the other runner's live
+        turn, then refused again as that turn is given back: the second
+        refusal is looked at again, not raised for the time the first began."""
+        lock = host_claims.lock_path(tmp_path, alias=HOST)
+        waits = host_claims.TURN_STALE_SECONDS // host_claims.TURN_POLL_SECONDS
+        with contextlib.ExitStack() as refusals:
+            releases = [refusals.enter_context(refused_creation(lock))]
+
+            def the_other_runner_takes_its_turn() -> None:
+                releases[0]()
+                lock.write_text(f"{ELEVATED} pid 4243 turn holding", encoding="utf-8")
+                os.utime(lock, (clock.at, clock.at))
+
+            def the_other_runner_is_still_inside_it() -> None:
+                os.utime(lock, (clock.at, clock.at))
+
+            def it_gives_back_and_the_platform_refuses_again() -> None:
+                lock.unlink()
+                releases.append(refusals.enter_context(refused_creation(lock)))
+
+            def the_give_back_ends() -> None:
+                releases[1]()
+
+            clock = FakeClock(
+                at=int(time.time()),
+                on_sleep=[
+                    the_other_runner_takes_its_turn,
+                    *[the_other_runner_is_still_inside_it] * waits,
+                    it_gives_back_and_the_platform_refuses_again,
+                    the_give_back_ends,
+                ],
+            )
+            _test_hooks.now = clock.now
+            _test_hooks.sleep = clock.sleep
+            with host_claims.claim_turn(tmp_path, alias=HOST, runner=ORDINARY):
+                held = lock.read_text(encoding="utf-8")
+
+        assert held.startswith(f"{ORDINARY} pid ")
+        assert len(clock.slept) == waits + 3
 
 
 class TestTheClaims:

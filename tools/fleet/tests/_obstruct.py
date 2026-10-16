@@ -1,4 +1,4 @@
-"""Make the platform refuse to remove a file, the way the host's other runner can.
+"""Make the platform refuse to remove or create a file, the way a racing process can.
 
 Support module, not a test module (MCPs board task a85ef09e). On Windows a
 file another process holds open cannot be removed: measured on austinpc,
@@ -54,4 +54,45 @@ def refused_removal(path: pathlib.Path) -> Generator[Callable[[], None], None, N
         release()
 
 
-__all__ = ["refused_removal"]
+@contextlib.contextmanager
+def refused_creation(path: pathlib.Path) -> Generator[Callable[[], None], None, None]:
+    """Refuse an exclusive create of a file with ``PermissionError`` until released.
+
+    What Windows does while another turn's give-back is still removing a lock
+    (:func:`fleet.core.file_turn.held`), made to last: on Windows a directory
+    standing at the path refuses ``os.open(O_CREAT | O_EXCL)`` with
+    ``PermissionError`` (measured on austinpc, Python 3.11.9, 2026-10-16),
+    and on Linux taking the write bit off the parent refuses it the same way
+    for a user other than root.
+
+    Args:
+        path: A file that does not exist, in a directory that does.
+
+    Yields:
+        The release, which a case calls when the refusal should end; calling
+        it again does nothing.
+    """
+    if sys.platform == "win32":
+        path.mkdir()
+        released = [False]
+
+        def release() -> None:
+            if not released[0]:
+                path.rmdir()
+                released[0] = True
+
+    else:
+        directory = path.parent
+        writable = directory.stat().st_mode
+        os.chmod(directory, writable & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
+
+        def release() -> None:
+            os.chmod(directory, writable)
+
+    try:
+        yield release
+    finally:
+        release()
+
+
+__all__ = ["refused_creation", "refused_removal"]
