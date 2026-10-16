@@ -73,7 +73,10 @@ HOOKS_ROUTE_FILE: Final = (".claude", "corvis-hooks.json")
 #: and pytest-timeout was missing, so fleet job 4ef9f20f on sedona logged
 #: ``Unknown config option: timeout`` and ran with no per-test timeout. A node
 #: is ready only at these versions (:data:`HOOKS_CHECK_PROGRAM`), so every
-#: machine lints and tests a commit by the same rules.
+#: machine lints and tests a commit by the same rules. Readers outside this
+#: package take them from ``rendered/hooks-check-packages.json``
+#: (:mod:`fleet.core.hooks_check_document`): run ``make render-hooks-check``
+#: after moving one.
 HOOKS_CHECK_PACKAGES: Final = (
     "ruff==0.17.1",
     "mypy==2.4.0",

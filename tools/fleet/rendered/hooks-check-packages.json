@@ -1,0 +1,32 @@
+{
+  "packages": [
+    {
+      "name": "ruff",
+      "version": "0.17.1"
+    },
+    {
+      "name": "mypy",
+      "version": "2.4.0"
+    },
+    {
+      "name": "pytest",
+      "version": "9.1.1"
+    },
+    {
+      "name": "pytest-xdist",
+      "version": "3.8.0"
+    },
+    {
+      "name": "pytest-cov",
+      "version": "7.1.0"
+    },
+    {
+      "name": "coverage",
+      "version": "7.16.2"
+    },
+    {
+      "name": "pytest-timeout",
+      "version": "2.4.0"
+    }
+  ]
+}
