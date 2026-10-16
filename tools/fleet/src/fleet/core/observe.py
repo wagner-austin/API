@@ -19,17 +19,30 @@ to a Linux one. Until board task cd5010c4 the PowerShell text went to every
 node, and diphtheria answered ``powershell: command not found`` on every
 tick, logged as a node that did not answer. Both renderings emit ONE JSON
 document: the node's platform and lowercased hostname (which together spell
-the harness's own ``pidDomain``, ``win32:serendipity``, ``linux:diphtheria``)
-and every record in the directory, verbatim. An absent directory is a node
-that has never run Claude Code, reported as zero records rather than as a
-fault.
+the ledger's machine key, ``win32:serendipity``, ``linux:diphtheria``), the
+``pidDomain`` the node's harness writes, and every record in the directory,
+verbatim. An absent directory is a node that has never run Claude Code,
+reported as zero records rather than as a fault.
+
+THE MACHINE KEY AND THE pidDomain ARE TWO SPELLINGS (board task 5cee2f65).
+Until Claude Code 2.1.294 the harness wrote ``pidDomain`` as
+``<platform>:<hostname>`` on both platforms, so one string served as both.
+2.1.294 writes ``linux:<machine-id>:pid:[<pid namespace inode>]`` on Linux
+(measured on ziggurat 2026-10-16:
+``linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]``, its
+``/etc/machine-id`` and ``readlink /proc/self/ns/pid``) and still
+``win32:<hostname>`` on Windows (all 8 records on austinpc), and every hub
+tick from 06:30Z failed on the comparison. So each dialect's script computes
+the node's own ``pidDomain`` the way its harness does, and a record is
+compared against THAT, while the ledger keeps its ``<platform>:<hostname>``
+key.
 
 WHAT IS COPIED AND WHAT IS CHECKED. Every field the ledger stores is copied
 from the record; nothing is inferred. Two things are refused by name: a record
 that is not the shape the harness writes (``SESSION_RECORD_UNREADABLE``), and
-a record whose own ``pidDomain`` names a machine other than the node it was
-read from (``SESSION_MACHINE_MISMATCH``) -- the refusal ``pcsession-mcp``
-makes for the hub's own directory, made here for the same reason.
+a record whose own ``pidDomain`` is not the one its node reports
+(``SESSION_MACHINE_MISMATCH``) -- the refusal ``pcsession-mcp`` makes for the
+hub's own directory, made here for the same reason.
 
 WHICH FAILURES ARE VALUES. A node that is off, or refuses ssh, is an OUTCOME
 of the pass -- reported per node and the pass continues, exactly as
@@ -73,11 +86,14 @@ class NodeSessions(TypedDict):
     Attributes:
         platform: The harness platform tag, ``win32`` or ``linux``.
         hostname: The node's hostname, lowercased.
+        pid_domain: The ``pidDomain`` the node's harness writes, computed on
+            the node the way the harness computes it.
         records: Every registration document in the directory, untouched.
     """
 
     platform: str
     hostname: str
+    pid_domain: str
     records: tuple[JSONObject, ...]
 
 
@@ -234,16 +250,17 @@ def decode_node_sessions(host: str, output: str) -> NodeSessions:
     return NodeSessions(
         platform=_field_str(host, document, "platform"),
         hostname=_field_str(host, document, "hostname"),
+        pid_domain=_field_str(host, document, "pidDomain"),
         records=tuple(records),
     )
 
 
-def to_observation(host: str, machine: str, record: JSONObject) -> SessionObservation:
+def to_observation(host: str, pid_domain: str, record: JSONObject) -> SessionObservation:
     """Copy one harness record into the tool's wire shape.
 
     Args:
         host: The node it came from, for errors.
-        machine: The machine id this pass attributes records to.
+        pid_domain: The ``pidDomain`` that node reports for its own harness.
         record: The registration document, as the harness wrote it.
 
     Returns:
@@ -252,18 +269,18 @@ def to_observation(host: str, machine: str, record: JSONObject) -> SessionObserv
     Raises:
         AppError: ``SESSION_RECORD_UNREADABLE`` for a missing or mistyped
             field; ``SESSION_MACHINE_MISMATCH`` when the record's own
-            ``pidDomain`` names a different machine than ``machine``.
+            ``pidDomain`` is not ``pid_domain``.
     """
-    pid_domain = record.get("pidDomain")
-    if pid_domain is not None:
-        if not isinstance(pid_domain, str):
-            raise _unreadable(host, f"'pidDomain' is {type(pid_domain).__name__}, not a string")
-        if pid_domain != machine:
+    recorded = record.get("pidDomain")
+    if recorded is not None:
+        if not isinstance(recorded, str):
+            raise _unreadable(host, f"'pidDomain' is {type(recorded).__name__}, not a string")
+        if recorded != pid_domain:
             raise AppError(
                 code=FleetErrorCode.SESSION_MACHINE_MISMATCH,
                 message=(
                     f"{host}: record for session {_field_str(host, record, 'sessionId')} "
-                    f"names pidDomain {pid_domain!r} but was read from {machine!r}"
+                    f"names pidDomain {recorded!r} but its node reports {pid_domain!r}"
                 ),
             )
     return SessionObservation(
@@ -304,13 +321,14 @@ def observation_json(observation: SessionObservation) -> JSONObject:
 
 
 def machine_of(sessions: NodeSessions) -> str:
-    """The machine id a node's document spells.
+    """The machine key a node's document spells.
 
     Args:
         sessions: The decoded document.
 
     Returns:
-        ``<platform>:<hostname>``, the harness's ``pidDomain`` form.
+        ``<platform>:<hostname>``, the ledger's machine key, which since
+        Claude Code 2.1.294 is the harness's ``pidDomain`` on Windows only.
     """
     return f"{sessions['platform']}:{sessions['hostname']}"
 
@@ -350,7 +368,7 @@ def observe_node(board: McpCredentials, node: RegistryNode, identity: JSONObject
     sessions = decode_node_sessions(node["name"], outcome["output"])
     machine = machine_of(sessions)
     observations: list[JSONValue] = [
-        observation_json(to_observation(node["name"], machine, record))
+        observation_json(to_observation(node["name"], sessions["pid_domain"], record))
         for record in sessions["records"]
     ]
     detail = queue.observe_sessions(

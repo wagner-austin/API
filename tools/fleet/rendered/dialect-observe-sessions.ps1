@@ -9,9 +9,11 @@ if (Test-Path -LiteralPath $SessionsDirectory) {
         $records += , (Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json)
     }
 }
+$hostname = $env:COMPUTERNAME.ToLowerInvariant()
 $document = [pscustomobject]@{
-    platform = 'win32'
-    hostname = $env:COMPUTERNAME.ToLowerInvariant()
-    records  = @($records)
+    platform  = 'win32'
+    hostname  = $hostname
+    pidDomain = 'win32:' + $hostname
+    records   = @($records)
 }
 $document | ConvertTo-Json -Depth 8 -Compress

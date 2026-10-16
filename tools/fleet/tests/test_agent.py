@@ -297,7 +297,16 @@ class TestObservingSessions:
             [
                 UNROLLED,
                 ok(""),
-                ok(dump_json_str({"platform": "win32", "hostname": "serendipity", "records": []})),
+                ok(
+                    dump_json_str(
+                        {
+                            "platform": "win32",
+                            "hostname": "serendipity",
+                            "pidDomain": "win32:serendipity",
+                            "records": [],
+                        }
+                    )
+                ),
             ]
         )
         endpoint = FakeQueue(

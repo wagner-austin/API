@@ -122,7 +122,11 @@ $drive = Get-PSDrive C
 #: under PowerShell on Windows by construction. ``hostname`` is lowercased
 #: because that is how the harness spells ``pidDomain`` (measured on
 #: austinpc: ``$env:COMPUTERNAME`` is ``AUSTINPC``, the record says
-#: ``win32:austinpc``). Records are emitted UNTOUCHED so the decode on the
+#: ``win32:austinpc``). ``pidDomain`` is the same string: Claude Code 2.1.294
+#: changed the spelling on Linux only, and still writes ``win32:austinpc``
+#: on every austinpc record (measured 2026-10-16, board task 5cee2f65), so it
+#: is reported beside the platform and hostname the ledger keys on. Records
+#: are emitted UNTOUCHED so the decode on the
 #: hub sees exactly the bytes the harness wrote, and an absent directory is
 #: an empty array rather than an error. The directory is a parameter whose
 #: default is the profile's, so the Pester suite reads one it laid out
@@ -139,10 +143,12 @@ if (Test-Path -LiteralPath $SessionsDirectory) {
         $records += , (Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json)
     }
 }
+$hostname = $env:COMPUTERNAME.ToLowerInvariant()
 $document = [pscustomobject]@{
-    platform = 'win32'
-    hostname = $env:COMPUTERNAME.ToLowerInvariant()
-    records  = @($records)
+    platform  = 'win32'
+    hostname  = $hostname
+    pidDomain = 'win32:' + $hostname
+    records   = @($records)
 }
 $document | ConvertTo-Json -Depth 8 -Compress
 """

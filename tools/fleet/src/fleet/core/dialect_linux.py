@@ -132,10 +132,17 @@ TOOLCHAIN_PROBE_SCRIPT = PROLOGUE + TOOLCHAIN_PROBE_BODY
 #: prologue prepends. ``sys.platform`` is ``linux``, the same word Node's
 #: ``process.platform`` writes into the harness's ``pidDomain``; the
 #: hostname is lowercased as the harness spells it (measured on diphtheria
-#: 2026-09-21: ``hostname`` prints ``Diphtheria``). Records are read in file
-#: name order so two runs over one directory agree, and an absent directory
-#: is an empty array rather than an error. Kept apart from the ``sh`` that
-#: feeds it so a test can run exactly this text under the interpreter it has.
+#: 2026-09-21: ``hostname`` prints ``Diphtheria``). Those two spell the
+#: ledger's machine key. ``pidDomain`` is computed apart, as Claude Code
+#: 2.1.294 writes it on Linux (board task 5cee2f65): ``linux:``, the
+#: ``/etc/machine-id``, then the pid namespace ``/proc/self/ns/pid`` links
+#: to, measured on ziggurat 2026-10-16 as
+#: ``linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]``. The script
+#: runs in the namespace the node's sessions run in, so its link is theirs.
+#: Records are read in file name order so two runs over one directory agree,
+#: and an absent directory is an empty array rather than an error. Kept apart
+#: from the ``sh`` that feeds it so a test can run exactly this text under the
+#: interpreter it has.
 OBSERVE_SESSIONS_PYTHON = (
     "import json\n"
     "import os\n"
@@ -148,9 +155,12 @@ OBSERVE_SESSIONS_PYTHON = (
     "        if name.endswith('.json'):\n"
     "            with open(os.path.join(directory, name), encoding='utf-8') as handle:\n"
     "                records.append(json.load(handle))\n"
+    "with open('/etc/machine-id', encoding='utf-8') as handle:\n"
+    "    machine_id = handle.read().strip()\n"
     "document = {\n"
     "    'platform': sys.platform,\n"
     "    'hostname': socket.gethostname().lower(),\n"
+    "    'pidDomain': 'linux:' + machine_id + ':' + os.readlink('/proc/self/ns/pid'),\n"
     "    'records': records,\n"
     "}\n"
     "print(json.dumps(document, separators=(',', ':')))\n"

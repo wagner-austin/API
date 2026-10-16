@@ -86,10 +86,11 @@ Describe 'The capacity probe' {
 }
 
 Describe 'The session observer' {
-    It 'reports no records, as win32 and the lowercased host, for a profile that never ran Claude Code' {
+    It 'reports no records, as win32, the lowercased host and its pidDomain, for a profile that never ran Claude Code' {
         $document = Read-ObserveDocument (Join-Path $TestDrive 'never\.claude\sessions')
         $document.platform | Should -BeExactly 'win32'
         $document.hostname | Should -BeExactly $env:COMPUTERNAME.ToLowerInvariant()
+        $document.pidDomain | Should -BeExactly ('win32:' + $env:COMPUTERNAME.ToLowerInvariant())
         @($document.records).Count | Should -Be 0
     }
     It 'reports every registration verbatim, and nothing that is not JSON' {

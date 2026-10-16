@@ -390,8 +390,11 @@ class TestTransportShape:
         )
         assert "if (Test-Path -LiteralPath $SessionsDirectory)" in body
         assert "-Filter '*.json'" in body
-        assert "$env:COMPUTERNAME.ToLowerInvariant()" in body
-        assert "platform = 'win32'" in body
+        assert "$hostname = $env:COMPUTERNAME.ToLowerInvariant()" in body
+        assert "platform  = 'win32'" in body
+        # Claude Code 2.1.294 still spells pidDomain win32:<hostname> on
+        # Windows (board task 5cee2f65).
+        assert "pidDomain = 'win32:' + $hostname" in body
         assert "ConvertTo-Json -Depth 8 -Compress" in body
 
 

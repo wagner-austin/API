@@ -95,28 +95,48 @@ def node(
     )
 
 
-def document(*records: JSONObject, hostname: str = "serendipity", platform: str = "win32") -> str:
+def document(
+    *records: JSONObject,
+    hostname: str = "serendipity",
+    platform: str = "win32",
+    pid_domain: str | None = None,
+) -> str:
     """Render what the observe script prints for these records.
 
     Args:
         *records: The registration documents.
         hostname: The lowercased hostname the script reports.
         platform: The harness platform tag the script reports.
+        pid_domain: The pidDomain the script reports; None spells it
+            ``<platform>:<hostname>``, as the Windows script does.
 
     Returns:
         The compact JSON the script emits.
     """
-    return dump_json_str({"platform": platform, "hostname": hostname, "records": list(records)})
+    return dump_json_str(
+        {
+            "platform": platform,
+            "hostname": hostname,
+            "pidDomain": f"{platform}:{hostname}" if pid_domain is None else pid_domain,
+            "records": list(records),
+        }
+    )
+
+
+#: The pidDomain Claude Code 2.1.294 writes on diphtheria: its
+#: ``/etc/machine-id`` and pid namespace, measured 2026-10-16 (board task
+#: 5cee2f65). Its ledger machine key stays ``linux:diphtheria``.
+DIPHTHERIA_PID_DOMAIN = "linux:212dd22057a34d6587f019c387979599:pid:[4026531836]"
 
 
 def linux_record() -> JSONObject:
-    """One registration document as a Linux node's harness writes it.
+    """One registration document as a Linux node's 2.1.294 harness writes it.
 
     Returns:
-        The record, with a POSIX cwd and socket and a ``linux:`` pidDomain.
+        The record, with a POSIX cwd and socket and the machine-id pidDomain.
     """
     return harness_record(
-        pidDomain="linux:diphtheria",
+        pidDomain=DIPHTHERIA_PID_DOMAIN,
         cwd="/home/corvis/PROJECTS/API",
         messagingSocketPath="/run/user/1000/claude-cc-msg-abc",
     )
@@ -143,6 +163,7 @@ def test_decode_node_sessions_reads_the_document() -> None:
     sessions = observe.decode_node_sessions("serendipity", document(harness_record()))
     assert sessions["platform"] == "win32"
     assert sessions["hostname"] == "serendipity"
+    assert sessions["pid_domain"] == MACHINE
     assert len(sessions["records"]) == 1
     assert sessions["records"][0]["sessionId"] == SESSION
     assert observe.machine_of(sessions) == MACHINE
@@ -163,6 +184,10 @@ def test_decode_node_sessions_reads_an_empty_directory_as_zero_records() -> None
         (
             '{"platform":"","hostname":"x","records":[]}',
             "'platform' is str, not a non-empty string",
+        ),
+        (
+            '{"platform":"linux","hostname":"x","records":[]}',
+            "'pidDomain' is NoneType, not a non-empty string",
         ),
     ],
 )
@@ -217,7 +242,33 @@ def test_to_observation_refuses_a_record_from_another_machine() -> None:
     assert caught.value.code is FleetErrorCode.SESSION_MACHINE_MISMATCH
     assert caught.value.message == (
         f"serendipity: record for session {SESSION} names pidDomain 'win32:austinpc' "
-        f"but was read from 'win32:serendipity'"
+        f"but its node reports 'win32:serendipity'"
+    )
+
+
+#: The pidDomain Claude Code 2.1.294 wrote on ziggurat, measured 2026-10-16.
+ZIGGURAT_PID_DOMAIN = "linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]"
+
+
+def test_to_observation_accepts_the_2_1_294_linux_spelling_its_node_reports() -> None:
+    """Board task 5cee2f65: every hub tick from 06:30Z failed here, because
+    the record was compared to ``linux:ziggurat``. The node now reports the
+    spelling its harness writes, and the record is compared to that."""
+    record = harness_record(pidDomain=ZIGGURAT_PID_DOMAIN, version="2.1.294")
+
+    observation = observe.to_observation("ziggurat", ZIGGURAT_PID_DOMAIN, record)
+
+    assert observation["harnessVersion"] == "2.1.294"
+
+
+def test_to_observation_refuses_a_linux_record_from_another_machine_id() -> None:
+    other = "linux:b016a0cfb2c942b0a2cc55b43e865711:pid:[4026531836]"
+    with pytest.raises(AppError) as caught:
+        observe.to_observation("ziggurat", ZIGGURAT_PID_DOMAIN, harness_record(pidDomain=other))
+    assert caught.value.code is FleetErrorCode.SESSION_MACHINE_MISMATCH
+    assert caught.value.message == (
+        f"ziggurat: record for session {SESSION} names pidDomain {other!r} "
+        f"but its node reports {ZIGGURAT_PID_DOMAIN!r}"
     )
 
 
@@ -302,8 +353,23 @@ def test_observe_node_records_an_empty_pass_for_a_node_with_no_sessions() -> Non
 def test_observe_node_speaks_sh_to_a_linux_node_and_records_its_machine() -> None:
     """Board task cd5010c4, acceptance 2: a Linux node in the registry gets
     the sh script at the sh path, run by /bin/sh, and its records land on
-    the board under the ``linux:`` machine its own document spells."""
-    run = FakeRun([ok(""), ok(document(linux_record(), hostname="diphtheria", platform="linux"))])
+    the board under the ``linux:`` machine its own document spells. Its
+    record carries the 2.1.294 pidDomain, which is checked against the one
+    the node reports, while the ledger keys it ``linux:diphtheria`` (board
+    task 5cee2f65)."""
+    run = FakeRun(
+        [
+            ok(""),
+            ok(
+                document(
+                    linux_record(),
+                    hostname="diphtheria",
+                    platform="linux",
+                    pid_domain=DIPHTHERIA_PID_DOMAIN,
+                )
+            ),
+        ]
+    )
     _test_hooks.run = run
     board = FakeQueue(["observed 1 session(s) for linux:diphtheria (1 new row(s)) at t"])
     _test_hooks.http_post = board
@@ -354,7 +420,12 @@ def test_observe_node_records_a_linux_node_that_has_never_run_claude_code() -> N
     """diphtheria as measured on 2026-09-21: no ``~/.claude`` at all. The
     honest line is zero sessions for ``linux:diphtheria``, and it is recorded,
     which is what closes the ledger coverage gap the task was filed for."""
-    _test_hooks.run = FakeRun([ok(""), ok(document(hostname="diphtheria", platform="linux"))])
+    _test_hooks.run = FakeRun(
+        [
+            ok(""),
+            ok(document(hostname="diphtheria", platform="linux", pid_domain=DIPHTHERIA_PID_DOMAIN)),
+        ]
+    )
     board = FakeQueue(["observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"])
     _test_hooks.http_post = board
 
