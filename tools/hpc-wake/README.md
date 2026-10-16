@@ -58,57 +58,35 @@ not mint identities.
 
 ## Scheduling
 
-The entry point is `scripts/run_cycle.py` — plain Python, registered as
-Windows scheduled task `corvis\hpc-wake` with a **native-binary action and
-an S4U principal**. Both halves of that are measured constraints from
-2026-09-09, not preferences:
-
-- Registered `LogonType=Interactive` (the original form), the scheduler
-  MISSES every trigger while no desktop session exists: 37 consecutive
-  missed runs after a Windows-Update reboot, `State: Ready`,
-  `Start-ScheduledTask` returning without running anything. Every wake on
-  the machine went silent for two hours.
-- Registered S4U with `powershell.exe` as the action, PowerShell itself
-  deadlocks before reaching any script (measured on this box by the
-  Docker-autostart work: stall at .NET assembly load, repeatable). A
-  native binary does not.
+The entry point is `scripts/run_cycle.py`, plain Python, run every three
+minutes as the hub runner's `hpc-wake` job: one row of the MCPs repo's
+`scripts/fleet/hub-jobs.json` (MCPs board task b27bd34a), in place of the
+scheduled task `\corvis\hpc-wake` that ran it until 2026-10-16. The runner
+is itself an S4U task started at boot, so the pump runs with nobody logged
+on, which the Interactive registration of 2026-09-09 did not: 37
+consecutive missed runs after a Windows-Update reboot silenced every wake on
+the machine for two hours.
 
 The binary is this package's own `.venv\Scripts\python.exe`, never the
-python on PATH. `run_cycle.py` imports `platform_core`, and the venv holds
-it as the editable path dependency `pyproject.toml` declares, so the pump
-always runs the tree's `platform_core`. The system python held a copied,
-older one: when d46de80d0 (repo API) moved the env parser into
-`platform_core.env_assignments` on 2026-09-29, every tick from 08:25Z died
-on `ModuleNotFoundError` and the pump published nothing for eight hours
-(board task 25306d98). After `poetry install` here, register:
+python on PATH; the row names it. `run_cycle.py` imports `platform_core`,
+and the venv holds it as the editable path dependency `pyproject.toml`
+declares, so the pump always runs the tree's `platform_core`. The system
+python held a copied, older one: when d46de80d0 (repo API) moved the env
+parser into `platform_core.env_assignments` on 2026-09-29, every tick from
+08:25Z died on `ModuleNotFoundError` and the pump published nothing for
+eight hours (board task 25306d98). Run `poetry install` here before the
+runner first starts the job.
 
-```powershell
-$py = 'C:\Users\Test\PROJECTS\API\tools\hpc-wake\.venv\Scripts\python.exe'
-$action = New-ScheduledTaskAction -Execute $py `
-  -Argument '-m scripts.run_cycle --package-root C:\Users\Test\PROJECTS\API\tools\hpc-wake' `
-  -WorkingDirectory 'C:\Users\Test\PROJECTS\API\tools\hpc-wake'
-$rep = New-TimeSpan -Minutes 3
-$t1 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval $rep
-$t2 = New-ScheduledTaskTrigger -AtStartup
-$t2.Repetition = $t1.Repetition
-$principal = New-ScheduledTaskPrincipal -UserId 'Test' -LogonType S4U -RunLevel Limited
-$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew `
-  -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-  -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
-Register-ScheduledTask -TaskPath '\corvis\' -TaskName 'hpc-wake' `
-  -Action $action -Trigger $t1, $t2 -Principal $principal -Settings $settings -Force
-```
-
-The `AtStartup` trigger re-arms the cycle after a reboot with no logon;
-`IgnoreNew` keeps a slow cycle from stacking; the 30-minute limit kills a
-hung one so the next trigger is not silently skipped (the 2026-09-08
-outage mode). Health is read from `runs/cycle.log`: the LAST line must be
+One run at a time, as the task's `IgnoreNew` kept: a cycle still running
+when the next is due starts once it ends. The row's 30-minute deadline ends
+a hung cycle's whole process tree so the next is not silently skipped (the
+2026-09-08 outage mode). Health is read from `runs/cycle.log`: the LAST line must be
 a result, and the last header's AGE must be under a few minutes — a stale
 timestamp IS an outage even when the line under it looks healthy.
 
 ## The pump: publisher inventory (board 9406cfd9)
 
-The scheduled task above is THE machine's event pump: each 3-minute tick
+The job above is THE machine's event pump: each 3-minute tick
 runs every row of `scripts/run_cycle.py`'s `PUBLISHERS` table, in order,
 each publisher isolated (one failing does not stop the next; the tick's
 status is the first nonzero exit and the log's `-- <name>` markers say
