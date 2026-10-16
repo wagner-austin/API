@@ -102,16 +102,12 @@ class TestEquipmentSearchHopFallback:
         assert decision["behavior"]["reason_kind"] == "walk_for_fuel"
         assert decision["command"]["cmd_type"] == "move"
 
-    def test_exhausted_collect_yields_to_hunt_at_healthy_fuel(self) -> None:
-        """An exhausted COLLECT cascade hands the tick to HUNT when combat-ready.
+    def test_exhausted_collect_walks_before_hunting_with_a_fuel_deficit(self) -> None:
+        """Combat equipment alone cannot justify abandoning reachable fuel.
 
-        Same marooned setup but fuel 550 > ``fuel_low_threshold``
-        (200) AND inventory at combat-ready (Bug 0.4: recruit needs
-        duals/homings at ``inventory_capacity(0) = 20`` and radars at
-        least ``combat_radar_min(0) = 15``): the tank is stocked, so
-        instead of a bogus ``out_of_fuel`` exit (live run 2026-07-06
-        exited at fuel 1100 this way) the tick falls through to the
-        hunt owner.
+        At 550 fuel the tank is above its critical floor, but cannot
+        afford the teleport to its known fuel. The strategy keeps
+        COLLECT ownership and walks toward it instead of hunting.
         """
         ws = self.ws
         ws.map_fuel_dots = ((250, 100),)
@@ -136,7 +132,9 @@ class TestEquipmentSearchHopFallback:
             ws=ws,
         )
 
-        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["behavior"]["reason_kind"] == "walk_for_fuel"
+        assert decision["command"]["cmd_type"] == "move"
 
     def test_wind_down_fully_stocked_exits_session_complete(self) -> None:
         """Winding down at full bars ends the session cleanly.
@@ -294,16 +292,16 @@ class TestEquipmentSearchHopFallback:
         """An exhausted COLLECT cascade with under-armed inventory ends the session.
 
         User contract (Bug 0.4 / Bug 0.7, 2026-07-06): the yield-to-hunt
-        gesture requires combat-ready inventory. When fuel is healthy
+        gesture requires combat-ready inventory. When the fuel tank is full
         but duals/homings/radars sit below their rank-derived caps AND
         no tracked equipment container is affordably teleport-reachable
-        (``world.containers`` empty here), COLLECT refuses to hand the
+        (no equipment and only an unaffordable fuel dot), COLLECT refuses to hand the
         tick to HUNT and the session exits with
         ``no_productive_collect`` instead of engaging under-armed.
         """
         ws = self.ws
-        ws.map_fuel_dots = ((250, 100),)
-        world, self_state = _make_world(fuel=550, scanned=True)
+        ws.map_fuel_dots = ((250, 250),)
+        world, self_state = _make_world(fuel=1100, scanned=True)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),

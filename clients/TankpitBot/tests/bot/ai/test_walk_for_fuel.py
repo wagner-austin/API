@@ -78,14 +78,15 @@ def _marooned_ctx(
     )
 
 
-def test_marooned_tank_walks_toward_a_known_dot_instead_of_exiting() -> None:
-    """The bot-20260728-091209 shape: broke, dots 20+ tiles out -> walk.
+@pytest.mark.parametrize("fuel", [88, 185])
+def test_marooned_tank_walks_toward_a_known_dot_instead_of_exiting(fuel: int) -> None:
+    """Unaffordable fuel dots remain reachable above the critical floor.
 
-    The dot at (130,100) is 30 tiles away -- every teleport
-    unaffordable at fuel 88 -- so the last resort walks the viewport
-    leg toward it instead of raising ``out_of_fuel``.
+    The dot at (200,100) is 100 tiles away. Neither tank can teleport
+    there, but both can walk a viewport leg without spending fuel.
+    Fuel 185 reproduces the public demo's premature hunt handoff.
     """
-    decision = decide_collect_mode(_marooned_ctx(map_fuel_dots=((130, 100), (200, 200))))
+    decision = decide_collect_mode(_marooned_ctx(fuel=fuel, map_fuel_dots=((200, 100), (200, 200))))
 
     if decision is None:
         raise AssertionError("expected walk-for-fuel decision")
