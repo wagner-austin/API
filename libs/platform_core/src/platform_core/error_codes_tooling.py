@@ -162,9 +162,10 @@ class McpClientErrorCode(ErrorCodeBase):
 
     Split out of :class:`BoardWatchErrorCode` on 2026-09-05, when a second
     package started calling MCP tools and the transport half of that enum
-    turned out never to have been board-specific. These three describe the
-    EXCHANGE: the endpoint refusing, the endpoint accepting and the tool
-    failing, and the endpoint answering in a shape no MCP client can read.
+    turned out never to have been board-specific. The first three describe
+    the EXCHANGE: the endpoint refusing, the endpoint accepting and the tool
+    failing, and the endpoint answering in a shape no MCP client can read;
+    the fourth is a URL whose exchange the client's deadline cannot bound.
     What a particular tool's ANSWER should look like stays with whoever parses
     it -- the board's rendered-prose grammar codes are still next door,
     because a fleet-dispatch caller reading JSON cannot hit them.
@@ -178,6 +179,9 @@ class McpClientErrorCode(ErrorCodeBase):
     HTTP_STATUS = "HTTP_STATUS"
     RPC_ERROR = "RPC_ERROR"
     RESPONSE_NOT_EVENT_STREAM = "RESPONSE_NOT_EVENT_STREAM"
+    # URL_NOT_HTTP is the one scheme the exchange deadline cannot bound being
+    # asked for: every declared endpoint is http on loopback or the tailnet.
+    URL_NOT_HTTP = "URL_NOT_HTTP"
 
 
 class BoardWatchErrorCode(ErrorCodeBase):
