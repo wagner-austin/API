@@ -28,6 +28,7 @@ from platform_core.mcp_client import (
 )
 
 from fleet.core import _test_hooks, queue
+from fleet.core.declared import PUBLISH_TOOL
 from fleet.core.queue_transport import answering, unanswered
 from tests._queue_fakes import QUEUE_CREDENTIALS
 
@@ -172,6 +173,9 @@ class TestTheProductionSeam:
         mcp-fleet sent the hub tick that held the hub lane 290 s on
         2026-10-16 (MCPs board task e14815d3): a 200 event stream for a tool
         it no longer served, then a keepalive comment and never a result.
+        The call names the queue tool the tick does call: the tool's name
+        plays no part in the hang, and tools/fleet names no tool fleet-mcp
+        has stopped serving, tests included (MCPs board task cca52c93).
         A byte arrives well inside every per-read timeout, so only the
         whole-exchange deadline can end the call."""
         listener = socket.create_server(("127.0.0.1", 0))
@@ -206,7 +210,7 @@ class TestTheProductionSeam:
             call_mcp_tool(
                 _test_hooks.http_post,
                 credentials,
-                "dispatch_refuse_undeclared",
+                PUBLISH_TOOL,
                 {},
                 timeout_seconds=DEADLINE_SECONDS,
             )
