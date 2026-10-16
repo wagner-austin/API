@@ -68,6 +68,10 @@ SLICE_AT_HIGH = 0.98
 #: p95 39, max 73.7. MCPs/execution-deploy claimed there at 42 to 51 percent
 #: ran 339 s of its 300 s budget, and claimed at 2 and about 10 percent ran
 #: 224 s and 287 s. At 30 the node waits out 88 of those 873 minutes.
+#: lavender-wsl, 16 cores, averaged 5.1 since boot (7561 s of pressure in
+#: 149135 s of uptime) and read 1.6 to 16.6 over six minutes from 14:52Z
+#: with its GitHub runners busy at load 8 to 17, where MCPs/execution-deploy
+#: ran 274 s and 287 s, inside its budget, so the bound never holds it.
 CPU_PRESSURE_BOUND_PCT = 30.0
 
 
